@@ -26,25 +26,25 @@
         />
       </a>
       <a href="https://docs.pennsieve.io" target="_blank" class="mr-16">
-        <IconHelp :class="iconSpacing" height="22" width="22" />
+        <IconHelp :class="iconSpacing" :height=22 :width=22 />
         {{ helpLinkCopy }}
       </a>
       <router-link tag="a" class="mr-16" :to="signupRoute">
-        <IconUpload :class="iconSpacing" height="22" width="22" />
+        <IconUpload :class="iconSpacing" :height=22 :width=22 />
         {{ createAccountCopy }}
       </router-link>
-      <!-- <bf-user-dropdown-menu
+      <bf-user-dropdown-menu
         :is-mobile="isMobile"
         :icon-spacing="iconSpacing"
         @open-log-in-modal="openLogInModal"
-      /> -->
+      />
     </div>
-    <!-- <bf-log-in-dialog
+    <ps-log-in-dialog
       v-model:visible="isLogInModalVisible"
       :is-mobile="isMobile"
       @succesfulLogin="loginUser"
       @close-log-in-dialog="closeLogInModal"
-    /> -->
+    />
   </div>
 </template>
 
@@ -56,8 +56,8 @@ import PennsieveLogo from "../../icons/PennsieveLogo.vue";
 import IconUpload from "../../icons/IconUpload.vue";
  
 // import DatasetSearch from "@/components/DatasetSearch/DatasetSearch.vue";
-// import BfLogInDialog from "@/components/shared/BfLogInDialog/BfLogInDialog.vue";
-// import BfUserDropdownMenu from "@/components/shared/BfUserDropdownMenu/BfUserDropdownMenu.vue";
+import PsLogInDialog from "../PsLogInDialog/PsLogInDialog.vue";
+import BfUserDropdownMenu from "../../shared/BfUserDropdownMenu/BfUserDropdownMenu.vue";
 
 export default {
   name: "PennsieveHeader",
@@ -66,7 +66,9 @@ export default {
     PennsieveLogo,
     IconRemove,
     IconHelp,
-    IconUpload
+    IconUpload,
+    PsLogInDialog,
+    BfUserDropdownMenu
 },
 
   props: {
@@ -97,7 +99,7 @@ export default {
      * @returns {String}
      */
     mobileSearchIconSize() {
-      return this.isMobileSearchOpen ? "16" : "24";
+      return this.isMobileSearchOpen ? 16 : 24;
     },
 
     /**
@@ -268,12 +270,12 @@ export default {
       transform: translateX(0);
     }
   }
-  ::v-deep .bf-button {
+  :deep(.bf-button) {
     @media (max-width: 48em) {
       display: none;
     }
   }
-  ::v-deep .dataset-search-input {
+  :deep(.dataset-search-input) {
     @media (max-width: 48em) {
       margin: 0;
     }

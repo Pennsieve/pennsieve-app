@@ -24,17 +24,17 @@
             </div>
           </div>
         </div>
-<!--        <img-->
-<!--          v-bind:src='../assets/images/illustrations/illo-neuron-mural.svg'-->
-<!--          alt="Neuron Mural Image"-->
-<!--        />-->
+        <img
+            src="@/assets/images/illustrations/illo-neuron-mural.svg"
+            alt="Neuron Mural Image"
+        />
       </div>
     </div>
 
-    <!-- <div class="highlight-wrapper">
+    <div class="highlight-wrapper">
       <div class="highlight-image">
         <img
-          src="/static/images/illustrations/research-platform.svg"
+          src="@/assets/images/illustrations/research-platform.svg"
           class="highlight"
         />
       </div>
@@ -61,7 +61,7 @@
       </div>
       <div class="highlight-image">
         <img
-          src="/static/images/illustrations/illo-dr_azumi_1.svg"
+          src="@/assets/images/illustrations/illo-dr_azumi_1.svg"
           class="highlight"
         />
       </div>
@@ -97,35 +97,35 @@
     <div class="org-section">
       <img
         ref="img"
-        src="/static/logos/psom_logo_blue.svg"
+        src="@/assets/images/logos/psom_logo_blue.svg"
         alt="Perelman School of Medicine at the University of Pennsylvania"
         class="logo"
       />
       <img
         ref="img"
-        src="/static/logos/ibi-logo.png"
+        src="@/assets/images/logos/ibi-logo.png"
         alt="Institute for Biomedical Informatics"
         class="logo"
       />
       <img
         ref="img"
-        src="/static/logos/cropped-CNT-logo.png"
+        src="@/assets/images/logos/cropped-CNT-logo.png"
         alt="Center for Translational Bioengineering  & Therapeutics"
         class="logo"
       />
       <img
         ref="img"
-        src="/static/logos/DataCite-Logos_primary.svg"
+        src="@/assets/images/logos/DataCite-Logos_primary.svg"
         alt="Datacite.org"
         class="logo"
       />
       <img
         ref="img"
-        src="/static/logos/ORCID_Member_CMYK.svg"
+        src="@/assets/images/logos/ORCID_Member_CMYK.svg"
         alt="Orcid.org"
         class="logo"
       />
-    </div> -->
+    </div>
 
     <!-- <PennsieveFooter /> -->
   </div>
@@ -144,6 +144,14 @@ import PennsieveHeader from "../components/shared/PennsieveHeader/PennsieveHeade
 // import DatasetSearch from "../../components/DatasetSearch/DatasetSearch";
 // import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFooter.vue";
 // import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid";
+
+import analyzeIcon from "../assets/images/icons/analyze.svg"
+import securityIcon from "../assets/images/icons/security.svg"
+import eegIcon from "../assets/images/icons/eeg-data.svg"
+import storageIcon from "../assets/images/icons/storage.svg"
+import logformsIcon from "../assets/images/icons/log-forms.svg"
+import collabIcon from "../assets/images/icons/collaboration.svg"
+
 
 // import EventBus from "../../utils/event-bus";
 // import AutoFocus from "../../mixins/auto-focus";
@@ -167,32 +175,32 @@ export default {
     return {
       features: [
         {
-          img: "/static/images/icons/collaboration.svg",
+          img: collabIcon,
           header: "Easy sharing between collaborators",
           text: "An easy, cloud-based solution for managing and sharing data with your team.",
         },
         {
-          img: "/static/images/icons/analyze.svg",
+          img: analyzeIcon,
           header: "Explore your data",
           text: "Open API access and Python client to programmatically interact with data on the platform.",
         },
         {
-          img: "/static/images/icons/log-forms.svg",
+          img: logformsIcon,
           header: "Advanced metadata management",
           text: "Create advanced metadata schemas and link metadata to files through a knowledge graph.",
         },
         {
-          img: "/static/images/icons/eeg-data.svg",
+          img: eegIcon,
           header: "Interactive viewers",
           text: "Directly interact with microscopy, timeseries and other scientific data modalities in the browser.",
         },
         {
-          img: "/static/images/icons/security.svg",
+          img: securityIcon,
           header: "Secure data management",
           text: "Secure encrypted storage in the cloud, SSL data transfer, and flexible user permissions.",
         },
         {
-          img: "/static/images/icons/storage.svg",
+          img: storageIcon,
           header: "FAIR publishing of data",
           text: "Publish your data, make your data findable, and cite your data using a DOI",
         },
