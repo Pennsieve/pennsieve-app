@@ -52,7 +52,7 @@
 import { mapState } from "vuex";
 import IconHelp from "../../icons/IconHelp.vue";
 import IconRemove from "../../icons/IconRemove.vue";
-import PennsieveLogo from "../../icons/PennsieveLogo.vue";
+import PennsieveLogo from "../../icons/IconPennsieveLogo.vue";
 import IconUpload from "../../icons/IconUpload.vue";
  
 // import DatasetSearch from "@/components/DatasetSearch/DatasetSearch.vue";

@@ -6,16 +6,18 @@
         v-model="search.q"
         class="dataset-search-input mr-16"
         placeholder="Find Public Datasets..."
-        @input.native="onInput"
+        @input.native="onInput">
+<!--        :prefix-icon=IconMagnifyingGlass-->
       >
-        <svg-icon
-          slot="prefix"
-          name="icon-magnifying-glass"
-          height="24px"
-          width="24px"
-          color="#71747c"
-          class="svg-icon"
-        />
+        <template #prefix>
+          <IconMagnifyingGlass
+              height="24px"
+              width="24px"
+              color="#71747c"
+          />
+        </template>
+
+
       </el-input>
 
       <bf-button :class="submitButtonType" type="submit">
@@ -29,12 +31,14 @@
 import {clone, propOr} from 'ramda'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import {mapGetters} from "vuex";
+import IconMagnifyingGlass from '../icons/IconMagnifyingGlass.vue'
 
 export default {
   name: 'DatasetSearch',
 
   components: {
-    BfButton
+    BfButton,
+    IconMagnifyingGlass
   },
 
   props: {
@@ -110,12 +114,4 @@ export default {
   color: $purple_2;
 }
 
-:deep(.el-input__prefix) {
-  align-items: center;
-  display: flex;
-  left: 12px;
-}
-:deep(.el-input--prefix .el-input__inner) {
-  padding-left: 46px;
-}
 </style>

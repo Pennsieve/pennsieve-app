@@ -4,7 +4,7 @@
       <div class="container-fluid discover-content">
         <div class="row">
           <div class="col-xs-12">
-            <IconPennsieveLogo
+            <IconPennsieveMark
                 class="mb-16"
                 width="35"
                 height="35"
@@ -40,7 +40,7 @@
 
 <script>
 import BfButton from '../bf-button/BfButton.vue'
-import IconPennsieveLogo from "../../icons/IconPennsieveLogo.vue"
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue"
 
 
 export default {
@@ -48,7 +48,7 @@ export default {
 
   components: {
     BfButton,
-    IconPennsieveLogo
+    IconPennsieveMark
   },
 
   props: {

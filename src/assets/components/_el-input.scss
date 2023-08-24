@@ -1,19 +1,15 @@
 @import '../_variables.scss';
 
-.el-input__wrapper {
-  padding: 0;
-}
-
-.el-form-item__error {
-
-}
-
+//.el-input__wrapper {
+//  padding: 0;
+//}
+//
 .el-textarea__inner, .el-input__inner, .text-disabled {
-  border: 1px solid $gray_3;
-  border-radius: 3px;
+//  border: 1px solid $gray_3;
+//  border-radius: 3px;
   color: $gray_4;
   font-family: $system-font;
-  padding: 0 16px;
+  //padding: 0 16px;
   resize: none;
   height: 40px;
   line-height: 40px;
@@ -24,12 +20,12 @@
   &::placeholder {
     color: $gray_4;
   }
-  &:focus, .el-form-item.is-success &:focus {
-    border-color: $app-primary-color;
-  }
-  .el-form-item.is-error &, .el-form-item.is-error &:focus {
-    border: 1px solid $error-color;
-  }
+  //&:focus, .el-form-item.is-success &:focus {
+  //  border-color: $app-primary-color;
+  //}
+  //.el-form-item.is-error &, .el-form-item.is-error &:focus {
+  //  border: 1px solid $error-color;
+  //}
   .el-form-item.is-success & {
     border-color: $gray_2;
   }
@@ -37,11 +33,11 @@
     background: $gray_1;
     border-color: $gray_2 !important;
   }
-  .simple & {
-    border: none;
-    height: auto;
-    padding: 0;
-  }
+  //.simple & {
+  //  border: none;
+  //  height: auto;
+  //  padding: 0;
+  //}
 }
 .el-textarea__inner {
   line-height: 16px;
@@ -64,15 +60,5 @@
       position: absolute;
       top: 8px;
     }
-  }
-}
-.icon-prefix {
-  .el-input__prefix {
-    align-items: center;
-    display: flex;
-    left: 8px;
-  }
-  &.el-input--prefix .el-input__inner {
-    padding-left: 32px;
   }
 }
