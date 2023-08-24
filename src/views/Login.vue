@@ -127,7 +127,7 @@
       />
     </div>
 
-    <!-- <PennsieveFooter /> -->
+     <PennsieveFooter />
   </div>
 </template>
 
@@ -136,13 +136,9 @@
 import { mapGetters, mapActions, mapState } from "vuex";
 import { propOr, pathOr } from "ramda";
 import { Auth } from "@aws-amplify/auth";
-
-// import BfButton from "../../components/shared/bf-button/BfButton.vue";
-// import A11yKeys from "../../components/shared/a11y-keys/A11yKeys.vue";
-// import BfFooter from "../../components/shared/bf-footer/BfFooter.vue";
 import PennsieveHeader from "../components/shared/PennsieveHeader/PennsieveHeader.vue";
-// import DatasetSearch from "../../components/DatasetSearch/DatasetSearch";
-// import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFooter.vue";
+import DatasetSearch from "../components/DatasetSearch/DatasetSearch.vue";
+import PennsieveFooter from "../components/shared/PennsieveFooter/PennsieveFooter.vue";
 // import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid";
 
 import analyzeIcon from "../assets/images/icons/analyze.svg"
@@ -164,8 +160,8 @@ export default {
     // A11yKeys,
     // BfFooter,
     PennsieveHeader,
-    // DatasetSearch,
-    // PennsieveFooter,
+    DatasetSearch,
+    PennsieveFooter,
     // PublicDatasetsGrid,
   },
 
