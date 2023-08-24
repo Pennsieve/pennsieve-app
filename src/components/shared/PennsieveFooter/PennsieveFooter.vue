@@ -4,12 +4,11 @@
       <div class="container-fluid discover-content">
         <div class="row">
           <div class="col-xs-12">
-            <svg-icon
-              class="mb-16"
-              name="pennsieve-logo"
-              width="35"
-              height="35"
-              color="#fff"
+            <IconPennsieveLogo
+                class="mb-16"
+                width="35"
+                height="35"
+                color="#fff"
             />
             <p class="mb-8">
               Copyright &copy; {{ copyrightYear }} University of Pennsylvania.
@@ -40,13 +39,16 @@
 </template>
 
 <script>
-import BfButton from '../bf-button/BfButton'
+import BfButton from '../bf-button/BfButton.vue'
+import IconPennsieveLogo from "../../icons/IconPennsieveLogo.vue"
+
 
 export default {
   name: 'PennsieveFooter',
 
   components: {
-    BfButton
+    BfButton,
+    IconPennsieveLogo
   },
 
   props: {

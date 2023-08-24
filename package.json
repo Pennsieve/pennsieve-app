@@ -12,6 +12,7 @@
     "aws-amplify": "^5.0.11",
     "element-plus": "^2.3.9",
     "js-cookie": "^3.0.1",
+    "moment": "^2.29.4",
     "ramda": "^0.28.0",
     "vue": "^3.2.45",
     "vue-router": "^4.1.6",

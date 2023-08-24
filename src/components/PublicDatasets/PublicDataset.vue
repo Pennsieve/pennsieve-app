@@ -18,7 +18,8 @@
     <div class="dataset-details-wrap mt-16">
       <div class="details">
         <div class="detail">
-          <svg-icon name="icon-files" height="16" width="16" />
+
+          <IconFiles/>
           <span v-if="dataset.fileCount > 0 && dataset.fileCount !== 1">
             <strong>{{ formatNumber(dataset.fileCount) }}</strong> Files
           </span>
@@ -28,11 +29,12 @@
           <span v-else>No Files</span>
         </div>
         <div class="detail">
-          <svg-icon name="icon-storage" height="16" width="16" />
+          <IconStorage/>
           <strong>{{ formatMetric(dataset.size) }}</strong>
         </div>
         <div class="detail">
-          <svg-icon name="icon-document" height="16" width="16" />
+          <IconDocument/>
+<!--          <svg-icon name="icon-document" height="16" width="16" />-->
           <span v-if="dataset.recordCount > 0 && dataset.recordCount !== 1">
             <strong>{{ formatNumber(dataset.recordCount) }}</strong> Records
           </span>
@@ -49,18 +51,25 @@
 <script>
 import { propOr, take } from 'ramda'
 
-import DatasetBannerImage from '@/components/DatasetBannerImage/DatasetBannerImage.vue'
+import DatasetBannerImage from '../DatasetBannerImage/DatasetBannerImage.vue'
 
-import { getLicenseAbbr } from '@/utils/license-util'
-import FormatMetric from '@/mixins/bf-storage-metrics'
-import FormatDate from '@/mixins/format-date'
+import { getLicenseAbbr } from '../../utils/license-util'
+import FormatMetric from '../../mixins/bf-storage-metrics'
+import FormatDate from '../../mixins/format-date'
 import {mapGetters} from "vuex";
+
+import IconFiles from "../icons/IconFiles.vue"
+import IconStorage from "../icons/IconStorage.vue"
+import IconDocument from "../icons/IconDocument.vue"
 
 export default {
   name: 'PublicDataset',
 
   components: {
-    DatasetBannerImage
+    DatasetBannerImage,
+    IconFiles,
+    IconStorage,
+    IconDocument
   },
 
   mixins: [FormatDate, FormatMetric],

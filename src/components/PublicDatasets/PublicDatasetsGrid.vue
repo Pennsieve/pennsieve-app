@@ -74,30 +74,6 @@ export default {
     onResize: function() {
       this.windowWidth = window.innerWidth
     }
-
-
-
-    // try {
-    //   let url = `${process.env.discover_api_host}/datasets?limit=${pageSize}&offset=0`
-    //   const tagsUrl = `${process.env.discover_api_host}/tags`
-    //   const token = $cookies.get('user_token')
-    //   if (token) {
-    //     url = `${url}&api_key=${token}`
-    //     // @TODO add back in when endpoint issue has been resolved.
-    //     // tagsUrl = `${tagsUrl}&api_key=${token}`
-    //   }
-    //
-    //   const datasetRes = await $axios.$get(url)
-    //   const tagsRes = await $axios.$get(tagsUrl)
-    //   return {
-    //     datasets: datasetRes.datasets,
-    //     totalDatasetCount: datasetRes.totalCount,
-    //     tags: tagsRes,
-    //     resetTags: tagsRes.map((tag) => ({ ...tag })) // this is for when we reset the tags on clear
-    //   }
-    // } catch (err) {
-    //   error({ message: err.message })
-    // }
   }
 }
 </script>

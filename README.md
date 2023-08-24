@@ -12,6 +12,12 @@ See [Vite Configuration Reference](https://vitejs.dev/config/).
 
 ## Project Setup
 
+Install Node.js version 18.17.1 using:
+```sh
+nvm install 18.17.1
+nvm use 18.17.1
+```
+
 ```sh
 npm install
 ```

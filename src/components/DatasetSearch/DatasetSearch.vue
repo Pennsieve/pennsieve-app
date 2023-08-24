@@ -110,13 +110,12 @@ export default {
   color: $purple_2;
 }
 
-/deep/ .el-input__prefix {
+:deep(.el-input__prefix) {
   align-items: center;
   display: flex;
   left: 12px;
 }
-
-/deep/ .el-input--prefix .el-input__inner {
+:deep(.el-input--prefix .el-input__inner) {
   padding-left: 46px;
 }
 </style>
