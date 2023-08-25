@@ -1,7 +1,7 @@
 import * as Vue from "vue";
 import { createStore } from "vuex";
 import Cookies from "js-cookie";
-import * as site from "@/site-config/site.json";
+import * as site from "../site-config/site.json";
 import * as R from "ramda";
 
 const hashFunction = (key, list) => {
@@ -838,6 +838,10 @@ export default createStore({
       commit("UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG", evt),
   },
   getters: {
+    isWelcomeOrg: state => {
+      const featuresList = R.pathOr([], ['activeOrganization', 'organization', 'features'], state)
+      return R.includes('sandbox_org_feature', featuresList)
+    },
     isOrgSynced: (state) => state.activeOrgSynced,
     config: (state) => state.config,
     profile: (state) => state.profile,
@@ -894,7 +898,7 @@ export default createStore({
         ["activeOrganization", "organization", "features"],
         state
       );
-      return R.contains(featureName, featuresList);
+      return R.includes(featureName, featuresList);
     },
     getModelById: (state) => (modelId) => {
       return find(R.propEq("id", modelId), state.concepts);

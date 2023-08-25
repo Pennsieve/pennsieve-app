@@ -149,12 +149,18 @@ import logformsIcon from "../assets/images/icons/log-forms.svg"
 import collabIcon from "../assets/images/icons/collaboration.svg"
 
 
-// import EventBus from "../../utils/event-bus";
+import EventBus from "../utils/event-bus";
 // import AutoFocus from "../../mixins/auto-focus";
 // import Request from "../../mixins/request";
 
 export default {
   name: "bf-login",
+  props: {
+    submitButtonType: {
+      type: String,
+      default: ''
+    }
+  },
   components: {
     // BfButton,
     // A11yKeys,

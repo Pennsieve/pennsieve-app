@@ -96,7 +96,7 @@ export default {
 
     /**
      * Conditional size for mobile search icon button
-     * @returns {String}
+     * @returns {number}
      */
     mobileSearchIconSize() {
       return this.isMobileSearchOpen ? 16 : 24;

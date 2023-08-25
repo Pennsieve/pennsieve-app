@@ -8,6 +8,9 @@
 </template>
 
 <script>
+
+import IconBrokenImage from "../../assets/images/icons/icon-broken-image.svg"
+
 export default {
   name: 'DatasetBannerImage',
   props: {
@@ -15,6 +18,10 @@ export default {
       type: String,
       default: ''
     }
+  },
+
+  components: {
+    IconBrokenImage
   },
 
   data() {
@@ -42,7 +49,7 @@ export default {
      * Set the source as the brokenImage URL
      */
     onError() {
-      this.bannerSrc = '~/assets/images/illustrations/icon-broken-image.svg'
+      this.bannerSrc = IconBrokenImage
     }
   }
 }

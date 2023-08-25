@@ -1,15 +1,20 @@
 @import '../_variables.scss';
 
-//.el-input__wrapper {
-//  padding: 0;
-//}
-//
+
+.el-input__inner{
+  background-color: white;
+}
+.el-input__wrapper {
+  padding: 0;
+}
+
 .el-textarea__inner, .el-input__inner, .text-disabled {
-//  border: 1px solid $gray_3;
-//  border-radius: 3px;
+  border: 1px solid $gray_3;
+  border-radius: 3px;
+  background: white;
   color: $gray_4;
   font-family: $system-font;
-  //padding: 0 16px;
+  padding: 0 16px;
   resize: none;
   height: 40px;
   line-height: 40px;

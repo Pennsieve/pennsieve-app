@@ -11,7 +11,7 @@
     <template #header="{ close }" class="dialog-header">
       <button class="log-in-dialog__close-dialog" @click="closeLogInDialog">
         <IconRemove
-            width=12
+            :width="12"
             color="#71747c"
         />
       </button>

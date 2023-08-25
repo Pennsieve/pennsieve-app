@@ -9,11 +9,13 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
-    "aws-amplify": "^5.0.11",
+    "aws-amplify": "^5.3.10",
     "element-plus": "^2.3.9",
     "js-cookie": "^3.0.1",
     "moment": "^2.29.4",
     "ramda": "^0.28.0",
+    "striptags": "^3.2.0",
+    "tiny-emitter": "^2.1.0",
     "vue": "^3.2.45",
     "vue-router": "^4.1.6",
     "vuex": "^4.0.2"
