@@ -9,27 +9,27 @@
         tag="button"
         :to="logoRoute"
       >
-        <svg-icon
-          v-show="!primaryNavCondensed || secondaryNavOpen"
+        <pennsieve-mark
+          :is-visible="!primaryNavCondensed || secondaryNavOpen"
           class="logo"
-          name="pennsieve-logo"
-          width="24"
-          height="24"
-          color="currentColor"
-        />
+          :width="24"
+          :height="24"
+          color="currentColor">
+        </pennsieve-mark>
+
       </router-link>
       <a
         v-else
         :href="logoLink"
       >
-        <svg-icon
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          name="pennsieve-logo"
-          width="24"
-          height="24"
-          color="currentColor"
-        />
+        <pennsieve-mark
+            :is-visible="!primaryNavCondensed || secondaryNavOpen"
+            class="logo"
+            :width="24"
+            :height="24"
+            color="currentColor">
+        </pennsieve-mark>
+
       </a>
       <button
         v-show="!secondaryNavOpen && !pageNotFound"
@@ -37,13 +37,22 @@
         name="Toggle Primary Menu"
         @click="toggleMenu"
       >
-        <svg-icon
-          :name="primaryNavCondensed ? 'icon-nav-expand' : 'icon-nav-collapse'"
-          :width="primaryNavCondensed ? '32' : '24'"
-          :height="primaryNavCondensed ? '32' : '24'"
+
+        <IconNavCollapse
+          :is-visible="!primaryNavCondensed"
+          :width="primaryNavCondensed ? 32 : 24"
+          :height="primaryNavCondensed ? 32 : 24"
           color="#fff"
-          class="collapse"
-        />
+          class="collapse">
+        </IconNavCollapse>
+        <IconNavExpand
+          :is-visible="primaryNavCondensed"
+          :width="primaryNavCondensed ? 32 : 24"
+          :height="primaryNavCondensed ? 32 : 24"
+          color="#fff"
+          class="collapse">
+        </IconNavExpand>
+
       </button>
     </div>
 
@@ -76,23 +85,37 @@
 
 <!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound || isWelcomeOrg)"-->
-<!--        :link="{ name: 'datasets-list', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Datasets"-->
-<!--        icon="icon-datasets"-->
-<!--        :condensed="primaryNavCondensed"-->
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg)"
+        :link="{ name: 'datasets-list', params: {orgId: activeOrganizationId} }"
+        label="Datasets"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconDatasets
+              :width="20"
+              :height="20"
+              color="currentColor"
+          />
+          </template>
+        </bf-navigation-item>
 
-<!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"-->
-<!--        :link="{ name: 'people-list', params: {orgId: activeOrganizationId} }"-->
-<!--        label="People"-->
-<!--        icon="icon-person"-->
-<!--        :condensed="primaryNavCondensed"-->
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        :link="{ name: 'people-list', params: {orgId: activeOrganizationId} }"
+        label="People"
+        :condensed="primaryNavCondensed"
 
-<!--      />-->
+      >
+        <template v-slot:icon>
+          <IconPerson
+              :width="20"
+              :height="20"
+              color="currentColor"
+          />
+        </template>
+      </bf-navigation-item>
 
 <!--      <bf-navigation-item-->
 <!--        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"-->
@@ -147,13 +170,24 @@
   import { mapActions, mapGetters, mapState } from 'vuex'
   import { pathOr, propOr } from 'ramda'
   import { PublicationTabs } from '../../utils/constants';
+  import PennsieveMark from '../icons/IconPennsieveMark.vue';
+  import IconNavCollapse from "../icons/IconNavCollapse.vue";
+  import IconNavExpand from "../icons/IconNavExpand.vue";
+  import IconDatasets from "../icons/IconDatasets.vue"
+  import IconPerson from "../icons/IconPerson.vue";
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconPerson,
+      IconNavExpand,
+      IconNavCollapse,
+      PennsieveMark,
       BfNavigationItem,
       BfNavigationTertiary,
+      IconDatasets,
+
       // BfOrganizationsList
     },
 

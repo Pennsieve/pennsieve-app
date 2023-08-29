@@ -11,13 +11,11 @@
       :to="link"
       @click="$emit(item)"
     >
-      <svg-icon
-        :name="icon"
-        width="20"
-        height="20"
-        color="currentColor"
-        class="svg-icon svg-fill icon-main"
-      />
+
+      <div class="svg-icon svg-fill icon-main">
+        <slot name="icon" ></slot>
+      </div>
+
       <span class="label">
         {{ label }}
       </span>

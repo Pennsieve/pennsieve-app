@@ -2,7 +2,6 @@
   <router-view
     name="stage"
     :datasets="datasets"
-    :dataset="dataset"
     list-type="dataset"
   />
 </template>
@@ -38,7 +37,6 @@
         'concepts',
         'scientificUnits',
         'config',
-        'dataset',
         'isDatasetOwner',
         'activeOrganization',
         'datasetRole',

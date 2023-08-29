@@ -1,5 +1,6 @@
 <template>
   <svg
+      v-show="isVisible"
     version="1.1"
     id="Layer_1"
     xmlns="http://www.w3.org/2000/svg"
@@ -50,10 +51,22 @@
 export default {
   name: "PennsieveLogo",
   props: {
+    // width: {
+    //   type: Number,
+    //   default: 16,
+    // },
+    // height: {
+    //   type: Number,
+    //   default: 16,
+    // },
     color: {
       type: String,
       default: "#fff",
     },
+    isVisible: {
+      type: Boolean,
+      default: true,
+    }
   },
 };
 </script>

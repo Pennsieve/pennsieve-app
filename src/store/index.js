@@ -4,6 +4,12 @@ import Cookies from "js-cookie";
 import * as site from "../site-config/site.json";
 import * as R from "ramda";
 
+import datasetModule from './datasetModule'
+import integrationsModule from './integrationsModule'
+import collectionsModule from './collectionsModule'
+
+
+
 const hashFunction = (key, list) => {
   const obj = {};
   list.forEach((item) => {
@@ -1020,4 +1026,10 @@ export default createStore({
       return state.onboardingEvents.includes("AddedOrcid") || false;
     },
   },
+  modules: {
+    datasetModule,
+    integrationsModule,
+    collectionsModule
+  }
+
 });

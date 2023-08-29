@@ -62,7 +62,10 @@ export default {
           // if the payload cannot be converted to json, just return the original response
           return resp.json()
             .then(this.finishLoading.bind(this))
-            .catch(() => this.finishLoading(resp))
+            .catch(() => {
+              console.log("returning unprocessed response")
+              this.finishLoading(resp.body)
+            })
         })
     },
     /**

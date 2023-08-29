@@ -6,8 +6,8 @@
           <div class="col-xs-12">
             <IconPennsieveMark
                 class="mb-16"
-                width="35"
-                height="35"
+                :width="35"
+                :height="35"
                 color="#fff"
             />
             <p class="mb-8">

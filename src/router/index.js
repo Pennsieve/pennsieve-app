@@ -4,6 +4,12 @@ import { createRouter, createWebHistory } from "vue-router";
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 
 const Datasets = () => import('./datasets/Datasets.vue')
+const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
+
+
+const People = () => import('./people/People.vue')
+const PeopleList = () => import('../components/people/list/PeopleList.vue')
+
 
 
 const router = createRouter({
@@ -37,23 +43,40 @@ const router = createRouter({
      * Datasets routes
      */
     {
-      name: "datasets",
       path: '/:orgId/datasets',
       components: {
         page: Datasets,
         navigation: BfNavigation
       },
       props: true,
-      // children: [
-      //   {
-      //     name: 'datasets-list',
-      //     path: '',
-      //     components: {
-      //       stage: BfDatasetList
-      //     },
-      //     props: true
-      //   }
-      // ]
+      children: [
+        {
+          name: 'datasets-list',
+          path: '',
+          components: {
+            stage: BfDatasetList
+          },
+          props: true
+        }
+      ]
+    },
+    {
+      name: "people",
+      path: '/:orgId/people',
+      components: {
+        // page: People,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'people-list',
+          path: '',
+          components: {
+            stage: PeopleList
+          }
+        },
+      ],
+      props: true
     },
   ],
 });
