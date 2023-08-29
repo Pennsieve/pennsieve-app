@@ -139,13 +139,14 @@ import OrgMember from '../org-member/OrgMember.vue'
 import EditMember from '../windows/EditMember.vue'
 import RemoveMember from '../windows/RemoveMember.vue'
 import InviteMember from '../windows/InviteMember.vue'
+import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
+
 
 
 import { propOr, findIndex, propEq, reject, union } from 'ramda'
 import Sorter from  '../../../mixins/sorter'
 import UserRoles from  '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
-import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu'
 
 export default {
   name: 'PeopleList',

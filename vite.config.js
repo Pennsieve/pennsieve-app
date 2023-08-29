@@ -20,7 +20,6 @@ export default defineConfig({
     }),
   ],
   define: {
-    global: {},
   },
   resolve: {
     alias: {

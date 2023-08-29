@@ -1,3 +1,4 @@
+
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
@@ -5,12 +6,8 @@ import store from "./store";
 import striptags from 'striptags';
 import Cookies from 'js-cookie'
 
-
-// import "./assets/element-variables.scss";
-// import "./assets/_svg-icon.scss";
-
 import Amplify from '@aws-amplify/core'
-import AWSConfig from '@/utils/aws-exports.js'
+import AWSConfig from './utils/aws-exports.js'
 import {ElMessage} from 'element-plus'
 
 Amplify.configure(AWSConfig)
@@ -67,7 +64,7 @@ router.beforeEach((to, from, next) => {
 router.afterEach((to, from) => {
     window.Intercom('update')
 
-    // Set nav state based on route
+    // Set nav state based on routegit a
     if (topLevelRoutes.indexOf(to.name) >= 0) {
         store.dispatch('togglePrimaryNav', true)
         store.dispatch('condensePrimaryNav', false)
