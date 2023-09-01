@@ -9,40 +9,54 @@
       <span class="el-dropdown-text-link">
         {{ paginationItemLabel }} per page {{ pageSize }}
       </span>
-<!--      <svg-icon-->
-<!--        class="ml-8"-->
-<!--        name="icon-arrow-up"-->
-<!--        :dir="menuArrowDir"-->
-<!--        height="10"-->
-<!--        width="10"-->
-<!--      />-->
+
+      <IconArrowUp
+        class="ml-8 arrow-style"
+        :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
+        color="black"
+      />
+
     </button>
-    <el-dropdown-menu
-      slot="dropdown"
-      class="bf-menu"
-    >
-      <el-dropdown-item
-        v-for="option in pageSizeOptions"
-        :key="option"
-        class="icon-item"
-        :command="option"
+    <template #dropdown>
+      <el-dropdown-menu
+        slot="dropdown"
+        class="bf-menu"
       >
-        {{ option }}
-<!--        <svg-icon-->
-<!--          v-if="pageSize === option"-->
-<!--          icon="icon-check"-->
-<!--          class="item-icon-check"-->
-<!--          width="20"-->
-<!--          height="20"-->
-<!--        />-->
-      </el-dropdown-item>
-    </el-dropdown-menu>
+        <el-dropdown-item
+          v-for="option in pageSizeOptions"
+          :key="option"
+          class="icon-item"
+          :command="option"
+        >
+          {{ option }}
+          <IconCheck
+            v-if="pageSize === option"
+            icon="icon-check"
+            class="item-icon-check"
+            :width="20"
+            :height="20"
+            color="black"
+          />
+
+        </el-dropdown-item>
+      </el-dropdown-menu>
+    </template>
   </el-dropdown>
 </template>
 
 <script>
+
+import IconArrowUp from "../../icons/IconArrowUp.vue"
+import IconCheck from "../../icons/IconCheck.vue"
+
+
 export default {
   name: 'PaginationPageMenu',
+
+  components: {
+    IconArrowUp,
+    IconCheck
+  },
 
   props: {
     paginationItemLabel: {

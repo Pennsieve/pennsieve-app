@@ -171,8 +171,6 @@ export default {
      * Get all dataset status options for organization
      */
     fetchDatasetStatuses: function() {
-      console.log(this.getDatasetStatusUrl())
-      console.log('hello')
       this.sendXhr(this.getDatasetStatusUrl,"").then(response => {
         this.updateOrgDatasetStatuses(response)
       })
@@ -184,9 +182,7 @@ export default {
      * @returns {String}
      */
     getDatasetStatusUrl: function() {
-      console.log(this.config.apiUrl)
-      console.log(this.userToken )
-      console.log(this.isOrgSynced)
+
       if (this.config.apiUrl && this.userToken && this.isOrgSynced) {
         const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
         return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${this.userToken}`

@@ -75,14 +75,16 @@
             class="button-icon small icon-sort"
             @click="setSortDir"
           >
-<!--            <svg-icon-->
-<!--              name="icon-sort"-->
-<!--              :class="[ sortIconDirection === 'down' ? 'svg-flip' : '' ]"-->
-<!--              color="currentColor"-->
-<!--              :dir="sortIconDirection"-->
-<!--              height="20"-->
-<!--              width="20"-->
-<!--            />-->
+
+            <IconSort
+              name="icon-sort"
+              color="currentColor"
+              :dir="sortIconDirection"
+              :height="20"
+              :width="20"
+              :class="[ sortIconDirection === 'down' ? 'svg-flip' : '' ]"
+
+            />
           </button>
         </div>
 
@@ -221,11 +223,14 @@ import Sorter from '../../../mixins/sorter'
 import Request from '../../../mixins/request'
 import UserAccountAge from '../../../mixins/user-account-age'
 import OnboardingCarousel from '../../onboarding-carousel/OnboardingCarousel.vue'
+import IconArrowRight from "../../icons/IconArrowRight.vue";
+import IconSort from "../../icons/IconSort.vue";
 
   export default {
     name: 'BfDatasetList',
 
     components: {
+      IconArrowRight,
       BfRafter,
       BfButton,
       BfDatasetListItem,
@@ -236,7 +241,8 @@ import OnboardingCarousel from '../../onboarding-carousel/OnboardingCarousel.vue
       DatasetFilterMenu,
       DatasetSortMenu,
       PaginationPageMenu,
-      OnboardingCarousel
+      OnboardingCarousel,
+      IconSort
     },
 
     mixins: [
@@ -304,13 +310,13 @@ import OnboardingCarousel from '../../onboarding-carousel/OnboardingCarousel.vue
         'curDatasetSearchPage'
       ]),
 
-      // /**
-      //  * Compute dataset icon sort direction
-      //  * @returns {String}
-      //  */
-      // sortIconDirection: function () {
-      //   return this.datasetSearchParams.orderDirection === 'Asc' ? 'up' : 'down'
-      // },
+      /**
+       * Compute dataset icon sort direction
+       * @returns {String}
+       */
+      sortIconDirection: function () {
+        return this.datasetSearchParams.orderDirection === 'Asc' ? 'up' : 'down'
+      },
 
       /**
        * Compute the search heading

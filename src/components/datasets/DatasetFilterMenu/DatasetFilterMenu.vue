@@ -1,139 +1,27 @@
 <template>
   <div>
     <el-popover
-      ref="roleMenu"
-      v-model="isRoleMenuOpen"
-      popper-class="no-padding dataset-filter-sub-menu scroll"
-      placement="right-start"
-      width="170"
-      trigger="hover"
-      :offset="-8"
-      transition=""
-      :open-delay="100"
-      :visible-arrow="false"
-    >
-      <div class="bf-menu scroll-menu">
-        <ul>
-          <li
-            v-for="role in roles"
-            :key="role.value"
-          >
-            <a
-              href="#"
-              class="bf-menu-item"
-              :data-menu-item="`role-${role.value}`"
-              @click.prevent="onMenuSelect(role)"
-            >
-              {{ role.name }}
-<!--              <svg-icon-->
-<!--                v-if="datasetSearchParams.withRole === role.value"-->
-<!--                icon="icon-check"-->
-<!--                class="item-icon-check"-->
-<!--                width="20"-->
-<!--                height="20"-->
-<!--              />-->
-            </a>
-          </li>
-        </ul>
-      </div>
-    </el-popover>
-
-    <el-popover
-      ref="collectionMenu"
-      v-model="isCollectionMenuOpen"
-      popper-class="no-padding dataset-filter-sub-menu scroll"
-      placement="right-start"
-      width="170"
-      trigger="hover"
-      :offset="-8"
-      transition=""
-      :open-delay="100"
-      :visible-arrow="false"
-    >
-      <div class="bf-menu scroll-menu">
-        <ul>
-          <li
-            v-for="collection in collections"
-            :key="collection.name"
-          >
-            <a
-              href="#"
-              class="bf-menu-item status-item"
-              :data-menu-item="`collection-${collection.name}`"
-              @click.prevent="onMenuSelect(collection)"
-            >
-              <span class="status-label">
-                {{ collection.name }}
-              </span>
-<!--              <svg-icon-->
-<!--                v-if="datasetSearchParams.collectionId === collection.id"-->
-<!--                icon="icon-check"-->
-<!--                class="item-icon-check"-->
-<!--                width="20"-->
-<!--                height="20"-->
-<!--              />-->
-            </a>
-          </li>
-        </ul>
-      </div>
-    </el-popover>
-
-    <el-popover
-      ref="statusMenu"
-      v-model="isStatusMenuOpen"
-      popper-class="no-padding dataset-filter-sub-menu scroll"
-      placement="right-start"
-      width="170"
-      trigger="hover"
-      :offset="-8"
-      transition=""
-      :open-delay="100"
-      :visible-arrow="false"
-    >
-      <div class="bf-menu scroll-menu">
-        <ul>
-          <li
-            v-for="status in filterOrgStatusList"
-            :key="status.name"
-          >
-            <a
-              href="#"
-              class="bf-menu-item status-item"
-              :data-menu-item="`status-${status.name}`"
-              @click.prevent="onMenuSelect(status)"
-            >
-              <span
-                class="dot"
-                :style="{
-                  backgroundColor: status.color
-                }"
-              />
-              <span class="status-label">
-                {{ status.displayName }}
-              </span>
-<!--              <svg-icon-->
-<!--                v-if="datasetSearchParams.status === status.name"-->
-<!--                icon="icon-check"-->
-<!--                class="item-icon-check"-->
-<!--                width="20"-->
-<!--                height="20"-->
-<!--              />-->
-            </a>
-          </li>
-        </ul>
-      </div>
-    </el-popover>
-
-    <el-popover
       ref="datasetFilterMenu"
-      v-model="isDatasetFilterMenuOpen"
+      v-model:visible = "isDatasetFilterMenuOpen"
       popper-class="no-padding"
       placement="bottom-start"
       width="200"
       trigger="click"
       transition=""
-      :visible-arrow="false"
     >
+      <template #reference>
+        <button class="dataset-filter-dropdown el-dropdown-link">
+          <span class="el-dropdown-text-link">
+            Show {{ filterLabel }}
+          </span>
+          <IconArrowUp
+            class="ml-8 arrow-style"
+            :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
+            color="black"
+          />
+        </button>
+      </template>
+
       <div class="bf-menu">
         <ul>
           <li
@@ -147,13 +35,14 @@
               @click="onMenuSelect(filter)"
             >
               {{ filter.name }}
-<!--              <svg-icon-->
-<!--                v-if="isShowingAllDatasets"-->
-<!--                icon="icon-check"-->
-<!--                class="item-icon-check"-->
-<!--                width="20"-->
-<!--                height="20"-->
-<!--              />-->
+              <IconCheck
+                v-if="isShowingAllDatasets"
+                class="item-icon-check"
+                :width="20"
+                :height="20"
+                color="black"
+                />
+
             </a>
           </li>
         </ul>
@@ -162,19 +51,65 @@
 
         <ul>
           <li>
-            <a
-              v-popover:collectionMenu
-              class="bf-menu-item icon-item"
-              href="#"
-              @click.prevent
+            <el-popover
+              ref="collectionMenu"
+              v-model:visible = "isCollectionMenuOpen"
+              popper-class="no-padding dataset-filter-sub-menu scroll"
+              placement="right-start"
+              width="170"
+              trigger="hover"
+              :offset="-8"
+              transition=""
+              :open-delay="100"
+              :visible-arrow="false"
             >
-              Collection
-<!--              <svg-icon-->
-<!--                icon="icon-arrow-right"-->
-<!--                width="10"-->
-<!--                height="10"-->
-<!--              />-->
-            </a>
+
+              <template #reference>
+                <a
+                  class="bf-menu-item icon-item"
+                  href="#"
+                  @click.prevent
+                >
+                  Collection
+                  <IconArrowRight
+                    :width="10"
+                    :height="10"
+                    color="black"
+                  />
+
+                </a>
+              </template>
+
+              <div class="bf-menu scroll-menu">
+                <ul>
+                  <li
+                    v-for="collection in collections"
+                    :key="collection.name"
+                  >
+                    <a
+                      href="#"
+                      class="bf-menu-item status-item"
+                      :data-menu-item="`collection-${collection.name}`"
+                      @click.prevent="onMenuSelect(collection)"
+                    >
+              <span class="status-label">
+                {{ collection.name }}
+              </span>
+
+                      <IconCheck
+                        v-if="datasetSearchParams.collectionId === collection.id"
+                        class="item-icon-check"
+                        :width="20"
+                        :height="20"
+                      />
+
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </el-popover>
+
+
           </li>
         </ul>
 
@@ -182,19 +117,60 @@
 
         <ul>
           <li>
-            <a
-              v-popover:roleMenu
-              class="bf-menu-item icon-item"
-              href="#"
-              @click.prevent
+            <el-popover
+              ref="roleMenu"
+              v-model:visible = "isRoleMenuOpen"
+              popper-class="no-padding dataset-filter-sub-menu scroll"
+              placement="right-start"
+              width="170"
+              trigger="hover"
+              :offset="-8"
+              transition=""
+              :open-delay="100"
+              :visible-arrow="false"
             >
-              Permission
-<!--              <svg-icon-->
-<!--                icon="icon-arrow-right"-->
-<!--                width="10"-->
-<!--                height="10"-->
-<!--              />-->
-            </a>
+
+              <template #reference>
+                <a
+                  class="bf-menu-item icon-item"
+                  href="#"
+                  @click.prevent
+                >
+                  Permission
+                  <IconArrowRight
+                    :width="10"
+                    :height="10"
+                    color="black"
+                  />
+
+                </a>
+              </template>
+              <div class="bf-menu scroll-menu">
+                <ul>
+                  <li
+                    v-for="role in roles"
+                    :key="role.value"
+                  >
+                    <a
+                      href="#"
+                      class="bf-menu-item"
+                      :data-menu-item="`role-${role.value}`"
+                      @click.prevent="onMenuSelect(role)"
+                    >
+                      {{ role.name }}
+
+                      <IconCheck
+                        v-if="datasetSearchParams.withRole === role.value"
+                        class="item-icon-check"
+                        :width="20"
+                        :height="20"
+                      />
+
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </el-popover>
           </li>
         </ul>
 
@@ -202,39 +178,73 @@
 
         <ul>
           <li>
-            <a
-              v-popover:statusMenu
-              class="bf-menu-item icon-item"
-              href="#"
-              @click.prevent
+            <el-popover
+              ref="statusMenu"
+              v-model:visible="isStatusMenuOpen"
+              popper-class="no-padding dataset-filter-sub-menu scroll"
+              placement="right-start"
+              width="170"
+              trigger="hover"
+              :offset="-8"
+              transition=""
+              :open-delay="100"
+              :visible-arrow="false"
             >
-              Status
-<!--              <svg-icon-->
-<!--                icon="icon-arrow-right"-->
-<!--                width="10"-->
-<!--                height="10"-->
-<!--              />-->
-            </a>
+
+              <template #reference>
+                <a
+                  class="bf-menu-item icon-item"
+                  href="#"
+                  @click.prevent
+                >
+                  Status
+                  <IconArrowRight
+                    :width="10"
+                    :height="10"
+                    color="black"
+                  />
+
+                </a>
+              </template>
+
+              <div class="bf-menu scroll-menu">
+                <ul>
+                  <li
+                    v-for="status in filterOrgStatusList"
+                    :key="status.name"
+                  >
+                    <a
+                      href="#"
+                      class="bf-menu-item status-item"
+                      :data-menu-item="`status-${status.name}`"
+                      @click.prevent="onMenuSelect(status)"
+                    >
+              <span
+                class="dot"
+                :style="{
+                  backgroundColor: status.color
+                }"
+              />
+                      <span class="status-label">
+                {{ status.displayName }}
+              </span>
+
+                      <IconCheck
+                        v-if="datasetSearchParams.status === status.name"
+                        class="item-icon-check"
+                        :width="20"
+                        :height="20"
+
+                      />
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </el-popover>
           </li>
         </ul>
       </div>
     </el-popover>
-
-    <button
-      v-popover:datasetFilterMenu
-      class="dataset-filter-dropdown el-dropdown-link"
-    >
-      <span class="el-dropdown-text-link">
-        Show {{ filterLabel }}
-      </span>
-<!--      <svg-icon-->
-<!--        class="ml-8 arrow-style"-->
-<!--        name="icon-arrow-up"-->
-<!--        :dir="menuArrowDir"-->
-<!--        height="10"-->
-<!--        width="10"-->
-<!--      />-->
-    </button>
   </div>
 </template>
 
@@ -248,6 +258,11 @@ import {
   propOr,
   propEq
 } from 'ramda'
+
+import IconCheck from "../../icons/IconCheck.vue"
+import IconArrowRight from "../../icons/IconArrowRight.vue"
+import IconArrowUp from "../../icons/IconArrowUp.vue"
+
 
 /**
  * Return the name property from a list of statuses
@@ -274,6 +289,12 @@ const getNonStatusLabel = (isOnlyMyDatasets) => {
 
 export default {
   name: 'DatasetFilterMenu',
+
+  components: {
+    IconCheck,
+    IconArrowRight,
+    IconArrowUp,
+  },
 
   data: function() {
     return {
@@ -328,6 +349,14 @@ export default {
     ]),
 
     /**
+     * Compute dataset filter arrow direction
+     * @returns {String}
+     */
+    menuArrowDir: function() {
+      return this.isDatasetFilterMenuOpen ? 'up' : 'down'
+    },
+
+    /**
      * Compute if the dataset filter checkbox
      * should be displayed based on the filter
      * @param {Object} filter
@@ -346,17 +375,13 @@ export default {
      * @returns {Array}
      */
     filterOrgStatusList: function() {
-      return this.orgDatasetStatuses.filter(status => {
-        return status.displayName !== ''
-      })
-    },
+      if (this.orgDatasetStatuses) {
+        return this.orgDatasetStatuses.filter(status => {
+          return status.displayName !== ''
+        })
+      }
+      return []
 
-    /**
-     * Compute dataset filter arrow direction
-     * @returns {String}
-     */
-    menuArrowDir: function() {
-      return this.isDatasetFilterMenuOpen ? 'up' : 'down'
     },
 
     /**
@@ -402,6 +427,7 @@ export default {
   },
 
   methods: {
+
     /**
      * On menu select, emit select event
      * and hide the menus
@@ -468,15 +494,6 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.el-dropdown-text-link {
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-  margin-top: 4px;
 }
 
 .arrow-style {

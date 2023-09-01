@@ -5,38 +5,41 @@
     @command="$emit('select', $event)"
     @visible-change="isMenuOpen = $event"
   >
+
     <button class="dataset-filter-dropdown el-dropdown-link">
       <span class="el-dropdown-text-link">
         {{ selectedLabel }}
       </span>
-<!--      <svg-icon-->
-<!--        class="ml-8"-->
-<!--        name="icon-arrow-up"-->
-<!--        :dir="menuArrowDir"-->
-<!--        height="10"-->
-<!--        width="10"-->
-<!--      />-->
+      <IconArrowUp
+        class="ml-8 arrow-style"
+        :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
+        color="black"
+      />
+
     </button>
-    <el-dropdown-menu
-      slot="dropdown"
-      class="bf-menu"
-    >
-      <el-dropdown-item
-        v-for="option in options"
-        :key="option.value"
-        class="icon-item"
-        :command="option"
+    <template #dropdown>
+      <el-dropdown-menu
+        slot="dropdown"
+        class="bf-menu"
       >
-        {{ option.name }}
-<!--        <svg-icon-->
-<!--          v-if="orderBy === option.value"-->
-<!--          icon="icon-check"-->
-<!--          class="item-icon-check"-->
-<!--          width="20"-->
-<!--          height="20"-->
-<!--        />-->
-      </el-dropdown-item>
-    </el-dropdown-menu>
+        <el-dropdown-item
+          v-for="option in options"
+          :key="option.value"
+          class="icon-item"
+          :command="option"
+        >
+          {{ option.name }}
+
+          <IconCheck
+            v-if="orderBy === option.value"
+            class="item-icon-check"
+            :width="20"
+            :height="20"
+            color="black"
+          />
+        </el-dropdown-item>
+      </el-dropdown-menu>
+    </template>
   </el-dropdown>
 </template>
 
@@ -47,10 +50,11 @@ import {
   propEq,
   propOr
 } from 'ramda'
+import IconCheck from "../../icons/IconCheck.vue";
 
 export default {
   name: 'DatasetSortMenu',
-
+  components: {IconCheck},
   props: {
     orderBy: {
       type: String,
