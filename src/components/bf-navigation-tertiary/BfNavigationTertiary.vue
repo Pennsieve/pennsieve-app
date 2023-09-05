@@ -1,24 +1,24 @@
 <template>
   <div class="bf-navigation-tertiary">
 <!--    <search-menu v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest" />-->
-<!--    <help-menu />-->
-<!--    <user-menu />-->
+    <help-menu />
+    <user-menu />
   </div>
 </template>
 
 <script>
   import { mapGetters, mapState } from 'vuex'
   import {propOr} from "ramda";
-  // const HelpMenu = () => import('@/components/bf-navigation/HelpMenu/HelpMenu.vue')
-  // const UserMenu = () => import('@/components/bf-navigation/UserMenu/UserMenu.vue')
+  import HelpMenu from '../bf-navigation/HelpMenu/HelpMenu.vue'
+  import UserMenu from '../bf-navigation/UserMenu/UserMenu.vue'
   // const SearchMenu = () => import('@/components/bf-navigation/SearchMenu/SearchMenu.vue')
 
   export default {
     name: 'BfNavigationTertiary',
 
     components: {
-      // HelpMenu,
-      // UserMenu,
+      HelpMenu,
+      UserMenu,
       // SearchMenu
     },
 

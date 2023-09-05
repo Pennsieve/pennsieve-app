@@ -6,16 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path
-      pid="0"
-      d="M14.12 12l8.94-8.94A1.5 1.5 0 0 0 20.94.94L12 9.88 3.06.94A1.5 1.5 0 0 0 .94 3.06L9.88 12 .94 20.94a1.5 1.5 0 1 0 2.12 2.12L12 14.12l8.94 8.94a1.5 1.5 0 0 0 2.12-2.12z"
-    />
+    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconRemove",
+  name: "IconHelpMessage",
   props: {
     width: {
       type: Number,

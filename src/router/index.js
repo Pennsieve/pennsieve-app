@@ -7,6 +7,10 @@ const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 
 
+const MySettings = () => import('./MySettings/MySettings.vue')
+const MySettingsContainer = () => import('../components/my-settings/MySettingsContainer.vue')
+
+
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
@@ -73,6 +77,23 @@ const router = createRouter({
           path: '',
           components: {
             stage: PeopleList
+          }
+        },
+      ],
+      props: true
+    },
+    {
+      path: '/:orgId/profile',
+      components: {
+        page: MySettings,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'my-settings-container',
+          path: '',
+          components: {
+            stage: MySettingsContainer
           }
         },
       ],

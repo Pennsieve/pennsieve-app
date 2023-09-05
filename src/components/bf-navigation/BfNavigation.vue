@@ -288,7 +288,7 @@
 
 <style scoped lang="scss">
   @import '../../assets/_variables.scss';
-  @import 'bf-navigation';
+  @import './bf-navigation.scss';
   @import './logo.scss';
 
   .bf-navigation {
