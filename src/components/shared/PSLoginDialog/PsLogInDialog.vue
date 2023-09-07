@@ -658,6 +658,7 @@ export default {
 @import '../../../assets/_variables.scss';
 
 .log-in-dialog {
+  //width: 540px;
 
   &__close-dialog {
     float: right;

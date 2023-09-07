@@ -1,14 +1,16 @@
 <template>
   <el-dialog
-    :visible.sync="dialogVisible"
+    class="dialog-box"
+    v-model="dialogVisible"
     :show-close="false"
     @open="handleOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Setup Two-Factor Authentication"
-    />
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        title="Setup Two-Factor Authentication"
+      />
+    </template>
 
     <dialog-body>
       <p> Follow these steps to enable two-factor authentication for your account.</p>
@@ -55,10 +57,7 @@
       </el-form> -->
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -68,7 +67,8 @@
       <bf-button @click="onTwoFactorFormSubmit">
         Confirm
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -258,20 +258,24 @@ export default {
 
 <style scoped lang="scss">
 @import '../../../assets/_variables.scss';
-p {
-  color: black;
-}
+  p {
+    color: black;
+  }
 
-.strong {
-  font-size: 14px;
-  font-weight: 500;
-  margin-top: 30px;
-}
+  .dialog-box {
+    width: 540px;
+  }
 
-.error {
-  color: red;
-  font-size: 12px;
-  margin-top: 3px;
-}
+  .strong {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 30px;
+  }
+
+  .error {
+    color: red;
+    font-size: 12px;
+    margin-top: 3px;
+  }
 
 </style>

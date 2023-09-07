@@ -14,7 +14,6 @@
         :model="ruleForm"
         :rules="rules"
         label-position="top"
-        @submit.native.prevent="handleUpdateProfileSubmit"
       >
         <el-form-item
           label="First Name"
@@ -68,17 +67,12 @@
         class="divider"
       />
       <!-- reset password -->
+<!--      TODO: bring this back, need to update to directly hit Cognito instead of a non-existing API call.-->
+
       <el-row>
         <el-col :span="12">
           <h2>Password</h2>
-          <el-row class="mb-20">
-            <p>We'll send you an email containing a link to reset your password.</p>
-          </el-row>
-          <el-row>
-            <bf-button @click="submitResetPasswordRequest">
-              Reset Password
-            </bf-button>
-          </el-row>
+            <p>To reset your password, please log out and use the 'forgot my password' link on the login page. We'll send you an email containing a link to reset your password.</p>
         </el-col>
       </el-row>
       <div
@@ -203,10 +197,9 @@
                         @click="sortColumn('name')"
                       >
                         Name
-                        <svg-icon
-                          class="sort-icon"
-                          :name="sortIcon('name')"
+                        <IconSort
                           color="currentColor"
+                          :class="[ this.sortDirection === 'desc' ? 'svg-flip' : '' ]"
                         />
                       </button>
                     </el-col>
@@ -341,10 +334,12 @@
       <create-api-key
         ref="createApiKeyDialog"
         @api-key-created="updateApiKeys"
+        :api-keys="apiKeys"
       />
 
       <delete-api-key
         ref="deleteApiKeyDialog"
+        :api-key="apiKey"
         @api-key-deleted="updateApiKeys"
       />
 
@@ -381,11 +376,13 @@ import DegreeSelect from '../shared/DegreeSelect/DegreeSelect.vue'
 import Request from '../../mixins/request'
 import Sorter from '../../mixins/sorter'
 import IconRemove from "../icons/IconRemove.vue";
+import IconSort from "../icons/IconSort.vue";
 
 export default {
   name: 'MySettingsContainer',
 
   components: {
+    IconSort,
     IconRemove,
     BfRafter,
     BfButton,
@@ -402,6 +399,8 @@ export default {
 
   data() {
     return {
+      emailButtonDisabled: false,
+      sortDirection: "asc",
       apiKeys: [],
       mfaStatus: false,
       isApiKeysLoading: true,
@@ -443,7 +442,12 @@ export default {
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
-      prevEmail: ''
+      prevEmail: '',
+      apiKey: {
+        name: '',
+        key: ''
+      }
+
     }
   },
 
@@ -531,17 +535,6 @@ export default {
       return env === 'dev'
         ? `https://sandbox.orcid.org/${this.profile.orcid.orcid}`
         : `https://orcid.org/${this.profile.orcid.orcid}`
-    },
-
-    resetPasswordUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const email = pathOr('', ['profile', 'email'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !email || !userToken) {
-        return ''
-      }
-      return `${url}/account/${email}/reset?api_key=${userToken}`
     },
 
     isEmailButtonDisabled: function(){
@@ -754,30 +747,6 @@ export default {
       })
     },
     /**
-     * Makes XHR call to reset a user's password
-     */
-    submitResetPasswordRequest: function() {
-      this.sendXhr(this.resetPasswordUrl, {
-        method: 'POST'
-      })
-        .then(this.handleResetPasswordXhrSuccess.bind(this))
-        .catch(this.handleXhrError.bind(this))
-    },
-    /**
-     * Handles successful two factor xhr response
-     */
-    handleResetPasswordXhrSuccess: function() {
-      EventBus.$emit('toast', {
-        detail: {
-          type: 'MESSAGE',
-          msg: 'Password reset email sent'
-        }
-      })
-      setTimeout(() => {
-        this.logout()
-      }, 1500)
-    },
-    /**
      * Fetches api keys for logged in user
      */
     getApiKeys: function() {
@@ -836,9 +805,10 @@ export default {
      * @param {Object} apiKey
      */
     openApiKeyWindow: function(refName, apiKey = {}) {
+
+      this.apiKey = apiKey
+
       const dialog = this.$refs[refName]
-      dialog.apiKey = apiKey
-      dialog.apiKeys = this.apiKeys
       dialog.dialogVisible = true
     },
     /**
@@ -972,8 +942,11 @@ p {
   }
 }
 
-.bf-table-row {
+.bf-table {
   min-width: 540px;
+}
+
+.bf-table-row {
   .el-row {
     height: 40px;
   }

@@ -1,5 +1,5 @@
 
-import { createApp } from "vue";
+import { createApp, getCurrentInstance } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import store from "./store";
@@ -10,18 +10,23 @@ import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
 import {ElMessage} from 'element-plus'
 
+// Need to import CSS specifically because we are only using the component API.
+// https://element-plus.org/en-US/guide/quickstart.html#manually-import
+import 'element-plus/es/components/message/style/css';
+
 Amplify.configure(AWSConfig)
 
 const app = createApp(App);
-
-app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
-app.config.globalProperties.$message = ElMessage;
 
 app.use(store);
 
 app.use(router);
 
 app.mount("#app");
+
+app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
+app.config.globalProperties.$message = ElMessage;
+
 
 const isAuthorized = (to, from, next) => {
     const token = Cookies.get('user_token')

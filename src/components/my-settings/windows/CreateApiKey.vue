@@ -1,43 +1,38 @@
 <template>
   <el-dialog
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :show-close="false"
     @open="handleOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Create an API Key"
-    />
 
-    <dialog-body>
-      <el-form
-        ref="apiKeyForm"
-        :model="ruleForm"
-        :rules="rules"
-        @submit.native.prevent="onFormSubmit"
-      >
-        <el-form-item
-          label="API Key"
-          prop="apiKey"
-        >
-          <a11y-keys @key-pressed="onHandleKeyPressed">
-            <el-input
-              v-model="ruleForm.apiKey"
-              autofocus
-            />
-          </a11y-keys>
-        </el-form-item>
-        <div class="sub-title">
-          Key names must be unique
-        </div>
-      </el-form>
-    </dialog-body>
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        title="Create an API Key"
+      />
+    </template>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
+    <el-form
+      ref="apiKeyForm"
+      :model="ruleForm"
+      :rules="rules"
+      label-position="top"
     >
+      <el-form-item
+        label="API Key"
+        prop="apiKey"
+      >
+        <el-input
+          v-model="ruleForm.apiKey"
+          autofocus
+        />
+      </el-form-item>
+      <div class="sub-title">
+        Key names must be unique
+      </div>
+    </el-form>
+
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -47,7 +42,8 @@
       <bf-button @click="onFormSubmit">
         Confirm
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -55,7 +51,6 @@
 import { mapGetters, mapActions } from 'vuex'
 import { path, pathOr, prop, compose, toLower, map, not, includes, indexOf, defaultTo } from 'ramda'
 
-import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
@@ -64,11 +59,12 @@ import Request from '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 
+
+
 export default {
   name: 'CreateApiKey',
 
   components: {
-    A11yKeys,
     BfButton,
     BfDialogHeader,
     DialogBody
@@ -78,6 +74,13 @@ export default {
     AutoFocus,
     Request
   ],
+
+  props: {
+    apiKeys: {
+      type: Array,
+      default: [],
+    },
+  },
 
   data() {
     const validateApiKey = (rule, value, callback) => {
@@ -96,7 +99,6 @@ export default {
     return {
       dialogVisible: false,
       labelPosition: 'right',
-      apiKeys: [],
       ruleForm: {
         apiKey: ''
       },
@@ -131,17 +133,10 @@ export default {
       'updateProfile'
     ]),
     /**
-     * Handles key-pressed event for last input in form
-     */
-    onHandleKeyPressed: function(e) {
-      this.onFormSubmit(e)
-    },
-    /**
      * Handles submit event
      */
     onFormSubmit: function(e) {
       e.preventDefault()
-
       this.$refs.apiKeyForm
         .validate((valid) => {
           if (!valid) {
@@ -183,7 +178,6 @@ export default {
      */
     handleOpen: function() {
       this.labelPosition = 'right'
-      this.apiKeys = []
       this.autoFocus()
     },
     /**
@@ -227,3 +221,19 @@ export default {
   }
 }
 </script>
+
+<style lang="scss">
+  @import '../../../assets/_variables';
+
+  .el-dialog {
+      width: 540px;
+  }
+
+  .el-dialog__header {
+    background: $purple_2;
+    color: $white;
+    border-bottom: 1px solid $purple_3;
+    margin: 0;
+  }
+
+</style>

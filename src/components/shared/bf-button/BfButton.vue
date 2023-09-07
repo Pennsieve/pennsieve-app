@@ -7,7 +7,6 @@
     :class="[
       type ? 'bf-button--' + type : ''
     ]"
-    @click="handleClick"
   >
     <span
       v-if="hasPrefixSlot"
@@ -78,9 +77,10 @@
        * On click
        * @param {Object} evt
        */
-      handleClick(evt) {
-        this.$emit('click', evt)
-      }
+      // handleClick(evt) {
+      //   console.log("Button clicked", evt)
+      //   // this.$emit('click', evt)
+      // }
     }
   }
 

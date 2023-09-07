@@ -25,6 +25,7 @@
           </div>
         </div>
         <img
+            class="login-image"
             src="@/assets/images/illustrations/illo-neuron-mural.svg"
             alt="Neuron Mural Image"
         />
@@ -718,7 +719,7 @@ export default {
   float: left;
 }
 
-img {
+.login-image {
   //position: absolute;
   top: -381px;
   right: -575px;

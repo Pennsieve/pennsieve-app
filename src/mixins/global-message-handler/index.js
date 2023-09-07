@@ -1,16 +1,13 @@
 import { mapGetters, mapActions, mapState } from 'vuex'
 import Auth from '@aws-amplify/auth'
-
 import EventBus from '../../utils/event-bus'
 import Request from '../request'
 import UserRoles from '../../mixins/user-roles'
 import logger from '../../mixins/logger'
 import Sorter from '../../mixins/sorter'
 import LogoutHandler from '../logout-handler'
-// import UserAccountAge from '../../mixins/user-account-age'
-
 import Cookies from 'js-cookie'
-import { path, pathOr, propOr, find, pathEq, defaultTo, isEmpty, not, compose, prop, propEq } from 'ramda'
+import { path, pathOr, propOr, find, pathEq, defaultTo, compose, prop, propEq } from 'ramda'
 
 export default {
   data() {
@@ -571,13 +568,12 @@ export default {
       }
 
       this.$message({
-        message,
-        type,
-        showClose: true,
-        customClass: messageClass,
-        duration,
-        dangerouslyUseHTMLString: true
+        message: message,
+        type:type,
+        center: true,
+        duration: duration
       })
+
     },
     /**
      * Close off primary nav

@@ -1,16 +1,20 @@
 <template>
   <el-dialog
     class="simple"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header slot="title" />
-    <dialog-body>
-      <h2 slot="heading">
-        Confirm Removal
-      </h2>
-      <p>Are you sure you want to this API key: {{ apiKey.name }}?</p>
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header title="Confirm Removal" />
+    </template>
+
+    <p>Are you sure you want to delete the following API key:</p>
+
+      <p>Name: <b>{{ apiKey.name }}?</b></p>
+
+    <p> Key: {{apiKey.key}}</p>
+    <template #footer>
       <div class="dialog-simple-buttons">
         <bf-button
           class="secondary"
@@ -25,7 +29,9 @@
           Confirm
         </bf-button>
       </div>
-    </dialog-body>
+    </template>
+
+
   </el-dialog>
 </template>
 
@@ -53,9 +59,18 @@ export default {
     Request
   ],
 
+  props: {
+    apiKey: {
+      type: Object,
+      default: {
+        name: '',
+        key: ''
+      },
+    },
+  },
+
   data() {
     return {
-      apiKey: {},
       dialogVisible: false,
       labelPosition: 'right'
     }
@@ -103,20 +118,14 @@ export default {
     handleXhrSuccess: function() {
       EventBus.$emit('toast', {
         detail: {
-          type: 'MESSAGE',
+          type: 'success',
           msg: 'API Key successfully deleted'
         }
       })
 
       this.$emit('api-key-deleted', { apiKey: this.apiKey, type: 'DELETED' })
-      this.clearKey()
     },
-    /**
-     * Clear apiKey
-     */
-    clearKey: function() {
-      this.apiKey = {}
-    },
+
     /**
      * Closes the dialog
      */

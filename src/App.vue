@@ -1,4 +1,6 @@
-<script setup></script>
+<script setup>
+
+</script>
 
 <template>
   <div id="app-wrap">
@@ -11,6 +13,9 @@
   </div>
 
   <PsAnalytics />
+
+<!--  This is the websocket connection-->
+<!--  <bf-notifications />-->
 
 
 </template>
@@ -26,6 +31,8 @@ import EventBus from './utils/event-bus'
 import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
 import PsAnalytics from './components/analytics/Analytics.vue'
+// import BfNotifications from './components/notifications/Notifications.vue'
+
 
 
 
@@ -33,7 +40,7 @@ export default {
   name: "app",
 
   components: {
-    PsAnalytics
+    PsAnalytics,
   },
   mixins: [
     globalMessageHandler,
@@ -84,11 +91,11 @@ export default {
       handler: function(val, oldVal) {
         if (this.getDatasetsUrl && this.datasets.length === 0) {
           this.setActiveOrgSynced()
-          this.fetchDatasets()
-          this.fetchDatasetPublishedData()
-          this.fetchCollections()
-          this.fetchIntegrations()
-          this.fetchDatasetStatuses()
+            .then(() =>this.fetchDatasets())
+            .then(() =>this.fetchDatasetPublishedData())
+            .then(() =>this.fetchCollections())
+            .then(() =>this.fetchIntegrations())
+            .then(() => this.fetchDatasetStatuses())
         }
 
       },
@@ -129,6 +136,19 @@ export default {
           : ''
     },
 
+    /**
+     * Get all status options for organization url
+     * @returns {String}
+     */
+    getDatasetStatusUrl: function() {
+      if (this.config.apiUrl && this.userToken && this.isOrgSynced) {
+        const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
+        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${this.userToken}`
+      } else {
+        return "Not-found"
+      }
+    },
+
   },
 
   methods: {
@@ -164,7 +184,6 @@ export default {
           .then(() => this.getProfileAndOrg(userToken))
           .then(() => {this.setActiveOrgSynced()})
           .then(() => this.getOnboardingEventStates(userToken))
-          .then(() => this.fetchDatasetStatuses())
     },
 
     /**
@@ -177,19 +196,7 @@ export default {
           .catch(this.handleXhrError.bind(this))
     },
 
-    /**
-     * Get all status options for organization url
-     * @returns {String}
-     */
-    getDatasetStatusUrl: function() {
 
-      if (this.config.apiUrl && this.userToken && this.isOrgSynced) {
-        const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
-        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${this.userToken}`
-      } else {
-        return "Not-found"
-      }
-    },
 
     /**
      * Get dataset publish data
