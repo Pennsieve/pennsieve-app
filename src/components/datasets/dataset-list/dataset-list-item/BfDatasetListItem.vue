@@ -350,7 +350,7 @@ export default {
      * @returns {String}
      */
     datasetBanner: function() {
-      return this.dataset.bannerPresignedUrl || '/static/images/banner-placeholder.jpg'
+      return this.dataset.bannerPresignedUrl || '/images/banner-placeholder.jpg'
     },
 
     /**

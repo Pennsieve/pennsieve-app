@@ -345,6 +345,7 @@
 
       <api-key-detail
         ref="apiKeyDetailDialog"
+        :api-key="apiKey"
       />
 
       <delete-orcid

@@ -5,26 +5,23 @@
       title="People"
       class="primary"
     >
-      <div
-        slot="description"
-        class="description"
-      >
+      <template #description>
         <p v-if="hasAdminRights">
           Members of your organization will be able to create datasets, add data to their datasets, and
           share datasets with other members of the team.
         </p>
-      </div>
-      <div
-        slot="buttons"
-        class="buttons"
-      >
-        <bf-button
-          v-if="hasAdminRights"
-          @click="openDialog"
-        >
-          Send Invitation
-        </bf-button>
-      </div>
+      </template>
+
+      <template #buttons>
+        <div class="buttons">
+          <bf-button
+            v-if="hasAdminRights"
+            @click="openDialog"
+          >
+            Send Invitation
+          </bf-button>
+        </div>
+      </template>
     </bf-rafter>
 
     <bf-stage
@@ -66,11 +63,10 @@
                 :class="[isSorting('lastName') ? 'sort-active' : '']"
                 @click="sortColumn('lastName')"
               >
-                Name<svg-icon
-                  class="sort-icon"
-                  :name="sortIcon('lastName')"
-                  color="currentColor"
-                />
+                Name
+                <IconSort
+                  :class="[ this.isSorting('lastName') ? 'svg-flip' : '' ]"
+                  />
               </button>
             </el-col>
             <el-col
@@ -81,10 +77,8 @@
                 @click="sortColumn('role')"
               >
                 Role
-                <svg-icon
-                  class="sort-icon"
-                  :name="sortIcon('role')"
-                  color="currentColor"
+                <IconSort
+                  :class="[ this.isSorting('role') ? 'svg-flip' : '' ]"
                 />
               </button>
             </el-col>
@@ -111,9 +105,8 @@
       </div>
 
       <invite-member
-        :is-visible="isInviteVisible"
+        :dialog-visible="isInviteVisible"
         :header="modalHeader"
-        :blind-reviewer-invitation="blindReviewerInvitation"
         :all-org-members="people"
         @member-invited="onHandleMemberInvited"
         @close-invite-dialog="onCloseInviteDialog"
@@ -147,11 +140,13 @@ import { propOr, findIndex, propEq, reject, union } from 'ramda'
 import Sorter from  '../../../mixins/sorter'
 import UserRoles from  '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
+import IconSort from "../../icons/IconSort.vue";
 
 export default {
   name: 'PeopleList',
 
   components: {
+    IconSort,
     BfRafter,
     BfButton,
     OrgMember,
@@ -171,7 +166,6 @@ export default {
     return {
       isInviteVisible: false,
       modalHeader: 'Invite Team Member',
-      blindReviewerInvitation: false,
       allPeople: [],
       offset: 0,
       limit: 25,
@@ -307,7 +301,7 @@ export default {
      */
     sortColumn: function(key) {
       this.offset = 0
-      this.allPeople = this.returnSort(key, this.allPeople)
+      this.allPeople = this.returnSort(key, this.allPeople, 'desc')
     },
     /**
      * Updates pending users object with any missing fields required for sorting
@@ -383,17 +377,6 @@ export default {
      */
     openDialog: function() {
       this.modalHeader = 'Invite Team Member'
-      this.isInviteVisible = true
-      this.blindReviewerInvitation = false
-    },
-
-    /**
-     * Opens Blind Reviewer Dialog
-     */
-
-    openBlindReviewerDialog: function() {
-      this.modalHeader = 'Invite Blind Reviewer'
-      this.blindReviewerInvitation = true
       this.isInviteVisible = true
     },
 

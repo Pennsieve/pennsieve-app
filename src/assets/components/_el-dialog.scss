@@ -10,12 +10,22 @@
 }
 .el-dialog__header, .el-dialog__body {
   padding: 24px 32px;
+  margin: 0;
 }
-//.el-dialog__header {
-//  //background: $purple_2;
-//  //color: $white;
-//  //border-bottom: 1px solid $purple_3;
-//}
+
+.el-dialog {
+  &.light-header {
+    .el-dialog__header {
+      background: $white;
+      color: $gray_6;
+    }
+  }
+  .el-dialog__header {
+    background: $purple_2;
+    color: $white;
+  }
+}
+
 .el-dialog__footer {
   border-top: 1px solid $gray_2;
   text-align: left;

@@ -1,33 +1,35 @@
 <template>
   <el-dialog
-    class="simple"
+    class="dark-header"
     :show-close="false"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     @close="closeDialog"
   >
-    <bf-dialog-header slot="title" />
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        title="Confirm removing user"
+      />
+    </template>
 
     <dialog-body>
-      <h2 slot="heading">
-        Confirm Deletion
-      </h2>
       <p>Are you sure you want to delete the member: <strong>{{ memberDisplayName }}</strong>?</p>
 
-      <div class="dialog-simple-buttons">
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          class="red"
-          @click="removeMember"
-        >
-          Confirm
-        </bf-button>
-      </div>
+
     </dialog-body>
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        class="red"
+        @click="removeMember"
+      >
+        Confirm
+      </bf-button>
+    </template>
   </el-dialog>
 </template>
 
@@ -138,7 +140,7 @@ export default {
         this.$emit('member-removed', this.member)
         EventBus.$emit('toast', {
           detail: {
-            type: 'MESSAGE',
+            type: 'success',
             msg: `${this.memberDisplayName} removed from ${this.activeOrganization.organization.name}`
           }
         })

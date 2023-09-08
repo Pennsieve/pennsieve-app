@@ -17,12 +17,12 @@
 <!--  This is the websocket connection-->
 <!--  <bf-notifications />-->
 
-
 </template>
 
 <script>
 
 import { mapGetters, mapState, mapActions } from 'vuex'
+
 import { setPageTitle, setMeta } from './utils/meta'
 
 import globalMessageHandler from './mixins/global-message-handler'
@@ -32,9 +32,6 @@ import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
 import PsAnalytics from './components/analytics/Analytics.vue'
 // import BfNotifications from './components/notifications/Notifications.vue'
-
-
-
 
 export default {
   name: "app",

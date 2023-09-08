@@ -1,21 +1,12 @@
 <template>
   <el-dialog
-    class="log-in-dialog"
+    class="light-header"
     :modelValue="visible"
     @update:modelValue="visible = $event"
     :show-close="false"
     :width="dialogWidth"
     @close="closeLogInDialog"
   >
-
-    <template #header="{ close }" class="dialog-header">
-      <button class="log-in-dialog__close-dialog" @click="closeLogInDialog">
-        <IconRemove
-            :width="12"
-            color="#71747c"
-        />
-      </button>
-    </template>
 
     <div class="log-in-dialog__container" :class="containerClass">
       <img

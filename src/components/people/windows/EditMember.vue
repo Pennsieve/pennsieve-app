@@ -1,61 +1,41 @@
 <template>
   <el-dialog
+    class="dark-header"
     :show-close="false"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     @open="autoFocus"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      :title="memberDisplayName"
-    />
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        :title="memberDisplayName"
+      />
+    </template>
 
     <dialog-body>
       <el-form
         ref="memberForm"
         :model="ruleForm"
         :rules="rules"
+        label-position="top"
         @submit.native.prevent="updateMember('memberForm')"
       >
-        <el-form-item
-          label="First Name"
-          prop="firstName"
-        >
-          <a11y-keys @key-pressed="onHandleKeyPressed">
-            <el-input
-              v-model="ruleForm.firstName"
-              autofocus
-            />
-          </a11y-keys>
+        <el-form-item label="First Name" prop="firstName">
+          <el-input v-model="ruleForm.firstName" autofocus/>
         </el-form-item>
-        <el-form-item
-          label="Last Name"
-          prop="lastName"
-        >
-          <a11y-keys @key-pressed="onHandleKeyPressed">
-            <el-input v-model="ruleForm.lastName" />
-          </a11y-keys>
+        <el-form-item label="Last Name" prop="lastName">
+          <el-input v-model="ruleForm.lastName" />
         </el-form-item>
-        <el-form-item
-          label="Email"
-          prop="email"
-        >
-          <a11y-keys @key-pressed="onHandleKeyPressed">
-            <el-input v-model="ruleForm.email" />
-          </a11y-keys>
+        <el-form-item label="Email" prop="email">
+          <el-input v-model="ruleForm.email" />
         </el-form-item>
         <el-form-item label="Title">
-          <a11y-keys @key-pressed="onHandleKeyPressed">
-            <el-input v-model="ruleForm.credential" />
-          </a11y-keys>
+          <el-input v-model="ruleForm.credential" />
         </el-form-item>
       </el-form>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -65,12 +45,9 @@
       <bf-button @click="updateMember('memberForm')">
         Save
       </bf-button>
-    </span>
+    </template>
   </el-dialog>
 </template>
-
-<style lang="scss">
-</style>
 
 <script>
 import { mapGetters } from 'vuex'
@@ -224,7 +201,7 @@ export default {
         this.$emit('member-updated', updatedMember)
         EventBus.$emit('toast', {
           detail: {
-            type: 'MESSAGE',
+            type: 'success',
             msg: `Profile for ${this.memberDisplayName} updated`
           }
         })
@@ -233,7 +210,7 @@ export default {
       .catch(() => {
         EventBus.$emit('toast', {
           detail: {
-            type: 'ERROR',
+            type: 'error',
             msg: `Error updating ${this.memberDisplayName}`
           }
         })

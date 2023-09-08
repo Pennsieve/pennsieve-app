@@ -1,5 +1,6 @@
 <template>
   <el-dialog
+    class="dark-header"
     v-model="dialogVisible"
     :show-close="false"
     @open="handleOpen"
@@ -9,6 +10,7 @@
     <template #header="{ close, titleId, titleClass }">
       <bf-dialog-header
         title="Create an API Key"
+        class="my-header"
       />
     </template>
 
@@ -167,7 +169,7 @@ export default {
 
       EventBus.$emit('toast', {
         detail: {
-          type: 'MESSAGE',
+          type: 'success',
           msg: 'API key successfully added'
         }
       })
@@ -221,19 +223,3 @@ export default {
   }
 }
 </script>
-
-<style lang="scss">
-  @import '../../../assets/_variables';
-
-  .el-dialog {
-      width: 540px;
-  }
-
-  .el-dialog__header {
-    background: $purple_2;
-    color: $white;
-    border-bottom: 1px solid $purple_3;
-    margin: 0;
-  }
-
-</style>

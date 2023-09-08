@@ -1,13 +1,14 @@
 <template>
   <el-dialog
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="API Key"
-    />
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        title="Newly Created API Credentials"
+      />
+    </template>
 
     <dialog-body>
       <div class="api-key-message">
@@ -22,10 +23,7 @@
       </div>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="copyApiKey"
@@ -38,19 +36,19 @@
       >
         Copy API Secret
       </bf-button>
-    </span>
+    </template>
   </el-dialog>
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
 
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
+import {copyText} from "vue3-clipboard";
 
 export default {
-  name: 'DeleteApiKey',
+  name: 'ApiKeyDetail',
 
   components: {
     BfButton,
@@ -58,9 +56,19 @@ export default {
     DialogBody
   },
 
+  props: {
+    apiKey: {
+      type: Object,
+      default: {
+        name: '',
+        key: '',
+        secret: '',
+      },
+    },
+  },
+
   data() {
     return {
-      apiKey: {},
       copyText: '',
       dialogVisible: false,
       labelPosition: 'right'
@@ -73,7 +81,7 @@ export default {
      */
     copyApiKey: function() {
       const key = this.apiKey.key
-      this.$clipboard(key)
+      copyText(key)
       this.copyText = 'API key copied to the clipboard.'
     },
     /**
@@ -81,7 +89,7 @@ export default {
      */
     copyApiSecret: function() {
       const secret = this.apiKey.secret
-      this.$clipboard(secret)
+      copyText(secret)
       this.copyText = 'API secret copied to the clipboard.'
     },
     /**

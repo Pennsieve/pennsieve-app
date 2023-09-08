@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :show-close="false"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     class="simple"
     @close="closeDialog"
   >

@@ -6,7 +6,7 @@
     :disabled="!tooltip"
   >
     <div
-      class="avatar-circle"
+      :class="`avatar-circle ${classOption}`"
       :style="`backgroundColor: ${profileColor}`"
     >
       <img
@@ -29,6 +29,10 @@
     name: 'Avatar',
 
     props: {
+      classOption: {
+        type: String,
+        default: "icon"
+      },
       tooltip: {
         type: Boolean,
         default: false
@@ -153,9 +157,7 @@
 
     border: 2px solid #fff;
     flex-shrink: 0;
-    .condensed & {
-      margin-left: -12px
-    }
+
   }
   .avatar-initials {
     font-weight: 500;

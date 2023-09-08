@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="simple"
+    class="dark-header"
     v-model="dialogVisible"
     :show-close="false"
     @close="closeDialog"

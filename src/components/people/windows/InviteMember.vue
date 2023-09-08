@@ -1,21 +1,25 @@
 <template>
   <div>
     <el-dialog
+      class="dark-header"
       :show-close="false"
-      :visible.sync="dialogVisible"
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
       @open="autoFocus"
       @close="closeDialog"
     >
-      <bf-dialog-header
-        slot="title"
-        :title="header"
-      />
+      <template #header="{ close, titleId, titleClass }">
+        <bf-dialog-header
+          :title="header"
+        />
+      </template>
 
       <dialog-body>
         <el-form
           ref="invitationForm"
           :model="ruleForm"
           :rules="rules"
+          label-position='top'
           @submit.native.prevent="sendInvite('invitationForm')"
         >
           <el-form-item
@@ -37,9 +41,7 @@
             label="Email Address"
             prop="email"
           >
-            <a11y-keys @key-pressed="onHandleKeyPressed">
-              <el-input v-model="ruleForm.email" />
-            </a11y-keys>
+            <el-input v-model="ruleForm.email" />
           </el-form-item>
           <el-form-item
             label="Message (Optional)"
@@ -54,10 +56,7 @@
         </el-form>
       </dialog-body>
 
-      <span
-        slot="footer"
-        class="dialog-footer"
-      >
+      <template #footer>
         <bf-button
           class="secondary"
           @click="closeDialog"
@@ -67,8 +66,10 @@
         <bf-button @click="sendInvite('invitationForm')">
           Confirm
         </bf-button>
-      </span>
+      </template>
+
     </el-dialog>
+
     <invite-confirmation
       :is-visible="confirmationModalVisible"
       :email="emailVal"
@@ -106,7 +107,7 @@ export default {
   ],
 
   props: {
-    isVisible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },
@@ -126,7 +127,6 @@ export default {
 
   data() {
     return {
-      dialogVisible: false,
       confirmationModalVisible: false,
       labelPosition: 'right',
       emailVal: '',
@@ -148,17 +148,6 @@ export default {
           { type: 'email', validator: this.checkEmail, trigger: 'false' }
         ]
       }
-    }
-  },
-
-  watch: {
-    isVisible: {
-      handler: function(val) {
-        if (val !== undefined) {
-          this.dialogVisible = val
-        }
-      },
-      immediate: true
     }
   },
 
@@ -328,3 +317,4 @@ export default {
   }
 }
 </script>
+

@@ -79,7 +79,6 @@ export default {
       'profile',
       'hasFeature',
       'publisherTeam',
-      'isFederatedLoginInProgress',
     ]),
 
     ...mapState([

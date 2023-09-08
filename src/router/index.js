@@ -68,7 +68,7 @@ const router = createRouter({
       name: "people",
       path: '/:orgId/people',
       components: {
-        // page: People,
+        page: People,
         navigation: BfNavigation
       },
       children: [

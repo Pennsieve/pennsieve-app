@@ -8,6 +8,10 @@
   padding: 0;
 }
 
+.el-input__inner {
+  height: 40px;
+}
+
 .el-textarea__inner, .el-input__inner, .text-disabled {
   border: 1px solid $gray_3;
   border-radius: 3px;
@@ -16,7 +20,6 @@
   font-family: $system-font;
   padding: 0 16px;
   resize: none;
-  height: 40px;
   line-height: 40px;
   &::-webkit-outer-spin-button,
   &::-webkit-inner-spin-button {

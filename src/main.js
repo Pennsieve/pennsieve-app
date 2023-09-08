@@ -9,6 +9,8 @@ import Cookies from 'js-cookie'
 import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
 import {ElMessage} from 'element-plus'
+import VueClipboard from 'vue3-clipboard'
+
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
@@ -19,6 +21,10 @@ Amplify.configure(AWSConfig)
 const app = createApp(App);
 
 app.use(store);
+app.use(VueClipboard, {
+    autoSetContainer: true,
+    appendToBody: true,
+})
 
 app.use(router);
 

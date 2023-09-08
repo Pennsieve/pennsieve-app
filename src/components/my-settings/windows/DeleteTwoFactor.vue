@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="simple"
+    class="dark-header"
     :visible.sync="dialogVisible"
     :show-close="false"
     @close="closeDialog"

@@ -71,13 +71,16 @@
           @command="handleCommand"
         >
           <span class="el-dropdown-link">
-            <svg-icon
-              name="icon-menu"
-              height="20"
-              width="20"
+
+
+            <icon-menu
+              :height="20"
+              :width="20"
             />
+
           </span>
-          <el-dropdown-menu
+          <template #dropdown>
+            <el-dropdown-menu
             v-if="status === 'Pending' || status === 'Expired'"
             slot="dropdown"
             :offset="9"
@@ -90,7 +93,7 @@
               Delete Member
             </el-dropdown-item>
           </el-dropdown-menu>
-          <el-dropdown-menu
+            <el-dropdown-menu
             v-if="status !== 'Pending' && status !== 'Expired'"
             slot="dropdown"
             :offset="9"
@@ -123,12 +126,12 @@
             >
               Remove Admin Privileges
             </el-dropdown-item>
-            <el-dropdown-item
-              command="reset-password"
-              class="bf-menu-item"
-            >
-              Reset Password
-            </el-dropdown-item>
+<!--            <el-dropdown-item-->
+<!--              command="reset-password"-->
+<!--              class="bf-menu-item"-->
+<!--            >-->
+<!--              Reset Password-->
+<!--            </el-dropdown-item>-->
             <el-dropdown-item
               command="remove"
               class="bf-menu-item"
@@ -136,6 +139,7 @@
               Delete Member
             </el-dropdown-item>
           </el-dropdown-menu>
+          </template>
         </el-dropdown>
       </el-col>
     </el-row>
@@ -152,11 +156,13 @@ import { mapGetters } from 'vuex'
 
 import { propOr } from 'ramda'
 import moment from 'moment'
+import IconMenu from "../../icons/IconMenu.vue";
 
 export default {
   name: 'OrgMember',
 
   components: {
+    IconMenu,
     User
   },
 
