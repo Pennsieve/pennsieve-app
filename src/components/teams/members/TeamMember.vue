@@ -21,11 +21,11 @@
           class="tools"
           @click="openDeleteMember(item)"
         >
-          <svg-icon
-            icon="icon-remove"
-            height="10"
-            width="10"
-          />
+          <IconRemove
+            :height="10"
+            :width="10"
+            />
+
         </button>
       </el-col>
     </el-row>
@@ -38,11 +38,13 @@ import User from '../../shared/user/User.vue'
 import UserRoles from '../../../mixins/user-roles'
 import EventBus from '../../../utils/event-bus'
 import { propOr } from 'ramda'
+import IconRemove from "../../icons/IconRemove.vue";
 
 export default {
   name: 'TeamMember',
 
   components: {
+    IconRemove,
     User
   },
 
@@ -74,12 +76,14 @@ export default {
   methods: {
     /**
      * Removes an org member from either a list or from the team
+     * List is used when adding new team members.
      */
     openDeleteMember: function(member) {
       if (this.removeFromList) {
         return this.$emit('remove-member-from-list', member)
       }
-      EventBus.$emit('open-remove-collaborator', member)
+      this.$emit('open-remove-collaborator', member)
+      // EventBus.$emit('open-remove-collaborator', member)
     }
   }
 }

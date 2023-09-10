@@ -38,24 +38,26 @@
               <bf-button class="secondary icon el-dropdown-link">
                 <IconMenu/>
               </bf-button>
-              <el-dropdown-menu
-                slot="dropdown"
-                class="bf-menu"
-              >
-                <el-dropdown-item
-                  command="edit"
-                  class="bf-menu-item"
+              <template #dropdown>
+                <el-dropdown-menu
+                  slot="dropdown"
+                  class="bf-menu"
                 >
-                  Update Team
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-if="!isSystemTeam"
-                  command="delete"
-                  class="bf-menu-item"
-                >
-                  Delete Team
-                </el-dropdown-item>
-              </el-dropdown-menu>
+                  <el-dropdown-item
+                    command="edit"
+                    class="bf-menu-item"
+                  >
+                    Update Team
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="!isSystemTeam"
+                    command="delete"
+                    class="bf-menu-item"
+                  >
+                    Delete Team
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
             </el-dropdown>
           </div>
         </div>
@@ -100,7 +102,7 @@
               >
                 Name
                 <IconSort
-                  :class="[ isSorting('lastName')  ? 'svg-flip' : '' ]"
+                  :class="[ this.sortDirection === 'desc' ? 'svg-flip' : '' ]"
                 />
               </button>
             </el-col>
@@ -116,6 +118,7 @@
           class="bf-table-row"
           :item="member"
           :has-admin-rights="hasAdminRights"
+          @open-remove-collaborator="openDeleteMemberDialog"
         />
       </div>
 
@@ -154,12 +157,18 @@
 
       <remove-collaborator
         :team="team"
+        :member="selectedTeamMember"
+        :dialog-visible="removeDialogVisible"
         @team-member-removed="onTeamMemberRemoved"
+        @close-dialog="closeDeleteDialog"
       />
 
       <create-edit-team
         :team="team"
+        :dialog-visible="editTeamDialogVisible"
+        :is-editing="true"
         @team-updated="onTeamUpdated"
+        @close-dialog="closeTeamDialog"
       />
 
       <remove-team />
@@ -216,11 +225,14 @@ export default {
   data() {
     return {
       addTeamMemberDialogVisible: false,
-      dialogVisible: false,
       allMembers: [],
       offset: 0,
       limit: 25,
-      team: {}
+      team: {},
+      removeDialogVisible: false,
+      editTeamDialogVisible: false,
+      selectedTeamMember: {},
+      sortDirection: "asc"
     }
   },
 
@@ -274,6 +286,16 @@ export default {
     ...mapActions([
       'updatePublishers',
     ]),
+    closeTeamDialog: function() {
+      this.editTeamDialogVisible = false
+    },
+    openDeleteMemberDialog: function(member) {
+      this.selectedTeamMember = member
+      this.removeDialogVisible = true
+    },
+    closeDeleteDialog: function() {
+      this.removeDialogVisible = false
+    },
 
     closeAddMemberDialog: function() {
       this.addTeamMemberDialogVisible = false
@@ -387,7 +409,8 @@ export default {
      */
     sortColumn: function(key) {
       this.offset = 0
-      this.allMembers = this.returnSort(key, this.allMembers)
+      this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc"
+      this.allMembers = this.returnSort(key, this.allMembers, this.sortDirection)
     },
     /**
      * Opens confirmation dialog to delete a team
@@ -399,7 +422,8 @@ export default {
      * Opens edit dialog for a team
      */
     openEditTeam: function() {
-      EventBus.$emit('open-edit-team', this.team)
+      this.editTeamDialogVisible = true
+      // EventBus.$emit('open-edit-team', this.team)
     },
     /**
      * Opens add user modal

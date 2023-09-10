@@ -4,23 +4,18 @@
 .el-input__inner{
   background-color: white;
 }
-.el-input__wrapper {
-  padding: 0;
-}
 
 .el-input__inner {
   height: 40px;
 }
 
 .el-textarea__inner, .el-input__inner, .text-disabled {
-  border: 1px solid $gray_3;
   border-radius: 3px;
   background: white;
   color: $gray_4;
   font-family: $system-font;
   padding: 0 16px;
   resize: none;
-  line-height: 40px;
   &::-webkit-outer-spin-button,
   &::-webkit-inner-spin-button {
     display: none;
@@ -28,45 +23,11 @@
   &::placeholder {
     color: $gray_4;
   }
-  //&:focus, .el-form-item.is-success &:focus {
-  //  border-color: $app-primary-color;
-  //}
-  //.el-form-item.is-error &, .el-form-item.is-error &:focus {
-  //  border: 1px solid $error-color;
-  //}
   .el-form-item.is-success & {
     border-color: $gray_2;
   }
   .is-disabled &, &.text-disabled {
     background: $gray_1;
     border-color: $gray_2 !important;
-  }
-  //.simple & {
-  //  border: none;
-  //  height: auto;
-  //  padding: 0;
-  //}
-}
-.el-textarea__inner {
-  line-height: 16px;
-  padding: 11px 16px;
-}
-.text-disabled {
-  min-height: 40px;
-  padding: 11px 16px;
-  line-height: 16px;
-  &.icon {
-    box-sizing: border-box;
-    padding-right: 48px;
-    position: relative;
-    .el-form-item & {
-      display: inline-block;
-      width: 100%
-    }
-    .svg-icon {
-      right: 20px;
-      position: absolute;
-      top: 8px;
-    }
   }
 }

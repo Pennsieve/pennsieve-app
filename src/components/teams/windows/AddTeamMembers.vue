@@ -4,7 +4,7 @@
     :show-close="false"
     :modelValue="dialogVisible"
     @update:modelValue="dialogVisible = $event"
-    @open="resetForm('userSearchForm')"
+    @open="resetForm()"
     @close="closeDialog"
   >
 
@@ -18,71 +18,46 @@
     <dialog-body>
       <div class="team-name-wrapper">
         <IconTeam
+          class="team-icon"
           :height="20"
           :width="20"
           />
-
-<!--        <svg-icon-->
-<!--          icon="icon-team"-->
-<!--          class="team-icon"-->
-<!--          height="20"-->
-<!--          width="20"-->
-<!--          color="currentColor"-->
-<!--        />-->
         <div class="team-name">
           Adding to {{ teamName }}
         </div>
       </div>
-      <el-form
-        ref="userSearchForm"
-        :model="ruleForm"
-        :rules="rules"
-        @submit.native.prevent="addToTeam('userSearchForm')"
-      >
-        <el-input
-          v-model="ruleForm.searchText"
-          placeholder="Find by name or email address"
-          @input="filterMembers"
-          @focus="toggleMembers(true)"
+
+      <el-autocomplete
+        class="add-member-input"
+        v-model="searchText"
+        placeholder="Find by name or email address"
+        :fetch-suggestions="filterMembers"
+        popper-class="pennsieve-autocomplete"
+        @select="selectMember"
         >
+        <template #prefix>
           <div
             slot="prefix"
             class="search-icon-wrapper"
           >
-            <svg-icon
-              icon="icon-magnifying-glass"
-              class="search-icon"
-              height="24"
-              width="24"
+            <IconMagnifyingGlass
+              :height="24"
+              :width="24"
             />
+
           </div>
-        </el-input>
-      </el-form>
-      <el-popover
-        id="autocompletePopover"
-        ref="popover"
-        popper-class="autocomplete"
-        placement="bottom"
-        trigger="manual"
-        transition=""
-        :visible-arrow="false"
-      >
-        <ul>
-          <li
-            v-for="member in filteredMembers"
-            :key="member.id"
-            class="filtered-member"
-            @click="selectMember(member)"
-          >
-            <div class="name">
-              <span v-html="highlight(ruleForm.searchText, fullName(member))" />
-            </div>
-            <div class="email">
-              <span v-html="highlight(ruleForm.searchText, member.email)" />
-            </div>
-          </li>
-        </ul>
-      </el-popover>
+        </template>
+        <template #default="{ item }">
+          <div class="name">
+            <span v-html="highlight(searchText, fullName(item))" />
+          </div>
+          <div class="email">
+            <span v-html="highlight(searchText, item.email)" />
+          </div>
+        </template>
+
+      </el-autocomplete>
+
       <div class="org-members">
         <team-member
           v-for="member in selectedMembers"
@@ -103,7 +78,7 @@
       </bf-button>
       <bf-button
         class="primary"
-        @click="addToTeam('userSearchForm')"
+        @click="addToTeam()"
       >
         Add to Team
       </bf-button>
@@ -113,10 +88,6 @@
   </el-dialog>
 </template>
 
-<style lang="scss">
-@import '../../../assets/_variables.scss';
-@import '../../../assets/components/_add-member-dialog.scss';
-</style>
 
 <script>
 import { mapGetters } from 'vuex'
@@ -130,14 +101,15 @@ import Request from  '../../../mixins/request'
 import Sorter from  '../../../mixins/sorter'
 import EventBus from '../../../utils/event-bus'
 import HighlightText from '../../../mixins/highlight-text'
-import { findParentById } from '../../../utils/findParentById'
 import { pathOr, propOr, find, propEq } from 'ramda'
 import IconTeam from "../../icons/IconTeam.vue";
+import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 
 export default {
   name: 'AddTeamMembers',
 
   components: {
+    IconMagnifyingGlass,
     IconTeam,
     BfButton,
     TeamMember,
@@ -173,25 +145,11 @@ export default {
   },
 
   data() {
-    /* istanbul ignore next */
-    const checkSelectedMembers = (rule, value, callback) => {
-      if (this.selectedMembers.length === 0) {
-        return callback('At least one team member is required')
-      }
-      return callback()
-    }
     return {
       filteredMembers: [],
       selectedMembers: [],
       origMembers: [],
-      ruleForm: {
-        searchText: ''
-      },
-      rules: {
-        searchText: [
-          { validator: checkSelectedMembers, trigger: 'false' },
-        ],
-      }
+      searchText: "",
     }
   },
 
@@ -208,23 +166,6 @@ export default {
     }
   },
 
-  mounted() {
-    EventBus.$on('open-add-team-members', this.onOpenTeamMembers.bind(this))
-
-    this.$el.addEventListener('click', (evt) => {
-      if (!this.$refs.popover.showPopper) {
-        return
-      }
-      const targ = evt.target.tagName.toLowerCase()
-      const visibility = (targ === 'input') ? true : findParentById(evt.target, 'autocompletePopover')
-      this.toggleMembers(visibility)
-    })
-  },
-
-  beforeDestroy() {
-    EventBus.$off('open-add-team-members', this.onOpenTeamMembers.bind(this))
-  },
-
   methods: {
     /**
      * Builds the user's full name
@@ -238,14 +179,8 @@ export default {
     /**
      * Add users to team
      */
-    addToTeam: function(formName) {
-      this.$refs[formName]
-        .validate((valid) => {
-          if (!valid) {
-            return
-          }
-          this.addToTeamRequest()
-        })
+    addToTeam: function() {
+      this.addToTeamRequest()
     },
     /**
      * Creates the add to team
@@ -273,7 +208,7 @@ export default {
           this.$emit('members-added-to-team', members)
           EventBus.$emit('toast', {
             detail: {
-              type: 'MESSAGE',
+              type: 'info',
               msg: `Team member(s) added for ${this.teamName}`
             }
           })
@@ -287,14 +222,6 @@ export default {
     selectMember: function(member) {
       this.selectedMembers.push(member)
       this.filteredMembers = this.filteredMembers.filter(fm => fm.id !== member.id)
-      this.toggleMembers(false)
-    },
-    /**
-     * Toggles filtered members autocomplete list
-     * @param {Boolean} bool
-     */
-    toggleMembers: function(bool) {
-      this.$refs.popover.showPopper = bool
     },
     /**
      * Removes a team member from filtered list
@@ -307,8 +234,14 @@ export default {
      * Filters org members based on searchText
      */
     filterMembers: function() {
-      const searchText = this.ruleForm.searchText.toLowerCase()
-      const list = this.origMembers.filter(member => {
+      const originalList = this.orgMembers.filter(orig => {
+        const existingMember = find(propEq('id', orig.id), this.members)
+        const guestUser = orig.role === 'guest'
+        return !existingMember && !guestUser
+      })
+
+      const searchText = this.searchText.toLowerCase()
+      const list = originalList.filter(member => {
         const selectedMember = find(propEq('id', member.id), this.selectedMembers)
         return !selectedMember
       })
@@ -319,49 +252,121 @@ export default {
         const email = propOr('', 'email', mem).toLowerCase()
         return name.indexOf(searchText) >= 0 || email.indexOf(searchText) >= 0
       })
-      this.filteredMembers = filteredList.length > 0 ? filteredList : []
-    },
-    /**
-     * Handles open-add-team-members event
-     */
-    onOpenTeamMembers: function() {
-      this.dialogVisible = true
-      if (this.filteredMembers.length === 0 && this.orgMembers) {
-        this.getMembers()
-      }
+      return filteredList.length > 0 ? filteredList : []
     },
     /**
      * Closes the dialog
      */
     closeDialog: function() {
-      // this.dialogVisible = false
       this.filteredMembers = []
       this.selectedMembers = []
-      this.toggleMembers(false)
       this.$emit('close-dialog')
     },
     /**
-     * Gets all members within an org
-     */
-    getMembers: function() {
-      const originalList = this.orgMembers.filter(orig => {
-        const existingMember = find(propEq('id', orig.id), this.members)
-        const guestUser = orig.role === 'guest'
-        return !existingMember && !guestUser
-      })
-      this.origMembers = this.returnSort('lastName', originalList)
-      this.filteredMembers = this.origMembers
-    },
-    /**
      * Resets form fields and validations
-     * @param {String} formName
      */
-    resetForm: function(formName) {
-      this.ruleForm.searchText = ''
-      this.$nextTick(() => {
-        this.$refs[formName].resetFields()
-      })
+    resetForm: function() {
+      this.searchText = ''
     },
   }
 }
 </script>
+
+<style lang="scss">
+@import '../../../assets/_variables.scss';
+
+.add-member-input {
+  width:100%
+}
+
+.add-member-dialog {
+  .search-icon-wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    .search-icon {
+      color: $gray_4;
+    }
+  }
+
+  .org-members {
+    box-sizing: border-box;
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid $gray_2;
+    border-radius: 3px;
+    height: 200px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .team-name-wrapper {
+    display: flex;
+    margin-bottom: 26px;
+
+    .team-name {
+      font-size: 14px;
+      line-height: 20px;
+      margin-left: 8px;
+      color: #000;
+    }
+  }
+
+  .team-icon {
+    color: $purple_1;
+  }
+
+  .collaborators-icon {
+    color: $purple_1;
+  }
+
+  .el-dialog__body {
+    position: relative;
+  }
+
+  .autocomplete {
+    width: 100%;
+    max-width: 474px;
+    max-height: 225px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0;
+
+    h4 {
+      margin: 8px 0 8px 8px;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+
+      li {
+        margin: 0;
+        padding: 8px;
+
+        .email {
+          color: $gray_6;
+        }
+
+        &:hover {
+          cursor: pointer;
+          color: $white;
+          background: $purple_1;
+
+          .email {
+            color: $white;
+          }
+        }
+      }
+    }
+  }
+}
+
+.filtered-member {
+  margin: 8px;
+  padding: 8px;
+}
+</style>

@@ -1,19 +1,17 @@
 <template>
   <el-dialog
-    class="simple"
+    class="light-header fixed-width simple"
     :show-close="false"
-    :visible.sync="dialogVisible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     @close="closeDialog"
   >
-    <bf-dialog-header slot="title" />
+
     <dialog-body>
-      <svg-icon
-        slot="icon"
-        icon="icon-person"
+      <IconPerson
         class="person-icon"
-        height="32"
-        width="32"
-        color="currentColor"
+        :height="32"
+        :width="32"
       />
       <h2 slot="heading">
         Delete {{ member.firstName }} {{ member.lastName }}?
@@ -37,13 +35,7 @@
   </el-dialog>
 </template>
 
-<style lang="scss">
-@import '../../../assets/variables.scss';
 
-.person-icon {
-  color: $purple_1;
-}
-</style>
 
 <script>
 import { mapGetters } from 'vuex'
@@ -52,11 +44,13 @@ import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import IconPerson from "../../icons/IconPerson.vue";
 
 export default {
   name: 'RemoveCollaborator',
 
   components: {
+    IconPerson,
     BfButton,
     BfDialogHeader,
     DialogBody
@@ -67,32 +61,34 @@ export default {
   ],
 
   props: {
+    dialogVisible: {
+      type: Boolean,
+      default: false,
+    },
     team: {
       type: Object
+    },
+    member: {
+      type: Object,
+      default: {
+        firstName: "?",
+        lastname: "?"
+      }
     }
   },
 
   computed: {
-    ...mapGetters([,
+    ...mapGetters([
       'activeOrganization',
       'userToken',
       'config'
-    ])
+    ]),
   },
 
   data() {
     return {
-      dialogVisible: false,
-      member: {}
+      // member: {}
     }
-  },
-
-  mounted() {
-    EventBus.$on('open-remove-collaborator', this.handleOpenRemoveCollaborator.bind(this))
-  },
-
-  beforeDestroy() {
-    EventBus.$off('open-remove-collaborator', this.handleOpenRemoveCollaborator.bind(this))
   },
 
   methods: {
@@ -100,14 +96,13 @@ export default {
      * Closes remove member dialog
      */
     closeDialog: function() {
-      this.dialogVisible = false
+      this.$emit("close-dialog")
     },
     /**
      * Handles open-remove-collaborator event
      * @param {Object} member
      */
     handleOpenRemoveCollaborator: function(member) {
-      this.dialogVisible = true
       this.member = member
     },
     /**
@@ -130,7 +125,7 @@ export default {
         this.$emit('team-member-removed', this.member)
         EventBus.$emit('toast', {
           detail: {
-            type: 'MESSAGE',
+            type: 'info',
             msg: `${this.member.firstName} ${this.member.lastName} removed from ${this.team.team.name}`
           }
         })
@@ -141,3 +136,11 @@ export default {
   }
 }
 </script>
+
+<style lang="scss">
+@import '../../../assets/variables.scss';
+
+.person-icon {
+  color: $purple_1;
+}
+</style>

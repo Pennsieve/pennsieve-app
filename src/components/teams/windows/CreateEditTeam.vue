@@ -3,7 +3,7 @@
     :show-close="false"
     :modelValue="dialogVisible"
     @update:modelValue="dialogVisible = $event"
-    @open="autoFocus"
+    @open="onOpen"
     @close="closeDialog"
   >
 
@@ -60,19 +60,18 @@
 import { mapGetters } from 'vuex'
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from  '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 import {  path, pathOr, pathEq } from 'ramda'
+import autoFocus from "../../../mixins/auto-focus";
 
 export default {
   name: 'CreateEditTeam',
 
   components: {
     BfButton,
-    A11yKeys,
     BfDialogHeader,
     DialogBody
   },
@@ -88,10 +87,18 @@ export default {
       'userToken',
       'config',
       'teams'
-    ])
+    ]),
+    modalTitle: function() {
+      return this.isEditing ? 'Update Team': 'Create Team'
+    },
   },
 
   props: {
+    // If true, we are updating an existing team
+    isEditing: {
+      type: Boolean,
+      default: false
+    },
     dialogVisible: {
       type: Boolean,
       default: false
@@ -99,7 +106,6 @@ export default {
     team: {
       type: Object,
       default: function() {
-        /* istanbul ignore next */
         return {}
       }
     }
@@ -116,8 +122,8 @@ export default {
       return callback()
     }
     return {
-      modalTitle: 'Create team',
-      isEditing: false,
+      // modalTitle: 'Create team',
+      // isEditing: false,
       ruleForm: {
         name: ''
       },
@@ -130,6 +136,12 @@ export default {
   },
 
   methods: {
+    onOpen: function() {
+      console.log("help")
+      if (this.isEditing) {
+        this.ruleForm.name = this.team.team.name
+      }
+    },
     /**
      * Handles key-pressed event
      * @param {Object} evt
@@ -138,19 +150,19 @@ export default {
       evt.preventDefault()
       this.createEditTeam('teamForm')
     },
-    /**
-     * Handles open-edit-team and open-create-team events
-     * @param {Object} team
-     */
-    onOpenTeam: function(team) {
-
-      const teamName = pathOr('', ['team', 'name'], team)
-      if (teamName.length > 0) {
-        this.isEditing = true
-        this.modalTitle = 'Update team'
-        this.ruleForm.name = teamName
-      }
-    },
+    // /**
+    //  * Handles open-edit-team and open-create-team events
+    //  * @param {Object} team
+    //  */
+    // onOpenTeam: function(team) {
+    //
+    //   const teamName = pathOr('', ['team', 'name'], team)
+    //   if (teamName.length > 0) {
+    //     this.isEditing = true
+    //     this.modalTitle = 'Update team'
+    //     this.ruleForm.name = teamName
+    //   }
+    // },
     /**
      * Verifies that team name is unique
      * @param {String} name
