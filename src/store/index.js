@@ -7,6 +7,7 @@ import * as R from "ramda";
 import datasetModule from './datasetModule'
 import integrationsModule from './integrationsModule'
 import collectionsModule from './collectionsModule'
+import viewerModule from './viewerModule'
 
 
 
@@ -178,7 +179,7 @@ export default createStore({
     },
     CLEAR_STATE(state) {
       state.profile = {};
-      state.userToken = ".";
+      state.userToken = "";
       state.activeOrganization = {};
       state.organizations = {};
       state.orgMembers = [];
@@ -265,9 +266,9 @@ export default createStore({
       state.publishers = publishers;
       state.publishersLoading = false;
     },
-    SET_LAST_ROUTE(state, route) {
-      state.lastRoute = route;
-    },
+    // SET_LAST_ROUTE(state, route) {
+    //   state.lastRoute = route;
+    // },
     UPDATE_CONCEPTS(state, concepts) {
       state.concepts = concepts;
       state.conceptsHash = hashFunction("id", [...concepts]);
@@ -677,7 +678,7 @@ export default createStore({
     updateUserToken: ({ commit }, evt) => commit("UPDATE_USER_TOKEN", evt),
     clearState: ({ commit }) => {
       commit("CLEAR_STATE");
-      commit("viewer/CLEAR_STATE");
+      commit("viewerModule/CLEAR_STATE");
       commit("datasetModule/CLEAR_STATE");
     },
     updateCurDataset: ({ commit }, evt) =>
@@ -705,7 +706,7 @@ export default createStore({
     setDatasetBanner: ({ commit }, evt) => commit("SET_DATASET_BANNER", evt),
     updateTeams: ({ commit }, evt) => commit("UPDATE_TEAMS", evt),
     updatePublishers: ({ commit }, evt) => commit("UPDATE_PUBLISHERS", evt),
-    setLastRoute: ({ commit }, evt) => commit("SET_LAST_ROUTE", evt),
+    // setLastRoute: ({ commit }, evt) => commit("SET_LAST_ROUTE", evt),
     updateConcepts: ({ commit }, evt) => commit("UPDATE_CONCEPTS", evt),
     updateIsLoadingConcepts: ({ commit }, evt) =>
       commit("UPDATE_IS_LOADING_CONCEPTS", evt),
@@ -892,8 +893,8 @@ export default createStore({
     },
     isDatasetOwner: (state) => state.isDatasetOwner,
     teams: (state) => state.teams,
-    lastRoute: (state) => state.lastRoute,
-    getLastRoute: (state) => () => state.lastRoute,
+    // lastRoute: (state) => state.lastRoute,
+    // getLastRoute: (state) => () => state.lastRoute,
     concepts: (state) => state.concepts,
     isLoadingConcepts: (state) => state.isLoadingConcepts,
     editingInstance: (state) => state.editingInstance,
@@ -1029,7 +1030,8 @@ export default createStore({
   modules: {
     datasetModule,
     integrationsModule,
-    collectionsModule
+    collectionsModule,
+    viewerModule
   }
 
 });

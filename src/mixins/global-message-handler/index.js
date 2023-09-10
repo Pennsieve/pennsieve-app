@@ -240,8 +240,8 @@ export default {
           this.updateProfile(profile)
           this.updateUserToken(token)
 
-          const sortedOrgs = this.returnSort('organization.name', orgs.organizations, 'asc')
-          this.updateOrganizations(sortedOrgs)
+          const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
+            this.updateOrganizations(sortedOrgs)
 
           const preferredOrgId = profile.preferredOrganization
           // check route params for orgId
@@ -354,7 +354,7 @@ export default {
             }
           } else {
             this.setDefaultRoute(orgId)
-          }
+         }
         })
         .catch(this.handleXhrError.bind(this))
     },

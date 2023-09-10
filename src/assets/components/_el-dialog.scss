@@ -14,6 +14,10 @@
 }
 
 .el-dialog {
+  &.fixed-width {
+    width: 540px
+  }
+
   &.light-header {
     .el-dialog__header {
       background: $white;

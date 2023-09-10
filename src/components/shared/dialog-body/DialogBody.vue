@@ -1,14 +1,14 @@
 <template>
   <div :class="classNames">
     <div
-      v-if="$slots['icon']"
+      v-if="hasSlot('icon')"
       class="dialog-body-icon"
     >
       <slot name="icon" />
     </div>
 
     <div
-      v-if="$slots['heading']"
+      v-if="hasSlot('heading')"
       class="dialog-body-heading"
     >
       <slot name="heading" />
@@ -30,10 +30,10 @@
     flex-direction: column;
     justify-content: center;
     .simple & {
-      padding: 64px 48px;
+      //padding: 64px 48px;
       text-align: center;
       &.icon {
-        padding: 48px;
+        //padding: 48px;
       }
     }
   }
@@ -48,7 +48,7 @@
       padding: 0 0px;
       text-align: center;
       &.icon {
-        padding: 48px;
+        //padding: 48px;
       }
     }
   }
@@ -85,13 +85,13 @@
     display: flex;
     margin-top: 16px;
     justify-content: center;
-    .bf-button:nth-child(2) {
+    .bf-button{
       margin-left: 8px;
     }
   }
 
   .spacing {
-    padding: 64px 7px;
+    //padding: 64px 7px;
   }
 </style>
 
@@ -99,6 +99,10 @@
   export default {
     name: 'DialogBody',
 
+    setup(props, { slots }) {
+      const hasSlot = name => !!slots[name]
+      return { hasSlot }
+    },
     props: {
       fixedHeight: {
         type: Boolean,

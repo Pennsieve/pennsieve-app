@@ -386,7 +386,7 @@
             return response.json()
           })
           .then(response => {
-            const sortedModels = this.returnSort('displayName', response, 'asc')
+            const sortedModels = this.returnSort('displayName', response)
             this.updateConcepts(sortedModels)
               .then(() => {
                 this.updateIsLoadingConcepts(false)

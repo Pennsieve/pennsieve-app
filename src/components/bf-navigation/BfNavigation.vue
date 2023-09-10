@@ -117,14 +117,20 @@
         </template>
       </bf-navigation-item>
 
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"-->
-<!--        :link="{ name: 'teams-list', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Teams"-->
-<!--        icon="icon-team"-->
-<!--        :condensed="primaryNavCondensed"-->
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        :link="{ name: 'teams-list', params: {orgId: activeOrganizationId} }"
+        label="Teams"
+        :condensed="primaryNavCondensed"
 
-<!--      />-->
+      >
+        <template v-slot:icon>
+          <IconTeam
+            :width="20"
+            :height="20"
+          />
+        </template>
+      </bf-navigation-item>
 
 <!--      <bf-navigation-item-->
 <!--        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"-->
@@ -175,6 +181,7 @@
   import IconNavExpand from "../icons/IconNavExpand.vue";
   import IconDatasets from "../icons/IconDatasets.vue"
   import IconPerson from "../icons/IconPerson.vue";
+  import IconTeam from "../icons/IconTeam.vue";
 
   export default {
     name: 'BfNavigation',
@@ -187,6 +194,7 @@
       BfNavigationItem,
       BfNavigationTertiary,
       IconDatasets,
+      IconTeam
 
       // BfOrganizationsList
     },

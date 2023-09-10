@@ -4,14 +4,6 @@
       <PennsieveLogo class="logo" color="white" />
     </div>
 
-    <!-- <div
-      v-if="isSearchVisible"
-      class="dataset-search-wrap"
-      :class="{ 'mobile-search-open': isMobileSearchOpen }"
-    >
-      <dataset-search ref="datasetSearch" submit-button-type="secondary" />
-    </div> -->
-
     <div class="nav-links">
       <a
         v-if="isMobile && isSearchVisible"

@@ -90,7 +90,7 @@ describe('sorter Mixin', () => {
       {id: 2, firstName: 'Stimpy', lastName: 'Cat'},
     ]
     const sortedList = ref.returnSort('lastName', list)
-    expect(ref.sortBy).toBe('lastName')
+      expect(ref.sortBy).toBe('lastName')
     expect(sortedList[0].lastName).toBe('Cat')
   })
 
@@ -102,7 +102,7 @@ describe('sorter Mixin', () => {
       {id: 2, name: 'Stimpy Cat'},
     ]
     const sortedList = ref.returnSort('name', list)
-    expect(sortedList[0].name).toBe('Stimpy Cat')
+      expect(sortedList[0].name).toBe('Stimpy Cat')
   })
 
   it('returnSort(): path support', () => {
@@ -111,7 +111,7 @@ describe('sorter Mixin', () => {
       {team: {id: 2, name: 'Justice League', storage: 123}},
     ]
     const sortedList = cmp.vm.returnSort('team.storage', list)
-    expect(sortedList[0].team.storage).toBe(123)
+      expect(sortedList[0].team.storage).toBe(123)
   })
 
   it('sortIcon', () => {

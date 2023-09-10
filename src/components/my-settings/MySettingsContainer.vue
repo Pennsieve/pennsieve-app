@@ -778,11 +778,11 @@ export default {
         apiKeys.push(payload.apiKey)
 
         // update keys list
-        this.apiKeys = this.returnSort('name', apiKeys, this.sortDirection)
+        this.apiKeys = this.returnSort('name', apiKeys)
       } else if (type === 'DELETED') {
         const index = this.apiKeys.findIndex(item => item.key === apiKey.key)
         apiKeys.splice(index, 1)
-        this.apiKeys = this.returnSort('name', apiKeys, this.sortDirection)
+        this.apiKeys = this.returnSort('name', apiKeys)
       }
     },
 

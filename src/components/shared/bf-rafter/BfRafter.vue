@@ -20,7 +20,7 @@
     </template>
 
     <div
-      v-if="this.$slots['breadcrumb'] == 'has-breadcrumb'"
+      v-if="this.$slots.breadcrumb"
       class="row bf-rafter-breadcrumb"
       :class="[this.$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
     >

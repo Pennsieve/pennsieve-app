@@ -1,5 +1,6 @@
 <template>
   <svg
+    class="icon-sort"
     v-show="isVisible"
     xmlns="http://www.w3.org/2000/svg"
     :width="width"
@@ -38,6 +39,10 @@ export default {
 
 <style scoped lang="scss">
 @import '../../assets/_variables.scss';
+
+.icon-sort {
+  margin-left: 4px;
+}
 
 .svg-flip {
   transform: rotate(180deg) scaleX(-1);

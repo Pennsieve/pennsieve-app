@@ -410,7 +410,7 @@ export default {
 
       EventBus.$emit("toast", {
         detail: {
-          type: "ERROR",
+          type: "error",
           msg: `Two Factor validation failed: Token is invalid`,
         },
       });

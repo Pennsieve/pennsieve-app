@@ -166,8 +166,8 @@ describe('PeopleList.vue', () => {
   it('sortColumn', () => {
     cmp.vm.allPeople = people
     cmp.vm.sortColumn('lastName')
-    const sortedPeople = cmp.vm.returnSort('lastName', people, 'asc')
-    expect(cmp.vm.allPeople).toMatchObject(sortedPeople)
+    const sortedPeople = cmp.vm.returnSort('lastName', people)
+      expect(cmp.vm.allPeople).toMatchObject(sortedPeople)
   })
 
   it('updatePendingMembers', () => {

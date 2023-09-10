@@ -14,6 +14,10 @@ const MySettingsContainer = () => import('../components/my-settings/MySettingsCo
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
+const Teams = () => import('./teams/Teams.vue')
+const TeamsList = () => import('../components/teams/list/TeamsList.vue')
+const TeamMembers = () => import('./team-members/TeamMembers.vue')
+const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 
 const router = createRouter({
@@ -77,6 +81,40 @@ const router = createRouter({
           path: '',
           components: {
             stage: PeopleList
+          }
+        },
+      ],
+      props: true
+    },
+    {
+      path: '/:orgId/teams',
+      components: {
+        page: Teams,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'teams-list',
+          path: '',
+          components: {
+            stage: TeamsList
+          }
+        },
+      ],
+      props: true
+    },
+    {
+      path: '/:orgId/teams/:id',
+      components: {
+        page: TeamMembers,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'team-members-list',
+          path: '',
+          components: {
+            stage: TeamMembersList
           }
         },
       ],

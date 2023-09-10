@@ -1,4 +1,4 @@
-import { prop, path, sort, ascend, descend, compose, head, defaultTo } from 'ramda'
+import {ascend, compose, defaultTo, descend, head, path, prop, sort} from 'ramda'
 import EventBus from '../../utils/event-bus'
 
 /**
@@ -108,9 +108,8 @@ export default {
      * @param {Array} list
      * @param {String} direction
      */
-    returnSort: function(key, list, direction) {
-      const sortedList = this._sorter(key, list, direction)
-      return sortedList
+    returnSort: function (key, list, direction="desc") {
+      return this._sorter(key, list, direction)
     },
     /**
      * Compute if the package list is sorted by given column
@@ -137,7 +136,7 @@ export default {
      */
     onTableSort: function(property = '') {
       if (property) {
-        this.setSortDirection(property)
+        this.setSortDirection(property, 'desc')
         this.sortBy = property
 
         this.$emit('set-table-sort', {

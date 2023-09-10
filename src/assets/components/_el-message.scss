@@ -1,13 +1,11 @@
 @import '../_variables.scss';
 
 .el-message {
-  background: $gray_6;
+  background: $info-color;
   border: none;
   box-shadow: 0 0 1px rgba(0,0,0,.2), 0 0 5px rgba(0,0,0,.2);
   color: $white;
   top: 8px;
-
-  //left: 50%;
   width: 480px;
   padding: 8px 16px;
   &.with-header {

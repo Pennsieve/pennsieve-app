@@ -65,8 +65,9 @@
               >
                 Name
                 <IconSort
-                  :class="[ this.isSorting('lastName') ? 'svg-flip' : '' ]"
-                  />
+                  :isVisible="this.isSorting('lastName')"
+                  :class="[ this.sortDirection === 'desc' ? 'svg-flip' : '' ]"
+                />
               </button>
             </el-col>
             <el-col
@@ -78,7 +79,8 @@
               >
                 Role
                 <IconSort
-                  :class="[ this.isSorting('role') ? 'svg-flip' : '' ]"
+                  :isVisible="this.isSorting('role')"
+                  :class="[ this.sortDirection === 'desc' ? 'svg-flip' : '' ]"
                 />
               </button>
             </el-col>
@@ -171,6 +173,7 @@ export default {
       limit: 25,
       members: [],
       invitations: [],
+      sortDirection: "asc"
     }
   },
 
@@ -226,7 +229,7 @@ export default {
      */
     onHandleMemberInvited: function(newMember) {
       const updatedList = this.allPeople.concat([newMember])
-      this.allPeople = this.returnSort(this.sortBy, updatedList, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, updatedList)
     },
     /**
      * Generates invited org members GET url
@@ -246,7 +249,7 @@ export default {
       const updatedMember = Object.assign({}, member, { role })
       const idx = findIndex(propEq('id', member.id), this.allPeople)
       this.allPeople.splice(idx, 1, updatedMember)
-      this.allPeople = this.returnSort(this.sortBy, this.allPeople, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, this.allPeople)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -255,7 +258,7 @@ export default {
      */
     onPromoteToAdmin: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, role: 'manager' } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -264,7 +267,7 @@ export default {
      */
     onDemoteFromAdmin: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, role: 'editor' } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
       this.updateOrgMembers(this.allPeople)
     },
 
@@ -274,7 +277,7 @@ export default {
      */
     onPromoteToPublisher: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, isPublisher: true } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
       this.updateOrgMembers(this.allPeople)
     },
 
@@ -284,7 +287,7 @@ export default {
      */
     onDemoteFromPublisher: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, isPublisher: false } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -300,8 +303,9 @@ export default {
      * @param {String} key
      */
     sortColumn: function(key) {
+      this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc"
       this.offset = 0
-      this.allPeople = this.returnSort(key, this.allPeople, 'desc')
+      this.allPeople = this.returnSort(key, this.allPeople, this.sortDirection)
     },
     /**
      * Updates pending users object with any missing fields required for sorting
@@ -364,7 +368,7 @@ export default {
           const currentMembers = this.updateCurrentMembers(values[1])
           const allUsers = union(pendingMembers, currentMembers)
           if (this.allPeople.length !== this.orgMembers.length) {
-            const sorted = this.returnSort('lastName', allUsers, 'asc')
+            const sorted = this.returnSort('lastName', allUsers)
             this.allPeople = sorted
           } else {
             this.allPeople = allUsers
