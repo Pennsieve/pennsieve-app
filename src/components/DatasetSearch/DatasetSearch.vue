@@ -11,8 +11,8 @@
       >
         <template #prefix>
           <IconMagnifyingGlass
-              height="24px"
-              width="24px"
+              :height="24"
+              :width="24"
               color="#71747c"
           />
         </template>

@@ -6,7 +6,11 @@ const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue'
 const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 
-
+/**
+ * Settings Components
+ */
+const Settings = () => import('./OrgSettings/Settings.vue')
+const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 const MySettings = () => import('./MySettings/MySettings.vue')
 const MySettingsContainer = () => import('../components/my-settings/MySettingsContainer.vue')
 
@@ -18,6 +22,8 @@ const Teams = () => import('./teams/Teams.vue')
 const TeamsList = () => import('../components/teams/list/TeamsList.vue')
 const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
+
+const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
 
 const router = createRouter({
@@ -121,6 +127,23 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/:orgId/settings',
+      components: {
+        page: Settings,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'settings',
+          path: '',
+          components: {
+            stage: OrgSettings
+          }
+        },
+      ],
+      props: true
+    },
+    {
       path: '/:orgId/profile',
       components: {
         page: MySettings,
@@ -137,6 +160,7 @@ const router = createRouter({
       ],
       props: true
     },
+
   ],
 });
 

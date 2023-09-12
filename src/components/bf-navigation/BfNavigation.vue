@@ -152,13 +152,20 @@
 
 <!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"-->
-<!--        :link="{ name: 'settings', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Settings"-->
-<!--        icon="icon-settings"-->
-<!--        :condensed="primaryNavCondensed"-->
-<!--      />-->
+      <bf-navigation-item
+        v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
+        :link="{ name: 'settings', params: {orgId: activeOrganizationId} }"
+        label="Settings"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconSettings
+            :width="20"
+            :height="20"
+            color="currentColor"
+          />
+        </template>
+      </bf-navigation-item>
     </div>
     <span
       v-if="!secondaryNavOpen && !pageNotFound"
@@ -182,11 +189,13 @@
   import IconDatasets from "../icons/IconDatasets.vue"
   import IconPerson from "../icons/IconPerson.vue";
   import IconTeam from "../icons/IconTeam.vue";
+  import IconSettings from "../icons/IconSettings.vue";
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconSettings,
       IconPerson,
       IconNavExpand,
       IconNavCollapse,

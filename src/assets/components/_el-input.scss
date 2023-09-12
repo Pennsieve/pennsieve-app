@@ -9,6 +9,12 @@
   height: 40px;
 }
 
+.el-textarea__inner {
+  &.single-line {
+    height: 40px;
+  }
+}
+
 .el-textarea__inner, .el-input__inner, .text-disabled {
   border-radius: 3px;
   background: white;
