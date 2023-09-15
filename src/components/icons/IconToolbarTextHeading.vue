@@ -6,14 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <path pid="0" d="M7.7 6h2.7v4.6h3.3V6h2.7v12h-2.7v-5h-3.3v5H7.7V6z"/>
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconToolbarTextHeading",
   props: {
     width: {
       type: Number,

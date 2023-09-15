@@ -6,14 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <g data-name="&lt;clipboard&gt;"><path pid="0" d="M9.5 13.07h5a1 1 0 0 0 0-2h-5a1 1 0 0 0 0 2zM9.5 17.07h5a1 1 0 0 0 0-2h-5a1 1 0 0 0 0 2z"/><path pid="1" d="M14 4a2 2 0 0 0-4 0H4.5v18H8a1 1 0 0 0 0-2H6.5V6h2v2h7V6h2v14H12a1 1 0 1 0 0 2h7.5V4z"/></g>
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconClinicalTrial",
   props: {
     width: {
       type: Number,

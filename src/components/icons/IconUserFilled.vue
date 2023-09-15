@@ -6,14 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <path pid="0" d="M10 4a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm2 12H0a6 6 0 0 1 12 0z" fill-rule="evenodd"/>
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconUserFilled",
   props: {
     width: {
       type: Number,

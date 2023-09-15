@@ -6,14 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <path pid="0" d="M6.94 5.91h2v2h-2zM10.94 5.91h2v2h-2zM14.94 5.91h2v2h-2zM6.94 9.91h2v2h-2zM10.94 9.91h2v2h-2zM14.94 9.91h2v2h-2zM6.94 13.91h2v2h-2zM10.94 13.91h2v2h-2zM14.94 13.91h2v2h-2z"/>
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconReorder",
   props: {
     width: {
       type: Number,

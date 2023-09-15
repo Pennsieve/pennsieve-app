@@ -4,24 +4,23 @@
     :width="width"
     :height="height"
     :fill="color"
-    viewBox="0 0 24 24"
+    viewBox="0 0 20 12"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
-
+    <path d="M10,6.001 C10,6.3 9.695,6.515 9.695,6.515 L1.134,11.818 C0.51,12.227 0,11.924 0,11.149 L0,0.852 C0,0.075 0.51,-0.226 1.135,0.182 L9.696,5.487 C9.695,5.487 10,5.702 10,6.001 Z"/>
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconControllerPlay",
   props: {
     width: {
       type: Number,
-      default: 16,
+      default: 10,
     },
     height: {
       type: Number,
-      default: 16,
+      default: 12,
     },
     color: {
       type: String,

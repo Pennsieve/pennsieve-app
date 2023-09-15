@@ -6,14 +6,14 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <circle pid="0" cx="12" cy="12" r="8"/><path pid="1" d="M12 11.289l-2.139-2.14a.504.504 0 1 0-.712.712l2.139 2.14-2.139 2.139a.504.504 0 1 0 .712.712L12 12.713l2.139 2.14a.504.504 0 1 0 .712-.713L12.712 12l2.139-2.139a.504.504 0 1 0-.712-.712z" />
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconXCircle",
   props: {
     width: {
       type: Number,

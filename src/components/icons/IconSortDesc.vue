@@ -4,16 +4,15 @@
     :width="width"
     :height="height"
     :fill="color"
-    viewBox="0 0 24 24"
+    viewBox="0 0 6 3"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
-
+    <path pid="0" d="M3 3L0 0h6z"/>
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconSortDesc",
   props: {
     width: {
       type: Number,

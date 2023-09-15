@@ -6,22 +6,22 @@
     :fill="color"
     viewBox="0 0 24 24"
   >
-    <path pid="0" d="M22 22.1L15.6 17H2V2h20v20.1zM4 15h12.4l3.6 2.9V4H4v11z"/>
+    <path pid="0" d="M17.4 13.3L6.6 2.5v14.8L10 14l3.1 7.5 2.4-1-3-7.2z"/>
 
   </svg>
 </template>
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconMouseCursor",
   props: {
     width: {
       type: Number,
-      default: 16,
+      default: 24,
     },
     height: {
       type: Number,
-      default: 16,
+      default: 24,
     },
     color: {
       type: String,

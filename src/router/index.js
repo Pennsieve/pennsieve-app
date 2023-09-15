@@ -25,6 +25,14 @@ const TeamMembersList = () => import('../components/teams/members/TeamMembersLis
 
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
+/**
+ * Integrations Components
+ */
+const Integrations = () => import('./Integrations/Integrations.vue')
+const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
+const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
+
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -108,6 +116,36 @@ const router = createRouter({
         },
       ],
       props: true
+    },
+    {
+      name: 'integrations',
+      path: '/:orgId/integrations',
+      components: {
+        page: Integrations,
+        navigation: BfNavigation
+      },
+      redirect: {
+        name: 'applications'
+      },
+      props: true,
+      children: [
+        {
+          name: 'applications',
+          path: 'applications',
+          components: {
+            stage: ApplicationsList,
+          },
+          props: true
+        },
+        {
+          name: 'webhooks',
+          path: 'webhooks',
+          components: {
+            stage: IntegrationsList,
+          },
+          props: true
+        },
+      ]
     },
     {
       path: '/:orgId/teams/:id',
