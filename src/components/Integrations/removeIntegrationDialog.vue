@@ -1,20 +1,25 @@
 <template>
   <el-dialog
-    class="simple"
-    :visible="visible"
+    class="light-header fixed-width simple"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="close"
     @closed="onClosed"
   >
-    <bf-dialog-header slot="title" />
     <dialog-body>
-      <svg-icon
-        class="mb-16"
-        name="icon-warning-circle"
-        height="32"
-        width="32"
+      <IconWarningCircle
+        :height="32"
+        :width="32"
+        color="#F25641"
       />
       <h2>Delete integration?</h2>
+
+      <dialog-body>
+        <div class="api-key-message">
+          <p>Removing this integration will prevent any datasets within the workspace to invoke this integration and remove access for the integration to the datasets that enabled the integration. </p>
+        </div>
+      </dialog-body>
 
       <div class="dialog-simple-buttons">
         <bf-button
@@ -36,19 +41,21 @@
 </template>
 
 <script>
-import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import BfDialogHeader from '../shared/bf-dialog-header/BfDialogHeader.vue'
+import DialogBody from '../shared/dialog-body/DialogBody.vue'
+import BfButton from '../shared/bf-button/BfButton.vue'
+import IconWarningCircle from "../icons/IconWarningCircle.vue";
 
 export default {
   name: 'RemoveIntegrationDialog',
   components: {
+    IconWarningCircle,
     BfDialogHeader,
     DialogBody,
     BfButton
   },
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },
@@ -96,13 +103,15 @@ export default {
 
 <style lang="scss" scoped>
 @import '../../assets/_variables.scss';
-.mb-16 {
-  color: $red_1
-}
 h2 {
-  color: #000;
   font-size: 14px;
-  list-style: 16px;
-  margin: 0 0 8px;
+}
+.dialog-simple-buttons {
+  display: flex;
+  margin-top: 16px;
+  justify-content: center;
+  .bf-button{
+    margin-left: 8px;
+  }
 }
 </style>

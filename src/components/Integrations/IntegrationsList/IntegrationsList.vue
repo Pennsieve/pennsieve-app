@@ -47,8 +47,8 @@
       >
         <img
           src="../../../assets/images/illustrations/illo-collaboration.svg"
-          height="240"
-          width="247"
+          :height="240"
+          :width="247"
           alt="Teams illustration"
         >
         <div
@@ -75,22 +75,25 @@
     </bf-stage>
 
     <add-edit-integration-dialog
-      :visible.sync="addEditIntegrationDialogVisible"
+      :dialog-visible="addEditIntegrationDialogVisible"
       :integration-edit.sync="integrationEdit"
       integrationType="Webhook"
       @add-integration="onAddIntegrationConfirm"
       @edit-integration="onEditIntegrationConfirm"
+      @close="onCloseAddEditDialog"
     />
 
     <remove-integration-dialog
       ref="removeIntegrationDialog"
-      :visible.sync="removeIntegrationDialogVisible"
+      :dialog-visible="removeIntegrationDialogVisible"
       @delete="onDeleteIntegrationConfirm"
+      @close="onRemoveIntegrationCloseDialog"
     />
 
     <integration-api-key-details
       ref="apiKeyDetails"
-      :visible.sync="APIKeyDetailsVisisble"
+      :dialog-visible="APIKeyDetailsVisible"
+      @close="onApiKeyCloseDialog"
     />
 
 
@@ -105,15 +108,15 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
 
 import AddEditIntegrationDialog from '../AddEditIntegrationDialog.vue'
-import IntegrationListItem from "../integration-list-item/IntegrationListItem";
+import IntegrationListItem from "../integration-list-item/IntegrationListItem.vue";
 import Sorter from  '../../../mixins/sorter'
 import UserRoles from  '../../../mixins/user-roles'
-import RemoveIntegrationDialog from  '../removeIntegrationDialog'
+import RemoveIntegrationDialog from  '../removeIntegrationDialog.vue'
 
 
 import { pathOr, propOr} from 'ramda'
-import DeleteApiKey from "../../my-settings/windows/DeleteApiKey";
-import IntegrationApiKeyDetails from "../integrationApiKeyDetails";
+import DeleteApiKey from "../../my-settings/windows/DeleteApiKey.vue";
+import IntegrationApiKeyDetails from "../integrationApiKeyDetails.vue";
 
 export default {
   name: 'IntegrationsList',
@@ -145,7 +148,7 @@ export default {
     return {
       addEditIntegrationDialogVisible: false,
       removeIntegrationDialogVisible: false,
-      APIKeyDetailsVisisble: false,
+      APIKeyDetailsVisible: false,
       integrationDelete: null,
       integrationEdit: {}
     }
@@ -198,6 +201,18 @@ export default {
 
     ...mapState([
     ]),
+
+    onApiKeyCloseDialog: function() {
+      this.APIKeyDetailsVisisble = false
+    },
+    onRemoveIntegrationCloseDialog: function() {
+      this.removeIntegrationDialogVisible = false
+    },
+
+    onCloseAddEditDialog: function() {
+      this.integrationEdit = {}
+      this.addEditIntegrationDialogVisible = false
+    },
 
     openDeleteIntegrationDialog: function(integration) {
       this.$refs.removeIntegrationDialog.setIntegration(integration)

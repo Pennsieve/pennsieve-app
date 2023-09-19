@@ -1,15 +1,18 @@
 <template>
   <el-dialog
-    :visible="visible"
-    class="add-integration-dialog"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    class="add-integration-dialog fixed-width"
     :show-close="false"
     @open="onOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      :title="dialogTitle"
-    />
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        :title="dialogTitle"
+      />
+    </template>
 
     <dialog-body>
       <!-- Step 1 -->
@@ -18,10 +21,11 @@
         ref="integrationFormStep1"
         :model="integration"
         :rules="rules"
+        label-position="top"
         @submit.native.prevent="createIntegration"
       >
         <el-form-item prop="displayName">
-          <template slot="label">
+          <template #label>
             Name <span class="label-helper">
               required
             </span>
@@ -35,21 +39,27 @@
 
         <el-form-item prop="description">
 
-          <template slot="label">
+          <template #label>
             Description <span class="label-helper">
               required
             </span>
           </template>
-          <character-count-input
-            ref="inputDescription"
-            v-model="integration.description"
-            :rows="5"
-            placeholder="Add a description to help others understand what the integration does."
-          />
+          <div class="text-area-wrapper">
+            <el-input
+              ref="input"
+              v-model="integration.description"
+              type="textarea"
+              :rows="5"
+              :maxlength="255"
+              placeholder="Add a description to help others understand what the integration does."
+              :show-word-limit="true"
+            />
+          </div>
+
         </el-form-item>
 
         <el-form-item prop="isPublic">
-          <template slot="label">
+          <template #label>
             Integration permissions <span class="label-helper">
             </span>
             <div class="info">Allow the integration to be used by everyone in the organization. By default the integration is private and can only be managed by the current user.</div>
@@ -62,7 +72,7 @@
 
         <el-form-item prop="isDefault"
                       v-show="integration.isPublic">
-          <template slot="label">
+          <template #label>
             Enable by default <span class="label-helper">
             </span>
             <div class="info">Enable this integration for all new datasets added to your organization. Individual dataset owners can opt-out or turn off.</div>
@@ -80,11 +90,12 @@
         v-show="shouldShow(2, 'All')">
         <el-form
           ref="integrationFormStep2"
+          label-position="top"
           :model="integration"
           :rules="rules">
 
           <el-form-item prop="integrationType">
-            <template slot="label">
+            <template #label>
               Integration Type <span class="label-helper">
                 required
               </span>
@@ -106,7 +117,7 @@
           </el-form-item>
 
           <el-form-item prop="apiUrl">
-            <template slot="label">
+            <template #label>
               API URL <span class="label-helper">
               required
             </span>
@@ -118,7 +129,7 @@
           </el-form-item>
 
           <el-form-item prop="imageUrl">
-            <template slot="label">
+            <template #label>
               Image URL <span class="label-helper">
               optional
             </span>
@@ -131,7 +142,7 @@
 
           <el-form-item
             prop="secret">
-            <template slot="label">
+            <template #label>
               Secret <span class="label-helper">
             </span>
               <p class="info">This unique string is sent with all published events to this webhook and can be used to validate the origin of the message.</p>
@@ -157,10 +168,13 @@
       <div class="form-container"
            v-show="shouldShow(3, 'Webhook')">
         <el-form
-          ref="integrationFormStep3a">
+          ref="integrationFormStep3a"
+          :model="integration"
+          label-position="top"
+        >
 
           <el-form-item prop="triggers">
-            <template slot="label">
+            <template #label>
               Select Triggers <span class="label-helper">
             </span>
             </template>
@@ -279,14 +293,16 @@
                   :value="item.value"
                 />
               </el-select>
-              <el-button icon="el-icon-minus" size="mini" @click="removeCustomTarget(index)"></el-button>
-
-
+              <el-button size="small" @click="removeCustomTarget(index)">
+                <Minus style="width: 1em; height: 1em; margin-right: 8px" />
+              </el-button>
             </div>
 
 
           </el-form-item>
-          <el-button icon="el-icon-plus" size="mini" @click="addCustomTarget"></el-button>
+          <el-button size="small" @click="addCustomTarget">
+            <Plus style="width: 1em; height: 1em; margin-right: 8px" />
+          </el-button>
 
         </el-form>
       </div>
@@ -294,10 +310,7 @@
     </dialog-body>
 
     <!-- Overview buttons -->
-    <div
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="advanceStep(-1)"
@@ -307,8 +320,7 @@
       <bf-button @click="advanceStep(1)">
         {{ createText }}
       </bf-button>
-
-    </div>
+    </template>
 
   </el-dialog>
 </template>
@@ -324,8 +336,8 @@ import Request from '../../mixins/request'
 import GetDataType from '../../mixins/data-type'
 import AutoFocus from '../../mixins/auto-focus'
 import checkUniqueName from '../../mixins/check-unique-names'
-import CharacterCountInput from '../shared/CharacterCountInput/CharacterCountInput.vue'
 import FileTypeMapper from '../../mixins/FileTypeMapper'
+import { Minus, Plus } from '@element-plus/icons-vue'
 
 /**
  * Returns the default values for a property
@@ -363,7 +375,8 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
-    CharacterCountInput
+    Plus,
+    Minus
   },
 
   mixins: [
@@ -375,7 +388,7 @@ export default {
   ],
 
   props: {
-    visible: Boolean,
+    dialogVisible: Boolean,
     integrationType: String,
     integrationEdit: {
       type: Object,
@@ -528,15 +541,8 @@ export default {
       this.integration.secret = this.generateId(16)
     },
     /**
-     * Handle enum list updates
-     * @param {Array} list
-     */
-    handleEnumListUpdated: function(list) {
-      this.savedEnumList = list.sort()
-    },
-    /**
      * Determines if tab content is active
-     * @param {String} key
+     * @param {number} key
      * @param {String} type
      * @returns {Boolean}
      */
@@ -583,7 +589,7 @@ export default {
      * Closes the dialog
      */
     closeDialog: function() {
-      this.$emit('update:visible', false)
+      this.$emit('close', false)
 
       // delays the reset for the state
       setTimeout(() => {
@@ -593,6 +599,7 @@ export default {
         this.$refs.integrationFormStep2.resetFields()
         this.$refs.integrationFormStep3a.resetFields()
         this.$refs.integrationFormStep3b.resetFields()
+        this.isE
         this.$emit('update:integrationEdit', {})
       }, 500)
     },
@@ -613,49 +620,61 @@ export default {
      */
     createIntegration: function() {
       let isValid = true
+      console.log('validate 1')
       this.$refs.integrationFormStep1.validate((valid) => {
+        console.log("in callback")
+        console.log(valid)
         if (!valid) {
           // switch tab views
           isValid = false
           return this.processStep = 1
         }
       })
+        .then(() => {
+          this.$refs.integrationFormStep2.validate((valid) => {
+            if (!valid) {
+              // switch tab views
+              isValid = false
+              return this.processStep = 2
+            }
 
-      this.$refs.integrationFormStep2.validate((valid) => {
-        if (!valid) {
-          // switch tab views
-          isValid = false
-          return this.processStep = 2
+          })
+        })
+      .then(() => {
+        this.$refs.integrationFormStep3a.validate((valid) => {
+          if (!valid) {
+            // switch tab views
+            isValid = false
+            return this.processStep = 3
+          }
+
+        })
+      })
+      .then(() => {
+        this.$refs.integrationFormStep3b.validate((valid) => {
+          if (!valid) {
+            // switch tab views
+            isValid = false
+            return this.processStep = 3
+          }
+
+        })
+      })
+      .then(() => {
+        if (isValid) {
+          if (this.editingIntegration) {
+            this.$emit('edit-integration', this.integration)
+          } else {
+            this.$emit('add-integration', this.integration)
+          }
+          this.closeDialog()
         }
-
       })
 
-      this.$refs.integrationFormStep3a.validate((valid) => {
-        if (!valid) {
-          // switch tab views
-          isValid = false
-          return this.processStep = 3
-        }
 
-      })
 
-      this.$refs.integrationFormStep3b.validate((valid) => {
-        if (!valid) {
-          // switch tab views
-          isValid = false
-          return this.processStep = 3
-        }
 
-      })
 
-      if (isValid) {
-        if (this.editingIntegration) {
-          this.$emit('edit-integration', this.integration)
-        } else {
-          this.$emit('add-integration', this.integration)
-        }
-        this.closeDialog()
-      }
 
     },
     validURL: function(str) {
@@ -688,6 +707,8 @@ export default {
       callback()
     },
     validateDescription: function(rule, value, callback) {
+      console.log(value)
+      console.log(rule)
       if (value === '' || value.length < 20) {
         callback(new Error(`Please provide a short description (>50 characters)`))
       }
@@ -724,6 +745,10 @@ export default {
 
 <style lang="scss">
 @import '../../assets/_variables.scss';
+
+.text-area-wrapper {
+  width: 100%;
+}
 
 .add-integration-dialog {
 
@@ -806,6 +831,7 @@ export default {
   .info {
     font-size: 12px;
     color: $gray_4;
+    line-height: 16px;
   }
   .info {
     font-size: 12px;

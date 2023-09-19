@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from "vue-router";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
-
 const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 

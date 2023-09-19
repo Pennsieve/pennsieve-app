@@ -17,8 +17,6 @@
         v-if="enableSwitch"
         class="activeSwitch"
       >
-
-
         <el-switch
           v-model="isActive"
           active-color="#5039F7"
@@ -44,11 +42,6 @@
               :height="20"
               :width="20"
               />
-            <svg-icon
-              name="icon-menu"
-              height="20"
-              width="20"
-            />
           </span>
           <template #dropdown>
             <el-dropdown-menu
@@ -82,18 +75,10 @@
       </p>
     </el-row>
     <el-row class="userIcon">
-
-      <el-tooltip
-        popper-class="bf-tooltip"
-        :content="userName"
-        placement="top-start"
-        :open-delay="300"
-      >
-        <avatar
-          class="icon condensed"
-          :user="user"
-        />
-      </el-tooltip>
+      <avatar
+        class="icon condensed"
+        :user="user"
+      />
     </el-row>
   </div>
 </template>
@@ -107,7 +92,6 @@ import {find, propEq} from "ramda";
 import FormatDate from '../../../mixins/format-date'
 import Avatar from '../../shared/avatar/Avatar.vue'
 import IconMenu from "../../icons/IconMenu.vue";
-// import PsSwitch from '../../shared/PsSwitch/PsSwitch.vue'
 
 export default {
   name: 'IntegrationListItem',

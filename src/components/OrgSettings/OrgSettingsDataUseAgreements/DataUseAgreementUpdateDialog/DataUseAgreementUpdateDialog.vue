@@ -47,12 +47,13 @@
           label="Description"
           >
 
-          <character-count-input
+          <el-input
             v-model="form.description"
             :rows="3"
             :maxlength="100"
-            class="character-count"
+            :show-word-limit="true"
           />
+
         </el-form-item>
         <el-form-item
           class="mb-16"
@@ -93,7 +94,6 @@ import Autofocus from '../../../../mixins/auto-focus'
 import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../../shared/bf-button/BfButton.vue'
-import CharacterCountInput from '../../../shared/CharacterCountInput/CharacterCountInput.vue'
 
 const defaultForm = () => {
   return {
@@ -111,7 +111,6 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
-    CharacterCountInput
   },
 
   mixins: [

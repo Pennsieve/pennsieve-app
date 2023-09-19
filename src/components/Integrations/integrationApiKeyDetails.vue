@@ -1,13 +1,16 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="API Access for Integration"
-    />
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        title="API Access for Integration"
+      />
+    </template>
 
     <dialog-body>
       <div class="api-key-message">
@@ -23,10 +26,7 @@
       </div>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="copyApiKey"
@@ -39,7 +39,8 @@
       >
         Copy API Secret
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -48,6 +49,7 @@
 import BfDialogHeader from '../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../shared/dialog-body/DialogBody.vue'
 import BfButton from '../shared/bf-button/BfButton.vue'
+import {copyText} from "vue3-clipboard";
 
 export default {
   name: 'IntegrationApiKeyDetails',
@@ -59,14 +61,13 @@ export default {
   },
 
   props: {
-    visible: Boolean,
+    dialogVisible: Boolean,
   },
 
   data() {
     return {
       apiKey: {},
       copyText: '',
-      dialogVisible: false,
       labelPosition: 'right'
     }
   },
@@ -77,7 +78,7 @@ export default {
      */
     copyApiKey: function() {
       const key = this.apiKey.key
-      this.$clipboard(key)
+      copyText(key)
       this.copyText = 'API key copied to the clipboard.'
     },
     /**
@@ -85,7 +86,7 @@ export default {
      */
     copyApiSecret: function() {
       const secret = this.apiKey.secret
-      this.$clipboard(secret)
+      copyText(secret)
       this.copyText = 'API secret copied to the clipboard.'
     },
     /**
@@ -99,7 +100,7 @@ export default {
      */
     closeDialog: function() {
       this.clearKey()
-      this.$emit('update:visible', false)
+      this.$emit('close', false)
     }
   }
 }

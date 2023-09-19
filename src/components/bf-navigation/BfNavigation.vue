@@ -186,7 +186,6 @@
 <script>
   import BfNavigationItem from './bf-navigation-item/BfNavigationItem.vue'
   import BfNavigationTertiary from '../bf-navigation-tertiary/BfNavigationTertiary.vue'
-  // import BfOrganizationsList from './bf-organizations-list/BfOrganizationsList.vue'
   import { mapActions, mapGetters, mapState } from 'vuex'
   import { pathOr, propOr } from 'ramda'
   import { PublicationTabs } from '../../utils/constants';
@@ -213,8 +212,6 @@
       IconDatasets,
       IconTeam,
       IconIntegrations
-
-      // BfOrganizationsList
     },
 
     computed: {

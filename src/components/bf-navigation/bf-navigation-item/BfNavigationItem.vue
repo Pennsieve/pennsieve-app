@@ -6,12 +6,7 @@
     :disabled="!condensed"
     :open-delay="200"
   >
-    <router-link
-      class="bf-navigation-item"
-      :to="link"
-      @click="$emit(item)"
-    >
-
+    <router-link class="bf-navigation-item" :to="link">
       <div class="svg-icon svg-fill icon-main">
         <slot name="icon" ></slot>
       </div>
@@ -64,25 +59,6 @@
         default: ''
       }
     }
-    /*
-    methods: {
-      ...mapActions([
-        'toggleDatasetVis'
-      ]),
-
-      handler: function() {
-        $emit(item)
-        this.setDatasetVis
-      },
-
-      setDatasetVis: function() {
-        if (label == "Datasets" || "People" || "Teams" || "Publishing" || "Integrations"){
-        console.log("SETTING VISIBILITY TO FALSE")
-        this.toggleDatasetVis(false)
-      }
-      },
-    }
-    */
   }
 </script>
 

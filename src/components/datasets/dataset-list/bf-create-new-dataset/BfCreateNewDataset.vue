@@ -34,9 +34,11 @@
           label="Subtitle"
           prop="description"
         >
-          <character-count-input
+          <el-input
             v-model="newDatasetForm.description"
             :rows="4"
+            :maxlength="255"
+            :show-word-limit="true"
           />
         </el-form-item>
       </el-form>
@@ -116,7 +118,6 @@
 
   import BfButton from '../../../shared/bf-button/BfButton.vue'
   import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
-  import CharacterCountInput from '../../../shared/CharacterCountInput/CharacterCountInput.vue'
   import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
   import IntegrationItemSmall from "./IntegrationItemSmall.vue";
 
@@ -134,7 +135,6 @@
       BfButton,
       BfDialogHeader,
       DialogBody,
-      CharacterCountInput,
       IntegrationItemSmall
     },
 

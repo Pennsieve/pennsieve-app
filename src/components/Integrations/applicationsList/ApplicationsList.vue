@@ -80,22 +80,25 @@
     </bf-stage>
 
     <add-edit-integration-dialog
-      :visible.sync="addEditIntegrationDialogVisible"
+      :dialog-visible="addEditIntegrationDialogVisible"
       :integration-edit.sync="integrationEdit"
       integrationType="Application"
       @add-integration="onAddIntegrationConfirm"
       @edit-integration="onEditIntegrationConfirm"
+      @close="onCloseAddEditDialog"
     />
 
     <remove-integration-dialog
       ref="removeIntegrationDialog"
-      :visible.sync="removeIntegrationDialogVisible"
+      :dialog-visible="removeIntegrationDialogVisible"
       @delete="onDeleteIntegrationConfirm"
+      @close="onRemoveIntegrationCloseDialog"
     />
 
     <integration-api-key-details
       ref="apiKeyDetails"
-      :visible.sync="APIKeyDetailsVisisble"
+      :dialog-visible="APIKeyDetailsVisible"
+      @close="onApiKeyCloseDialog"
     />
 
 
@@ -150,9 +153,9 @@ export default {
     return {
       addEditIntegrationDialogVisible: false,
       removeIntegrationDialogVisible: false,
-      APIKeyDetailsVisisble: false,
+      APIKeyDetailsVisible: false,
       integrationDelete: null,
-      integrationEdit: {}
+      integrationEdit: {},
     }
   },
 
@@ -202,6 +205,17 @@ export default {
 
     ...mapState([
     ]),
+
+    onApiKeyCloseDialog: function() {
+      this.APIKeyDetailsVisisble = false
+    },
+    onRemoveIntegrationCloseDialog: function() {
+      this.removeIntegrationDialogVisible = false
+    },
+
+    onCloseAddEditDialog: function() {
+      this.addEditIntegrationDialogVisible = false
+    },
 
     openDeleteIntegrationDialog: function(integration) {
       this.$refs.removeIntegrationDialog.setIntegration(integration)
@@ -326,8 +340,6 @@ export default {
         customTargets: customTargetDTO,
         targetEvents: ["CUSTOM"]
       }
-
-      console.log(integrationDTO)
 
       this.createIntegration(integrationDTO).then(response => {
           let detailPopup = this.$refs.apiKeyDetails
