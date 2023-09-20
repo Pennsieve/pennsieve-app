@@ -57,14 +57,13 @@
     </div>
 
     <div class="menu-wrap">
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound) && isWelcomeOrg"-->
-<!--        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Welcome"-->
-<!--        icon="icon-organization"-->
-<!--        :condensed="primaryNavCondensed"-->
+      <bf-navigation-item
+        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"
+        label="Welcome"
+        icon="icon-organization"
+        :condensed="primaryNavCondensed"
 
-<!--      />-->
+      />
 
 <!--      <bf-navigation-item-->
 <!--        v-if="!(pageNotFound) && isWelcomeOrg"-->

@@ -8,6 +8,12 @@ const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatase
 /**
  * Settings Components
  */
+const Welcome = () => import('./welcome/Welcome.vue')
+const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
+const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
+
+
+
 const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 const MySettings = () => import('./MySettings/MySettings.vue')
@@ -196,6 +202,29 @@ const router = createRouter({
         },
       ],
       props: true
+    },
+    {
+      name: 'invitation',
+      path: '/invitation',
+      components: {
+        page: Welcome
+      },
+      children: [
+        {
+          name: 'setup-profile-accept',
+          path: 'accept/:username/:password',
+          components: {
+            stage: SetupProfile
+          }
+        },
+        {
+          name: 'verify-account',
+          path: 'verify/:username/:password',
+          components: {
+            stage: FinalizeAccount
+          }
+        },
+      ]
     },
 
   ],
