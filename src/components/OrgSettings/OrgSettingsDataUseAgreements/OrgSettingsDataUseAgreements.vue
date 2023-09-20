@@ -101,7 +101,6 @@ export default {
      * @param {Object} dataUseAgreement
      */
     deleteDataUseAgreement: function(dataUseAgreement) {
-      console.log("heoijl")
       const { id } = dataUseAgreement
 
       this.sendXhr(`${this.dataUseAgreementUrl}/${id}?api_key=${this.userToken}`, {

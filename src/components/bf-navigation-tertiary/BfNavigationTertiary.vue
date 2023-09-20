@@ -53,6 +53,13 @@
       line-height: inherit;
       text-align: left;
       width: 100%;
+
+      .avatar-circle {
+        .condensed & {
+          margin-left: -12px;
+        }
+      }
+
       .icon-main {
         color: #fff;
         flex-shrink: 0;

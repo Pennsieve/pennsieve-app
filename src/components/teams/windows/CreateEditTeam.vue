@@ -137,7 +137,6 @@ export default {
 
   methods: {
     onOpen: function() {
-      console.log("help")
       if (this.isEditing) {
         this.ruleForm.name = this.team.team.name
       }

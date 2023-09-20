@@ -226,10 +226,10 @@
     </el-popover>
 
 
-    <create-organization-dialog
-      :visible.sync="isCreateOrgDialogVisible"
-      @close-dialog="onCloseDialog"
-    />
+<!--    <create-organization-dialog-->
+<!--      :visible.sync="isCreateOrgDialogVisible"-->
+<!--      @close-dialog="onCloseDialog"-->
+<!--    />-->
   </div>
 </template>
 

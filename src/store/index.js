@@ -8,6 +8,7 @@ import datasetModule from './datasetModule'
 import integrationsModule from './integrationsModule'
 import collectionsModule from './collectionsModule'
 import viewerModule from './viewerModule'
+import repositoryModule from "./repositoryModule";
 
 
 
@@ -1031,7 +1032,8 @@ export default createStore({
     datasetModule,
     integrationsModule,
     collectionsModule,
-    viewerModule
+    viewerModule,
+    repositoryModule
   }
 
 });

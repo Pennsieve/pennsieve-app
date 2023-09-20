@@ -62,8 +62,15 @@
         label="Welcome"
         icon="icon-organization"
         :condensed="primaryNavCondensed"
-
-      />
+      >
+        <template v-slot:icon>
+          <IconOrganization
+            :width="20"
+            :height="20"
+            color="currentColor"
+          />
+        </template>
+      </bf-navigation-item>
 
 <!--      <bf-navigation-item-->
 <!--        v-if="!(pageNotFound) && isWelcomeOrg"-->
@@ -196,11 +203,13 @@
   import IconTeam from "../icons/IconTeam.vue";
   import IconSettings from "../icons/IconSettings.vue";
   import IconIntegrations from "../icons/IconIntegrations.vue";
+  import IconOrganization from "../icons/IconOrganization.vue";
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconOrganization,
       IconSettings,
       IconPerson,
       IconNavExpand,

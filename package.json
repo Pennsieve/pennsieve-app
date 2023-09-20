@@ -23,10 +23,12 @@
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
     "vue": "^3.2.45",
+    "vue-content-loader": "^2.0.1",
     "vue-router": "^4.1.6",
     "vue3-clipboard": "^1.0.0",
     "vue3-swatches": "^1.2.3",
-    "vuex": "^4.0.2"
+    "vuex": "^4.0.2",
+    "woofmark": "^4.2.6"
   },
   "devDependencies": {
     "@aws-amplify/auth": "^5.1.5",
