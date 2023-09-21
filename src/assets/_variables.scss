@@ -1,7 +1,7 @@
-$purple_1: #5039F7;
-$purple_2: #3A26CB;
-$purple_3: #34259F;
-$purple_tint: #EEEBFE;
+$purple_tint: #e6e9ef;
+$purple_1: #808fad;
+$purple_2: #4d628c;
+$purple_3: #011F5B;
 
 $red_1: #F25641;
 $red_2: #C14D49;
@@ -13,13 +13,13 @@ $green_2: #14a758;
 
 $black: #000000;
 $white: #ffffff;
-$gray_0: #FAFAF9;
-$gray_1: #F9F9F8;
-$gray_2: #E7E5E1;
-$gray_3: #CAC5BF;
-$gray_4: #928D85;
-$gray_5: #5B5955;
-$gray_6: #383734;
+$gray_0: #F2F2F2;
+$gray_1: #F2F2F2;
+$gray_2: #F7F7F7;
+$gray_3: #CCCCCC;
+$gray_4: #999999;
+$gray_5: #333333;
+$gray_6: #333333;
 
 $notification_green: #357940;
 $notification_yellow: #FAD749;
@@ -34,9 +34,9 @@ $status_pink: #DE38B3;
 $status_brown: #835800;
 
 // Aliases
-$default-primary-color: $purple_1;
+$default-primary-color: $purple_2;
 $primary-color: $default-primary-color;
-$app-primary-color: $purple_1;
+$app-primary-color: $purple_2;
 $app-secondary-color: $black;
 $success-color: $green_1;
 

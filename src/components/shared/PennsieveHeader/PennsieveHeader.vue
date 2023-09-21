@@ -1,7 +1,16 @@
 <template>
   <div class="pennsieve-header">
     <div class="logo-wrap">
-      <PennsieveLogo class="logo" color="white" />
+<!--      <div class="penn-logo">-->
+        <img
+          src="../../../assets/images/Upenn_FullLogo_Reverse_RGB.png"
+          alt="University of Pennsylvania"
+          class="penn-logo"
+          width="10px"
+        />
+<!--      </div>-->
+
+      <PennsieveLogo class="pennsieve-logo" color="white" />
     </div>
 
     <div class="nav-links">
@@ -196,7 +205,7 @@ export default {
   box-sizing: border-box;
   display: flex;
   height: 64px;
-  background-color: $purple_2;
+  background-color: $purple_3;
   padding-right: 20px;
   position: relative;
   width: 100%;
@@ -205,6 +214,21 @@ export default {
   align-items: center;
   display: flex;
   flex-shrink: 0;
+
+  .penn-logo {
+    border-right: 1px solid white;
+    margin-left: 8px;
+    padding: 0 8px;
+    width:100px;
+
+  }
+
+  .pennsieve-logo {
+    margin-left: 8px;
+    margin-top: 4px;
+    color: white;
+    width: 150px;
+  }
 }
 #btn-home {
   height: 64px;
