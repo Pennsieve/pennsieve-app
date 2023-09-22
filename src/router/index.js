@@ -11,6 +11,8 @@ const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatase
 const Welcome = () => import('./welcome/Welcome.vue')
 const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
+const PennsieveInfo = () => import('../components/welcome/Info.vue')
+
 
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
@@ -68,6 +70,26 @@ const router = createRouter({
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
       component: () => import("../views/Login.vue"),
+    },
+    /**
+     * Information Panel for organization
+     */
+    {
+      path: '/:orgId/information',
+      components: {
+        page: WelcomePage,
+        navigation: BfNavigation
+      },
+      props: true,
+      children: [
+        {
+          name: 'info',
+          path: '',
+          components: {
+            stage: PennsieveInfo
+          }
+        },
+      ],
     },
     /**
      * Welcome Org routes

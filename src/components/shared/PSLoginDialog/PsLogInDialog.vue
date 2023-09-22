@@ -9,10 +9,12 @@
   >
 
     <div class="log-in-dialog__container" :class="containerClass">
-      <img
-        src="@/assets/images/pennsieve-logo-full.svg"
-        class="log-in-dialog__container--logo"
-      />
+      <PennsieveLogoContainer class="dialog-container" stacked="stacked" :show-penn-logo="false"/>
+
+<!--      <img-->
+<!--        src="@/assets/images/pennsieve-logo-full.svg"-->
+<!--        class="log-in-dialog__container&#45;&#45;logo"-->
+<!--      />-->
       <template v-if="logInState !== states.TWO_FACTOR">
         <p
              class="log-in-dialog__container--top-copy">
@@ -182,12 +184,14 @@ import BfButton from '../bf-button/BfButton.vue'
 import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
 import IconArrowDown from "../../icons/IconArrowDown.vue"
+import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
 
 export default {
   name: 'PsLogInDialog',
 
   components: {
+    PennsieveLogoContainer,
     BfButton,
     IconRemove,
     IconArrowDown
@@ -648,6 +652,9 @@ export default {
 <style lang="scss" scoped>
 @import '../../../assets/_variables.scss';
 
+.dialog-container {
+  margin-bottom: 40px;
+}
 .log-in-dialog {
   //width: 540px;
 

@@ -1,17 +1,7 @@
 <template>
   <div class="pennsieve-header">
-    <div class="logo-wrap">
-<!--      <div class="penn-logo">-->
-        <img
-          src="../../../assets/images/Upenn_FullLogo_Reverse_RGB.png"
-          alt="University of Pennsylvania"
-          class="penn-logo"
-          width="10px"
-        />
-<!--      </div>-->
 
-      <PennsieveLogo class="pennsieve-logo" color="white" />
-    </div>
+    <PennsieveLogoContainer class="logo-container" :dark-background="true" :show-pennsieve-logo="false"/>
 
     <div class="nav-links">
       <a
@@ -59,11 +49,13 @@ import IconUpload from "../../icons/IconUpload.vue";
 // import DatasetSearch from "@/components/DatasetSearch/DatasetSearch.vue";
 import PsLogInDialog from "../PsLogInDialog/PsLogInDialog.vue";
 import BfUserDropdownMenu from "../../shared/BfUserDropdownMenu/BfUserDropdownMenu.vue";
+import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
 export default {
   name: "PennsieveHeader",
 
   components: {
+    PennsieveLogoContainer,
     PennsieveLogo,
     IconRemove,
     IconHelp,
@@ -323,5 +315,10 @@ export default {
     box-sizing: border-box;
     padding: 4px;
   }
+}
+
+.logo-container {
+  width: 300px;
+  margin-left: 24px;
 }
 </style>

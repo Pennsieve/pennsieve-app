@@ -4,14 +4,14 @@
 h1 {
   color: #000;
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 40px;
   margin: 0 0 32px;
 }
 h2 {
   color: #000;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 16px;
   margin: 0 0 16px
 }
@@ -51,7 +51,7 @@ p {
   margin: 0 0 8px;
 }
 strong {
-  font-weight: 600;
+  font-weight: 500;
 }
 .align-right {
   text-align: right
@@ -158,14 +158,12 @@ ul.dot-list {
 }
 
 @font-face {
-  font-family: 'SharpSans';
-  src: url('/fonts/SharpSansDispNo1-Bold.woff2') format('woff2'),
-       url('/fonts/SharpSansDispNo1-Bold.woff') format('woff');
-  font-weight: 700;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 400;
   font-style: normal;
 }
 
 .sharp-sans-font {
   font-family: 'SharpSans', $system-font;
-  font-weight: 700;
+  font-weight: 400;
 }

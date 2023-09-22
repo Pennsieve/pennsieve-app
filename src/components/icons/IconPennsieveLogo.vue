@@ -51,17 +51,9 @@
 export default {
   name: "PennsieveLogo",
   props: {
-    // width: {
-    //   type: Number,
-    //   default: 16,
-    // },
-    // height: {
-    //   type: Number,
-    //   default: 16,
-    // },
     color: {
       type: String,
-      default: "#fff",
+      default: "currentColor",
     },
     isVisible: {
       type: Boolean,

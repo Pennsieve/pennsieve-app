@@ -7,11 +7,12 @@
       element-loading-background="transparent"
     >
 
-      <img
-        src="../../assets/images/pennsieve-logo-full.svg"
-        class="logo"
-        alt="Logo for Pennsieve"
-      >
+      <PennsieveLogoContainer class="logo-container"/>
+<!--      <img-->
+<!--        src="../../assets/images/pennsieve-logo-full.svg"-->
+<!--        class="logo"-->
+<!--        alt="Logo for Pennsieve"-->
+<!--      >-->
 
       <div class="content">
         <h1>Welcome to Pennsieve!</h1>
@@ -63,11 +64,13 @@ import RepositoryInfo from './repository-info/RepositoryInfo.vue'
 
 import PaginationPageMenu from '../shared/PaginationPageMenu/PaginationPageMenu.vue'
 import RepositoryListItem from './repository-list-item/repositoryListItem.vue'
+import PennsieveLogoContainer from "../shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
 export default {
   name: 'Welcome',
 
   components: {
+    PennsieveLogoContainer,
     BfRafter,
     BfButton,
     PaginationPageMenu,
@@ -151,5 +154,9 @@ p {
 .pagination-header {
   display: flex;
   justify-content: space-between
+}
+
+.logo-container {
+  width: 500px;
 }
 </style>

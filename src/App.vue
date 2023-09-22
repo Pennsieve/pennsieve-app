@@ -327,6 +327,7 @@ export default {
 
 <style lang="scss">
 @import "./assets/_variables.scss";
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&family=Roboto:wght@100;300;400;500;700&display=swap');
 
 html,
 body {

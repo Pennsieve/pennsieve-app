@@ -4,12 +4,14 @@
       <div class="container-fluid discover-content">
         <div class="row">
           <div class="col-xs-12">
-            <IconPennsieveMark
-                class="mb-16"
-                :width="35"
-                :height="35"
-                color="#fff"
-            />
+            <PennsieveLogoContainer class="logo-container" :mark-only="true" :dark-background="true"/>
+
+<!--            <IconPennsieveMark-->
+<!--                class="mb-16"-->
+<!--                :width="35"-->
+<!--                :height="35"-->
+<!--                color="#fff"-->
+<!--            />-->
             <p class="mb-8">
               Copyright &copy; {{ copyrightYear }} University of Pennsylvania.
               All rights reserved.
@@ -41,12 +43,14 @@
 <script>
 import BfButton from '../bf-button/BfButton.vue'
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue"
+import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
 
 export default {
   name: 'PennsieveFooter',
 
   components: {
+    PennsieveLogoContainer,
     BfButton,
     IconPennsieveMark
   },
@@ -73,6 +77,10 @@ export default {
   display: block;
   font-size: 13px;
   z-index: 2;
+
+  .logo-container {
+    width: 60px;
+  }
 
   .buttons {
     display: flex;
