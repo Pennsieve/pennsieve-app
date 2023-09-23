@@ -327,7 +327,7 @@ export default {
     }
     h1 {
       margin: 0;
-      color: $purple_2;
+      color: $purple_3;
       font-size: 24px;
       &.flex-heading {
         align-items: center;

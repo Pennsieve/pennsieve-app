@@ -88,7 +88,12 @@ export default {
 
   computed: {
     pennsieveLogoClass: function() {
-      return this.darkBackground? "pennsieve-logo dark-background" : "pennsieve-logo"
+      if (this.showPennLogo) {
+        return this.darkBackground? "pennsieve-logo dark-background" : "pennsieve-logo "
+      } else {
+        return this.darkBackground? "pennsieve-logo dark-background no-penn-logo" : "pennsieve-logo no-penn-logo"
+
+      }
     },
     pennsieveMarkClass: function() {
       return this.darkBackground? "pennsieve-mark dark-background" : "pennsieve-mark"
@@ -174,6 +179,10 @@ export default {
 
   &.dark-background {
     color: white;
+  }
+
+  & .no-penn-logo {
+    margin-left: 0;
   }
 }
 

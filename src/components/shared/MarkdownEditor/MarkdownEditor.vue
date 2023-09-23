@@ -34,10 +34,9 @@
             title="Heading <h1>, <h2>, ... ⌘+D"
             @click="markdownCommand('Heading <h1>, <h2>, ... ⌘+D')"
           >
-            <svg-icon
-              name="icon-toolbar-text-heading"
-              height="24"
-              width="24"
+            <IconToolbarTextHeading
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -45,10 +44,9 @@
             title="Strong <strong> ⌘+B"
             @click="markdownCommand('Strong <strong> ⌘+B')"
           >
-            <svg-icon
-              name="icon-toolbar-text-bold"
-              height="24"
-              width="24"
+            <IconToolbarTextBold
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -56,10 +54,9 @@
             title="Emphasis <em> ⌘+I"
             @click="markdownCommand('Emphasis <em> ⌘+I')"
           >
-            <svg-icon
-              name="icon-toolbar-text-italic"
-              height="24"
-              width="24"
+            <IconToolbarTextItalic
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -67,10 +64,9 @@
             title="Hyperlink <a> ⌘+K"
             @click="hyperLinkCommand"
           >
-            <svg-icon
-              name="icon-toolbar-link"
-              height="24"
-              width="24"
+            <IconToolbarLink
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -78,10 +74,9 @@
             title="Bulleted List <ul> ⌘+U"
             @click="markdownCommand('Bulleted List <ul> ⌘+U')"
           >
-            <svg-icon
-              name="icon-toolbar-list-bulleted"
-              height="24"
-              width="24"
+            <IconToolbarListBulleted
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -89,10 +84,9 @@
             title="Numbered List <ol> ⌘+O"
             @click="markdownCommand('Numbered List <ol> ⌘+O')"
           >
-            <svg-icon
-              name="icon-toolbar-list-numbered"
-              height="24"
-              width="24"
+            <IconToolbarListNumbered
+              :height="24"
+              :width="24"
             />
           </button>
           <button
@@ -100,10 +94,9 @@
             title="Blockquote <blockquote> ⌘+J"
             @click="markdownCommand('Blockquote <blockquote> ⌘+J')"
           >
-            <svg-icon
-              name="icon-toolbar-quote"
-              height="24"
-              width="24"
+            <IconToolbarQuote
+              :height="24"
+              :width="24"
             />
           </button>
         </div>
@@ -195,6 +188,13 @@
   import { ContentLoader } from 'vue-content-loader'
 
   import 'woofmark/dist/woofmark.css';
+  import IconToolbarTextHeading from "../../icons/IconToolbarTextHeading.vue";
+  import IconToolbarTextBold from "../../icons/IconToolbarTextBold.vue";
+  import IconToolbarTextItalic from "../../icons/IconToolbarTextItalic.vue";
+  import IconToolbarLink from "../../icons/IconToolbarLink.vue";
+  import IconToolbarListBulleted from "../../icons/IconToolbarListBulleted.vue";
+  import IconToolbarListNumbered from "../../icons/IconToolbarListNumbered.vue";
+  import IconToolbarQuote from "../../icons/IconToolbarQuote.vue";
 
   marked.setOptions({
     sanitize: true
@@ -222,6 +222,13 @@
     name: 'MarkdownEditor',
 
     components: {
+      IconToolbarQuote,
+      IconToolbarListNumbered,
+      IconToolbarListBulleted,
+      IconToolbarLink,
+      IconToolbarTextItalic,
+      IconToolbarTextBold,
+      IconToolbarTextHeading,
       ContentLoader
     },
 

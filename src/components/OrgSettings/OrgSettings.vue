@@ -1,11 +1,4 @@
 <template>
-  <bf-page class="bf-org-settings">
-    <bf-rafter
-      slot="heading"
-      title="Organization Settings"
-      class="primary"
-    />
-
     <bf-stage
       slot="stage"
       v-loading="isLoading"
@@ -194,7 +187,6 @@
 <!--      :visible.sync="isDeleteDatasetTemplateDialogVisible"-->
 <!--      :dataset-template="activeDatasetTemplate"-->
 <!--    />-->
-  </bf-page>
 </template>
 
 <script>

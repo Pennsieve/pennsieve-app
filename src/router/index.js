@@ -8,7 +8,7 @@ const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatase
 /**
  * Settings Components
  */
-const Welcome = () => import('./welcome/Welcome.vue')
+const Invite = () => import('./invite/Invite.vue')
 const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 const PennsieveInfo = () => import('../components/welcome/Info.vue')
@@ -16,6 +16,10 @@ const PennsieveInfo = () => import('../components/welcome/Info.vue')
 
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
+const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
+const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
+
+
 
 
 
@@ -107,6 +111,23 @@ const router = createRouter({
           path: '',
           components: {
             stage: WelcomeInfo
+          }
+        },
+      ],
+    },
+    {
+      path: '/:orgId/submit',
+      components: {
+        page: SubmitDatasetPage,
+        navigation: BfNavigation
+      },
+      props: true,
+      children: [
+        {
+          name: 'submit',
+          path: '',
+          components: {
+            stage: SubmitDatasets
           }
         },
       ],
@@ -252,7 +273,7 @@ const router = createRouter({
       name: 'invitation',
       path: '/invitation',
       components: {
-        page: Welcome
+        page: Invite
       },
       children: [
         {

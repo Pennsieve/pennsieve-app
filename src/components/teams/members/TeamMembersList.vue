@@ -1,25 +1,12 @@
 <template>
-  <bf-page class="content-wrapper">
-    <bf-rafter
-      slot="heading"
-      :title="teamName"
-      class="primary"
+    <bf-stage
+      slot="stage"
+      v-loading="isLoading"
+      element-loading-background="transparent"
     >
-      <template #breadcrumb>
-        <div>
-          <router-link :to="{ name: 'teams-list' }">
-            <IconArrowLeft
-              class="icon"
-              :width="10"
-              :height="10"
-            />
-            All Teams
-          </router-link>
-        </div>
 
-      </template>
-
-      <template #buttons>
+      <template #actions>
+        {{teamName}}
         <div>
           <div
             v-if="hasAdminRights"
@@ -63,13 +50,6 @@
         </div>
       </template>
 
-    </bf-rafter>
-
-    <bf-stage
-      slot="stage"
-      v-loading="isLoading"
-      element-loading-background="transparent"
-    >
       <div class="pagination-header mb-16">
         <pagination-page-menu
           class="mr-24"
@@ -173,7 +153,6 @@
 
       <remove-team />
     </bf-stage>
-  </bf-page>
 </template>
 
 <script>

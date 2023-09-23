@@ -193,10 +193,11 @@ export default {
 @import "../../../assets/_variables.scss";
 
 .pennsieve-header {
-  align-items: center;
+  align-items: end;
+  padding-bottom: 8px;
   box-sizing: border-box;
   display: flex;
-  height: 64px;
+  height: 72px;
   background-color: $purple_3;
   padding-right: 20px;
   position: relative;

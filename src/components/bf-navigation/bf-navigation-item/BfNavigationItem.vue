@@ -118,7 +118,7 @@
     .primary & {
       color: $white;
       &:hover, &:focus, &.active {
-        background: $purple_3;
+        background: $purple_2;
         color: $white;
         .svg-icon {
           color: $white;

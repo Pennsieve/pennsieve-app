@@ -22,16 +22,10 @@
     color: #71747C;
     display: flex;
     flex-direction: column;
+    align-items: center;
   }
   h2 {
-    font-size: 24px;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
-  img {
-    display: inline-block;
-    height: 73px;
-    margin-bottom: 10px;
-    width: auto;
+    font-size: 50px;
+    color: red;
   }
 </style>

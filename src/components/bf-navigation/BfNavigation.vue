@@ -72,14 +72,21 @@
         </template>
       </bf-navigation-item>
 
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound) && isWelcomeOrg"-->
-<!--        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Submit Datasets"-->
-<!--        icon="icon-document"-->
-<!--        :condensed="primaryNavCondensed"-->
+      <bf-navigation-item
+        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"
+        label="Submit Datasets"
+        icon="icon-document"
+        :condensed="primaryNavCondensed"
 
-<!--      />-->
+      >
+        <template v-slot:icon>
+          <IconDocument
+            :width="20"
+            :height="20"
+            color="currentColor"
+          />
+        </template>
+      </bf-navigation-item>
 
 
 <!--      <bf-navigation-item-->
@@ -204,11 +211,13 @@
   import IconSettings from "../icons/IconSettings.vue";
   import IconIntegrations from "../icons/IconIntegrations.vue";
   import IconOrganization from "../icons/IconOrganization.vue";
+  import IconDocument from "../icons/IconDocument.vue";
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconDocument,
       IconOrganization,
       IconSettings,
       IconPerson,
@@ -323,9 +332,9 @@
   @import './logo.scss';
 
   .bf-navigation {
-    background: $app-primary-color;
     color: $white;
     z-index: 99;
+    background-image: linear-gradient(to top, $purple_2, $purple_1);
   }
   .active-org {
     align-items: center;

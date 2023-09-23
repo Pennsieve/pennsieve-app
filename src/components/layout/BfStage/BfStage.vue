@@ -1,8 +1,15 @@
 <template>
   <div :class="['bf-stage', this.isEditing ? 'editing' : '']">
+
+    <template v-if="this.$slots['actions']">
+      <div class="buttons">
+       <slot name="actions"/>
+      </div>
+    </template>
+
     <template v-if="this.$slots['sidebar']">
       <div class="bf-sidebar-wrap">
-        <div class="bf-stage-content">
+        <div :class="stageContentClass">
           <slot />
         </div>
 
@@ -13,7 +20,7 @@
     </template>
 
     <template v-else>
-      <div class="bf-stage-content">
+      <div :class="stageContentClass">
         <slot />
       </div>
     </template>
@@ -40,6 +47,12 @@
 
     beforeDestroy: function() {
       this.$el.removeEventListener('scroll', this.onScroll)
+    },
+
+    computed: {
+      stageContentClass: function() {
+        return this.$slots['actions']? "bf-stage-content" : "bf-stage-content no-actions"
+      }
     },
 
     methods: {
@@ -76,9 +89,13 @@
   .bf-stage-content {
     box-sizing: border-box;
     min-height: 100%;
-    padding: 32px;
+    padding: 8px 32px;
     display: flex;
     flex-direction: column;
+
+    &.no-actions {
+      padding: 32px;
+    }
   }
   .graph-management {
     .bf-stage-content {
@@ -119,5 +136,12 @@
     &:first-child {
       border: none;
     }
+  }
+
+  .buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: end;
+    margin: 16px;
   }
 </style>

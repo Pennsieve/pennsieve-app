@@ -1,108 +1,102 @@
 <template>
-  <bf-page class="applications-list">
+  <bf-stage
+    element-loading-background="transparent"
+  >
+    <div class="addIntegrationContainer">
+      <div class="description">
 
-    <bf-stage
-      slot="stage"
-      element-loading-background="transparent"
-    >
-      <div class="addIntegrationContainer">
-        <div class="description">
-
-          <p class="mb-16">
-            Applications support actions on various entities on the platform such as "Files", "Records", and "Datasets".
-            Registered applications can be triggered from the action-menu associated with the targeted entities.
-            <a
-              href="https://docs.pennsieve.io/docs/introduction-to-integrations"
-              target="_blank"
-            >
-              What's this?
-            </a>
-          </p>
-
-        </div>
-
-        <div class="reg-button">
-          <bf-button
-            v-if="hasAdminRights"
-            @click="openAddIntegration"
+        <p class="mb-16">
+          Applications support actions on various entities on the platform such as "Files", "Records", and "Datasets".
+          Registered applications can be triggered from the action-menu associated with the targeted entities.
+          <a
+            href="https://docs.pennsieve.io/docs/introduction-to-integrations"
+            target="_blank"
           >
-            Register Application
-          </bf-button>
-        </div>
+            What's this?
+          </a>
+        </p>
 
+      </div>
+
+      <div class="reg-button">
+        <bf-button
+          v-if="hasAdminRights"
+          @click="openAddIntegration"
+        >
+          Register Application
+        </bf-button>
+      </div>
+
+    </div>
+    <div
+      v-if="integrations.length > 0"
+      class="integration-list"
+    >
+      <integration-list-item
+        v-for="integration in filteredApplications"
+        :key="integration.id"
+        :integration="integration"
+        @open-remove-integration="openDeleteIntegrationDialog"
+        @open-edit-integration="openEditIntegrationDialog"
+      />
+    </div>
+
+    <bf-empty-page-state
+      v-else
+      class="empty"
+    >
+      <img
+        src="../../../assets/images/illustrations/illo-collaboration.svg"
+        height="240"
+        width="247"
+        alt="Teams illustration"
+      >
+      <div
+        v-if="hasAdminRights"
+        class="copy"
+      >
+        <h2>There are no integrations yet</h2>
+        <p>Integrations allow external services to be notified when certain events occur on Pennsieve. These integrations are available to all members within the organization and can be managed at the dataset level under settings.</p>
+        <bf-button
+          class="create-team-button"
+          @click="openAddIntegration"
+        >
+          Add Global Integration
+        </bf-button>
       </div>
       <div
-        v-if="integrations.length > 0"
-        class="integration-list"
+        v-if="!hasAdminRights"
+        class="copy"
       >
-        <integration-list-item
-          v-for="integration in filteredApplications"
-          :key="integration.id"
-          :integration="integration"
-          @open-remove-integration="openDeleteIntegrationDialog"
-          @open-edit-integration="openEditIntegrationDialog"
-        />
+        <h2>{{ orgName }} doesn't have any integrations yet.</h2>
+        <p>Contact your administrator to get started working with Integrations.</p>
       </div>
-
-      <bf-empty-page-state
-        v-else
-        class="empty"
-      >
-        <img
-          src="../../../assets/images/illustrations/illo-collaboration.svg"
-          height="240"
-          width="247"
-          alt="Teams illustration"
-        >
-        <div
-          v-if="hasAdminRights"
-          class="copy"
-        >
-          <h2>There are no integrations yet</h2>
-          <p>Integrations allow external services to be notified when certain events occur on Pennsieve. These integrations are available to all members within the organization and can be managed at the dataset level under settings.</p>
-          <bf-button
-            class="create-team-button"
-            @click="openAddIntegration"
-          >
-            Add Global Integration
-          </bf-button>
-        </div>
-        <div
-          v-if="!hasAdminRights"
-          class="copy"
-        >
-          <h2>{{ orgName }} doesn't have any integrations yet.</h2>
-          <p>Contact your administrator to get started working with Integrations.</p>
-        </div>
-      </bf-empty-page-state>
+    </bf-empty-page-state>
 
 
-    </bf-stage>
+  </bf-stage>
 
-    <add-edit-integration-dialog
-      :dialog-visible="addEditIntegrationDialogVisible"
-      :integration-edit.sync="integrationEdit"
-      integrationType="Application"
-      @add-integration="onAddIntegrationConfirm"
-      @edit-integration="onEditIntegrationConfirm"
-      @close="onCloseAddEditDialog"
-    />
+  <add-edit-integration-dialog
+    :dialog-visible="addEditIntegrationDialogVisible"
+    :integration-edit.sync="integrationEdit"
+    integrationType="Application"
+    @add-integration="onAddIntegrationConfirm"
+    @edit-integration="onEditIntegrationConfirm"
+    @close="onCloseAddEditDialog"
+  />
 
-    <remove-integration-dialog
-      ref="removeIntegrationDialog"
-      :dialog-visible="removeIntegrationDialogVisible"
-      @delete="onDeleteIntegrationConfirm"
-      @close="onRemoveIntegrationCloseDialog"
-    />
+  <remove-integration-dialog
+    ref="removeIntegrationDialog"
+    :dialog-visible="removeIntegrationDialogVisible"
+    @delete="onDeleteIntegrationConfirm"
+    @close="onRemoveIntegrationCloseDialog"
+  />
 
-    <integration-api-key-details
-      ref="apiKeyDetails"
-      :dialog-visible="APIKeyDetailsVisible"
-      @close="onApiKeyCloseDialog"
-    />
-
-
-  </bf-page>
+  <integration-api-key-details
+    ref="apiKeyDetails"
+    :dialog-visible="APIKeyDetailsVisible"
+    @close="onApiKeyCloseDialog"
+  />
 </template>
 
 <script>

@@ -1,9 +1,18 @@
 <template>
-  <router-view
-    name="stage"
-    :datasets="datasets"
-    list-type="dataset"
-  />
+  <bf-page>
+    <bf-rafter
+      slot="heading"
+      title="Datasets"
+      class="primary"
+    >
+    </bf-rafter>
+    <router-view
+      name="stage"
+      :datasets="datasets"
+      list-type="dataset"
+    />
+  </bf-page>
+
 </template>
 
 <script>

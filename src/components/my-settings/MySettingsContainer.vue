@@ -1,11 +1,4 @@
 <template>
-  <bf-page class="bf-my-settings">
-    <bf-rafter
-      slot="heading"
-      title="My Settings"
-      class="primary"
-    />
-
     <bf-stage slot="stage">
       <!-- update profile -->
       <el-form
@@ -355,7 +348,6 @@
         @orcid-close="updateORCID2"
       />
     </bf-stage>
-  </bf-page>
 </template>
 
 <script>

@@ -332,6 +332,7 @@ export default {
 html,
 body {
   font-family: $system-font;
+  font-weight: 300;
   font-size: 14px;
   line-height: 17px;
 }

@@ -1,56 +1,51 @@
 <template>
-  <bf-page class="bf-dataset-list">
-    <bf-rafter
-      slot="heading"
-      :title="pageHeading"
-      class="primary"
-    >
-      <div
-        slot="buttons"
-        class="buttons"
-      >
-        <bf-button
-          v-if="hasDatasets && !isWorkspaceGuest"
-          @click="openNewDatasetDialog"
-        >
-          New Dataset
-        </bf-button>
-      </div>
-
-      <div
-        slot="bottom"
-        class="search-wrap"
-      >
-        <form
-          class="mb-8 dataset-search-form"
-          @submit.prevent="searchDatasetsByQuery"
-        >
-          <el-input
-            ref="input"
-            v-model="searchQuery"
-            class="dataset-search-input icon-prefix"
-            placeholder="Find Datasets"
-            @keyup.enter.native="searchDatasetsByQuery"
-          >
-<!--            <svg-icon-->
-<!--              slot="prefix"-->
-<!--              name="icon-magnifying-glass"-->
-<!--              height="24px"-->
-<!--              width="24px"-->
-<!--              color="#71747c"-->
-<!--            />-->
-          </el-input>
-        </form>
-        <p v-if="hasDatasets">
-          {{ searchHeading }}
-        </p>
-      </div>
-    </bf-rafter>
-
     <bf-stage
       slot="stage"
       v-loading="isLoadingDatasets"
     >
+      <template #actions>
+        <div
+          class="search-wrap"
+        >
+          <form
+            class="mb-8 dataset-search-form"
+            @submit.prevent="searchDatasetsByQuery"
+          >
+            <el-input
+              ref="input"
+              v-model="searchQuery"
+              class="dataset-search-input icon-prefix"
+              placeholder="Find Datasets"
+              @keyup.enter.native="searchDatasetsByQuery"
+            >
+              <!--            <svg-icon-->
+              <!--              slot="prefix"-->
+              <!--              name="icon-magnifying-glass"-->
+              <!--              height="24px"-->
+              <!--              width="24px"-->
+              <!--              color="#71747c"-->
+              <!--            />-->
+            </el-input>
+          </form>
+          <p v-if="hasDatasets">
+            {{ searchHeading }}
+          </p>
+        </div>
+
+        <div>
+          <bf-button
+            v-if="hasDatasets && !isWorkspaceGuest"
+            @click="openNewDatasetDialog"
+          >
+            New Dataset
+          </bf-button>
+        </div>
+
+
+
+      </template>
+
+
       <div class="dataset-list-controls mb-16">
         <div class="dataset-list-controls-menus">
           <pagination-page-menu
@@ -202,7 +197,7 @@
 
 <!--      <OnboardingCarousel v-if="gettingStartedOpen"/>-->
     </bf-stage>
-  </bf-page>
+<!--  </bf-page>-->
 </template>
 
 <script>

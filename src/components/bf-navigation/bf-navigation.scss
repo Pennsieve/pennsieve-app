@@ -1,7 +1,7 @@
 @import '../../assets/_variables.scss';
 
 .bf-navigation {
-  background: $app-primary-color;
+  background: $purple_2;
   box-sizing: border-box;
   color: $white;
   display: flex;
@@ -28,10 +28,10 @@
   top: 0;
   width: 18px;
   &:hover {
-    border-color: $app-primary-color;
+    border-color: $purple_2;
   }
   .primary &:hover {
-    border-color: $purple_3
+    border-color: $purple_2
   }
 }
 .logo {

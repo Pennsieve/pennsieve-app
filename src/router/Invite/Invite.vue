@@ -16,7 +16,7 @@
 import PennsieveMark from "../../components/icons/IconPennsieveMark.vue";
 
   export default {
-    name: 'WelcomePage',
+    name: 'Invite',
     components: {PennsieveMark},
   }
 </script>

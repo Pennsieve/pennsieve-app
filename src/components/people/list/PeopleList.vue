@@ -1,34 +1,23 @@
 <template>
-  <bf-page class="bf-people-list">
-    <bf-rafter
-      slot="heading"
-      title="People"
-      class="primary"
-    >
-      <template #description>
-        <p v-if="hasAdminRights">
-          Members of your organization will be able to create datasets, add data to their datasets, and
-          share datasets with other members of the team.
-        </p>
-      </template>
+<!--  <bf-page class="bf-people-list">-->
 
-      <template #buttons>
-        <div class="buttons">
-          <bf-button
-            v-if="hasAdminRights"
-            @click="openDialog"
-          >
-            Send Invitation
-          </bf-button>
-        </div>
-      </template>
-    </bf-rafter>
+
 
     <bf-stage
       slot="stage"
       v-loading="isLoading"
       element-loading-background="transparent"
     >
+      <template #actions>
+          <bf-button
+            v-if="hasAdminRights"
+            @click="openDialog"
+          >
+            Send Invitation
+          </bf-button>
+      </template>
+
+
       <div class="pagination-header mb-16">
         <pagination-page-menu
           class="mr-24"
@@ -122,7 +111,7 @@
         @member-removed="onMemberRemoved"
       />
     </bf-stage>
-  </bf-page>
+<!--  </bf-page>-->
 </template>
 
 <script>
@@ -413,6 +402,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
+
 .data-usage {
   text-align: right;
 }

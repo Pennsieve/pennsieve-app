@@ -42,10 +42,6 @@
       :integrations="integrations"
     />
   </bf-page>
-
-
-
-
 </template>
 
 <script>

@@ -11,6 +11,9 @@
         <div class="discover-content container-fluid">
           <div class="row">
             <div class="col-xs-12">
+              <div class="pennsieve-logo">
+                <PennsieveLogoContainer :dark-background="false" :show-penn-logo="false" />
+              </div>
               <h1>Scientific Data Management, Integration and Publishing.</h1>
               <p>
                 Organize, visualize and link scientific data, and publish high
@@ -18,11 +21,11 @@
               </p>
             </div>
           </div>
-          <div class="row">
-            <div class="col-xs-12 col-sm-10">
-              <dataset-search />
-            </div>
-          </div>
+<!--          <div class="row">-->
+<!--            <div class="col-xs-12 col-sm-10">-->
+<!--              <dataset-search />-->
+<!--            </div>-->
+<!--          </div>-->
         </div>
         <img
             class="login-image"
@@ -151,6 +154,7 @@ import collabIcon from "../assets/images/icons/collaboration.svg"
 
 
 import EventBus from "../utils/event-bus";
+import PennsieveLogoContainer from "../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
 // import AutoFocus from "../../mixins/auto-focus";
 // import Request from "../../mixins/request";
 
@@ -163,6 +167,7 @@ export default {
     }
   },
   components: {
+    PennsieveLogoContainer,
     // BfButton,
     // A11yKeys,
     // BfFooter,
@@ -484,8 +489,15 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import "../assets/variables.scss";
+
+.pennsieve-logo {
+  width: 264px;
+  margin-left: 2px;
+  margin-bottom: 24px;
+  color: white;
+}
 
 .not-logged-in {
   background: $gray_1;
@@ -604,8 +616,8 @@ export default {
   }
   .highlight-text {
     margin: 24px;
-    font-size: 24px;
-    color: $gray_3;
+    font-size: 22px;
+    color: $gray_4;
     line-height: 1.5em;
     align-self: center;
     max-width: 600px;
@@ -737,9 +749,10 @@ export default {
   width: 100%;
   background-color: $gray_4;
   box-sizing: border-box;
-  padding: 64px 0 64px;
+  padding: 32px 0 8px;
   position: relative;
   overflow: hidden;
+  background-image: linear-gradient(to left, #b3bcce , $gray_1);
   @media only screen and (max-width: 550px) {
     padding-top: 40px;
   }
@@ -753,16 +766,16 @@ export default {
   }
 
   h1 {
-    color: #ffffff;
-    font-size: 48px;
-    font-weight: 200;
+    color: $purple_3;
+    font-size: 40px;
+    font-weight: 300;
     margin-bottom: 16px;
     max-width: 600px;
     line-height: 56px;
   }
 
   p {
-    color: #ffffff;
+    color: $purple_3;
     font-size: 24px;
     font-weight: 200;
     line-height: 32px;

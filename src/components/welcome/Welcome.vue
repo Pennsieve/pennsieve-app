@@ -1,39 +1,21 @@
 <template>
-  <bf-page class="bf-people-list">
-
     <bf-stage
       slot="stage"
       v-loading="isLoading"
       element-loading-background="transparent"
     >
 
-      <PennsieveLogoContainer class="logo-container"/>
-<!--      <img-->
-<!--        src="../../assets/images/pennsieve-logo-full.svg"-->
-<!--        class="logo"-->
-<!--        alt="Logo for Pennsieve"-->
-<!--      >-->
+      <template #actions>
+        <a href="https://docs.pennsieve.io" target="_blank" class="mr-16"><bf-button>Visit Documentation Hub</bf-button></a>
+        <bf-button
+          @click="navigateToSubmit"
+        >
+          Submit a Dataset
+        </bf-button>
+      </template>
 
-      <div class="content">
-        <h1>Welcome to Pennsieve!</h1>
-        <p> Pennsieve is a cloud-based data management and publication platform which supports several public repositories as well as private consortium workspaces.</p>
-
-        <div class="buttons">
-
-          <a href="https://docs.pennsieve.io" target="_blank" class="mr-16"><bf-button>Visit Documentation Hub</bf-button></a>
-            <bf-button
-              @click="navigateToSubmit"
-            >
-              Submit a Dataset
-            </bf-button>
-
-        </div>
-
-        <h1>Repositories</h1>
-        <p> Pennsieve is a cloud-based data management and publication platform which supports several public repositories as well as private consortium workspaces.</p>
-
-
-      </div>
+      <h1>Repositories</h1>
+      <p> Pennsieve is a cloud-based data management and publication platform which supports several public repositories as well as private consortium workspaces.</p>
 
       <div
         v-if="repositories.length > 0"
@@ -46,13 +28,11 @@
         />
       </div>
 
-
+      <repository-info
+        :dialog-visible="repositoryModalVisible"
+        :repository="selectedRepoForRequest"
+      />
     </bf-stage>
-    <repository-info
-      :dialog-visible="repositoryModalVisible"
-      :repository="selectedRepoForRequest"
-    />
-  </bf-page>
 </template>
 
 <script>

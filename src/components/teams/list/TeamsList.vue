@@ -1,34 +1,18 @@
 <template>
-  <bf-page class="bf-teams-list">
-    <bf-rafter
-      slot="heading"
-      title="Teams"
-      class="primary"
+    <bf-stage
+      slot="stage"
+      v-loading="teamsLoading"
+      element-loading-background="transparent"
     >
-      <template #description>
-        <p v-if="hasAdminRights">
-          You can create teams to group users. Datasets can be shared with individual users, or teams.
-        </p>
-      </template>
-      <template #buttons>
-      <div
-        class="buttons"
-      >
+      <template #actions>
         <bf-button
           v-if="hasAdminRights && !isEmpty"
           @click="openCreateDialog"
         >
           Create Team
         </bf-button>
-      </div>
       </template>
-    </bf-rafter>
 
-    <bf-stage
-      slot="stage"
-      v-loading="teamsLoading"
-      element-loading-background="transparent"
-    >
       <div
         v-if="!isEmpty"
         class="bf-table"
@@ -130,7 +114,6 @@
         @team-removed="onTeamRemoved"
       />
     </bf-stage>
-  </bf-page>
 </template>
 
 <script>
