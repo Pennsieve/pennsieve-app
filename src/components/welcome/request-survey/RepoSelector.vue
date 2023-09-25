@@ -27,28 +27,30 @@
           <i class="el-icon-arrow-down el-icon&#45;&#45;right"></i>
         </div>
       </div>
-      <el-dropdown-menu
-        v-if="!locked"
-        slot="dropdown"
-        class="bf-menu"
-        :offset="9"
-      >
-        <el-dropdown-item
-          command="onSelect"
-          v-for="(repo, idx) in repositories"
-          :key="repo.id"
-          :command=idx
+      <template #dropdown>
+        <el-dropdown-menu
+          v-if="!locked"
+          slot="dropdown"
+          class="bf-menu"
+          :offset="9"
         >
-          {{ repo.displayName }}
-        </el-dropdown-item>
-      </el-dropdown-menu>
+          <el-dropdown-item
+            v-for="(repo, idx) in repositories"
+            :key="repo.id"
+            :command=idx
+          >
+            {{ repo.displayName }}
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
     </el-dropdown>
   </div>
 
 
 </template>
 
-<script>
+
+<script  >
 import {
   mapState,
   mapActions
@@ -96,7 +98,9 @@ export default {
       'setSelectedRepo'
     ]),
     onSelect: function(cmd) {
-      this.setSelectedRepo(this.repositories[cmd])
+      console.log(cmd)
+
+      this.setSelectedRepo(this.repositories[cmd] )
     }
   }
 }

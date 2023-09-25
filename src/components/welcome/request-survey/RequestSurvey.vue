@@ -1,15 +1,18 @@
 <template>
   <el-dialog
-    :visible="visible"
-    :custom-class="calculateModalWidth"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :class="calculateModalWidth"
     :show-close="false"
     @open="openDialog"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Dataset Submission Request"
-    />
+    <template #header>
+      <bf-dialog-header
+        title="Dataset Submission Request"
+      />
+    </template>
+
 
     <div class="status-info">
       <div class="wrapper">
@@ -100,7 +103,7 @@
         :is-expandable="true"
         :padding="false"
       >
-        <template v-if="!proposalLocked" slot="title-aux">
+        <template v-if="!proposalLocked" #title-aux>
           <button
             v-if="!isEditingMarkdown"
             class="linked mr-8"
@@ -128,33 +131,35 @@
         />
       </data-card>
 
-      <data-card
-        ref="contributorsDataCard"
-        class="compact purple question-card"
-        title="Please list the dataset contributors"
-        :is-expandable="true"
-        :padding="false"
-      >
-        <template v-if="!proposalLocked" slot="title-aux">
-          <button
-            class="linked mr-8"
-            :disabled="proposalLocked"
-            @click.prevent="onClickAddContributor"
-          >
-            Add
-          </button>
-        </template>
-        <template v-for="(contributor, idx) in proposal.contributors">
-          <proposal-contributor
-            :id=contributor.emailAddress
-            :index=idx
-            :contributor=contributor
-            :locked="proposalLocked"
-            @edit-contributor="editContributor"
-            @remove-contributor="removeContributor"
-            />
-        </template>
-      </data-card>
+<!--      TODO: Bring this back. Currently, it does not correctly check for email and not sure what the difference is between request and proposal in object-->
+
+<!--      <data-card-->
+<!--        ref="contributorsDataCard"-->
+<!--        class="compact purple question-card"-->
+<!--        title="Invite other investigators to work on your dataset"-->
+<!--        :is-expandable="true"-->
+<!--        :padding="false"-->
+<!--      >-->
+<!--        <template v-if="!proposalLocked" #title-aux>-->
+<!--          <button-->
+<!--            class="linked mr-8"-->
+<!--            :disabled="proposalLocked"-->
+<!--            @click.prevent="onClickAddContributor"-->
+<!--          >-->
+<!--            Add-->
+<!--          </button>-->
+<!--        </template>-->
+<!--        <template v-for="(contributor, idx) in proposal.contributors">-->
+<!--          <proposal-contributor-->
+<!--            :id=contributor.emailAddress-->
+<!--            :index=idx-->
+<!--            :contributor=contributor-->
+<!--            :locked="proposalLocked"-->
+<!--            @edit-contributor="editContributor"-->
+<!--            @remove-contributor="removeContributor"-->
+<!--            />-->
+<!--        </template>-->
+<!--      </data-card>-->
 
       <div class="questions">
         <data-card
@@ -174,15 +179,15 @@
       </div>
     </el-form>
 
-    <proposal-contributor-dialog
-      :visible="contributorDialogVisible"
-      :all-contributors="datasetRequest.contributors"
-      :id="selectedContributorId"
-      :contributor="selectedContributor"
-      @add-contributor="addContributor"
-      @update-contributor="updateContributor"
-      @close="closeContributorDialog"
-    />
+<!--    <proposal-contributor-dialog-->
+<!--      :dialog-visible="contributorDialogVisible"-->
+<!--      :all-contributors="proposal.contributors"-->
+<!--      :id="selectedContributorId"-->
+<!--      :contributor="selectedContributor"-->
+<!--      @add-contributor="addContributor"-->
+<!--      @update-contributor="updateContributor"-->
+<!--      @close="closeContributorDialog"-->
+<!--    />-->
 
   </el-dialog>
 
@@ -223,7 +228,7 @@ export default {
     SanitizeName
   ],
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },
@@ -237,7 +242,8 @@ export default {
         name: "",
         organizationNodeId: "",
         description: "",
-        status: ""
+        status: "",
+        contributors: []
       }
     }
   },

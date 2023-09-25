@@ -1,13 +1,16 @@
 <template>
   <el-dialog
-    :visible.sync="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Confirmation required"
-    />
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        title="Confirmation required"
+      />
+    </template>
 
     <dialog-body>
       <div class="warning-wrap">
@@ -47,10 +50,7 @@
       </el-form>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -58,20 +58,21 @@
         {{cancelActionLabel}}
       </bf-button>
       <bf-button v-if="infoMessage !== ''"
-        class="blue"
-        :disabled="disableConfirmation"
-        @click="onFormSubmit"
+                 class="blue"
+                 :disabled="disableConfirmation"
+                 @click="onFormSubmit"
       >
         {{confirmActionLabel}}
       </bf-button>
       <bf-button v-if="warningMessage !== ''"
-        class="red"
-        :disabled="disableConfirmation"
-        @click="onFormSubmit"
+                 class="red"
+                 :disabled="disableConfirmation"
+                 @click="onFormSubmit"
       >
         {{confirmActionLabel}}
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -94,7 +95,7 @@ export default {
   },
 
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },

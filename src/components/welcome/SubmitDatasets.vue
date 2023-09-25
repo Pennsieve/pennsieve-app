@@ -41,14 +41,15 @@
       </bf-empty-page-state>
 
       <request-survey
-        :visible.sync="requestModalVisible"
+        :dialog-visible="requestModalVisible"
         :dataset-request="activeRequest"
         @create-proposal="createProposal"
         @update-proposal="updateProposal"
+        @close="closeRequestsurvey"
       />
 
       <confirmation-dialog
-        :visible="confirmationDialogVisible"
+        :dialog-visible="confirmationDialogVisible"
         :action="confirmationDialog.action"
         :action-message="confirmationDialog.actionMessage"
         :resource="confirmationDialog.resource"
@@ -137,6 +138,9 @@ export default {
       ]
     ),
 
+    closeRequestsurvey: function() {
+      this.updateRequestModalVisible(false)
+    },
     resetConfirmation: function() {
       this.confirmationDialogVisible = false
       this.confirmationDialog = {

@@ -107,7 +107,8 @@
     padding: 12px 16px;
     text-transform: none;
     &[disabled] {
-      opacity: .6;
+      opacity: .3;
+      color: $gray_3;
       cursor: default;
     }
     &:not([disabled]) {

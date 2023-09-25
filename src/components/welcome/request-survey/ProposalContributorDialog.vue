@@ -1,15 +1,18 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     append-to-body
     @close="onClose"
     @open="onOpen"
   >
-    <bf-dialog-header
-      slot="title"
-      :title="dialogTitle"
-    />
+    <template #header>
+      <bf-dialog-header
+        :title="dialogTitle"
+      />
+    </template>
+
     <dialog-body>
       <el-form
         ref="form"
@@ -27,7 +30,7 @@
               class="mb-16"
               prop="firstName"
             >
-              <template slot="label">
+              <template #label>
                 First Name
                 <span class="label-helper">
                   required
@@ -45,7 +48,7 @@
           class="mb-16"
           prop="lastName"
         >
-          <template slot="label">
+          <template #label>
             Last Name
             <span class="label-helper">
               required
@@ -61,7 +64,7 @@
           class="mb-16"
           prop="emailAddress"
         >
-          <template slot="label">
+          <template #label>
             Email Address
             <span class="label-helper">
               required
@@ -78,10 +81,8 @@
         </el-form-item>
       </el-form>
     </dialog-body>
-    <div
-      slot="footer"
-      class="dialog-footer"
-    >
+
+    <template #footer>
       <bf-button
         class="secondary"
         @click="onClose"
@@ -95,7 +96,8 @@
       >
         {{ btnSubmitText }}
       </bf-button>
-    </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -132,7 +134,7 @@ export default {
   ],
 
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },
@@ -203,7 +205,7 @@ export default {
     dialogTitle: function() {
       return this.isEditing
         ? 'Update Contributor'
-        : 'New Contributor'
+        : 'Invite Contributor'
     },
 
     /**
@@ -244,9 +246,11 @@ export default {
      * @param {Function} callback
      */
     checkCollaborators: function(rule, value, callback) {
+      console.log(value)
       if (!value) {
         callback(new Error('Email address is required'))
       } else {
+        console.log(this.allContributors)
         const result = this.allContributors.filter(contributor => value === contributor.emailAddress );
         if (result.length !== 0 && !this.isEditing) {
           callback(new Error('Contributor with this email address already exists'));

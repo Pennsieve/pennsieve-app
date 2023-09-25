@@ -128,9 +128,7 @@ export default {
 }
 
 .repository-list-item {
-  border: 1px solid $gray_3;
-  margin: 0 0 16px 0;
-  //padding:  16px 24px 8px 24px;
+  border-bottom: 1px solid $gray_3;
   background-color: white;
   display:flex;
   flex-direction: column;
@@ -140,8 +138,12 @@ export default {
     background-color: $purple-tint;
   }
 
+  &:first-child {
+    margin-top: 16px;
+  }
+
   .info {
-    padding:  16px 24px 8px 24px;
+    padding: 8px;
   }
 
 }

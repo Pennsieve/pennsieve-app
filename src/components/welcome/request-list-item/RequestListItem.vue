@@ -1,5 +1,5 @@
 <template>
-  <div class="repository-list-item">
+  <div class="repository-list-item" @click="triggerRequest(DatasetProposalAction.EDIT)">
 
     <el-row
       type="flex"
@@ -7,7 +7,7 @@
       class="info"
     >
       <el-col
-        :sm="24"
+        :sm="12"
       >
         <el-row
           type="flex"
@@ -21,12 +21,7 @@
 
         <el-row>
           <div class="repository-title" >
-            <a
-              href="#"
-              @click.prevent="triggerRequest(DatasetProposalAction.EDIT)"
-            >
               {{datasetRequest.name}}
-            </a>
           </div>
         </el-row>
         <el-row>
@@ -52,7 +47,7 @@
         <template v-if="datasetRequest.proposalStatus === 'DRAFT' && readyToSubmit">
           <a
             href="#"
-            @click.prevent="triggerRequest(DatasetProposalAction.SUBMIT)"
+            @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
           >
             Submit Request
           </a>
@@ -60,7 +55,7 @@
         <template v-if="datasetRequest.proposalStatus === 'DRAFT'">
           <a
             href="#"
-            @click.prevent="triggerRequest(DatasetProposalAction.REMOVE)"
+            @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
           >
             Remove Request
           </a>
@@ -68,7 +63,7 @@
         <template v-if="datasetRequest.proposalStatus === 'ACCEPTED'">
           <a
             href="#"
-            @click.prevent="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
+            @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
           >
             Open Dataset
           </a>
@@ -76,7 +71,7 @@
         <template v-if="datasetRequest.proposalStatus === 'SUBMITTED'">
           <a
             href="#"
-            @click.prevent="triggerRequest(DatasetProposalAction.WITHDRAW)"
+            @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
           >
             Retract Request
           </a>
@@ -84,7 +79,7 @@
         <template v-if="datasetRequest.proposalStatus === 'REJECTED'">
           <a
             href="#"
-            @click.prevent="triggerRequest(DatasetProposalAction.RESUBMIT)"
+            @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
           >
             Resubmit To...
           </a>
@@ -93,10 +88,10 @@
 
       </el-col>
       <el-col
-        :sm="16">
+        :sm="4">
         <el-row
           type="flex"
-          align="right"
+          align="bottom"
           class="logo-wrapper">
           <img
             :src=logoPath
@@ -180,12 +175,8 @@ export default {
         'setRepositoryDescription',
       ]
     ),
-    ...mapGetters('repositoryModule',[
-      'getRepositoryByNodeId'
-    ]),
     openInfoPanel: function(event) {
       console.log("RequestListItem::openInfoPanel() event:")
-      console.log(event)
       this.$emit("open", this.datasetRequest)
     },
     surveyComplete: function() {
@@ -228,7 +219,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0 24px;
+  padding: 0 24px;
 }
 
 .repository-menu {
@@ -236,7 +227,7 @@ export default {
 }
 
 .repository-list-item {
-  border: 1px solid $gray_3;
+  border-bottom: 1px solid $gray_3;
   margin: 0 0 16px 0;
   //padding:  16px 24px 8px 24px;
   background-color: white;

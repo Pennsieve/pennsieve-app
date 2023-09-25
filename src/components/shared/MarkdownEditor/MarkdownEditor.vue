@@ -383,10 +383,13 @@
        * @param {String} title
        */
       markdownCommand: function(title) {
-        const wkButton = this.$el.querySelector(`.wk-command[title="${title}"]`)
-        if (wkButton) {
-          wkButton.click()
-        }
+        // Event.preventDefault()
+
+        console.log('help')
+        // const wkButton = this.$el.querySelector(`.wk-command[title="${title}"]`)
+        // if (wkButton) {
+        //   wkButton.click()
+        // }
       },
 
       /**
