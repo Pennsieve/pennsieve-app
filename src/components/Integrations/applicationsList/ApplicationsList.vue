@@ -2,32 +2,33 @@
   <bf-stage
     element-loading-background="transparent"
   >
-    <div class="addIntegrationContainer">
-      <div class="description">
 
-        <p class="mb-16">
-          Applications support actions on various entities on the platform such as "Files", "Records", and "Datasets".
-          Registered applications can be triggered from the action-menu associated with the targeted entities.
-          <a
-            href="https://docs.pennsieve.io/docs/introduction-to-integrations"
-            target="_blank"
-          >
-            What's this?
-          </a>
-        </p>
+    <template #actions>
+      <bf-button
+        v-if="hasAdminRights"
+        @click="openAddIntegration"
+      >
+        Register Application
+      </bf-button>
+    </template>
 
-      </div>
+<!--    <div class="addIntegrationContainer">-->
+<!--      <div class="description">-->
 
-      <div class="reg-button">
-        <bf-button
-          v-if="hasAdminRights"
-          @click="openAddIntegration"
-        >
-          Register Application
-        </bf-button>
-      </div>
+<!--        <p class="mb-16">-->
+<!--          Applications support actions on various entities on the platform such as "Files", "Records", and "Datasets".-->
+<!--          Registered applications can be triggered from the action-menu associated with the targeted entities.-->
+<!--          <a-->
+<!--            href="https://docs.pennsieve.io/docs/introduction-to-integrations"-->
+<!--            target="_blank"-->
+<!--          >-->
+<!--            What's this?-->
+<!--          </a>-->
+<!--        </p>-->
 
-    </div>
+<!--      </div>-->
+
+<!--    </div>-->
     <div
       v-if="integrations.length > 0"
       class="integration-list"
@@ -73,30 +74,31 @@
       </div>
     </bf-empty-page-state>
 
+    <add-edit-integration-dialog
+      :dialog-visible="addEditIntegrationDialogVisible"
+      :integration-edit.sync="integrationEdit"
+      integrationType="Application"
+      @add-integration="onAddIntegrationConfirm"
+      @edit-integration="onEditIntegrationConfirm"
+      @close="onCloseAddEditDialog"
+    />
+
+    <remove-integration-dialog
+      ref="removeIntegrationDialog"
+      :dialog-visible="removeIntegrationDialogVisible"
+      @delete="onDeleteIntegrationConfirm"
+      @close="onRemoveIntegrationCloseDialog"
+    />
+
+    <integration-api-key-details
+      ref="apiKeyDetails"
+      :dialog-visible="APIKeyDetailsVisible"
+      @close="onApiKeyCloseDialog"
+    />
 
   </bf-stage>
 
-  <add-edit-integration-dialog
-    :dialog-visible="addEditIntegrationDialogVisible"
-    :integration-edit.sync="integrationEdit"
-    integrationType="Application"
-    @add-integration="onAddIntegrationConfirm"
-    @edit-integration="onEditIntegrationConfirm"
-    @close="onCloseAddEditDialog"
-  />
 
-  <remove-integration-dialog
-    ref="removeIntegrationDialog"
-    :dialog-visible="removeIntegrationDialogVisible"
-    @delete="onDeleteIntegrationConfirm"
-    @close="onRemoveIntegrationCloseDialog"
-  />
-
-  <integration-api-key-details
-    ref="apiKeyDetails"
-    :dialog-visible="APIKeyDetailsVisible"
-    @close="onApiKeyCloseDialog"
-  />
 </template>
 
 <script>

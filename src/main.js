@@ -46,8 +46,17 @@ const topLevelRoutes = [
 
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
+
+    console.log('ads')
     const token = Cookies.get('user_token')
     const savedOrgId = Cookies.get('preferred_org_id')
+    const stateToken = store.state.userToken
+
+    if (token && !stateToken) {
+        console.log('Update token in beforeEach')
+        store.dispatch('updateUserToken', token)
+    }
+
     const allowList = [
         'home',
         'password',

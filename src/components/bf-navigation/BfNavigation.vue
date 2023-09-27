@@ -145,15 +145,20 @@
         </template>
       </bf-navigation-item>
 
-<!--      <bf-navigation-item-->
-<!--        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"-->
-<!--        id="nav-publishing"-->
-<!--        :link="{ name: 'publishing', params: {orgId: activeOrganizationId} }"-->
-<!--        label="Publishing"-->
-<!--        icon="icon-public"-->
-<!--        :condensed="primaryNavCondensed"-->
-
-<!--      />-->
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        id="nav-publishing"
+        :link="{ name: 'publishing', params: {orgId: activeOrganizationId} }"
+        label="Publishing"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconPublic
+            :width="20"
+            :height="20"
+          />
+        </template>
+      </bf-navigation-item>
 
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
@@ -212,11 +217,13 @@
   import IconIntegrations from "../icons/IconIntegrations.vue";
   import IconOrganization from "../icons/IconOrganization.vue";
   import IconDocument from "../icons/IconDocument.vue";
+  import IconPublic from "../icons/IconPublic.vue";
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconPublic,
       IconDocument,
       IconOrganization,
       IconSettings,

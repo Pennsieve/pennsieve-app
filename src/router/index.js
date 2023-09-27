@@ -1,9 +1,26 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
+
+/**
+ * ORCIDRedirect
+ * ORCIDRedirect
+ */
+
+const ORCIDRedirect = () => import('../components/ORCID/ORCIDRedirect.vue')
+const ORCID = () => import('./ORCID/ORCID.vue')
+
+/**
+ * Publishing Components
+ */
+const Publishing = () => import('./Publishing/PublishingView.vue')
+const PublishingDatasetsList = () => import ('../components/Publishing/PublishingDatasetsList/PublishingDatasetsList.vue')
+const PublishingProposalsList = () => import ('../components/Publishing/PublishingProposalsList/PublishingProposalsList.vue')
+
 
 /**
  * Settings Components
@@ -58,6 +75,21 @@ const router = createRouter({
         page: () => import("../views/Login.vue"),
       },
       props: true,
+    },
+    {
+      path: '/orcid-redirect',
+      components: {
+        page: ORCID
+      },
+      children: [
+        {
+          name: 'orcid-redirect',
+          path: '',
+          components: {
+            stage: ORCIDRedirect
+          }
+        },
+      ],
     },
     {
       name: "create-account",
@@ -185,6 +217,79 @@ const router = createRouter({
             stage: TeamsList
           }
         },
+        {
+          name: 'team-members-list',
+          path: ':id',
+          components: {
+            stage: TeamMembersList
+          }
+        },
+
+      ],
+      props: true
+    },
+    /**
+     * Publishing routes
+     */
+    {
+      name: 'publishing',
+      path: '/:orgId/publishing',
+      redirect: {
+        name: PublicationTabs.REVIEW
+      },
+      components: {
+        page: Publishing,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: PublicationTabs.REVIEW,
+          path: PublicationTabs.REVIEW,
+          components: {
+            stage: PublishingDatasetsList
+          },
+          props: {
+            stage: {
+              publicationStatus: [PublicationStatus.REQUESTED, PublicationStatus.ACCEPTED, PublicationStatus.FAILED],
+            }
+          }
+        },
+        {
+          name: PublicationTabs.PUBLISHED,
+          path: PublicationTabs.PUBLISHED,
+          components: {
+            stage: PublishingDatasetsList
+          },
+          props: {
+            stage: {
+              publicationStatus: [PublicationStatus.COMPLETED],
+            }
+          }
+        },
+        {
+          name: PublicationTabs.REJECTED,
+          path: PublicationTabs.REJECTED,
+          components: {
+            stage: PublishingDatasetsList
+          },
+          props: {
+            stage: {
+              publicationStatus: [PublicationStatus.REJECTED],
+            }
+          }
+        },
+        {
+          name: PublicationTabs.PROPOSED,
+          path: PublicationTabs.PROPOSED,
+          components: {
+            stage: PublishingProposalsList
+          },
+          props: {
+            stage: {
+              publicationStatus: [PublicationStatus.PROPOSED],
+            }
+          }
+        }
       ],
       props: true
     },
@@ -218,23 +323,7 @@ const router = createRouter({
         },
       ]
     },
-    {
-      path: '/:orgId/teams/:id',
-      components: {
-        page: TeamMembers,
-        navigation: BfNavigation
-      },
-      children: [
-        {
-          name: 'team-members-list',
-          path: '',
-          components: {
-            stage: TeamMembersList
-          }
-        },
-      ],
-      props: true
-    },
+
     {
       path: '/:orgId/settings',
       components: {

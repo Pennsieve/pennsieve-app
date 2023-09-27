@@ -23,6 +23,7 @@ export default {
       // clear vuex
       this.clearState()
       // remove user token
+      console.log('removing user_token cookie')
       Cookies.remove('user_token')
 
       // Add a redirect link

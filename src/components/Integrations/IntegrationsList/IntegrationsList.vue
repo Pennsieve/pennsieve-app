@@ -4,29 +4,15 @@
       slot="stage"
       element-loading-background="transparent"
     >
-      <div class="addIntegrationContainer">
-        <div class="description">
-          <p class="mb-16">
-            Webhooks provide mechanisms to notify external applications of events that happen on the Pennsieve platform, such as "File Uploaded", or "Description updated".
-            <a
-              href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
-              target="_blank"
-            >
-              What's this?
-            </a>
-          </p>
-        </div>
 
-        <div class="reg-button">
-          <bf-button
-            v-if="hasAdminRights"
-            @click="openAddIntegration"
-          >
-            Register Webhook
-          </bf-button>
-        </div>
-
-      </div>
+      <template #actions>
+        <bf-button
+          v-if="hasAdminRights"
+          @click="openAddIntegration"
+        >
+          Register Webhook
+        </bf-button>
+      </template>
 
       <div
         v-if="integrations.length > 0"

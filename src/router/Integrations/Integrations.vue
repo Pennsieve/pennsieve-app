@@ -10,8 +10,25 @@
           slot="description"
           class="description"
         >
-          <p >
-            Integrations and applications allow users to expand the functionality of the platform through custom actions and webhooks.
+
+          <p v-if="this.$route.name === 'applications'">
+            Applications support actions on various entities on the platform such as "Files", "Records", and "Datasets".
+            Registered applications can be triggered from the action-menu associated with the targeted entities.
+            <a
+              href="https://docs.pennsieve.io/docs/introduction-to-integrations"
+              target="_blank"
+            >
+              What's this?
+            </a>
+          </p>
+          <p v-else>
+            Webhooks provide mechanisms to notify external applications of events that happen on the Pennsieve platform, such as "File Uploaded", or "Description updated".
+            <a
+              href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
+              target="_blank"
+            >
+              What's this?
+            </a>
           </p>
         </div>
       </template>
@@ -46,9 +63,9 @@
 
 <script>
   import {mapState} from "vuex";
-  import BfPage from '@/components/layout/BfPage/BfPage.vue'
-  import BfStage from '@/components/layout/BfStage/BfStage.vue'
-  import BfRafter from '@/components/shared/bf-rafter/BfRafter.vue'
+  import BfPage from '../../components/layout/BfPage/BfPage.vue'
+  import BfStage from '../../components/layout/BfStage/BfStage.vue'
+  import BfRafter from '../../components/shared/bf-rafter/BfRafter.vue'
 
 
   export default {
@@ -64,8 +81,6 @@
       ]),
     }
   }
-
-
 </script>
 
 

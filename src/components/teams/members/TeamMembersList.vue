@@ -6,48 +6,52 @@
     >
 
       <template #actions>
-        {{teamName}}
-        <div>
-          <div
-            v-if="hasAdminRights"
-            class="buttons"
-          >
-            <bf-button
-              class="primary"
-              @click="openAddUser"
+        <div class="actions-wrapper">
+          <h2 class="sub-page-title">
+            {{teamName}}
+          </h2>
+          <div>
+            <div
+              v-if="hasAdminRights"
             >
-              Add User
-            </bf-button>
-            <el-dropdown
-              trigger="click"
-              @command="handleCommand"
-            >
-              <bf-button class="secondary icon el-dropdown-link">
-                <IconMenu/>
+              <bf-button
+                class="primary mr-16"
+                @click="openAddUser"
+              >
+                Add User
               </bf-button>
-              <template #dropdown>
-                <el-dropdown-menu
-                  slot="dropdown"
-                  class="bf-menu"
-                >
-                  <el-dropdown-item
-                    command="edit"
-                    class="bf-menu-item"
+              <el-dropdown
+                trigger="click"
+                @command="handleCommand"
+              >
+                <bf-button class="secondary icon el-dropdown-link">
+                  <IconMenu/>
+                </bf-button>
+                <template #dropdown>
+                  <el-dropdown-menu
+                    slot="dropdown"
+                    class="bf-menu"
                   >
-                    Update Team
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="!isSystemTeam"
-                    command="delete"
-                    class="bf-menu-item"
-                  >
-                    Delete Team
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+                    <el-dropdown-item
+                      command="edit"
+                      class="bf-menu-item"
+                    >
+                      Update Team
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="!isSystemTeam"
+                      command="delete"
+                      class="bf-menu-item"
+                    >
+                      Delete Team
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </div>
         </div>
+
       </template>
 
       <div class="pagination-header mb-16">
@@ -469,6 +473,20 @@ export default {
     font-size: 14px;
     line-height: 16px;
     text-align: center;
+  }
+}
+
+.actions-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+
+  .sub-page-title {
+    font-size: 24px;
+    padding-left: 20px;
+    color: $purple_3;
+    align-self: end;
   }
 }
 

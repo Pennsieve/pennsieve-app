@@ -12,8 +12,12 @@
           </p>
         </template>
       </bf-rafter>
+    </template>
+
+    <template #stage>
       <router-view name="stage" />
     </template>
+
   </bf-page>
 
 </template>

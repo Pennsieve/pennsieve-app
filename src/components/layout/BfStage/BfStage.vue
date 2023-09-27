@@ -142,6 +142,6 @@
     display: flex;
     flex-direction: row;
     justify-content: end;
-    margin: 16px;
+    margin: 16px 32px 16px 16px;
   }
 </style>

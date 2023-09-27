@@ -3,6 +3,7 @@ import EventBus from '../../utils/event-bus'
 import Logger from '../../mixins/logger'
 import LogoutHandler from '../../mixins/logout-handler'
 import { always, compose, defaultTo, pathOr, prop, propOr, tryCatch, F } from 'ramda'
+import logger from "../../mixins/logger";
 
 const _isString = (x) => Object.prototype.toString.call(x) === '[object String]'
 

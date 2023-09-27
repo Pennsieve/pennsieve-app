@@ -177,6 +177,7 @@ export default {
      * @returns {Promise}
      */
     bootUp: function(userToken) {
+      console.log("Booting up")
       return this.getBfTermsOfService()
           .then(() => this.getProfileAndOrg(userToken))
           .then(() => {this.setActiveOrgSynced()})
