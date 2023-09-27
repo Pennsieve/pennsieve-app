@@ -123,11 +123,6 @@ export default {
         }
       ]
     },
-
-    publisherTeamRoute: function() {
-      if (!this.$route.params || !this.publisherTeam) return ''
-      return `/${this.$route.params.orgId}/teams/${this.publisherTeam.id}`
-    }
   },
 
   mounted: function() {
@@ -138,13 +133,13 @@ export default {
 
   },
 
-   beforeRouteEnter(to, from, next) {
-    next(vm => {
-     if (vm.hasFeature('sandbox_org_feature')) {
-      vm.$router.push({name: 'create-org'})
-    }
-    })
-  },
+  //  beforeRouteEnter(to, from, next) {
+  //   next(vm => {
+  //    if (vm.hasFeature('sandbox_org_feature')) {
+  //     vm.$router.push({name: 'create-org'})
+  //   }
+  //   })
+  // },
 
   methods: {
     ...mapActions('publishingModule', [
@@ -158,30 +153,30 @@ export default {
      * On submit dataset, notify user
      * @param {Object} dataset
      */
-    onSubmitDataset: function({dataset}) {
-      const datasetName = dataset.content
-        ? dataset.content.name
-        : ''
-
-      EventBus.$emit('toast', {
-        detail: {
-          type: 'success',
-          msg: `${datasetName} has been submitted for publishing.`
-        }
-      })
-
-      // Update total count of datasets
-      const count = this.getTotalCount(PublicationStatus.REQUESTED) + 1
-      this.updateDatasetTotalCount({
-        type: PublicationStatus.REQUESTED,
-        count
-      })
-
-      // Update pending review or ready for review list
-      if (this.$route.name === PublicationStatus.REQUESTED) {
-        this.$refs.datasetList.fetchDatasets()
-      }
-    },
+    // onSubmitDataset: function({dataset}) {
+    //   const datasetName = dataset.content
+    //     ? dataset.content.name
+    //     : ''
+    //
+    //   EventBus.$emit('toast', {
+    //     detail: {
+    //       type: 'success',
+    //       msg: `${datasetName} has been submitted for publishing.`
+    //     }
+    //   })
+    //
+    //   // Update total count of datasets
+    //   const count = this.getTotalCount(PublicationStatus.REQUESTED) + 1
+    //   this.updateDatasetTotalCount({
+    //     type: PublicationStatus.REQUESTED,
+    //     count
+    //   })
+    //
+    //   // Update pending review or ready for review list
+    //   if (this.$route.name === PublicationStatus.REQUESTED) {
+    //     this.$refs.datasetList.fetchDatasets()
+    //   }
+    // },
 
     /**
      * Get publishing data and set the total counts

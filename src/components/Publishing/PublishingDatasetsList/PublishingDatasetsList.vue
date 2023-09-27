@@ -173,6 +173,9 @@ export default {
   },
 
   computed: {
+    ...mapGetters([
+      'publisherTeam',
+    ]),
     ...mapState([
       'config',
       'userToken',
@@ -189,8 +192,9 @@ export default {
       'getDatasets'
     ]),
 
-    PublicationStatus: function() {
-      return PublicationStatus
+    publisherTeamRoute: function() {
+      if (!this.$route.params || !this.publisherTeam) return ''
+      return `/${this.$route.params.orgId}/teams/${this.publisherTeam.id}`
     },
 
     /**
