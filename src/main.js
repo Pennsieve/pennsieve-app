@@ -15,6 +15,7 @@ import VueClipboard from 'vue3-clipboard'
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import 'element-plus/es/components/message/style/css';
+import {path, pathOr} from "ramda";
 
 Amplify.configure(AWSConfig)
 
@@ -44,46 +45,70 @@ const topLevelRoutes = [
     'my-settings-container'
 ]
 
+// Users should be able to access the following routes without authentication
+const allowList = [
+    'home',
+    'password',
+    'welcome',
+    'setup-profile',
+    'setup-profile-accept',
+    'verify-account',
+    'welcome-to-pennsieve',
+    'docs-login',
+    'jupyter-login',
+    'create-account']
+
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
 
-    console.log('ads')
-    const token = Cookies.get('user_token')
-    const savedOrgId = Cookies.get('preferred_org_id')
-    const stateToken = store.state.userToken
-
-    if (token && !stateToken) {
-        console.log('Update token in beforeEach')
-        store.dispatch('updateUserToken', token)
-    }
-
-    const allowList = [
-        'home',
-        'password',
-        'welcome',
-        'setup-profile',
-        'setup-profile-accept',
-        'verify-account',
-        'welcome-to-pennsieve',
-        'docs-login',
-        'jupyter-login',
-        'create-account']
-
-
-    if (allowList.indexOf(to.name) < 0 && !token) {
-        const destination = to.fullPath
-        if (destination && destination.name !== 'page-not-found') {
-            next(`/?redirectTo=${destination}`)
-        } else {
-            next('/')
-        }
-    } else if (token && to.name === 'home' && savedOrgId) {
-        next(`/${savedOrgId}/datasets`)
-    } else {
+    if (allowList.indexOf(to.name) >= 0) {
+        // Support Unauthenticated Access for AllowList Routes
         next()
+    } else {
+        // Requires Authenticated Access
+
+        const token = Cookies.get('user_token')
+        const savedOrgId = Cookies.get('preferred_org_id')
+        const stateToken = store.state.userToken
+
+        if (token && !stateToken) {
+            console.log('Update token in beforeEach')
+            store.dispatch('updateUserToken', token)
+        }
+
+        if (!token) {
+            // Not authenticated --> Route to login with optional redirect after login.
+            const destination = to.fullPath
+            if (destination && destination.name !== 'page-not-found') {
+                next(`/?redirectTo=${destination}`)
+            } else {
+                next('/')
+            }
+        } else {
+            // Is Authenticated --> Route to destination, or Dataset Overview if route is login route.
+
+            if (token && to.name === 'home' && savedOrgId) {
+                next(`/${savedOrgId}/datasets`)
+            } else {
+                next()
+            }
+        }
     }
+})
 
+router.beforeResolve(async to => {
+    if (allowList.indexOf(to.name) < 0 &&
+        !store.state.activeOrgSynced &&
+        store.state.userToken) {
+        // Org is not synced yet --> Sync org and get org assets.
 
+        // TODO: Need to sync Workspace and get Workspace assets here
+        // This now happens in app.vue/bootup, and getProfileAndOrg in GlobalMessageHandler
+        // If we handle that here, we should be able to remove some watchers that might introduce race conditions.
+
+        console.log("Router Resolve Requires fetching of Workspace data")
+
+    }
 })
 
 router.afterEach((to, from) => {

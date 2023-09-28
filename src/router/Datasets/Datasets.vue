@@ -5,6 +5,11 @@
       title="Datasets"
       class="primary"
     >
+      <template #description>
+        <p>
+          Datasets are used to store files and metadata and are the primary component of the Pennsieve platform.
+        </p>
+      </template>
     </bf-rafter>
     <router-view
       name="stage"

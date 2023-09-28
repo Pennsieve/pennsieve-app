@@ -43,12 +43,7 @@
         >
           <h2>There are no integrations yet</h2>
           <p>Integrations allow external services to be notified when certain events occur on Pennsieve. These integrations are available to all members within the organization and can be managed at the dataset level under settings.</p>
-          <bf-button
-            class="create-team-button"
-            @click="openAddIntegration"
-          >
-            Add Global Integration
-          </bf-button>
+
         </div>
         <div
           v-if="!hasAdminRights"
@@ -317,11 +312,10 @@ export default {
 
 .empty {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 85px 190px;
 }
 
 .integration-list {

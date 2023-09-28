@@ -22,11 +22,11 @@
 <script>
 
 import { mapGetters, mapState, mapActions } from 'vuex'
-
+import { isProxy, toRaw } from 'vue';
 import { setPageTitle, setMeta } from './utils/meta'
 
 import globalMessageHandler from './mixins/global-message-handler'
-import {mergeAll, pathOr, propOr} from "ramda";
+import {compose, mergeDeepLeft, pathOr, propOr} from "ramda";
 import EventBus from './utils/event-bus'
 import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
@@ -84,19 +84,35 @@ export default {
     /**
      * Trigger API request when active organization is changed
      */
-    activeOrganization: {
-      handler: function(val, oldVal) {
-        if (this.getDatasetsUrl && this.datasets.length === 0) {
-          this.setActiveOrgSynced()
-            .then(() =>this.fetchDatasets())
-            .then(() =>this.fetchDatasetPublishedData())
-            .then(() =>this.fetchCollections())
-            .then(() =>this.fetchIntegrations())
-            .then(() => this.fetchDatasetStatuses())
+    // activeOrganization: {
+    //   handler: function(val, oldVal) {
+    //     const oldOrgId = pathOr("NONE",['organization','id'],oldVal)
+    //     const newOrgId = pathOr("NONE",['organization','id'],val)
+    //
+    //     // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
+    //     if (this.userToken && oldOrgId !== newOrgId) {
+    //       console.log('Workspace switch; getting datasets, published data, collections, Integrations, and Statuses')
+    //       this.setActiveOrgSynced()
+    //         .then(() => this.fetchDatasets())
+    //         .then(() => this.fetchDatasetPublishedData())
+    //         .then(() => this.fetchCollections())
+    //         .then(() => this.fetchIntegrations())
+    //         .then(() => this.fetchDatasetStatuses())
+    //     }
+    //   },
+    //   immediate: true
+    // },
+    /**
+     * Watch getDatasetsUrl and get datasets
+     * Used for dataset search
+     */
+    getDatasetsUrl: {
+      handler: function(newVal, oldVal) {
+        if (newVal !== oldVal && this.isOrgSynced) {
+          this.fetchDatasets()
         }
-
       },
-      immediate: true
+      deep: true
     },
   },
 
@@ -127,10 +143,10 @@ export default {
      * @return {String}
      */
     getDatasetsUrl: function() {
-      const params = toQueryParams(mergeAll({api_key: this.userToken}))
-      return this.userToken
-          ? `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-          : ''
+      const params = toQueryParams(mergeDeepLeft(this.datasetSearchParams, {api_key: this.userToken}))
+      return this.isOrgSynced
+        ? `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
+        : ''
     },
 
     /**
@@ -217,7 +233,7 @@ export default {
      */
     fetchDatasets: function() {
       this.setIsLoadingDatasets(true)
-          .then(() => this.sendXhr(this.getDatasetsUrl))
+          .then(() => this.sendXhr(this.getDatasetsUrl,{}))
           .then(response => {
             this.setDatasetData(response)
             this.setIsLoadingDatasetsError(false)

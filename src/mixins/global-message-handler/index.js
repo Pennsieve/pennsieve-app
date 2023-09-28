@@ -291,7 +291,8 @@ export default {
       return `${this.config.apiUrl}/user?api_key=${token}`
     },
     /**
-     * Get active org data
+     * Get the active org that is defined on the server side.
+     * Then update the active org on the client side to match.
      */
     getActiveOrg: function() {
       const url = this.getActiveOrgUrl(this.userToken)

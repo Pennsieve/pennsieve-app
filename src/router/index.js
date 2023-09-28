@@ -3,8 +3,12 @@ import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
+const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
+
 const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
+const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
+
 
 /**
  * ORCIDRedirect
@@ -183,6 +187,26 @@ const router = createRouter({
           },
           props: true
         }
+      ]
+    },
+    {
+      path: '/:orgId/datasets/:datasetId',
+      components: {
+        page: Datasets,
+        navigation: BfNavigation,
+        navigationSecondary: BfNavigationSecondary
+      },
+      children: [
+        {
+          name: 'dataset-overview',
+          path: 'overview',
+          components: {
+            stage: DatasetOverview
+          },
+          props: {
+            stage: true
+          }
+        },
       ]
     },
     {

@@ -18,6 +18,13 @@
               placeholder="Find Datasets"
               @keyup.enter.native="searchDatasetsByQuery"
             >
+              <template #prefix>
+                <IconMagnifyingGlass
+                  :height="24"
+                  :width="24"
+                  color="#71747c"
+                  />
+              </template>
               <!--            <svg-icon-->
               <!--              slot="prefix"-->
               <!--              name="icon-magnifying-glass"-->
@@ -40,8 +47,6 @@
             New Dataset
           </bf-button>
         </div>
-
-
 
       </template>
 
@@ -197,7 +202,6 @@
 
 <!--      <OnboardingCarousel v-if="gettingStartedOpen"/>-->
     </bf-stage>
-<!--  </bf-page>-->
 </template>
 
 <script>
@@ -220,11 +224,13 @@ import UserAccountAge from '../../../mixins/user-account-age'
 import OnboardingCarousel from '../../onboarding-carousel/OnboardingCarousel.vue'
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
+import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 
   export default {
     name: 'BfDatasetList',
 
     components: {
+      IconMagnifyingGlass,
       IconArrowRight,
       BfRafter,
       BfButton,

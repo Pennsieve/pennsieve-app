@@ -1,5 +1,5 @@
 <template>
-  <div class="bf-dataset-list-item">
+  <div class="bf-dataset-list-item" >
     <el-row
       type="flex"
       :gutter="32"
@@ -13,16 +13,14 @@
           >
           <div>
             <h2>
-<!--              <router-link :to="datasetLink">-->
-<!--&lt;!&ndash;                <svg-icon&ndash;&gt;-->
-<!--&lt;!&ndash;                  v-if="datasetLocked"&ndash;&gt;-->
-<!--&lt;!&ndash;                  color="#71747C"&ndash;&gt;-->
-<!--&lt;!&ndash;                  name="icon-lock-filled"&ndash;&gt;-->
-<!--&lt;!&ndash;                  height="16"&ndash;&gt;-->
-<!--&lt;!&ndash;                  width="16"&ndash;&gt;-->
-<!--&lt;!&ndash;                />&ndash;&gt;-->
-<!--                {{ dataset.content.name }}-->
-<!--              </router-link>-->
+              <router-link :to="datasetLink">
+                <IconLockFilled
+                  v-if="datasetLocked"
+                  :height="16"
+                  :width="16"
+                />
+                {{ dataset.content.name }}
+              </router-link>
             </h2>
             <div
               v-if="publishStatus === 'PUBLISH_SUCCEEDED'"
@@ -30,12 +28,10 @@
             >
               <!-- Published to Pennsieve Discover -->
               <template v-if="dataset.publication.type !== PublicationType.EMBARGO">
-<!--                <svg-icon-->
-<!--                  class="mr-8"-->
-<!--                  name="icon-discover"-->
-<!--                  height="15"-->
-<!--                  width="15"-->
-<!--                />-->
+                <IconDiscover
+                  :height="15"
+                  :width="15"
+                />
                 <p>
                   Published a copy on
                   <strong>{{ publishedDate }}</strong>
@@ -50,12 +46,10 @@
 
               <!-- Embargoed dataset -->
               <template v-if="dataset.publication.type === PublicationType.EMBARGO">
-<!--                <svg-icon-->
-<!--                  class="mr-8"-->
-<!--                  name="icon-discover"-->
-<!--                  height="15"-->
-<!--                  width="15"-->
-<!--                />-->
+                <IconDiscover
+                  :height="15"
+                  :width="15"
+                />
                 <p>
                   Embargoed until
                   <strong>{{ formatDate(dataset.publication.embargoReleaseDate) }}</strong>
@@ -67,12 +61,10 @@
               v-if="publishStatus === 'PUBLISH_FAILED'"
               class="publish-info mb-8 error"
             >
-<!--              <svg-icon-->
-<!--                class="mr-8"-->
-<!--                name="icon-warning-circle"-->
-<!--                height="15"-->
-<!--                width="15"-->
-<!--              />-->
+              <IconWarningCircle
+                :height="15"
+                :width="15"
+              />
               <p>
                 Dataset failed to publish
                 <router-link
@@ -155,6 +147,7 @@
             :indicator-color="publicationStatusColor"
             :label="publicatonStatus"
           >
+
 <!--            <svg-icon-->
 <!--              slot="prefix"-->
 <!--              class="icon-publish-status"-->
@@ -204,11 +197,17 @@ import BfStorageMetricsMixin from '../../../../mixins/bf-storage-metrics'
 import FormatDate from '../../../../mixins/format-date'
 import DatasetPublishedData from '../../../../mixins/dataset-published-data'
 import { PublicationType, PublicationStatus, UserFriendlyPublicationStatus, PublicationStatusColor } from '../../../../utils/constants'
+import IconLockFilled from "../../../icons/IconLockFilled.vue";
+import IconDiscover from "../../../icons/IconDiscover.vue";
+import IconWarningCircle from "../../../icons/IconWarningCircle.vue";
 
 export default {
   name: 'BfDatasetListItem',
 
   components: {
+    IconWarningCircle,
+    IconDiscover,
+    IconLockFilled,
     BfIconWaiting,
     TagPill
   },
