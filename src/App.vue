@@ -84,24 +84,24 @@ export default {
     /**
      * Trigger API request when active organization is changed
      */
-    // activeOrganization: {
-    //   handler: function(val, oldVal) {
-    //     const oldOrgId = pathOr("NONE",['organization','id'],oldVal)
-    //     const newOrgId = pathOr("NONE",['organization','id'],val)
-    //
-    //     // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
-    //     if (this.userToken && oldOrgId !== newOrgId) {
-    //       console.log('Workspace switch; getting datasets, published data, collections, Integrations, and Statuses')
-    //       this.setActiveOrgSynced()
-    //         .then(() => this.fetchDatasets())
-    //         .then(() => this.fetchDatasetPublishedData())
-    //         .then(() => this.fetchCollections())
-    //         .then(() => this.fetchIntegrations())
-    //         .then(() => this.fetchDatasetStatuses())
-    //     }
-    //   },
-    //   immediate: true
-    // },
+    activeOrganization: {
+      handler: function(val, oldVal) {
+        const oldOrgId = pathOr("NONE",['organization','id'],oldVal)
+        const newOrgId = pathOr("NONE",['organization','id'],val)
+
+        // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
+        if (this.userToken && oldOrgId !== newOrgId) {
+          console.log('Workspace switch; getting datasets, published data, collections, Integrations, and Statuses')
+          this.setActiveOrgSynced()
+            .then(() => this.fetchDatasets())
+            .then(() => this.fetchDatasetPublishedData())
+            .then(() => this.fetchCollections())
+            .then(() => this.fetchIntegrations())
+            .then(() => this.fetchDatasetStatuses())
+        }
+      },
+      immediate: true
+    },
     /**
      * Watch getDatasetsUrl and get datasets
      * Used for dataset search
