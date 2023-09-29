@@ -5,13 +5,14 @@
     :content="label"
     :disabled="!condensed"
     :open-delay="200"
+    :style="styleObject"
   >
-    <router-link class="bf-navigation-item" :to="link">
+    <router-link class="bf-navigation-item" :to="link"  :style="styleObject">
       <div class="svg-icon svg-fill icon-main">
         <slot name="icon" ></slot>
       </div>
 
-      <span class="label">
+      <span class="label" :style="styleObject">
         {{ label }}
       </span>
 
@@ -57,6 +58,20 @@
       icon: {
         type: String,
         default: ''
+      },
+      styleColor: {
+        type: String,
+        default: ''
+      }
+    },
+    computed: {
+      styleObject: function() {
+        return this.styleColor? {
+          '--color-hover': this.styleColor
+        } : {
+          '--color-hover': '#4d628c'
+        }
+
       }
     }
   }
@@ -89,18 +104,18 @@
         color: $gray_2;
       }
     }
-    &.router-link-active {
-      background: transparent;
-      color: $purple_1;
-
-      .svg-icon {
-        color: $purple_1;
-      }
-      &.secondary {
-      background: $purple_tint;
-      border-right: 4px solid;
-    }
-    }
+    //&.router-link-active {
+    //  background: transparent;
+    //  color: $purple_1;
+    //
+    //  .svg-icon {
+    //    color: $purple_1;
+    //  }
+    //  &.secondary {
+    //  background: $purple_tint;
+    //  border-right: 4px solid;
+    //}
+    //}
     .svg-icon {
       color: $gray_2;
     }
@@ -112,13 +127,13 @@
         color: inherit;
       }
       &:hover, &:focus, &.active {
-          color: $purple_1;
+          color: var(--color-hover);
       }
     }
     .primary & {
       color: $white;
       &:hover, &:focus, &.active {
-        background: $purple_2;
+        background: var(--color-hover);
         color: $white;
         .svg-icon {
           color: $white;
@@ -126,10 +141,10 @@
       }
       &.router-link-active {
         background: $gray_1;
-        color: $purple_1;
+        color: var(--color-hover);
 
         .svg-icon {
-          color: $purple_1;
+          color: var(--color-hover);
         }
       }
       .svg-icon {

@@ -98,7 +98,7 @@
   }
 
   .locked-dialog {
-    /deep/ .el-dialog__header {
+    .el-dialog__header {
       border-bottom: none;
     }
     text-align: center;

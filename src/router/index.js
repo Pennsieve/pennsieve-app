@@ -76,7 +76,7 @@ const router = createRouter({
       path: "/",
       name: "home",
       components: {
-        page: () => import("../views/Login.vue"),
+        page: () => import("./Login/Login.vue"),
       },
       props: true,
     },
@@ -99,7 +99,7 @@ const router = createRouter({
       name: "create-account",
       path: "/sign-up",
       components: {
-        page: () => import("../views/Login.vue"),
+        page: () => import("./Login/Login.vue"),
       },
       props: true,
     },
@@ -109,7 +109,7 @@ const router = createRouter({
       // route level code-splitting
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
-      component: () => import("../views/Login.vue"),
+      component: () => import("./Login/Login.vue"),
     },
     /**
      * Information Panel for organization

@@ -1,7 +1,6 @@
 <template>
     <bf-stage
       slot="stage"
-      v-loading="isLoadingDatasets"
     >
       <template #actions>
         <div
@@ -25,13 +24,6 @@
                   color="#71747c"
                   />
               </template>
-              <!--            <svg-icon-->
-              <!--              slot="prefix"-->
-              <!--              name="icon-magnifying-glass"-->
-              <!--              height="24px"-->
-              <!--              width="24px"-->
-              <!--              color="#71747c"-->
-              <!--            />-->
             </el-input>
           </form>
           <p v-if="hasDatasets">
@@ -100,6 +92,7 @@
       <div
         v-if="hasDatasets && isLoadingDatasetsError === false"
         class="dataset-list-item-wrap"
+        v-loading="isLoadingDatasets"
       >
         <bf-dataset-list-item
           v-for="dataset in datasets"
@@ -133,8 +126,8 @@
       <bf-create-new-dataset
         :datasets="datasets"
         :integrations="integrations"
-        :visible.sync="newDatasetDialogOpen"
-        @close-dialog="newDatasetDialogOpen = false"
+        :dialog-visible="newDatasetDialogOpen"
+        @close-dialog="onCloseCreateDialog"
       />
 
       <bf-empty-page-state v-if="isEmptyOrg && !isWorkspaceGuest">
@@ -452,6 +445,11 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
         'updateDatasetSearchOrderBy',
         'updateDatasetOffset'
       ]),
+
+      onCloseCreateDialog: function() {
+        console.log('closing dialog')
+        this.newDatasetDialogOpen = false
+      },
 
       searchDatasetsByQuery: function(){
         this.updateDatasetSearchQuery(this.searchQuery)

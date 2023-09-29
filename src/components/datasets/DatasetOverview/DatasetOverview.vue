@@ -314,7 +314,7 @@
           @save="onReadmeSave"
         />
       </data-card>
-      <br> </br>
+      <br>
       <data-card
         ref="changelogDataCard"
         class="grey compact"
@@ -380,10 +380,10 @@
   import datasetDescriptionEmptyState from './dataset-description-empty-state'
   import changelogDescriptionEmptyState from './changelog-description-empty-state'
   import ContributorItem from '../ContributorItem/ContributorItem.vue'
-  import BfRafter from "../../shared/bf-rafter/BfRafter";
-  import BfButton from "../../shared/bf-button/BfButton";
-  import StaleUpdateDialog from "../stale-update-dialog/StaleUpdateDialog";
-  import LockedBanner from '../LockedBanner/LockedBanner';
+  import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
+  import BfButton from "../../shared/bf-button/BfButton.vue";
+  import StaleUpdateDialog from "../stale-update-dialog/StaleUpdateDialog.vue";
+  import LockedBanner from '../LockedBanner/LockedBanner.vue';
 
 
   const replaceLineBreaks = str => {

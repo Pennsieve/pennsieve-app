@@ -2,7 +2,7 @@
   <div class="bf-navigation-tertiary">
 <!--    <search-menu v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest" />-->
     <help-menu />
-    <user-menu />
+    <user-menu :style="{ backgroundColor: `${bkColor}` }"/>
   </div>
 </template>
 
@@ -15,6 +15,13 @@
 
   export default {
     name: 'BfNavigationTertiary',
+
+    props: {
+      bkColor: {
+        type: String,
+        default: '#011F5B'
+      }
+    },
 
     components: {
       HelpMenu,

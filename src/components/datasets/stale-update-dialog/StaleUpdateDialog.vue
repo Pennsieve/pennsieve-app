@@ -77,7 +77,7 @@
 <style lang="scss" scoped>
   @import '../../../assets/_variables';
   .confirm-stale-update-body {
-    /deep/ p {
+    p {
       color: $app-secondary-color
     }
   }

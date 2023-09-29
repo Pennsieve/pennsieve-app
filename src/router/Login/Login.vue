@@ -140,21 +140,21 @@
 import { mapGetters, mapActions, mapState } from "vuex";
 import { propOr, pathOr } from "ramda";
 import { Auth } from "@aws-amplify/auth";
-import PennsieveHeader from "../components/shared/PennsieveHeader/PennsieveHeader.vue";
-import DatasetSearch from "../components/DatasetSearch/DatasetSearch.vue";
-import PennsieveFooter from "../components/shared/PennsieveFooter/PennsieveFooter.vue";
+import PennsieveHeader from "../../components/shared/PennsieveHeader/PennsieveHeader.vue";
+import DatasetSearch from "../../components/DatasetSearch/DatasetSearch.vue";
+import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFooter.vue";
 // import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid";
 
-import analyzeIcon from "../assets/images/icons/analyze.svg"
-import securityIcon from "../assets/images/icons/security.svg"
-import eegIcon from "../assets/images/icons/eeg-data.svg"
-import storageIcon from "../assets/images/icons/storage.svg"
-import logformsIcon from "../assets/images/icons/log-forms.svg"
-import collabIcon from "../assets/images/icons/collaboration.svg"
+import analyzeIcon from "../../assets/images/icons/analyze.svg"
+import securityIcon from "../../assets/images/icons/security.svg"
+import eegIcon from "../../assets/images/icons/eeg-data.svg"
+import storageIcon from "../../assets/images/icons/storage.svg"
+import logformsIcon from "../../assets/images/icons/log-forms.svg"
+import collabIcon from "../../assets/images/icons/collaboration.svg"
 
 
-import EventBus from "../utils/event-bus";
-import PennsieveLogoContainer from "../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
+import EventBus from "../../utils/event-bus";
+import PennsieveLogoContainer from "../../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
 // import AutoFocus from "../../mixins/auto-focus";
 // import Request from "../../mixins/request";
 
@@ -490,7 +490,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../assets/variables.scss";
+@import "src/assets/variables";
 
 .pennsieve-logo {
   width: 264px;

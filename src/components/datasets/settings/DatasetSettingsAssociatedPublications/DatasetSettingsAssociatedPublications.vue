@@ -226,7 +226,7 @@ export default {
     }
   }
 
-  /deep/ .bf-button {
+  .bf-button {
     &.secondary {
       width: 135px;
       margin-bottom: 10px;

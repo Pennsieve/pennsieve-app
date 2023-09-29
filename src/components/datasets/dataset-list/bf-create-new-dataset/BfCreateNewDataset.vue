@@ -1,15 +1,18 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     class="create-new-dataset-dialog"
     @open="handleOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Create Dataset"
-    />
+    <template #header>
+      <bf-dialog-header
+        title="Create Dataset"
+      />
+    </template>
+
 
     <dialog-body>
       <!-- Step 1 -->
@@ -17,6 +20,7 @@
         v-show="shouldShow(1)"
         ref="newDatasetFormStep1"
         :model="newDatasetForm"
+        label-position="top"
         :rules="rules"
         @submit.native.prevent="createDataset()"
       >
@@ -88,10 +92,7 @@
       </el-form>
     </dialog-body>
 
-    <div
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         tabindex="4"
         class="secondary"
@@ -108,7 +109,8 @@
       >
         {{ createText }}
       </bf-button>
-    </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -146,7 +148,7 @@
     ],
 
     props: {
-      visible: Boolean,
+      dialogVisible: Boolean,
       datasets: Array,
       integrations: Array
     },
@@ -344,6 +346,7 @@
        * Closes the dialog
        */
       closeDialog: function() {
+        console.log('called close dialog')
         this.$emit('close-dialog')
         this.duplicateName = false
         for (let x in this.integrations) {
@@ -425,8 +428,10 @@
        * @param {Object} response
        */
       handleSuccess: function(response) {
+        console.log('successfully created dataset')
         this.addDataset(response).then(() => {
-          this.closeDialog('newDatasetForm')
+          console.log('in then')
+          this.closeDialog()
 
           // check for onboarding event state for creating a dataset
           if (this.onboardingEvents.indexOf('CreatedDataset') === -1){

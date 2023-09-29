@@ -59,7 +59,7 @@
 <style lang="scss" scoped>
 @import '../../../assets/_variables.scss';
  .locked-dialog {
-    /deep/ .el-dialog__header {
+   .el-dialog__header {
       border-bottom: none;
     }
     text-align: center;

@@ -1,4 +1,3 @@
-import * as Vue from "vue";
 import { createStore } from "vuex";
 import Cookies from "js-cookie";
 import * as site from "../site-config/site.json";
@@ -287,34 +286,10 @@ export default createStore({
     UPDATE_FILES_PROXY_ID(state, id) {
       state.filesProxyId = id;
     },
-    // UPDATE_SITES(state, sites) {
-    //   state.sites = sites;
-    // },
-    // UPDATE_SITE(state, { site, id }) {
-    //   let sites = clone(state.sites);
-
-    //   const index = getIndexByProp("id", id, sites);
-    //   sites[index] = site;
-
-    //   state.sites =sites;
-    // },
-    // REMOVE_SITE(state, id) {
-    //   let sites = clone(state.sites);
-
-    //   const index = getIndexByProp("id", id, sites);
-    //   sites.splice(index, 1);
-
-    //   state.sites =sites;
-    // },
-    // ADD_SITE(state, site) {
-    //   let sites = clone(state.sites);
-    //   sites.unshift(site);
-
-    //   state.sites = sites;
-    // },
     ADD_CONSORTIUM_DATASET(state, dataset) {
       const consortiumDatasets = state.consortiumDatasets;
-      Vue.set(consortiumDatasets, consortiumDatasets.length, dataset);
+      consortiumDatasets.push(dataset)
+
     },
     UPDATE_CONSORTIUM_DATASETS(state, datasets) {
       state.consortiumDatasets = datasets;
@@ -326,23 +301,19 @@ export default createStore({
           R.propEq("id", discoverId),
           state.consortiumDatasets
         );
-        Vue.delete(state.consortiumDatasets, idx);
+        delete state.consortiumDatasets[idx];
       }
     },
     ADD_CONSORTIUM_DATASET_IMPORTING(state, dataset) {
       const consortiumDatasetsImporting = state.consortiumDatasetsImporting;
-      Vue.set(
-        consortiumDatasetsImporting,
-        consortiumDatasetsImporting.length,
-        dataset
-      );
+      consortiumDatasetsImporting.push(dataset)
     },
     REMOVE_CONSORTIUM_DATASET_IMPORTING(state, dataset) {
       const idx = R.findIndex(
         R.propEq("id", dataset.id),
         state.consortiumDatasetsImporting
       );
-      Vue.delete(state.consortiumDatasetsImporting, idx);
+      delete state.consortiumDatasetsImporting[idx];
     },
 
     SET_DATASETS(state, data) {
@@ -355,7 +326,7 @@ export default createStore({
       state.dataset = dataset;
 
       if (index !== -1) {
-        Vue.set(state.datasets, index, dataset);
+        state.datasets[index] = dataset
       }
     },
 
@@ -363,14 +334,14 @@ export default createStore({
       const index = getDatasetIndex(dataset, state.datasets);
 
       if (index) {
-        Vue.delete(state.datasets, index);
-        Vue.set(dataset, {});
+        delete state.datasets[index]
+        dataset = {}
       }
     },
 
     ADD_DATASET(state, dataset) {
       const datasets = state.datasets;
-      Vue.set(datasets, datasets.length, dataset);
+      datasets.unshift(dataset)
     },
 
     SET_DATASET_PUBLISHED_DATA(state, data) {
@@ -378,19 +349,21 @@ export default createStore({
     },
 
     ADD_DATASET_PUBLISHED_DATA(state, data) {
-      Vue.set(state, "datasetPublishedData", data);
+      state.datasetPublishedData = data
     },
 
     UPDATE_DATASET_PUBLISHED_DATA(state, { data, getters }) {
       const sourceDatasetId = R.propOr(0, "sourceDatasetId", data);
       const idx = getters.getPublishedDataIndexByIntId(sourceDatasetId);
-      Vue.set(state.datasetPublishedData, idx, data);
+      state.datasetPublishedData[idx] = data
+
     },
 
     DELETE_DATASET_PUBLISHED_DATA(state, { data, getters }) {
       const sourceDatasetId = R.propOr(0, "sourceDatasetId", data);
       const idx = getters.getPublishedDataIndexByIntId(sourceDatasetId);
-      Vue.delete(state.datasetPublishedData, idx);
+
+      delete state.datasetPublishedData[idx]
     },
 
     SET_IS_LOADING_DATASET_PUBLISHED_DATA(state, data) {
