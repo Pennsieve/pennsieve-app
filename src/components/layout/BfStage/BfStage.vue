@@ -45,7 +45,7 @@
     this.$el.addEventListener('scroll', this.onScroll)
     },
 
-    beforeDestroy: function() {
+    beforeUnmount: function() {
       this.$el.removeEventListener('scroll', this.onScroll)
     },
 

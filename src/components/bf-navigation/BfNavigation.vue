@@ -4,19 +4,26 @@
     :class="[ primaryNavCondensed || pageNotFound || secondaryNavOpen ? 'condensed' : '' ]"
     :style="{ backgroundImage: `${workspaceBackgroundStyle}` }"
   >
+
     <div class="logo-wrap">
       <router-link
         v-if="!pageNotFound"
         tag="button"
         :to="logoRoute"
       >
-        <pennsieve-mark
+
+        <component :is="MarkComponent"
           :is-visible="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          :width="24"
-          :height="24"
-          color="currentColor">
-        </pennsieve-mark>
+          :class="logoClass"
+          color="currentColor"
+          />
+<!--        <pennsieve-mark-->
+<!--          :is-visible="!primaryNavCondensed || secondaryNavOpen"-->
+<!--          class="logo"-->
+<!--          :width="24"-->
+<!--          :height="24"-->
+<!--          color="currentColor">-->
+<!--        </pennsieve-mark>-->
 
       </router-link>
       <a
@@ -227,11 +234,16 @@
   import IconOrganization from "../icons/IconOrganization.vue";
   import IconDocument from "../icons/IconDocument.vue";
   import IconPublic from "../icons/IconPublic.vue";
+  import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
+  import IconI3HLogo from "../icons/IconI3HLogo.vue";
+
 
   export default {
     name: 'BfNavigation',
 
     components: {
+      IconSPARCLogo,
+      IconI3HLogo,
       IconPublic,
       IconDocument,
       IconOrganization,
@@ -262,6 +274,22 @@
         'pageNotFound',
 
       ]),
+      logoClass: function() {
+        if (this.activeOrganizationName === 'Penn Immune Health') {
+          return "I3H-logo"
+        } else {
+          return "logo"
+        }
+      },
+      MarkComponent: function() {
+        let name = "PennsieveMark"
+        if (this.activeOrganizationName === 'Pennsieve Test') {
+          name = "IconSPARCLogo"
+        } else if (this.activeOrganizationName === 'Penn Immune Health') {
+          name = "IconI3HLogo"
+        }
+        return name
+      },
       hasCustomTheme: function() {
         return true
       },
@@ -364,6 +392,7 @@
        * Toggles primary nav open and closed
        */
       toggleMenu: function() {
+        console.log('condensing primary nav')
         this.condensePrimaryNav(!this.primaryNavCondensed)
       },
 
@@ -377,7 +406,7 @@
       pSBC: function(p,c0,c1,l) {
         let r,g,b,P,f,t,h,i=parseInt,m=Math.round,a=typeof(c1)=="string";
         if(typeof(p)!="number"||p<-1||p>1||typeof(c0)!="string"||(c0[0]!='r'&&c0[0]!='#')||(c1&&!a))return null;
-        if(!this.pSBCr)this.pSBCr=(d)=>{
+        this.pSBCr=(d)=>{
           let n=d.length,x={};
           if(n>9){
             [r,g,b,a]=d=d.split(","),n=d.length;
@@ -397,7 +426,7 @@
         a=f.a,t=t.a,f=a>=0||t>=0,a=f?a<0?t:t<0?a:a*P+t*p:0;
         if(h)return"rgb"+(f?"a(":"(")+r+","+g+","+b+(f?","+m(a*1000)/1000:"")+")";
         else return"#"+(4294967296+r*16777216+g*65536+b*256+(f?m(a*255):0)).toString(16).slice(1,f?undefined:-2)
-      }
+      },
     }
   }
 </script>
@@ -432,6 +461,14 @@
   .logo {
     color: $white;
     fill: $white;
+  }
+  .I3H-logo {
+    height:30px;
+
+    .condensed & {
+      width: 24px;
+      height: auto;
+    }
   }
   .logo-wrap {
     margin: 18px 0;

@@ -117,6 +117,7 @@ export default createStore({
     onboardingEvents: [],
     shouldShowLinkOrcidDialog: false,
     isLinkOrcidDialogVisible: false,
+    userToken: ''
   },
   mutations: {
     SET_ACTIVE_ORG_SYNC(state) {
@@ -407,8 +408,8 @@ export default createStore({
 
     SET_RELATIONSHIP_TYPES(state, data) {
       state.relationshipTypes = data;
-      Vue.set(state, "relationshipTypesHash", hashFunction("id", data));
-    },
+      state.relationshipTypesHash = hashFunction("id", data);
+      },
 
     ADD_RELATIONSHIP_TYPE(state, data) {
       state.relationshipTypes.push(data);
@@ -419,7 +420,7 @@ export default createStore({
         R.propEq("id", relationship.id),
         state.relationshipTypes
       );
-      Vue.set(state.relationshipTypes, idx, relationship);
+      state.relationshipTypes[idx] = relationship
     },
 
     DELETE_RELATIONSHIP_TYPE(state, relationship) {
@@ -427,7 +428,7 @@ export default createStore({
         R.propEq("id", relationship.id),
         state.relationshipTypes
       );
-      Vue.delete(state.relationshipTypes, idx);
+      delete state.relationshipTypes[idx]
     },
 
     UPDATE_IS_LOADING_RELATIONSHIP_TYPES(state, data) {
@@ -460,7 +461,7 @@ export default createStore({
 
     ADD_DATASET_TEMPLATE(state, datasetTemplate) {
       const datasetTemplates = state.datasetTemplates;
-      Vue.set(datasetTemplates, datasetTemplates.length, datasetTemplate);
+      datasetTemplates.push(datasetTemplate)
     },
 
     REMOVE_DATASET_TEMPLATE(state, datasetTemplate) {
@@ -468,7 +469,7 @@ export default createStore({
         R.propEq("id", datasetTemplate.id),
         state.datasetTemplates
       );
-      Vue.delete(state.datasetTemplates, idx);
+      delete state.datasetTemplates[idx]
     },
 
     UPDATE_DATASET_TEMPLATES(state, datasetTemplate) {
@@ -476,7 +477,8 @@ export default createStore({
         R.propEq("id", datasetTemplate.id),
         state.datasetTemplates
       );
-      Vue.set(state.datasetTemplates, idx, datasetTemplate);
+      state.datasetTemplates[idx] = datasetTemplate
+
     },
 
     SET_IS_LOADING_DATASET_TEMPLATES(state, data) {
@@ -537,7 +539,7 @@ export default createStore({
     },
 
     REMOVE_DATASET_CONTRIBUTOR(state, idx) {
-      Vue.delete(state.datasetContributors, idx);
+      delete state.datasetContributors[idx]
     },
 
     SET_ORG_CONTRIBUTORS(state, contributors) {
@@ -691,10 +693,6 @@ export default createStore({
       commit("UPDATE_EXPLORE_FILES", evt),
     updateFilesProxyId: ({ commit }, evt) =>
       commit("UPDATE_FILES_PROXY_ID", evt),
-    updateSites: ({ commit }, evt) => commit("UPDATE_SITES", evt),
-    updateSite: ({ commit }, evt) => commit("UPDATE_SITE", evt),
-    removeSite: ({ commit }, evt) => commit("REMOVE_SITE", evt),
-    addSite: ({ commit }, evt) => commit("ADD_SITE", evt),
     addConsortiumDataset: ({ commit }, evt) =>
       commit("ADD_CONSORTIUM_DATASET", evt),
     updateConsortiumDatasets: ({ commit }, evt) =>

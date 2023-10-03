@@ -72,7 +72,6 @@ router.beforeEach((to, from, next) => {
         const stateToken = store.state.userToken
 
         if (token && !stateToken) {
-            console.log('Update token in beforeEach')
             store.dispatch('updateUserToken', token)
         }
 

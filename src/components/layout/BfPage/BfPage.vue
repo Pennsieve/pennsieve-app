@@ -1,13 +1,17 @@
 <template>
   <div
     class="bf-page"
-    :class="[condensed ? 'condensed' : '']"
+    :class="[condensed ? 'page-condensed' : '']"
   >
 <!--    <sandbox-organization-banner />-->
-    <slot name="banner" />
-    <slot name="heading" />
-    <slot name="stage" />
-    <slot />
+    <slot name="navigationSecondary"/>
+    <div class="stageWrapper">
+      <slot name="banner" />
+      <slot name="heading" />
+      <slot name="stage" />
+      <slot />
+    </div>
+
   </div>
 </template>
 
@@ -33,7 +37,7 @@
       EventBus.$on('stage-scroll', this.onScroll.bind(this))
     },
 
-    beforeDestroy: function() {
+    beforeUnmount: function() {
       EventBus.$off('stage-scroll', this.onScroll.bind(this))
     },
 
@@ -53,6 +57,12 @@
 <style lang="scss">
   .bf-page {
     display: flex;
+    flex-direction: row;
+  }
+
+  .stageWrapper {
+    display: flex;
     flex-direction: column;
+    flex:1;
   }
 </style>

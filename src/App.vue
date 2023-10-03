@@ -7,7 +7,6 @@
     <router-view name="header" />
     <div id="main-wrap">
       <router-view v-show="primaryNavOpen" name="navigation" />
-      <router-view v-show="secondaryNavOpen" name="navigationSecondary" />
       <router-view id="page" name="page" />
     </div>
   </div>
@@ -91,7 +90,6 @@ export default {
 
         // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
         if (this.userToken && oldOrgId !== newOrgId) {
-          console.log('Workspace switch; getting datasets, published data, collections, Integrations, and Statuses')
           this.setActiveOrgSynced()
             .then(() => this.fetchDatasets())
             .then(() => this.fetchDatasetPublishedData())

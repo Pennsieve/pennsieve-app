@@ -43,7 +43,7 @@
       this.$store.watch(this.getActiveOrganization, this.bootIntercom.bind(this))
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
       EventBus.$off('track-event', this.trackEvent.bind(this))
     },
 

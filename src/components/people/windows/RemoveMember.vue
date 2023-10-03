@@ -73,7 +73,7 @@ export default {
     EventBus.$on('remove-org-member', this.handleRemoveOrgMember.bind(this))
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     EventBus.$off('remove-org-member', this.handleRemoveOrgMember.bind(this))
   },
 

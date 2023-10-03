@@ -1,23 +1,31 @@
 <template>
   <bf-page>
-    <bf-rafter
-      slot="heading"
-      title="Datasets"
-      class="primary"
-    >
-      <template #description>
-        <p>
-          Datasets are used to store files and metadata and are the primary component of the Pennsieve platform.
-        </p>
-      </template>
-    </bf-rafter>
-    <router-view
-      name="stage"
-      :datasets="datasets"
-      list-type="dataset"
-    />
-  </bf-page>
+    <template #navigationSecondary>
+      <router-view name="navigationSecondary" />
+    </template>
 
+    <template #heading v-if="isPrimary">
+      <bf-rafter
+        slot="heading"
+        title="Datasets"
+        class="primary"
+      >
+        <template #description>
+          <p>
+            Datasets are used to store files and metadata and are the primary component of the Pennsieve platform.
+          </p>
+        </template>
+      </bf-rafter>
+    </template>
+
+    <template #stage>
+      <router-view
+        name="stage"
+        :datasets="datasets"
+        list-type="dataset"
+      />
+    </template>
+  </bf-page>
 </template>
 
 <script>
@@ -28,6 +36,8 @@
   import Sorter from '../../mixins/sorter'
   import EventBus from '../../utils/event-bus'
   import GetDatasetDoi from '../../mixins/get-dataset-doi'
+  import BfPage from '../../components/layout/BfPage/BfPage.vue'
+
 
   export default {
     name: 'BfDatasets',
@@ -38,6 +48,10 @@
       Sorter
     ],
 
+    components: {
+      BfPage
+    },
+
     data: function() {
       return {
         isLoading: false
@@ -47,6 +61,7 @@
     computed: {
       ...mapState([
         'datasets',
+        'dataset',
         'userToken',
         'concepts',
         'scientificUnits',
@@ -63,6 +78,10 @@
         'getPermission',
         'isOrgSynced'
       ]),
+
+      isPrimary: function(){
+        return this.$route.name === 'datasets-list'
+      },
 
        /**
        * Get units URL
@@ -104,9 +123,6 @@
     },
 
     watch: {
-
-
-
       /**
        * Watch to compute dataset
        */
@@ -124,7 +140,7 @@
       EventBus.$on('get-dataset-contributors', this.getDatasetContributors.bind(this))
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
       EventBus.$off('get-dataset-contributors', this.getDatasetContributors.bind(this))
     },
 
@@ -133,7 +149,6 @@
         'updateConcepts',
         'updateIsLoadingConcepts',
         'updateFilesProxyId',
-        'updateSites',
         'setDataset',
         'setDatasetEtag',
         'setRelationshipTypes',
@@ -160,20 +175,23 @@
       * Retrieves list of scientific units
     */
     getScientificUnits: function() {
-      this.sendXhr(this.scientificUnitsUrl).then(resp => {
-        this.updateScientificUnits([
-          ...resp,
-          {
-            dimension: 'Other',
-            units: [{
-              name: 'Other',
-              displayName: 'Other',
-              description: 'Other'
-            }]
-          }
-        ])
-      })
-      .catch(this.handleXhrError.bind(this))
+      if (this.userToken) {
+        this.sendXhr(this.scientificUnitsUrl).then(resp => {
+          this.updateScientificUnits([
+            ...resp,
+            {
+              dimension: 'Other',
+              units: [{
+                name: 'Other',
+                displayName: 'Other',
+                description: 'Other'
+              }]
+            }
+          ])
+        })
+          .catch(this.handleXhrError.bind(this))
+      }
+
     },
 
       /**
@@ -203,6 +221,7 @@
                 })
                 .then(() => {
                   if (this.getPermission('manager')) {
+
                     this.getDatasetIgnoreFiles(datasetId)
                   }
                 })
@@ -369,10 +388,9 @@
         const datasetId = pathOr(0, ['content', 'id'], this.dataset)
         const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${this.userToken}`
         try {
-          const role = await this.sendXhr(url)
+          const role = await this.sendXhr(url,{})
           return this.setDatasetRole(role)
         } catch (error) {
-          this.updateSites([])
         }
       },
 

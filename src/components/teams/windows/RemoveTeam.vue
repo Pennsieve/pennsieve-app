@@ -106,7 +106,7 @@ export default {
     EventBus.$on('open-remove-team', this.handleRemoveTeam.bind(this))
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     EventBus.$off('open-remove-team', this.handleRemoveTeam.bind(this))
   },
 

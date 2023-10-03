@@ -133,7 +133,7 @@ export default {
     EventBus.$on('open-getting-started', this.showUserMenu.bind(this))
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     EventBus.$off('open-getting-started', this.showUserMenu.bind(this))
   },
 

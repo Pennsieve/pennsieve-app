@@ -18,7 +18,7 @@
 
 <script>
 export default {
-  name: "IconHelpMessage",
+  name: "IconLock",
   props: {
     width: {
       type: Number,

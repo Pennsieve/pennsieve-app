@@ -112,7 +112,7 @@ export default {
     EventBus.$on('update-org-member', this.handleUpdateOrgMember.bind(this))
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     EventBus.$off('update-org-member', this.handleUpdateOrgMember.bind(this))
   },
 

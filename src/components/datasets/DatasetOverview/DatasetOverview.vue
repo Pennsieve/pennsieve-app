@@ -1,273 +1,272 @@
 <template>
-  <bf-page class="dataset-overview">
-    <locked-banner
-      slot="banner"
-    />
-    <bf-rafter slot="heading" class="overview">
-      <div
-        slot="heading"
-        class="flex-heading"
-      >
-        <div class="dataset-heading">
-          <dataset-banner
-            empty-state-text="Add a banner image."
-            @click.native="goToBanner"
-          />
+  <div>
+    <bf-rafter  class="overview">
+      <template #heading>
+        <div
+          class="flex-heading"
+        >
+          <div class="dataset-heading">
+            <dataset-banner
+              empty-state-text="Add a banner image."
+              @click.native="goToBanner"
+            />
 
-          <div class="dataset-heading-info">
-            <h1 class="mb-8">
-              {{ datasetName }}
-            </h1>
+            <div class="dataset-heading-info">
+              <h1 class="mb-8">
+                {{ datasetName }}
+              </h1>
 
-            <div class="dataset-owners">
+              <div class="dataset-owners">
+                <div
+                  v-for="(contributor, idx) in datasetContributorsList"
+                  :key="contributor.id"
+                  class="contributor-item-wrap"
+                >
+                  <contributor-item :contributor="contributor" />
+                  <template v-if="idx < datasetContributorsList.length - 1">
+                    ,
+                  </template>
+                </div>
+              </div>
+
+              <!-- eslint-disable vue/no-v-html -->
+              <!-- $sanitize will sanitize the HTML injected -->
               <div
-                v-for="(contributor, idx) in datasetContributorsList"
-                :key="contributor.id"
-                class="contributor-item-wrap"
-              >
-                <contributor-item :contributor="contributor" />
-                <template v-if="idx < datasetContributorsList.length - 1">
-                  ,
+                class="dataset-description mb-24"
+                v-html="$sanitize(datasetSubtitle)"
+              />
+
+              <div class="dataset-heading-meta">
+                Last updated on <b>{{ lastUpdatedDate }}</b>
+                <template v-if="isPublished && publishedCount > 0">
+                  (<a
+                  :href="discoverLink"
+                  target="_blank"
+                >
+                  Version {{ publishedVersionLabel }}
+                </a>)
+                  <div class="sharing-status">
+
+                    Last published on <b>{{ publishedDate }}</b>
+                    <a
+                      target="_blank"
+                      :href="discoverLink"
+                      class="discover-link"
+                    >
+                      View on Discover
+                    </a>
+                  </div>
+
+                  <div class="sharing-status">
+                    Published dataset DOI: <a :href="doiUrl">{{datasetDoi.doi}}</a>
+                  </div>
                 </template>
+
+
+
+
+
+                <!--            <div class="dataset-corresponding-contributor">-->
+                <!--              <p>Dataset owner:</p>-->
+                <!--              <contributor-item :contributor="correspondingContributor" />-->
+                <!--            </div>-->
+
+                <div>
+
+                </div>
               </div>
             </div>
+          </div>
 
-            <!-- eslint-disable vue/no-v-html -->
-            <!-- $sanitize will sanitize the HTML injected -->
-            <div
-              class="dataset-description mb-24"
-              v-html="$sanitize(datasetSubtitle)"
-            />
-
-            <div class="dataset-heading-meta">
-              Last updated on <b>{{ lastUpdatedDate }}</b>
-              <template v-if="isPublished && publishedCount > 0">
-                (<a
-                :href="discoverLink"
-                target="_blank"
-              >
-                Version {{ publishedVersionLabel }}
-              </a>)
-                <div class="sharing-status">
-
-                  Last published on <b>{{ publishedDate }}</b>
-                  <a
-                    target="_blank"
-                    :href="discoverLink"
-                    class="discover-link"
-                  >
-                    View on Discover
-                  </a>
-                </div>
-
-                <div class="sharing-status">
-                  Published dataset DOI: <a :href="doiUrl">{{datasetDoi.doi}}</a>
-                </div>
-              </template>
-
-
-
-
-
-              <!--            <div class="dataset-corresponding-contributor">-->
-              <!--              <p>Dataset owner:</p>-->
-              <!--              <contributor-item :contributor="correspondingContributor" />-->
-              <!--            </div>-->
-
+          <div class="dataset-info-stats">
+            <div class="dataset-info-stat">
+              <IconFiles
+                class="svg-icon"
+                :height="20"
+                :width="20"
+              />
               <div>
-
+                <strong>{{ packageTypeCount }}</strong>
+                <!--                  <router-link :to="{ name: 'dataset-files' }">-->
+                <!--                    Files-->
+                <!--                  </router-link>-->
+              </div>
+            </div>
+            <div class="dataset-info-stat">
+              <IconStorage
+                class="svg-icon"
+                :height="20"
+                :width="20"
+              />
+              <div>
+                <strong>{{ datasetStorage.number }}</strong>
+                {{ datasetStorage.unit }}
+              </div>
+            </div>
+            <div class="dataset-info-stat">
+              <IconDocument
+                class="svg-icon"
+                :height="20"
+                :width="20"
+              />
+              <div>
+                <strong>{{ totalRecordsCount.toLocaleString('en') }}</strong>
+                <!--                  <router-link :to="{ name: 'records' }">-->
+                <!--                    {{ totalRecordsCountLabel }}-->
+                <!--                  </router-link>-->
+              </div>
+            </div>
+            <div class="dataset-info-stat">
+              <IconLicense
+                class="svg-icon"
+                :height="20"
+                :width="20"
+              />
+              <div>
+                <!--                  <router-link-->
+                <!--                    :to="{-->
+                <!--                name: 'dataset-settings',-->
+                <!--                query: {-->
+                <!--                  focusInput: 'inputLicense'-->
+                <!--                }-->
+                <!--              }"-->
+                <!--                  >-->
+                <!--                    {{ datasetLicense }}-->
+                <!--                  </router-link>-->
               </div>
             </div>
           </div>
         </div>
 
-        <div class="dataset-info-stats">
-          <div class="dataset-info-stat">
-            <svg-icon
-              name="icon-files"
-              height="20"
-              width="20"
-            />
-            <div>
-              <strong>{{ packageTypeCount }}</strong>
-              <router-link :to="{ name: 'dataset-files' }">
-                Files
-              </router-link>
-            </div>
-          </div>
-          <div class="dataset-info-stat">
-            <svg-icon
-              name="icon-storage"
-              height="20"
-              width="20"
-            />
-            <div>
-              <strong>{{ datasetStorage.number }}</strong>
-              {{ datasetStorage.unit }}
-            </div>
-          </div>
-          <div class="dataset-info-stat">
-            <svg-icon
-              name="icon-document"
-              height="20"
-              width="20"
-            />
-            <div>
-              <strong>{{ totalRecordsCount.toLocaleString('en') }}</strong>
-              <router-link :to="{ name: 'records' }">
-                {{ totalRecordsCountLabel }}
-              </router-link>
-            </div>
-          </div>
-          <div class="dataset-info-stat">
-            <svg-icon
-              name="icon-license"
-              height="20"
-              width="20"
-            />
-            <div>
-              <router-link
-                :to="{
-                name: 'dataset-settings',
-                query: {
-                  focusInput: 'inputLicense'
-                }
-              }"
-              >
-                {{ datasetLicense }}
-              </router-link>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      </template>
     </bf-rafter>
-    <bf-stage slot="stage">
+
+    <bf-stage>
 
 
-<!--      <data-card-->
-<!--        v-if="isChecklistDimissed === false && hasManagerPermissions"-->
-<!--        class="mb-32 grey compact"-->
-<!--        title="Dataset Publishing Checklist:"-->
-<!--        :padding="false"-->
-<!--      >-->
-<!--        <button-->
-<!--          slot="title-aux"-->
-<!--          class="linked"-->
-<!--          @click="dismissDatasetChecklist"-->
-<!--        >-->
-<!--          Dismiss-->
-<!--        </button>-->
+      <!--      <data-card-->
+      <!--        v-if="isChecklistDimissed === false && hasManagerPermissions"-->
+      <!--        class="mb-32 grey compact"-->
+      <!--        title="Dataset Publishing Checklist:"-->
+      <!--        :padding="false"-->
+      <!--      >-->
+      <!--        <button-->
+      <!--          slot="title-aux"-->
+      <!--          class="linked"-->
+      <!--          @click="dismissDatasetChecklist"-->
+      <!--        >-->
+      <!--          Dismiss-->
+      <!--        </button>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasSubtitle)"-->
-<!--          :route="{-->
-<!--            name: 'dataset-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'inputDescription'-->
-<!--            }-->
-<!--          }"-->
-<!--          cta="Add a subtitle"-->
-<!--        >-->
-<!--          gives others a brief description of your dataset.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasSubtitle)"-->
+      <!--          :route="{-->
+      <!--            name: 'dataset-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'inputDescription'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--          cta="Add a subtitle"-->
+      <!--        >-->
+      <!--          gives others a brief description of your dataset.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasTags)"-->
-<!--          :route="{-->
-<!--            name: 'dataset-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'inputTags'-->
-<!--            }-->
-<!--          }"-->
-<!--          cta="Add tags"-->
-<!--        >-->
-<!--          make it easier for people to find your dataset in Discover.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasTags)"-->
+      <!--          :route="{-->
+      <!--            name: 'dataset-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'inputTags'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--          cta="Add tags"-->
+      <!--        >-->
+      <!--          make it easier for people to find your dataset in Discover.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasDescription)"-->
-<!--          cta="Add a description"-->
-<!--          :route="{-->
-<!--            query: {-->
-<!--              editDescription: true-->
-<!--            }-->
-<!--          }"-->
-<!--        >-->
-<!--          provide a detailed overview of your dataset and outline your findings and analysis for others.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasDescription)"-->
+      <!--          cta="Add a description"-->
+      <!--          :route="{-->
+      <!--            query: {-->
+      <!--              editDescription: true-->
+      <!--            }-->
+      <!--          }"-->
+      <!--        >-->
+      <!--          provide a detailed overview of your dataset and outline your findings and analysis for others.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasBanner)"-->
-<!--          cta="Add an image"-->
-<!--          :route="{-->
-<!--            name: 'dataset-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'bannerImage'-->
-<!--            }-->
-<!--          }"-->
-<!--        >-->
-<!--          add an image to help your dataset stand out in listings.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasBanner)"-->
+      <!--          cta="Add an image"-->
+      <!--          :route="{-->
+      <!--            name: 'dataset-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'bannerImage'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--        >-->
+      <!--          add an image to help your dataset stand out in listings.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasContributors)"-->
-<!--          cta="Add contributors"-->
-<!--          :route="{-->
-<!--            name: 'dataset-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'inputAddContributor'-->
-<!--            }-->
-<!--          }"-->
-<!--        >-->
-<!--          list all of the people who have contributed to this dataset.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasContributors)"-->
+      <!--          cta="Add contributors"-->
+      <!--          :route="{-->
+      <!--            name: 'dataset-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'inputAddContributor'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--        >-->
+      <!--          list all of the people who have contributed to this dataset.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasDatasetDoi)"-->
-<!--          cta="Reserve a DOI"-->
-<!--          :route="{-->
-<!--            name: 'publishing-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'dataciteDoi'-->
-<!--            }-->
-<!--          }"-->
-<!--        >-->
-<!--          reserve a DataCite DOI for published research.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasDatasetDoi)"-->
+      <!--          cta="Reserve a DOI"-->
+      <!--          :route="{-->
+      <!--            name: 'publishing-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'dataciteDoi'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--        >-->
+      <!--          reserve a DataCite DOI for published research.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(hasDatasetLicense)"-->
-<!--          cta="Add a license"-->
-<!--          :route="{-->
-<!--            name: 'dataset-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'inputLicense'-->
-<!--            }-->
-<!--          }"-->
-<!--        >-->
-<!--          let others know how they can use this data in their own research.-->
-<!--        </checklist-item>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(hasDatasetLicense)"-->
+      <!--          cta="Add a license"-->
+      <!--          :route="{-->
+      <!--            name: 'dataset-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'inputLicense'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--        >-->
+      <!--          let others know how they can use this data in their own research.-->
+      <!--        </checklist-item>-->
 
-<!--        <checklist-item-->
-<!--          :icon="computeChecklistIcon(datasetOwnerHasOrcidId)"-->
-<!--          cta="Link ORCID Account"-->
-<!--          :route="{-->
-<!--            name: 'publishing-settings',-->
-<!--            query: {-->
-<!--              focusInput: 'orcidId'-->
-<!--            }-->
-<!--          }"-->
-<!--          :show-link="isDatasetOwner"-->
-<!--        >-->
-<!--          <template v-if="isDatasetOwner">-->
-<!--            link your ORCID iD to distinguish yourself from other researchers-->
-<!--          </template>-->
-<!--          <template v-else>-->
-<!--            link the dataset owner's ORCID iD to distinguish themselves from other researchers-->
-<!--          </template>-->
-<!--        </checklist-item>-->
-<!--      </data-card>-->
+      <!--        <checklist-item-->
+      <!--          :icon="computeChecklistIcon(datasetOwnerHasOrcidId)"-->
+      <!--          cta="Link ORCID Account"-->
+      <!--          :route="{-->
+      <!--            name: 'publishing-settings',-->
+      <!--            query: {-->
+      <!--              focusInput: 'orcidId'-->
+      <!--            }-->
+      <!--          }"-->
+      <!--          :show-link="isDatasetOwner"-->
+      <!--        >-->
+      <!--          <template v-if="isDatasetOwner">-->
+      <!--            link your ORCID iD to distinguish yourself from other researchers-->
+      <!--          </template>-->
+      <!--          <template v-else>-->
+      <!--            link the dataset owner's ORCID iD to distinguish themselves from other researchers-->
+      <!--          </template>-->
+      <!--        </checklist-item>-->
+      <!--      </data-card>-->
 
       <data-card
         ref="descriptionDataCard"
@@ -347,19 +346,26 @@
             Update
           </button>
         </template>
-      <markdown-editor
-        ref="markdownEditor"
-        :value="changelogText"
-        :is-editing="isEditingMarkdown2"
-        :is-saving="isSavingMarkdown"
-        :empty-state="changelogDescriptionEmptyState"
+        <markdown-editor
+          ref="markdownEditor"
+          :value="changelogText"
+          :is-editing="isEditingMarkdown2"
+          :is-saving="isSavingMarkdown"
+          :empty-state="changelogDescriptionEmptyState"
 
-      />
+        />
       </data-card>
 
     </bf-stage>
-    <stale-update-dialog ref="staleUpdateDialog" />
-  </bf-page>
+
+    <stale-update-dialog
+      ref="staleUpdateDialog"
+      :dialog-visible = "staleUpdateDialogVisible"
+      @close="staleUpdateDialogClose"
+    />
+  </div>
+
+
 </template>
 
 <script>
@@ -384,7 +390,10 @@
   import BfButton from "../../shared/bf-button/BfButton.vue";
   import StaleUpdateDialog from "../stale-update-dialog/StaleUpdateDialog.vue";
   import LockedBanner from '../LockedBanner/LockedBanner.vue';
-
+  import IconFiles from "../../icons/IconFiles.vue";
+  import IconStorage from "../../icons/IconStorage.vue";
+  import IconDocument from "../../icons/IconDocument.vue";
+  import IconLicense from "../../icons/IconLicense.vue";
 
   const replaceLineBreaks = str => {
   return Object.prototype.toString.call(str) === '[object String]'
@@ -402,6 +411,10 @@ export default {
   name: 'DatasetOverview',
 
   components: {
+    IconLicense,
+    IconDocument,
+    IconStorage,
+    IconFiles,
     LockedBanner,
     DatasetBanner,
     ChecklistItem,
@@ -431,7 +444,8 @@ export default {
       datasetDescriptionEmptyState,
       changelogDescriptionEmptyState,
       packageTypeCount: 0,
-      isDialogVisible: false
+      isDialogVisible: false,
+      staleUpdateDialogVisible: false
     }
   },
 
@@ -743,6 +757,10 @@ export default {
   methods: {
     ...mapActions(['setDatasetDescription', 'setDatasetDescriptionEtag']),
 
+
+    staleUpdateDialogClose: function() {
+      this.staleUpdateDialogVisible = false
+    },
     /**
      * Check if the dataset checklist
      * has been dismissed
@@ -826,7 +844,7 @@ export default {
             })
           } else if (response.status === 412) {
             this.isSavingMarkdown = false
-            this.$refs.staleUpdateDialog.dialogVisible = true
+            this.staleUpdateDialogVisible = true
           } else {
             throw response
           }
@@ -874,7 +892,7 @@ export default {
 <style scoped lang="scss">
 @import '../../../assets/_variables';
 
-.dataset-overview {
+.dataset-v {
   background: #fff;
 }
 

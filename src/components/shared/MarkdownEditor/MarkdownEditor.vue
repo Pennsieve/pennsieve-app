@@ -294,7 +294,7 @@
       this.parseMarkdown()
     },
 
-    beforeDestroy: function() {
+    beforeUnmount: function() {
       // Destroy the editor
       const hasEditor = woofmark.find(this.$refs.textarea)
       if (hasEditor) {

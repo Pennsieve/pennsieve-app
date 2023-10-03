@@ -12,6 +12,11 @@
       :disabled="!hasOrcid"
       @show="getOrcidData"
     >
+
+      <template #reference>
+        {{displayName}}
+      </template>
+
       <div
         v-loading="isLoadingOrcid"
         element-loading-background="#fff"
@@ -46,9 +51,7 @@
           </p>
         </template>
       </div>
-      <span slot="reference">
-        {{ displayName }}
-      </span>
+
     </el-popover>
   </div>
 </template>
@@ -169,9 +172,6 @@ export default {
     getOrcidData: function () {
       this.isOrcidDataNotFound = false
       this.hasOrcidDataError = false
-      this.$nextTick(() => {
-        this.$refs.popper.updatePopper()
-      })
 
       if (this.hasOrcid && Object.keys(this.orcidData).length === 0) {
         this.sendXhr(`${site.ORCIDpubUrl}/${this.orcidId}`)
@@ -189,7 +189,6 @@ export default {
           })
           .finally(() => {
             this.isLoadingOrcid = false
-            this.$refs.popper.updatePopper()
           })
       }
     }

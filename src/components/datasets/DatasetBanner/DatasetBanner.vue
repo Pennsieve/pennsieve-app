@@ -1,4 +1,5 @@
 <template>
+
   <div class="dataset-banner">
     <content-loader
       v-if="isLoadingDatasetBanner"
@@ -33,7 +34,7 @@
         <div class="empty-state">
           <img
             class="img-upload mb-8"
-            src="/static/images/illustrations/illo-add-files.svg"
+            src="../../../assets/images/illustrations/illo-add-files.svg"
             alt="Upload an image"
           >
           <p class="mb-0">

@@ -2,16 +2,16 @@
   <div>
     <el-dialog
       class="locked-dialog"
-      :visible="visible"
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
       :append-to-body="true"
       @close="toggleVisible"
     >
       <dialog-body>
-        <svg-icon
+        <IconLock
           class="mb-8"
-          name="icon-lock"
-          height="32"
-          width="32"
+          :height="32"
+          :width="32"
           color="#2760FF"
         />
         <h2>This dataset is under review</h2>
@@ -33,14 +33,16 @@
 <script>
   import BfButton from '../../shared/bf-button/BfButton.vue';
   import DialogBody from '../../shared/dialog-body/DialogBody.vue';
+  import IconLockFilled from "../../icons/IconLock.vue";
   export default {
     name: 'LockedDialog',
     components: {
+      IconLockFilled,
       BfButton,
       DialogBody
     },
     props: {
-      visible: {
+      dialogVisible: {
         type: Boolean,
         default: false
       },
@@ -50,7 +52,7 @@
      * Toggles modal to be visible or not
      */
     toggleVisible: function() {
-      this.$emit('toggle-visible', false)
+      this.$emit('close', false)
     },
     },
   }

@@ -28,17 +28,16 @@
                     {{ formatDatasetStatus }}
                   </div>
                 </span>
-                  <svg-icon
+                  <IconArrowUp
                     v-if="getPermission('manager')"
-                    name="icon-arrow-up"
-                    :dir="datasetFilterArrowDir"
-                    height="7"
-                    width="7"
-                    color="#404554"
+                    :class="[ datasetFilterArrowDir === 'down' ? 'svg-flip' : '' ]"
+                    :height="7"
+                    :width="7"
+                    color="#000000"
                   />
                 </button>
-                <el-dropdown-menu
-                  slot="dropdown"
+                <template #dropdown>
+                  <el-dropdown-menu
                   class="bf-menu auto-height"
                   :offset="14"
                   :arrow-offset="150"
@@ -54,15 +53,15 @@
                     :style="getDotColor(status)"
                   />
                     {{ status.displayName }}
-                    <svg-icon
+                    <IconCheck
                       v-if="formatDatasetStatus === `${status.displayName}`"
-                      icon="icon-check"
                       class="dataset-filter-status-check"
-                      width="20"
-                      height="20"
+                      :width="20"
+                      :height="20"
                     />
                   </el-dropdown-item>
                 </el-dropdown-menu>
+                </template>
               </el-dropdown>
             </div>
             <div>
@@ -71,8 +70,7 @@
                 name="Collapse Secondary Menu"
                 @click="toggleMenu"
               >
-                <svg-icon
-                  name="icon-nav-collapse"
+                <IconNavCollapse
                   color="#71747C"
                 />
               </button>
@@ -86,11 +84,10 @@
             name="Expand Secondary Menu"
             @click="toggleMenu"
           >
-            <svg-icon
-              name="icon-nav-expand"
+            <IconNavExpand
               color="#ffF"
-              height="32"
-              width="32"
+              :height="32"
+              :width="32"
             />
           </button>
         </template>
@@ -103,36 +100,42 @@
 
       <bf-navigation-item
         :link="{ name: 'dataset-overview' }"
-        icon="icon-overview"
         label="Overview"
-        class="secondary"
         :condensed="secondaryNavCondensed"
         :secondary=true
-
-      />
-
-      <bf-navigation-item
-        :link="{ name: 'metadata' }"
-        icon="icon-explore-dataset"
-        label="Records"
-        class="secondary"
-        :condensed="secondaryNavCondensed"
-
-      />
-
-      <bf-navigation-item
-        :link="{ name: 'dataset-files' }"
-        icon="icon-files"
-        label="Files"
-        class="secondary"
-        :condensed="secondaryNavCondensed"
-
       >
-        <bf-waiting-icon
-          v-if="uploading"
-          slot="suffix"
-        />
+        <template #icon>
+          <IconOverview
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
       </bf-navigation-item>
+
+
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'metadata' }"-->
+<!--        icon="icon-explore-dataset"-->
+<!--        label="Records"-->
+<!--        class="secondary"-->
+<!--        :condensed="secondaryNavCondensed"-->
+
+<!--      />-->
+
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'dataset-files' }"-->
+<!--        icon="icon-files"-->
+<!--        label="Files"-->
+<!--        class="secondary"-->
+<!--        :condensed="secondaryNavCondensed"-->
+
+<!--      >-->
+<!--        <bf-waiting-icon-->
+<!--          v-if="uploading"-->
+<!--          slot="suffix"-->
+<!--        />-->
+<!--      </bf-navigation-item>-->
 
 <!--      <bf-navigation-item-->
 <!--        v-if="getPermission('manager')"-->
@@ -148,52 +151,52 @@
 
 
 
-      <bf-navigation-item
-          :link="{ name: 'activity' }"
-          icon="icon-activity"
-          label="Activity"
-          class="secondary"
-          :condensed="secondaryNavCondensed"
+<!--      <bf-navigation-item-->
+<!--          :link="{ name: 'activity' }"-->
+<!--          icon="icon-activity"-->
+<!--          label="Activity"-->
+<!--          class="secondary"-->
+<!--          :condensed="secondaryNavCondensed"-->
 
-        />
+<!--        />-->
 
 
-      <bf-navigation-item
-        :link="{ name: 'integrations-settings' }"
-        icon="icon-integrations"
-        label="Integrations"
-        class="secondary"
-        :condensed="secondaryNavCondensed"
-        :secondary=true
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'integrations-settings' }"-->
+<!--        icon="icon-integrations"-->
+<!--        label="Integrations"-->
+<!--        class="secondary"-->
+<!--        :condensed="secondaryNavCondensed"-->
+<!--        :secondary=true-->
 
-      />
+<!--      />-->
 
-      <bf-navigation-item
-        :link="{ name: 'publishing-settings' }"
-        icon="icon-globe-check"
-        label="Publishing"
-        class="secondary"
-        :condensed="secondaryNavCondensed"
-        :secondary=true
-      />
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'publishing-settings' }"-->
+<!--        icon="icon-globe-check"-->
+<!--        label="Publishing"-->
+<!--        class="secondary"-->
+<!--        :condensed="secondaryNavCondensed"-->
+<!--        :secondary=true-->
+<!--      />-->
 
-      <bf-navigation-item
-        :link="{ name: 'dataset-permissions' }"
-        icon="icon-collaborators"
-        label="Permissions"
-        :class="hasFeature('sandbox_org_feature') ? 'disabled' : 'secondary' "
-        :condensed="secondaryNavCondensed"
-      />
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'dataset-permissions' }"-->
+<!--        icon="icon-collaborators"-->
+<!--        label="Permissions"-->
+<!--        :class="hasFeature('sandbox_org_feature') ? 'disabled' : 'secondary' "-->
+<!--        :condensed="secondaryNavCondensed"-->
+<!--      />-->
 
-      <bf-navigation-item
-        v-if="getPermission('manager')"
-        :link="{ name: 'dataset-settings' }"
-        icon="icon-dataset-settings"
-        label="Settings"
-        class="secondary"
-        :condensed="secondaryNavCondensed"
+<!--      <bf-navigation-item-->
+<!--        v-if="getPermission('manager')"-->
+<!--        :link="{ name: 'dataset-settings' }"-->
+<!--        icon="icon-dataset-settings"-->
+<!--        label="Settings"-->
+<!--        class="secondary"-->
+<!--        :condensed="secondaryNavCondensed"-->
 
-      />
+<!--      />-->
     </div>
 
     <span
@@ -215,12 +218,20 @@ import { path, pathOr } from 'ramda'
 import EventBus from '../../utils/event-bus'
 
 import Request from '../../mixins/request/index'
+import IconArrowUp from "../icons/IconArrowUp.vue";
+import IconNavCollapse from "../icons/IconNavCollapse.vue";
+import IconNavExpand from "../icons/IconNavExpand.vue";
+import IconOverview from "../icons/IconOverview.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconOverview,
+    IconNavExpand,
+    IconNavCollapse,
+    IconArrowUp,
     BfNavigationItem,
     BfNavigationTertiary,
     BfWaitingIcon,
@@ -358,7 +369,7 @@ export default {
     this.toggleSecondaryNav(true)
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     this.toggleSecondaryNav(false)
   },
 
@@ -460,6 +471,7 @@ hr {
 .menu-wrap {
   margin-top: 0 !important;
 }
+
 .heading-wrap {
   box-sizing: border-box;
   color: $gray_6;
@@ -476,7 +488,7 @@ hr {
   .condensed & {
     background: $purple_1;
     height: 56px;
-    padding: 14px 20px 12px;
+    padding: 10px;
   }
 
   .btn-expand-collapse {
@@ -489,6 +501,7 @@ hr {
     height: 24px;
   }
 }
+
 
 .dataset-info {
   display: flex;

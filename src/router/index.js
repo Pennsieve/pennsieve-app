@@ -6,8 +6,9 @@ const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue'
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
 
 const Datasets = () => import('./datasets/Datasets.vue')
+
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
-const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
+const DatasetOverview = () => import('./Dataset/DatasetOverviewView.vue')
 
 
 /**
@@ -175,7 +176,7 @@ const router = createRouter({
       path: '/:orgId/datasets',
       components: {
         page: Datasets,
-        navigation: BfNavigation
+        navigation: BfNavigation,
       },
       props: true,
       children: [
@@ -183,32 +184,45 @@ const router = createRouter({
           name: 'datasets-list',
           path: '',
           components: {
-            stage: BfDatasetList
+            stage: BfDatasetList,
+
           },
           props: true
-        }
-      ]
-    },
-    {
-      path: '/:orgId/datasets/:datasetId',
-      components: {
-        page: Datasets,
-        navigation: BfNavigation,
-        navigationSecondary: BfNavigationSecondary
-      },
-      children: [
+        },
         {
           name: 'dataset-overview',
-          path: 'overview',
+          path: ':datasetId/overview',
           components: {
-            stage: DatasetOverview
+            stage: DatasetOverview,
+            navigationSecondary: BfNavigationSecondary
+
           },
           props: {
-            stage: true
+            stage: true,
           }
         },
       ]
     },
+    // {
+    //   path: '/:orgId/datasets/:datasetId',
+    //   components: {
+    //     page: Dataset,
+    //     navigation: BfNavigation,
+    //     navigationSecondary: BfNavigationSecondary
+    //   },
+    //   children: [
+    //     {
+    //       name: 'dataset-overview',
+    //       path: 'overview',
+    //       components: {
+    //         stage: DatasetOverview
+    //       },
+    //       props: {
+    //         stage: true
+    //       }
+    //     },
+    //   ]
+    // },
     {
       name: "people",
       path: '/:orgId/people',

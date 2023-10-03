@@ -5,9 +5,8 @@
     :content="label"
     :disabled="!condensed"
     :open-delay="200"
-    :style="styleObject"
   >
-    <router-link class="bf-navigation-item" :to="link"  :style="styleObject">
+    <router-link :class="itemClass" :to="link" :style="styleObject">
       <div class="svg-icon svg-fill icon-main">
         <slot name="icon" ></slot>
       </div>
@@ -71,7 +70,10 @@
         } : {
           '--color-hover': '#4d628c'
         }
+      },
+      itemClass: function() {
 
+        return `bf-navigation-item ${this.secondary? 'secondary': ''}`
       }
     }
   }
@@ -104,18 +106,18 @@
         color: $gray_2;
       }
     }
-    //&.router-link-active {
-    //  background: transparent;
-    //  color: $purple_1;
-    //
-    //  .svg-icon {
-    //    color: $purple_1;
-    //  }
-    //  &.secondary {
-    //  background: $purple_tint;
-    //  border-right: 4px solid;
-    //}
-    //}
+    &.router-link-active {
+      background: transparent;
+      color: $purple_1;
+
+      .svg-icon {
+        color: $purple_1;
+      }
+      &.secondary {
+      background: $purple_tint;
+      border-right: 4px solid;
+    }
+    }
     .svg-icon {
       color: $gray_2;
     }
