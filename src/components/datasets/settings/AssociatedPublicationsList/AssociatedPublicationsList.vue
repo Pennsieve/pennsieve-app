@@ -36,25 +36,28 @@
             @command="onMenuSelect"
           >
             <button class="el-dropdown-link">
-              <svg-icon
-                name="icon-menu"
-                height="20"
-                width="20"
+              <IconMenu
+                :height="20"
+                :width="20"
               />
             </button>
-            <el-dropdown-menu
-              slot="dropdown"
-              class="bf-menu"
-              :offset="9"
-            >
-              <el-dropdown-item
-                :disabled="datasetLocked"
-                command="remove-citation"
+
+            <template #dropdown>
+              <el-dropdown-menu
+                slot="dropdown"
+                class="bf-menu"
+                :offset="9"
               >
-                Delete
-              </el-dropdown-item>
-            </el-dropdown-menu>
+                <el-dropdown-item
+                  :disabled="datasetLocked"
+                  command="remove-citation"
+                >
+                  Delete
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
           </el-dropdown>
+
         </div>
       </div>
     </div>
@@ -65,9 +68,10 @@
 import { find, propOr, propEq } from 'ramda'
 import { mapGetters } from 'vuex'
 import { referenceTypeOptions } from '../../../../utils/constants'
+import IconMenu from "../../../icons/IconMenu.vue";
   export default {
     name: 'AssociatedPublicationsList',
-
+    components: {IconMenu},
     props: {
       publication: {
         type: Object,

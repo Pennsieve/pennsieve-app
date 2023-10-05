@@ -108,41 +108,39 @@
 
     <hr>
 
-<!--    <template>-->
-      <!-- delete dataset -->
-      <el-row>
-        <el-col>
-          <h2 class="delete-title">
-            Delete Dataset
-          </h2>
-          <p>
-            Deleting a dataset removes all data from Pennsieve.
-            <strong>This cannot be undone.</strong>
-          </p>
-          <p class="mb-20">
-            Datasets that are published to Pennsieve Discover must be removed before they can be deleted.
-          </p>
-          <bf-button
-            class="red"
-            :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
-            @click="onDeleteDatasetBtnClick"
+    <!-- delete dataset -->
+    <el-row>
+      <el-col>
+        <h2 class="delete-title">
+          Delete Dataset
+        </h2>
+        <p>
+          Deleting a dataset removes all data from Pennsieve.
+          <strong>This cannot be undone.</strong>
+        </p>
+        <p class="mb-20">
+          Datasets that are published to Pennsieve Discover must be removed before they can be deleted.
+        </p>
+        <bf-button
+          class="red"
+          :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
+          @click="onDeleteDatasetBtnClick"
+        >
+          Delete
+        </bf-button>
+        <p
+          v-if="!getPermission('owner')"
+          class="sharing-blurb"
+        >
+          Deleting is restricted to owners only. To change the owner of your dataset, please contact
+          <a
+            :href="`mailto:${datasetOwnerEmail}`"
           >
-            Delete
-          </bf-button>
-          <p
-            v-if="!getPermission('owner')"
-            class="sharing-blurb"
-          >
-            Deleting is restricted to owners only. To change the owner of your dataset, please contact
-            <a
-              :href="`mailto:${datasetOwnerEmail}`"
-            >
-              {{ datasetOwnerName }}
-            </a>
-          </p>
-        </el-col>
-      </el-row>
-<!--    </template>-->
+            {{ datasetOwnerName }}
+          </a>
+        </p>
+      </el-col>
+    </el-row>
 
     <delete-dataset
       ref="deleteDatasetDialog"
@@ -150,27 +148,15 @@
       @delete-dataset-confirmed="submitDeleteDatasetRequest"
       @close="onCloseDeleteDialog"
     />
-
-<!--        <bf-empty-page-state-->
-<!--          v-else-->
-<!--          class="empty-state"-->
-<!--        >-->
-<!--          <h2>Access Denied</h2>-->
-<!--          <p>You have reached a page in which you do not have access. Please use the navigation to the left to browse your organization's data.</p>-->
-<!--        </bf-empty-page-state>-->
-<!--    <stale-update-dialog ref="staleUpdateDialog" />-->
   </bf-stage>
 
 </template>
 
-<!--    -->
-<!--  </div>-->
-<!--</template>-->
-
 <script>
   import {mapActions, mapGetters, mapState} from 'vuex'
   import {clone, compose, includes, defaultTo, equals, not, path, pathOr, pick, propOr, toLower, trim} from 'ramda'
-  import debounce from 'lodash/debounce';
+  import debounce from 'lodash.debounce'
+
 
   import BfRafter from '../../shared/bf-rafter/BfRafter.vue'
   import BfButton from '../../shared/bf-button/BfButton.vue'
@@ -336,10 +322,6 @@ export default {
   methods: {
     ...mapActions(['updateDataset', 'setDatasetEtag']),
 
-
-    closeReferenceDialog: function() {
-      this.
-    },
     onUpdateDescription: function(description) {
       this.form.description = description
       this.submitUpdateDatasetRequest()
