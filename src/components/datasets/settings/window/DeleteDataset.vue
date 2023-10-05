@@ -1,20 +1,23 @@
 <template>
   <el-dialog
-    :visible.sync="dialogVisible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Confirm Delete"
-    />
+    <template #header>
+      <bf-dialog-header
+        title="Confirm Delete"
+      />
+    </template>
+
 
     <dialog-body>
       <div class="warning-wrap">
-        <svg-icon
-          name="icon-warning-circle"
-          height="32"
-          width="32"
+        <icon-warning-circle
+          :height="32"
+          :width="32"
+          color="#C14D49"
         />
         <h4 class="delete-dataset-title">
           Delete {{ datasetName }}
@@ -53,10 +56,7 @@
       </el-form>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -70,7 +70,8 @@
       >
         Delete
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -83,14 +84,22 @@ import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
 
 import DatasetPublishedData from '../../../../mixins/dataset-published-data/index'
+import IconWarningCircle from "../../../icons/IconWarningCircle.vue";
 
 export default {
   name: 'DeleteDataset',
 
   components: {
+    IconWarningCircle,
     BfButton,
     BfDialogHeader,
     DialogBody
+  },
+  props: {
+    dialogVisible: {
+      type: Boolean,
+      default: false,
+    }
   },
 
   mixins: [
@@ -129,7 +138,6 @@ export default {
 
   data() {
     return {
-      dialogVisible: false,
       form: {
         checkBoxes: [],
       },
@@ -157,9 +165,9 @@ export default {
      * Closes the dialog
      */
     closeDialog: function() {
-      this.dialogVisible = false
       this.form.checkBoxes = []
       this.disabled = true
+      this.$emit('close')
     },
   }
 }
@@ -175,6 +183,7 @@ export default {
 }
 
 .delete-dataset-title {
+  color:  $red_2;
   margin-top: 0;
 }
 
@@ -199,14 +208,16 @@ export default {
 }
 
 .warning-message {
-  color: $red_1;
+  color: $red_2;
 }
 
 .el-form-item {
   // margin-left: 45px;
 }
 
+.step-1,
 .step-2 {
   margin-left: 0;
+  color: $gray_5;
 }
 </style>

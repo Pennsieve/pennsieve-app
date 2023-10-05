@@ -39,12 +39,12 @@
 
 <script>
 import { mapGetters, mapState } from 'vuex'
-import { pathOr, propEq, find, propOr, groupBy } from 'ramda'
+import { pathOr, groupBy } from 'ramda'
 import AssociatedPublicationsList from '../AssociatedPublicationsList/AssociatedPublicationsList.vue'
 import ReferenceTypesDialog from '../ReferenceTypesDialog/ReferenceTypesDialog.vue'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import Request from '@/mixins/request/index'
-import { referenceTypeOptions } from '@/utils/constants'
+import BfButton from '../../../shared/bf-button/BfButton.vue'
+import Request from '../../../../mixins/request/index'
+import { referenceTypeOptions } from '../../../../utils/constants'
 export default {
   name: 'DatasetAssociatedPublications',
 

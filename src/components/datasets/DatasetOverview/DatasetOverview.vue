@@ -16,18 +16,18 @@
                 {{ datasetName }}
               </h1>
 
-              <div class="dataset-owners">
-                <div
-                  v-for="(contributor, idx) in datasetContributorsList"
-                  :key="contributor.id"
-                  class="contributor-item-wrap"
-                >
-                  <contributor-item :contributor="contributor" />
-                  <template v-if="idx < datasetContributorsList.length - 1">
-                    ,
-                  </template>
-                </div>
-              </div>
+<!--              <div class="dataset-owners">-->
+<!--                <div-->
+<!--                  v-for="(contributor, idx) in datasetContributorsList"-->
+<!--                  :key="contributor.id"-->
+<!--                  class="contributor-item-wrap"-->
+<!--                >-->
+<!--                  <contributor-item :contributor="contributor" />-->
+<!--                  <template v-if="idx < datasetContributorsList.length - 1">-->
+<!--                    ,-->
+<!--                  </template>-->
+<!--                </div>-->
+<!--              </div>-->
 
               <!-- eslint-disable vue/no-v-html -->
               <!-- $sanitize will sanitize the HTML injected -->
@@ -430,6 +430,10 @@ export default {
 
   props: {
     datasetId: {
+      type: String,
+      default: ''
+    },
+    orgId: {
       type: String,
       default: ''
     }

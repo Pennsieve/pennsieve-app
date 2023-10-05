@@ -188,15 +188,22 @@
 <!--        :condensed="secondaryNavCondensed"-->
 <!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        v-if="getPermission('manager')"-->
-<!--        :link="{ name: 'dataset-settings' }"-->
-<!--        icon="icon-dataset-settings"-->
-<!--        label="Settings"-->
-<!--        class="secondary"-->
-<!--        :condensed="secondaryNavCondensed"-->
+      <bf-navigation-item
+        v-if="getPermission('manager')"
+        :link="{ name: 'dataset-settings' }"
+        label="Settings"
+        :secondary=true
+        :condensed="secondaryNavCondensed"
+      >
+        <template #icon>
+          <IconDatasetSettings
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
 
-<!--      />-->
+      </bf-navigation-item>
     </div>
 
     <span
@@ -222,12 +229,14 @@ import IconArrowUp from "../icons/IconArrowUp.vue";
 import IconNavCollapse from "../icons/IconNavCollapse.vue";
 import IconNavExpand from "../icons/IconNavExpand.vue";
 import IconOverview from "../icons/IconOverview.vue";
+import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconDatasetSettings,
     IconOverview,
     IconNavExpand,
     IconNavCollapse,

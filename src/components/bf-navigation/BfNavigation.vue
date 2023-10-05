@@ -241,6 +241,17 @@
   export default {
     name: 'BfNavigation',
 
+    props: {
+      orgId: {
+        type: String,
+        default: ''
+      },
+      datasetId: {
+        ype: String,
+        default: ''
+      }
+    },
+
     components: {
       IconSPARCLogo,
       IconI3HLogo,
@@ -275,17 +286,19 @@
 
       ]),
       logoClass: function() {
-        if (this.activeOrganizationName === 'Penn Immune Health') {
+        // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
+        if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
           return "I3H-logo"
         } else {
           return "logo"
         }
       },
       MarkComponent: function() {
+        // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
         let name = "PennsieveMark"
-        if (this.activeOrganizationName === 'Pennsieve Test') {
+        if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5') {
           name = "IconSPARCLogo"
-        } else if (this.activeOrganizationName === 'Penn Immune Health') {
+        } else if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
           name = "IconI3HLogo"
         }
         return name
@@ -296,9 +309,9 @@
       getThemeColors: function() {
         // TODO: Make this dynamic and not hardcoded...
         if (this.hasCustomTheme) {
-          if (this.activeOrganizationName == "Penn Immune Health") {
+          if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
             return [ '#C35A00','#82AFD3']
-          } else if (this.activeOrganizationName !== "SPARC") {
+          } else if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5') {
             return ['#011F5B', '#7516A5']
           } else {
             return []
@@ -339,7 +352,7 @@
         let routeName = 'datasets-list'
 
         return {
-          name: routeName, params: { orgId: this.activeOrganizationId }
+          name: routeName, params: { orgId: this.orgId }
         }
       },
 

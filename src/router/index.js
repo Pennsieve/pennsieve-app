@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
+import DatasetSettings from "./Dataset/DatasetSettings.vue";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -8,7 +9,9 @@ const BfNavigationSecondary = () => import('../components/bf-navigation/BfNaviga
 const Datasets = () => import('./datasets/Datasets.vue')
 
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
-const DatasetOverview = () => import('./Dataset/DatasetOverviewView.vue')
+const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
+const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
+const DatasetSettingsHeader = () => import('./Dataset/DatasetSettingsHeader.vue')
 
 
 /**
@@ -67,8 +70,6 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 const Integrations = () => import('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
-
-
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -141,7 +142,10 @@ const router = createRouter({
         page: WelcomePage,
         navigation: BfNavigation
       },
-      props: true,
+      props: {
+        page: true,
+        navigation: true,
+      },
       children: [
         {
           name: 'welcome',
@@ -177,25 +181,42 @@ const router = createRouter({
       components: {
         page: Datasets,
         navigation: BfNavigation,
+        navigationSecondary: BfNavigationSecondary,
       },
-      props: true,
+      props: {
+        page: true,
+        navigation: true,
+        navigationSecondary: false,
+      },
+      meta: { hideSecondaryNav: false},
       children: [
         {
           name: 'datasets-list',
           path: '',
           components: {
             stage: BfDatasetList,
-
+            stageHeader:DatasetListHeader,
           },
-          props: true
+          props: true,
+          meta: { hideSecondaryNav: true},
         },
         {
           name: 'dataset-overview',
           path: ':datasetId/overview',
           components: {
             stage: DatasetOverview,
-            navigationSecondary: BfNavigationSecondary
 
+          },
+          props: {
+            stage: true,
+          }
+        },
+        {
+          name: 'dataset-settings',
+          path: ':datasetId/settings',
+          components: {
+            stageHeader: DatasetSettingsHeader,
+            stage: BfDatasetSettings,
           },
           props: {
             stage: true,

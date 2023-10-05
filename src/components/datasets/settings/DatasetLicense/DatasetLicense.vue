@@ -12,19 +12,20 @@
       </a>
     </div>
     <el-select
+      v-if="dataset.content"
       ref="inputLicense"
       v-model="dataset.content.license"
       placeholder="No License Selected"
       :disabled="datasetLocked"
       @change="changeLicenseSelection"
     >
-      <svg-icon
-        slot="prefix"
-        name="icon-license"
-        height="20"
-        width="20"
-        color="#000"
-      />
+      <template #prefix>
+        <IconLicense
+          :height="20"
+          :width="20"
+          />
+      </template>
+
       <el-option-group
         v-for="license in licenses"
         :key="license.label"
@@ -44,13 +45,14 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import licenses from '../dataset-licenses'
+import IconLicense from "../../../icons/IconLicense.vue";
   export default {
     name: 'DatasetLicense',
-
+    components: {IconLicense},
     data() {
       return {
         licenseVal: '',
-        licenses
+        licenses: licenses
       }
     },
     computed: {

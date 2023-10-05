@@ -22,6 +22,13 @@ import {mapActions, mapState} from "vuex";
 
 export default {
   name: "WelcomePage",
+  props: {
+    orgId: {
+      type: String,
+      default: ''
+    }
+  },
+
   computed: {
     ...mapState('repositoryModule', [
       'repositories',

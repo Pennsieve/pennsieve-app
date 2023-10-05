@@ -18,13 +18,13 @@
       popper-class="bf-menu dataset-collections-input-options"
       @change="onCollectionSelect"
     >
-      <svg-icon
-        slot="prefix"
-        name="icon-research"
-        height="20"
-        width="20"
-        color="#000"
-      />
+      <template #prefix>
+        <IconResearch
+          :height="20"
+          :width="20"
+          />
+      </template>
+
       <el-option
         v-for="collection in unselectedCollections"
         :key="collection.id"
@@ -55,13 +55,15 @@
 <script>
 import { mapActions, mapState } from 'vuex'
 
-import BfTag from '../../../shared/BfTag/BfTag'
+import BfTag from '../../../shared/BfTag/BfTag.vue'
 import Request from '../../../../mixins/request'
+import IconResearch from "../../../icons/IconResearch.vue";
 
 export default {
   name: 'DatasetSettingsCollections',
 
   components: {
+    IconResearch,
     BfTag
   },
 
@@ -154,7 +156,7 @@ export default {
   display: flex;
   flex-wrap: wrap;
 }
-/deep/ .el-input__prefix {
+.el-input__prefix {
   align-items: center;
   display: flex;
 }

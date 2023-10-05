@@ -1,216 +1,171 @@
 <template>
-  <bf-page class="bf-dataset-settings">
-    <locked-banner
-      slot="banner"
-    />
-    <template v-if="hasPermission">
-      <bf-rafter slot="heading">
-        <h1
-          slot="heading"
-          class="flex-heading"
+  <bf-stage
+    ref="bfStage"
+  >
+    <!-- update dataset -->
+    <el-row>
+      <el-col>
+        <el-form
+          ref="updateDatasetForm"
+          class="dataset-search-form"
+          label-position="top"
+          :model="form"
+          :rules="rules"
+          @submit.native.prevent
         >
-          <svg-icon
-            v-if="datasetLocked"
-            class="mr-8"
-            color="#71747C"
-            name="icon-lock-filled"
-            height="24"
-            width="24"
-          />Dataset Settings
-        </h1>
-<!--        <ul-->
-<!--          slot="tabs"-->
-<!--          class="tabs unstyled"-->
-<!--        >-->
-<!--          <li>-->
-<!--            <router-link :to="{ name: 'dataset-settings' }">-->
-<!--              General-->
-<!--            </router-link>-->
-<!--          </li>-->
-<!--          <li>-->
-<!--            <router-link-->
-<!--              :class="[ hasFeature('sandbox_org_feature') ? 'tab-disabled' : '']"-->
-<!--              :to="{ name: 'integrations-settings' }"-->
-<!--            >-->
-<!--              Integrations-->
-<!--            </router-link>-->
-<!--          </li>-->
-<!--&lt;!&ndash;          <li>&ndash;&gt;-->
-<!--&lt;!&ndash;            <router-link&ndash;&gt;-->
-<!--&lt;!&ndash;              :class="[ hasFeature('sandbox_org_feature') ? 'tab-disabled' : '']"&ndash;&gt;-->
-<!--&lt;!&ndash;              :to="{ name: 'publishing-settings' }"&ndash;&gt;-->
-<!--&lt;!&ndash;            >&ndash;&gt;-->
-<!--&lt;!&ndash;              Publishing&ndash;&gt;-->
-<!--&lt;!&ndash;            </router-link>&ndash;&gt;-->
-<!--&lt;!&ndash;          </li>&ndash;&gt;-->
-<!--        </ul>-->
-      </bf-rafter>
-      <bf-stage
-        ref="bfStage"
-        slot="stage"
-      >
-        <!-- update dataset -->
-        <el-row>
-          <el-col>
-            <el-form
-              ref="updateDatasetForm"
-              class="dataset-search-form"
-              label-position="top"
-              :model="form"
-              :rules="rules"
-              @submit.native.prevent
+          <el-form-item
+            prop="name"
+            class="mb-24"
+          >
+            <template #label>
+              Name
+              <span class="label-helper">
+                required
+              </span>
+            </template>
+            <el-input
+              v-model="form.name"
+              :disabled="datasetLocked"
+              :maxlength="255"
+              @input="submitUpdateDatasetRequest"
+            />
+          </el-form-item>
+
+          <el-form-item
+            id="inputDescription"
+            prop="description"
+            class="mb-24"
+          >
+            <template #label>
+              Subtitle
+              <span class="label-helper">
+                required to publish
+              </span>
+            </template>
+            <character-count-input
+              ref="inputDescription"
+              v-model="form.description"
+              :rows="5"
+              placeholder="Add a description to help others understand what's in your dataset"
+              :disabled="datasetLocked"
+              @input="onUpdateDescription"
+            />
+          </el-form-item>
+
+          <el-form-item id="inputTags">
+            <template #label>
+              Tags
+            </template>
+            <el-input
+              ref="inputTags"
+              v-model="inputTag"
+              class="mb-8"
+              placeholder="Add tags"
+              :disabled="datasetLocked"
+              @keyup.enter.native.stop="addTag"
             >
-              <el-form-item
-                prop="name"
-                class="mb-24"
-              >
-                <template slot="label">
-                  Name
-                  <span class="label-helper">
-                    required
-                  </span>
-                </template>
-                <el-input
-                  v-model="form.name"
-                  :disabled="datasetLocked"
-                  :maxlength="255"
-                  @input="submitUpdateDatasetRequest"
-                />
-              </el-form-item>
-
-              <el-form-item
-                id="inputDescription"
-                prop="description"
-                class="mb-24"
-              >
-                <template slot="label">
-                  Subtitle
-                  <span class="label-helper">
-                    required to publish
-                  </span>
-                </template>
-                <character-count-input
-                  ref="inputDescription"
-                  v-model="form.description"
-                  :rows="5"
-                  placeholder="Add a description to help others understand what's in your dataset"
-                  :disabled="datasetLocked"
-                  @input="submitUpdateDatasetRequest"
-                />
-              </el-form-item>
-
-              <el-form-item id="inputTags">
-                <template slot="label">
-                  Tags
-                </template>
-                <el-input
-                  ref="inputTags"
-                  v-model="inputTag"
-                  class="mb-8"
-                  placeholder="Add tags"
-                  :disabled="datasetLocked"
-                  @keyup.enter.native.stop="addTag"
-                >
-                  <svg-icon
-                    slot="prefix"
-                    name="icon-tag"
-                    height="20"
-                    width="20"
-                    color="#000"
+              <template #prefix>
+                <IconTag
+                  :height="20"
+                  :width="20"
                   />
-                </el-input>
+              </template>
+            </el-input>
 
-                <div class="tag-wrap">
-                  <bf-tag
-                    v-for="tag in form.tags"
-                    :key="tag"
-                    :label="tag"
-                    class="mr-8 mb-8"
-                    @remove="removeTag(tag)"
-                  />
-                </div>
-              </el-form-item>
-            </el-form>
-          </el-col>
-        </el-row>
+            <div class="tag-wrap">
+              <bf-tag
+                v-for="tag in form.tags"
+                :key="tag"
+                :label="tag"
+                class="mr-8 mb-8"
+                @remove="removeTag(tag)"
+              />
+            </div>
+          </el-form-item>
+        </el-form>
+      </el-col>
+    </el-row>
 
-        <hr>
+    <hr>
 
-        <dataset-license
-          id="inputLicense"
-          @change-license="submitUpdateDatasetRequest"
-        />
+    <dataset-license
+      id="inputLicense"
+      @change-license="submitUpdateDatasetRequest"
+    />
 
-        <template>
-          <dataset-settings-banner-image
-            id="bannerImage"
-            ref="bannerImage"
-          />
-        </template>
+    <dataset-settings-banner-image
+      id="bannerImage"
+      ref="bannerImage"
+    />
 
-        <hr>
+    <hr>
 
-        <dataset-settings-collections />
+    <dataset-settings-collections />
 
-        <hr>
+    <hr>
 
-        <dataset-settings-associated-publications />
+    <dataset-settings-associated-publications />
 
-        <hr>
+    <hr>
 
-        <template>
-          <!-- delete dataset -->
-          <el-row>
-            <el-col>
-              <h2 class="delete-title">
-                Delete Dataset
-              </h2>
-              <p>
-                Deleting a dataset removes all data from Pennsieve.
-                <strong>This cannot be undone.</strong>
-              </p>
-              <p class="mb-20">
-                Datasets that are published to Pennsieve Discover must be removed before they can be deleted.
-              </p>
-              <bf-button
-                class="red"
-                :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
-                @click="onDeleteDatasetBtnClick"
-              >
-                Delete
-              </bf-button>
-              <p
-                v-if="!getPermission('owner')"
-                class="sharing-blurb"
-              >
-                Deleting is restricted to owners only. To change the owner of your dataset, please contact
-                <a
-                  :href="`mailto:${datasetOwnerEmail}`"
-                >
-                  {{ datasetOwnerName }}
-                </a>
-              </p>
-            </el-col>
-          </el-row>
-        </template>
+<!--    <template>-->
+      <!-- delete dataset -->
+      <el-row>
+        <el-col>
+          <h2 class="delete-title">
+            Delete Dataset
+          </h2>
+          <p>
+            Deleting a dataset removes all data from Pennsieve.
+            <strong>This cannot be undone.</strong>
+          </p>
+          <p class="mb-20">
+            Datasets that are published to Pennsieve Discover must be removed before they can be deleted.
+          </p>
+          <bf-button
+            class="red"
+            :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
+            @click="onDeleteDatasetBtnClick"
+          >
+            Delete
+          </bf-button>
+          <p
+            v-if="!getPermission('owner')"
+            class="sharing-blurb"
+          >
+            Deleting is restricted to owners only. To change the owner of your dataset, please contact
+            <a
+              :href="`mailto:${datasetOwnerEmail}`"
+            >
+              {{ datasetOwnerName }}
+            </a>
+          </p>
+        </el-col>
+      </el-row>
+<!--    </template>-->
 
-        <delete-dataset
-          ref="deleteDatasetDialog"
-          @delete-dataset-confirmed="submitDeleteDatasetRequest"
-        />
-      </bf-stage>
-    </template>
+    <delete-dataset
+      ref="deleteDatasetDialog"
+      :dialog-visible="deleteDatasetDialogVisible"
+      @delete-dataset-confirmed="submitDeleteDatasetRequest"
+      @close="onCloseDeleteDialog"
+    />
 
-    <bf-empty-page-state
-      v-else
-      class="empty-state"
-    >
-      <h2>Access Denied</h2>
-      <p>You have reached a page in which you do not have access. Please use the navigation to the left to browse your organization's data.</p>
-    </bf-empty-page-state>
-    <stale-update-dialog ref="staleUpdateDialog" />
-  </bf-page>
+<!--        <bf-empty-page-state-->
+<!--          v-else-->
+<!--          class="empty-state"-->
+<!--        >-->
+<!--          <h2>Access Denied</h2>-->
+<!--          <p>You have reached a page in which you do not have access. Please use the navigation to the left to browse your organization's data.</p>-->
+<!--        </bf-empty-page-state>-->
+<!--    <stale-update-dialog ref="staleUpdateDialog" />-->
+  </bf-stage>
+
 </template>
+
+<!--    -->
+<!--  </div>-->
+<!--</template>-->
 
 <script>
   import {mapActions, mapGetters, mapState} from 'vuex'
@@ -231,17 +186,19 @@
   import CheckUniqueNames from '../../../mixins/check-unique-names'
   import SanitizeName from '../../../mixins/sanitize-name'
   import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
-  import BfTag from '../../shared/BfTag/BfTag'
+  import BfTag from '../../shared/BfTag/BfTag.vue'
 
 
   import licenses from './dataset-licenses'
-  import StaleUpdateDialog from "../stale-update-dialog/StaleUpdateDialog";
-  import LockedBanner from '../LockedBanner/LockedBanner';
+  import StaleUpdateDialog from "../stale-update-dialog/StaleUpdateDialog.vue";
+  import LockedBanner from '../LockedBanner/LockedBanner.vue';
+  import IconLockFilled from "../../icons/IconLockFilled.vue";
 
 export default {
   name: 'BfDatasetSettings',
 
   components: {
+    IconLockFilled,
     BfRafter,
     BfButton,
     DeleteDataset,
@@ -265,17 +222,13 @@ export default {
   ],
 
   props: {
-    dataset: {
-      type: Object,
-      default: function() {
-        return {}
-      }
+    orgId: {
+      type: String,
+      default: ''
     },
-    datasets: {
-      type: Array,
-      default: function() {
-        return []
-      }
+    datasetId: {
+      type: String,
+      default: ''
     }
   },
 
@@ -296,6 +249,7 @@ export default {
           }
         ]
       },
+      deleteDatasetDialogVisible: false,
       dialogDescriptionVisible: false,
       dialogReleaseNewVisible: false,
       licenses
@@ -303,7 +257,12 @@ export default {
   },
 
   computed: {
-    ...mapState(['concepts', 'datasetEtag']),
+    ...mapState([
+      'concepts',
+      'datasetEtag',
+      'dataset',
+      'datasets'
+    ]),
 
     ...mapGetters([
       'activeOrganization',
@@ -378,6 +337,10 @@ export default {
     ...mapActions(['updateDataset', 'setDatasetEtag']),
 
 
+    onUpdateDescription: function(description) {
+      this.form.description = description
+      this.submitUpdateDatasetRequest()
+    },
     /**
      * Makes XHR call to update a dataset
      */
@@ -536,8 +499,10 @@ export default {
      * Handle delete dataset btn click
      */
     onDeleteDatasetBtnClick: function() {
-      const dialog = this.$refs.deleteDatasetDialog
-      dialog.dialogVisible = true
+      this.deleteDatasetDialogVisible = true
+    },
+    onCloseDeleteDialog: function() {
+      this.deleteDatasetDialogVisible = false
     },
 
     /**
@@ -607,6 +572,16 @@ export default {
 
 <style scoped lang="scss">
 @import '../../../assets/_variables';
+
+.settings-wrapper {
+  height:100%;
+}
+
+.flex-heading {
+  color: $white;
+  margin-bottom: 8px;
+}
+
 .bf-dataset-settings {
   background: $white;
 }
@@ -615,7 +590,7 @@ export default {
 .dataset-settings-collections {
   max-width: 475px;
 }
-/deep/ .el-form-item__label {
+.el-form-item__label {
   width: 100%;
 }
 
@@ -655,7 +630,7 @@ hr {
 }
 </style>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import '../../../assets/_variables.scss';
 .bf-dataset-settings {
   .el-checkbox__input.is-checked + .el-checkbox__label {

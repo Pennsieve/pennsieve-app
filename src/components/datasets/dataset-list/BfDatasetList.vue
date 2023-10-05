@@ -42,7 +42,6 @@
 
       </template>
 
-
       <div class="dataset-list-controls mb-16">
         <div class="dataset-list-controls-menus">
           <pagination-page-menu
@@ -246,9 +245,9 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
     ],
 
     props: {
-      datasets: {
-        type: Array,
-        default: () => []
+      orgId: {
+        type: String,
+        default: ''
       }
     },
 
@@ -280,7 +279,8 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
         'onboardingEvents',
         'datasetFilters',
         'gettingStartedOpen',
-        'activeOrganization'
+        'activeOrganization',
+        'datasets'
       ]),
 
       ...mapState('integrationsModule', [

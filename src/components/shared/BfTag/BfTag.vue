@@ -5,20 +5,19 @@
       type="button"
       @click="$emit('remove')"
     >
-      <svg-icon
-        name="icon-remove"
-        height="10"
-        width="10"
-        color="#000"
+      <IconRemove
+        :height="10"
+        :width="10"
       />
     </button>
   </div>
 </template>
 
 <script>
+import IconRemove from "../../icons/IconRemove.vue";
 export default {
   name: 'BfTag',
-
+  components: {IconRemove},
   props: {
     label: {
       type: String,

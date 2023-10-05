@@ -1,30 +1,19 @@
 <template>
-  <bf-page>
-    <template #navigationSecondary>
-      <router-view name="navigationSecondary" />
-    </template>
+  <bf-page id="page">
 
-    <template #heading v-if="isPrimary">
-      <bf-rafter
-        slot="heading"
-        title="Datasets"
-        class="primary"
-      >
-        <template #description>
-          <p>
-            Datasets are used to store files and metadata and are the primary component of the Pennsieve platform.
-          </p>
-        </template>
-      </bf-rafter>
+    <template #heading>
+      <router-view
+        name="stageHeader"
+      />
     </template>
 
     <template #stage>
       <router-view
         name="stage"
-        :datasets="datasets"
         list-type="dataset"
       />
     </template>
+
   </bf-page>
 </template>
 
@@ -48,6 +37,18 @@
       Sorter
     ],
 
+    // From Router
+    props: {
+      orgId: {
+        type: String,
+        default: ''
+      },
+      datasetId: {
+        type: String,
+        default: ''
+      }
+    },
+
     components: {
       BfPage
     },
@@ -67,13 +68,11 @@
         'scientificUnits',
         'config',
         'isDatasetOwner',
-        'activeOrganization',
         'datasetRole',
         'activeOrgSynced'
       ]),
 
       ...mapGetters([
-        'getActiveOrganization',
         'hasFeature',
         'getPermission',
         'isOrgSynced'
@@ -103,22 +102,15 @@
           : ''
       },
 
-       /**
-       * Returns the active organization id
-       * @returns {String}
-       */
-      activeOrgId: function() {
-        return path(['organization', 'intId'], this.activeOrganization)
-      },
       /**
        * Compute active record url to retrieve submission asset
        * @returns {String}
        */
       getModelTemplatesUrl: function() {
-        if (!this.activeOrgId || !this.userToken) {
+        if (!this.userToken) {
           return
         }
-        return `${this.config.apiUrl}/model-schema/organizations/${this.activeOrgId}/templates`
+        return `${this.config.apiUrl}/model-schema/organizations/${this.orgId}/templates`
       },
     },
 

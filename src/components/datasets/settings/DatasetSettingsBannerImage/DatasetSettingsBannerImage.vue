@@ -45,15 +45,16 @@
     >
 
     <el-dialog
-      :visible.sync="isDialogVisible"
+      v-model="isDialogVisible"
       :show-close="false"
       :close-on-click-modal="false"
       @closed="closeDialog"
     >
-      <bf-dialog-header
-        slot="title"
-        title="Update banner image"
-      />
+      <template #header>
+        <bf-dialog-header
+          title="Update banner image"
+        />
+      </template>
 
       <dialog-body>
         <div
@@ -67,10 +68,7 @@
         </div>
       </dialog-body>
 
-      <div
-        slot="footer"
-        class="dialog-footer"
-      >
+      <template #footer>
         <bf-button
           class="secondary"
           @click="isDialogVisible = false"
@@ -84,7 +82,8 @@
         >
           Save
         </bf-button>
-      </div>
+      </template>
+
     </el-dialog>
   </div>
 </template>
@@ -102,10 +101,10 @@
   import Cropper from 'cropperjs'
   import 'cropperjs/dist/cropper.css'
 
-  import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
-  import BfButton from '@/components/shared/bf-button/BfButton.vue'
-  import DatasetBanner from '@/components/datasets/DatasetBanner/DatasetBanner.vue'
-  import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
+  import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
+  import BfButton from '../../../shared/bf-button/BfButton.vue'
+  import DatasetBanner from '../../../datasets/DatasetBanner/DatasetBanner.vue'
+  import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
 
   export default {
     name: 'DatasetSettingsBannerImage',

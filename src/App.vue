@@ -1,13 +1,15 @@
 <script setup>
-
+  import { useRoute } from "vue-router";
+  let route = useRoute();
 </script>
 
 <template>
   <div id="app-wrap">
     <router-view name="header" />
     <div id="main-wrap">
-      <router-view v-show="primaryNavOpen" name="navigation" />
-      <router-view id="page" name="page" />
+      <router-view name="navigation" v-if="primaryNavOpen" />
+      <router-view name="navigationSecondary" v-if="!route.meta.hideSecondaryNav"/>
+      <router-view name="page" id="page" />
     </div>
   </div>
 
@@ -21,11 +23,10 @@
 <script>
 
 import { mapGetters, mapState, mapActions } from 'vuex'
-import { isProxy, toRaw } from 'vue';
 import { setPageTitle, setMeta } from './utils/meta'
 
 import globalMessageHandler from './mixins/global-message-handler'
-import {compose, mergeDeepLeft, pathOr, propOr} from "ramda";
+import { mergeDeepLeft, pathOr, propOr} from "ramda";
 import EventBus from './utils/event-bus'
 import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
