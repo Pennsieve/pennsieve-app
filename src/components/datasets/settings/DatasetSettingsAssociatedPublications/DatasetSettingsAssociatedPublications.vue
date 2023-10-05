@@ -30,9 +30,10 @@
       </div>
     </div>
     <reference-types-dialog
-      :visible.sync="publicationsDialogVisible"
+      v-model="publicationsDialogVisible"
       :url="externalPublicationsUrl"
       @add-reference="addReference"
+      @close="closeReferenceDialog"
     />
   </div>
 </template>
@@ -102,6 +103,10 @@ export default {
   },
 
   methods: {
+
+    closeReferenceDialog: function() {
+      this.publicationsDialogVisible=false
+    },
     /**
      * Get reference heading by value
      * @TODO optimize

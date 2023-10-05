@@ -104,7 +104,7 @@
 
     <hr>
 
-    <dataset-settings-associated-publications />
+    <dataset-settings-associated-publications/>
 
     <hr>
 
@@ -337,6 +337,9 @@ export default {
     ...mapActions(['updateDataset', 'setDatasetEtag']),
 
 
+    closeReferenceDialog: function() {
+      this.
+    },
     onUpdateDescription: function(description) {
       this.form.description = description
       this.submitUpdateDatasetRequest()

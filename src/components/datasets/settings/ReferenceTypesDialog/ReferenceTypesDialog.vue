@@ -4,10 +4,13 @@
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Add a dataset reference"
-    />
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        title="Add a dataset reference"
+      />
+    </template>
+
     <dialog-body>
       <p class="info-blurb">
         List references to other items that are associated with this dataset
@@ -100,7 +103,8 @@
         </el-form>
       </div>
     </dialog-body>
-    <div slot="footer">
+
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -113,7 +117,8 @@
       >
         Add Reference
       </bf-button>
-    </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -216,7 +221,7 @@ export default {
       this.doi = ''
       this.invalidDOI = ''
       this.notFound = false
-      this.$emit('update:visible', false)
+      this.$emit('close')
     },
 
     /**
