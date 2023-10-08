@@ -5,7 +5,7 @@
     :autofocus="autofocus"
     :type="type"
     :class="[
-      type ? 'bf-button--' + type : ''
+      type ? 'bf-button--' + type : '', hasPrefixSlot? 'hasPrefix' : ''
     ]"
   >
     <span
@@ -106,6 +106,12 @@
     outline: none;
     padding: 12px 16px;
     text-transform: none;
+    min-height: 40px;
+
+    &.hasPrefix {
+      padding: 4px 16px;
+    }
+
     &[disabled] {
       opacity: .3;
       color: $gray_3;
@@ -233,13 +239,13 @@
     display: inline-flex;
   }
   .prefix {
-    margin-right: 16px;
+    margin-right: 2px;
     .compact & {
-      margin-right: 8px;
+      margin-right: 2px;
     }
   }
   .suffix {
-    margin-left: 16px;
+    margin-left: 8px;
     .compact & {
       margin-left: 8px;
     }

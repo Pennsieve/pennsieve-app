@@ -84,6 +84,7 @@
                 class="svg-icon"
                 :height="20"
                 :width="20"
+                color="white"
               />
               <div>
                 <strong>{{ packageTypeCount }}</strong>

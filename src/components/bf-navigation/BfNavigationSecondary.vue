@@ -123,19 +123,26 @@
 
 <!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        :link="{ name: 'dataset-files' }"-->
-<!--        icon="icon-files"-->
-<!--        label="Files"-->
-<!--        class="secondary"-->
-<!--        :condensed="secondaryNavCondensed"-->
+      <bf-navigation-item
+        :link="{ name: 'dataset-files' }"
+        label="Files"
+        :condensed="secondaryNavCondensed"
+        :secondary=true
 
-<!--      >-->
-<!--        <bf-waiting-icon-->
-<!--          v-if="uploading"-->
-<!--          slot="suffix"-->
-<!--        />-->
-<!--      </bf-navigation-item>-->
+      >
+        <template #icon>
+          <IconFiles
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
+
+        <bf-waiting-icon
+          v-if="uploading"
+          slot="suffix"
+        />
+      </bf-navigation-item>
 
 <!--      <bf-navigation-item-->
 <!--        v-if="getPermission('manager')"-->
@@ -230,12 +237,14 @@ import IconNavCollapse from "../icons/IconNavCollapse.vue";
 import IconNavExpand from "../icons/IconNavExpand.vue";
 import IconOverview from "../icons/IconOverview.vue";
 import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
+import IconFiles from "../icons/IconFiles.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconFiles,
     IconDatasetSettings,
     IconOverview,
     IconNavExpand,

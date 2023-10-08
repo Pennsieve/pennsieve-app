@@ -564,9 +564,10 @@ export default {
       }
 
       // Check the route to see if header is visible
-      if (this.$route.matched.some(record => record.components.header)) {
-        messageClass = 'with-header'
-      }
+      // TODO: Check if we want to bring this back. Not all matched routes have components??
+      // if (this.$route.matched.some(record => record.components.header)) {
+      //   messageClass = 'with-header'
+      // }
 
       this.$message({
         message: message,

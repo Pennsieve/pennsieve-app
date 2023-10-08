@@ -11,7 +11,8 @@ const Datasets = () => import('./datasets/Datasets.vue')
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
-const DatasetSettingsHeader = () => import('./Dataset/DatasetSettingsHeader.vue')
+const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
+const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 
 
 /**
@@ -212,10 +213,33 @@ const router = createRouter({
           }
         },
         {
+          name: 'dataset-files',
+          path: ':datasetId/files',
+          components: {
+            stageHeader: SecondaryPageHeader,
+            stage: BfDatasetFiles
+          },
+          props: {
+            stage: true,
+          },
+          children: [
+            {
+              name: 'collection-files',
+              path: ':fileId',
+              props: true
+            },
+            {
+              name: 'collection-files-deleted',
+              path: ':fileId',
+              props: true
+            }
+          ]
+        },
+        {
           name: 'dataset-settings',
           path: ':datasetId/settings',
           components: {
-            stageHeader: DatasetSettingsHeader,
+            stageHeader: SecondaryPageHeader,
             stage: BfDatasetSettings,
           },
           props: {

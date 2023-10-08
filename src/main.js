@@ -14,8 +14,7 @@ import VueClipboard from 'vue3-clipboard'
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
-import 'element-plus/es/components/message/style/css';
-import {path, pathOr} from "ramda";
+import 'element-plus/es/components/message/style/index';
 
 Amplify.configure(AWSConfig)
 

@@ -28,7 +28,7 @@ export default {
     },
     color: {
       type: String,
-      default: "#fff",
+      default: "currentColor",
     },
   },
 };

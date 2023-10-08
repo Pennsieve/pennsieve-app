@@ -82,19 +82,22 @@
   .bf-stage {
     flex: 1;
     overflow: auto;
+    display: flex;
+    flex-direction: column;
     &.editing {
       background: $gray_1;
     }
   }
   .bf-stage-content {
     box-sizing: border-box;
-    min-height: 100%;
+    min-height: calc(100% - 72px);
     padding: 8px 32px;
     display: flex;
     flex-direction: column;
 
     &.no-actions {
       padding: 32px;
+      min-height: 100%;
     }
   }
   .graph-management {
@@ -111,6 +114,7 @@
     }
     .bf-stage-content {
       flex: 1;
+
     }
   }
   .stage-sidebar {

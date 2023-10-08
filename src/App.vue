@@ -14,7 +14,7 @@
   </div>
 
   <PsAnalytics />
-
+  <bf-download-file ref="downloadFile" />
 <!--  This is the websocket connection-->
 <!--  <bf-notifications />-->
 
@@ -31,6 +31,8 @@ import EventBus from './utils/event-bus'
 import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
 import PsAnalytics from './components/analytics/Analytics.vue'
+import BfDownloadFile from './components/bf-download-file/BfDownloadFile.vue'
+
 // import BfNotifications from './components/notifications/Notifications.vue'
 
 export default {
@@ -38,6 +40,7 @@ export default {
 
   components: {
     PsAnalytics,
+    BfDownloadFile,
   },
   mixins: [
     globalMessageHandler,

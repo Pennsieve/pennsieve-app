@@ -9,7 +9,7 @@ import collectionsModule from './collectionsModule'
 import viewerModule from './viewerModule'
 import repositoryModule from "./repositoryModule"
 import publishingModule from "./publishingModule"
-
+import filesModule from "./filesModule";
 
 
 const hashFunction = (key, list) => {
@@ -1006,7 +1006,8 @@ export default createStore({
     collectionsModule,
     viewerModule,
     repositoryModule,
-    publishingModule
+    publishingModule,
+    filesModule
   }
 
 });

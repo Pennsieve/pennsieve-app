@@ -46,6 +46,7 @@ import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import {copyText} from "vue3-clipboard";
+import EventBus from "../../../utils/event-bus";
 
 export default {
   name: 'ApiKeyDetail',
@@ -81,29 +82,33 @@ export default {
      */
     copyApiKey: function() {
       const key = this.apiKey.key
-      copyText(key)
-      this.copyText = 'API key copied to the clipboard.'
+      copyText(key, undefined, (error, event) => {
+        if (error) {
+          this.copyText = 'Unable to copy key to the clipboard.'
+        } else {
+          this.copyText = 'API key copied to the clipboard.'
+        }
+      })
+
     },
     /**
      * Copy API secret to clipboard
      */
     copyApiSecret: function() {
       const secret = this.apiKey.secret
-      copyText(secret)
-      this.copyText = 'API secret copied to the clipboard.'
-    },
-    /**
-     * Clear api key state
-     */
-    clearKey: function() {
-      this.apiKey = {}
+      copyText(secret, undefined, (error, event) => {
+        if (error) {
+          this.copyText = 'Unable to copy secret to the clipboard.'
+        } else {
+          this.copyText = 'API secret copied to the clipboard.'
+        }
+      })
     },
     /**
      * Closes the dialog
      */
     closeDialog: function() {
       this.dialogVisible = false
-      this.clearKey()
     }
   }
 }
