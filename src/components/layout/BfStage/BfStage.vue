@@ -94,6 +94,7 @@
     padding: 8px 32px;
     display: flex;
     flex-direction: column;
+    overflow: auto;
 
     &.no-actions {
       padding: 32px;

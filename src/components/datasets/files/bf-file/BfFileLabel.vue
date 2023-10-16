@@ -49,6 +49,7 @@
     >
 
     <button
+      v-if="isNameLink"
       class="name"
       data-cy="moveDialogFileName"
       :disabled="disabled"
@@ -56,6 +57,9 @@
     >
       {{ displayName }}
     </button>
+    <div v-else class="no-link-name">
+      {{ displayName }}
+    </div>
   </div>
 </template>
 
@@ -93,6 +97,10 @@ export default {
   ],
 
   props: {
+    isNameLink: {
+      type: Boolean,
+      default: true
+    },
     file: {
       type: Object,
       default: () => {}
@@ -290,6 +298,11 @@ export default {
 
 <style scoped lang="scss">
 @import '../../../../assets/_icon-item-colors.scss';
+
+
+.no-link-name {
+  color:$gray_6
+}
 
 .btn-open-file {
   display: none;

@@ -31,7 +31,6 @@
         <template v-else>
           <li class="mr-24">
             <button
-              v-if="!searchAllDataMenu"
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('delete')"
@@ -40,9 +39,8 @@
               Delete
             </button>
           </li>
-          <li class="mr-24">
+          <li class="mr-8">
             <button
-              v-if="!searchAllDataMenu"
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('move')"
@@ -55,9 +53,8 @@
               Move to&hellip;
             </button>
           </li>
-          <li class="mr-24" v-if="false">
+          <li class="mr-8" v-if="false">
             <button
-              v-if="!searchAllDataMenu"
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('custom-actions-click')"
@@ -72,7 +69,7 @@
           </li>
         </template>
         <li>
-          <button class="linked btn-selection-action" @click="onDownloadClick">
+          <button class="linked btn-selection-action mr-8" @click="onDownloadClick">
             <IconUpload
               class="mr-8"
               :height="16"
@@ -81,6 +78,22 @@
             Download
           </button>
         </li>
+        <li>
+            <table-menu
+              v-if="getPermission('editor') || searchAllDataMenu"
+              :file="activeRow"
+              :multiple-selected="multipleSelected"
+              :search-all-data-menu="searchAllDataMenu"
+              @delete="deleteFile"
+              @move="moveFile"
+              @download-file="downloadFile"
+              @process-file="processFile"
+              @copy-url="getPresignedUrl"
+            />
+        </li>
+
+
+
       </ul>
     </div>
 
@@ -176,30 +189,30 @@
             {{ formatDate(scope.row.content.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column
-          label=""
-          fixed="right"
-          align="right"
-          width="54"
-          :sortable="false"
-          :resizable="false"
-        >
-          <template #default="scope">
-            <div class="file-actions-wrap">
-              <table-menu
-                v-if="getPermission('editor') || searchAllDataMenu"
-                :file="scope.row"
-                :multiple-selected="multipleSelected"
-                :search-all-data-menu="searchAllDataMenu"
-                @delete="deleteFile"
-                @move="moveFile"
-                @download-file="downloadFile"
-                @process-file="processFile"
-                @copy-url="getPresignedUrl"
-              />
-            </div>
-          </template>
-        </el-table-column>
+<!--        <el-table-column-->
+<!--          label=""-->
+<!--          fixed="right"-->
+<!--          align="right"-->
+<!--          width="54"-->
+<!--          :sortable="false"-->
+<!--          :resizable="false"-->
+<!--        >-->
+<!--          <template #default="scope">-->
+<!--            <div class="file-actions-wrap">-->
+<!--              <table-menu-->
+<!--                v-if="getPermission('editor') || searchAllDataMenu"-->
+<!--                :file="scope.row"-->
+<!--                :multiple-selected="multipleSelected"-->
+<!--                :search-all-data-menu="searchAllDataMenu"-->
+<!--                @delete="deleteFile"-->
+<!--                @move="moveFile"-->
+<!--                @download-file="downloadFile"-->
+<!--                @process-file="processFile"-->
+<!--                @copy-url="getPresignedUrl"-->
+<!--              />-->
+<!--            </div>-->
+<!--          </template>-->
+<!--        </el-table-column>-->
       </template>
     </el-table>
   </div>
@@ -344,7 +357,6 @@ export default {
     handleTableSelectionChange: function(selection) {
       this.selection = selection
       this.checkAll = this.data.length === selection.length
-      this.$emit('selection-change', selection)
     },
 
     /**
@@ -389,8 +401,11 @@ export default {
     },
 
     onRowClick: function(row, selected) {
+      console.log('onRowClick: ' + row)
       this.$refs.table.clearSelection()
-      this.$refs.table.toggleRowSelection(row, true)
+      setTimeout(function() {
+        this.$refs.table.toggleRowSelection(row, true)
+      }, 100);
     },
 
     /**
@@ -539,7 +554,7 @@ export default {
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   display: flex;
-  padding: 11px 15px 10px;
+  padding: 6px 15px;
   position: absolute;
   justify-content: space-between;
   width: 100%;
@@ -550,6 +565,7 @@ export default {
   display: flex;
   flex: 1;
   justify-content: flex-end;
+  align-items: center;
 }
 .el-table {
   border-radius: 4px;

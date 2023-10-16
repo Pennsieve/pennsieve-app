@@ -13,7 +13,8 @@ const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
 const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
-
+const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
+const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 
 /**
  * ORCIDRedirect
@@ -206,35 +207,68 @@ const router = createRouter({
           path: ':datasetId/overview',
           components: {
             stage: DatasetOverview,
-
           },
           props: {
             stage: true,
           }
         },
         {
-          name: 'dataset-files',
+          name: 'dataset-files-wrapper',
           path: ':datasetId/files',
           components: {
             stageHeader: SecondaryPageHeader,
-            stage: BfDatasetFiles
+            stage: DatasetFilesView
           },
           props: {
             stage: true,
           },
           children: [
             {
-              name: 'collection-files',
-              path: ':fileId',
-              props: true
+              name: 'dataset-files',
+              path: '',
+              components: {
+                stage: BfDatasetFiles
+              },
+              props: {
+                stage: true,
+              },
             },
             {
-              name: 'collection-files-deleted',
+              name: 'collection-files',
               path: ':fileId',
-              props: true
-            }
+              components: {
+                stage: BfDatasetFiles
+              },
+              props: {
+                stage: true,
+              },
+            },
+            {
+              name: 'file-record',
+              path: ':fileId/details',
+              components: {
+                stage: FileDetails
+              },
+              meta: { showBackToFiles: true},
+              props: {
+                stage: true,
+              },
+            },
           ]
+
         },
+
+        // {
+        //   name: 'file-record',
+        //   path: ':datasetId/files/:instanceId/details',
+        //   components: {
+        //     stageHeader: SecondaryPageHeader,
+        //     stage: FileDetails
+        //   },
+        //   props: {
+        //     stage: true,
+        //   },
+        // },
         {
           name: 'dataset-settings',
           path: ':datasetId/settings',

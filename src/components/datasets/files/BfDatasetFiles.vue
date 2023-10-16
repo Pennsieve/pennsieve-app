@@ -220,6 +220,17 @@ export default {
     FileMetadataInfo
   },
 
+  props: {
+    fileId: {
+      type: String,
+      default: ''
+    },
+    datasetId: {
+      type: String,
+      default: ''
+    }
+  },
+
   mixins: [Sorter, Request, GetFileProperty],
 
   data: function() {
@@ -280,8 +291,8 @@ export default {
           this.$route.name === 'dataset-files' ? 'datasets' : 'packages'
         const id =
           this.$route.name === 'dataset-files'
-            ? this.$route.params.datasetId
-            : this.$route.params.fileId
+            ? this.datasetId
+            : this.fileId
 
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${
           this.userToken
@@ -548,11 +559,9 @@ export default {
       } else {
         this.$router.push({
           name: 'file-record',
-          params: {
-            conceptId: this.filesProxyId,
-            instanceId: id
-          }
+          params: { fileId: id }
         })
+
       }
     },
 
@@ -801,13 +810,13 @@ export default {
       const { packageDTO, uploadDestination } = evt
       const uploadId = propOr('', 'id', uploadDestination)
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const fileId = pathOr('', ['params', 'fileId'], this.$route)
+      const fId = pathOr('', ['params', 'fileId'], this.$route)
 
       const exists = this.checkExists(packageDTO)
       const isParent = this.checkIsParent(packageDTO)
 
       if (
-        (uploadId === datasetId || uploadId === fileId) &&
+        (uploadId === datasetId || uploadId === fId) &&
         exists === false &&
         isParent
       ) {
@@ -970,14 +979,14 @@ export default {
         }
       })
         .then(response => {
-          const fileId = pathOr(
+          const fId = pathOr(
             '',
             ['objects', 'source', 0, 'content', 'id'],
             response
           )
           const url = `${
             this.config.apiUrl
-          }/packages/${packageId}/files/${fileId}?short=true&api_key=${
+          }/packages/${packageId}/files/${fId}?short=true&api_key=${
             this.userToken
           }`
           this.sendXhr(url, {
@@ -1059,12 +1068,13 @@ export default {
   margin: -10px 0px -8px 6px;
 }
 
-.bf-stage-content {
-  display: flex;
-  flex-direction: row;
-  padding-top: 0px;
-  flex-direction: column;
-}
+//.bf-stage-content {
+//  display: flex;
+//  flex-direction: row;
+//  padding-top: 0px;
+//  flex-direction: column;
+//  overflow: auto;
+//}
 
 .file-meta-wrapper {
   position: relative;

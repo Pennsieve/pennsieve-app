@@ -26,7 +26,7 @@ export default {
   justify-content: space-between;
 }
 
-.right-actions, left-actions {
+.right-actions, .left-actions {
   display: flex;
   flex-direction: row;
        }
