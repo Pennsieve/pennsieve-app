@@ -21,8 +21,8 @@
       Get Help
     </a>
     <locked-dialog
-      :visible.sync="visible"
-      @toggle-visible="toggleVisible(false)"
+      :dialog-visible="visible"
+      @close="toggleVisible(false)"
     />
   </div>
 </template>

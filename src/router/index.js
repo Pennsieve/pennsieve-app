@@ -15,6 +15,7 @@ const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
+const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 
 /**
  * ORCIDRedirect
@@ -257,18 +258,15 @@ const router = createRouter({
           ]
 
         },
-
-        // {
-        //   name: 'file-record',
-        //   path: ':datasetId/files/:instanceId/details',
-        //   components: {
-        //     stageHeader: SecondaryPageHeader,
-        //     stage: FileDetails
-        //   },
-        //   props: {
-        //     stage: true,
-        //   },
-        // },
+        {
+          name: 'publishing-settings',
+          path: ':datasetId/publishing-settings',
+          components: {
+            stageHeader: SecondaryPageHeader,
+            stage: BfPublishingSettings
+          },
+          props: true
+        },
         {
           name: 'dataset-settings',
           path: ':datasetId/settings',

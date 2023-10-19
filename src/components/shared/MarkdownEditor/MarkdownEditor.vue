@@ -404,6 +404,8 @@
 
 <style lang="scss" scoped>
   @import './_markdown.scss';
+  @import '../../../assets/_variables.scss';
+
 
   textarea {
     font: 14px/1.1 monospace;
@@ -471,10 +473,6 @@
     height: auto;
     max-width: 600px;
   }
-</style>
-<style lang="scss">
-  @import '../../../assets/_variables.scss';
-
   .markdown-editor {
     .wk-container {
       padding-top: 35px;

@@ -3,6 +3,7 @@
     class="bf-rafter"
     :class="[$slots['tabs'] ? 'with-tabs' : '', isEditing ? 'editing' : '']"
   >
+
     <template v-if="datasetNameVisible">
       <div class="parent">
         <div class="dataset-name">{{ datasetNameDisplay() }}</div>

@@ -5,14 +5,20 @@
       :modelValue="dialogVisible"
       @update:modelValue="dialogVisible = $event"
       :append-to-body="true"
+      :show-close="false"
       @close="toggleVisible"
     >
+      <template #header>
+        <bf-dialog-header
+          title="Review process">
+        </bf-dialog-header>
+      </template>
+
       <dialog-body>
         <IconLock
           class="mb-8"
           :height="32"
           :width="32"
-          color="#2760FF"
         />
         <h2>This dataset is under review</h2>
         <p>
@@ -34,9 +40,11 @@
   import BfButton from '../../shared/bf-button/BfButton.vue';
   import DialogBody from '../../shared/dialog-body/DialogBody.vue';
   import IconLockFilled from "../../icons/IconLock.vue";
+  import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
   export default {
     name: 'LockedDialog',
     components: {
+      BfDialogHeader,
       IconLockFilled,
       BfButton,
       DialogBody
@@ -52,7 +60,7 @@
      * Toggles modal to be visible or not
      */
     toggleVisible: function() {
-      this.$emit('close', false)
+      this.$emit('close')
     },
     },
   }

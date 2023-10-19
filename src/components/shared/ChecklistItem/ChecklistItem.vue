@@ -1,13 +1,14 @@
 <template>
   <div class="dataset-discover-checklist-item">
     <div class="icon-link-wrap">
-      <svg-icon
-        class="mr-8"
-        :class="icon"
-        :name="icon"
-        height="20"
-        width="20"
+      <IconDoneCheckCircle v-if="isComplete" class="mr-8 checked"
+                           :height="20"
+                           :width="20"
       />
+      <IconInfo v-else
+                class="mr-8"
+                :height="20"
+                :width="20"/>
 
       <div class="link-wrap mr-8">
         <router-link
@@ -33,10 +34,16 @@
 </template>
 
 <script>
+  import IconInfo from "../../icons/IconInfo.vue";
+  import IconDoneCheckCircle from "../../icons/IconDoneCheckCircle.vue";
   export default {
     name: 'ChecklistItem',
-
+    components: {IconDoneCheckCircle, IconInfo},
     props: {
+      isComplete: {
+        type: Boolean,
+        default: false
+      },
       icon: {
         type: String,
         default: ''
@@ -62,6 +69,10 @@
 <style lang="scss" scoped>
   @import './src/assets/_variables.scss';
 
+  .checked {
+    color: $green_2
+  }
+
   .dataset-discover-checklist-item {
     align-items: center;
     border-top: 1px solid $gray_2;
@@ -78,12 +89,7 @@
     align-items: center;
     display: flex;
   }
-  .icon-done-check-circle {
-    color: $green_2
-  }
-  .svg-icon {
-    flex-shrink: 0;
-  }
+
   .description {
     flex: 1;
   }

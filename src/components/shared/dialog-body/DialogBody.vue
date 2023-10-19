@@ -58,7 +58,7 @@
   }
 
   .dialog-body-heading {
-    color: #000;
+    color: $gray_5;
     font-weight: bold;
     line-height: 16px;
     margin-bottom: 8px;
@@ -76,7 +76,7 @@
   }
 
   .dialog-body-content {
-    color: $gray_4;
+    color: $gray_5;
 	  line-height: 18px;
 	  width: 100%;
   }

@@ -232,7 +232,7 @@ import FormatDate from '../../mixins/format-date'
 import TableFunctions from '../../mixins/table-functions'
 import Sorter from '../../mixins/sorter'
 import IconMoveFile from "../icons/IconMoveFile.vue";
-import IconDoneCheckCircle from "../icons/IconDonCheckCircle.vue";
+import IconDoneCheckCircle from "../icons/IconDoneCheckCircle.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import IconMenu from "../icons/IconMenu.vue"
 

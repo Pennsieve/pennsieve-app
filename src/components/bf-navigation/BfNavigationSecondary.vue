@@ -178,14 +178,21 @@
 
 <!--      />-->
 
-<!--      <bf-navigation-item-->
-<!--        :link="{ name: 'publishing-settings' }"-->
-<!--        icon="icon-globe-check"-->
-<!--        label="Publishing"-->
-<!--        class="secondary"-->
-<!--        :condensed="secondaryNavCondensed"-->
-<!--        :secondary=true-->
-<!--      />-->
+      <bf-navigation-item
+        :link="{ name: 'publishing-settings' }"
+        label="Publishing"
+        class="secondary"
+        :condensed="secondaryNavCondensed"
+        :secondary=true
+      >
+        <template #icon>
+          <IconGlobeCheck
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
+      </bf-navigation-item>
 
 <!--      <bf-navigation-item-->
 <!--        :link="{ name: 'dataset-permissions' }"-->
@@ -238,12 +245,14 @@ import IconNavExpand from "../icons/IconNavExpand.vue";
 import IconOverview from "../icons/IconOverview.vue";
 import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
 import IconFiles from "../icons/IconFiles.vue";
+import IconGlobeCheck from "../icons/IconGlobeCheck.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconGlobeCheck,
     IconFiles,
     IconDatasetSettings,
     IconOverview,

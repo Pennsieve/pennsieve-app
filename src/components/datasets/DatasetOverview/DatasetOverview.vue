@@ -1,5 +1,7 @@
 <template>
   <div>
+    <locked-banner slot="banner" />
+
     <bf-rafter  class="overview">
       <template #heading>
         <div
@@ -16,18 +18,18 @@
                 {{ datasetName }}
               </h1>
 
-<!--              <div class="dataset-owners">-->
-<!--                <div-->
-<!--                  v-for="(contributor, idx) in datasetContributorsList"-->
-<!--                  :key="contributor.id"-->
-<!--                  class="contributor-item-wrap"-->
-<!--                >-->
-<!--                  <contributor-item :contributor="contributor" />-->
-<!--                  <template v-if="idx < datasetContributorsList.length - 1">-->
-<!--                    ,-->
-<!--                  </template>-->
-<!--                </div>-->
-<!--              </div>-->
+              <div class="dataset-owners">
+                <div
+                  v-for="(contributor, idx) in datasetContributorsList"
+                  :key="contributor.id"
+                  class="contributor-item-wrap"
+                >
+                  <contributor-item :contributor="contributor" />
+                  <template v-if="idx < datasetContributorsList.length - 1">
+                    ,
+                  </template>
+                </div>
+              </div>
 
               <!-- eslint-disable vue/no-v-html -->
               <!-- $sanitize will sanitize the HTML injected -->
@@ -88,9 +90,9 @@
               />
               <div>
                 <strong>{{ packageTypeCount }}</strong>
-                <!--                  <router-link :to="{ name: 'dataset-files' }">-->
-                <!--                    Files-->
-                <!--                  </router-link>-->
+                  <router-link :to="{ name: 'dataset-files' }">
+                    Files
+                  </router-link>
               </div>
             </div>
             <div class="dataset-info-stat">
@@ -124,16 +126,16 @@
                 :width="20"
               />
               <div>
-                <!--                  <router-link-->
-                <!--                    :to="{-->
-                <!--                name: 'dataset-settings',-->
-                <!--                query: {-->
-                <!--                  focusInput: 'inputLicense'-->
-                <!--                }-->
-                <!--              }"-->
-                <!--                  >-->
-                <!--                    {{ datasetLicense }}-->
-                <!--                  </router-link>-->
+                  <router-link
+                    :to="{
+                      name: 'dataset-settings',
+                      query: {
+                        focusInput: 'inputLicense'
+                      }
+                    }"
+                  >
+                    {{ datasetLicense }}
+                  </router-link>
               </div>
             </div>
           </div>
@@ -144,131 +146,6 @@
 
     <bf-stage>
 
-
-      <!--      <data-card-->
-      <!--        v-if="isChecklistDimissed === false && hasManagerPermissions"-->
-      <!--        class="mb-32 grey compact"-->
-      <!--        title="Dataset Publishing Checklist:"-->
-      <!--        :padding="false"-->
-      <!--      >-->
-      <!--        <button-->
-      <!--          slot="title-aux"-->
-      <!--          class="linked"-->
-      <!--          @click="dismissDatasetChecklist"-->
-      <!--        >-->
-      <!--          Dismiss-->
-      <!--        </button>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasSubtitle)"-->
-      <!--          :route="{-->
-      <!--            name: 'dataset-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'inputDescription'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--          cta="Add a subtitle"-->
-      <!--        >-->
-      <!--          gives others a brief description of your dataset.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasTags)"-->
-      <!--          :route="{-->
-      <!--            name: 'dataset-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'inputTags'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--          cta="Add tags"-->
-      <!--        >-->
-      <!--          make it easier for people to find your dataset in Discover.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasDescription)"-->
-      <!--          cta="Add a description"-->
-      <!--          :route="{-->
-      <!--            query: {-->
-      <!--              editDescription: true-->
-      <!--            }-->
-      <!--          }"-->
-      <!--        >-->
-      <!--          provide a detailed overview of your dataset and outline your findings and analysis for others.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasBanner)"-->
-      <!--          cta="Add an image"-->
-      <!--          :route="{-->
-      <!--            name: 'dataset-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'bannerImage'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--        >-->
-      <!--          add an image to help your dataset stand out in listings.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasContributors)"-->
-      <!--          cta="Add contributors"-->
-      <!--          :route="{-->
-      <!--            name: 'dataset-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'inputAddContributor'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--        >-->
-      <!--          list all of the people who have contributed to this dataset.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasDatasetDoi)"-->
-      <!--          cta="Reserve a DOI"-->
-      <!--          :route="{-->
-      <!--            name: 'publishing-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'dataciteDoi'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--        >-->
-      <!--          reserve a DataCite DOI for published research.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(hasDatasetLicense)"-->
-      <!--          cta="Add a license"-->
-      <!--          :route="{-->
-      <!--            name: 'dataset-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'inputLicense'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--        >-->
-      <!--          let others know how they can use this data in their own research.-->
-      <!--        </checklist-item>-->
-
-      <!--        <checklist-item-->
-      <!--          :icon="computeChecklistIcon(datasetOwnerHasOrcidId)"-->
-      <!--          cta="Link ORCID Account"-->
-      <!--          :route="{-->
-      <!--            name: 'publishing-settings',-->
-      <!--            query: {-->
-      <!--              focusInput: 'orcidId'-->
-      <!--            }-->
-      <!--          }"-->
-      <!--          :show-link="isDatasetOwner"-->
-      <!--        >-->
-      <!--          <template v-if="isDatasetOwner">-->
-      <!--            link your ORCID iD to distinguish yourself from other researchers-->
-      <!--          </template>-->
-      <!--          <template v-else>-->
-      <!--            link the dataset owner's ORCID iD to distinguish themselves from other researchers-->
-      <!--          </template>-->
-      <!--        </checklist-item>-->
-      <!--      </data-card>-->
-
       <data-card
         ref="descriptionDataCard"
         class="grey compact"
@@ -276,19 +153,22 @@
         :is-expandable="true"
         :padding="false"
       >
-        <template slot="title-aux">
+        <template #title-aux>
           <button
-            v-if="isEditingMarkdown1"
+            v-if="isEditingMarkdownDescription
+"
             class="linked mr-8"
-            @click="isEditingMarkdown1 = false"
+            @click="isEditingMarkdownDescription
+ = false"
           >
             Cancel
           </button>
           <button
-            v-if="isEditingMarkdown1"
+            v-if="isEditingMarkdownDescription
+"
             class="linked"
             :disabled="datasetLocked"
-            @click="isSavingMarkdown = true"
+            @click="isSavingMarkdownDescription = true"
           >
             Save
           </button>
@@ -298,7 +178,8 @@
             slot="title-aux"
             class="linked-9"
             :disabled="datasetLocked"
-            @click="isEditingMarkdown1 = true"
+            @click="isEditingMarkdownDescription
+ = true"
           >
             Update
           </button>
@@ -307,8 +188,9 @@
         <markdown-editor
           ref="markdownEditor"
           :value="datasetDescription"
-          :is-editing="isEditingMarkdown1"
-          :is-saving="isSavingMarkdown"
+          :is-editing="isEditingMarkdownDescription
+"
+          :is-saving="isSavingMarkdownDescription"
           :empty-state="datasetDescriptionEmptyState"
           :is-loading="isLoadingDatasetDescription"
           @save="onReadmeSave"
@@ -322,18 +204,21 @@
         :is-expandable="true"
         :padding="false"
       >
-        <template slot="title-aux">
+        <template #title-aux>
           <button
-            v-if="isEditingMarkdown2"
+            v-if="isEditingMarkdownChangelog
+"
             class="linked mr-8"
-            @click="isEditingMarkdown2 = false"
+            @click="isEditingMarkdownChangelog
+ = false"
           >
             Cancel
           </button>
           <button
-            v-if="isEditingMarkdown2"
+            v-if="isEditingMarkdownChangelog
+"
             class="linked"
-            @click="isSavingMarkdown = true"
+            @click="isSavingMarkdownChangelog = true"
           >
             Save
           </button>
@@ -342,7 +227,8 @@
             slot="title-aux"
             class="linked-9"
             :disabled="datasetLocked"
-            @click="isEditingMarkdown2 = true"
+            @click="isEditingMarkdownChangelog
+ = true"
           >
             Update
           </button>
@@ -350,9 +236,11 @@
         <markdown-editor
           ref="markdownEditor"
           :value="changelogText"
-          :is-editing="isEditingMarkdown2"
-          :is-saving="isSavingMarkdown"
+          :is-editing="isEditingMarkdownChangelog
+"
+          :is-saving="isSavingMarkdownChangelog"
           :empty-state="changelogDescriptionEmptyState"
+          @save="onChangelogSave"
 
         />
       </data-card>
@@ -443,9 +331,10 @@ export default {
   data() {
     return {
       isChecklistDimissed: false,
-      isEditingMarkdown1: false,
-      isEditingMarkdown2: false,
-      isSavingMarkdown: false,
+      isEditingMarkdownDescription: false,
+      isEditingMarkdownChangelog: false,
+      isSavingMarkdownDescription: false,
+      isSavingMarkdownChangelog: false,
       datasetDescriptionEmptyState,
       changelogDescriptionEmptyState,
       packageTypeCount: 0,
@@ -760,7 +649,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['setDatasetDescription', 'setDatasetDescriptionEtag']),
+    ...mapActions(['setDatasetDescription', 'setDatasetDescriptionEtag', 'setChangelogText']),
 
 
     staleUpdateDialogClose: function() {
@@ -796,7 +685,8 @@ export default {
      * Set edit description and scroll to description
      */
     setEditDescription: function() {
-      this.isEditingMarkdown1 = true
+      this.isEditingMarkdownDescription
+ = true
       this.$nextTick(() => {
         this.$refs.descriptionDataCard.$el.scrollIntoView()
         this.$refs.markdownEditor.focus()
@@ -844,11 +734,12 @@ export default {
           if (response.ok) {
             this.setDatasetDescriptionEtag(response.headers.get('etag'))
             this.setDatasetDescription(markdown).finally(() => {
-              this.isSavingMarkdown = false
-              this.isEditingMarkdown1 = false
+              this.isSavingMarkdownDescription = false
+              this.isEditingMarkdownDescription
+ = false
             })
           } else if (response.status === 412) {
-            this.isSavingMarkdown = false
+            this.isSavingMarkdownDescription = false
             this.staleUpdateDialogVisible = true
           } else {
             throw response
@@ -856,6 +747,39 @@ export default {
         })
         .catch(this.handleXhrError.bind(this))
     },
+
+    /**
+     * On changelog save, emitted from the MarkdownEditor
+     * Make a request to the API to save the readme
+     * @params {String} markdown
+     */
+
+    onChangelogSave: function(markdown) {
+      fetch(this.datasetChangelogUrl, {
+        body: JSON.stringify({
+          changelog: markdown
+        }),
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(response => {
+          if (response.ok) {
+            this.setChangelogText(markdown).finally(() => {
+              this.isSavingMarkdownChangelog = false
+              this.isEditingMarkdownChangelog = false
+            })
+          } else if (response.status === 412) {
+            this.isSavingMarkdownChangelog = false
+            this.$refs.staleUpdateDialog.dialogVisible = true
+          } else {
+            throw response
+          }
+        })
+        .catch(this.handleXhrError.bind(this))
+    },
+
 
     getChangelog: function(datasetId) {
       //this.setIsLoadingDatasetDescription(true)

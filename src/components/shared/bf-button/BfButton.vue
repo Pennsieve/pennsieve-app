@@ -114,7 +114,7 @@
 
     &[disabled] {
       opacity: .3;
-      color: $gray_3;
+      color: $gray_1;
       cursor: default;
     }
     &:not([disabled]) {

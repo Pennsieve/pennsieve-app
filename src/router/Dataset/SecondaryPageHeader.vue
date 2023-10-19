@@ -4,10 +4,9 @@ let route = useRoute();
 </script>
 
 <template >
+  <locked-banner slot="banner" />
+
   <bf-rafter slot="heading">
-    <template #banner>
-      <locked-banner slot="banner" />
-    </template>
 
     <template #breadcrumb v-if="route.meta.showBackToFiles">
       <a @click="$router.go(-1)" class="link-to-files">
@@ -24,13 +23,7 @@ let route = useRoute();
       <h1
         class="flex-heading"
       >
-        <IconLockFilled
-          v-if="datasetLocked"
-          class="mr-8"
-          color="#71747C"
-          :height="24"
-          :width="24"
-        />{{pageName}}
+        {{pageName}}
       </h1>
     </template>
   </bf-rafter>
@@ -43,18 +36,18 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import {mapGetters, mapState} from "vuex";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
+import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
 
 
 export default {
   name: 'SecondaryPageHeader',
   components: {
     BfRafter,
-    IconArrowLeft
+    IconArrowLeft,
+    LockedBanner
   },
   computed: {
-    ...mapGetters([
-      'datasetLocked'
-    ]),
+
     pageName: function() {
       const r = useRoute()
 
@@ -65,6 +58,8 @@ export default {
           return "Files"
         case "file-record":
           return "File Details"
+        case "publishing-settings":
+          return "Dataset Publishing"
 
       }
       return "Unknown"
