@@ -224,6 +224,7 @@ export default {
     ...mapState([
       'profile',
       'dataset',
+      'datasetRole',
       'datasetDoi',
       'datasetContributors',
       'datasetDescription',

@@ -34,7 +34,7 @@
           </a>
         </p>
         <div v-if="!loadingOrcid" class="orcid-success">
-          <img src="/static/images/orcid.png" />
+          <img src="/src/assets/images/orcid.png" />
           <el-row
             class="orcid-success-info"
             type="flex"

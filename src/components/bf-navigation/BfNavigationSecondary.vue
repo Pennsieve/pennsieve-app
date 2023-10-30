@@ -158,14 +158,21 @@
 
 
 
-<!--      <bf-navigation-item-->
-<!--          :link="{ name: 'activity' }"-->
-<!--          icon="icon-activity"-->
-<!--          label="Activity"-->
-<!--          class="secondary"-->
-<!--          :condensed="secondaryNavCondensed"-->
+      <bf-navigation-item
+          :link="{ name: 'dataset-activity' }"
+          label="Activity"
+          :secondary="true"
+          :condensed="secondaryNavCondensed"
 
-<!--        />-->
+        >
+        <template #icon>
+          <IconActivity
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
+      </bf-navigation-item>
 
 
 <!--      <bf-navigation-item-->
@@ -246,12 +253,14 @@ import IconOverview from "../icons/IconOverview.vue";
 import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
 import IconFiles from "../icons/IconFiles.vue";
 import IconGlobeCheck from "../icons/IconGlobeCheck.vue";
+import IconActivity from "../icons/IconActivity.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconActivity,
     IconGlobeCheck,
     IconFiles,
     IconDatasetSettings,

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 import DatasetSettings from "./Dataset/DatasetSettings.vue";
+import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -12,10 +13,14 @@ const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatase
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
 const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
+const DatasetActivityHeader = () => import('./Dataset/DatasetActivityHeader.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
+const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
+
+
 
 /**
  * ORCIDRedirect
@@ -277,6 +282,76 @@ const router = createRouter({
           props: {
             stage: true,
           }
+        },
+        {
+          name: 'dataset-activity',
+          path: ':datasetId/activity',
+          components: {
+            stageHeader: DatasetActivityHeader,
+            stage: DatasetActivityView
+          },
+          redirect: {
+            name: 'activity-log'
+          },
+          props: {
+            stage: true,
+          },
+          children: [
+            {
+                  name: 'activity-log',
+                  path: 'logs',
+                  components: {
+                    stage: DatasetActivityLog
+                  },
+                  props: {
+                    stage: true
+                  }
+                },
+                {
+                  name: 'upload-manifests',
+                  path: 'manifests',
+                  components: {
+                  },
+                  props: {
+                    stage: true
+                  }
+                },
+            // {
+            //   path: '',
+            //   name: 'activity',
+            //   props: {
+            //     stage: true
+            //   },
+            //   components: {
+            //     stage: DatasetActivity
+            //   },
+            //   redirect: {
+            //     name: 'activity-log'
+            //   },
+            //   children: [
+            //     {
+            //       name: 'activity-log',
+            //       path: 'logs',
+            //       components: {
+            //         stage: DatasetActivityLog
+            //       },
+            //       props: {
+            //         stage: true
+            //       }
+            //     },
+            //     {
+            //       name: 'upload-manifests',
+            //       path: 'manifests',
+            //       components: {
+            //         stage: DatasetManifests
+            //       },
+            //       props: {
+            //         stage: true
+            //       }
+            //     },
+            //   ]
+            // },
+          ]
         },
       ]
     },

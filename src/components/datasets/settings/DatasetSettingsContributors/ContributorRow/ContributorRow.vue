@@ -39,10 +39,9 @@
       @command="onMenuSelect"
     >
       <button class="el-dropdown-link">
-        <svg-icon
-          name="icon-menu"
-          height="20"
-          width="20"
+        <IconMenu
+          :height="20"
+          :width="20"
         />
       </button>
       <el-dropdown-menu
@@ -97,11 +96,13 @@ import {
 import SlatInfo from '../../../../shared/SlatInfo/SlatInfo.vue'
 import { displayNameAndDegree } from '../../../../../utils/displayNameAndDegree'
 import IconOrcid from "../../../../icons/IconOrcid.vue";
+import IconMenu from "../../../../icons/IconMenu.vue";
 
 export default {
   name: 'ContributorRow',
 
   components: {
+    IconMenu,
     IconOrcid,
     SlatInfo
   },

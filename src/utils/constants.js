@@ -269,8 +269,8 @@ export const ChangelogMessage = Object.freeze({
     },
 
     CREATE_README: {
-      plural: 'Overview added',
-      singular: 'Overview added'
+      plural: 'Readme added',
+      singular: 'Readme added'
     },
 
     CREATE_CHANGELOG: {
@@ -279,8 +279,8 @@ export const ChangelogMessage = Object.freeze({
     },
 
     UPDATE_README: {
-      plural: 'Overview changes',
-      singular: 'Overview changed'
+      plural: 'Readme changes',
+      singular: 'Readme changed'
     },
 
     CREATE_BANNER_IMAGE: {
@@ -314,7 +314,7 @@ export const ChangelogMessage = Object.freeze({
     },
 
     ADD_CONTRIBUTOR: {
-      plural: '[NUMBER] contributors added',
+      plural: 'Contributors added',
       singular: '[FULLNAME] added as contributor'
     },
 
@@ -341,7 +341,12 @@ export const ChangelogMessage = Object.freeze({
     UPDATE_STATUS: {
       plural: 'Status changes',
       singular: 'Status changed from [OLDNAME] to [NEWNAME]'
-    }
+    },
+
+    UPDATE_CHANGELOG: {
+      plural: 'Changelog changes',
+      singular: 'Changelog changed'
+    },
   }
 })
 

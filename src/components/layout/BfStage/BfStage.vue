@@ -38,6 +38,14 @@
       isEditing: {
         type: Boolean,
         default: false
+      },
+      orgId: {
+        type: String,
+        default: ''
+      },
+      datasetId: {
+        type: String,
+        default: ''
       }
     },
 

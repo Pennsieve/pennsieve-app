@@ -11,6 +11,7 @@ import repositoryModule from "./repositoryModule"
 import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
 
+import router from '../router'
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -978,7 +979,7 @@ export default createStore({
     },
     datasetOwnerHasOrcidId: (state, getters) => {
       const owner = getters.datasetOwner;
-      return R.pathOr(false, ["orcid", "orcid"], owner);
+      return R.pathOr(false, ["orcid", "orcid"], owner).length > 0;
     },
     isUserSuperAdmin: (state) => {
       return state.profile.isSuperAdmin === true;

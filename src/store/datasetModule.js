@@ -4,6 +4,7 @@ import moment from 'moment'
 import { DATASET_ACTIVITY_ALL_CATEGORIES, DATASET_ACTIVITY_ALL_CONTRIBUTORS, DATASET_ACTIVITY_DATE_RANGE_2_YEAR } from '../utils/constants'
 import toQueryParams from '../utils/toQueryParams.js'
 import EventBus from '../utils/event-bus'
+import router from '../router'
 
 /**
  * Converts the days to a date range
@@ -258,7 +259,8 @@ export const actions = {
 
     commit('UPDATE_IS_LOADING_MANIFESTS', true)
 
-    const datasetId = rootState.route.params.datasetId
+
+    const datasetId = router.currentRoute.value.params.datasetId
     const endpoint = `${rootState.config.api2Url}/manifest`
 
     const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -289,7 +291,7 @@ export const actions = {
   fetchDatasetActivity: async ({state, commit, rootState}) => {
     commit('UPDATE_IS_LOADING_DATASET_ACTIVITY', true)
 
-    const datasetId = rootState.route.params.datasetId
+    const datasetId = router.currentRoute.value.params.datasetId
     const endpoint = `${rootState.config.apiUrl}/datasets/${datasetId}/changelog/timeline`
 
     const apiKey = rootState.userToken || Cookies.get('user_token')

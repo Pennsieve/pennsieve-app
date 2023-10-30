@@ -293,6 +293,48 @@ export default {
   background: $purple_1;
   z-index: 5;
 
+  .tabs {
+    display: flex;
+    li {
+      margin-left: 32px;
+      &:first-child {
+        margin: 0;
+      }
+    }
+    a {
+      color: $purple_tint;
+      display: inline-flex;
+      padding: 0 0 16px;
+      position: relative;
+      text-decoration: none;
+      &:hover,
+      &:focus {
+        color: $gray_2;
+        text-decoration: none;
+      }
+      &.router-link-active,
+      &.active {
+        color: $white;
+        &:after {
+          color: $white;
+          background: $white;
+          bottom: 0;
+          content: '';
+          left: 0;
+          height: 6px;
+          position: absolute;
+          width: 100%;
+        }
+      }
+      &.disabled {
+        cursor: default;
+        color: $purple_tint;
+      }
+    }
+  }
+
+
+
   &.overview {
     background: white;
     padding: 0;
@@ -318,6 +360,8 @@ export default {
     font-size: 12px;
     cursor: pointer;
   }
+
+
 
   &.primary {
     background: $gray_1;

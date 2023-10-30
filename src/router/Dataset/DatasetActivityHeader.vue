@@ -8,17 +8,6 @@ let route = useRoute();
 
   <bf-rafter slot="heading">
 
-    <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="$router.go(-1)" class="link-to-files">
-        <IconArrowLeft
-          :height="10"
-          :width="10"
-        />
-        Back to Files
-      </a>
-
-    </template>
-
     <template #heading>
       <h1
         class="flex-heading"
@@ -26,6 +15,23 @@ let route = useRoute();
         {{pageName}}
       </h1>
     </template>
+
+    <template #tabs>
+      <ul
+        slot="tabs"
+        class="tabs unstyled"
+      >
+        <li
+          v-for="tab in tabs"
+          :key="tab.route.name"
+        >
+          <router-link :to="tab.route">
+            {{ tab.label }}
+          </router-link>
+        </li>
+      </ul>
+    </template>
+
   </bf-rafter>
 </template>
 
@@ -39,7 +45,7 @@ import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vu
 
 
 export default {
-  name: 'SecondaryPageHeader',
+  name: 'DatasetActivityHeader',
   components: {
     BfRafter,
     IconArrowLeft,
@@ -47,23 +53,34 @@ export default {
   },
   computed: {
 
+    /**
+     * Compute publishing tab based on user's publisher role
+     * @returns {Array}
+     */
+    tabs: function() {
+      return [
+        {
+          route: {
+            name: 'activity-log',
+          },
+          label: 'Activity Log',
+        },
+        {
+          route: {
+            name: 'upload-manifests',
+          },
+          label: 'Upload Manifests',
+        },
+      ]
+    },
     pageName: function() {
       const r = useRoute()
-      console.log(r)
 
       switch (r.name) {
-        case "dataset-settings":
-          return "Dataset Settings"
-        case "dataset-files":
-          return "Files"
-        case "file-record":
-          return "File Details"
-        case "publishing-settings":
-          return "Dataset Publishing"
-        case "dataset-activity":
-          return "Dataset Activity"
-
-
+        case "activity-log":
+          return "Activity Logs"
+        case "upload-manifests":
+          return "Upload Manifests"
       }
       return "Unknown"
     }

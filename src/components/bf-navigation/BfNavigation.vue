@@ -236,7 +236,7 @@
   import IconPublic from "../icons/IconPublic.vue";
   import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
   import IconI3HLogo from "../icons/IconI3HLogo.vue";
-
+  import IconHealInitiative from "../icons/IconHealInitiative.vue";
 
   export default {
     name: 'BfNavigation',
@@ -267,7 +267,8 @@
       BfNavigationTertiary,
       IconDatasets,
       IconTeam,
-      IconIntegrations
+      IconIntegrations,
+      IconHealInitiative
     },
 
     computed: {
@@ -299,7 +300,7 @@
         if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5') {
           name = "IconSPARCLogo"
         } else if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
-          name = "IconI3HLogo"
+          name = "IconHealInitiative"
         }
         return name
       },
@@ -310,8 +311,10 @@
         // TODO: Make this dynamic and not hardcoded...
         if (this.hasCustomTheme) {
           if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
+            return [ '#a33936','#532962']
             return [ '#C35A00','#82AFD3']
           } else if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5') {
+            // return [ '#a33936','#532962']
             return ['#011F5B', '#7516A5']
           } else {
             return []

@@ -9,7 +9,7 @@
     >
       <div class="bf-drop-info-content">
         <img
-          src="/static/images/illustrations/illo-drag-and-drop.svg"
+          src="/src/assets/images/illustrations/illo-drag-and-drop.svg"
           alt="Illustration of file system"
           height="225"
           width="339"
