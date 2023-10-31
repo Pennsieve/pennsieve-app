@@ -30,7 +30,7 @@
 .bf-table {
   border: 1px solid $gray_2;
   border-radius: 2px 2px 0 0;
-  overflow: hidden;
+  overflow: scroll;
 
 
   .bf-table-header, thead {

@@ -78,9 +78,9 @@ export default {
 
       switch (r.name) {
         case "activity-log":
-          return "Activity Logs"
+          return "Activity"
         case "upload-manifests":
-          return "Upload Manifests"
+          return "Activity"
       }
       return "Unknown"
     }

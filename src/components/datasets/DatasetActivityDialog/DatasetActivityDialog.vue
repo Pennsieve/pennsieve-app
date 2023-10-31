@@ -13,7 +13,7 @@
     </template>
 
 
-    <dialog-body>
+    <dialog-body ref="dialogBody">
       <h3>{{ renderActivityType(event.eventType) }}</h3>
       <ul class="member-list unstyled">
         <li
@@ -134,11 +134,7 @@ export default {
   },
 
   watch: {
-    dialogVisible: function(val) {
-      if (val) {
-        this.scrollToTop()
-      }
-    }
+
   },
 
   methods: {
@@ -182,17 +178,6 @@ export default {
       this.$emit('load-more-events', this.activity.cursor)
     },
 
-    /**
-     * Scroll dialog to top
-     */
-    scrollToTop: function()  {
-      const dialogBody = this.$el.querySelector('.el-dialog__body')
-      this.$nextTick(() =>  {
-        if (dialogBody) {
-          dialogBody.scrollTop = 0
-        }
-      })
-    }
   }
 }
 </script>

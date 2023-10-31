@@ -19,6 +19,7 @@ const FileDetails = () => import('../components/datasets/files/FileDetails/FileD
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
+const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
 
 
 
@@ -311,6 +312,7 @@ const router = createRouter({
                   name: 'upload-manifests',
                   path: 'manifests',
                   components: {
+                    stage: DatasetManifests
                   },
                   props: {
                     stage: true

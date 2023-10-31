@@ -330,12 +330,14 @@
       class="dataset-activity-detail__info"
     >
       <div class="info-title">
-        <p>Previous Name:</p>
         <p>New Name:</p>
+        <p>Previous Name:</p>
+
       </div>
       <div class="dataset-activity-detail__info-link">
-        <p>{{ eventDetail.detail.oldName }}</p>
+
         <p>{{ eventDetail.detail.newName }}</p>
+        <p>{{ eventDetail.detail.oldName }}</p>
       </div>
     </div>
 

@@ -206,8 +206,7 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
     margin-right: 8px;
   }
 
-  :deep .el-collapse-item {
-    &__header {
+    :deep(.el-collapse-item__header) {
       background-color: transparent;
       border-bottom: none;
       font-size: 14px;
@@ -215,13 +214,13 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
       line-height: 1.1;
     }
 
-    &__wrap {
+   :deep(.el-collapse-item__wrap) {
       background: transparent;
       border-bottom: none;
     }
-    &__content {
+    :deep(.el-collapse-item__content) {
       padding: 0;
     }
-  }
+
 }
 </style>

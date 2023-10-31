@@ -12,6 +12,7 @@ import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
 
 import router from '../router'
+import uploadModule from "./uploadModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1008,7 +1009,8 @@ export default createStore({
     viewerModule,
     repositoryModule,
     publishingModule,
-    filesModule
+    filesModule,
+    uploadModule
   }
 
 });
