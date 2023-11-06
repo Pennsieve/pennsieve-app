@@ -174,25 +174,41 @@ export default {
      * @param permanent = false
      */
     onArchiveManifest: function(permanent = false) {
-      let manifestId = this.item.id
-      let result = this.archiveManifest({
-        manifest_id:manifestId,
-        permanent: permanent}
-      )
-      console.log(result)
+
+      if (this.item.status === 'Archived') {
+        EventBus.$emit('toast', {
+          detail: {
+            type: 'error',
+            msg: 'The selected manifest is already archived.'
+          }
+        })
+      } else {
+        let manifestId = this.item.id
+        let result = this.archiveManifest({
+          manifest_id:manifestId,
+          permanent: permanent}
+        ).then(result => {
+
+          EventBus.$emit('toast', {
+            detail: {
+              type: 'success',
+              msg: 'Archiving Manifest. The manifest is still accessible as a downloadable CSV file.'
+            }
+          })
+
+          this.item.status = 'Archived'
+        })
+      }
     },
 
     downloadManifest: function() {
       let manifestId = this.item.id
-
-
-
       let result = this.archiveManifest({ manifest_id:manifestId, permanent: false}).then(value => {
 
           EventBus.$emit('toast', {
             detail: {
               type: 'success',
-              msg: 'Exporting manifest to CSV, it will download when ready.'
+              msg: 'Getting the manifest ready, it will download shortly.'
             }
           })
 

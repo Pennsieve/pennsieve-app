@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 import DatasetSettings from "./Dataset/DatasetSettings.vue";
 import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
+import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -20,6 +21,10 @@ const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
 const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
+
+const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeader.vue')
+const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
+const EmbargoedPermissions = () => import('../components/datasets/DatasetPermissions/EmbargoedPermissions/EmbargoedPermissions.vue')
 
 
 
@@ -285,6 +290,42 @@ const router = createRouter({
           }
         },
         {
+          name: 'dataset-permissions',
+          path: ':datasetId/permissions',
+          components: {
+            stageHeader: DatasetPermissionsHeader,
+            stage: DatasetPermissionsView
+          },
+          redirect: {
+            name: 'user-permissions'
+          },
+          props: {
+            stage: true,
+          },
+          children: [
+            {
+              name: 'user-permissions',
+              path: 'user',
+              components: {
+                stage: DatasetPermissions
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'embargo-permissions',
+              path: 'embargo',
+              components: {
+                stage: EmbargoedPermissions
+              },
+              props: {
+                stage: true
+              }
+            },
+          ]
+        },
+        {
           name: 'dataset-activity',
           path: ':datasetId/activity',
           components: {
@@ -299,60 +340,25 @@ const router = createRouter({
           },
           children: [
             {
-                  name: 'activity-log',
-                  path: 'logs',
-                  components: {
-                    stage: DatasetActivityLog
-                  },
-                  props: {
-                    stage: true
-                  }
-                },
-                {
-                  name: 'upload-manifests',
-                  path: 'manifests',
-                  components: {
-                    stage: DatasetManifests
-                  },
-                  props: {
-                    stage: true
-                  }
-                },
-            // {
-            //   path: '',
-            //   name: 'activity',
-            //   props: {
-            //     stage: true
-            //   },
-            //   components: {
-            //     stage: DatasetActivity
-            //   },
-            //   redirect: {
-            //     name: 'activity-log'
-            //   },
-            //   children: [
-            //     {
-            //       name: 'activity-log',
-            //       path: 'logs',
-            //       components: {
-            //         stage: DatasetActivityLog
-            //       },
-            //       props: {
-            //         stage: true
-            //       }
-            //     },
-            //     {
-            //       name: 'upload-manifests',
-            //       path: 'manifests',
-            //       components: {
-            //         stage: DatasetManifests
-            //       },
-            //       props: {
-            //         stage: true
-            //       }
-            //     },
-            //   ]
-            // },
+              name: 'activity-log',
+              path: 'logs',
+              components: {
+                stage: DatasetActivityLog
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'upload-manifests',
+              path: 'manifests',
+              components: {
+                stage: DatasetManifests
+              },
+              props: {
+                stage: true
+              }
+            },
           ]
         },
       ]

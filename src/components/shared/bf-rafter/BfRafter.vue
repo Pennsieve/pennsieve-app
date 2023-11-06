@@ -120,7 +120,9 @@ export default {
         'dataset-settings',
         'concept-search',
         'metadata',
-        'records'
+        'records',
+        'user-permissions',
+        'embargo-permissions'
       ]
     }
   },

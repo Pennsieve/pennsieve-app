@@ -201,13 +201,22 @@
         </template>
       </bf-navigation-item>
 
-<!--      <bf-navigation-item-->
-<!--        :link="{ name: 'dataset-permissions' }"-->
-<!--        icon="icon-collaborators"-->
-<!--        label="Permissions"-->
-<!--        :class="hasFeature('sandbox_org_feature') ? 'disabled' : 'secondary' "-->
-<!--        :condensed="secondaryNavCondensed"-->
-<!--      />-->
+      <bf-navigation-item
+        :link="{ name: 'dataset-permissions' }"
+        label="Permissions"
+        class="secondary"
+        :secondary="true"
+        :condensed="secondaryNavCondensed"
+      >
+        <template #icon>
+          <IconCollaborators
+            color="currentColor"
+            :height="20"
+            :width="20"
+            />
+        </template>
+      </bf-navigation-item>
+
 
       <bf-navigation-item
         v-if="getPermission('manager')"
@@ -254,12 +263,14 @@ import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
 import IconFiles from "../icons/IconFiles.vue";
 import IconGlobeCheck from "../icons/IconGlobeCheck.vue";
 import IconActivity from "../icons/IconActivity.vue";
+import IconCollaborators from "../icons/IconCollaborators.vue";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconCollaborators,
     IconActivity,
     IconGlobeCheck,
     IconFiles,
