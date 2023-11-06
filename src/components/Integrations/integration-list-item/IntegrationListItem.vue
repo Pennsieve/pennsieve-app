@@ -219,8 +219,9 @@ export default {
   background: $purple_tint;
   padding: 8px 16px;
   height: 64px;
-
+  align-items: center;
 }
+
 
 .integration-title {
   font-size: 16px;
@@ -234,6 +235,10 @@ export default {
   color: $gray_5;
   font-weight: 500;
   font-size: 12px;
+}
+
+.activeSwitch {
+  text-align: end;
 }
 
 .integration-description {

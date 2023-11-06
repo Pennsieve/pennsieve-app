@@ -62,6 +62,8 @@ export default {
           return "Dataset Publishing"
         case "dataset-activity":
           return "Dataset Activity"
+        case "integrations-settings":
+          return "Dataset Integrations"
 
 
       }
