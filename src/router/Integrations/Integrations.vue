@@ -4,6 +4,7 @@
       slot="heading"
       title="Integrations"
       class="primary"
+      :org-id="orgId"
     >
       <template #description>
         <div
@@ -79,7 +80,18 @@
       ...mapState('integrationsModule', [
         'integrations'
       ]),
-    }
+    },
+    // From Router
+    props: {
+      orgId: {
+        type: String,
+        default: ''
+      },
+      datasetId: {
+        type: String,
+        default: ''
+      }
+    },
   }
 </script>
 

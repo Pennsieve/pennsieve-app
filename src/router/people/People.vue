@@ -4,6 +4,7 @@
       <bf-rafter
         title="People"
         class="primary"
+        :org-id="orgId"
       >
         <template #description>
           <p>
@@ -22,9 +23,29 @@
 
 </template>
 
+
+
+
 <script>
+
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
+
 export default {
-  name: 'BfPeople'
+  name: 'BfPeople',
+  components: {
+    BfRafter
+  },
+  // From Router
+  props: {
+    orgId: {
+      type: String,
+      default: ''
+    },
+    datasetId: {
+      type: String,
+      default: ''
+    }
+  },
 
 
 }

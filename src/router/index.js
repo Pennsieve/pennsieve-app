@@ -3,6 +3,7 @@ import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 import DatasetSettings from "./Dataset/DatasetSettings.vue";
 import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
 import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
+import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -201,7 +202,7 @@ const router = createRouter({
       props: {
         page: true,
         navigation: true,
-        navigationSecondary: false,
+        navigationSecondary: true,
       },
       meta: { hideSecondaryNav: false},
       children: [
@@ -322,6 +323,94 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              }
+            },
+          ]
+        },
+        {
+          name: 'metadata',
+          path: ':datasetId/metadata',
+          components: {
+            stageHeader: DatasetMetadataHeader,
+            stage: DatasetPermissionsView
+          },
+          props: true,
+          redirect: {
+            name: 'records'
+          },
+          children: [
+            {
+              path: 'model/:conceptId',
+              name: 'model',
+              props: true,
+              components: {
+                // stage: ConceptManagement
+              }
+            },
+            {
+              path: 'management',
+              name: 'management',
+              props: {
+                stage: true
+              },
+              components: {
+                // stage: DatasetRecords
+              },
+              redirect: {
+                name: 'records'
+              },
+              children: [
+                {
+                  path: 'records',
+                  name: 'records',
+                  props: {
+                    stage: true
+                  },
+                  components: {
+                    // stage: ModelRecords
+                  }
+                },
+                {
+                  path: 'models',
+                  name: 'models',
+                  props: {
+                    stage: true
+                  },
+                  components: {
+                    // stage: Models
+                  }
+                },
+                {
+                  path: 'relationships',
+                  name: 'relationships',
+                  props: {
+                    stage: true
+                  },
+                  components: {
+                    // stage: RelationshipTypes
+                  }
+                },
+                {
+                  path: 'graph',
+                  name: 'graph',
+                  props: {
+                    stage: true
+                  },
+                  components: {
+                    // stage: GraphBrowser
+                  }
+                },
+              ]
+            },
+            {
+              path: 'record/:conceptId/:instanceId',
+              name: 'concept-instance',
+              props: true,
+              meta: {
+                headerAux: true
+              },
+              components: {
+                // stage: ConceptInstance
               }
             },
           ]

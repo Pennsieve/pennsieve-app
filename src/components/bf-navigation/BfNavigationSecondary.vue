@@ -4,7 +4,10 @@
     :class="[ secondaryNavCondensed ? 'condensed' : '' ]"
   >
     <div class="menu-wrap">
-      <div class="heading-wrap">
+      <div
+        class="heading-wrap"
+        :style="{ backgroundColor: `${secNavHeaderCollapsedStyle}` }"
+      >
         <template v-if="!secondaryNavCondensed">
 
             <div>
@@ -83,6 +86,7 @@
             class="btn-expand-collapse"
             name="Expand Secondary Menu"
             @click="toggleMenu"
+
           >
             <IconNavExpand
               color="#ffF"
@@ -103,6 +107,8 @@
         label="Overview"
         :condensed="secondaryNavCondensed"
         :secondary=true
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconOverview
@@ -128,7 +134,8 @@
         label="Files"
         :condensed="secondaryNavCondensed"
         :secondary=true
-
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconFiles
@@ -144,15 +151,25 @@
         />
       </bf-navigation-item>
 
-<!--      <bf-navigation-item-->
-<!--        v-if="getPermission('manager')"-->
-<!--        :link="{ name: 'models' }"-->
-<!--        icon="icon-graph"-->
-<!--        label="Models"-->
-<!--        class="secondary"-->
-<!--        :condensed="secondaryNavCondensed"-->
+      <bf-navigation-item
+        v-if="getPermission('manager')"
+        :link="{ name: 'models' }"
+        label="Metadata"
+        class="secondary"
+        :condensed="secondaryNavCondensed"
+        :secondary=true
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
 
-<!--      />-->
+      >
+        <template #icon>
+          <IconGraph
+            color="currentColor"
+            :height="20"
+            :width="20"
+          />
+        </template>
+      </bf-navigation-item>
 
 
 
@@ -163,7 +180,8 @@
           label="Activity"
           :secondary="true"
           :condensed="secondaryNavCondensed"
-
+          :style-color="getThemeColors[0]"
+          :org-id="orgId"
         >
         <template #icon>
           <IconActivity
@@ -180,7 +198,8 @@
         label="Integrations"
         :condensed="secondaryNavCondensed"
         :secondary=true
-
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconIntegrations
@@ -197,6 +216,8 @@
         class="secondary"
         :condensed="secondaryNavCondensed"
         :secondary=true
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconGlobeCheck
@@ -213,6 +234,8 @@
         class="secondary"
         :secondary="true"
         :condensed="secondaryNavCondensed"
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconCollaborators
@@ -230,6 +253,8 @@
         label="Settings"
         :secondary=true
         :condensed="secondaryNavCondensed"
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
       >
         <template #icon>
           <IconDatasetSettings
@@ -246,7 +271,9 @@
       class="collapse-handle"
       @click="toggleMenu"
     />
-    <bf-navigation-tertiary v-if="secondaryNavCondensed" />
+    <bf-navigation-tertiary v-if="secondaryNavCondensed"
+                            :bk-color="tertiaryNavColor"
+    />
   </div>
 </template>
 
@@ -270,12 +297,15 @@ import IconFiles from "../icons/IconFiles.vue";
 import IconGlobeCheck from "../icons/IconGlobeCheck.vue";
 import IconActivity from "../icons/IconActivity.vue";
 import IconCollaborators from "../icons/IconCollaborators.vue";
+import IconGraph from "../icons/IconGraph.vue";
+import CustomTheme from "../../mixins/custom-theme";
 
 
 export default {
   name: 'BfNavigationSecondary',
 
   components: {
+    IconGraph,
     IconCollaborators,
     IconActivity,
     IconGlobeCheck,
@@ -291,7 +321,20 @@ export default {
     CreateButton
   },
 
-  mixins: [ Request],
+  mixins: [
+    Request,
+    CustomTheme
+  ],
+  props: {
+    orgId: {
+      type: String,
+      default: ''
+    },
+    datasetId: {
+      ype: String,
+      default: ''
+    }
+  },
 
   data: function() {
     return {
@@ -314,6 +357,33 @@ export default {
       'userToken',
       'config'
     ]),
+    getThemeColors: function() {
+      return this.getTheme(this.orgId)
+    },
+    secNavHeaderCollapsedStyle: function() {
+      if (this.secondaryNavCondensed) {
+        const themeColors = this.getThemeColors
+        const color1 =  themeColors[1]
+        return `${color1}`
+      } else {
+        return ''
+      }
+
+    },
+    workspaceBackgroundStyle: function() {
+        const color1 = this.pSBC(0.8, this.getThemeColors[1])
+        return `${color1}`
+
+    },
+    tertiaryNavColor: function() {
+      if (this.secondaryNavCondensed) {
+        const themeColors = this.getThemeColors
+        const color1 = themeColors[0]
+        return `${color1}`
+      } else {
+        return ''
+      }
+    },
 
     /**
      * Filters empty status names from orgDatasetStatuses

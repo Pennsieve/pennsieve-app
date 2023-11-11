@@ -1,6 +1,5 @@
 <template >
   <bf-rafter
-    slot="heading"
     title="Datasets"
     class="primary"
   >
@@ -16,12 +15,14 @@
 
 <script>
 
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconLockFilled from "../../components/icons/IconLockFilled.vue";
 
 export default {
   name: 'DatasetListHeader',
   components: {
-    IconLockFilled
+    IconLockFilled,
+    BfRafter
   },
 }
 </script>

@@ -68,6 +68,7 @@ import { path, pathOr } from 'ramda'
 import EventBus from '@/utils/event-bus'
 import Request from '../../../mixins/request/index'
 import BfButton from '../bf-button/BfButton.vue'
+import CustomTheme from "../../../mixins/custom-theme";
 
 export default {
   name: 'BfRafter',
@@ -90,14 +91,18 @@ export default {
       default: () => {
         return {}
       }
-    }
+    },
+    orgId: {
+      type: String,
+      default: ''
+    },
   },
 
   components: {
     BfButton
   },
 
-  mixins: [Request],
+  mixins: [Request, CustomTheme],
 
   data: function() {
     return {
@@ -134,6 +139,16 @@ export default {
       'datasetRafterVisStatus',
       'datasetRafterVisStatus2'
     ]),
+
+    getThemeColors: function() {
+      return this.getTheme(this.orgId)
+    },
+
+    rafterBackgroundStyle: function() {
+      const color1 = this.pSBC(0.8, this.getThemeColors[1])
+      return `${color1}`
+
+    },
 
     backLinkVisible: function() {
       return Object.keys(this.linkBack).length > 0

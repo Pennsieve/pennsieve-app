@@ -6,12 +6,13 @@
     :disabled="!condensed"
     :open-delay="200"
   >
+
     <router-link :class="itemClass" :to="link" :style="styleObject">
       <div class="svg-icon svg-fill icon-main">
         <slot name="icon" ></slot>
       </div>
 
-      <span class="label" :style="styleObject">
+      <span ref="routerlink"  class="label">
         {{ label }}
       </span>
 
@@ -26,8 +27,16 @@
 </template>
 
 <script>
-  export default {
+
+import CustomTheme from "../../../mixins/custom-theme";
+
+export default {
     name: 'BfNavigationItem',
+
+    mixins:[
+      CustomTheme
+    ],
+
 
     props: {
       condensed: {
@@ -61,18 +70,33 @@
       styleColor: {
         type: String,
         default: ''
-      }
+      },
+      orgId: {
+        type: String,
+        default: ''
+      },
     },
     computed: {
+      getThemeColors: function() {
+        return this.getTheme(this.orgId)
+      },
       styleObject: function() {
+        // Check if any of the matched routes (including parents of current route)
+        // matches --> link is active
+        let cl = ''
+        if (this.$route.matched.map(a => a.name).includes(this.link.name)) {
+          cl = this.styleColor
+        }
+
         return this.styleColor? {
-          '--color-hover': this.styleColor
+          '--color-hover': this.styleColor,
+          'color': cl
+
         } : {
           '--color-hover': '#4d628c'
         }
       },
       itemClass: function() {
-
         return `bf-navigation-item ${this.secondary? 'secondary': ''}`
       }
     }

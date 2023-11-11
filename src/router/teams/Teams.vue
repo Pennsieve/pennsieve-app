@@ -5,6 +5,7 @@
         slot="heading"
         title="Teams"
         class="primary"
+        :org-id="orgId"
       >
         <template #breadcrumb v-if="this.$route.name === 'team-members-list'">
           <div>
@@ -31,8 +32,25 @@
 </template>
 
 <script>
+
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
+
 export default {
   name: 'BfTeams',
+  components: {
+    BfRafter
+  },
+  // From Router
+  props: {
+    orgId: {
+      type: String,
+      default: ''
+    },
+    datasetId: {
+      type: String,
+      default: ''
+    }
+  },
 
   computed: {
   }
