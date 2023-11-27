@@ -3,13 +3,13 @@
       <template v-if="showPennLogo">
         <img
           v-if="darkBackground && !markOnly"
-          src="../../../assets/images/Upenn_FullLogo_Reverse_RGB.png"
+          src="../../../assets/images/UPenn_FullLogo_Reverse_RGB.png"
           alt="University of Pennsylvania"
           :class="pennLogoClass"
         />
         <img
           v-else-if="!darkBackground && !markOnly"
-          src="../../../assets/images/Upenn_FullLogo_RGB.png"
+          src="../../../assets/images/UPenn_FullLogo_RGB.png"
           alt="University of Pennsylvania"
           :class="pennLogoClass"
         />
