@@ -506,7 +506,7 @@ export default {
     requestCreateOrganization: function() {
       this.closeMenus()
 
-      window.Intercom('show')
+      // window.Intercom('show')
     }
   }
 }

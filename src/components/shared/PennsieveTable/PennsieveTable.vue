@@ -1,5 +1,6 @@
 <template>
-  <div>
+  <div
+    v-click-outside="clearSelection">
     <div
       class="content-section"
       id="source-files-table"
@@ -27,7 +28,9 @@
 
       <div class="table-wrap">
         <div v-if="selection.length > 0" class="selection-menu-wrap mb-16">
+
           <el-checkbox
+            v-if="!singleSelect"
             class="slim-checkbox"
             id="check-all"
             v-model="checkAll"
@@ -35,6 +38,7 @@
             :indeterminate="isIndeterminate"
 
           />
+          <div v-else></div>
 
           <div class="right-actions">
             <slot name="actions" />
@@ -50,6 +54,7 @@
             :border="true"
             @row-click="onRowClick"
             @selection-change="handleTableSelectionChange"
+            :highlight-current-row="singleSelect"
           >
             <slot name="columns"/>
           </el-table>
@@ -92,6 +97,10 @@ export default {
     offset: {
       type: Number,
       default: 0
+    },
+    singleSelect: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -121,6 +130,7 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange(selection) {
+
       this.selection = selection
       this.checkAll = this.data.length === this.selection.length;
       this.$emit('selectionChange', selection)
@@ -128,6 +138,12 @@ export default {
     onRowClick: function(row, selected) {
       this.$refs.Table.clearSelection()
       this.$refs.Table.toggleRowSelection(row, true)
+    },
+    clearSelection: function() {
+      this.$refs.Table.clearSelection()
+      this.$refs.Table.setCurrentRow(null)
+      this.selection = []
+      this.checkAll = false
     },
 
     handleCheckAllChange: function(val){
@@ -171,6 +187,7 @@ export default {
   width: 100%;
   z-index: 10;
   align-items: center;
+  min-height: 40px;
 }
 
 .right-actions {

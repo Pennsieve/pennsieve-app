@@ -4,6 +4,7 @@ import DatasetSettings from "./Dataset/DatasetSettings.vue";
 import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
 import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
+import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
 
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -86,6 +87,16 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 const Integrations = () => import('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
+
+
+/**
+ * Metadata Components
+ */
+// const DatasetRecords = () => import('../components/datasets/records/DatasetRecords/DatasetRecords.vue')
+const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
+const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
+const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -332,13 +343,47 @@ const router = createRouter({
           path: ':datasetId/metadata',
           components: {
             stageHeader: DatasetMetadataHeader,
-            stage: DatasetPermissionsView
+            stage: DatasetMetadataView
           },
-          props: true,
+          props: {
+            stage: true,
+            stageHeader: false
+          },
           redirect: {
             name: 'records'
           },
           children: [
+            {
+              path: 'records',
+              name: 'records',
+              props: {
+                stage: true
+              },
+              components: {
+                stage: ModelRecords
+              }
+            },
+            {
+              path: 'record/:conceptId/:instanceId',
+              name: 'metadata-record',
+              props: true,
+              meta: {
+                headerAux: true
+              },
+              components: {
+                // stage: ConceptInstance
+              }
+            },
+            {
+              path: 'models',
+              name: 'models',
+              props: {
+                stage: true
+              },
+              components: {
+                stage: Models
+              }
+            },
             {
               path: 'model/:conceptId',
               name: 'model',
@@ -348,69 +393,23 @@ const router = createRouter({
               }
             },
             {
-              path: 'management',
-              name: 'management',
+              path: 'relationships',
+              name: 'relationships',
               props: {
                 stage: true
               },
               components: {
-                // stage: DatasetRecords
-              },
-              redirect: {
-                name: 'records'
-              },
-              children: [
-                {
-                  path: 'records',
-                  name: 'records',
-                  props: {
-                    stage: true
-                  },
-                  components: {
-                    // stage: ModelRecords
-                  }
-                },
-                {
-                  path: 'models',
-                  name: 'models',
-                  props: {
-                    stage: true
-                  },
-                  components: {
-                    // stage: Models
-                  }
-                },
-                {
-                  path: 'relationships',
-                  name: 'relationships',
-                  props: {
-                    stage: true
-                  },
-                  components: {
-                    // stage: RelationshipTypes
-                  }
-                },
-                {
-                  path: 'graph',
-                  name: 'graph',
-                  props: {
-                    stage: true
-                  },
-                  components: {
-                    // stage: GraphBrowser
-                  }
-                },
-              ]
+                stage: RelationshipTypes
+              }
             },
             {
-              path: 'record/:conceptId/:instanceId',
-              name: 'concept-instance',
-              props: true,
-              meta: {
-                headerAux: true
+              path: 'graph',
+              name: 'graph',
+              props: {
+                stage: true
               },
               components: {
-                // stage: ConceptInstance
+                // stage: GraphBrowser
               }
             },
           ]

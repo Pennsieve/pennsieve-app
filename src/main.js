@@ -10,6 +10,7 @@ import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
 import {ElMessage} from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
+import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
 
 // Need to import CSS specifically because we are only using the component API.
@@ -19,6 +20,8 @@ import 'element-plus/es/components/message/style/index';
 Amplify.configure(AWSConfig)
 
 const app = createApp(App);
+
+app.directive('click-outside', ClickOutside)
 
 app.use(store);
 app.use(VueClipboard, {
@@ -110,7 +113,6 @@ router.beforeResolve(async to => {
 })
 
 router.afterEach((to, from) => {
-    window.Intercom('update')
 
     // Set nav state based on routegit a
     if (topLevelRoutes.indexOf(to.name) >= 0) {

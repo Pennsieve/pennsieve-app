@@ -5,6 +5,15 @@
   background-color: white;
 }
 
+
+.no-shadow {
+  .el-input__wrapper {
+    box-shadow:none;
+    border: 2px solid $gray_1;
+  }
+}
+
+
 .el-input__inner {
   height: 40px;
 }

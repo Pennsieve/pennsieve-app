@@ -10,6 +10,7 @@ import viewerModule from './viewerModule'
 import repositoryModule from "./repositoryModule"
 import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
+import metadataModule from "./metadataModule";
 
 import router from '../router'
 import uploadModule from "./uploadModule";
@@ -1010,7 +1011,8 @@ export default createStore({
     repositoryModule,
     publishingModule,
     filesModule,
-    uploadModule
+    uploadModule,
+    metadataModule
   }
 
 });

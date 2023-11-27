@@ -153,7 +153,7 @@
 
       <bf-navigation-item
         v-if="getPermission('manager')"
-        :link="{ name: 'models' }"
+        :link="{ name: 'metadata' }"
         label="Metadata"
         class="secondary"
         :condensed="secondaryNavCondensed"

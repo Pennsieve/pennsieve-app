@@ -17,8 +17,8 @@ node('executor') {
             try {
                 sh """#!/bin/bash -ex
                     node -v
-                    npm
-                    npm build-${buildEnv}"""
+                    npm install
+                    npm run build-${buildEnv}"""
 
                 stash includes: "**/dist/**", name: 'dist'
 //                 stash includes: "**/web-components/build/**", name: 'buildComponents'

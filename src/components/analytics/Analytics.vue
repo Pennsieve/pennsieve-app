@@ -38,9 +38,9 @@
      */
     mounted: function () {
       // Custom event handlers
-      EventBus.$on('track-event', this.trackEvent.bind(this))
+      // EventBus.$on('track-event', this.trackEvent.bind(this))
       // Intercom
-      this.$store.watch(this.getActiveOrganization, this.bootIntercom.bind(this))
+      // this.$store.watch(this.getActiveOrganization, this.bootIntercom.bind(this))
     },
 
     beforeUnmount() {
@@ -51,38 +51,38 @@
       /**
        * Registers the user with Intercom when an active organization is set or changes.
        */
-      bootIntercom: function () {
-        const isProduction = location.href.indexOf('app.pennsieve.') >= 0
-        const intercomAppId = isProduction ? 'tmzdtqj9' : 'tmzdtqj9'
+      // bootIntercom: function () {
+        // const isProduction = location.href.indexOf('app.pennsieve.') >= 0
+        // const intercomAppId = isProduction ? 'tmzdtqj9' : 'tmzdtqj9'
+        //
+        // const userId = propOr('', 'id', this.profile)
+        // const userEmail = propOr('', 'email', this.profile)
 
-        const userId = propOr('', 'id', this.profile)
-        const userEmail = propOr('', 'email', this.profile)
+        // Intercom('boot', {
+        //   app_id: intercomAppId,
+        //   user_id: userId,
+        //   email: userEmail,
+        //   company: {
+        //     'id': this.activeOrgId,
+        //     'name': this.activeOrgName,
+        //     'subscriptionState': pathOr('', ['organization', 'subscriptionState', 'type'], this.activeOrganization),
+        //     'features': pathOr([], ['organization', 'features'], this.activeOrganization).join(', '),
+        //     'environment': site.environment
+        //   }
+        // })
+      // },
 
-        Intercom('boot', {
-          app_id: intercomAppId,
-          user_id: userId,
-          email: userEmail,
-          company: {
-            'id': this.activeOrgId,
-            'name': this.activeOrgName,
-            'subscriptionState': pathOr('', ['organization', 'subscriptionState', 'type'], this.activeOrganization),
-            'features': pathOr([], ['organization', 'features'], this.activeOrganization).join(', '),
-            'environment': site.environment
-          }
-        })
-      },
-
-      /**
-       * Generic event handler for Intercom
-       * @param {Object} evt
-       */
-      trackEvent: function (evt) {
-        const eventName = propOr('', 'name', evt)
-        const meta = propOr({}, 'meta', evt)
-        if (eventName) {
-          Intercom('trackEvent', eventName, meta)
-        }
-      },
+      // /**
+      //  * Generic event handler for Intercom
+      //  * @param {Object} evt
+      //  */
+      // trackEvent: function (evt) {
+      //   const eventName = propOr('', 'name', evt)
+      //   const meta = propOr({}, 'meta', evt)
+      //   if (eventName) {
+      //     Intercom('trackEvent', eventName, meta)
+      //   }
+      // },
 
 
       /**
@@ -92,7 +92,7 @@
        * @param {String}
        * @return String
        */
-      getBlackfynnId: compose(
+      getPennsieveId: compose(
           last,
           split(':'),
           defaultTo('')
@@ -121,7 +121,7 @@
         }
         const preferredOrg = propOr('', 'preferredOrganization', data)
         const orgName = this.getOrgName(preferredOrg, this.organizations)
-        const id = this.getBlackfynnId(data.id)
+        const id = this.getPennsieveId(data.id)
         return {
           'Pennsieve ID': id,
           'First Name': data.firstName,

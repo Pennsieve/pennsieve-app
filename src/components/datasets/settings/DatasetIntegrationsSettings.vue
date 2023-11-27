@@ -36,7 +36,7 @@
       class="empty"
     >
       <img
-        src="/static/images/illustrations/illo-collaboration.svg"
+        src="/src/assets/images/illustrations/illo-collaboration.svg"
         height="240"
         width="247"
         alt="Teams illustration"
@@ -69,7 +69,7 @@
         class="empty"
       >
         <img
-          src="/static/images/illustrations/illo-collaboration.svg"
+          src="/src/assets/images/illustrations/illo-collaboration.svg"
           height="240"
           width="247"
           alt="Teams illustration"

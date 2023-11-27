@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.1.0",
+    "@vueuse/components": "^10.6.0",
+    "@vueuse/core": "^10.6.0",
     "animejs": "^3.2.1",
     "aws-amplify": "^5.3.10",
     "blueimp-md5": "^2.19.0",
@@ -25,11 +27,14 @@
     "lodash.snakecase": "^4.1.1",
     "marked": "^9.0.0",
     "moment": "^2.29.4",
+    "moment-range": "^4.0.2",
     "ramda": "^0.28.0",
     "striptags": "^3.2.0",
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
+    "uuid": "^9.0.1",
     "valid-url": "^1.0.9",
+    "vite": "^4.5.0",
     "vue": "^3.2.45",
     "vue-content-loader": "^2.0.1",
     "vue-router": "^4.1.6",
@@ -48,7 +53,6 @@
     "prettier": "^2.7.1",
     "sass": "^1.57.1",
     "unplugin-auto-import": "^0.16.6",
-    "unplugin-vue-components": "^0.25.1",
-    "vite": "^4.5.0"
+    "unplugin-vue-components": "^0.25.1"
   }
 }

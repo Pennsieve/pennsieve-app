@@ -414,7 +414,7 @@ export default {
      * Show intercom window
      */
     showIntercom: function() {
-      window.Intercom('show')
+      // window.Intercom('show')
     }
   }
 }
