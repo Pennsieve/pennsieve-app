@@ -17,6 +17,7 @@ node('executor') {
             try {
                 sh """#!/bin/bash -ex
                     node -v
+                    npm -v
                     npm install
                     npm run build-${buildEnv}"""
 
