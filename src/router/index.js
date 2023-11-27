@@ -50,7 +50,7 @@ const PublishingProposalsList = () => import ('../components/Publishing/Publishi
 /**
  * Settings Components
  */
-const Invite = () => import('./invite/Invite.vue')
+const Invite = () => import('./Invite/Invite.vue')
 const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 const PennsieveInfo = () => import('../components/welcome/Info.vue')
