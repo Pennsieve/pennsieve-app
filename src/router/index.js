@@ -10,7 +10,7 @@ import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
 
-const Datasets = () => import('./datasets/Datasets.vue')
+const Datasets = () => import('./Datasets/Datasets.vue')
 
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
