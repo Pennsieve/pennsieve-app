@@ -16,7 +16,8 @@ node('executor') {
         stage("Build") {
             try {
                 sh """#!/bin/bash -ex
-                    nvm use 18.17.1
+                    chmod u+x /home/ubuntu/.nvm/nvm.sh
+                    /home/ubuntu/.nvm/nvm.sh use 18.17.1
                     node -v
                     npm -v
                     npm install
