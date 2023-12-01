@@ -47,7 +47,7 @@ import PennsieveLogo from "../../icons/IconPennsieveLogo.vue";
 import IconUpload from "../../icons/IconUpload.vue";
  
 // import DatasetSearch from "@/components/DatasetSearch/DatasetSearch.vue";
-import PsLogInDialog from "../PsLogInDialog/PsLogInDialog.vue";
+import PsLogInDialog from "../PsLoginDialog/PsLogInDialog.vue";
 import BfUserDropdownMenu from "../../shared/BfUserDropdownMenu/BfUserDropdownMenu.vue";
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
