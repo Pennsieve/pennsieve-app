@@ -16,8 +16,8 @@ node('executor') {
         stage("Build") {
             try {
                 sh """#!/bin/bash -ex
-                    chmod 777 ./.profile
-                    ./.profile
+                    chmod 777 /home/ubuntu/.profile
+                    /home/ubuntu/.profile
                     node -v
                     npm -v
                     npm install
