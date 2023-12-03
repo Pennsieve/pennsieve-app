@@ -1,5 +1,5 @@
 import Vuex from 'vuex'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 import ConceptListItem from './ConceptListItem.vue' // import the right component
 import { state, actions, mutations, getters } from '../../../../../vuex/store'
 import EventBus from '../../../../../utils/event-bus'

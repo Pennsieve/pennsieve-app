@@ -1,25 +1,24 @@
 import TeamLabel from './TeamLabel.vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('TeamLabel.vue', () => {
-  let cmp
-
-  beforeEach(() => {
-    cmp = shallow(TeamLabel)
-  })
 
   it('avatarClass: showMembers false', () => {
-    cmp.setProps({
-      showMembers: false
+    const wrapper = shallowMount(TeamLabel, {
+      propsData: {
+        showMembers: false
+      }
     })
-    expect(cmp.vm.avatarClass).toBe('team-avatar condensed')
+    expect(wrapper.vm.avatarClass).toBe('team-avatar condensed')
   })
 
   it('avatarClass: showMembers true', () => {
-    cmp.setProps({
-      showMembers: true
+    const wrapper = shallowMount(TeamLabel, {
+      propsData: {
+        showMembers: true
+      }
     })
-    expect(cmp.vm.avatarClass).toBe('team-avatar')
+    expect(wrapper.vm.avatarClass).toBe('team-avatar')
   })
 
   it('createTeamId: valid Id', () => {
@@ -28,11 +27,21 @@ describe('TeamLabel.vue', () => {
         id: 123
       }
     }
-    expect(cmp.vm.createTeamId(team)).toBe(123)
+    const wrapper = shallowMount(TeamLabel, {
+      propsData: {
+        showMembers: false
+      }
+    })
+    expect(wrapper.vm.createTeamId(team)).toBe(123)
   })
 
   it('createTeamId: default Id', () => {
     const team = {}
-    expect(cmp.vm.createTeamId(team)).toBe('N:team:0')
+    const wrapper = shallowMount(TeamLabel, {
+      propsData: {
+        showMembers: false
+      }
+    })
+    expect(wrapper.vm.createTeamId(team)).toBe('N:team:0')
   })
 })

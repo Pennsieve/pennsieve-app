@@ -39,3 +39,17 @@ npm run build
 ```sh
 npm run lint
 ```
+
+## Testing
+
+We use [Vitest](https://vitest.dev/) library for unit testing components.
+We use [msw](https://mswjs.io/) for mocking APIs in tests
+We use [test-utils](https://test-utils.vuejs.org/) for unit testing.
+
+The mock API can be found in ```/src/test/mocks```
+For an example using the mock API look here: ```/src/mixins/request/request.spec.js```
+
+
+``` sh
+npm test 
+```

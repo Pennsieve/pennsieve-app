@@ -1,11 +1,11 @@
 import BfEmptyPageState from './BfEmptyPageState.vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('bf-dialog.vue', () => {
   let cmp
 
   beforeEach(() => {
-    cmp = shallow(BfEmptyPageState, {
+    cmp = shallowMount(BfEmptyPageState, {
       slots: {
         default: '<div class="test">Test</div>'
       }

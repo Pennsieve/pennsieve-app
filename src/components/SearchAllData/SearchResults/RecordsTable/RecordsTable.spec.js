@@ -1,5 +1,5 @@
 import RecordsTable from './RecordsTable.vue'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 
 
 describe('RecordsTable.vue', () => {

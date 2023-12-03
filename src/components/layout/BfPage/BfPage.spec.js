@@ -1,4 +1,5 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import BfPage from './BfPage.vue'
 import EventBus from '../../../utils/event-bus'
@@ -13,12 +14,12 @@ describe('BfPage.vue', () => {
     })
   })
 
-  it('Supports stage-scroll custom event', (done) => {
+  it('Supports stage-scroll custom event', (payload) => new Promise(done => {
     EventBus.$on('stage-scroll', () => {
       done()
     })
     EventBus.$emit('stage-scroll')
-  })
+  }))
 
   it('onScroll: scrollTop 0', () => {
     const evt = {

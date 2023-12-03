@@ -1,8 +1,8 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import BfNavigationSecondary from './BfNavigationSecondary.vue'
-import { shallow } from 'vue-test-utils'
-import { actions, mutations, getters, state } from '../../vuex/store'
+import { shallow } from '@vue/test-utils'
+import { actions, mutations, getters, state } from 'vuex'
 
 describe('BfNavigationSecondary.vue', () => {
   let cmp

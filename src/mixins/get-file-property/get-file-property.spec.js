@@ -1,5 +1,5 @@
 import Vue from 'vue'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 
 import GetFileProperty from './'
 

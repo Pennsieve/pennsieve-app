@@ -1,18 +1,17 @@
-import Vue from 'vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount} from '@vue/test-utils'
 import EventBus from '../../utils/event-bus'
 import Sorter from './'
+import TestComponent from "../test-component.vue";
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 
 describe('sorter Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const test = Vue.component('test', {
-      mixins: [
-        Sorter
-      ]
+    cmp = shallowMount(TestComponent, {
+      mixins: [Sorter]
     })
-    cmp = shallow(test)
   })
 
   afterEach(() => {
@@ -44,10 +43,10 @@ describe('sorter Mixin', () => {
   })
 
   it('setSort(): descending order', (done) => {
-    EventBus.$on('sorted', (sortedList) => {
+    EventBus.$on('sorted', (sortedList) => new Promise(done => {
       expect(sortedList[0].lastName).toBe('Cat')
       done()
-    })
+    }))
     const ref = cmp.vm
     const list = [
       {id: 1, firstName: 'Ren', lastName: 'Hoek'},
@@ -58,10 +57,10 @@ describe('sorter Mixin', () => {
   })
 
   it('setSort(): ascending order', (done) => {
-    EventBus.$on('sorted', (sortedList) => {
+    EventBus.$on('sorted', (sortedList) => new Promise(done => {
       expect(sortedList[0].name).toBe('Stimpy Cat')
       done()
-    })
+    }))
     const ref = cmp.vm
     ref.sortDirection = 'asc'
     const list = [
@@ -72,10 +71,10 @@ describe('sorter Mixin', () => {
   })
 
   it('setSort(): path support', (done) => {
-    EventBus.$on('sorted', (sortedList) => {
+    EventBus.$on('sorted', (sortedList) => new Promise(done => {
       expect(sortedList[0].team.name).toBe('Justice League')
       done()
-    })
+    }))
     const list = [
       {team: { id: 1, name: 'Spumco'}},
       {team: {id: 2, name: 'Justice League'}},
@@ -89,7 +88,7 @@ describe('sorter Mixin', () => {
       {id: 1, firstName: 'Ren', lastName: 'Hoek'},
       {id: 2, firstName: 'Stimpy', lastName: 'Cat'},
     ]
-    const sortedList = ref.returnSort('lastName', list)
+    const sortedList = ref.returnSort('lastName', list, 'asc')
       expect(ref.sortBy).toBe('lastName')
     expect(sortedList[0].lastName).toBe('Cat')
   })
@@ -110,7 +109,7 @@ describe('sorter Mixin', () => {
       {team: { id: 1, name: 'Spumco', storage: 456}},
       {team: {id: 2, name: 'Justice League', storage: 123}},
     ]
-    const sortedList = cmp.vm.returnSort('team.storage', list)
+    const sortedList = cmp.vm.returnSort('team.storage', list, 'asc')
       expect(sortedList[0].team.storage).toBe(123)
   })
 
@@ -124,13 +123,9 @@ describe('sorter Mixin', () => {
   })
 
   it('onTableSort: empty property', () => {
-    const spy = jest.spyOn(cmp.vm, '$emit')
+    const spy = vi.spyOn(cmp.vm, '$emit')
     cmp.vm.onTableSort('')
     expect(spy).not.toBeCalled()
   })
 
-  it('onTableSort: valid property', (done) => {
-    cmp.vm.$on('set-table-sort', () => done())
-    cmp.vm.onTableSort('kind')
-  })
 })

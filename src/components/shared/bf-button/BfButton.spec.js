@@ -1,5 +1,5 @@
 import BfButton from './BfButton.vue'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 
 describe('BfButton.vue', () => {
 

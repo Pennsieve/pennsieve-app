@@ -37,4 +37,14 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // enable jest-like global test APIs
+    globals: true,
+    // max duration for async calls in tests
+    testTimeout: 200,
+    setupFiles: ['./src/test/setup.ts'],
+    // simulate DOM with happy-dom
+    // (requires installing happy-dom as a peer dependency)
+    environment: 'happy-dom'
+  }
 });

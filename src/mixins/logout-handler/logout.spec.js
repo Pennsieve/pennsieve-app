@@ -1,9 +1,9 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import EventBus from '../../utils/event-bus'
 import Cookies from 'js-cookie'
-import { state, actions, mutations, getters } from '../../vuex/store'
+import { state, actions, mutations, getters } from 'vuex'
 
 import App from '../../components/app/App.vue'
 import logout from './'

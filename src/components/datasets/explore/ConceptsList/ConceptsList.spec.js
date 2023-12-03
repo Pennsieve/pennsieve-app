@@ -5,7 +5,7 @@ global.localStorage = {
 }
 
 import Vuex from 'vuex'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 import ConceptsList from './ConceptsList.vue'
 import { actions, mutations, getters, state } from '../../../../vuex/store'
 

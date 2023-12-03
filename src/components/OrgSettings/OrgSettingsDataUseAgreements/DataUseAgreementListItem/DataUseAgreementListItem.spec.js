@@ -1,4 +1,4 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import DataUseAgreementListItem from './DataUseAgreementListItem.vue'
 import { defaultAgreement, agreement } from '../mock-data-use-agreements'
 

@@ -32,7 +32,7 @@ node('executor') {
         stage("Test") {
             try {
                 sh """#!/bin/bash
-                    xvfb-run --auto-servernum --server-args='-screen 0, 1024x768x16' yarn test"""
+                    xvfb-run --auto-servernum --server-args='-screen 0, 1024x768x16' npm test"""
             } catch (e) {
                 slackSend(color: '#b20000', message: "FAILED: Tests! '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) by ${authorName}")
                 throw e

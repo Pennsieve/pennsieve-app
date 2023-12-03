@@ -1,17 +1,18 @@
 import Vue from 'vue'
-import { shallow } from 'vue-test-utils'
+import {mount, shallowMount} from '@vue/test-utils'
 import UserRoles from './'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import TestComponent from "../test-component.vue";
+
 
 describe('sorter Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const test = Vue.component('test', {
-      mixins: [
-        UserRoles
-      ]
+    cmp = shallowMount(TestComponent, {
+      mixins: [UserRoles]
     })
-    cmp = shallow(test)
+
   })
 
   it('getOrgRole()', () => {

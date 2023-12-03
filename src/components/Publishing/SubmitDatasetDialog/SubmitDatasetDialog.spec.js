@@ -1,7 +1,7 @@
 import SubmitDatasetDialog from './SubmitDatasetDialog.vue'
 import Vuex from 'vuex'
 import moment from 'moment'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import { state } from 'vuex/store'
 
 const embargoedDataset = {

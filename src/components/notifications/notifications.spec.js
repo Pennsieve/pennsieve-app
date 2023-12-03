@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import Notifications from './Notifications.vue'
-import { actions, mutations, getters } from '../../vuex/store'
+import { actions, mutations, getters } from 'vuex'
 import EventBus from '../../utils/event-bus'
 
 describe('Notifications.vue', () => {

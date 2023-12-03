@@ -1,4 +1,4 @@
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 import DeleteDataset from './DeleteDataset.vue'
 import Vuex from 'vuex'
 import { getters } from 'vuex/store'

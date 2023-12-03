@@ -1,4 +1,4 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import A11yKeys from './A11yKeys.vue'
 
 describe('A11yKeys.vue', () => {

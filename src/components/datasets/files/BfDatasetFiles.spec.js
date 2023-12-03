@@ -1,5 +1,5 @@
 import Vuex, { mapActions } from 'vuex'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 import BfDatasetFiles from './BfDatasetFiles.vue'
 import { state, actions, mutations, getters } from '../../../vuex/store'
 

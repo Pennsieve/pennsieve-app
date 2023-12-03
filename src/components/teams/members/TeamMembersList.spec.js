@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 
-import { actions, mutations, getters } from '../../../vuex/store'
+import { actions, mutations, getters } from 'vuex'
 import TeamMembersList from './TeamMembersList.vue'
 import EventBus from '../../../utils/event-bus'
 import flushPromises from 'flush-promises'

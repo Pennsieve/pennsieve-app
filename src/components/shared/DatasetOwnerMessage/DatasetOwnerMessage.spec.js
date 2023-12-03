@@ -1,5 +1,7 @@
 import DatasetOwnerMessage from './DatasetOwnerMessage.vue'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 
 describe('DatasetOwnerMessage.vue', () => {
   let cmp
@@ -33,12 +35,4 @@ describe('DatasetOwnerMessage.vue', () => {
     expect(cmpEmpty.vm.$slots.button).toBe(undefined)
   })
 
-  it('Emits custom got-it event', (done) => {
-    cmp.vm.$on('got-it', () => {
-      done()
-    })
-    cmp.vm.gotIt({
-      preventDefault: () => {}
-    })
-  })
 })

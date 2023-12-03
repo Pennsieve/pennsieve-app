@@ -1,5 +1,5 @@
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import RemoveTeam from './RemoveTeam.vue'
 import { actions, mutations, getters } from '../../../vuex/store'
 import EventBus from '../../../utils/event-bus'

@@ -1,5 +1,5 @@
 import CharacterCountInput from './CharacterCountInput.vue'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 
 describe('CharacterCountInput.vue', () => {
   let cmp

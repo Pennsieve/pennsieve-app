@@ -1,5 +1,7 @@
 import Vue from 'vue'
-import { shallow } from 'vue-test-utils'
+import {shallow, shallowMount} from '@vue/test-utils'
+import TestComponent from "../test-component.vue";
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import sanitizer from './'
 
@@ -8,10 +10,9 @@ describe('Sanitize Name Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('test', {
+    cmp = shallowMount(TestComponent, {
       mixins: [sanitizer]
     })
-    cmp = shallow(TestComponent)
   })
 
   it('Does not need to be sanitized', () => {

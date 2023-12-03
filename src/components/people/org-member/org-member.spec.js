@@ -1,9 +1,9 @@
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 
 import OrgMember from './OrgMember.vue'
 import EventBus from '../../../utils/event-bus'
-import { actions, mutations, getters } from '../../../vuex/store'
+import { actions, mutations, getters } from 'vuex'
 
 describe('OrgMember.vue', () => {
   let cmp

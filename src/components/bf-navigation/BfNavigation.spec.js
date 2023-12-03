@@ -1,8 +1,8 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import BfNavigation from './BfNavigation.vue'
-import { shallow } from 'vue-test-utils'
-import { actions, mutations, getters } from '../../vuex/store'
+import { shallow } from '@vue/test-utils'
+import { actions, mutations, getters } from 'vuex'
 
 const state = {
   config: {

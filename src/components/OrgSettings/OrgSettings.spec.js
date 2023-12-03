@@ -1,8 +1,9 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+
+import { mount } from '@vue/test-utils'
 import OrgSettings from './OrgSettings.vue'
-import { actions, mutations, getters } from '../../vuex/store'
+import { actions, mutations, getters } from 'vuex'
 import EventBus from '../../utils/event-bus'
 import flushPromises from 'flush-promises'
 

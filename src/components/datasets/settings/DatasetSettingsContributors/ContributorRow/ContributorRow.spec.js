@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
 import ContributorRow from './ContributorRow.vue'
 import { state, getters } from '@/vuex/store'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 
 const dataset = {
   "content": {

@@ -1,5 +1,5 @@
 import Vuex from 'vuex'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 import DatasetActivityPanel from './DatasetActivityPanel.vue'
 import { state, actions, mutations, getters } from '@/vuex/store'
 

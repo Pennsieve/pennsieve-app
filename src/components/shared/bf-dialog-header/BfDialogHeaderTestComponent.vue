@@ -1,5 +1,5 @@
 <template>
-  <bf-dialog-header />
+  <bf-dialog-header ref="dialog" />
 </template>
 
 <script>
@@ -9,6 +9,11 @@ export default {
   name: 'BfDialogHeaderTestComponent',
   components: {
     BfDialogHeader
+  },
+  methods: {
+    handleClose: function(){
+      return
+    }
   }
 }
 </script>

@@ -1,4 +1,4 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import FilterMenu from './FilterMenu.vue'
 
 const options = [

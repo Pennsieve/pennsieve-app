@@ -1,5 +1,5 @@
 import User from './User.vue'
-import { shallow } from 'vue-test-utils'
+import { shallow } from '@vue/test-utils'
 
 describe('User.vue', () => {
 

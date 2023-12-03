@@ -1,4 +1,4 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import Vuex from 'vuex'
 import { state, getters } from '@/vuex/store'
 import EmbargoedPermissions from './EmbargoedPermissions.vue'

@@ -1,5 +1,5 @@
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import cloneDeep from 'lodash.clonedeep'
 
 import { state, actions, mutations } from '@/vuex/store'

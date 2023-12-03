@@ -1,4 +1,5 @@
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import BfStage from './BfStage.vue'
 import EventBus from '../../../utils/event-bus'
@@ -18,16 +19,16 @@ describe('BfStage.vue', () => {
         position: 50
       }
     }
-    EventBus.$on('stage-scroll', payload => {
+    EventBus.$on('stage-scroll', (payload) => new Promise(done => {
       expect(payload).toMatchObject(evt)
       done()
-    })
+    }))
     cmp.vm.onScroll(evt)
   })
 
   it('Removes event listener when destroyed', () => {
-    const spy = jest.spyOn(cmp.vm.$el, 'removeEventListener')
-    cmp.destroy()
+    const spy = vi.spyOn(cmp.vm.$el, 'removeEventListener')
+    cmp.unmount()
     expect(spy).toBeCalled()
   })
 })

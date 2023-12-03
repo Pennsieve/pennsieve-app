@@ -1,6 +1,6 @@
 
 import Vuex from 'vuex'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
 import CreateConceptDialog from './CreateConceptDialog.vue'
 import { state, actions, mutations, getters } from 'vuex'
 import EventBus from '../../../../utils/event-bus'

@@ -1,5 +1,6 @@
 import BfDialogHeaderTestComponent from './BfDialogHeaderTestComponent.vue'
-import { mount } from 'vue-test-utils'
+import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('BfDialogHeader.vue', () => {
   let cmp
@@ -13,8 +14,8 @@ describe('BfDialogHeader.vue', () => {
   })
 
   it('Parent handles close event', () => {
-    const spy = jest.spyOn(cmp.vm, 'handleClose')
-    cmp.vm.$children[0].onClose()
+    const spy = vi.spyOn(cmp.vm, 'handleClose')
+    cmp.vm.$refs.dialog.onClose()
     expect(spy).toBeCalled()
   })
 
