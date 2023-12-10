@@ -81,9 +81,9 @@ export default {
      */
     classNames: function() {
       const baseName = 'bf-card'
-      const modelCardClass = this.isModelCard ? ' model-card' : ''
-      const selectedClass = this.checked ? ' active' : ''
-      const isDisabled = this.isDisabled ? ' is-disabled' : ''
+      const modelCardClass = this.isModelCard? ' model-card' : ''
+      const selectedClass = this.checked? ' active' : ''
+      const isDisabled = this.isDisabled? ' is-disabled' : ''
       return baseName + modelCardClass + selectedClass + isDisabled
     },
     /**
@@ -102,13 +102,13 @@ export default {
     },
     /**
      * Returns Boolean whether property slot exists
-     * @returns {Boolean}
+     * @returns {string}
      */
     formattedCopy: function() {
       const copy = this.cardCopy
       const maxLength = 185
       if (copy.length > maxLength) {
-        return `${copy.substr(0, maxLength)}...`
+        return `${copy.substring(0, maxLength)}...`
       }
       return copy
     },

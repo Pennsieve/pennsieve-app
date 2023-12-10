@@ -43,6 +43,12 @@ export default defineConfig({
     // max duration for async calls in tests
     testTimeout: 200,
     setupFiles: ['./src/test/setup.ts'],
+    server: {
+      deps: {
+        inline:['element-plus'],
+      },
+    },
+
     // simulate DOM with happy-dom
     // (requires installing happy-dom as a peer dependency)
     environment: 'happy-dom'

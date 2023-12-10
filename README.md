@@ -51,5 +51,5 @@ For an example using the mock API look here: ```/src/mixins/request/request.spec
 
 
 ``` sh
-npm test 
+npm run test 
 ```

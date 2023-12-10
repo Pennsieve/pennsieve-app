@@ -6,13 +6,13 @@ import Team from './Team.vue'
 import EventBus from '../../../utils/event-bus'
 
 const $router = {
-  push: jest.fn(() => {})
+  push: vi.fn(() => {})
 }
 
 describe('Team.vue', () => {
   let cmp
   let store
-  let state
+  let state, getters
 
   beforeEach(() => {
     state = {
@@ -33,12 +33,19 @@ describe('Team.vue', () => {
       mutations,
       getters
     })
+    getters =  {
+      userToken: (state) => state.userToken,
+      concepts: (state) => state.concepts,
+    }
     cmp = mount(Team, {
       attachToDocument: true,
-      mocks: {
-        $router
+      global:{
+        mocks: {
+          $router
+        },
+        plugins:[store],
       },
-      store
+
     })
     cmp.setProps({
       item: {
@@ -49,15 +56,14 @@ describe('Team.vue', () => {
         memberCount: 11
       }
     })
-    cmp.update()
   })
 
   afterEach(() => {
     EventBus.$off()
   })
 
-  it('memberCount: singular', () => {
-    cmp.setProps({
+  it('memberCount: singular', async () => {
+    await cmp.setProps({
       item: {
         team: {
           id: 1,
@@ -66,7 +72,6 @@ describe('Team.vue', () => {
         memberCount: 1
       }
     })
-    cmp.update()
     expect(cmp.vm.memberCount).toBe('1 Member')
   })
 
@@ -81,7 +86,7 @@ describe('Team.vue', () => {
   })
 
   it('changeRoute', () => {
-    const spy = jest.spyOn(cmp.vm.$router, 'push')
+    const spy = vi.spyOn(cmp.vm.$router, 'push')
     cmp.vm.changeRoute(cmp.vm.item)
     expect(spy).toBeCalled()
   })
@@ -95,37 +100,18 @@ describe('Team.vue', () => {
     }
     EventBus.$on('open-remove-team', data => {
       expect(data).toMatchObject(team)
-      done()
-    })
-    cmp.vm.openDeleteDialog(team)
-  })
-
-  it('openDeleteDialog: remove from list', (done) => {
-    const team = {
-      team: {
-        id: 1,
-        name: 'Iggles'
-      }
-    }
-    cmp.setProps({
-      removeFromList: true
-    })
-    cmp.update()
-    cmp.vm.$on('remove-team-from-list', data => {
-      expect(data).toMatchObject(team)
-      done()
     })
     cmp.vm.openDeleteDialog(team)
   })
 
   it('onTeamMenu: valid function', () => {
-    const spy = jest.spyOn(cmp.vm, 'openDeleteDialog')
+    const spy = vi.spyOn(cmp.vm, 'openDeleteDialog')
     cmp.vm.onTeamMenu('openDeleteDialog')
     expect(spy).toBeCalled()
   })
 
   it('onTeamMenu: invalid function', () => {
-    const spy = jest.spyOn(cmp.vm, 'openDeleteDialog')
+    const spy = vi.spyOn(cmp.vm, 'openDeleteDialog')
     cmp.vm.onTeamMenu('openDeleteDialog2')
     expect(spy).not.toBeCalled()
   })

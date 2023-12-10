@@ -1,7 +1,8 @@
 import Vue from 'vue'
-import { shallow } from '@vue/test-utils'
+import {shallow, shallowMount} from '@vue/test-utils'
 
 import GetFileProperty from './'
+import TestComponent from "../test-component.vue";
 
 const fileProperties = [
   {
@@ -45,12 +46,12 @@ describe('GetFileProperty Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('test', {
-      mixins: [
-        GetFileProperty
-      ]
+
+
+    cmp = shallowMount(TestComponent, {
+      mixins: [GetFileProperty]
     })
-    cmp = shallow(TestComponent)
+
   })
 
   it('fileIcon: returns a file icon value', () => {

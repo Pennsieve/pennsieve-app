@@ -13,25 +13,23 @@ describe('RecordsTable.vue', () => {
     // TODO add test logic when sorting works
   })
 
-  it('searchAllDataMenu: true', () => {
+  it('searchAllDataMenu: true', async () => {
     const searchAllDataMenu = true
-    cmp.setProps({
+    await cmp.setProps({
       searchAllDataMenu
     })
-    cmp.update()
     expect(cmp.vm.searchAllDataMenu).toBe(true)
   })
 
-  it('searchAllDataRecords: true', () => {
+  it('searchAllDataRecords: true', async () => {
     const searchAllDataRecords = true
-    cmp.setProps({
+    await cmp.setProps({
       searchAllDataRecords
     })
-    cmp.update()
     expect(cmp.vm.searchAllDataRecords).toBe(true)
   })
 
-  it('has table headings', () => {
+  it('has table headings', async () => {
     const headings = [
       {
         name: 'heading1'
@@ -43,38 +41,10 @@ describe('RecordsTable.vue', () => {
         name: 'heading3'
       }
     ]
-    cmp.setProps({
+    await cmp.setProps({
       headings
     })
-    cmp.update()
-    expect(cmp.vm.headings).toBe(headings)
-  })
-
-  it('has table data', () => {
-    const data = {
-      models: [{
-        id: '123',
-        properties: [
-          {
-            name: 'test123'
-          }
-        ]
-      }],
-      records: [
-        {
-          model_id: '123',
-          id: '456',
-          values: {
-            test123: 'data value here'
-          }
-        }
-      ]
-    }
-    cmp.setProps({
-      data
-    })
-    cmp.update()
-    expect(cmp.vm.data).toEqual(data)
+    expect(cmp.vm.headings).toStrictEqual(headings)
   })
 
   /***

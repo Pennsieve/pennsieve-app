@@ -102,12 +102,10 @@ export default {
      */
     deleteDataUseAgreement: function(dataUseAgreement) {
       const { id } = dataUseAgreement
-
       this.sendXhr(`${this.dataUseAgreementUrl}/${id}?api_key=${this.userToken}`, {
         method: 'DELETE'
       })
         .then((e) => {
-          console.log(e)
           this.removeDataUseAgreement(id)
         })
         .catch( error => {

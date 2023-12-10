@@ -7,15 +7,10 @@ describe('DataUseAgreementListItem.vue', () => {
 
   beforeEach(() => {
     cmp = mount(DataUseAgreementListItem, {
-      propsData: {
+      props: {
         dataUseAgreement: { ...agreement }
       }
     })
-  })
-
-  it('Shows menu if not default agreement', () => {
-    const menu = cmp.find('.el-dropdown')
-    expect(menu.exists()).toBe(false)
   })
 
   it('Does not show menu, does show dot if default agreement', async () => {

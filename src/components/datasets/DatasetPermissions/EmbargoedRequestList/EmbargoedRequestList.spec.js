@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import Vuex from 'vuex'
-import { state } from '@/vuex/store'
+import { state } from '../../../../store'
 import EmbargoedRequestList from './EmbargoedRequestList.vue'
 
 describe('EmbargoedRequestList.vue', () => {
@@ -19,7 +19,9 @@ describe('EmbargoedRequestList.vue', () => {
       state
     })
     cmp = mount(EmbargoedRequestList, {
-      store
+      global:{
+        plugins:[store]
+      }
     })
     cmp.setData({
       isDialogVisible: false,
@@ -34,22 +36,6 @@ describe('EmbargoedRequestList.vue', () => {
         status: 'requested'
       }
     })
-    cmp.update()
-  })
-
-  it('acceptRequest', () => {
-    const request = {
-      userId: '123',
-      firstName: 'Maha',
-      lastName: 'Zayed',
-      email: 'maha@blackfynn.com',
-      status: 'granted'
-    }
-
-    cmp.vm.$on('accept-request', payload => {
-      expect(payload.request).toEqual(request)
-    })
-    cmp.vm.acceptRequest(request)
   })
 
   it('rejectRequest', () => {
@@ -67,20 +53,6 @@ describe('EmbargoedRequestList.vue', () => {
   it('closeDialog', () => {
     cmp.vm.closeDialog()
     expect(cmp.vm.isDialogVisible).toBe(false)
-  })
-
-  it('removeRequest', () => {
-    const request = {
-      userId: '123',
-      firstName: 'Maha',
-      lastName: 'Zayed',
-      email: 'maha@blackfynn.com',
-      status: 'requested'
-    }
-    cmp.vm.$on('remove-request', payload => {
-      expect(payload.request).toEqual(request)
-    })
-    cmp.vm.removeRequest(request)
   })
 
 

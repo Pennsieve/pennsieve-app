@@ -1,10 +1,12 @@
 import log from './'
+import { beforeEach, afterEach,describe, expect, it, vi } from 'vitest'
+
 
 describe('logger Mixin', () => {
   beforeEach(() => {
     const noop = () => {}
     global.console = {
-      log: jest.fn(noop),
+      log: vi.fn(noop),
       apply: noop
     }
     global.location = {
@@ -13,7 +15,7 @@ describe('logger Mixin', () => {
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('logger fires console function', () => {

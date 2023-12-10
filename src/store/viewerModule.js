@@ -1,4 +1,4 @@
-import { mergeAll, propOr, propEq, findIndex, flatten, compose, pluck, pathOr, includes, remove, find } from 'ramda'
+import { mergeRight,propOr, propEq, findIndex, flatten, compose, pluck, pathOr, includes, remove, find } from 'ramda'
 import { viewerSidePanelTypes, viewerToolTypes } from '@/utils/constants'
 
 const getLayerIndex = (key, data, viewerAnnotations) => {
@@ -68,7 +68,7 @@ export const mutations = {
   },
 
   UPDATE_CHANNEL (state, { data, channelIndex }) {
-    Vue.set(state.viewerChannels, channelIndex, data)
+    state.viewerChannels[channelIndex] = data
   },
 
   CREATE_LAYER (state, data)  {
@@ -98,7 +98,7 @@ export const mutations = {
     state.activeAnnotation = data
   },
   UPDATE_LAYER (state, { layer, index })  {
-    Vue.set(state.viewerAnnotations, index, layer)
+    state.viewerAnnotations[index] = layer
   },
 
   DELETE_LAYER (state, { index })  {
@@ -244,7 +244,7 @@ export const actions = {
   deleteAnnotation: ({commit, getters}, data) =>
     commit('DELETE_ANNOTATION', { data, getters }),
   updateViewerSlideInfo: ({ commit }, evt) => {
-    const newSlideInfo = mergeAll(state.viewerSlideInfo, evt)
+    const newSlideInfo = mergeRight(state.viewerSlideInfo, evt)
 
     commit('UPDATE_VIEWER_SLIDE_INFO', newSlideInfo)
   },

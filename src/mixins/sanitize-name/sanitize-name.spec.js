@@ -1,5 +1,4 @@
-import Vue from 'vue'
-import {shallow, shallowMount} from '@vue/test-utils'
+import {shallowMount} from '@vue/test-utils'
 import TestComponent from "../test-component.vue";
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

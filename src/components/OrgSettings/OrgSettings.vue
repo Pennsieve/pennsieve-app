@@ -194,7 +194,7 @@ import { mapActions, mapState, mapGetters } from 'vuex'
 
 import BfRafter from '../shared/bf-rafter/BfRafter.vue'
 import BfButton from '../shared/bf-button/BfButton.vue'
-import A11yKeys from '../shared/a11y-keys/A11yKeys.vue'
+// import A11yKeys from '../shared/a11y-keys/A11yKeys.vue'
 import OrgMember from '../../components/people/org-member/OrgMember.vue'
 // import CreateDatasetTemplateDialog from '../../components/datasets/management/GraphManagement/CreateDatasetTemplateDialog/CreateDatasetTemplateDialog.vue'
 // import DeleteDatasetTemplateDialog from './DeleteDatasetTemplate/DeleteDatasetTemplate.vue'
@@ -218,7 +218,7 @@ export default {
   components: {
     BfRafter,
     BfButton,
-    A11yKeys,
+    // A11yKeys,
     // OrgMember,
     // CreateDatasetTemplateDialog,
     // DeleteDatasetTemplateDialog,

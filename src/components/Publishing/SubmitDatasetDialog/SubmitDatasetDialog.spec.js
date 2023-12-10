@@ -2,7 +2,9 @@ import SubmitDatasetDialog from './SubmitDatasetDialog.vue'
 import Vuex from 'vuex'
 import moment from 'moment'
 import { mount } from '@vue/test-utils'
-import { state } from 'vuex/store'
+import { state } from '../../../store'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+
 
 const embargoedDataset = {
   "content": {
@@ -143,7 +145,9 @@ describe('SubmitDatasetDialog.vue', () => {
       state
     })
     cmp = mount(SubmitDatasetDialog, {
-      store
+      global: {
+          plugins: [store]
+      }
     })
     cmp.setData({
       selectedDataset: {}

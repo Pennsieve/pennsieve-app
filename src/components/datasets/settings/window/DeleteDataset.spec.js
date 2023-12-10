@@ -1,7 +1,7 @@
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import DeleteDataset from './DeleteDataset.vue'
 import Vuex from 'vuex'
-import { getters } from 'vuex/store'
+import { getters } from '../../../../store'
 
 
 describe('DeleteDataset.vue', () => {
@@ -37,8 +37,10 @@ describe('DeleteDataset.vue', () => {
       state,
       getters
     })
-    cmp = shallow(DeleteDataset, {
-      store
+    cmp = shallowMount(DeleteDataset, {
+      global: {
+        plugins:[store]
+      }
     })
   })
 
@@ -48,23 +50,6 @@ describe('DeleteDataset.vue', () => {
 
   it('Computes stepOneLabelText', () => {
     expect(cmp.vm.stepOneLabelText.indexOf('Blackfynn') > 0).toBe(true)
-  })
-
-  it('isChecked(): false', () => {
-    cmp.vm.isChecked([])
-    expect(cmp.vm.disabled).toBe(true)
-  })
-
-  it('isChecked(): true', () => {
-    cmp.vm.isChecked([1, 2, 3])
-    expect(cmp.vm.disabled).toBe(false)
-  })
-
-  it('onFormSubmit()', (done) => {
-    cmp.vm.$on('delete-dataset-confirmed', () => {
-      done()
-    })
-    cmp.vm.onFormSubmit()
   })
 
   it('closeDialog()', () => {

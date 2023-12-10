@@ -1,7 +1,7 @@
 import Vuex, { mapActions } from 'vuex'
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import BfDatasetFiles from './BfDatasetFiles.vue'
-import { state, actions, mutations, getters } from '../../../vuex/store'
+import { state, actions, mutations, getters } from '../../../store'
 
 describe('bf-dataset-files.vue', () => {
   let cmp
@@ -43,39 +43,43 @@ describe('bf-dataset-files.vue', () => {
       mutations,
       getters
     })
-    cmp = shallow(BfDatasetFiles, {
-      data: {
-        files: [
-          {
-            children: [],
-            content: {
-              createdAt: '2018-06-11T13:26:43.097679Z',
-              datasetId: 'N:dataset:8c02e00f-1b77-4f84-9e89-664443da13bb',
-              id: 'N:package:77c88edb-b881-4b18-a5df-b1d49f155095',
-              name: 'settings',
-              packageType: 'Image',
-              state: 'READY',
-              updatedAt: '2018-07-16T19:22:34.418883Z'
-            },
-            icon: 'XML',
-            properties: [],
-            storage: 71182,
-            subtype: 'XML'
-          }
-        ],
-        sortBy: 'content.name',
-        sortDirection: 'asc'
+    cmp = shallowMount(BfDatasetFiles, {
+      data() {
+        return {
+          files: [
+            {
+              children: [],
+              content: {
+                createdAt: '2018-06-11T13:26:43.097679Z',
+                datasetId: 'N:dataset:8c02e00f-1b77-4f84-9e89-664443da13bb',
+                id: 'N:package:77c88edb-b881-4b18-a5df-b1d49f155095',
+                name: 'settings',
+                packageType: 'Image',
+                state: 'READY',
+                updatedAt: '2018-07-16T19:22:34.418883Z'
+              },
+              icon: 'XML',
+              properties: [],
+              storage: 71182,
+              subtype: 'XML'
+            }
+          ],
+          sortBy: 'content.name',
+          sortDirection: 'asc'
+        }
       },
-      mocks: {
-        $route
+      global: {
+        plugins: [ store],
+        mocks: {
+          $route
+        },
       },
-      store
+
     })
-    cmp.update()
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('resetSelectedFiles()', () => {

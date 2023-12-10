@@ -1,95 +1,23 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
 import BfNavigation from './BfNavigation.vue'
-import { shallow } from '@vue/test-utils'
-import { actions, mutations, getters } from 'vuex'
-
-const state = {
-  config: {
-    apiUrl: 'https://api.blackfynn.net',
-    environment: 'development'
-  },
-  activeOrganization: {
-    isAdmin: true,
-    isOwner: false,
-    organization: {
-      name: 'Blackfynn',
-      id: 1
-    },
-    administrators: [{id: 1}],
-    owners: [{id: 5}]
-  },
-  primaryNavOpen: false,
-  orgMembers: [
-    {
-      id: '123',
-      email: 'cameron@blackfynn.com',
-      firstName: 'Cameron',
-      lastName: 'Baney',
-      credential: 'Front-end Engineer',
-      color: '#B74F6F',
-      url: '',
-      authyId: 0,
-      isSuperAdmin: false,
-      isPublisher: true,
-      createdAt: '2019-10-31T16:43:44.219502Z',
-      updatedAt: '2020-05-07T17:30:24.273276Z',
-      preferredOrganization: '1',
-      orcid: {
-        name: 'Cameron',
-        orcid: '0000-0000-0000-0000'
-      },
-      pennsieveTermsOfService: {
-        version: '20181010000000'
-      },
-      customTermsOfService: [],
-      storage: 82833847
-    }
-  ],
-  profile: {
-    id: '123',
-    email: 'cameron@blackfynn.com',
-    firstName: 'Cameron',
-    lastName: 'Baney',
-    credential: 'Front-end Engineer',
-    color: '#B74F6F',
-    url: '',
-    authyId: 0,
-    isSuperAdmin: false,
-    isPublisher: true,
-    createdAt: '2019-10-31T16:43:44.219502Z',
-    updatedAt: '2020-05-07T17:30:24.273276Z',
-    preferredOrganization: '1',
-    orcid: {
-      name: 'Cameron',
-      orcid: '0000-0000-0000-0000'
-    },
-    pennsieveTermsOfService: {
-      version: '20181010000000'
-    },
-    customTermsOfService: [],
-    storage: 82833847
-  },
-  publishers: []
-}
+import {RouterLinkStub, shallowMount} from '@vue/test-utils'
+import store from '../../store'
 
 describe('BfNavigation.vue', () => {
   let cmp
-  let store
 
   beforeEach(() => {
-    store = new Vuex.Store({
-      state,
-      actions,
-      mutations,
-      getters
-    })
-    cmp = shallow(BfNavigation, {
-      store
+    cmp = shallowMount(BfNavigation, {
+      global: {
+        stubs: {
+          RouterLink: RouterLinkStub
+        },
+        plugins: [store],
+      },
     })
   })
 
   it('hasAdminRights: true', () => {
+    cmp.vm.$store.state.activeOrganization.isAdmin = true
     expect(cmp.vm.hasAdminRights).toBe(true)
   })
 
@@ -99,10 +27,12 @@ describe('BfNavigation.vue', () => {
   })
 
   it('activeOrganizationName', () => {
+    cmp.vm.$store.state.activeOrganization.organization ={name:'Blackfynn'}
     expect(cmp.vm.activeOrganizationName).toBe('Blackfynn')
   })
 
   it('activeOrganizationId', () => {
+    cmp.vm.$store.state.activeOrganization.organization ={id:1}
     expect(cmp.vm.activeOrganizationId).toBe(1)
   })
 
@@ -113,11 +43,10 @@ describe('BfNavigation.vue', () => {
     expect(cmp.vm.primaryNavCondensed).toBe(false)
   })
 
-  it('closeMenu', (done) => {
+  it('closeMenu', async (done) => {
     cmp.vm.closeMenu()
-    cmp.vm.$nextTick(() => {
+    await cmp.vm.$nextTick(() => {
       expect(cmp.vm.$store.state.primaryNavOpen).toBe(false)
-      done()
     })
   })
 })

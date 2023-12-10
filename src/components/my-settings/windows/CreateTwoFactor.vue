@@ -77,7 +77,7 @@ import { mapGetters, mapActions, mapState } from 'vuex'
 import { pathOr, prop } from 'ramda'
 import Auth from '@aws-amplify/auth'
 
-import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
+// import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
@@ -90,7 +90,7 @@ export default {
   name: 'CreateTwoFactor',
 
   components: {
-    A11yKeys,
+    // A11yKeys,
     BfButton,
     BfDialogHeader,
     DialogBody

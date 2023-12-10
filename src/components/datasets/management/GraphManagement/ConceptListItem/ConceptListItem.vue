@@ -25,9 +25,8 @@
           </router-link>
         </el-tooltip>
 
-        <svg-icon
+        <IconLockFilled
           v-if="concept.locked"
-          icon="icon-lock-filled"
         />
       </div>
       Created {{ formatDate(concept.createdAt) }}
@@ -70,10 +69,9 @@
         @command="onMenuSelect"
       >
         <span class="btn-file-menu el-dropdown-link">
-          <svg-icon
-            name="icon-menu"
-            height="16"
-            width="16"
+          <IconMenu
+            :height="16"
+            :width="16"
           />
         </span>
         <el-dropdown-menu
@@ -114,10 +112,12 @@
   import { mapGetters, mapState } from 'vuex';
 
   import FormatDate from '../../../../../mixins/format-date'
+  import IconLockFilled from "../../../../icons/IconLockFilled.vue";
+  import IconMenu from "../../../../icons/IconMenu.vue";
 
   export default {
     name: 'ConceptListItem',
-
+    components: {IconLockFilled, IconMenu},
     mixins: [
       FormatDate
     ],

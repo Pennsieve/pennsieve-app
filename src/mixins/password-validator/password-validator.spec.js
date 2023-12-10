@@ -1,18 +1,16 @@
-import Vue from 'vue'
-import { shallow } from '@vue/test-utils'
+import { shallowMount} from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import PasswordValidator from './'
+import TestComponent from "../test-component.vue";
 
 describe('Password Validator Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('Test', {
-      mixins: [
-        PasswordValidator,
-      ]
+    cmp = shallowMount(TestComponent, {
+      mixins: [PasswordValidator]
     })
-    cmp = shallow(TestComponent)
   })
 
   it('validatePassword: needs at least 8 characters', () => {

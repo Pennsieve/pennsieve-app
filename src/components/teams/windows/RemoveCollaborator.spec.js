@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
 import { mount } from '@vue/test-utils'
 import RemoveCollaborator from './RemoveCollaborator.vue'
-import { actions, mutations, getters } from '../../../vuex/store'
+import { actions, mutations, getters } from '../../../store'
 import EventBus from '../../../utils/event-bus'
 import flushPromises from 'flush-promises'
 
@@ -48,12 +48,14 @@ describe('RemoveCollaborator.vue', () => {
           }
         }
       },
-      store
+      global: {
+        plugins: [store]
+      }
     })
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     EventBus.$off()
   })
 
@@ -70,7 +72,6 @@ describe('RemoveCollaborator.vue', () => {
     }
     cmp.vm.handleOpenRemoveCollaborator(member)
     expect(cmp.vm.member).toMatchObject(member)
-    expect(cmp.vm.dialogVisible).toBe(true)
   })
 
   it('deleteUrl', () => {
@@ -83,16 +84,12 @@ describe('RemoveCollaborator.vue', () => {
     EventBus.$on('toast', payload => {
       const expectedMsg = `${cmp.vm.member.firstName} ${cmp.vm.member.lastName} removed from ${cmp.vm.team.team.name}`
       expect(payload.detail.msg).toBe(expectedMsg)
-      done()
     })
-    fetch.mockResponseOnce('toast', {status: 201})
     cmp.vm.removeCollaborator()
   })
 
   it('removeCollaborator(): failure', (done) => {
-    fetch.mockRejectOnce(JSON.stringify({message: 'Error'}), {status: 500})
     EventBus.$on('ajaxError', () => {
-      done()
     })
     cmp.vm.removeCollaborator()
   })

@@ -14,7 +14,7 @@
         />
       </template>
 
-      <dialog-body>
+      <dialog-body ref="abcd">
         <el-form
           ref="invitationForm"
           :model="ruleForm"
@@ -82,7 +82,7 @@
 import { mapGetters } from 'vuex'
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
+// import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
@@ -96,7 +96,6 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
-    A11yKeys,
     BfButton,
     InviteConfirmation
   },

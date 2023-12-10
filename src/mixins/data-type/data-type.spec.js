@@ -1,24 +1,21 @@
-import Vue from 'vue'
-import { shallow } from '@vue/test-utils'
+import { shallowMount} from '@vue/test-utils'
 
 import DataType from './'
+import TestComponent from "../test-component.vue";
 
 describe('DataType Mixin', () => {
 
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('test', {
-      mixins: [
-        DataType
-      ],
+    cmp = shallowMount(TestComponent, {
+      mixins: [DataType],
       data() {
         return {
           placeholder: ''
         }
       }
     })
-    cmp = shallow(TestComponent)
   })
 
   it('getRawDataType(): array', () => {

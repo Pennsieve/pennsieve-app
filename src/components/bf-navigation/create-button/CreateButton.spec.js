@@ -1,7 +1,7 @@
 import Vuex from "vuex";
 import CreateButton from "./CreateButton.vue";
-import { shallow } from "vue-test-utils";
-import { state, actions, mutations, getters } from "../../../vuex/store";
+import { shallowMount } from "@vue/test-utils";
+import { state, actions, mutations, getters } from "../../../store";
 
 describe("CreateButton.vue", () => {
   let cmp
@@ -14,8 +14,10 @@ describe("CreateButton.vue", () => {
       mutations,
       getters
     });
-    cmp = shallow(CreateButton, {
-      store
+    cmp = shallowMount(CreateButton, {
+      global: {
+        plugins:[store]
+      }
     })
   });
 

@@ -1,10 +1,20 @@
 import TeamLabel from './TeamLabel.vue'
 import { shallowMount } from '@vue/test-utils'
 
+
+const $router = {
+  push: vi.fn(() => {})
+}
+
 describe('TeamLabel.vue', () => {
 
   it('avatarClass: showMembers false', () => {
     const wrapper = shallowMount(TeamLabel, {
+      global: {
+        mocks :{
+          $router
+        },
+      },
       propsData: {
         showMembers: false
       }

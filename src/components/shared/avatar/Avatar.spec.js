@@ -1,7 +1,7 @@
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import Avatar from './Avatar.vue'
 import Vuex from 'vuex'
-import { getters } from '../../../vuex/store'
+import { getters } from '../../../store'
 
 
 describe('Avatar.vue', () => {
@@ -19,8 +19,10 @@ describe('Avatar.vue', () => {
       state,
       getters
     })
-    cmp = shallow(Avatar, {
-      store
+    cmp = shallowMount(Avatar, {
+      global:{
+        plugins:[store]
+      }
     })
   })
 

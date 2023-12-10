@@ -1,33 +1,31 @@
 import CollaboratorLabel from './CollaboratorLabel.vue'
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('CollaboratorLabel.vue', () => {
   let cmp
 
   beforeEach(() => {
-    cmp = shallow(CollaboratorLabel)
+    cmp = shallowMount(CollaboratorLabel)
   })
 
-  it('isTeam: true', () => {
+  it('isTeam: true', async () => {
     const item = {
       team: {
         id: 123,
         name: 'Blackfynn'
       }
     }
-    cmp.setProps({
+    await cmp.setProps({
       item
     })
-    cmp.update()
     expect(cmp.vm.isTeam).toBe(true)
   })
 
-  it('isTeam: false', () => {
+  it('isTeam: false', async () => {
     const item = {}
-    cmp.setProps({
+    await cmp.setProps({
       item
     })
-    cmp.update()
     expect(cmp.vm.isTeam).toBe(false)
   })
 

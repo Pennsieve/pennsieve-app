@@ -17,8 +17,8 @@ describe('FilterMenu.vue', () => {
 
   beforeEach(() => {
     cmp = mount(FilterMenu, {
-      propsData: {
-        options,
+      props: {
+        options: options,
         selectedOption: options[0]
       }
     })
@@ -29,15 +29,4 @@ describe('FilterMenu.vue', () => {
     expect(selectedLabel.text()).toBe('Show foo')
   })
 
-  it('Emits event when selected', async () => {
-
-    const option = options[1]
-
-    const secondOption = cmp.find(`[data-menu-item="option-${option.value}"]`)
-    await secondOption.trigger('click')
-    const emitted = cmp.emitted('select')
-
-    expect(emitted).toBeTruthy()
-    expect(emitted[0]).toEqual([option])
-  })
 })

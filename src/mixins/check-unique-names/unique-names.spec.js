@@ -1,18 +1,17 @@
 import Vue from 'vue'
-import { shallow } from '@vue/test-utils'
+import {shallow, shallowMount} from '@vue/test-utils'
 
 import uniqueNames from './'
+import TestComponent from "../test-component.vue";
 
 describe('check-unique-names Mixin', () => {
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('test', {
-      mixins: [
-        uniqueNames
-      ]
+
+    cmp = shallowMount(TestComponent, {
+      mixins: [uniqueNames]
     })
-    cmp = shallow(TestComponent)
   })
 
   it('checkUniqueName: is unique', () => {

@@ -1,4 +1,5 @@
 <template>
+  <div></div>
   <el-dialog
     :show-close="false"
     :modelValue="dialogVisible"
@@ -13,7 +14,7 @@
       />
     </template>
 
-    <dialog-body>
+    <dialog-body ref="dialogb">
       <el-form
         ref="teamForm"
         :model="ruleForm"
@@ -75,6 +76,7 @@ export default {
     BfDialogHeader,
     DialogBody
   },
+  emits: ['team-created','team-updated','close-dialog'],
 
   mixins: [
     Request,
@@ -106,7 +108,7 @@ export default {
     team: {
       type: Object,
       default: function() {
-        return {}
+        return {name: ''}
       }
     }
   },
@@ -114,7 +116,8 @@ export default {
   data() {
     /* istanbul ignore next */
     const checkForUniqueness = (rule, value, callback) => {
-      if (value.length === 0) {
+      console.log("value" + value)
+      if ( value.length === 0) {
         return callback('Team name is required')
       } else if (this.teamNameExists(value)) {
         return callback('Team names must be unique')
@@ -186,6 +189,7 @@ export default {
     closeDialog: function() {
       this.$refs['teamForm'].resetFields()
       this.$emit('close-dialog')
+
     },
     /**
      * Makes XHR call to create/edit a team

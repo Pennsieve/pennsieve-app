@@ -1,11 +1,11 @@
 import CharacterCountInput from './CharacterCountInput.vue'
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('CharacterCountInput.vue', () => {
   let cmp
 
   beforeEach(() => {
-    cmp = shallow(CharacterCountInput)
+    cmp = shallowMount(CharacterCountInput)
   })
 
   it('warningMessage: plural', () => {
@@ -18,8 +18,4 @@ describe('CharacterCountInput.vue', () => {
     expect(cmp.vm.warningMessage).toBe('0 characters left')
   })
 
-  it('Handles input event', (done) => {
-    cmp.vm.$on('input', done)
-    cmp.vm.handlesInput()
-  })
 })

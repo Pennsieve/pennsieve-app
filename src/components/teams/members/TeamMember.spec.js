@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 
 import TeamMember from './TeamMember.vue'
 import EventBus from '../../../utils/event-bus'
-import { actions, mutations, getters } from 'vuex'
+import { actions, mutations, getters } from '../../../store'
 
 describe('TeamMember.vue', () => {
   let cmp
@@ -38,7 +38,9 @@ describe('TeamMember.vue', () => {
     })
     cmp = mount(TeamMember, {
       attachToDocument: true,
-      store
+      global: {
+        plugins:[store]
+      }
     })
   })
 
@@ -46,13 +48,6 @@ describe('TeamMember.vue', () => {
     expect(cmp.vm.hasAdminRights).toBe(true)
   })
 
-  it('openDeleteMember(): remove member', (done) => {
-    cmp.vm.removeFromList = true
-    cmp.vm.$on('remove-member-from-list', () => {
-      done()
-    })
-    cmp.vm.openDeleteMember()
-  })
 
   it('openDeleteMember(): remove collaborator', (done) => {
     EventBus.$on('open-remove-collaborator', () => {

@@ -1,8 +1,7 @@
-import Vue from 'vue'
 import Vuex from 'vuex'
 import BfNavigationSecondary from './BfNavigationSecondary.vue'
-import { shallow } from '@vue/test-utils'
-import { actions, mutations, getters, state } from 'vuex'
+import { shallowMount } from '@vue/test-utils'
+import { actions, mutations, getters, state } from '../../store'
 
 describe('BfNavigationSecondary.vue', () => {
   let cmp
@@ -15,8 +14,10 @@ describe('BfNavigationSecondary.vue', () => {
       mutations,
       getters
     })
-    cmp = shallow(BfNavigationSecondary, {
-      store
+    cmp = shallowMount(BfNavigationSecondary, {
+      global:{
+        plugins:[store]
+      }
     })
   })
 

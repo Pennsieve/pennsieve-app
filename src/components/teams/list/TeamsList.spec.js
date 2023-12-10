@@ -1,10 +1,9 @@
 import Vuex from 'vuex'
 import { mount } from '@vue/test-utils'
 
-import { actions, mutations, getters } from 'vuex'
 import TeamList from './TeamsList.vue'
-import EventBus from '../../../utils/event-bus'
-import flushPromises from 'flush-promises'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+
 
 const teams = [
   {team: {id: 1, name: 'Eagles'}},
@@ -15,8 +14,7 @@ const teams = [
 
 describe('TeamList.vue', () => {
   let cmp
-  let store
-  let state
+  let state, actions, getters, mutations
 
   beforeEach(() => {
     state = {
@@ -39,26 +37,44 @@ describe('TeamList.vue', () => {
         administrators: [{id: 1}]
       },
     }
-    store = new Vuex.Store({
+
+    mutations = {
+      UPDATE_TEAMS(state, teams) {
+        state.teams = teams;
+      },
+    }
+
+    actions = {
+      updateTeams: ({ commit }, evt) => commit("UPDATE_TEAMS", evt),
+    }
+
+    getters = {
+      activeOrganization: (state) => state.activeOrganization,
+    }
+
+    let store = new Vuex.Store({
       state,
       actions,
       mutations,
       getters
     })
-    fetch.mockResponse(JSON.stringify(teams), {status: 200})
     cmp = mount(TeamList, {
+      global: {
+        plugins: [store],
+        stubs: ["router-link", "router-view"]
+      },
       attachToDocument: true,
-      store
     })
+
+
   })
 
-  it('watch teams', (done) => {
-    const spy = jest.spyOn(cmp.vm, 'getTeams')
+  it('watch teams', async (done) =>  {
+    const spy = vi.spyOn(cmp.vm, 'getTeams')
     cmp.vm.teamsList = []
-    cmp.vm.$store.dispatch('updateTeams', [{team: {id: 1, name: 'Eagles'}},]).then(() => {
+    await cmp.vm.$store.dispatch('updateTeams', [{team: {id: 1, name: 'Eagles'}},]).then(() => {
       const updatedTeams = cmp.vm.teams
       expect(spy).toBeCalled()
-      done()
     })
   })
 
@@ -93,7 +109,7 @@ describe('TeamList.vue', () => {
     expect(cmp.vm.teams.length).toBe(4)
   })
 
-  it('onTeamCreated(): success', () => {
+  it('onTeamCreated(): success', async () => {
     const team = {
       team: {
         id: 5,
@@ -102,6 +118,7 @@ describe('TeamList.vue', () => {
     }
     expect(cmp.vm.teams.length).toBe(4)
     cmp.vm.onTeamCreated(team)
+    await cmp.vm.$nextTick()
     expect(cmp.vm.teams.length).toBe(5)
   })
 
@@ -109,14 +126,17 @@ describe('TeamList.vue', () => {
     expect(cmp.vm.teams.length > 0).toBe(true)
   })
 
-  it('sortColumn', () => {
+  it('sortColumn', async () => {
     cmp.vm.sortColumn('team.id')
-    const sortedTeams = cmp.vm.returnSort('team.id', teams)
-      expect(cmp.vm.teams).toMatchObject(sortedTeams)
+    const sortedTeams = cmp.vm.returnSort('team.id', teams, 'asc')
+    await cmp.vm.$nextTick()
+
+    expect(cmp.vm.teams).toMatchObject(sortedTeams)
   })
 
-  it('openCreateDialog()', () => {
+  it('openCreateDialog()', async () => {
     cmp.vm.openCreateDialog()
+    await cmp.vm.$nextTick()
     expect(cmp.vm.$refs.createEditTeam.dialogVisible).toBe(true)
   })
 })

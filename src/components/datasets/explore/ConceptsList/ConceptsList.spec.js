@@ -5,23 +5,36 @@ global.localStorage = {
 }
 
 import Vuex from 'vuex'
-import { shallow } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import ConceptsList from './ConceptsList.vue'
-import { actions, mutations, getters, state } from '../../../../vuex/store'
+import { actions, mutations, getters } from '../../../../store'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+
 
 describe('ConceptsList.vue', () => {
   let cmp
-  let store
+  let store, state
 
   beforeEach(() => {
+
+    state = {
+      config: {
+        apiUrl: 'https://api.blackfynn.net'
+      },
+      userToken: '123',
+      concepts: [],
+    }
+
     store = new Vuex.Store({
       state,
       actions,
       mutations,
       getters
     })
-    cmp = shallow(ConceptsList, {
-      store
+    cmp = shallowMount(ConceptsList, {
+      global: {
+        plugins:[store]
+      }
     })
   })
 

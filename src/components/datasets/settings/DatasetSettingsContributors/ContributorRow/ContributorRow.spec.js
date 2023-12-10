@@ -1,6 +1,6 @@
 import Vuex from 'vuex'
 import ContributorRow from './ContributorRow.vue'
-import { state, getters } from '@/vuex/store'
+import { state, getters } from '../../../../../store'
 import { mount } from '@vue/test-utils'
 
 const dataset = {
@@ -82,11 +82,13 @@ describe('ContributorRow.vue', () => {
       getters
     })
     cmp = mount(ContributorRow, {
-      store
+      global:{
+        plugins:[store]
+      }
     })
   })
 
-  it('The contributor is a dataset owner', () => {
+  it('The contributor is a dataset owner', async () => {
     cmp.setProps({
       contributor: {
         "id": 5,
@@ -97,6 +99,7 @@ describe('ContributorRow.vue', () => {
         "userId": 28
       }
     })
+    await cmp.vm.$nextTick()
     expect(cmp.vm.isDatasetOwner).toBe(true)
   })
 

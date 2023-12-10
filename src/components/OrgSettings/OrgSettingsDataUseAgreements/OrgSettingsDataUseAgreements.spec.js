@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
 import { mount } from '@vue/test-utils'
 
-import { actions, mutations, getters } from 'vuex'
+import { actions, mutations, getters } from '../../../store'
 import OrgSettingsDataUseAgreements from './OrgSettingsDataUseAgreements.vue'
 
 import { agreement, agreements } from './mock-data-use-agreements'
@@ -33,14 +33,18 @@ describe('OrgSettingsDataUseAgreements.vue', () => {
     })
     cmp = mount(OrgSettingsDataUseAgreements, {
       attachToDocument: false,
-      store
+      global:{
+        plugins:[store]
+      }
     })
 
-    cmp.vm.sendXhr = jest.fn(() => Promise.resolve({ data: {} }));
+    cmp.vm.sendXhr = vi.fn(() => Promise.resolve({ data: {} }));
   })
 
   it('Should remove agreement from list when deleted', async () => {
     await cmp.vm.deleteDataUseAgreement(agreement)
+    await cmp.vm.$nextTick()
+    await cmp.vm.$nextTick()
     expect(cmp.vm.dataUseAgreements.length).toBe(2)
   })
 
@@ -55,6 +59,8 @@ describe('OrgSettingsDataUseAgreements.vue', () => {
       name: 'New updated name'
     }
     await cmp.vm.editDataUseAgreement(updatedAgreement)
+    await cmp.vm.$nextTick()
+    await cmp.vm.$nextTick()
     expect(cmp.vm.dataUseAgreements[1]).toMatchObject(updatedAgreement)
   })
 

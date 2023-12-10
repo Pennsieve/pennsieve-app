@@ -1,24 +1,23 @@
 import Vue from 'vue'
-import { shallow } from '@vue/test-utils'
+import {shallow, shallowMount} from '@vue/test-utils'
 
 import FileIcon from './'
+import TestComponent from "../test-component.vue";
 
 describe('FileIcon Mixin', () => {
 
   let cmp
 
   beforeEach(() => {
-    const TestComponent = Vue.component('test', {
-      mixins: [
-        FileIcon
-      ],
+    cmp = shallowMount(TestComponent, {
+      mixins: [FileIcon],
       data() {
         return {
           placeholder: ''
         }
       }
     })
-    cmp = shallow(TestComponent)
+
   })
 
   it('fileIcon: returns Collection folder icon', () => {

@@ -54,7 +54,7 @@ export default {
 
   props: {
     item: {
-      type: Object
+      type: Object,
     },
     removeFromList: {
       type: Boolean,
