@@ -42,7 +42,7 @@ node('executor') {
         if (["main", "prod"].contains(env.BRANCH_NAME)) {
             stage('Deploy') {
                 node("${executorEnv}-executor") {
-                    def bucketName = "pennsieve-${executorEnv}-app-v2-use1"
+                    def bucketName = "pennsieve-${executorEnv}-app2-use1"
 
                     try {
                         unstash 'dist'
