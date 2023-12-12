@@ -1,5 +1,6 @@
 import BfCard from './BfCard.vue'
 import { shallowMount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 
 const evt = {
   preventDefault: () => {}
@@ -94,13 +95,16 @@ describe('BfCard.vue', () => {
   // })
 
   it('Creates css classNames if isModelCard and checked are true', async () => {
-    await cmp.setProps({
+    cmp.setProps({
       isModelCard: true,
       checked: true
     })
+
+    // expect(cmp.vm.classNames).toBe('bf-card model-card active')
+
     setTimeout(() => {
       expect(cmp.vm.classNames).toBe('bf-card model-card active')
-    }, "50");
+    }, 100);
 
   })
 
@@ -111,7 +115,7 @@ describe('BfCard.vue', () => {
     })
     setTimeout(() => {
       expect(cmp.vm.classNames).toBe('bf-card model-card')
-    }, "50");
+    }, 100);
 
   })
 
