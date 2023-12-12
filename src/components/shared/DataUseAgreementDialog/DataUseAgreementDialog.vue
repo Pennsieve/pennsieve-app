@@ -117,61 +117,65 @@ export default {
   line-height: 24px;
   padding-top: 32px;
   white-space: pre-wrap;
-  :deep {
+  :deep(
     h1,
     p,
     h2,
     h3,
     blockquote,
     h4,
-    pre {
+    pre) {
       max-width: 616px;
-    }
+    };
+  :deep(
     h1,
     h2,
     h3,
     h4,
-    h5 {
+    h5) {
       margin: 0 0 8px;
-    }
-    h1 {
+    };
+  :deep(
+    h1) {
       font-size: 32px;
       font-weight: bold;
       line-height: 40px;
-    }
-    p {
+    };
+  :deep(
+      p) {
       margin-bottom: 16px;
-    }
-    img {
+    };
+  :deep(
+    img) {
       height: auto;
       max-width: 170%;
       margin-bottom: 20px;
       flex-basis: 50%;
       margin-top: 24px;
-    }
-    h2 {
+    };
+  :deep(h2) {
       font-size: 24px;
       font-weight: bold;
       line-height: 32px;
-    }
-    h3 {
+    };
+  :deep(h3) {
       font-size: 20px;
       font-weight: bold;
       line-height: 24px;
-      letter-spacing: 0px;
-    }
-    h4 {
+      letter-spacing: 0;
+    };
+  :deep(h4) {
       font-size: 16px;
       font-weight: bold;
       line-height: 24px;
       text-transform: uppercase;
-      letter-spacing: 0px;
-    }
-    ul {
+      letter-spacing: 0;
+    };
+  :deep(ul) {
       margin: 0 0 16px;
       padding: 0 0 0 18px;
-    }
-    blockquote {
+    };
+  :deep(blockquote) {
       font-weight: normal;
       line-height: 24px;
       font-size: 16px;
@@ -180,8 +184,8 @@ export default {
       p {
         margin-left: 16px;
       }
-    }
-    pre {
+    };
+  :deep(pre) {
       background-color: #f1f1f3;
       line-height: 24px;
       padding: 16px;
@@ -189,7 +193,6 @@ export default {
         font-weight: normal;
         font-size: 14px;
       }
-    }
   }
 }
 </style>

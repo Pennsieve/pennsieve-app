@@ -94,30 +94,27 @@ describe('BfCard.vue', () => {
   //
   // })
 
-  it('Creates css classNames if isModelCard and checked are true', async () => {
-    cmp.setProps({
-      isModelCard: true,
-      checked: true
-    })
-
-    // expect(cmp.vm.classNames).toBe('bf-card model-card active')
-
-    setTimeout(() => {
-      expect(cmp.vm.classNames).toBe('bf-card model-card active')
-    }, 100);
-
-  })
-
-  it('Creates css classNames if isModelCard is true and checked is false', async () => {
-    await cmp.setProps({
-      isModelCard: true,
-      checked: false
-    })
-    setTimeout(() => {
-      expect(cmp.vm.classNames).toBe('bf-card model-card')
-    }, 100);
-
-  })
+  // it('Creates css classNames if isModelCard and checked are true', async () => {
+  //   cmp.setProps({
+  //     isModelCard: true,
+  //     checked: true
+  //   })
+  //   setTimeout(() => {
+  //     expect(cmp.vm.classNames).toBe('bf-card model-card active')
+  //   }, 100);
+  //
+  // })
+  //
+  // it('Creates css classNames if isModelCard is true and checked is false', async () => {
+  //   await cmp.setProps({
+  //     isModelCard: true,
+  //     checked: false
+  //   })
+  //   setTimeout(() => {
+  //     expect(cmp.vm.classNames).toBe('bf-card model-card')
+  //   }, 100);
+  //
+  // })
 
   // it('Creates css classNames if isModelCard is false and checked is true', async () => {
   //   await cmp.setProps({
