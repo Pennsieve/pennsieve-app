@@ -385,7 +385,6 @@
       markdownCommand: function(title) {
         // Event.preventDefault()
 
-        console.log('help')
         // const wkButton = this.$el.querySelector(`.wk-command[title="${title}"]`)
         // if (wkButton) {
         //   wkButton.click()

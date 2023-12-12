@@ -25,9 +25,10 @@ export const handlers = [
     http.get('https://app.blackfynn.net/organizations/1/teams/17/members', () => {
         return HttpResponse.json({status: 200})
     }),
-
-
-
-
-
+    http.get('https://app.blackfynn.net/organizations/777/invites', () => {
+        return HttpResponse.json({status: 200})
+    }),
+    http.put('    https://app.blackfynn.net/organizations/666/teams/17', () => {
+        return HttpResponse.json({status: 200})
+    }),
 ]

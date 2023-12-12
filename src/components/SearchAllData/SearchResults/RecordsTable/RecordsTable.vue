@@ -55,6 +55,7 @@
         :sortable="isSortable ? 'custom' : false"
         :resizable="false"
       >
+        <template #default="scope">
           <div
             class="record-actions-wrap"
           >
@@ -64,6 +65,7 @@
               :search-all-data-records="searchAllDataMenu"
             />
           </div>
+        </template>
       </el-table-column>
     </el-table>
 </template>

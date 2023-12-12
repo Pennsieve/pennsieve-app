@@ -178,10 +178,6 @@ export default {
      * Handler for form submit and validation
      */
     onFormSubmit: function() {
-      console.log("ConfirmationDialog::onFormSubmit()")
-      console.log(`- action: ${this.action}`)
-      console.log("- resource: ")
-      console.log(this.resource)
       this.$emit("confirmed", {action: this.action, resource: this.resource})
       this.closeDialog()
     },

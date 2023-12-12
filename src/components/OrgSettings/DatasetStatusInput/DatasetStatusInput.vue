@@ -290,7 +290,6 @@ export default {
 
 
     closeSwatches: function() {
-      console.log("lkjdaslkas")
       this.openColorMenu = false
     },
     /**

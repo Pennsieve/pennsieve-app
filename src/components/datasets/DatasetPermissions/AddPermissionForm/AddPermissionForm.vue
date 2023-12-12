@@ -411,8 +411,6 @@
        * @param {Object} item
        */
       onChange: function(item) {
-        console.log(`onChange() item:`)
-        console.log(item)
         if (item && typeof(item) === 'string') {
           this.checkForExternal(item)
         } else {
@@ -425,7 +423,6 @@
       },
 
       clearForm: function() {
-        console.log("clearForm()")
         this.externalProvided = false
         this.externalPerson = {}
       },
@@ -439,9 +436,7 @@
       },
 
       checkForExternal: function(input) {
-        console.log(`checkForExternal() input: ${input}`)
         if (this.validateEmail(input) !== null) {
-          console.log(`checkForExternal() ${input} is a valid email`)
           this.externalPerson = {
             email: input,
             id: 'N:email:00000000-0000-0000-0000-000000000000'

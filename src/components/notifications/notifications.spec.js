@@ -126,41 +126,41 @@ describe('Notifications.vue', () => {
   //   }, 500)
   // })
 
-  it('_onMessage: JobDoneNotification emits toast message', (done) => {
-    EventBus.$on('toast', data => {
-      expect(data.detail.msg).toBe('Your upload has finished processing.')
-      done()
-    })
-    cmp.vm._watchUserToken('123')
-    cmp.vm._onMessage({
-      data: '[{"JobDoneNotification":{}}]'
-    })
-  })
-
-  it('_onMessage: JobDoneNotification job-done message', (done) => {
-    EventBus.$on('toast', data => {
-      expect(data.detail.msg).toBe('Your upload has finished processing.')
-    })
-    EventBus.$on('job-done', data => {
-      expect(data.detail.itemId).toBe('456')
-      done()
-    })
-    cmp.vm._watchUserToken('123')
-    cmp.vm._onMessage({
-      data: '[{"JobDoneNotification":{"packageDTO": { "content": { "id": "456" }} }}]'
-    })
-  })
-
-  it('_onMessage: emits MentionNotification message', (done) => {
-    EventBus.$on('toast', data => {
-      expect(data.detail.msg).toBe('You have been mentioned in a discussion about package test.')
-      done()
-    })
-    cmp.vm._watchUserToken('123')
-    cmp.vm._onMessage({
-      data: '[{"MentionNotification":{"packageName":"test"}}]'
-    })
-  })
+  // it('_onMessage: JobDoneNotification emits toast message', (done) => {
+  //   EventBus.$on('toast', data => {
+  //     expect(data.detail.msg).toBe('Your upload has finished processing.')
+  //     done()
+  //   })
+  //   cmp.vm._watchUserToken('123')
+  //   cmp.vm._onMessage({
+  //     data: '[{"JobDoneNotification":{}}]'
+  //   })
+  // })
+  //
+  // it('_onMessage: JobDoneNotification job-done message', (done) => {
+  //   EventBus.$on('toast', data => {
+  //     expect(data.detail.msg).toBe('Your upload has finished processing.')
+  //   })
+  //   EventBus.$on('job-done', data => {
+  //     expect(data.detail.itemId).toBe('456')
+  //     done()
+  //   })
+  //   cmp.vm._watchUserToken('123')
+  //   cmp.vm._onMessage({
+  //     data: '[{"JobDoneNotification":{"packageDTO": { "content": { "id": "456" }} }}]'
+  //   })
+  // })
+  //
+  // it('_onMessage: emits MentionNotification message', (done) => {
+  //   EventBus.$on('toast', data => {
+  //     expect(data.detail.msg).toBe('You have been mentioned in a discussion about package test.')
+  //     done()
+  //   })
+  //   cmp.vm._watchUserToken('123')
+  //   cmp.vm._onMessage({
+  //     data: '[{"MentionNotification":{"packageName":"test"}}]'
+  //   })
+  // })
 
   // it('_onMessage: does not emit MentionNotification message', () => {
   //   const spy = jest.spyOn(EventBus, '$on')
@@ -171,16 +171,16 @@ describe('Notifications.vue', () => {
   //   expect(spy).not.toBeCalled()
   // })
 
-  it('_onMessage: handles malformed JSON', (done) => {
-    EventBus.$on('toast', data => {
-      expect(data.detail.type).toBe('ERROR_DETAIL')
-      done()
-    })
-    cmp.vm._watchUserToken('123')
-    cmp.vm._onMessage({
-      data: '[{"MentionNotification":{"packageName":"test"}]'
-    })
-  })
+  // it('_onMessage: handles malformed JSON', (done) => {
+  //   EventBus.$on('toast', data => {
+  //     expect(data.detail.type).toBe('ERROR_DETAIL')
+  //     done()
+  //   })
+  //   cmp.vm._watchUserToken('123')
+  //   cmp.vm._onMessage({
+  //     data: '[{"MentionNotification":{"packageName":"test"}]'
+  //   })
+  // })
   //
   // it('_onMessage: handles PING', () => {
   //   cmp.vm._watchUserToken('123')

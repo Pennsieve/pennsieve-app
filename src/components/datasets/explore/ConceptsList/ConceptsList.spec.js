@@ -33,7 +33,9 @@ describe('ConceptsList.vue', () => {
     })
     cmp = shallowMount(ConceptsList, {
       global: {
-        plugins:[store]
+        plugins:[store],
+        stubs: ["router-link"]
+
       }
     })
   })

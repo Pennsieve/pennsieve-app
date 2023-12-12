@@ -118,21 +118,16 @@ export default {
     ...mapActions('repositoryModule', ['fetchPublishingInfo']),
 
     getInfo: function() {
-      console.log("Info::getInfo()")
       this.fetchPublishingInfo()
         .then(_ => this.loadInfo())
         .catch(err => {console.log(`Info::getInfo() err: ${err}`)})
     },
 
     loadInfo: function() {
-      console.log("Info::loadInfo()")
       const infoTypes = ['info', 'funding', 'acknowledgements']
 
       for (const infoType of infoTypes) {
-        console.log(`Info::loadInfo() infoType: ${infoType}`)
         let publishingInfo = this.getPublishingInfo(infoType)
-        console.log("Info::loadInfo() publishingInfo:")
-        console.log(publishingInfo)
         if (publishingInfo && publishingInfo.url) {
           this.loadText(publishingInfo.url)
             .then(result => this.publishingInfo[infoType] = result)

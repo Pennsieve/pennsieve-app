@@ -31,21 +31,17 @@ describe('RemoveCollaborator.vue', () => {
     })
     cmp = mount(RemoveCollaborator, {
       attachToDocument: true,
-      propsData: {
+      props: {
         team: {
           team: {
             id: 777,
             name: 'Iggles'
           }
-        }
-      },
-      data() {
-        return {
-          member: {
-            id: 1,
-            firstName: 'Clark',
-            lastName: 'Kent'
-          }
+        },
+        member: {
+          id: 1,
+          firstName: 'Clark',
+          lastName: 'Kent'
         }
       },
       global: {
@@ -62,16 +58,6 @@ describe('RemoveCollaborator.vue', () => {
   it('closeDialog', () => {
     cmp.vm.closeDialog()
     expect(cmp.vm.dialogVisible).toBe(false)
-  })
-
-  it('handleOpenRemoveCollaborator', () => {
-    const member = {
-      id: 1,
-      firstName: 'Clark',
-      lastName: 'Kent'
-    }
-    cmp.vm.handleOpenRemoveCollaborator(member)
-    expect(cmp.vm.member).toMatchObject(member)
   })
 
   it('deleteUrl', () => {

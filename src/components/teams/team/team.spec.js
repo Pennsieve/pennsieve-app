@@ -44,6 +44,7 @@ describe('Team.vue', () => {
           $router
         },
         plugins:[store],
+        stubs: ["router-link"]
       },
 
     })

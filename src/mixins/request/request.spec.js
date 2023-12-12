@@ -11,7 +11,6 @@ const store = createStore({
   },
   actions: {
     clearState: ({commit}) => {
-      console.log('state cleared')
     }
   }
 })

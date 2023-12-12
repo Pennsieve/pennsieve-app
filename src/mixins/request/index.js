@@ -64,7 +64,6 @@ export default {
           return resp.json()
             .then(this.finishLoading.bind(this))
             .catch(() => {
-              console.log("returning unprocessed response")
               this.finishLoading(resp.body)
             })
         })

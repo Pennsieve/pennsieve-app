@@ -44,7 +44,6 @@ export const actions = {
 
     archiveManifest: async({ commit, rootState}, {manifest_id, permanent}) => {
         try {
-            console.log(permanent)
             let endpoint = `${rootState.config.api2Url}/manifest/archive`
             const apiKey = rootState.userToken || Cookies.get('user_token')
 

@@ -220,9 +220,6 @@ export default {
     role: function() {
       const oldRole = this.item.role === 'Administrator' ? 'Collaborator' : this.item.role
       const role = propOr('', 'permission', this.item)
-
-      console.log(oldRole)
-      console.log(role)
       return defaultTo(oldRole, role)
 
     }

@@ -49,7 +49,6 @@ export default {
 
     pageName: function() {
       const r = useRoute()
-      console.log(r)
 
       switch (r.name) {
         case "dataset-settings":

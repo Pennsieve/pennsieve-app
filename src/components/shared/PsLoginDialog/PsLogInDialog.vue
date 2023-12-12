@@ -519,7 +519,6 @@ export default {
       try {
         const cred = await Auth.federatedSignIn({customProvider: provider})
       } catch (error) {
-        console.log("initiateFederatedLogin() error: " + error)
         this.isLoggingIn = false
         EventBus.$emit('toast', {
           detail: {

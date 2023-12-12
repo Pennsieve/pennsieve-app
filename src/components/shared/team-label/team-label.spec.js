@@ -14,19 +14,25 @@ describe('TeamLabel.vue', () => {
         mocks :{
           $router
         },
+        stubs: ['router-link']
       },
-      propsData: {
+      props: {
         showMembers: false
-      }
+      },
     })
     expect(wrapper.vm.avatarClass).toBe('team-avatar condensed')
   })
 
   it('avatarClass: showMembers true', () => {
     const wrapper = shallowMount(TeamLabel, {
-      propsData: {
+      props: {
         showMembers: true
-      }
+      },
+      global:{
+        stubs: ['router-link']
+      },
+      stubs: ['router-link']
+
     })
     expect(wrapper.vm.avatarClass).toBe('team-avatar')
   })
@@ -38,9 +44,12 @@ describe('TeamLabel.vue', () => {
       }
     }
     const wrapper = shallowMount(TeamLabel, {
-      propsData: {
+      props: {
         showMembers: false
-      }
+      },
+      global:{
+        stubs: ['router-link']
+      },
     })
     expect(wrapper.vm.createTeamId(team)).toBe(123)
   })
@@ -48,9 +57,12 @@ describe('TeamLabel.vue', () => {
   it('createTeamId: default Id', () => {
     const team = {}
     const wrapper = shallowMount(TeamLabel, {
-      propsData: {
+      props: {
         showMembers: false
-      }
+      },
+      global:{
+        stubs: ['router-link']
+      },
     })
     expect(wrapper.vm.createTeamId(team)).toBe('N:team:0')
   })

@@ -116,7 +116,6 @@ export default {
   data() {
     /* istanbul ignore next */
     const checkForUniqueness = (rule, value, callback) => {
-      console.log("value" + value)
       if ( value.length === 0) {
         return callback('Team name is required')
       } else if (this.teamNameExists(value)) {

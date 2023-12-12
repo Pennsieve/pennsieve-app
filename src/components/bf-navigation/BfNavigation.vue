@@ -400,7 +400,6 @@
        * Toggles primary nav open and closed
        */
       toggleMenu: function() {
-        console.log('condensing primary nav')
         this.condensePrimaryNav(!this.primaryNavCondensed)
       },
 

@@ -70,7 +70,6 @@ export const actions = {
       const resp = await fetch(url, { headers: myHeaders })
       if (resp.ok) {
         const  metadata = await resp.json()
-        console.log(metadata)
         commit('UPDATE_PACKAGE_META', metadata)
 
       } else {

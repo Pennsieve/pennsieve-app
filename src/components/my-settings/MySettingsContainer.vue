@@ -647,7 +647,6 @@ export default {
     //validate email form
     handleUpdateEmailSubmit: function() {
       var temp = this.$refs.updateEmailForm;
-      console.log("The new email is: ",temp)
       //UNCOMMENT AFTER DEBUGGING:
       /*
       this.$refs.updateEmailForm.validate(valid => {

@@ -99,13 +99,6 @@ export default {
       this.$emit("close-dialog")
     },
     /**
-     * Handles open-remove-collaborator event
-     * @param {Object} member
-     */
-    handleOpenRemoveCollaborator: function(member) {
-      this.member = member
-    },
-    /**
      * Creates DELETE url to remove member from org
      */
     deleteUrl: function() {

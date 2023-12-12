@@ -348,7 +348,6 @@ export default {
 
           if (!isSubscribed) {
             if (this.profile.email.split("@")[1] === "pennsieve-nonexistent.email") {
-              console.log("federatedLogin: " + this.profile.email + " => " + this.profile.email.split("@")[1])
               this.$router.replace(`/${orgId}/welcome/federated-sign-up`)
             } else {
               this.$router.replace(`/${orgId}/welcome/terms-of-service`)
@@ -558,7 +557,6 @@ export default {
       let messageClass = pathOr('', ['detail', 'class'], evt)
 
       if (!message) {
-        console.log(evt)
         this.logger(['Error!', evt], 'error')
         return
       }
@@ -705,11 +703,8 @@ export default {
     },
 
     finalizeOrcidIntegration: function(event) {
-      console.log("finalizeOrcidIntegration()")
       const oauthCode = pathOr('', ['oauthCode'], event)
       if (oauthCode !== '') {
-        console.log("oauthCode:")
-        console.log(oauthCode)
         const url = this.getORCIDApiUrl
 
         this.sendXhr(url, {

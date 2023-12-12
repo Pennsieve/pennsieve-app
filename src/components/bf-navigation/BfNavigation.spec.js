@@ -1,6 +1,8 @@
 import BfNavigation from './BfNavigation.vue'
-import {RouterLinkStub, shallowMount} from '@vue/test-utils'
+import {shallowMount} from '@vue/test-utils'
 import store from '../../store'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 
 describe('BfNavigation.vue', () => {
   let cmp
@@ -8,9 +10,7 @@ describe('BfNavigation.vue', () => {
   beforeEach(() => {
     cmp = shallowMount(BfNavigation, {
       global: {
-        stubs: {
-          RouterLink: RouterLinkStub
-        },
+        stubs: ["router-link", "router-view"],
         plugins: [store],
       },
     })

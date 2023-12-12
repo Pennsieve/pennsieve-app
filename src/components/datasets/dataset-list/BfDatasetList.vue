@@ -447,7 +447,6 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
       ]),
 
       onCloseCreateDialog: function() {
-        console.log('closing dialog')
         this.newDatasetDialogOpen = false
       },
 

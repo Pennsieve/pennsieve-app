@@ -7,9 +7,6 @@ describe('BfDialogHeader.vue', () => {
 
   beforeEach(() => {
     cmp = mount(BfDialogHeaderTestComponent, {
-      methods: {
-        handleClose: () => {}
-      }
     })
   })
 

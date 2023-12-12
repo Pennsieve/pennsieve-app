@@ -79,7 +79,6 @@ describe('ConceptListItem.vue', () => {
     await cmp.setProps({
       concept: cpt
     })
-    console.log(cmp.vm.modelId)
     expect(cmp.vm.modelId).toEqual(cpt.id)
   })
 
