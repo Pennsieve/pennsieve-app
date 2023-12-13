@@ -257,7 +257,7 @@
       box-sizing: border-box;
       flex: 1;
       overflow: scroll;
-      padding: 0 0 16px 16px;
+      padding: 0 0 16px 8px;
     }
     .models-list-loading-wrap {
       display: flex;
@@ -265,7 +265,7 @@
       height: 100%;
     }
     .input-wrap {
-      padding: 0px 0px 0 16px;
+      padding: 0px 0px 0 8px;
     }
     .el-input {
       margin-bottom: 0;

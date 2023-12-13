@@ -75,13 +75,13 @@ export default {
           route: {
             name: 'relationships',
           },
-          label: 'relationships',
+          label: 'Relationships',
         },
         {
           route: {
             name: 'graph',
           },
-          label: 'graph',
+          label: 'Graph',
         },
       ]
     },

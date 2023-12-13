@@ -96,6 +96,7 @@ const ApplicationsList = () => import ('../components/Integrations/applicationsL
 const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
 const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
+const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/GraphBrowser.vue')
 
 
 const router = createRouter({
@@ -409,7 +410,7 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                // stage: GraphBrowser
+                stage: GraphBrowser
               }
             },
           ]

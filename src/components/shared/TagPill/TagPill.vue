@@ -61,7 +61,7 @@ export default {
   .indicator {
     background-color: $gray_4;
     border-radius: 50%;
-    flex-shrinK: 0;
+    flex-shrink: 0;
     height: 8px;
     margin-right: 6px;
     width: 8px;

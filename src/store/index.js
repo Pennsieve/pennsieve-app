@@ -105,8 +105,6 @@ export const state = {
   environment: site.environment,
   viewerMontageScheme: "NOT_MONTAGED",
   bulkEditingChannels: false,
-  blindReviewerSubmissions: {},
-  thirdReviewerSubmissions: {},
   orgDatasetStatuses: [],
   searchModalVisible: false,
   searchModalSearch: {},
@@ -151,9 +149,7 @@ export const mutations = {
         state.shouldCollapsePrimaryNav = data;
       },
 
-      UPDATE_THIRD_REVIEWER_SUBMISSIONS(state, data) {
-        state.thirdReviewerSubmissions = data;
-      },
+
       UPDATE_ORG_MEMBERS(state, members) {
         state.orgMembers = members;
       },
@@ -452,10 +448,6 @@ export const mutations = {
       SET_DATASET_ROLE(state, data) {
         const role = R.propOr("viewer", "role", data);
         state.datasetRole = role;
-      },
-      UPDATE_BLIND_REVIEWER_SUBMISSIONS(state, data) {
-        const key = R.merge(state.blindReviewerSubmissions, data);
-        state.blindReviewerSubmissions = key;
       },
 
       SET_DATASET_TEMPLATES(state, datasetTemplates) {
@@ -779,10 +771,6 @@ export const actions = {
   setDatasetDoi: ({ commit }, evt) => commit("SET_DATASET_DOI", evt),
   setIsLoadingDatasetDoi: ({ commit }, evt) =>
       commit("SET_IS_LOADING_DATASET_DOI", evt),
-  updateBlindReviewerSubmissions: ({ commit }, evt) =>
-      commit("UPDATE_BLIND_REVIEWER_SUBMISSIONS", evt),
-  updateThirdReviewerSubmissions: ({ commit }, evt) =>
-      commit("UPDATE_THIRD_REVIEWER_SUBMISSIONS", evt),
   setDatasetFilters: ({ commit }, evt) => commit("SET_DATASET_FILTERS", evt),
   setDatasetContributors: ({ commit }, evt) =>
       commit("SET_DATASET_CONTRIBUTORS", evt),
