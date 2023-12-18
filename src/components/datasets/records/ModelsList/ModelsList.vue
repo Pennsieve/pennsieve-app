@@ -123,6 +123,8 @@
   export default {
     name: 'ModelsList',
 
+    emits: ['click'],
+
     components: {
       IconMagnifyingGlass,
       ConceptsListItem,

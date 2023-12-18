@@ -9,15 +9,15 @@
         <div class="dataset-name">{{ datasetNameDisplay() }}</div>
       </div>
     </template>
-    <template v-if="backLinkVisible">
-      <div class="link-back" @click.prevent="pageBackRoute">
-        <div v-if="isFileRecord">
-          &lt; Back to Files
-        </div>
-        <div v-else>
-          &lt; Back to {{linkBack.name}}
-        </div>
-      </div>
+
+    <template v-if="showLinkBack">
+      <a @click="$router.go(-1)" class="link-back">
+        <IconArrowLeft
+          :height="10"
+          :width="10"
+        />
+        Back to {{ this.linkBack }}
+      </a>
     </template>
 
     <div
@@ -27,6 +27,7 @@
     >
       <slot name="breadcrumb" />
     </div>
+
     <div class="row main">
       <div class="col">
         <h1 v-if="title">{{ title }}</h1>
@@ -69,6 +70,7 @@ import EventBus from '@/utils/event-bus'
 import Request from '../../../mixins/request/index'
 import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
+import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 
 export default {
   name: 'BfRafter',
@@ -123,11 +125,11 @@ export default {
         'dataset-permissions',
         'activity-log',
         'dataset-settings',
-        'concept-search',
         'metadata',
         'records',
         'user-permissions',
-        'embargo-permissions'
+        'embargo-permissions',
+        'models-list'
       ]
     }
   },
@@ -139,6 +141,9 @@ export default {
       'datasetRafterVisStatus',
       'datasetRafterVisStatus2'
     ]),
+    showLinkBack: function() {
+      return this.linkBack.length >0
+    },
 
     getThemeColors: function() {
       return this.getTheme(this.orgId)
@@ -150,9 +155,9 @@ export default {
 
     },
 
-    backLinkVisible: function() {
-      return Object.keys(this.linkBack).length > 0
-    },
+    // backLinkVisible: function() {
+    //   return Object.keys(this.linkBack).length > 0
+    // },
 
     isFileRecord: function() {
       return this.$route.name === "file-record";
@@ -303,6 +308,13 @@ export default {
 <style lang="scss">
 @import '../../../assets/_variables.scss';
 @import '../../../assets/components/_dataset-status.scss';
+
+.link-back {
+  color: $white;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
 
 .bf-rafter {
   padding: 8px 32px 8px 32px;

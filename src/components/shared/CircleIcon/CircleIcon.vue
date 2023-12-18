@@ -30,7 +30,7 @@ export default {
 </script>
 
 
-<style lang="scss">
+<style scoped lang="scss">
   .circle-icon {
     align-items: center;
     background: #F1F1F3;

@@ -13,9 +13,9 @@
       no-data-text="Start typing to add a new relationship"
       popper-class="bf-menu relationship-input-options"
       @visible-change="formatDisplayValue"
-      @change="$emit('input', $event)"
+      @change="$emit('update:modelValue', $event)"
     >
-      <el-option-group label="Choose from Existing Relationships">
+      <el-option-group label="Existing Relationships">
         <el-option
           v-for="option in options"
           :key="option.id"
@@ -55,7 +55,7 @@ export default {
     },
     placeholder: {
       type: String,
-      default: 'Describe Relationship'
+      default: 'Provide New or Select Existing Relationship Type'
     },
     isCreating: {
       type: Boolean,
@@ -65,7 +65,7 @@ export default {
       type: Boolean,
       default: true
     },
-    value: {
+    modelValue: {
       type: String
     },
     showDirection: {
@@ -91,7 +91,7 @@ export default {
   },
 
   watch: {
-    value: function(newValue) {
+    modelValue: function(newValue) {
       if (newValue !== this.selectedValue) {
         this.selectedValue = newValue
       }
@@ -123,9 +123,9 @@ export default {
      */
     formatDisplayValue: function() {
       this.$nextTick(() => {
-        const displayName = this.getRelationshipTypeDisplayName(this.value)
+        const displayName = this.getRelationshipTypeDisplayName(this.modelValue)
         if (displayName) {
-          this.$refs.menu.selectedLabel = this.getRelationshipTypeDisplayName(this.value)
+          this.$refs.menu.selectedLabel = this.getRelationshipTypeDisplayName(this.modelValue)
         }
       })
     },
@@ -187,6 +187,10 @@ export default {
   .flip-icon-arrow {
     transform: rotate(180deg);
   }
+}
+
+.relationship-input {
+  min-width:100%;
 }
 
 .relationship-input.can-create .el-select__caret {

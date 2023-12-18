@@ -27,8 +27,8 @@
       >
         <IconZoomOut
           icon="icon-zoom-out"
-          height="24"
-          width="24"
+          :height="24"
+          :width="24"
         />
       </button>
     </el-tooltip>

@@ -11,7 +11,7 @@
         class="relationship-title"
       >
         <IconArrowUp
-          :class="[ arrowDirection(`fileRelationships+${this.relationshipName}`) === 'down' ? 'svg-flip' : '' ]"
+          :class="[ arrowDirection(`fileRelationships+${this.relationshipName}`) === 'up' ? 'svg-flip' : '' ]"
           :height="10"
           :width="10"
         />
@@ -519,7 +519,7 @@ export default {
     arrowDirection: function(sectionName) {
       if (this.activeSections) {
         const isActive = includes(sectionName, this.activeSections)
-        return isActive ? 'down' : 'right'
+        return isActive ? 'down' : 'up'
       }
     },
     /**
@@ -1107,7 +1107,7 @@ export default {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import '../../../../assets/_variables.scss';
 
 .remove-relationship {
@@ -1235,13 +1235,16 @@ export default {
 }
 
 .relationship-title {
-  .add-new {
-    font-size: 12px;
-    margin-left: 8px;
-    &.disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
+  align-items: center;
+  display: flex;
+  color: $purple_2;
+  h2 {
+    color: $purple_2;
+    flex: 1;
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+    margin: 0 0 0 8px;
   }
 }
 

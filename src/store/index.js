@@ -117,10 +117,14 @@ export const state = {
   onboardingEvents: [],
   shouldShowLinkOrcidDialog: false,
   isLinkOrcidDialogVisible: false,
-  userToken: ''
+  userToken: '',
+  sessionTimer: null
 }
 
 export const mutations = {
+    SET_SESSION_TIMER(state, data) {
+      state.sessionTimer = data
+    },
       SET_ACTIVE_ORG_SYNC(state) {
         state.activeOrgSynced = true;
       },
@@ -197,6 +201,8 @@ export const mutations = {
         state.shouldShowLinkOrcidDialog = false;
         state.isLinkOrcidDialogVisible = false;
         state.gettingStartedOpen = false;
+        state.cognitoUser = {};
+        state.sessionTimer = null
       },
       UPDATE_CUR_DATASET(state, dataset) {
         state.curDataset = dataset;
@@ -612,6 +618,7 @@ export const mutations = {
     }
 
 export const actions = {
+  setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),
   updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
       commit("UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE", evt),
@@ -824,6 +831,7 @@ export const getters = {
   activeOrganization: (state) => state.activeOrganization,
   getActiveOrganization: (state) => () => state.activeOrganization,
   orgMembers: (state) => state.orgMembers,
+  getCognitoUser: (state) => state.cognitoUser,
   getOrgMembers: (state) => () => state.orgMembers,
   getOrgMember: (state) => (id) => {
     return R.defaultTo({}, R.find(R.propEq("id", id), state.orgMembers));

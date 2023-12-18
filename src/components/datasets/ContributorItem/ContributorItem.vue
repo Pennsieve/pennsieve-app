@@ -200,8 +200,7 @@ export default {
 .has-orcid {
   text-decoration: underline;
 }
-</style>
-<style lang="scss">
+
 .orcid-popover {
   min-height: 52px;
   p:last-of-type {

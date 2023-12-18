@@ -463,11 +463,6 @@
     flex: 1;
   }
 
-</style>
-
-<style lang="scss">
-  @import '../../../../assets/_variables.scss';
-
   .form-wrapper {
     display: flex;
     flex-direction: column;

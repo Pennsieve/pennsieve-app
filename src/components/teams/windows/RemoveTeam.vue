@@ -42,7 +42,7 @@
   </el-dialog>
 </template>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import '../../../assets/variables.scss';
 
 .team-icon {

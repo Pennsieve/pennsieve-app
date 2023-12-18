@@ -54,7 +54,7 @@
   }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
   .bf-page {
     display: flex;
     flex-direction: row;

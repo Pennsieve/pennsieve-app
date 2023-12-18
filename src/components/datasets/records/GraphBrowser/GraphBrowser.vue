@@ -33,6 +33,7 @@
             :is-link="false"
             :should-reset.sync="resetModelsList"
             :scrolling-list="true"
+            @click="focusNode"
           />
         </div>
       </div>
@@ -43,16 +44,15 @@
 
 <script>
   import debounce from 'lodash/debounce'
-
   import DataModelGraph from '../../explore/DataModelGraph.vue'
   import ModelsList from '../ModelsList/ModelsList.vue'
 
-  import EventBus from '../../../../utils/event-bus'
-
   import {
+    mapActions,
     mapState
   } from 'vuex'
   import IconArrowRight from "../../../icons/IconArrowRight.vue";
+  import Cookies from "js-cookie";
 
   export default {
     name: 'GraphBrowser',
@@ -100,18 +100,24 @@
     },
 
     mounted: function() {
+        const token = Cookies.get('user_token')
+        if (token) {
+          this.fetchModels()
+        }
       document.addEventListener('fullscreenchange', this.onFullscreenchange.bind(this))
 
-      EventBus.$on('concepts-list-item-click', this.focusNode.bind(this))
     },
 
     beforeDestroy: function() {
       document.removeEventListener('fullscreenchange', this.onFullscreenchange.bind(this))
       window.removeEventListener('resize', this.setChartHeight)
-      EventBus.$off('concepts-list-item-click', this.focusNode.bind(this))
     },
 
     methods: {
+      ...mapActions('metadataModule', [
+        'fetchModels'
+      ]),
+
       /**
        * Set chart height based on the height of the window
        */

@@ -5,7 +5,7 @@ import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
 import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
 import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
-
+import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
@@ -97,6 +97,7 @@ const ModelRecords = () => import('../components/datasets/explore/search/ModelRe
 const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
 const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/GraphBrowser.vue')
+const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 
 
 const router = createRouter({
@@ -382,17 +383,32 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: Models
-              }
+                stage: DatasetMetadataModelsView
+              },
+              redirect: {
+                name: 'models-list'
+              },
+              children: [
+                {
+                  path: 'list',
+                  name: 'models-list',
+                  props: true,
+                  components: {
+                    stage: Models
+                  }
+                },
+                {
+                  path: 'details/:modelId',
+                  name: 'model-details',
+                  props: true,
+                  meta: { backLinkName: "Models"},
+                  components: {
+                    stage: ModelInstance
+                  }
+                },
+              ]
             },
-            {
-              path: 'model/:conceptId',
-              name: 'model',
-              props: true,
-              components: {
-                // stage: ConceptManagement
-              }
-            },
+
             {
               path: 'relationships',
               name: 'relationships',

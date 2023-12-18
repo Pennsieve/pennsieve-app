@@ -11,10 +11,6 @@
     <div class="log-in-dialog__container" :class="containerClass">
       <PennsieveLogoContainer class="dialog-container" stacked="stacked" :show-penn-logo="false"/>
 
-<!--      <img-->
-<!--        src="@/assets/images/pennsieve-logo-full.svg"-->
-<!--        class="log-in-dialog__container&#45;&#45;logo"-->
-<!--      />-->
       <template v-if="logInState !== states.TWO_FACTOR">
         <p
              class="log-in-dialog__container--top-copy">
@@ -56,7 +52,7 @@
             :processing="isLoggingIn"
             processing-text="Signing In"
             @click="initiateFederatedLogin('ORCID')"
-            ><img src="@/assets/images/orcid_24x24.png" alt="iD" width="24" height="24" style="display: block; margin-left: 0; margin-right: 32px; width: 24px; height: 24px">Sign in with your ORCID iD</bf-button>
+            ><img src="src/assets/images/orcid_24x24.png" alt="iD" width="24" height="24" style="display: block; margin-left: 0; margin-right: 32px; width: 24px; height: 24px">Sign in with your ORCID iD</bf-button>
           <div class="log-in-dialog__container--actions" :class="actionsClass">
             <router-link
               tag="a"
@@ -485,6 +481,7 @@ export default {
      * Handle login request after validation
      */
     async sendLoginRequest() {
+      console.log('send login request')
       this.isLoggingIn = true
       try {
         const user = await Auth.signIn(
@@ -526,29 +523,6 @@ export default {
             msg: `There was an error with your federated login attempt. Please try again.`
           }
         })
-      }
-    },
-
-    /**
-     * Handle a successful login: set vuex state
-     * and cookies, close login dialog
-     */
-    handleLoginSuccess(user) {
-      const token = pathOr(
-        '',
-        ['signInUserSession', 'accessToken', 'jwtToken'],
-        user
-      )
-      const userAttributes = propOr({}, 'attributes', user)
-      if (user.preferredMFA !== 'NOMFA') {
-        this.tempSessionToken = token
-        this.logInState = this.states.TWO_FACTOR
-
-        this.$nextTick(() => {
-          this.$refs.twoFactor.focus()
-        })
-      } else {
-        this.setLogin(token, userAttributes)
       }
     },
 

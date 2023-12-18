@@ -129,7 +129,7 @@ export default {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 
 .image-wrapper {
   display: flex;

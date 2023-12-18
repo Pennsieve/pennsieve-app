@@ -148,6 +148,7 @@
           />
 
         </div>
+        </div>
 
         <el-collapse
           v-if="hasMultipleSourceFiles"
@@ -206,7 +207,7 @@
 <!--              :date="instance.updatedAt"-->
 <!--            />-->
 <!--          </div>-->
-        </div>
+<!--        </div>-->
 <!--        &lt;!&ndash; END PROPERTIES TABLE &ndash;&gt;-->
 
 <!--        &lt;!&ndash; BEGIN FILES TABLE EMPTY STATE &ndash;&gt;-->
@@ -2632,7 +2633,7 @@ export default {
 
     breadcrumbNavigate: function() {
       const lastRouteName = propOr('', 'name', this.lastRoute)
-      let route = { name: 'concept-search' }
+      let route = { name: 'model-details' }
 
       if (
         lastRouteName === 'dataset-files' ||
@@ -3102,7 +3103,7 @@ export default {
 
 </style>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import '../../../../assets/_variables.scss';
 @import '../../../../assets/_icon-item-colors.scss';
 //@import '../../../../assets/components/_uploader-empty-state.scss';
@@ -3190,7 +3191,6 @@ export default {
   }
   .relationship-title {
     align-items: center;
-    display: flex;
     flex: 1;
     h2 {
       color: $purple_1;

@@ -1,5 +1,8 @@
 import {v1 as uuidv1} from "uuid";
 import router from "../router";
+import { find, propEq } from 'ramda'
+import * as R from "ramda";
+
 
 const initialState = () => ({
   // showModels: ['patient', 'visit', 'sample', 'study'],
@@ -233,6 +236,12 @@ export const actions = {
 }
 
 export const getters = {
+  getModelByName: (state) => (modelName) => {
+    return find(R.propEq("name", modelName), state.models);
+  },
+  getModelById: (state) => (id) => {
+    return find(propEq('id', id), state.models)
+  },
   getRecordsByModel: (state) => (name) => {
     return state.records[name]
   },

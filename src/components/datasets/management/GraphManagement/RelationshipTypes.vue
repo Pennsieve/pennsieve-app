@@ -145,258 +145,8 @@
                 label="Destination Model"
                 class-name="column-destination"
               />
-<!--              <el-table-column-->
-<!--                min-width="20"-->
-<!--                fixed="right"-->
-<!--              >-->
-<!--                <template #default="scope"-->
-<!--                >-->
-<!--                  <el-dropdown-->
-<!--                    trigger="click"-->
-<!--                    placement="bottom-end"-->
-<!--                  >-->
-<!--                    <IconMenu-->
-<!--                      :height="16"-->
-<!--                      :width="16"-->
-<!--                    />-->
-<!--                    <template #dropdown>-->
-<!--                      <el-dropdown-menu-->
-<!--                        slot="dropdown"-->
-<!--                        class="bf-menu"-->
-<!--                        :offset="9"-->
-<!--                      >-->
-<!--                        <el-dropdown-item-->
-<!--                          :disabled="datasetLocked"-->
-<!--                          command="edit"-->
-<!--                        >-->
-<!--                          Update-->
-<!--                        </el-dropdown-item>-->
-<!--                        <el-dropdown-item-->
-<!--                          :disabled="datasetLocked"-->
-<!--                          command="remove"-->
-<!--                        >-->
-<!--                          Delete-->
-<!--                        </el-dropdown-item>-->
-<!--                      </el-dropdown-menu>-->
-<!--                    </template>-->
-<!--                  </el-dropdown>-->
-<!--                </template>-->
-<!--              </el-table-column>-->
-
             </template>
           </pennsieve-table>
-
-<!--          <el-popover-->
-<!--            ref="filterMenu"-->
-<!--            v-model="isFilterMenuOpen"-->
-<!--            popper-class="filter-menu no-padding scroll"-->
-<!--            placement="top-start"-->
-<!--            transition=""-->
-<!--            :visible-arrow="false"-->
-<!--            trigger="manual"-->
-<!--            width="260"-->
-<!--            :popper-options="{-->
-<!--              modifiers: [ 'offset', 'preventOverflow', popperModifier, 'applyStyle' ]-->
-<!--            }"-->
-<!--          >-->
-<!--            <div class="bf-menu">-->
-<!--              <el-popover-->
-<!--                popper-class="filter-by-menu no-padding scroll"-->
-<!--                placement="right-start"-->
-<!--                transition=""-->
-<!--                :visible-arrow="false"-->
-<!--                trigger="hover"-->
-<!--                width="260"-->
-<!--              >-->
-<!--                <div class="bf-menu">-->
-<!--                  <ul>-->
-<!--                    <li-->
-<!--                      v-for="item in filterOptions[activeColumn]"-->
-<!--                      :key="item"-->
-<!--                    >-->
-<!--                      <a-->
-<!--                        href="#"-->
-<!--                        class="bf-menu-item icon-item"-->
-<!--                        @click.prevent="onFilterOptionClick(activeColumn, item)"-->
-<!--                      >-->
-<!--                        {{ item }}-->
-
-<!--                        <IconCheck-->
-<!--                          v-show="isFilterOptionChecked(activeColumn, item)"-->
-<!--                          class="icon-check"-->
-<!--                          :width="20"-->
-<!--                          :height="20"-->
-<!--                        />-->
-<!--                      </a>-->
-<!--                    </li>-->
-<!--                  </ul>-->
-<!--                </div>-->
-
-<!--                <template #reference>-->
-<!--                  <ul slot="reference">-->
-<!--                    <li>-->
-<!--                      <a-->
-<!--                        class="bf-menu-item filter-menu-item icon-item"-->
-<!--                        href="#"-->
-<!--                        @click.prevent-->
-<!--                      >-->
-<!--                    <span>-->
-<!--                      <IconFilterFilled-->
-<!--                        class="icon-filter-filled"-->
-<!--                        :width="16"-->
-<!--                        :height="16"-->
-<!--                      />-->
-<!--                      Filter by {{ activeColumn }}-->
-<!--                      <a-->
-<!--                        v-show="hasFilterSelections(activeColumn)"-->
-<!--                        href="#"-->
-<!--                        class="clear-column-filter-selections"-->
-<!--                        @click.prevent="clearColumnFilterSelections"-->
-<!--                      >-->
-<!--                        Clear All-->
-<!--                      </a>-->
-<!--                    </span>-->
-<!--                        <IconArrowRight-->
-<!--                          icon="icon-arrow-right"-->
-<!--                          :width="10"-->
-<!--                          :height="10"-->
-<!--                        />-->
-<!--                      </a>-->
-<!--                    </li>-->
-<!--                  </ul>-->
-<!--                </template>-->
-
-<!--              </el-popover>-->
-
-<!--              <hr>-->
-
-<!--              <ul>-->
-<!--                <li>-->
-<!--                  <a-->
-<!--                    class="bf-menu-item"-->
-<!--                    href="#"-->
-<!--                    @click.prevent="sortColumn(activeColumn, 'asc')"-->
-<!--                  >-->
-<!--                    <IconSortAsc-->
-<!--                      class="icon-sort-asc"-->
-<!--                      :width="20"-->
-<!--                      :height="20"-->
-<!--                    /> Sort Ascending-->
-<!--                  </a>-->
-<!--                </li>-->
-<!--                <li>-->
-<!--                  <a-->
-<!--                    class="bf-menu-item"-->
-<!--                    href="#"-->
-<!--                    @click.prevent="sortColumn(activeColumn, 'desc')"-->
-<!--                  >-->
-<!--                    <IconSort-->
-<!--                      icon="icon-sort"-->
-<!--                      class="icon-sort-desc svg-down svg-flip"-->
-<!--                      :width="20"-->
-<!--                      :height="20"-->
-<!--                    /> Sort Descending-->
-<!--                  </a>-->
-<!--                </li>-->
-<!--              </ul>-->
-<!--            </div>-->
-<!--&lt;!&ndash;            <template >&ndash;&gt;-->
-<!--              <el-table-->
-<!--                ref="Table"-->
-<!--                v-loading="isLoadingRelationshipTypes"-->
-<!--                :data="filteredRelationshipTypes"-->
-<!--                @selection-change="onTableSelectionChange"-->
-<!--                @header-click="onHeaderClick"-->
-<!--                @row-click="onTableRowClick"-->
-<!--              >-->
-<!--                <el-table-column-->
-<!--                  width="60"-->
-<!--                  class="checkbox"-->
-<!--                  fixed-->
-<!--                >-->
-<!--                  <template #default>-->
-<!--                    &lt;!&ndash; @NOTE Hiding until we have API support &ndash;&gt;-->
-<!--                    &lt;!&ndash; <el-checkbox-->
-<!--                      v-if="showRowCheckbox(scope.store)"-->
-<!--                      :value="scope.store.isSelected(scope.row)"-->
-<!--                      @input="scope.store.commit('rowSelectedChanged', scope.row)"-->
-<!--                    /> &ndash;&gt;-->
-<!--                    <IconProcedure-->
-<!--                      class="icon-procedure"-->
-<!--                      color="currentColor"-->
-<!--                      :width="20"-->
-<!--                      :height="20"-->
-<!--                    />-->
-<!--                  </template>-->
-<!--                </el-table-column>-->
-<!--                <el-table-column-->
-<!--                  prop="source"-->
-<!--                  label="Source Model"-->
-<!--                  class-name="column-source"-->
-<!--                  :render-header="renderHeader"-->
-<!--                />-->
-<!--                <el-table-column-->
-<!--                  prop="relationship"-->
-<!--                  label="Relationship"-->
-<!--                  class-name="column-relationship"-->
-<!--                  :render-header="renderHeader"-->
-<!--                >-->
-<!--                  <template #default="scope">-->
-<!--                    {{ scope.row.relationship }}-->
-<!--                    <IconArrowUp-->
-<!--                      class="icon-arrow"-->
-<!--                      :width="24"-->
-<!--                      :height="24"-->
-<!--                    />-->
-<!--                  </template>-->
-<!--                </el-table-column>-->
-<!--                <el-table-column-->
-<!--                  prop="destination"-->
-<!--                  label="Destination Model"-->
-<!--                  class-name="column-destination"-->
-<!--                  :render-header="renderHeader"-->
-<!--                />-->
-<!--                <el-table-column-->
-<!--                  min-width="20"-->
-<!--                  fixed="right"-->
-<!--                >-->
-<!--                  <template #default="scope"-->
-<!--                  >-->
-<!--                    <el-dropdown-->
-<!--                      trigger="click"-->
-<!--                      placement="bottom-end"-->
-<!--                    >-->
-<!--                      <IconMenu-->
-<!--                        :height="16"-->
-<!--                        :width="16"-->
-<!--                      />-->
-<!--                      <template #dropdown>-->
-<!--                        <el-dropdown-menu-->
-<!--                          slot="dropdown"-->
-<!--                          class="bf-menu"-->
-<!--                          :offset="9"-->
-<!--                        >-->
-<!--                          <el-dropdown-item-->
-<!--                            :disabled="datasetLocked"-->
-<!--                            command="edit"-->
-<!--                          >-->
-<!--                            Update-->
-<!--                          </el-dropdown-item>-->
-<!--                          <el-dropdown-item-->
-<!--                            :disabled="datasetLocked"-->
-<!--                            command="remove"-->
-<!--                          >-->
-<!--                            Delete-->
-<!--                          </el-dropdown-item>-->
-<!--                        </el-dropdown-menu>-->
-<!--                      </template>-->
-<!--                    </el-dropdown>-->
-<!--                  </template>-->
-<!--                </el-table-column>-->
-<!--              </el-table>-->
-
-<!--            </template>-->
-<!--          </el-popover>-->
         </div>
       </template>
 
@@ -404,9 +154,10 @@
         :relationship-type-edit.sync="relationshipTypeEdit"
         :relationship-types="relationshipTypes"
         :url="relationshipsUrl"
-        :visible.sync="createRelationshipDialogVisible"
+        :dialog-visible="createRelationshipDialogVisible"
         @add-relationship-type="onAddRelationshipType"
         @update-relationship-type="onUpdateRelationshipType"
+        @close="closeRelationshipDialog"
       />
 
       <delete-relationship-type-dialog
@@ -446,6 +197,7 @@
   import IconArrowUp from "../../../icons/IconArrowUp.vue";
   import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
   import IconArrow from "../../../icons/IconArrow.vue";
+  import Cookies from "js-cookie";
 
   export default {
     name: 'RelationshipTypes',
@@ -626,7 +378,10 @@
     },
 
     mounted: function() {
-
+      const token = Cookies.get('user_token')
+      if (token) {
+        this.fetchModels()
+      }
       // console.log('in mounted')
       // this.getRelationshipTypes().then(() => {
       //   console.log('in getRElation')
@@ -641,7 +396,13 @@
         'updateRelationshipType',
         'deleteRelationshipType'
       ]),
+      ...mapActions('metadataModule', [
+        'fetchModels'
+      ]),
 
+      closeRelationshipDialog: function() {
+        this.createRelationshipDialogVisible = false
+      },
       getRelationshipLinkedProperties: function() {
         if (!this.linkedPropertiesUrl) {
           return

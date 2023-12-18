@@ -6,6 +6,17 @@
 <template>
   <div id="app-wrap">
     <router-view name="header" />
+    <div class="session-info" v-if="showSessionTimer">
+      <div>
+        {{sessionTokenMessage}}
+      </div>
+      <div class="refresh-action"
+           v-if="!sessionTimedOut"
+           @click="refreshToken">
+        Refresh
+      </div>
+    </div>
+
     <div id="main-wrap">
       <router-view name="navigation" v-if="primaryNavOpen" />
       <router-view name="navigationSecondary" v-if="!route.meta.hideSecondaryNav"/>
@@ -32,6 +43,7 @@ import Cookies from 'js-cookie'
 import toQueryParams from "./utils/toQueryParams.js";
 import PsAnalytics from './components/analytics/Analytics.vue'
 import BfDownloadFile from './components/bf-download-file/BfDownloadFile.vue'
+import {Auth} from "@aws-amplify/auth";
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -50,11 +62,14 @@ export default {
     return {
       defaultPageTitle: 'Sign In | Pennsieve',
       defaultPageDescription: 'Pennsieve secure Sign In page. Sign in to your Pennsieve customer account.',
-
+      sessionTimedOut: false,
+      showSessionTimerThreshold: 300,
+      sessionLogoutThreshold: 0,
     }
   },
 
   mounted() {
+
     this.$store.watch(this.getActiveOrganization, this.onActiveOrgChange.bind(this))
     EventBus.$on('reload-datasets', this.fetchDatasets)
 
@@ -110,7 +125,7 @@ export default {
      */
     getDatasetsUrl: {
       handler: function(newVal, oldVal) {
-        if (newVal !== oldVal && this.isOrgSynced) {
+        if (this.userToken && newVal !== oldVal && this.isOrgSynced) {
           this.fetchDatasets()
         }
       },
@@ -126,6 +141,7 @@ export default {
       "environment",
       "searchModalVisible",
       "isLinkOrcidDialogVisible",
+      "sessionTimer"
     ]),
     ...mapGetters([
       "activeOrganization",
@@ -139,6 +155,25 @@ export default {
     ...mapState('datasetModule', [
       'datasetSearchParams'
     ]),
+    sessionTokenMessage: function() {
+      if (this.sessionTimedOut) {
+        return "Logged out due to inactivity."
+      } else {
+        return "Your session will expire in: " + this.sessionTimer + " seconds."
+      }
+    },
+
+    /**
+     * Indicate that we should start showing message that the user will be logged out
+     * due to inactivity starting at 5 min. before the session expires.
+     *
+     * The user can either manually refresh, or take some action on the site that
+     * calls the platform as we automatically refresh on Xhr calls.
+     * @returns {boolean}
+     */
+    showSessionTimer: function() {
+      return !!(this.sessionTimedOut || (this.sessionTimer && this.sessionTimer < this.showSessionTimerThreshold));
+    },
 
     /**
      * Compute get datasets URL
@@ -176,6 +211,8 @@ export default {
       'setIsLoadingDatasetPublishedData',
       'setIsLoadingDatasetsError',
       'setDatasetPublishedData',
+      'updateCognitoUser',
+      'setSessionTimer'
     ]),
     ...mapActions('datasetModule', [
       'updateDatasetTotalCount'
@@ -188,18 +225,81 @@ export default {
     ...mapActions('integrationsModule', [
       'fetchIntegrations'
     ]),
+    ...mapGetters([
+      'getCognitoUser'
+    ]),
+
+    /**
+     * Manually refresh token.
+     */
+    refreshToken: function() {
+      const usr = this.getCognitoUser()
+      const currentSession = usr.signInUserSession;
+      usr.refreshSession(currentSession.refreshToken, (err, session) => {
+        console.log("Manually refreshed token.")
+      })
+    },
 
     /**
      * Request critical data required for app to run properly
+     *
+     * Method called from onLogin in Global Message Handler, and
+     * By changes to orgId in the route if a session cookie is present.
+     *
+     *
      * @param {String} userToken
      * @returns {Promise}
      */
-    bootUp: function(userToken) {
+    bootUp: async function(userToken, fromLogin = false) {
       console.log("Booting up")
-      return this.getBfTermsOfService()
+
+      // Indicate that we are no longer timed out.
+      this.sessionTimedOut = false
+
+      // Get the current Cognito User and store in Vuex
+      await Auth.currentAuthenticatedUser().then(user => {
+        this.updateCognitoUser(user)
+
+        // Setting recurring check for token life-cycle
+        clearInterval(this.interval)
+        this.interval = setInterval(function () {
+          try {
+            const usr = this.getCognitoUser()
+            const timeOut = usr.signInUserSession.accessToken.payload.exp
+
+            this.setSessionTimer( Math.round((timeOut*1000 - Date.now())/1000))
+            if (this.sessionTimer < this.sessionLogoutThreshold) {
+              console.log("Logging out due to expired session.")
+              this.sessionTimedOut = true
+              EventBus.$emit('logout')
+            }
+          } catch (e) {
+            console.log('Error checking for session timer -- prevent further checking')
+            clearInterval(this.interval)
+          }
+
+        }.bind(this), 1000);
+      });
+
+      // If bootup is called from Login, only get Profile and org as login
+      // will re-trigger bootup when it updates the route to the correct org.
+      if (fromLogin) {
+        return this.getBfTermsOfService()
           .then(() => this.getProfileAndOrg(userToken))
+      } else {
+        return this.getBfTermsOfService()
+          .then(() => this.getProfileAndOrg(userToken))
+          .then(() => this.getPrimaryData())
           .then(() => {this.setActiveOrgSynced()})
           .then(() => this.getOnboardingEventStates(userToken))
+      }
+
+
+    },
+
+    beforeUnmount: function(){
+      console.log('Unmounting app, clearing sessionToken check timer.')
+      clearInterval(this.interval)
     },
 
     /**
@@ -343,6 +443,26 @@ export default {
   },
 };
 </script>
+
+<style scoped lang="scss">
+@import "./assets/_variables.scss";
+  .refresh-action {
+    color: $purple_3;
+    margin: 0 16px;
+    text-decoration: underline;
+    cursor: pointer;
+
+  }
+  .session-info {
+    background-color: $purple_tint;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    padding: 8px 16px ;
+    font-weight: 500;
+    color: $purple_2
+  }
+</style>
 
 <style lang="scss">
 @import "./assets/_variables.scss";

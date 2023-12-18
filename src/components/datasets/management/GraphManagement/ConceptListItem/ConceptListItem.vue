@@ -17,8 +17,8 @@
         >
           <router-link
             :to="{
-              name: 'model',
-              params: { conceptId: concept.id }
+              name: 'model-details',
+              params: { modelId: concept.id }
             }"
           >
             {{ concept.displayName }}

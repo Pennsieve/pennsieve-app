@@ -22,6 +22,7 @@ export default {
 
       // clear vuex
       this.clearState()
+
       // remove user token
       Cookies.remove('user_token')
 
@@ -38,6 +39,7 @@ export default {
         name: 'home',
         query
       })
+
       // fire toast
       if (shouldShowToast) {
         EventBus.$emit('toast', { detail: { msg: 'Logged Out' }})

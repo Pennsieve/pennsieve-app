@@ -582,7 +582,7 @@ export default {
     border-top: 1px solid $gray_2;
   }
 </style>
-<style lang="scss">
+<style scoped lang="scss">
   @import '../../../assets/_variables.scss';
 
   .user-menu-org-menu {

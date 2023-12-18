@@ -97,6 +97,6 @@
 
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
   @import './_concept-instance-static-property.scss';
 </style>

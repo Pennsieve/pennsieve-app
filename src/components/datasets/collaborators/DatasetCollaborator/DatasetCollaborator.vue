@@ -301,9 +301,6 @@ export default {
   font-weight: 300;
   margin-right: 8px;
 }
-</style>
-<style lang="scss">
-  @import '../../../../assets/_variables.scss';
 
   .member .el-spinner-inner .path {
     stroke: $gray_4

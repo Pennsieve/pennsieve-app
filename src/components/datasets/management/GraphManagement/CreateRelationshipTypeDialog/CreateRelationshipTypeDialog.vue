@@ -1,24 +1,29 @@
 <template>
   <el-dialog
     class="create-relationship-type-dialog"
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      :title="title"
-    />
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        :title="title"
+      />
+    </template>
+
 
     <dialog-body>
       <el-form
         ref="form"
         :model="relationship"
         :rules="rules"
-        @submit.native.prevent="create"
+        label-position="top"
+        @submit.native.prevent="createRelationshipType"
       >
         <el-form-item prop="originModel">
-          <template slot="label">
+          <template #label>
             Originating Model <span class="label-helper">
               required
             </span>
@@ -47,17 +52,15 @@
             <div class="value">
               {{ relationship.originModelDisplayName }}
             </div>
-            <svg-icon
-              name="icon-lock-filled"
-              height="20"
-              width="20"
-              color="#DADADA"
+            <IconLockFilled
+              :height="20"
+              :width="20"
             />
           </div>
         </el-form-item>
 
         <el-form-item prop="relationshipName">
-          <template slot="label">
+          <template #label>
             Relationship Name <span class="label-helper">
               required
             </span>
@@ -66,11 +69,12 @@
             ref="relationshipInput"
             v-model="relationship.relationshipName"
             :options="relationshipNames"
+            @input="setRelationship"
           />
         </el-form-item>
 
         <el-form-item prop="destinationModel">
-          <template slot="label">
+          <template #label>
             Destination Model <span class="label-helper">
               required
             </span>
@@ -99,21 +103,16 @@
             <div class="value">
               {{ relationship.destinationModelDisplayName }}
             </div>
-            <svg-icon
-              name="icon-lock-filled"
-              height="20"
-              width="20"
-              color="#DADADA"
+            <IconLockFilled
+              :height="20"
+              :width="20"
             />
           </div>
         </el-form-item>
       </el-form>
     </dialog-body>
 
-    <div
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -133,7 +132,8 @@
           Save
         </template>
       </bf-button>
-    </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -149,11 +149,13 @@
   import RelationshipInput from '../../../explore/RelationshipInput/RelationshipInput.vue'
 
   import Request from '../../../../../mixins/request'
+  import IconLockFilled from "../../../../icons/IconLockFilled.vue";
 
   export default {
     name: 'CreateRelationshipTypeDialog',
 
     components: {
+      IconLockFilled,
       BfDialogHeader,
       DialogBody,
       BfButton,
@@ -165,7 +167,7 @@
     ],
 
     props: {
-      visible: {
+      dialogVisible: {
         type: Boolean,
         default: false
       },
@@ -210,7 +212,7 @@
     },
 
     computed: {
-      ...mapGetters([
+      ...mapGetters('metadataModule',[
         'getModelByName'
       ]),
 
@@ -227,6 +229,8 @@
       createDisabled: function() {
         const vals = values(this.relationship)
         const validValues = vals.filter(Boolean)
+
+        console.log("check disabled: " + vals + " " + validValues)
         return vals.length !== validValues.length
       },
 
@@ -273,6 +277,9 @@
     },
 
     methods: {
+      setRelationship: function(ev) {
+        console.log('huh' +ev)
+      },
       /**
        * Closes the dialog and resets form
        */

@@ -307,7 +307,7 @@ export const actions = {
     }
   },
 
-  refreshPublishingData: ({ dispatch }, status) => {
+  FrefreshPublishingData: ({ dispatch }, status) => {
     const actions = StatusActions[status]
 
     actions.forEach(action => {

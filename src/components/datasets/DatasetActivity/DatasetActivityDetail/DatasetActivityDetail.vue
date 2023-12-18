@@ -158,9 +158,9 @@
 
       <div class="dataset-activity-detail__info-link">
         <router-link
-          :to="{name: 'concept-search',
+          :to="{name: 'model-details',
                 params: {
-                  conceptId: eventDetail.detail.modelId,
+                  modelId: eventDetail.detail.modelId,
                 }}"
         >
           <p>{{ eventDetail.detail.modelName }} </p>
@@ -179,9 +179,9 @@
 
       <div class="dataset-activity-detail__info-link">
         <router-link
-          :to="{name: 'concept-search',
+          :to="{name: 'model-details',
                 params: {
-                  conceptId: eventDetail.detail.id,
+                  modelId: eventDetail.detail.id,
                 }}"
         >
           {{ eventDetail.detail.name }}
@@ -199,9 +199,9 @@
 
       <div class="dataset-activity-detail__info-link">
         <router-link
-          :to="{name: 'concept-search',
+          :to="{name: 'model-details',
                 params: {
-                  conceptId: eventDetail.detail.modelId,
+                  modelId: eventDetail.detail.modelId,
                 }}"
         >
           {{ eventDetail.detail.modelName }}
@@ -233,9 +233,9 @@
 
       <div class="dataset-activity-detail__info-link">
         <router-link
-          :to="{name: 'concept-search',
+          :to="{name: 'cmodel-details',
                 params: {
-                  conceptId: eventDetail.detail.modelId,
+                  modelId: eventDetail.detail.modelId,
                 }}"
         >
           {{ eventDetail.detail.modelName }}
@@ -261,7 +261,7 @@
         <router-link
           :to="{name: 'concept-instance',
                 params: {
-                  conceptId: eventDetail.detail.modelId,
+                  modelId: eventDetail.detail.modelId,
                   instanceId: eventDetail.detail.id
                 }}"
         >
@@ -300,7 +300,7 @@
           <router-link
             :to="{name: 'concept-instance',
                   params: {
-                    conceptId: eventDetail.detail.modelId,
+                    modelId: eventDetail.detail.modelId,
                     instanceId: eventDetail.detail.id
                   }}"
           >

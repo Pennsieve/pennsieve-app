@@ -21,15 +21,10 @@
               </p>
             </div>
           </div>
-<!--          <div class="row">-->
-<!--            <div class="col-xs-12 col-sm-10">-->
-<!--              <dataset-search />-->
-<!--            </div>-->
-<!--          </div>-->
         </div>
         <img
             class="login-image"
-            src="@/assets/images/illustrations/illo-neuron-mural.svg"
+            src="/src/assets/images/illustrations/illo-neuron-mural.svg"
             alt="Neuron Mural Image"
         />
       </div>
@@ -38,8 +33,9 @@
     <div class="highlight-wrapper">
       <div class="highlight-image">
         <img
-          src="@/assets/images/illustrations/research-platform.svg"
+          src="/src/assets/images/illustrations/research-platform.svg"
           class="highlight"
+          alt="research platform"
         />
       </div>
       <div class="highlight-text">
@@ -65,8 +61,9 @@
       </div>
       <div class="highlight-image">
         <img
-          src="@/assets/images/illustrations/illo-dr_azumi_1.svg"
+          src="/src/assets/images/illustrations/illo-dr_azumi_1.svg"
           class="highlight"
+          alt="azumi"
         />
       </div>
     </div>
@@ -101,31 +98,31 @@
     <div class="org-section">
       <img
         ref="img"
-        src="@/assets/images/logos/psom_logo_blue.svg"
+        src="/src/assets/images/logos/psom_logo_blue.svg"
         alt="Perelman School of Medicine at the University of Pennsylvania"
         class="logo"
       />
       <img
         ref="img"
-        src="@/assets/images/logos/ibi-logo.png"
+        src="/src/assets/images/logos/ibi-logo.png"
         alt="Institute for Biomedical Informatics"
         class="logo"
       />
       <img
         ref="img"
-        src="@/assets/images/logos/cropped-CNT-logo.png"
+        src="/src/assets/images/logos/cropped-CNT-logo.png"
         alt="Center for Translational Bioengineering  & Therapeutics"
         class="logo"
       />
       <img
         ref="img"
-        src="@/assets/images/logos/DataCite-Logos_primary.svg"
+        src="/src/assets/images/logos/DataCite-Logos_primary.svg"
         alt="Datacite.org"
         class="logo"
       />
       <img
         ref="img"
-        src="@/assets/images/logos/ORCID_Member_CMYK.svg"
+        src="/src/assets/images/logos/ORCID_Member_CMYK.svg"
         alt="Orcid.org"
         class="logo"
       />
@@ -143,7 +140,8 @@ import { Auth } from "@aws-amplify/auth";
 import PennsieveHeader from "../../components/shared/PennsieveHeader/PennsieveHeader.vue";
 import DatasetSearch from "../../components/DatasetSearch/DatasetSearch.vue";
 import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFooter.vue";
-// import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid";
+import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid.vue";
+import BfButton from "../../components/shared/bf-button/BfButton.vue";
 
 import analyzeIcon from "../../assets/images/icons/analyze.svg"
 import securityIcon from "../../assets/images/icons/security.svg"
@@ -168,13 +166,13 @@ export default {
   },
   components: {
     PennsieveLogoContainer,
-    // BfButton,
+    BfButton,
     // A11yKeys,
     // BfFooter,
     PennsieveHeader,
     DatasetSearch,
     PennsieveFooter,
-    // PublicDatasetsGrid,
+    PublicDatasetsGrid,
   },
 
   //   mixins: [AutoFocus, Request],
@@ -287,20 +285,20 @@ export default {
   methods: {
     ...mapActions(["updateCognitoUser"]),
 
-    /**
-     * Handles submit event
-     * @param {Object} e
-     */
-    onFormSubmit: function (e) {
-      e.preventDefault();
-
-      this.$refs.loginForm.validate((valid) => {
-        if (!valid) {
-          return;
-        }
-        this.sendLoginRequest();
-      });
-    },
+    // /**
+    //  * Handles submit event
+    //  * @param {Object} e
+    //  */
+    // onFormSubmit: function (e) {
+    //   e.preventDefault();
+    //
+    //   this.$refs.loginForm.validate((valid) => {
+    //     if (!valid) {
+    //       return;
+    //     }
+    //     this.sendLoginRequest();
+    //   });
+    // },
 
     directToDiscover: function () {
       const discoverUrl = propOr("", "discoverAppUrl", this.config);
@@ -308,33 +306,33 @@ export default {
       window.location.href = `${discoverUrl}`;
     },
 
-    /**
-     * Handles key-pressed event for last input in form
-     */
-    onHandleKeyPressed: function (e) {
-      this.onFormSubmit(e);
-    },
+    // /**
+    //  * Handles key-pressed event for last input in form
+    //  */
+    // onHandleKeyPressed: function (e) {
+    //   this.onFormSubmit(e);
+    // },
 
-    /**
-     * Makes XHR call to login
-     */
-    async sendLoginRequest() {
-      this.isLoggingIn = true;
-      try {
-        const user = await Auth.signIn(
-          this.loginForm.email,
-          this.loginForm.password
-        );
-        this.handleLoginSuccess(user);
-      } catch (error) {
-        this.isLoggingIn = false;
-        EventBus.$emit("toast", {
-          detail: {
-            msg: `There was an error with your login attempt. Please try again.`,
-          },
-        });
-      }
-    },
+    // /**
+    //  * Makes XHR call to login
+    //  */
+    // async sendLoginRequest() {
+    //   this.isLoggingIn = true;
+    //   try {
+    //     const user = await Auth.signIn(
+    //       this.loginForm.email,
+    //       this.loginForm.password
+    //     );
+    //     this.handleLoginSuccess(user);
+    //   } catch (error) {
+    //     this.isLoggingIn = false;
+    //     EventBus.$emit("toast", {
+    //       detail: {
+    //         msg: `There was an error with your login attempt. Please try again.`,
+    //       },
+    //     });
+    //   }
+    // },
 
     /**
      * Handles successful login response

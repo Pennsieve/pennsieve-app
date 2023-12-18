@@ -23,7 +23,6 @@ export default {
     UserRoles,
     LogoutHandler,
     logger,
-    // UserAccountAge,
     Sorter
   ],
 
@@ -229,7 +228,6 @@ export default {
         return
       }
 
-      // TODO: Refactor to take both token and profile
       // add logic to only make organizations request if profile is defined
       let currentPath = this.$router.currentRoute.path
       const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
@@ -254,13 +252,27 @@ export default {
           // handle org switch
           return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId, currentPath)
         })
-        .then(this.getOrgMembers.bind(this))
-        .then(this.getTeams.bind(this))
-        .then(this.getPublishers.bind(this))
-        .then(this.getOrgContributors.bind(this))
-        .then(this.getDataUseAgreements.bind(this))
         .catch(this.handleXhrError.bind(this))
     },
+
+    /**
+     * Sequence of Xhr calls to get data for org-level. These data should always be present
+     * in workspace.
+     */
+    getPrimaryData: function() {
+      const membersPromise = this.getOrgMembers()
+      const publisherPromise = this.getPublishers()
+      const orgContributorsPromise = this.getOrgContributors()
+      const dataUseAgreementPromise = this.getDataUseAgreements()
+      const teamsPromise = this.getTeams()
+
+      return Promise.all([membersPromise,
+        publisherPromise,
+        orgContributorsPromise,
+        dataUseAgreementPromise,
+        teamsPromise]).catch(this.handleXhrError.bind(this))
+    },
+
     /**
      * Switch orgs if active org is not preferred org
      * @param {Object} activeOrg
@@ -333,15 +345,8 @@ export default {
         this.saveFirstTimeSignOnEvent(token)
       }
 
-      this.bootUp(token)
+      this.bootUp(token, true)
         .then(() => {
-          // send event to analytics component
-          EventBus.$emit('track-user', {
-            detail: this.profile
-          })
-
-          const user = pathOr('', ['user'], evt)
-          this.updateCognitoUser(user)
           const activeOrg = this.activeOrganization
           const orgId = this.activeOrgId
           const isSubscribed = this.checkIsSubscribed(activeOrg)
@@ -393,8 +398,9 @@ export default {
      */
     onLogout: async function(payload) {
       try {
-        this.handleLogout(payload)
+        clearInterval(this.interval)
         await Auth.signOut()
+        this.handleLogout(payload)
       } catch (error) {
         this.handleXhrError()
       }
@@ -479,8 +485,10 @@ export default {
      * Retrieves all members of an organization
      */
     getOrgMembers: function() {
+
       const url = this.orgMembersUrl
       if (!url) {
+        console.log('no url')
         return
       }
       if (this.hasFeature('sandbox_org_feature')) {
@@ -561,11 +569,6 @@ export default {
         return
       }
 
-      // Check the route to see if header is visible
-      // TODO: Check if we want to bring this back. Not all matched routes have components??
-      // if (this.$route.matched.some(record => record.components.header)) {
-      //   messageClass = 'with-header'
-      // }
 
       this.$message({
         message: message,

@@ -44,7 +44,7 @@
     },
 
     beforeUnmount() {
-      EventBus.$off('track-event', this.trackEvent.bind(this))
+      // EventBus.$off('track-event', this.trackEvent.bind(this))
     },
 
     methods: {

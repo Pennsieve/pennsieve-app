@@ -51,9 +51,8 @@
     </div>
 
     <model-tooltip
-      :model="hoveredModel"
-      @mouseenter.native="shouldHideTooltip = false"
-      @mouseleave.native="hideModelTooltip"
+      :model-id="hoveredModelId"
+      v-click-outside="hideModelTooltip"
     />
   </div>
 </template>
@@ -137,6 +136,7 @@ export default {
       graphData: Object,
       hasData: false,
       hoveredModel: {},
+      hoveredModelId: '',
       newDataArray: []
     }
   },
@@ -769,24 +769,24 @@ export default {
       */
       // d3.select('.chart').on('mousemove', handleChartHover)
 
-      function handleChartHover(d) {
-        const e = d3.event
-        const target = e.target
-        const nodeName = target.nodeName
-
-        const chart = document.querySelector('.chart')
-        const [x, y] = d3.mouse(chart)
-
-        // Always update position here to avoid jitter on node enter / leave
-        tooltip.style('left', `${x + 16}px`)
-        tooltip.style('top', `${y}px`)
-
-        if (nodeName === 'circle') {
-          tooltip.style('opacity', 1)
-        } else {
-          tooltip.style('opacity', 0)
-        }
-      }
+      // function handleChartHover(d) {
+      //   const e = d3.event
+      //   const target = e.target
+      //   const nodeName = target.nodeName
+      //
+      //   const chart = document.querySelector('.chart')
+      //   const [x, y] = d3.mouse(chart)
+      //
+      //   // Always update position here to avoid jitter on node enter / leave
+      //   tooltip.style('left', `${x + 16}px`)
+      //   tooltip.style('top', `${y}px`)
+      //
+      //   if (nodeName === 'circle') {
+      //     tooltip.style('opacity', 1)
+      //   } else {
+      //     tooltip.style('opacity', 0)
+      //   }
+      // }
 
       /**
        * Node Enter & Leave
@@ -794,15 +794,16 @@ export default {
       d3.selectAll('.node-circle').on('mouseenter', handleNodeEnter)
 
       function handleNodeEnter(d) {
+        vm.hoveredModelId = d.target.getAttribute('data-id')
         vm.shouldHideTooltip = false
 
-        vm.hoveredModel = d
-        const textEl = vm.$el.querySelector(`.node-text[data-id="${d.id}"]`)
+        const textEl = vm.$el.querySelector(`.node-text[data-id="${d.target.getAttribute('data-id')}"]`)
         if (textEl) {
           const boundingBox = textEl.getBoundingClientRect()
 
           tooltip.style('transform', `translate(${boundingBox.x}px, ${boundingBox.y}px)`)
         }
+
       }
 
       d3.selectAll('.node-circle').on('mouseleave', vm.hideModelTooltip)
@@ -1007,7 +1008,7 @@ export default {
 
       this.hideModelTooltipTimeout = setTimeout(() => {
         if (this.shouldHideTooltip) {
-          this.hoveredModel = {}
+          this.hoveredModelId = null
           this.shouldHideTooltip = false
         }
       }, 300)

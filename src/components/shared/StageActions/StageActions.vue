@@ -5,7 +5,7 @@
     </div>
 
     <div class="right-actions">
-      <slot name="rigth"/>
+      <slot name="right"/>
     </div>
   </div>
 </template>

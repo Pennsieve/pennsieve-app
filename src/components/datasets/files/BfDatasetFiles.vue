@@ -14,7 +14,7 @@
             @navigate-breadcrumb="handleNavigateBreadcrumb"
           />
         </template>
-        <template #rigth>
+        <template #right>
           <bf-button
             @click="NavToDeleted"
             class="mr-8"

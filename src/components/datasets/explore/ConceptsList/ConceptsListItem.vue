@@ -105,7 +105,7 @@ export default {
     modelSearchLink: function() {
       const modelId = prop('id', this.item)
       const routerLink = {
-        name: 'concept-search',
+        name: 'model-detailsh',
         params: { conceptId: modelId }
       }
       return modelId ? routerLink : ''
