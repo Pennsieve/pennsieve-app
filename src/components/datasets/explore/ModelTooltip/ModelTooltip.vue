@@ -118,8 +118,8 @@
         const modelId = propOr('', 'id', this.curModel)
 
         return {
-          name: 'model',
-          params: { conceptId: modelId }
+          name: 'model-details',
+          params: { modelId: modelId }
         }
       },
     }

@@ -222,11 +222,9 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
 
     methods: {
       setPopOverVisible: function() {
-        console.log('vivivisbl')
         this.isPopoverVisible = true
       },
       closePopOver: function() {
-        console.log('vivivisbl close')
         this.isPopoverVisible = false
       },
       /**
