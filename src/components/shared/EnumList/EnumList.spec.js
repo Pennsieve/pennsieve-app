@@ -1,6 +1,5 @@
 import EnumList from './EnumList.vue'
-import { shallow } from 'vue-test-utils'
-import { V4MAPPED } from 'dns';
+import { shallowMount } from '@vue/test-utils'
 
 const evt = {
   preventDefault: () => {}
@@ -10,7 +9,7 @@ describe('EnumList.vue', () => {
   let cmp
 
   beforeEach(() => {
-    cmp = shallow(EnumList)
+    cmp = shallowMount(EnumList)
   })
 
   it('addItem', () => {
@@ -24,11 +23,10 @@ describe('EnumList.vue', () => {
     expect(cmp.vm.newItem.length).toBe(0)
   })
 
-  it('onRemoveItemFromList', () => {
-    cmp.setProps({
+  it('onRemoveItemFromList', async () => {
+    await cmp.setProps({
       savedList: ['A', 'B', 'C']
     })
-    cmp.update()
     expect(cmp.vm.itemList.length).toBe(3)
 
     cmp.vm.onRemoveItemFromList('B')

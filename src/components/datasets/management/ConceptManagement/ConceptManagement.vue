@@ -235,20 +235,19 @@ export default {
   },
 
   computed: {
+    ...mapGetters('metadataModule',[
+      'getModelById'
+    ]),
     ...mapState([
       'dataset',
       'activeOrganization',
     ]),
-
     ...mapGetters([
       'concepts',
       'config',
       'userToken',
       'hasFeature',
       'datasetLocked'
-    ]),
-    ...mapGetters('metadataModule', [
-      'getModelById',
     ]),
 
     /**
@@ -270,9 +269,8 @@ export default {
       // const modelId = pathOr('', ['params', 'conceptId'], this.$route)
 
       const datasetId = this.datasetId
-      const modelId = this.modelId
 
-      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`
+      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${this.modelId}`
     },
 
     /**
@@ -285,9 +283,9 @@ export default {
       }
 
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const modelId = pathOr('', ['params', 'conceptId'], this.$route)
+      const mId = pathOr('', ['params', 'conceptId'], this.$route)
 
-      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}/linked`
+      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${mId}/linked`
     },
 
     /**
@@ -317,13 +315,13 @@ export default {
       return propOr(0, 'propertyCount', this.model)
     },
 
-    /**
-     * Returns model id
-     * @returns {String}
-     */
-    modelId: function() {
-      return propOr('', 'id', this.model)
-    },
+    // /**
+    //  * Returns model id
+    //  * @returns {String}
+    //  */
+    // modelId: function() {
+    //   return propOr('', 'id', this.model)
+    // },
 
     /**
      * Compute total records in model
@@ -383,7 +381,7 @@ export default {
     },
 
     /**
-     * Compute linked properties from changedProperties union
+     * Compute linked properties from changedProperties union.
      * @returns {Array}
      */
     linkedProperties: function() {
@@ -433,9 +431,9 @@ export default {
 
   watch: {
 
-    '$route.query.open'() {
-      this.addEditPropertyDialogVisible = true
-    },
+    // '$route.query.open'() {
+    //   this.addEditPropertyDialogVisible = true
+    // },
     concepts: {
       handler() {
         if (this.properties.length === 0) {
@@ -464,12 +462,11 @@ export default {
     if (token) {
       this.fetchModels()
     }
-    console.log("fetch models")
-    this.$nextTick(() => {
-      if (this.$route.query.open) {
-        this.addEditPropertyDialogVisible = true
-      }
-    })
+    // this.$nextTick(() => {
+    //   if (this.$route.query.open) {
+    //     this.addEditPropertyDialogVisible = true
+    //   }
+    // })
   },
 
   beforeDestroy() {

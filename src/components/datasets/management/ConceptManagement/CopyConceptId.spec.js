@@ -1,19 +1,19 @@
 import CopyConceptId from './CopyConceptId.vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('CopyConceptId.vue', () => {
   let cmp
 
-  beforeEach(() => {
-    cmp = shallow(CopyConceptId)
-    cmp.setProps({
+  beforeEach(async () => {
+    cmp = shallowMount(CopyConceptId)
+    await cmp.setProps({
       conceptId: 'abc-123'
     })
   })
 
   it('copyId()', () => {
-    cmp.vm.$clipboard = jest.fn(() => {})
-    const spy = jest.spyOn(cmp.vm, 'displayMessage')
+    cmp.vm.$clipboard = vi.fn(() => {})
+    const spy = vi.spyOn(cmp.vm, 'displayMessage')
     cmp.vm.copyId()
     expect(cmp.vm.$clipboard).toBeCalled()
     expect(spy).toBeCalled()

@@ -3,7 +3,6 @@ import router from "../router";
 import { find, propEq } from 'ramda'
 import * as R from "ramda";
 
-
 const initialState = () => ({
   // showModels: ['patient', 'visit', 'sample', 'study'],
   orderBy:{
@@ -67,11 +66,11 @@ export const mutations = {
     state.filterParams = []
   },
   SET_PROPS_FOR_MODEL(state, response) {
-    const objIndex = state.models.findIndex((obj => obj.name == response.model));
+    const objIndex = state.models.findIndex((obj => obj.name === response.model));
     state.models[objIndex].props = response.props
   },
   REMOVE_FILTER(state, id) {
-    const objIndex = state.filterParams.findIndex((obj => obj.id == id));
+    const objIndex = state.filterParams.findIndex((obj => obj.id === id));
     state.filterParams.splice(objIndex, 1)
 
   },
@@ -79,7 +78,7 @@ export const mutations = {
     state.filterParams.push(filter)
   },
   UPDATE_FILTER(state, filter) {
-    const objIndex = state.filterParams.findIndex((obj => obj.id == filter.id));
+    const objIndex = state.filterParams.findIndex((obj => obj.id === filter.id));
 
     state.filterParams[objIndex].target = filter.model
     state.filterParams[objIndex].property = filter.property
@@ -210,7 +209,7 @@ export const actions = {
     commit('CLEAR_FILTERS')
   },
   createOrUpdateFilterParams: ({commit, state}, filterParams) => {
-    const objIndex = state.filterParams.findIndex((obj => obj.id == filter.id));
+    const objIndex = state.filterParams.findIndex((obj => obj.id === filter.id));
     if (objIndex >= 0) {
       commit('UPDATE_FILTER_PARAMS', filter)
     } else {
@@ -218,7 +217,7 @@ export const actions = {
     }
   },
   removeFilter: ({commit, state}, id) => {
-    const objIndex = state.filterParams.findIndex((obj => obj.id == id));
+    const objIndex = state.filterParams.findIndex((obj => obj.id === id));
     if (objIndex >= 0) {
       commit('REMOVE_FILTER', id)
     }
@@ -280,7 +279,7 @@ const metadataModule = {
   state,
   mutations,
   actions,
-  getters
+  getters,
 }
 
 export default metadataModule

@@ -3,6 +3,7 @@ import  { mount} from '@vue/test-utils'
 import DataModelGraph from './DataModelGraph.vue'
 import { state, actions, mutations, getters } from '../../../store'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import metadataModule from "../../../store/metadataModule";
 
 const rawData = [
   {
@@ -50,7 +51,10 @@ describe('DataModelGraph.vue', () => {
       state,
       actions,
       mutations,
-      getters
+      getters,
+      modules: {
+        metadataModule: metadataModule
+      }
     })
     cmp = mount(DataModelGraph, {
       attachToDocument: true,

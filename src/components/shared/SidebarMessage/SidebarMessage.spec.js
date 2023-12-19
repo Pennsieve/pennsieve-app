@@ -1,13 +1,13 @@
 import SidebarMessage from './SidebarMessage.vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 describe('SidebarMessage.vue', () => {
   let cmp
   let cmpEmpty
 
   beforeEach(() => {
-    cmp = shallow(SidebarMessage, {
-      propsData: {
+    cmp = shallowMount(SidebarMessage, {
+      props: {
         title: 'Locked Concept'
       },
       slots: {
@@ -15,7 +15,7 @@ describe('SidebarMessage.vue', () => {
         default: '<p>This is a test</p>',
       }
     })
-    cmpEmpty = shallow(SidebarMessage)
+    cmpEmpty = shallowMount(SidebarMessage)
   })
 
   it('Has slots', () => {

@@ -925,12 +925,12 @@ export const getters = {
             const sortByProp = (a, b) => {
               return b.count - a.count;
             };
-            // const filterEmpty = R.filter((model) => model.count > 0);
+            const filterEmpty = R.filter((model) => model.count > 0);
 
             return R.compose(
                 R.take(count),
                 R.sort(sortByProp),
-                R.filterEmpty,
+                filterEmpty(),
                 R.defaultTo([])
             )(state.concepts);
           },
@@ -1017,7 +1017,7 @@ export default createStore({
     publishingModule,
     filesModule,
     uploadModule,
-    metadataModule
+    metadataModule,
   }
 
 });

@@ -47,8 +47,7 @@
           class="button-icon small icon-sort"
           @click="setSortDir"
         >
-          <svg-icon
-            name="icon-sort"
+          <IconSort
             :class="[ sortIconDirection === 'down' ? 'svg-flip' : '' ]"
             color="currentColor"
             :dir="sortIconDirection"
@@ -125,11 +124,13 @@ import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMe
 import RequestSurvey from "../../welcome/request-survey/RequestSurvey.vue";
 import ConfirmationDialog from "../../shared/ConfirmationDialog/ConfirmationDialog.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
+import IconSort from "../../icons/IconSort.vue";
 
 export default {
   name: 'PublishingProposalsList',
 
   components: {
+    IconSort,
     IconMagnifyingGlass,
     BfEmptyPageState,
     PublishingProposalsListItem,

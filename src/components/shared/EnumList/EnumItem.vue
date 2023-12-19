@@ -21,11 +21,10 @@
           class="tools"
           @click="deleteItem($event, item)"
         >
-          <svg-icon
-            icon="icon-remove"
+          <IconRemove
             class="remove"
-            height="10"
-            width="10"
+            :height="10"
+            :width="10"
           />
         </button>
       </el-col>
@@ -35,10 +34,11 @@
 
 <script>
   import { propOr } from 'ramda'
+  import IconRemove from "../../icons/IconRemove.vue";
 
   export default {
     name: 'EnumItem',
-
+    components: {IconRemove},
     props: {
       item: {
         type: String,

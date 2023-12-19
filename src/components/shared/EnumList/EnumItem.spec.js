@@ -1,5 +1,5 @@
 import EnumItem from './EnumItem.vue'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 
 const evt = {
   preventDefault: () => {}
@@ -8,12 +8,11 @@ const evt = {
 describe('EnumItem.vue', () => {
   let cmp
 
-  beforeEach(() => {
-    cmp = shallow(EnumItem)
-    cmp.setProps({
+  beforeEach(async () => {
+    cmp = shallowMount(EnumItem)
+    await cmp.setProps({
       item: 'Jawn #1'
     })
-    cmp.update()
   })
 
   it('Computes item name', () => {
@@ -21,12 +20,11 @@ describe('EnumItem.vue', () => {
   })
 
   it('deleteItem', (done) => {
-    const spy = jest.spyOn(evt, 'preventDefault')
-    cmp.vm.$on('remove-item-from-list', itemName => {
-      expect(itemName).toBe('Jawn')
-      expect(spy).toHaveBeenCalled()
-      done()
-    })
+    const spy = vi.spyOn(evt, 'preventDefault')
     cmp.vm.deleteItem(evt, 'Jawn')
+
+    const removeItem = cmp.emitted('remove-item-from-list')
+    expect(removeItem[0]).toStrictEqual(['Jawn'])
+
   })
 })

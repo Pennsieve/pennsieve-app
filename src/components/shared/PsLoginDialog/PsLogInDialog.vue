@@ -52,7 +52,7 @@
             :processing="isLoggingIn"
             processing-text="Signing In"
             @click="initiateFederatedLogin('ORCID')"
-            ><img src="src/assets/images/orcid_24x24.png" alt="iD" width="24" height="24" style="display: block; margin-left: 0; margin-right: 32px; width: 24px; height: 24px">Sign in with your ORCID iD</bf-button>
+            ><img src="/src/assets/images/orcid_24x24.png" alt="iD" width="24" height="24" style="display: block; margin-left: 0; margin-right: 32px; width: 24px; height: 24px">Sign in with your ORCID iD</bf-button>
           <div class="log-in-dialog__container--actions" :class="actionsClass">
             <router-link
               tag="a"

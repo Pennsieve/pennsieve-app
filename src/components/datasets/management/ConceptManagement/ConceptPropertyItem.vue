@@ -26,13 +26,12 @@
         :span="10"
         class="property-info"
       >
-        <svg-icon
+        <IconReorder
           v-if="!modelLocked"
           class="icon-reorder"
           color="currentColor"
-          height="24"
-          name="icon-reorder"
-          width="24"
+          :height="24"
+          :width="24"
         />
         <el-tooltip
           placement="top"
@@ -46,9 +45,8 @@
             @mouseout="hideLabel"
           >
             <span>{{ property.displayName }}</span>
-            <svg-icon
+            <IconLockFilled
               v-if="propertyLocked && !modelLocked"
-              icon="icon-lock-filled"
             />
           </div>
         </el-tooltip>
@@ -73,9 +71,8 @@
           @command="handlePropertyUpdate"
         >
           <span class="btn-file-menu el-dropdown-link">
-            <svg-icon
+            <IconMenu
               class="icon-menu"
-              icon="icon-menu"
             />
           </span>
           <el-dropdown-menu
@@ -125,11 +122,14 @@ import CheckOverflow from '../../../../mixins/check-overflow'
 import { getUnitDisplayName } from '../../../../mixins/data-type/utils'
 import DataType from '../../../../mixins/data-type'
 import EventBus from '../../../../utils/event-bus'
+  import IconReorder from "../../../icons/IconReorder.vue";
+  import IconLockFilled from "../../../icons/IconLockFilled.vue";
+  import IconMenu from "../../../icons/IconMenu.vue";
 
   export default {
   name: 'ConceptPropertyItem',
-
-  mixins: [
+    components: {IconMenu, IconLockFilled, IconReorder},
+    mixins: [
     CheckOverflow,
     DataType
   ],
