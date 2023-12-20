@@ -118,10 +118,14 @@ export const state = {
   shouldShowLinkOrcidDialog: false,
   isLinkOrcidDialogVisible: false,
   userToken: '',
-  sessionTimer: null
+  sessionTimer: null,
+  isRefreshing: false
 }
 
 export const mutations = {
+    SET_IS_REFRESHING(state, data) {
+      state.isRefreshing = data
+    },
     SET_SESSION_TIMER(state, data) {
       state.sessionTimer = data
     },
@@ -618,6 +622,7 @@ export const mutations = {
     }
 
 export const actions = {
+  setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),
   updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
@@ -818,6 +823,8 @@ export const actions = {
 }
 
 export const getters = {
+  sessionTimer: (state) => state.sessionTimer,
+  isRefreshing: (state) => state.isRefreshing,
   isWelcomeOrg: state => {
     const featuresList = R.pathOr([], ['activeOrganization', 'organization', 'features'], state)
     return R.includes('sandbox_org_feature', featuresList)

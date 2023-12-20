@@ -12,7 +12,7 @@
       </div>
       <div class="refresh-action"
            v-if="!sessionTimedOut"
-           @click="refreshToken">
+           @click="onRefreshToken">
         Refresh
       </div>
     </div>
@@ -44,6 +44,8 @@ import toQueryParams from "./utils/toQueryParams.js";
 import PsAnalytics from './components/analytics/Analytics.vue'
 import BfDownloadFile from './components/bf-download-file/BfDownloadFile.vue'
 import {Auth} from "@aws-amplify/auth";
+import request from './mixins/request'
+
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -56,6 +58,7 @@ export default {
   },
   mixins: [
     globalMessageHandler,
+    request
   ],
 
   data() {
@@ -63,8 +66,8 @@ export default {
       defaultPageTitle: 'Sign In | Pennsieve',
       defaultPageDescription: 'Pennsieve secure Sign In page. Sign in to your Pennsieve customer account.',
       sessionTimedOut: false,
-      showSessionTimerThreshold: 300,
-      sessionLogoutThreshold: 0,
+      showSessionTimerThreshold: 120,
+      sessionLogoutThreshold: 5,
     }
   },
 
@@ -141,7 +144,6 @@ export default {
       "environment",
       "searchModalVisible",
       "isLinkOrcidDialogVisible",
-      "sessionTimer"
     ]),
     ...mapGetters([
       "activeOrganization",
@@ -159,7 +161,7 @@ export default {
       if (this.sessionTimedOut) {
         return "Logged out due to inactivity."
       } else {
-        return "Your session will expire in: " + this.sessionTimer + " seconds."
+        return "Your session will expire in: " + (this.sessionTimer()- this.sessionLogoutThreshold) + " seconds."
       }
     },
 
@@ -172,7 +174,7 @@ export default {
      * @returns {boolean}
      */
     showSessionTimer: function() {
-      return !!(this.sessionTimedOut || (this.sessionTimer && this.sessionTimer < this.showSessionTimerThreshold));
+      return !!(this.sessionTimedOut || (this.sessionTimer() && this.sessionTimer() < this.showSessionTimerThreshold));
     },
 
     /**
@@ -226,17 +228,27 @@ export default {
       'fetchIntegrations'
     ]),
     ...mapGetters([
-      'getCognitoUser'
+      'getCognitoUser',
+      'sessionTimer'
     ]),
 
+    onRefreshToken: function() {
+      this.refreshToken()
+    },
     /**
      * Manually refresh token.
      */
-    refreshToken: function() {
+    refreshToken: async function() {
       const usr = this.getCognitoUser()
       const currentSession = usr.signInUserSession;
-      usr.refreshSession(currentSession.refreshToken, (err, session) => {
-        console.log("Manually refreshed token.")
+
+      this.isRefreshing = true
+      await usr.refreshSession(currentSession.refreshToken, async (err, session) => {
+        const timeOut = session.accessToken.payload.exp
+        this.setSessionTimer( Math.round((timeOut*1000 - Date.now())/1000))
+
+        await this.updateUserToken(session.accessToken.jwtToken)
+        this.isRefreshing = false
       })
     },
 
@@ -251,10 +263,7 @@ export default {
      * @returns {Promise}
      */
     bootUp: async function(userToken, fromLogin = false) {
-      console.log("Booting up")
-
-      // Indicate that we are no longer timed out.
-      this.sessionTimedOut = false
+      console.log("Booting up: login="+fromLogin)
 
       // Get the current Cognito User and store in Vuex
       await Auth.currentAuthenticatedUser().then(user => {
@@ -268,7 +277,7 @@ export default {
             const timeOut = usr.signInUserSession.accessToken.payload.exp
 
             this.setSessionTimer( Math.round((timeOut*1000 - Date.now())/1000))
-            if (this.sessionTimer < this.sessionLogoutThreshold) {
+            if (this.sessionTimer() < this.sessionLogoutThreshold) {
               console.log("Logging out due to expired session.")
               this.sessionTimedOut = true
               EventBus.$emit('logout')
@@ -284,6 +293,9 @@ export default {
       // If bootup is called from Login, only get Profile and org as login
       // will re-trigger bootup when it updates the route to the correct org.
       if (fromLogin) {
+        // Indicate that we are no longer timed out.
+        this.sessionTimedOut = false
+
         return this.getBfTermsOfService()
           .then(() => this.getProfileAndOrg(userToken))
       } else {

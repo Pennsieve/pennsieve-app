@@ -11,6 +11,7 @@ import AWSConfig from './utils/aws-exports.js'
 import {ElMessage} from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
+import request from './mixins/request'
 
 
 // Need to import CSS specifically because we are only using the component API.
@@ -36,6 +37,8 @@ app.mount("#app");
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
 
+
+const sessionRefreshThreshold = 300;
 
 // Top level routes allowList
 const topLevelRoutes = [
@@ -87,6 +90,28 @@ router.beforeEach((to, from, next) => {
             }
         } else {
             // Is Authenticated --> Route to destination, or Dataset Overview if route is login route.
+
+            // Check for session time-out and refresh token if within refresh threshold
+            const sessionT = store.state.sessionTimer
+            if (!store.state.isRefreshing && sessionT && sessionT < sessionRefreshThreshold) {
+                const usr = store.state.cognitoUser
+                if (usr){
+                    const currentSession = usr.signInUserSession;
+                    if (currentSession) {
+                        console.log('Session automatically refreshed during pre-route.')
+                        store.dispatch('setIsRefreshing',true)
+
+                        usr.refreshSession(usr.signInUserSession.refreshToken, async (err, session) => {
+                            const timeOut = session.accessToken.payload.exp
+                            await store.dispatch('setSessionTimer', Math.round((timeOut*1000 - Date.now())/1000))
+                            await store.dispatch('updateUserToken',session.accessToken.jwtToken)
+                                .then(() => store.dispatch('setIsRefreshing',false))
+
+                        })
+                    }
+                }
+            }
+
 
             if (token && to.name === 'home' && savedOrgId) {
                 next(`/${savedOrgId}/datasets`)

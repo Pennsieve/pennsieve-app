@@ -12,19 +12,22 @@
         </template>
 
         <template #tabs>
-          <ul
-            slot="tabs"
-            class="tabs unstyled"
-          >
-            <li
-              v-for="tab in tabs"
-              :key="tab.route.name"
-            >
-              <router-link :to="tab.route">
-                {{ tab.label }} ({{ this.getTotalCount(tab.type) }})
-              </router-link>
-            </li>
-          </ul>
+          <router-tabs :tabs="tabs"/>
+
+
+<!--          <ul-->
+<!--            slot="tabs"-->
+<!--            class="tabs unstyled"-->
+<!--          >-->
+<!--            <li-->
+<!--              v-for="tab in tabs"-->
+<!--              :key="tab.route.name"-->
+<!--            >-->
+<!--              <router-link :to="tab.route">-->
+<!--                {{ tab.label }} ({{ this.getTotalCount(tab.type) }})-->
+<!--              </router-link>-->
+<!--            </li>-->
+<!--          </ul>-->
         </template>
 
 
@@ -53,11 +56,13 @@ import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import EventBus from '../../utils/event-bus'
 import { PublicationStatus, PublicationTabs } from '../../utils/constants.js'
 import Request from '../../mixins/request'
+import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
 export default {
   name: 'PublishingView',
 
   components: {
+    RouterTabs,
     BfButton,
     BfPage,
     BfStage,
@@ -87,11 +92,32 @@ export default {
       'totalCounts'
     ]),
 
+    tabs: function() {
+      return [
+        {
+          name: this.isUserPublisher ? 'Ready for Review ' : 'Pending Review (' + this.getTotalCount(PublicationTabs.REVIEW) + ')',
+          to: PublicationTabs.REVIEW
+        },
+        {
+          name: 'Published (' + this.getTotalCount(PublicationTabs.PUBLISHED) + ')',
+          to: PublicationTabs.PUBLISHED
+        },
+        {
+          name: 'Rejected (' + this.getTotalCount(PublicationTabs.REJECTED) + ')',
+          to: PublicationTabs.REJECTED,
+        },
+        {
+          name: 'Proposed (' + this.getTotalCount(PublicationTabs.PROPOSED) + ')',
+          to: PublicationTabs.PROPOSED,
+        }
+      ]
+    },
+
     /**
      * Compute publishing tab based on user's publisher role
      * @returns {Array}
      */
-    tabs: function() {
+    tabs2: function() {
       return [
         {
           route: {

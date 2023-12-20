@@ -409,7 +409,6 @@ export default {
       this.renameDialogVisible = false
     },
     showRenameFileDialog: function() {
-      console.log('iopoepjkjf')
       this.selectedFileForAction = this.selectedFiles[0]
       this.renameDialogVisible = true
     },

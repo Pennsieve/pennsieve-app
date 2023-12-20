@@ -66,7 +66,7 @@
 <script>
 import { mapState, mapGetters, mapActions } from 'vuex'
 import { path, pathOr } from 'ramda'
-import EventBus from '@/utils/event-bus'
+import EventBus from '../../../utils/event-bus'
 import Request from '../../../mixins/request/index'
 import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
@@ -101,7 +101,8 @@ export default {
   },
 
   components: {
-    BfButton
+    BfButton,
+    IconArrowLeft
   },
 
   mixins: [Request, CustomTheme],
@@ -305,7 +306,8 @@ export default {
   }
 }
 </script>
-<style lang="scss">
+
+<style scoped lang="scss">
 @import '../../../assets/_variables.scss';
 @import '../../../assets/components/_dataset-status.scss';
 
