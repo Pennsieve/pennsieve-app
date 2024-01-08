@@ -144,11 +144,12 @@ export default {
   },
 
   async mounted() {
-    await this.$recaptchaLoaded();
-    this.$recaptchaInstance.showBadge();
+    console.log("**", this);
+    await this.recaptchaLoaded();
+    this.recaptchaInstance.showBadge();
   },
   destroyed() {
-    this.$recaptchaInstance.hideBadge();
+    this.recaptchaInstance.hideBadge();
   },
 
   methods: {
@@ -156,7 +157,7 @@ export default {
      * Take the user back home
      */
     onFormCancel: function () {
-      this.$router.push({ name: "home" });
+      this.router.push({ name: "home" });
     },
 
     /**
@@ -180,8 +181,10 @@ export default {
       this.isCreatingAccount = true;
       this.hasError = false;
 
+      console.log("this", this);
+
       try {
-        const recaptchaToken = await this.$recaptcha();
+        const recaptchaToken = await this.recaptcha();
 
         await this.sendXhr(`${this.config.apiUrl}/account/sign-up`, {
           method: "POST",

@@ -1,14 +1,16 @@
 
-import { createApp, getCurrentInstance } from "vue";
+import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import store from "./store";
 import striptags from 'striptags';
 import Cookies from 'js-cookie'
+import { VueReCaptcha, useReCaptcha } from 'vue-recaptcha-v3'
+import * as siteConfig from '@/site-config/site.json'
 
 import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
-import {ElMessage} from 'element-plus'
+import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
@@ -19,7 +21,11 @@ import 'element-plus/es/components/message/style/index';
 
 Amplify.configure(AWSConfig)
 
-const app = createApp(App);
+
+const app = createApp(App).use(VueReCaptcha, { siteKey: siteConfig.reCAPTCHASiteKey })
+
+
+app.use(VueReCaptcha, { siteKey: siteConfig.reCAPTCHASiteKey })
 
 app.directive('click-outside', ClickOutside)
 
@@ -35,7 +41,6 @@ app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
-
 
 // Top level routes allowList
 const topLevelRoutes = [
