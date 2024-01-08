@@ -1,10 +1,7 @@
-import Cookies from 'js-cookie'
 import EventBus from '../../utils/event-bus'
 import Logger from '../../mixins/logger'
 import LogoutHandler from '../../mixins/logout-handler'
 import { always, compose, defaultTo, pathOr, prop, propOr, tryCatch, F } from 'ramda'
-import logger from "../../mixins/logger";
-import {mapGetters, mapState, mapActions} from "vuex";
 
 const _isString = (x) => Object.prototype.toString.call(x) === '[object String]'
 
@@ -26,49 +23,18 @@ export default {
       method: 'GET',
       body: null,
       isLoading: true,
-      isRefreshing: false,
-      sessionRefreshTime: 300
+      sessionRefreshTime: 290
     }
   },
-  computed: {
-    ...mapState([
-        "sessionTimer"
-    ])
-  },
   methods: {
-    ...mapGetters([
-      'getCognitoUser'
-    ]),
-    ...mapActions([
-        'setSessionTimer'
-    ]),
     /**
      * Sends an XHR request
      * @param {Object} opts
      * @returns {Promise}
      */
-    sendXhr: async function(url, opts) {
+    sendXhr: function(url, opts) {
       if (!url) {
         return Promise.reject({status: 400, message: 'Url is missing!'})
-      }
-
-      // Check if we need to refresh session and refresh token if less than 10sec left.
-      // Refresh when less than 5 minutes available. This matches the time that we show the
-      // session expiring warning.
-      if (!this.isRefreshing && this.sessionTimer < this.sessionRefreshTime) {
-        const usr = this.getCognitoUser()
-        if (usr){
-          const currentSession = usr.signInUserSession;
-          if (currentSession) {
-            console.log('Session automatically refreshed during Xhr request.')
-            this.isRefreshing = true
-            await usr.refreshSession(currentSession.refreshToken, (err, session) => {
-              const timeOut = session.accessToken.payload.exp
-              this.setSessionTimer( Math.round((timeOut*1000 - Date.now())/1000))
-              this.isRefreshing = false
-            })
-          }
-        }
       }
 
       this.isLoading = true
@@ -101,6 +67,7 @@ export default {
             })
         })
     },
+
     /**
      * Update isLoading on $nextTick
      * @param {Object} json

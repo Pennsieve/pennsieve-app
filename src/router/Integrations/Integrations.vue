@@ -34,24 +34,7 @@
         </div>
       </template>
       <template #tabs>
-        <ul
-          class="tabs unstyled"
-        >
-          <li
-            key="ApplicationsList"
-          >
-            <router-link to="applications">
-              Applications
-            </router-link>
-          </li>
-          <li
-            key="IntegrationsList"
-          >
-            <router-link to="webhooks">
-              Webhooks
-            </router-link>
-          </li>
-        </ul>
+        <router-tabs :tabs="tabs"/>
       </template>
 
     </bf-rafter>
@@ -67,11 +50,12 @@
   import BfPage from '../../components/layout/BfPage/BfPage.vue'
   import BfStage from '../../components/layout/BfStage/BfStage.vue'
   import BfRafter from '../../components/shared/bf-rafter/BfRafter.vue'
-
+  import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
   export default {
     name: 'IntegrationView',
     components: {
+      RouterTabs,
       BfPage,
       BfStage,
       BfRafter
@@ -92,13 +76,26 @@
         default: ''
       }
     },
+    data() {
+      return {
+        tabs: [
+          {
+            name: "Applications",
+            to: "applications"
+          },
+          {
+            name: "Webhooks",
+            to: "webhooks"
+          }
+        ]
+      }
+    }
   }
 </script>
 
 
 <style scoped lang="scss">
 @import '../../assets/variables';
-
 
 .description {
   max-width: 600px;

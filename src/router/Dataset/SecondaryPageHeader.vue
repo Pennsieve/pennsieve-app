@@ -26,6 +26,7 @@ let route = useRoute();
         {{pageName}}
       </h1>
     </template>
+
   </bf-rafter>
 </template>
 
@@ -63,6 +64,8 @@ export default {
           return "Dataset Activity"
         case "integrations-settings":
           return "Dataset Integrations"
+        case "collection-files":
+          return "Files"
 
 
       }
@@ -73,9 +76,13 @@ export default {
 }
 </script>
 
+<!--<style lang="scss">-->
+<!--@import '../../assets/_variables.scss';-->
+<!---->
+<!--</style>-->
+
 <style scoped lang="scss">
 @import '../../assets/_variables.scss';
-
 
 .link-to-files {
   color: $white;
