@@ -1399,7 +1399,7 @@ it('checkModelTitle(): new property is model title', async () => {
   it.skip('saveChanges(): success event emitted for property changes', (done) => {
     // @TODO need to re-write
     const spy = vi.spyOn(cmp.vm, 'resetModel')
-    const countSpy = jest.spyOn(cmp.vm, 'incrementPropertyCount')
+    const countSpy = vi.spyOn(cmp.vm, 'incrementPropertyCount')
     const msg = 'Whiskey saved.'
 
     cmp.vm.saveChanges()

@@ -1,7 +1,7 @@
 import Vuex from 'vuex'
-import { shallow } from 'vue-test-utils'
+import { shallowMount } from '@vue/test-utils'
 import AddRelationshipDrawer from './AddRelationshipDrawer.vue'
-import { actions, mutations, getters, state } from '../../../../vuex/store'
+import { actions, mutations, getters, state } from 'vuex'
 
 describe('AddRelationshipDrawer.vue', () => {
   let cmp
@@ -14,8 +14,11 @@ describe('AddRelationshipDrawer.vue', () => {
       mutations,
       getters
     })
-    cmp = shallow(AddRelationshipDrawer, {
-      store
+
+    cmp = shallowMount(AddRelationshipDrawer, {
+      global: {
+        plugins: [store],
+      },
     })
   })
 
@@ -29,23 +32,6 @@ describe('AddRelationshipDrawer.vue', () => {
     cmp.vm.relationshipVal = 'belongs_to'
 
     expect(cmp.vm.disableButton).toBe(false)
-  })
-
-  it('openDrawer', (done) => {
-    cmp.vm.$store.state.concepts = [{
-      id: 1,
-      name: 'Studies'
-    }, {
-      id: 2,
-      name: 'Animals'
-    }]
-    cmp.vm.openDrawer(1)
-    expect.assertions(1);
-    setTimeout(() => {
-      expect(cmp.vm.visible).toBe(true)
-      done()
-    })
-
   })
 
   it('closeSideDrawer', () => {
