@@ -292,7 +292,7 @@ export default {
       const modelId = propOr('', 'modelId', this.file)
 
       this.$router.push({
-        name: 'concept-instance',
+        name: 'metadata-record',
         params: {
           instanceId: recordId,
           conceptId: modelId,
@@ -311,7 +311,7 @@ export default {
       const modelId = propOr('', 'modelId', this.file)
 
       this.$router.push({
-        name: 'model-detailsconceptId',
+        name: 'model-details',
         params: {
           datasetId: datasetId,
           conceptId: modelId

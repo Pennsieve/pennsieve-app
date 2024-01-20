@@ -1,532 +1,97 @@
 <template>
-    <div>
-      <el-collapse-item
-        v-if="showCollapse && !isSourceFile"
-        :title="relationship.displayName"
-        :name="relationship.name"
-        :class="selectionCount > 0 ? 'row-is-selected' : ''"
+  <el-collapse-item
+    v-if="showCollapse"
+    :title="relationship.displayName"
+    :name="relationship.name"
+    :class="selectionCount > 0 ? 'row-is-selected' : ''"
+    @change="toggleCollapse"
+  >
+    <template #title>
+      <div
+        class="relationship-title"
       >
-        <div
-          slot="title"
-          class="relationship-title"
-        >
+        <div class="left">
           <IconArrowUp
             :class="[ arrowDirection(relationship.name) === 'down' ? 'icon-collapse svg-flip' : 'icon-collapse' ]"
             :height="10"
             :width="10"
-            color="#404554"
           />
           <h2>{{ relationship.displayName }}</h2>
-          <div
-            v-if="!selectionCount > 0"
-            class="table-actions"
-          >
-            <span
-              v-if="canAddNewFile"
-              @click="onUploadClick"
-            >
-              <IconUpload
-                v-if="!isSourceFile"
-                class="icon-upload"
-                :height="20"
-                :width="20"
-                color="#606266"
-              />
-            </span>
-            <span
-              v-if="canAddRelationship && getPermission('editor') && !isSourceFile"
-              class="add-new"
-              :class=" { disabled: datasetLocked }"
-              @click="onAddRelationshipClick(relationship.name, $event)"
-            >
-              Add New
-            </span>
-          </div>
-          <div
-            v-else
-            class="table-info"
-          >
-            <span class="selected-files">
-              {{ selectionText }}
-            </span>
-            <a
-              v-if="!datasetLocked"
-              href="#"
-              @click.prevent="onRemoveRelationships(relationship.name, $event)"
-            >
-              {{ relationshipText }}
-            </a>
-            <span
-              v-if="isFilesType && !datasetLocked"
-              class="relationships-text-divider"
-            >
-            </span>
-            <a
-              v-if="isFilesType && !datasetLocked && !hasFolders"
-              href="#"
-              @click.stop="onDeleteFiles"
-            >
-              | {{ deleteText }}
-            </a>
-          </div>
         </div>
 
         <div
-          id="relationships-table1"
-          v-loading="isLoading"
-          :class="!isLoading && hasConcepts ? 'has-data' : ''"
-          element-loading-background="#FBFBFD"
+          class="table-actions"
         >
-          <p
-            v-if="!isFilesType && !hasConcepts && canAddRelationship"
-            class="empty-state-text"
-          >
-            No Related Records. Click "Add New" to link a record.
-          </p>
-          <p
-            v-if="!canAddRelationship && !hasConcepts"
-            class="empty-state-text"
-          >
-            No records have been created.
-          </p>
+
           <div
-            v-if="totalRowCount > 0"
-            class="pagination-header mb-16"
+            v-if="canAddRelationship && getPermission('editor') && !isSourceFile"
+            class="add-new"
+            :class=" { disabled: datasetLocked }"
+            @click="onAddRelationshipClick(relationship.name, $event)"
           >
-            <pagination-page-menu
-              class="ml-8"
-              :page-size="limit"
-              @update-page-size="onUpdateLimit"
-            />
-            <el-pagination
-              :page-size="limit"
-              :pager-count="5"
-              :current-page="offset / limit + 1"
-              layout="prev, pager, next"
-              :total="totalRowCount"
-              @current-change="onPaginationPageChange"
-            />
+            Add New
           </div>
-          <el-table
-            v-if="hasConcepts"
-            ref="Table"
-            :data="concepts"
-            max-height="467"
-            :row-class-name="tableRowClassName"
-            :border="true"
-            @bf-sort="handleSortChange"
-            @selection-change="handleTableSelectionChange"
-            @cell-mouse-enter="handleTableCellEnter"
-            @cell-mouse-leave="handleTableCellLeave"
-          >
-            <!-- Files again...is isFilesType === the former 'isRecordFile' -->
-            <template v-if="isFilesType">
-              <el-table-column
+        </div>
+      </div>
+    </template>
+    <div
+      id="relationships-table1"
+      :class="!isLoading && hasConcepts ? 'has-data' : ''"
+      element-loading-background="#FBFBFD"
+    >
+      <PennsieveTable
+        :is-loading="isLoading"
+        :data="concepts"
+        :total-row-count="totalRowCount"
+        @selection-change="handleTableSelectionChange"
+        >
+
+        <template #actions>
+          <span id="selection-count-label">{{ selectionCountLabel }}</span>
+          <ul class="selection-actions unstyled">
+            <li>
+              <button
+                class="linked btn-selection-action mr-8"
                 v-if="!datasetLocked"
-                class-name="column-no-padding el-table-column--selection file-selection"
-                type="selection"
-                fixed
-              >
-                <template #default="scope">
-                  <el-checkbox
-                    v-if="showRowCheckbox(scope.store, scope.row, hoverRow)"
-                    :value="scope.store.isSelected(scope.row)"
-                    @input="scope.store.commit('rowSelectedChanged', scope.row)"
-                  />
-                  <bf-waiting-icon
-                    v-else-if="scope.row.status === 'Processing' || scope.row.status === 'Uploading'"
-                    class="icon-package icon-waiting"
-                  />
-                  <img
-                    v-else
-                    class="svg-icon icon-item"
-                    :src="fileIcon(scope.row.icon, scope.row.packageType)"
-                  >
-                </template>
-              </el-table-column>
-              <el-table-column
-                prop="name"
-                label="Name"
-                fixed
-                min-width="75"
-                :resizable="true"
-              >
-                <template #header>
-                  Name
-                </template>
-                <template #default="scope">
-                  <router-link
-                    :to="getRecordUrl(scope)"
-                  >
-                    {{ getPackageDisplayName(scope.row) }}
-                  </router-link>
-                </template>
-              </el-table-column>
-              <el-table-column
-                prop="subtype"
-                label="Kind"
-                :resizable="true"
-              >
+                @click="onRemoveRelationships(relationship.name, $event)">
+                {{ relationshipText }}
+              </button>
+            </li>
+          </ul>
+        </template>
 
-                <template #header>
-                 Kind
-                </template>
-              </el-table-column>
-              <el-table-column
-                prop="createdAt"
-                label="Date Created"
-                :resizable="true"
-              >
-                <template #header>
-                  Date Created
-                </template>
-              </el-table-column>
-              <el-table-column
-                width="75"
-                :resizable="true"
-              >
-                <template #default="scope">
-                  <el-dropdown
-                    v-if="getPermission('editor')"
-                    trigger="click"
-                    placement="bottom-end"
-                    @command="onFileMenu"
-                  >
-                    <span
-                      v-show="!datasetLocked"
-                      class="btn-file-menu el-dropdown-link"
-                      @click.stop="setActiveRow(scope.row, $event)"
-                    >
-                      <IconMenu
-                        :height="16"
-                        :width="16"
-                      />
-                    </span>
-                    <template #dropdown>
-                      <el-dropdown-menu
-                        slot="dropdown"
-                        class="bf-menu"
-                        :offset="9"
-                      >
-                        <el-dropdown-item
-                          v-if="scope.row.status === 'Unprocessed'"
-                          command="process"
-                        >
-                          Process
-                        </el-dropdown-item>
-                        <el-dropdown-item command="unlink">
-                          Unlink
-                        </el-dropdown-item>
-                        <el-dropdown-item command="delete"
-                                          v-if="scope.row.packageType !== 'Collection'">
-                          Delete
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-
-                  </el-dropdown>
-                </template>
-              </el-table-column>
-
-              <div
-                v-if="isLoading"
-                slot="append"
-                class="append-skeleton-loader"
-              >
-                <div>
-                  <content-loader
-                    :width="25"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="7"
-                      y="5.2"
-                      rx="0"
-                      ry="0"
-                      width="11"
-                      height="12"
-                    />
-                  </content-loader>
-                </div>
-                <div>
-                  <content-loader
-                    :width="124"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="6"
-                      y="9"
-                      rx="5"
-                      ry="5"
-                      width="107"
-                      height="7"
-                    />
-                  </content-loader>
-                </div>
-                <div>
-                  <content-loader
-                    :width="158"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="50"
-                      y="9"
-                      rx="5"
-                      ry="5"
-                      width="107"
-                      height="7"
-                    />
-                  </content-loader>
-                </div>
-                <div>
-                  <content-loader
-                    :width="177"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="70"
-                      y="9"
-                      rx="5"
-                      ry="5"
-                      width="97"
-                      height="7"
-                    />
-                  </content-loader>
-                </div>
-                <div>
-                  <content-loader
-                    :width="187"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="75"
-                      y="9"
-                      rx="5"
-                      ry="5"
-                      width="97"
-                      height="7"
-                    />
-                  </content-loader>
-                </div>
-                <div>
-                  <content-loader
-                    :width="137"
-                    :height="25"
-                    :speed="2"
-                    primary-color="#d8d8d8"
-                    secondary-color="#ecebeb"
-                    class="source-file-table-skeleton-loader"
-                  >
-                    <rect
-                      x="68"
-                      y="9"
-                      rx="5"
-                      ry="5"
-                      width="17"
-                      height="7"
-                    />
-                  </content-loader>
-                </div>
-              </div>
-            </template>
-
-            <!-- Relationships -->
-            <template v-else>
-              <el-table-column
-                v-if="!datasetLocked"
-                type="selection"
-              />
-              <el-table-column
-                v-if="showRelationshipName"
-                prop="relationship"
-                label="Relationship"
-                fixed
-                min-width="165"
-                :resizable="true"
-              >
-                <template #header>
-                  Relationship
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-for="(heading, index) in getHeadings(headings, ['relationship'], true)"
-                :key="heading"
-                :item="heading"
-                :prop="getProperty(heading)"
-                :label="heading"
-                min-width="165"
-                :resizable="true"
-              >
-                <template #header>
-                  ???
-                </template>
-                <template #default="scope">
-                  <router-link
-                    v-if="index === 0"
-                    :to="getRecordUrl(scope)"
-                    v-html="displayValue(scope.row[heading])"
-                  />
-                  <span
-                    v-else
-                    v-html="displayValue(scope.row[heading])"
-                  />
-
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-if="getPermission('editor')"
-                min-width="45"
-                fixed="right"
-                :resizable="true"
-              >
-                <template #default="scope">
-                  <div
-                    v-if="!datasetLocked"
-                    class="remove-relationship"
-                    @click="onRemoveRelationship(scope.row, $event)"
-                  >
-                    <IconRemove
-                      :height="10"
-                      :width="10"
-                      color="#404554"
-                    />
-                  </div>
-                </template>
-              </el-table-column>
-            </template>
-          </el-table>
-
-          <div
-            v-if="totalRowCount > 0"
-            class="source-file-table-results-count"
-          >
-            {{ getRowCount }}
-          </div>
-        </div>
-      </el-collapse-item>
-
-      <!-- SOURCE FILES TABLE -->
-      <el-collapse-item
-        v-if="showCollapse && isSourceFile"
-        title="Source Files"
-        name="sourcefiles"
-        :class="selectionCount > 0 ? 'row-is-selected' : ''"
-      >
-        <div
-          slot="title"
-          class="relationship-title"
-        >
-          <IconArrowUp
-            class="icon-collapse"
-            :dir="arrowDirection('sourcefiles')"
-            :height="10"
-            :width="10"
-            color="#404554"
-          />
-          <h2>{{ displayName }}</h2>
-          <div
-            v-if="selectionCount > 0"
-            class="table-info"
-          >
-            <span
-              v-if="!datasetLocked"
-              class="selected-source-files"
-            >
-              {{ selectionText }}
-            </span>
-            <span
-              v-if="!datasetLocked"
-              class="relationships-text-divider"
-            >
-              |
-            </span>
-            <a
-              v-if="!datasetLocked"
-              href="#"
-              @click.stop="onDownloadSelection"
-            >
-              Download Selected
-            </a>
-          </div>
-        </div>
-
-        <div
-          id="relationships-table"
-          v-loading="loadTableResults"
-          :class="!loadTableResults && hasConcepts ? 'has-data' : ''"
-          element-loading-background="#FBFBFD"
-        >
-          <div
-            v-if="totalRowCount > 0"
-            class="pagination-header"
-          >
-            <pagination-page-menu
-              class="ml-8"
-              :page-size="limit"
-              @update-page-size="onUpdateLimit"
-            />
-            <el-pagination
-              :page-size="limit"
-              :pager-count="5"
-              :current-page="offset / limit + 1"
-              layout="prev, pager, next"
-              :total="totalRowCount"
-              @current-change="onPaginationPageChange"
-            />
-          </div>
-          <el-table
-            ref="Table"
-            class="no-radius-bottom"
-            :data="concepts"
-            max-height="467"
-            :row-class-name="tableRowClassName"
-            :border="true"
-            @bf-sort="handleSortChange"
-            @selection-change="handleTableSelectionChange"
-            @cell-mouse-enter="handleTableCellEnter"
-            @cell-mouse-leave="handleTableCellLeave"
-          >
+        <template #columns>
+          <template v-if="isFilesType">
             <el-table-column
               v-if="!datasetLocked"
-              class-name="column-no-padding el-table-column--selection file-selection"
               type="selection"
-              fixed
-            >
-              <template #default="scope">
-                <el-checkbox
-                  v-if="showRowCheckbox(scope.store, scope.row, hoverRow)"
-                  :value="scope.store.isSelected(scope.row)"
-                  @input="scope.store.commit('rowSelectedChanged', scope.row)"
-                />
-                <img
-                  v-else
-                  class="svg-icon icon-item"
-                  :src="fileIcon(scope.row.icon, scope.row.packageType)"
-                >
-              </template>
-            </el-table-column>
+            />
+<!--            <el-table-column-->
+<!--              v-if="!datasetLocked"-->
+<!--              class-name="column-no-padding el-table-column&#45;&#45;selection file-selection"-->
+<!--              type="selection"-->
+<!--              fixed-->
+<!--            >-->
+<!--              <template #default="scope">-->
+<!--                <el-checkbox-->
+<!--                  v-if="showRowCheckbox(scope.store, scope.row, hoverRow)"-->
+<!--                  :value="scope.store.isSelected(scope.row)"-->
+<!--                  @input="scope.store.commit('rowSelectedChanged', scope.row)"-->
+<!--                />-->
+<!--                <bf-waiting-icon-->
+<!--                  v-else-if="scope.row.status === 'Processing' || scope.row.status === 'Uploading'"-->
+<!--                  class="icon-package icon-waiting"-->
+<!--                />-->
+<!--                <img-->
+<!--                  v-else-->
+<!--                  class="svg-icon icon-item"-->
+<!--                  :src="fileIcon(scope.row.icon, scope.row.packageType)"-->
+<!--                  alt="FileIcon"-->
+<!--                >-->
+<!--              </template>-->
+<!--            </el-table-column>-->
             <el-table-column
-              prop="filename"
+              prop="name"
               label="Name"
               fixed
               min-width="75"
@@ -536,16 +101,33 @@
                 Name
               </template>
               <template #default="scope">
-                {{ scope.row.filename }}
+                <router-link
+                  :to="getRecordUrl(scope)"
+                >
+                  <div class="cell-name-content">
+                    <bf-waiting-icon
+                      v-if="scope.row.status === 'Processing' || scope.row.status === 'Uploading'"
+                      class="icon-package icon-waiting"
+                    />
+                    <img
+                      v-else
+                      class="svg-icon icon-item"
+                      :src="fileIcon(scope.row.icon, scope.row.packageType)"
+                      alt="FileIcon"
+                    >
+                    <div class="name">{{ getPackageDisplayName(scope.row) }}</div>
+                  </div>
+                </router-link>
               </template>
             </el-table-column>
             <el-table-column
-              prop="size"
-              label="Size"
+              prop="subtype"
+              label="Kind"
               :resizable="true"
             >
+
               <template #header>
-                Size
+                Kind
               </template>
             </el-table-column>
             <el-table-column
@@ -557,25 +139,6 @@
                 Date Created
               </template>
             </el-table-column>
-            <el-table-column
-              width="85"
-              :resizable="true"
-            >
-              <template #default="scope">
-                <button
-                  v-if="showRowCheckbox(scope.store, scope.row, hoverRow)"
-                  class="download-source-file-col"
-                  @click="onDownloadRow(scope.row)"
-                >
-                  <IconUpload
-                    class="download-source-file-icon"
-                    name="icon-upload"
-                    dir="down"
-                  />
-                </button>
-              </template>
-            </el-table-column>
-
             <div
               v-if="isLoading"
               slot="append"
@@ -602,7 +165,7 @@
               </div>
               <div>
                 <content-loader
-                  :width="164"
+                  :width="124"
                   :height="25"
                   :speed="2"
                   primary-color="#d8d8d8"
@@ -614,14 +177,33 @@
                     y="9"
                     rx="5"
                     ry="5"
-                    width="157"
+                    width="107"
                     height="7"
                   />
                 </content-loader>
               </div>
               <div>
                 <content-loader
-                  :width="244"
+                  :width="158"
+                  :height="25"
+                  :speed="2"
+                  primary-color="#d8d8d8"
+                  secondary-color="#ecebeb"
+                  class="source-file-table-skeleton-loader"
+                >
+                  <rect
+                    x="50"
+                    y="9"
+                    rx="5"
+                    ry="5"
+                    width="107"
+                    height="7"
+                  />
+                </content-loader>
+              </div>
+              <div>
+                <content-loader
+                  :width="177"
                   :height="25"
                   :speed="2"
                   primary-color="#d8d8d8"
@@ -633,14 +215,14 @@
                     y="9"
                     rx="5"
                     ry="5"
-                    width="167"
+                    width="97"
                     height="7"
                   />
                 </content-loader>
               </div>
               <div>
                 <content-loader
-                  :width="424"
+                  :width="187"
                   :height="25"
                   :speed="2"
                   primary-color="#d8d8d8"
@@ -648,41 +230,127 @@
                   class="source-file-table-skeleton-loader"
                 >
                   <rect
-                    x="60"
+                    x="75"
                     y="9"
                     rx="5"
                     ry="5"
-                    width="167"
+                    width="97"
+                    height="7"
+                  />
+                </content-loader>
+              </div>
+              <div>
+                <content-loader
+                  :width="137"
+                  :height="25"
+                  :speed="2"
+                  primary-color="#d8d8d8"
+                  secondary-color="#ecebeb"
+                  class="source-file-table-skeleton-loader"
+                >
+                  <rect
+                    x="68"
+                    y="9"
+                    rx="5"
+                    ry="5"
+                    width="17"
                     height="7"
                   />
                 </content-loader>
               </div>
             </div>
-          </el-table>
-          <div
-            v-if="totalRowCount > 0"
-            class="source-file-table-results-count"
-          >
-            {{ getRowCount }}
-          </div>
-        </div>
-      </el-collapse-item>
+          </template>
+
+          <!-- Relationships -->
+          <template v-else>
+            <el-table-column
+              v-if="!datasetLocked"
+              type="selection"
+            />
+            <el-table-column
+              v-if="showRelationshipName"
+              prop="relationship"
+              label="Relationship"
+              fixed
+              min-width="165"
+              :resizable="true"
+            >
+              <template #header>
+                Relationship
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-for="(heading, index) in getHeadings(headings, ['relationship'], true)"
+              :key="heading"
+              :item="heading"
+              :prop="getProperty(heading)"
+              :label="heading"
+              min-width="165"
+              :resizable="true"
+            >
+              <template #default="scope">
+                <router-link
+                  v-if="index === 0"
+                  :to="getRecordUrl(scope)"
+                  v-html="displayValue(scope.row[heading])"
+                />
+                <span
+                  v-else
+                  v-html="displayValue(scope.row[heading])"
+                />
+
+              </template>
+            </el-table-column>
+          </template>
+        </template>
+      </PennsieveTable>
+
+
+      <p
+        v-if="!isFilesType && !hasConcepts && canAddRelationship"
+        class="empty-state-text"
+      >
+        No Related Records. Click "Add New" to link a record.
+      </p>
+      <p
+        v-if="!canAddRelationship && !hasConcepts"
+        class="empty-state-text"
+      >
+        No records have been created.
+      </p>
+      <div
+        v-if="totalRowCount > 0"
+        class="pagination-header mb-16"
+      >
+        <pagination-page-menu
+          class="ml-8"
+          :page-size="limit"
+          @update-page-size="onUpdateLimit"
+        />
+        <el-pagination
+          :page-size="limit"
+          :pager-count="5"
+          :current-page="offset / limit + 1"
+          layout="prev, pager, next"
+          :total="totalRowCount"
+          @current-change="onPaginationPageChange"
+        />
+      </div>
     </div>
-<!--  </intersect>-->
+  </el-collapse-item>
 </template>
 
 <script>
 import { clone, compose, defaultTo, find, head, last, pathOr, propEq, propOr, includes } from 'ramda'
 import { mapGetters, mapState } from 'vuex'
-// import Intersect from 'vue-intersect'
 import { ContentLoader } from 'vue-content-loader'
 
 import EventBus from '../../../../utils/event-bus'
 import Request from '../../../../mixins/request'
 import TableFunctions from '../../../../mixins/table-functions'
 import Sorter from '../../../../mixins/sorter'
-import EncodeInternalFields from '@/mixins/encode-internal-fields'
-import StorageMetrics from '@/mixins/bf-storage-metrics/index'
+import EncodeInternalFields from '../../../../mixins/encode-internal-fields'
+import StorageMetrics from '../../../../mixins/bf-storage-metrics/index'
 import FileIcon from '../../../../mixins/file-icon/index'
 import FormatDate from '../../../../mixins/format-date'
 import GetFileProperty from '../../../../mixins/get-file-property'
@@ -694,18 +362,29 @@ import PaginationPageMenu from '../../../shared/PaginationPageMenu/PaginationPag
 import IconArrowUp from "../../../icons/IconArrowUp.vue";
 import IconMenu from "../../../icons/IconMenu.vue";
 import IconRemove from "../../../icons/IconRemove.vue";
+import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
+import IconUpload from "../../../icons/IconUpload.vue";
 
 export default {
   name: 'RelationshipsTable',
 
   components: {
+    PennsieveTable,
     IconRemove,
     IconMenu,
     IconArrowUp,
     BfWaitingIcon,
     ContentLoader,
-    PaginationPageMenu
+    PaginationPageMenu,
+    IconUpload
   },
+
+  emits:[
+    'add-relationship',
+    'set-related-files',
+    'remove-relationships',
+    'unlink-files'
+  ],
 
   mixins: [
     Request,
@@ -720,10 +399,6 @@ export default {
   ],
 
   props: {
-    // isSubmissions: {
-    //   type: Boolean,
-    //   default: false
-    // },
     showRelationshipName: {
       type: Boolean,
       default: true
@@ -777,7 +452,7 @@ export default {
         concepts: [],
         selection: [],
         sortBy: this.sourceType === 'sourceFile' ? 'name' : 'createdAt',
-        limit: 50,
+        limit: 10,
         offset: 0,
         origResponse: [],
         isLoading: false,
@@ -806,6 +481,16 @@ export default {
      */
     totalRowCount: function() {
       return this.relationship.count || this.sourceFileCount
+    },
+
+    /**
+     * Compute selection count label
+     * @returns {String}
+     */
+    selectionCountLabel: function() {
+      const selectionCount = this.selection.length
+      const fileWord = selectionCount === 1 ? 'record' : 'records'
+      return `${selectionCount} ${fileWord} selected`
     },
 
     /**
@@ -970,6 +655,7 @@ export default {
   },
 
   mounted: function() {
+    this.refreshTable()
     this.$store.watch(
       this.getRelationshipTypes,
       this.onWatchRelationshipTypes.bind(this)
@@ -977,6 +663,9 @@ export default {
   },
 
   methods: {
+    toggleCollapse: function() {
+    },
+
     /**
      * Get package display name
      * @params {Object} file
@@ -1024,23 +713,23 @@ export default {
         })
         .catch(this.handleXhrError.bind(this))
     },
-    /**
-     * Used to load source files of a package
-     * for Source Files table
-     */
-    loadSourceFiles: function() {
-      if (!this.sourceFilesUrl) {
-        this.isLoading = false
-        return
-      }
-
-      this.sendXhr(this.sourceFilesUrl)
-        .then(response => {
-          this.sourceFileCount = response.totalCount
-          this.handleXhrResponse(response.results)
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
+    // /**
+    //  * Used to load source files of a package
+    //  * for Source Files table
+    //  */
+    // loadSourceFiles: function() {
+    //   if (!this.sourceFilesUrl) {
+    //     this.isLoading = false
+    //     return
+    //   }
+    //
+    //   this.sendXhr(this.sourceFilesUrl)
+    //     .then(response => {
+    //       this.sourceFileCount = response.totalCount
+    //       this.handleXhrResponse(response.results)
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
 
     /**
      * Used to generate the styling for the
@@ -1183,7 +872,7 @@ export default {
         return
       }
 
-      EventBus.$emit('add-relationship', conceptName)
+      this.$emit('add-relationship', conceptName)
     },
     /**
      * Handle remove relationship click event
@@ -1199,19 +888,19 @@ export default {
 
       this.$emit('remove-relationships', { relationships, tableName })
     },
-    /**
-     * Handle unlinking a file click event
-     * @param {Object} row
-     * @param {Object} e
-     */
-    onUnlinkFiles(row, e) {
-      e.stopPropagation()
-
-      const relationships = [row.relationshipInstanceId]
-      const tableName = this.relationship.name
-
-      this.$emit('unlink-files', { relationships, tableName })
-    },
+    // /**
+    //  * Handle unlinking a file click event
+    //  * @param {Object} row
+    //  * @param {Object} e
+    //  */
+    // onUnlinkFiles(row, e) {
+    //   e.stopPropagation()
+    //
+    //   const relationships = [row.relationshipInstanceId]
+    //   const tableName = this.relationship.name
+    //
+    //   this.$emit('unlink-files', { relationships, tableName })
+    // },
     /**
      * Emit remove relationships event to Concept Instance component
      * @param {String} relName
@@ -1224,7 +913,12 @@ export default {
       )
       const tableName = this.relationship.name
 
-      this.$emit('remove-relationships', { relationships, tableName })
+      if (this.isFilesType){
+        this.$emit('unlink-files', { relationships, tableName })
+      } else {
+        this.$emit('remove-relationships', { relationships, tableName })
+      }
+
     },
     /**
      * Calculate number of items selected in a table
@@ -1662,14 +1356,15 @@ export default {
      */
     getRecordUrl: function(scope) {
       const recordId = pathOr('', ['row', 'recordId'])(scope)
+      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
 
       // file relationships
       if (recordId && recordId.includes('package')) {
         return {
           name: 'file-record',
           params: {
-            conceptId: this.filesProxyId,
-            instanceId: recordId
+            datasetId: datasetId,
+            fileId: recordId
           }
         }
       }
@@ -1679,7 +1374,7 @@ export default {
         return {
           name: 'collection-files',
           params: {
-            conceptId: this.filesProxyId,
+            datasetId: datasetId,
             fileId: recordId
           }
         }
@@ -1688,10 +1383,11 @@ export default {
       // standard relationships
       const model = this.getModelByName(this.relationship.name)
       if (model && recordId) {
+        console.log('powerpoei')
         return {
-          name: 'concept-instance',
+          name: 'metadata-record',
           params: {
-            conceptId: model.id,
+            modelId: model.id,
             instanceId: recordId
           }
         }
@@ -1748,6 +1444,10 @@ export default {
 <style scoped lang="scss">
 @import '../../../../assets/_variables.scss';
 
+.icon-item {
+  height: 22px;
+}
+
 .relationships-text-divider {
   display: inline-block;
   margin: 0 4px;
@@ -1756,9 +1456,9 @@ export default {
 #relationships-table {
   position: relative;
   min-height: 50px;
-  transition-property: min-height;
-  transition-duration: 0.5s;
-  transition-timing-function: ease-in;
+  //transition-property: min-height;
+  //transition-duration: 0.5s;
+  //transition-timing-function: ease-in;
 
   .load-more {
     display: inline-block;
@@ -1868,16 +1568,36 @@ export default {
   }
 }
 
-//.relationship-title {
-//  .add-new {
-//    font-size: 12px;
-//    margin-left: 8px;
-//    &.disabled {
-//      opacity: 0.6;
-//      cursor: default;
-//    }
-//  }
-//}
+
+
+.relationship-title {
+  display: flex;
+  justify-content: space-between;
+  width:99%;
+
+  .left {
+    display: flex;
+    align-items: center;
+  }
+
+  .add-new {
+    font-size: 12px;
+    margin-right: 8px;
+    &.disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+}
+
+.cell-name-content {
+  display: flex;
+  flex-direction: row;
+
+  .name {
+    margin-left: 4px
+  }
+}
 
 .relationship-title {
   align-items: center;
@@ -1924,10 +1644,14 @@ export default {
   flex-direction: row;
 }
 
+.icon-upload {
+  color: $purple_3;
+}
+
 .source-file-table-load-more {
   cursor: pointer;
   border-top: solid 1px $gray_2;
-  width: -webkit-fill-available;
+  //width: -webkit-fill-available;
   padding-top: 11px;
   padding-bottom: 18px;
   display: flex;

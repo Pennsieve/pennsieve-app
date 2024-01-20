@@ -17,7 +17,6 @@
           />
           <h2>Source Files</h2>
         </div>
-
       </template>
 
       <div

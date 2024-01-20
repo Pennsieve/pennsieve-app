@@ -1051,7 +1051,7 @@ export default {
       const model = this.getModelByName(this.relationship.name)
       if (model && recordId) {
         return {
-          name: 'concept-instance',
+          name: 'metadata-record',
           params: {
             conceptId: model.id,
             instanceId: recordId

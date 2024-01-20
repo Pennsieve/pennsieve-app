@@ -29,7 +29,7 @@ export default {
     window.addEventListener('beforeunload', this.onBeforeUnload)
   },
 
-  destroyed: function() {
+  unmounted: function() {
     // Warn user that changes have been made and they are unsaved
     window.removeEventListener('beforeunload', this.onBeforeUnload)
   },

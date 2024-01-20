@@ -66,7 +66,6 @@
           v-for="concept in combinedConcepts"
           :key="concept.id"
           :concept="concept"
-          @archive-concept="openArchiveDialog"
           @lock-concept="openLockDialog"
           @unlock-concept="onUnlockConcept"
         />
@@ -84,17 +83,22 @@
           src="/src/assets/images/illustrations/illo-missing-models.svg"
           alt=""
         >
-        <p slot="copy">
-          Models are the basis of your metadata schema. Before adding metadata records, you'll need to <br> create some models
-        </p>
-        <bf-button
-          slot="button"
-          class="new-model-button"
-          :disabled="datasetLocked"
-          @click="createConcept"
-        >
-          New Model
-        </bf-button>
+        <template #copy>
+          <p>
+            Models are the basis of your metadata schema. Before adding metadata records, you'll need to <br> create some models
+          </p>
+        </template>
+
+        <template #button>
+          <bf-button
+            class="new-model-button"
+            :disabled="datasetLocked"
+            @click="createConcept"
+          >
+            New Model
+          </bf-button>
+        </template>
+
         <p
           v-if="modelTemplates.length > 0 && datasetLocked === false"
           slot="link"
@@ -163,6 +167,7 @@
   import IconArrowRight from "../../../icons/IconArrowRight.vue";
   import IconLockFilled from "../../../icons/IconLockFilled.vue";
   import IconTrash from "../../../icons/IconTrash.vue";
+  import Cookies from "js-cookie";
 
   export default {
     name: 'Models',
@@ -198,10 +203,15 @@
         loadingModels: true
       }
     },
+    mounted() {
+      const token = Cookies.get('user_token')
+      if (token) {
+        this.fetchModels()
+      }
+    },
 
     computed: {
       ...mapGetters([
-        'concepts',
         'config',
         'hasFeature',
         'userToken',
@@ -213,13 +223,16 @@
         'dataset',
         'isLoadingConcepts'
       ]),
+      ...mapState('metadataModule',[
+        'models'
+      ]),
 
       /**
        * Computes if cards should be displayed
        * @returns {Boolean}
        */
       showCards: function() {
-        return !this.loadingModels && this.concepts.length > 0
+        return !this.loadingModels && this.models.length > 0
       },
 
       /**
@@ -235,7 +248,7 @@
        * @returns {Boolean}
        */
       hasNoModels: function() {
-        return !this.isLoadingConcepts && (!this.concepts || this.concepts.length === 0)
+        return !this.isLoadingConcepts && (!this.models || this.models.length === 0)
       },
 
       /**
@@ -270,9 +283,9 @@
         },
         immediate: true
       },
-      concepts: {
+      models: {
         handler: function(val) {
-          if (val && !this.combinedConcepts || (this.combinedConcepts && this.combinedConcepts.length !== this.concepts.length)) {
+          if (val && !this.combinedConcepts || (this.combinedConcepts && this.combinedConcepts.length !== this.models.length)) {
             this.getLinkedProps(val)
           }
         },
@@ -285,6 +298,10 @@
       ...mapActions([
         'updateConcepts',
       ]),
+      ...mapActions('metadataModule', [
+        'fetchModels',
+      ]),
+
 
       closeCreateConceptDialog: function() {
         console.log('closing dialog')
@@ -297,6 +314,7 @@
        * @returns {Promise}
        */
       buildLinkedPromises: function(models) {
+        console.log('linked promise build')
         const datasetId = this.$route.params.datasetId
         const promises = models.map(model => {
           const modelId = model.id
@@ -323,7 +341,7 @@
         const promises = this.buildLinkedPromises(models)
         Promise.all(promises)
           .then(linkedProps => {
-            this.combinedConcepts = clone(this.concepts)
+            this.combinedConcepts = clone(this.models)
             linkedProps
               .filter(linked => linked.length > 0)
               .forEach(linked => {
@@ -383,36 +401,36 @@
        * Archive concept
        * @param {object} concept
        */
-      openArchiveDialog: function(concept) {
-        this.activeModel = concept
-        this.archiveDialogVisible = true
-      },
+      // openArchiveDialog: function(concept) {
+      //   this.activeModel = concept
+      //   this.archiveDialogVisible = true
+      // },
 
-      /**
-       * Open Archive Dialog
-       */
-      archiveConcept: function() {
-        this.sendXhr(this.modelUrl, {
-          method: 'DELETE',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(() => {
-          const displayName = this.activeModel.displayName
-          const index = findIndex(propEq('name', this.activeModel.name), this.concepts)
-
-          const updatedConcepts = this.concepts.slice()
-          updatedConcepts.splice(index, 1)
-
-          this.updateConcepts(updatedConcepts).then(() => {
-            this.archiveDialogVisible = false
-            this.combinedConcepts = clone(this.concepts)
-            this.activeModel = {}
-          })
-        })
-        .catch(this.handleXhrError.bind(this))
-      },
+      // /**
+      //  * Open Archive Dialog
+      //  */
+      // archiveConcept: function() {
+      //   this.sendXhr(this.modelUrl, {
+      //     method: 'DELETE',
+      //     header: {
+      //       'Authorization': `bearer ${this.userToken}`
+      //     }
+      //   })
+      //   .then(() => {
+      //     const displayName = this.activeModel.displayName
+      //     const index = findIndex(propEq('name', this.activeModel.name), this.models)
+      //
+      //     const updatedConcepts = this.models.slice()
+      //     updatedConcepts.splice(index, 1)
+      //
+      //     this.updateConcepts(updatedConcepts).then(() => {
+      //       this.archiveDialogVisible = false
+      //       this.combinedConcepts = clone(this.models)
+      //       this.activeModel = {}
+      //     })
+      //   })
+      //   .catch(this.handleXhrError.bind(this))
+      // },
 
       onUnlockConcept: function(model) {
         this.activeModel = model
@@ -424,8 +442,8 @@
        * @param {Object} response
        */
       updateModel: function(response) {
-        const index = findIndex(propEq('name', response.name), this.concepts)
-        const updatedConcepts = this.concepts.slice()
+        const index = findIndex(propEq('name', response.name), this.models)
+        const updatedConcepts = this.models.slice()
         updatedConcepts.splice(index, 1, response)
         this.updateConcepts(updatedConcepts)
 

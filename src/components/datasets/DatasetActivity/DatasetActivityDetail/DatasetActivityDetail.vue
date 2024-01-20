@@ -259,7 +259,7 @@
       </div>
       <div class="dataset-activity-detail__info-link">
         <router-link
-          :to="{name: 'concept-instance',
+          :to="{name: 'metadata-record',
                 params: {
                   modelId: eventDetail.detail.modelId,
                   instanceId: eventDetail.detail.id
@@ -298,7 +298,7 @@
 
         <div class="dataset-activity-detail__info-link">
           <router-link
-            :to="{name: 'concept-instance',
+            :to="{name: 'metadata-record',
                   params: {
                     modelId: eventDetail.detail.modelId,
                     instanceId: eventDetail.detail.id

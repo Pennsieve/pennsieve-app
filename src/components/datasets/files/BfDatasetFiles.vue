@@ -380,7 +380,7 @@ export default {
     })
   },
 
-  destroyed: function() {
+  unmounted: function() {
     this.$el.removeEventListener('dragenter', this.onDragEnter.bind(this))
     EventBus.$off('rename-file', this.showRenameFileDialog.bind(this))
     EventBus.$off('add-uploaded-file', this.onAddUploadedFile.bind(this))

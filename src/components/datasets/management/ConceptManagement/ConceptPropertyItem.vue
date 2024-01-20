@@ -23,7 +23,7 @@
       align="middle"
     >
       <el-col
-        :span="10"
+        :span="8"
         class="property-info"
       >
         <IconReorder
@@ -57,7 +57,7 @@
       <el-col :span="5">
         {{ unitOrSubtype }}
       </el-col>
-      <el-col :span="7">
+      <el-col :span="4">
         {{ property.conceptTitle ? 'Model Title' : '' }}
       </el-col>
       <el-col
@@ -75,40 +75,43 @@
               class="icon-menu"
             />
           </span>
-          <el-dropdown-menu
-            slot="dropdown"
-            class="bf-menu"
-            :offset="9"
-          >
-            <template v-if="!propertyLocked">
-              <el-dropdown-item
-                :disabled="datasetLocked"
-                command="edit"
-              >
-                Update
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-if="canArchive"
-                :disabled="datasetLocked"
-                command="archive"
-              >
-                Delete
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-if="canRemove"
-                :disabled="datasetLocked"
-                command="remove"
-              >
-                Remove
-              </el-dropdown-item>
-            </template>
+          <template #dropdown>
+            <el-dropdown-menu
+              slot="dropdown"
+              class="bf-menu"
+              :offset="9"
+            >
+              <template v-if="!propertyLocked">
+                <el-dropdown-item
+                  :disabled="datasetLocked"
+                  command="edit"
+                >
+                  Update
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="canArchive"
+                  :disabled="datasetLocked"
+                  command="archive"
+                >
+                  Delete
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="canRemove"
+                  :disabled="datasetLocked"
+                  command="remove"
+                >
+                  Remove
+                </el-dropdown-item>
+              </template>
 
-            <template v-else>
-              <el-dropdown-item command="unlock">
-                Unlock
-              </el-dropdown-item>
-            </template>
-          </el-dropdown-menu>
+              <template v-else>
+                <el-dropdown-item command="unlock">
+                  Unlock
+                </el-dropdown-item>
+              </template>
+            </el-dropdown-menu>
+
+          </template>
         </el-dropdown>
       </el-col>
     </el-row>

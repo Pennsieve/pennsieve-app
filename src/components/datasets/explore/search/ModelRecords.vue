@@ -1,23 +1,51 @@
 <template>
  <bf-stage>
+   <template #actions>
+     <stage-actions>
+       <template #left>
+         <div
+           class="model-name-heading"
+         >
+           <div>
+             <IconLockFilled
+               v-if="datasetLocked"
+               class="mr-8"
+               color="#71747C"
+               :height="24"
+               :width="24"
+             />
+             Selected model: {{ modelDisplayName }}
+           </div>
+
+         </div>
+       </template>
+       <template #right>
+         <router-link
+           v-if="selectedModelId !== ''"
+           :to="{
+            name: 'metadata-record-edit',
+            params: {
+              modelId: selectedModelId,
+              instanceId: 'new'
+            }
+          }"
+         >
+           <bf-button
+             class="action-button"
+           >
+             New {{modelDisplayName }}
+           </bf-button>
+         </router-link>
+       </template>
+     </stage-actions>
+   </template>
+
    <div class="records-explore">
      <template v-if="hasModels">
        <div class="explore-wrapper">
          <div class="results">
            <div>
-             <h1
-               slot="heading"
-               class="model-name-heading"
-             >
-               <IconLockFilled
-                 v-if="datasetLocked"
-                 class="mr-8"
-                 color="#71747C"
-                 :height="24"
-                 :width="24"
-               />
-               {{ modelDisplayName }}
-             </h1>
+
              <template v-if="recordCount === 0">
                <bf-empty-page-state
                  class="no-results"
@@ -56,12 +84,12 @@
                    <router-link
                      v-if="propertyCount > 0"
                      :to="{
-// <!--                name: 'concept-instance',-->
-// <!--                params: {-->
-// <!--                  conceptId: selectedModel.id,-->
-// <!--                  instanceId: 'new'-->
-// <!--                }-->
-              }"
+                      name: 'metadata-record',
+                      params: {
+                        modelId: selectedModelId,
+                        instanceId: 'new'
+                      }
+                    }"
                    >
                      <bf-button
                        v-if="getPermission('editor')"
@@ -76,7 +104,7 @@
                </bf-empty-page-state>
              </template>
              <template v-else>
-               <!---->
+
                <search-filter
                  v-for="(filter, idx) in filterParams"
                  :key="filter.id"
@@ -93,17 +121,18 @@
                  @input-value="onInputValue"
                />
                <!---->
+
                <div v-show="recordCount > 0">
-                 <div class="mb-24">
+                 <div class="add-filter-wrapper mb-24">
+                   <IconPlus
+                     :height="24"
+                     :width="24"
+                   />
                    <button
                      class="linked"
                      :disabled="search.model === ''"
                      @click="addFilter(true)"
                    >
-                     <IconPlus
-                       :height="24"
-                       :width="24"
-                     />
                      Add Filter
                    </button>
                  </div>
@@ -261,6 +290,17 @@ export default {
     console.log("fetch models")
   },
 
+  props: {
+    datasetId: {
+      type: String,
+      default: ''
+    },
+    orgId: {
+      type: String,
+      default: ''
+    }
+  },
+
   data() {
     return {
       search: {
@@ -384,6 +424,10 @@ export default {
       // return this.selectedModel.displayName || 'Files'
     },
 
+    selectedModelId: function () {
+      return propOr('', 'id', this.selectedModel)
+    },
+
     // /**
     //  * Compute search models to limit to the current model
     //  * @returns {Array}
@@ -444,6 +488,8 @@ export default {
     }
   },
 
+
+
   methods: {
     ...mapActions('metadataModule', [
       'fetchModels',
@@ -453,6 +499,7 @@ export default {
       'fetchModelProps',
       'setSelectedModel'
     ]),
+
 
     // /**
     //  * Toggle models list visibility and scroll list to the top
@@ -541,7 +588,7 @@ export default {
       const modelId = propOr('', 'modelId', record)
 
       this.$router.push({
-        name: 'concept-instance',
+        name: 'metadata-record',
         params: {
           instanceId: recordId,
           conceptId: modelId,
@@ -651,6 +698,11 @@ export default {
 
 }
 
+.section-heading {
+  margin-bottom: 8px;
+  color: $purple_3;
+  font-size: larger;
+}
 
 .models-list-wrap {
   background: #fff;
@@ -704,6 +756,12 @@ p {
   margin: 0 0 16px;
 }
 
+.no-results {
+  img {
+    height: 120px;
+  }
+}
+
 .file-meta-data-info {
   border: 1px solid $gray_2;
   margin-left: 16px;
@@ -724,9 +782,12 @@ p {
 }
 
 .model-name-heading {
-  color: $gray_6;
-  margin: 0 0 16px 0;
+  color: $purple_3;
+  margin: 0 0 0 16px;
   text-transform: capitalize;
+  font-size: 18px;
+  align-items: center;
+  display: flex;
 }
 
 
@@ -734,6 +795,11 @@ p {
 .models-list-scroll {
   height: 100%;
   overflow: hidden;
+}
+
+.add-filter-wrapper {
+  display: flex;
+  align-items: center;
 }
 
 .btn-toggle-models-list {

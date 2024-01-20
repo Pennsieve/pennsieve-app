@@ -49,7 +49,7 @@
           </el-row>
           <el-col class="orcid-delete-button">
             <button @click="openORCIDWindow">
-              <svg-icon icon="icon-remove" height="10" width="10" />
+              <IconRemove :height="10" :width="10" />
             </button>
           </el-col>
         </div>
@@ -71,10 +71,12 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 import DeleteOrcid from '../../../my-settings/windows/DeleteOrcid.vue'
 import { mapGetters, mapState, mapActions } from 'vuex'
 import { pathOr } from 'ramda'
+import IconRemove from "../../../icons/IconRemove.vue";
 export default {
   name: 'OwnerOrcid',
 
   components: {
+    IconRemove,
     BfButton,
     DeleteOrcid
   },

@@ -3,12 +3,16 @@
 .concept-instance-property {
   box-sizing: border-box;
   color: #000;
-  border-top: 1px solid $gray_2;
-  min-height: 49px;
-  padding: 16px 0;
+  //border-top: 1px solid $gray_2;
+  padding: 6px;
   &:first-child {
     border: none;
   }
+
+  &:last-child {
+    //border-bottom: 1px solid $gray_2;
+  }
+
   &:hover {
     .icon-prop {
       display: inline-flex;
@@ -16,7 +20,7 @@
   }
   .name {
     color: $gray_6;
-    font-weight: 500;
+    //font-weight: 500;
     position: relative;
   }
   .property-label {

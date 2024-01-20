@@ -74,34 +74,37 @@
             :width="16"
           />
         </span>
-        <el-dropdown-menu
-          slot="dropdown"
-          class="bf-menu"
-          :offset="9"
-        >
-          <template v-if="!concept.locked">
-            <el-dropdown-item
-              :disabled="datasetLocked"
-              command="configure"
-            >
-              Configure
-            </el-dropdown-item>
-            <el-dropdown-item
-              v-if="concept.count === 0"
-              command="archive"
-              :disabled="datasetLocked"
-            >
-              Delete
-            </el-dropdown-item>
-            <el-dropdown-item
-              v-if="concept.propertyCount > 0"
-              :disabled="datasetLocked"
-              command="newRecord"
-            >
-              Create new {{ modelDisplayName }}
-            </el-dropdown-item>
-          </template>
-        </el-dropdown-menu>
+        <template #dropdown>
+          <el-dropdown-menu
+            slot="dropdown"
+            class="bf-menu"
+            :offset="9"
+          >
+            <template v-if="!concept.locked">
+              <el-dropdown-item
+                :disabled="datasetLocked"
+                command="configure"
+              >
+                Configure
+              </el-dropdown-item>
+              <el-dropdown-item
+                v-if="concept.count === 0"
+                command="archive"
+                :disabled="datasetLocked"
+              >
+                Delete
+              </el-dropdown-item>
+              <el-dropdown-item
+                v-if="concept.propertyCount > 0"
+                :disabled="datasetLocked"
+                command="newRecord"
+              >
+                Create new {{ modelDisplayName }}
+              </el-dropdown-item>
+            </template>
+          </el-dropdown-menu>
+
+        </template>
       </el-dropdown>
     </el-col>
   </el-row>
@@ -157,7 +160,7 @@
         const commandsList = {
           'configure': () => this.openConcept(),
           'archive': () => this.$emit('archive-concept', this.concept),
-          'newRecord': () => this.$router.push({ name: 'concept-instance', params: { conceptId: this.modelId, instanceId: 'new' }})
+          'newRecord': () => this.$router.push({ name: 'metadata-record', params: { conceptId: this.modelId, instanceId: 'new' }})
         }
         const cmd = commandsList[command]
         if (typeof cmd === 'function') {
@@ -172,9 +175,9 @@
         const conceptId = propOr('', 'id', this.concept)
 
         this.$router.push({
-          name: 'models',
+          name: 'model-details',
           params: {
-            conceptId
+            modelId: conceptId
           }
         })
       }

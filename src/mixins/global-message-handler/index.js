@@ -242,6 +242,7 @@ export default {
             this.updateOrganizations(sortedOrgs)
 
           const preferredOrgId = profile.preferredOrganization
+
           // check route params for orgId
           const activeOrgId = preferredOrgId ?
             pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
@@ -250,7 +251,8 @@ export default {
           const activeOrg = orgs.organizations[activeOrgIndex]
 
           // handle org switch
-          return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId, currentPath)
+          return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
+
         })
         .catch(this.handleXhrError.bind(this))
     },

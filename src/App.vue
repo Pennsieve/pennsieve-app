@@ -263,7 +263,7 @@ export default {
      * @returns {Promise}
      */
     bootUp: async function(userToken, fromLogin = false) {
-      console.log("Booting up: login="+fromLogin)
+      console.log("Booting up: login=" + fromLogin)
 
       // Get the current Cognito User and store in Vuex
       await Auth.currentAuthenticatedUser().then(user => {

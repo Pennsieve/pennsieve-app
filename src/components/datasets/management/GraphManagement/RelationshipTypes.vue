@@ -86,6 +86,7 @@
             :data="transformedRelationshipTypes"
             :is-loading="false"
             :single-select="true"
+            @selection-change="handleTableSelectionChange"
           >
             <template #actions>
 
@@ -97,7 +98,7 @@
 
                   <button class="linked btn-selection-action mr-8"
                           :disabled="datasetLocked"
-                          @click="onDownloadSelection">
+                          @click="onDeleteRelationshipAction">
                     Delete
                   </button>
 
@@ -161,10 +162,10 @@
       />
 
       <delete-relationship-type-dialog
-        :relationship-type-edit.sync="relationshipTypeEdit"
+        :relationshipTypeEdit="relationshipTypeEdit"
         :relationship-types="relationshipTypes"
         :url="relationshipsUrl"
-        :visible.sync="deleteRelationshipDialogVisible"
+        v-model:dialogVisible="deleteRelationshipDialogVisible"
         @remove-relationship-type="onRemoveRelationshipType"
       />
     </div>
@@ -479,36 +480,42 @@
         this.closeFilterMenu()
       },
 
+      onDeleteRelationshipAction: function() {
+        this.deleteRelationshipDialogVisible = true
+      },
+
       /**
        * Handle table row menu click event
        * @param {String} command
        * @param {Object} row
        */
-      onTableRowMenuClick: function(command, row) {
+      handleTableSelectionChange: function(selection) {
+
+        let selectedRelationship = selection[0]
         // Find relationship type
         this.relationshipTypeEdit = {
-          id: propOr('', 'id', row),
-          originModel: propOr('', 'sourceName', row),
-          originModelDisplayName: propOr('', 'source', row),
-          relationshipName: propOr('', 'relationshipName', row),
-          destinationModel: propOr('', 'destinationName', row),
-          destinationModelDisplayName: propOr('', 'destination', row),
+          id: propOr('', 'id', selectedRelationship),
+          originModel: propOr('', 'sourceName', selectedRelationship),
+          originModelDisplayName: propOr('', 'source', selectedRelationship),
+          relationshipName: propOr('', 'relationshipName', selectedRelationship),
+          destinationModel: propOr('', 'destinationName', selectedRelationship),
+          destinationModelDisplayName: propOr('', 'destination', selectedRelationship),
         }
 
 
-        switch (command) {
-          case 'edit':
-            // Open edit dialog
-            this.createRelationshipDialogVisible = true
-            break;
-
-          case 'remove':
-            // Open delete dialog
-            this.deleteRelationshipDialogVisible = true
-
-          default:
-            break;
-        }
+        // switch (command) {
+        //   case 'edit':
+        //     // Open edit dialog
+        //     this.createRelationshipDialogVisible = true
+        //     break;
+        //
+        //   case 'remove':
+        //     // Open delete dialog
+        //     this.deleteRelationshipDialogVisible = true
+        //
+        //   default:
+        //     break;
+        // }
       },
 
       /**

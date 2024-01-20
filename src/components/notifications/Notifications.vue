@@ -76,7 +76,7 @@ export default {
   mounted() {
     this.$store.watch(this.getUserToken, this._watchUserToken.bind(this))
   },
-  destroyed() {
+  unmounted() {
     this.close()
   },
   methods: {

@@ -3,6 +3,7 @@
 .el-dialog {
   border-radius: 5px;
   box-shadow: 0 2px 15px 0 rgba(0,0,0,0.25), 0 28px 41px 0 rgba(33,43,54,0.2);
+
 }
 .el-dialog__body {
   line-height: inherit;
@@ -11,6 +12,7 @@
 .el-dialog__header, .el-dialog__body {
   padding: 24px 32px;
   margin: 0;
+
 }
 
 .el-dialog {
@@ -27,7 +29,21 @@
   .el-dialog__header {
     background: $purple_2;
     color: $white;
+
+
   }
+
+
+}
+
+.add-property-dialog {
+  .el-dialog__header {
+    align-items: flex-start;
+    background: $purple_2;
+    color: $white;
+    padding: 24px 24px 0 24px;
+  }
+
 }
 
 .el-dialog__footer {
@@ -83,3 +99,4 @@
   width: 860px;
   height: 669px;
 }
+

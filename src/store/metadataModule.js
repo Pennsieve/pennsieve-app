@@ -44,6 +44,15 @@ export const mutations = {
   SET_MODELS(state, models) {
     state.models = models
   },
+  REMOVE_MODEL(state, id) {
+    const modelIndex = state.models.findIndex(obj => obj.id === id);
+    state.models.splice(modelIndex, 1)
+  },
+  RENAME_MODEL(state, {id, newName}) {
+    const objIndex = state.models.findIndex((obj => obj.id === id));
+    state.models[objIndex].displayName = newName
+
+  },
   SET_RECORDS_FOR_MODEL(state, response) {
     if (response.result == null) {
       response.result = []
@@ -151,6 +160,10 @@ export const actions = {
       return Promise.reject(err)
     }
   },
+  updateModels: ({ commit }, evt) => commit("SET_MODELS", evt),
+  removeModel: async ({commit}, id) => {
+    commit('REMOVE_MODEL', id)
+  },
   fetchRecords: async({commit, rootState, state}, params) => {
     try {
 
@@ -232,6 +245,9 @@ export const actions = {
   setSelectedRecord: ({commit}, record) => {
     commit('SET_SELECTED_RECORD', record)
   },
+  renameModel: ({commit}, model) => {
+    commit('RENAME_MODEL', {id: model.id, newName: model.displayName})
+  }
 }
 
 export const getters = {

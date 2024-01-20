@@ -98,7 +98,8 @@ const Models = () => import('../components/datasets/management/GraphManagement/M
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
 const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/GraphBrowser.vue')
 const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
-
+const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
+const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -349,7 +350,7 @@ const router = createRouter({
           },
           props: {
             stage: true,
-            stageHeader: false
+            stageHeader: true
           },
           redirect: {
             name: 'records'
@@ -366,14 +367,27 @@ const router = createRouter({
               }
             },
             {
-              path: 'record/:conceptId/:instanceId',
+              path: 'record/:modelId/:instanceId',
               name: 'metadata-record',
               props: true,
               meta: {
+                backLink: {name: "Records", to: "records"},
                 headerAux: true
               },
               components: {
-                // stage: ConceptInstance
+                stage: ConceptInstance
+              }
+            },
+            {
+              path: 'record/:modelId/:instanceId/edit',
+              name: 'metadata-record-edit',
+              props: true,
+              meta: {
+                backLink: {name: "Records", to: "metadata-record"},
+                headerAux: true
+              },
+              components: {
+                stage: InstanceEdit
               }
             },
             {
@@ -401,7 +415,7 @@ const router = createRouter({
                   path: 'details/:modelId',
                   name: 'model-details',
                   props: true,
-                  meta: { backLinkName: "Models"},
+                  meta: { backLink: {name: "Models", to: "models-list"}},
                   components: {
                     stage: ModelInstance
                   }
