@@ -37,8 +37,8 @@
         <div class="file-pagination">
           <div>
             <pagination-page-menu
-              class="mr-24"
-              pagination-item-label="Results"
+              class="mr-16"
+              pagination-item-label="Records"
               :page-size="tableSearchParams.limit"
               @update-page-size="updateTableSearchLimit"
             />
@@ -528,14 +528,14 @@ export default {
       const datasetId = propOr('', 'datasetId', record)
       const modelId = propOr('', 'modelId', record)
 
-      // this.$router.push({
-      //   name: 'concept-instance',
-      //   params: {
-      //     instanceId: recordId,
-      //     conceptId: modelId,
-      //     datasetId: datasetId
-      //   }
-      // })
+      this.$router.push({
+        name: 'metadata-record',
+        params: {
+          instanceId: recordId,
+          modelId: modelId,
+          datasetId: datasetId
+        }
+      })
       this.updateSearchModalVisible(false)
     },
 
@@ -594,7 +594,7 @@ h3 {
 }
 
 .file-pagination {
-  margin-bottom: 14px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: row;
   justify-content: space-between;

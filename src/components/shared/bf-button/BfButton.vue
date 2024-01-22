@@ -142,7 +142,8 @@
     }
     &.icon {
       padding: 11px 11px;
-      min-width: 0
+      min-width: 0;
+      height: 40px;
     }
     &.secondary {
       background: $gray_1;

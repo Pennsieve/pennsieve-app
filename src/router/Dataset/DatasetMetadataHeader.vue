@@ -4,46 +4,50 @@ let route = useRoute();
 </script>
 
 <template >
-  <locked-banner slot="banner" />
+  <div>
+    <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading" :link-back="route.meta.backLinkName">
+    <bf-rafter slot="heading" :link-back=route.meta.backLink :dataset-id="datasetId" :org-id="orgId">
 
-<!--    <template #breadcrumb v-if="route.meta.backLinkName">-->
-<!--      <a @click="$router.go(-1)" class="link-to-files">-->
-<!--        <IconArrowLeft-->
-<!--          :height="10"-->
-<!--          :width="10"-->
-<!--        />-->
-<!--        Back to {{ route.meta.backLinkName }}-->
-<!--      </a>-->
+      <!--    <template #breadcrumb v-if="route.meta.backLinkName">-->
+      <!--      <a @click="$router.go(-1)" class="link-to-files">-->
+      <!--        <IconArrowLeft-->
+      <!--          :height="10"-->
+      <!--          :width="10"-->
+      <!--        />-->
+      <!--        Back to {{ route.meta.backLinkName }}-->
+      <!--      </a>-->
 
-<!--    </template>-->
+      <!--    </template>-->
 
-    <template #heading>
-      <h1
-        class="flex-heading"
-      >
-        {{pageName}}
-      </h1>
-    </template>
-
-    <template #tabs>
-      <ul
-        slot="tabs"
-        class="tabs unstyled"
-      >
-        <li
-          v-for="tab in tabs"
-          :key="tab.route.name"
+      <template #heading>
+        <h1
+          class="flex-heading"
         >
-          <router-link :to="tab.route">
-            {{ tab.label }}
-          </router-link>
-        </li>
-      </ul>
-    </template>
+          {{pageName}}
+        </h1>
+      </template>
 
-  </bf-rafter>
+      <template v-if="hasTabs" #tabs>
+        <RouterTabs :tabs="tabs" class="secondary"/>
+        <!--      <ul-->
+        <!--        slot="tabs"-->
+        <!--        class="tabs unstyled"-->
+        <!--      >-->
+        <!--        <li-->
+        <!--          v-for="tab in tabs"-->
+        <!--          :key="tab.route.name"-->
+        <!--        >-->
+        <!--          <router-link :to="tab.route">-->
+        <!--            {{ tab.label }}-->
+        <!--          </router-link>-->
+        <!--        </li>-->
+        <!--      </ul>-->
+      </template>
+
+    </bf-rafter>
+  </div>
+
 </template>
 
 
@@ -53,6 +57,7 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
+import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
 
 export default {
@@ -60,7 +65,26 @@ export default {
   components: {
     BfRafter,
     IconArrowLeft,
-    LockedBanner
+    LockedBanner,
+    RouterTabs
+  },
+  props: {
+    orgId: {
+      type: String,
+      default: ''
+    },
+    datasetId: {
+      type: String,
+      default: ''
+    },
+    modelId: {
+      type: String,
+      default: ''
+    },
+    instanceId: {
+      type: String,
+      default: ''
+    }
   },
   computed: {
 
@@ -71,30 +95,28 @@ export default {
     tabs: function() {
       return [
         {
-          route: {
-            name: 'records',
-          },
-          label: 'Records',
+          to: 'records',
+          name: 'Records',
         },
         {
-          route: {
-            name: 'models',
-          },
-          label: 'Models',
+          to: 'models',
+          name: 'Models',
         },
         {
-          route: {
-            name: 'relationships',
-          },
-          label: 'Relationships',
+          to: 'relationships',
+          name: 'Relationships',
         },
         {
-          route: {
-            name: 'graph',
-          },
-          label: 'Graph',
+          to: 'graph',
+          name: 'Graph',
         },
       ]
+    },
+    /*
+    Don't show tabs in the model-record detail page.
+     */
+    hasTabs: function() {
+      return !this.instanceId
     },
     pageName: function() {
       const r = useRoute()
@@ -110,6 +132,9 @@ export default {
           return "Metadata Relationships"
         case "graph":
           return "Metadata Graph"
+        case "metadata-record":
+          return "Metadata Record"
+
       }
       return "Unknown"
     }

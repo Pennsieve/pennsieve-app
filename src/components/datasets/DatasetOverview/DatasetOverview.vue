@@ -835,6 +835,12 @@ h1 {
   display: flex;
   padding: 32px;
   background: $purple_tint;
+
+  h1 {
+    color: $gray_6;
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
 }
 
 .dataset-banner {

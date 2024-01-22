@@ -867,10 +867,10 @@ export const getters = {
   dataset: (state) => state.dataset,
   getDataset: (state) => () => state.dataset,
   getDatasetById: (state) => (id) => {
-    return find(R.pathEq(["content", "id"], id), state.datasets);
+    return R.find(R.pathEq(["content", "id"], id), state.datasets);
   },
   getDatasetByIntId: (state) => (intId) => {
-    return find(R.pathEq(["content", "intId"], intId), state.datasets);
+    return R.find(R.pathEq(["content", "intId"], intId), state.datasets);
   },
   isDatasetOwner: (state) => state.isDatasetOwner,
   teams: (state) => state.teams,
@@ -889,10 +889,10 @@ export const getters = {
     return R.includes(featureName, featuresList);
   },
   getModelById: (state) => (modelId) => {
-    return find(R.propEq("id", modelId), state.concepts);
+    return R.find(R.propEq("id", modelId), state.concepts);
   },
   getModelByName: (state) => (modelName) => {
-    return find(R.propEq("name", modelName), state.concepts);
+    return R.find(R.propEq("name", modelName), state.concepts);
   },
   getModelCount: (state) => (modelName) =>
       R.compose(

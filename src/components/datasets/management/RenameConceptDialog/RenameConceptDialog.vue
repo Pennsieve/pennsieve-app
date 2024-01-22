@@ -1,25 +1,28 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     class="add-concept-dialog"
     :show-close="false"
     @open="onOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Rename Model"
-    />
+    <template #header>
+      <bf-dialog-header
+        title="Rename Model"
+      />
+    </template>
 
     <dialog-body>
       <el-form
         ref="conceptForm"
         :model="concept"
         :rules="rules"
+        label-position="top"
         @submit.native.prevent="renameConcept"
       >
         <el-form-item prop="displayName">
-          <template slot="label">
+          <template #label>
             Display Name <span class="label-helper">
               required
             </span>
@@ -32,7 +35,7 @@
         </el-form-item>
 
         <el-form-item prop="name">
-          <template slot="label">
+          <template #label>
             Model Identifier
           </template>
           <el-input
@@ -43,10 +46,7 @@
       </el-form>
     </dialog-body>
 
-    <div
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -56,7 +56,8 @@
       <bf-button @click="renameConcept">
         Rename Model
       </bf-button>
-    </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -88,7 +89,7 @@
     ],
 
     props: {
-      visible: Boolean,
+      dialogVisible: Boolean,
       updatingConcept: Object
     },
 
@@ -121,8 +122,11 @@
     },
 
     methods: {
-      ...mapActions([
-        'updateConcepts'
+      // ...mapActions([
+      //   'updateConcepts',
+      // ]),
+      ...mapActions('metadataModule',[
+        'renameModel'
       ]),
 
       /**
@@ -130,7 +134,6 @@
        */
       onOpen: function() {
         this.autoFocus()
-
         this.concept = clone(this.updatingConcept)
       },
 
@@ -138,7 +141,7 @@
        * Closes the dialog
        */
       closeDialog: function() {
-        this.$emit('update:visible', false)
+        this.$emit('close')
         this.$refs.conceptForm.resetFields()
       },
 
@@ -148,13 +151,12 @@
       renameConcept: function() {
         this.$refs.conceptForm.validate((valid) => {
           const datasetId = path(['params', 'datasetId'], this.$route)
-          const conceptId = path(['params', 'conceptId'], this.$route)
+          const conceptId = path(['params', 'modelId'], this.$route)
           if (!valid || !conceptId || !datasetId) {
             return
           }
 
           const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${conceptId}`
-
           const concept = Object.assign({}, this.updatingConcept, this.concept)
 
           this.sendXhr(url, {
@@ -171,9 +173,9 @@
             concepts[index] = response
 
             const sortedConcepts = this.returnSort('displayName', concepts, 'asc')
-            this.updateConcepts(sortedConcepts)
+            this.renameModel(response)
 
-            this.$emit('update:visible', false)
+            this.$emit('close')
 
             EventBus.$emit('toast', {
               type: 'success',

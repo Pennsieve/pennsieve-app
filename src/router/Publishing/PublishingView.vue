@@ -12,7 +12,7 @@
         </template>
 
         <template #tabs>
-          <router-tabs :tabs="tabs"/>
+          <router-tabs :tabs="tabs" />
 
 
 <!--          <ul-->

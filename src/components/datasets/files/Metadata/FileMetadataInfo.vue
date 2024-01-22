@@ -274,7 +274,7 @@ export default {
 
   mounted: function() {},
 
-  destroyed: function() {},
+  unmounted: function() {},
 
   methods: {
     ...mapActions('filesModule', ['fetchMetadataForPackage']),

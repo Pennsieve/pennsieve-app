@@ -2188,7 +2188,7 @@ export default {
 
           // Redirect user to new concept instance page
           this.$router.replace({
-            name: 'concept-instance',
+            name: 'metadata-record',
             params: {
               instanceId: record.id
             }

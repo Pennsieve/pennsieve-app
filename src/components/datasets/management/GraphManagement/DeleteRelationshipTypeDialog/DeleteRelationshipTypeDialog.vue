@@ -1,20 +1,22 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      title="Confirm Deletion"
-    />
+    <template #header>
+      <bf-dialog-header
+        title="Confirm Deletion"
+      />
+    </template>
+
 
     <dialog-body>
       <div class="warning-wrap">
-        <svg-icon
-          name="icon-warning-circle"
-          height="32"
-          width="32"
+        <IconWarningCircle
+          :height="32"
+          :width="32"
         />
         <h4 class="delete-title">
           Deleting this Relationship Type will remove the links between records in your graph.
@@ -43,10 +45,7 @@
       </el-form>
     </dialog-body>
 
-    <span
-      slot="footer"
-      class="dialog-footer"
-    >
+    <template #footer>
       <bf-button
         class="secondary"
         @click="closeDialog"
@@ -60,7 +59,8 @@
       >
         Delete
       </bf-button>
-    </span>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -73,11 +73,13 @@ import BfDialogHeader from '../../../../shared/bf-dialog-header/BfDialogHeader.v
 import DialogBody from '../../../../shared/dialog-body/DialogBody.vue'
 
 import Request from '../../../../../mixins/request'
+import IconWarningCircle from "../../../../icons/IconWarningCircle.vue";
 
 export default {
   name: 'DeleteRelationshipTypeDialog',
 
   components: {
+    IconWarningCircle,
     BfButton,
     BfDialogHeader,
     DialogBody
@@ -88,7 +90,7 @@ export default {
   ],
 
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     },
@@ -130,7 +132,7 @@ export default {
   },
 
   watch: {
-    visible: {
+    dialogVisible: {
       handler: function(val) {
         if (val) {
           this.getRelationshipInstances()
@@ -144,7 +146,7 @@ export default {
      * Closes the dialog
      */
     closeDialog: function() {
-      this.$emit('update:visible', false)
+      this.$emit('update:dialogVisible', false)
       this.$emit('update:relationshipTypeEdit', {})
       this.form.checkBoxes = []
     },
@@ -153,6 +155,7 @@ export default {
      * Handler for form submit and validation
      */
     onFormSubmit: function() {
+      console.log("123" + this.relationshipTypeEdit.id)
       this.deleteRelationshipType()
     },
 
@@ -160,6 +163,7 @@ export default {
      * Request all relationship instances of the current relationship type
      */
     getRelationshipInstances: function() {
+      console.log(this.relationshipTypeEdit.id)
       this.sendXhr(this.relationshipInstancesUrl, {
         header: {
           'Authorization': `bearer ${this.userToken}`
@@ -176,6 +180,7 @@ export default {
      * Delete relationship type and all associated relationships
      */
     deleteRelationshipType: function() {
+      console.log(this.relationshipTypeEdit)
       const relationshipId = propOr('', 'id', this.relationshipTypeEdit)
       const url = `${this.url}/${relationshipId}`
 
@@ -187,11 +192,11 @@ export default {
       })
       .then(response => {
         this.$emit('remove-relationship-type', this.relationshipTypeEdit)
-        this.closeDialog()
+        // this.closeDialog()
       })
       .catch(error => {
         this.handleXhrError(error)
-        this.closeDialog()
+        // this.closeDialog()
       })
     }
   }

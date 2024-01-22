@@ -11,12 +11,12 @@
     </template>
 
     <template v-if="showLinkBack">
-      <a @click="$router.go(-1)" class="link-back">
+      <a @click="backRoute" class="link-back">
         <IconArrowLeft
           :height="10"
           :width="10"
         />
-        Back to {{ this.linkBack }}
+        Back to {{ this.linkBack.name }}
       </a>
     </template>
 
@@ -98,6 +98,10 @@ export default {
       type: String,
       default: ''
     },
+    datasetId: {
+      type: String,
+      default: ''
+    }
   },
 
   components: {
@@ -142,8 +146,9 @@ export default {
       'datasetRafterVisStatus',
       'datasetRafterVisStatus2'
     ]),
+
     showLinkBack: function() {
-      return this.linkBack.length >0
+      return Object.keys(this.linkBack).length > 0
     },
 
     getThemeColors: function() {
@@ -155,10 +160,6 @@ export default {
       return `${color1}`
 
     },
-
-    // backLinkVisible: function() {
-    //   return Object.keys(this.linkBack).length > 0
-    // },
 
     isFileRecord: function() {
       return this.$route.name === "file-record";
@@ -239,6 +240,10 @@ export default {
 
   methods: {
     ...mapActions(['updateDataset', 'setDataset']),
+
+    backRoute: function() {
+      this.$router.push({ name: this.linkBack.to, params: { datasetId: this.datasetId, orgId: this.orgId}})
+    },
 
     pageBackRoute: function() {
       this.$router.back()
@@ -324,48 +329,6 @@ export default {
   background: $purple_1;
   z-index: 5;
 
-  .tabs {
-    display: flex;
-    li {
-      margin-left: 32px;
-      &:first-child {
-        margin: 0;
-      }
-    }
-    a {
-      color: $purple_tint;
-      display: inline-flex;
-      padding: 0 0 16px;
-      position: relative;
-      text-decoration: none;
-      &:hover,
-      &:focus {
-        color: $gray_2;
-        text-decoration: none;
-      }
-      &.router-link-active,
-      &.active {
-        color: $white;
-        &:after {
-          color: $white;
-          background: $white;
-          bottom: 0;
-          content: '';
-          left: 0;
-          height: 6px;
-          position: absolute;
-          width: 100%;
-        }
-      }
-      &.disabled {
-        cursor: default;
-        color: $purple_tint;
-      }
-    }
-  }
-
-
-
   &.overview {
     background: white;
     padding: 0;
@@ -411,45 +374,6 @@ export default {
       }
     }
 
-    .tabs {
-      display: flex;
-      li {
-        margin-left: 32px;
-        &:first-child {
-          margin: 0;
-        }
-      }
-      a {
-        color: $gray_5;
-        display: inline-flex;
-        padding: 0 0 16px;
-        position: relative;
-        text-decoration: none;
-        &:hover,
-        &:focus {
-          color: $purple_2;
-          text-decoration: none;
-        }
-        &.router-link-active,
-        &.active {
-          color: $purple_2;
-          &:after {
-            color: $purple_1;
-            background: $purple_1;
-            bottom: 0;
-            content: '';
-            left: 0;
-            height: 6px;
-            position: absolute;
-            width: 100%;
-          }
-        }
-        &.disabled {
-          cursor: default;
-          color: $gray_4;
-        }
-      }
-    }
   }
   &.small {
     padding-top: 28px;
@@ -460,16 +384,12 @@ export default {
   }
   &.border,
   &.with-tabs {
-    //box-shadow: 1px 1px 0 0 $purple_3;
-    //border-bottom: 2px solid $purple_2;
-  }
-  &.with-tabs {
-    padding-bottom: 2px;
+    padding-bottom: 0px;
   }
   &.editing {
     //background: $gray_1;
   }
-  h1 {
+  :slotted(h1) {
     margin: 0;
     color: white;
     font-size: 20px;
@@ -480,15 +400,9 @@ export default {
   }
   .condensed & {
     background: $purple_1 ;
-    //padding: 8px 32px;
-    &.with-tabs {
-      padding-bottom: 2px;
-    }
-
     &.primary {
       background: $gray_1;
     }
-
   }
   .row {
     display: flex;

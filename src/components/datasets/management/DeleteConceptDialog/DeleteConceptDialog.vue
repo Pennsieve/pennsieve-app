@@ -1,22 +1,27 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     class="simple"
     confirm-text="Delete"
     :before-close="suppressCloseIfLoading"
     @close="onClose"
   >
+    <template #header>
+      <bf-dialog-header
+        title="Delete Model"
+      />
+    </template>
+
     <dialog-body>
-      <svg-icon
-        name="icon-trash"
-        height="32"
-        width="32"
-        color="#e94b4b"
+      <IconTrash
+        :height="32"
+        :width="32"
       />
       <template v-if="isPropertyDeletion">
         <template v-if="propertyDeletionState === PROPERTY_DELETION_STATES.INITIAL">
           <h3>Delete {{ property.displayName }}?</h3>
-          <p>By deleting this property, members of your organization will no longer be able to add values to records in your graph.</p>
+          <p>By deleting this property, workspace users will no longer be able to add records in your graph.</p>
         </template>
         <template v-else-if="propertyDeletionState === PROPERTY_DELETION_STATES.FAILED">
           <h3>Delete failed</h3>
@@ -46,28 +51,28 @@
 
       <template v-else>
         <h3>Delete {{ modelName }}?</h3>
-        <p>By deleting this model, members of your organization will no longer be able to create records in your graph.</p>
+        <p>By deleting this model, workspace users will no longer be able to create records in your graph.</p>
       </template>
 
-      <div class="dialog-simple-buttons">
-        <bf-button
-          class="secondary"
-          :disabled="loading"
-          @click="onClose"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          v-if="propertyRecordUsageCount <= MAX_RECORD_COUNT_FOR_PROPERTY_DELETION && propertyDeletionState !== PROPERTY_DELETION_STATES.FAILED"
-          class="red"
-          :processing="loading"
-          processing-text="Please wait..."
-          @click="confirmArchiveDialog"
-        >
-          {{ propertyDeletionState === PROPERTY_DELETION_STATES.CONFIRM_RECORD_MODIFICATION ? 'Confirm Deletion' : 'Delete' }}
-        </bf-button>
-      </div>
     </dialog-body>
+    <template #footer>
+      <bf-button
+        class="secondary"
+        :disabled="loading"
+        @click="onClose"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        v-if="propertyRecordUsageCount <= MAX_RECORD_COUNT_FOR_PROPERTY_DELETION && propertyDeletionState !== PROPERTY_DELETION_STATES.FAILED"
+        class="red"
+        :processing="loading"
+        processing-text="Please wait..."
+        @click="confirmArchiveDialog"
+      >
+        {{ propertyDeletionState === PROPERTY_DELETION_STATES.CONFIRM_RECORD_MODIFICATION ? 'Confirm Deletion' : 'Delete' }}
+      </bf-button>
+    </template>
   </el-dialog>
 </template>
 
@@ -75,15 +80,19 @@
 import DialogBody from '../../../shared/dialog-body/DialogBody.vue';
 import BfButton from '../../../shared/bf-button/BfButton.vue';
 import { MAX_RECORD_COUNT_FOR_PROPERTY_DELETION, PROPERTY_DELETION_STATES } from '../ConceptManagement/utils';
+import IconTrash from "../../../icons/IconTrash.vue";
+import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue";
 
 export default {
   components: {
     DialogBody,
-    BfButton
+    BfButton,
+    IconTrash,
+    BfDialogHeader
   },
 
   props: {
-    visible: Boolean,
+    dialogVisible: Boolean,
     loading: Boolean,
     propertyDeletionState: {
       type: String,

@@ -128,11 +128,13 @@
       ...mapGetters([
         'userToken',
         'config',
-        'concepts',
         'hasFeature',
       ]),
       ...mapState([
         'onboardingEvents'
+      ]),
+      ...mapState('metadataModule',[
+        'models'
       ]),
 
       /**
@@ -167,8 +169,10 @@
 
     methods: {
       ...mapActions([
-        'updateConcepts',
         'updateOnboardingEvents'
+      ]),
+      ...mapActions('metadataModule',[
+        'updateModels'
       ]),
 
       /**
@@ -215,13 +219,12 @@
 
       /**
        * Add concept to state then send user to concept manage page
-       * @param {Object} concept
+       * @param {Object} model
        */
-      handleCreateConcept: function(concept) {
+      handleCreateConcept: function(model) {
         // Add to state
-        const concepts = [...this.concepts, concept]
-        const conceptId = propOr('', 'id', concept)
-        const sortedConcepts = this.returnSort('displayName', concepts, 'asc')
+        const models = [...this.models, model]
+        const sortedConcepts = this.returnSort('displayName', models, 'asc')
 
         // check for onboarding event state for creating a model
         if (this.onboardingEvents.indexOf('CreatedModel') === -1){
@@ -229,7 +232,7 @@
           this.sendOnboardingEventsRequest()
         }
 
-        this.updateConcepts(sortedConcepts).then(() => {
+        this.updateModels(sortedConcepts).then(() => {
           // Redirect user to new concept instance page
           this.$router.replace({
             name: 'models',
@@ -249,7 +252,7 @@
         if (value === '') {
           callback(new Error('Please provide an identifier'))
         }
-        const isUnique = this.checkUniqueName(this.concepts, ['name'], value, '')
+        const isUnique = this.checkUniqueName(this.models, ['name'], value, '')
         if (!isUnique) {
           callback(new Error('A concept with this name already exists'))
         }
@@ -266,7 +269,7 @@
         if (value === '') {
           callback(new Error('Please provide a display name'))
         }
-        const isUnique = this.checkUniqueName(this.concepts, ['displayName'], value, '')
+        const isUnique = this.checkUniqueName(this.models, ['displayName'], value, '')
         if (!isUnique) {
           callback(new Error('A concept with this display name already exists'))
         }

@@ -1,4 +1,4 @@
-<script setup>
+[<script setup>
 import { useRoute } from "vue-router";
 let route = useRoute();
 </script>
@@ -17,19 +17,21 @@ let route = useRoute();
     </template>
 
     <template #tabs>
-      <ul
-        slot="tabs"
-        class="tabs unstyled"
-      >
-        <li
-          v-for="tab in tabs"
-          :key="tab.route.name"
-        >
-          <router-link :to="tab.route">
-            {{ tab.label }}
-          </router-link>
-        </li>
-      </ul>
+      <router-tabs :tabs="tabs" class="secondary"/>
+
+<!--      <ul-->
+<!--        slot="tabs"-->
+<!--        class="tabs unstyled"-->
+<!--      >-->
+<!--        <li-->
+<!--          v-for="tab in tabs"-->
+<!--          :key="tab.route.name"-->
+<!--        >-->
+<!--          <router-link :to="tab.route">-->
+<!--            {{ tab.label }}-->
+<!--          </router-link>-->
+<!--        </li>-->
+<!--      </ul>-->
     </template>
 
   </bf-rafter>
@@ -42,6 +44,7 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
+import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
 
 export default {
@@ -49,7 +52,8 @@ export default {
   components: {
     BfRafter,
     IconArrowLeft,
-    LockedBanner
+    LockedBanner,
+    RouterTabs
   },
   computed: {
 
@@ -60,16 +64,12 @@ export default {
     tabs: function() {
       return [
         {
-          route: {
-            name: 'activity-log',
-          },
-          label: 'Activity Log',
+          to: 'activity-log',
+          name: 'Activity Log',
         },
         {
-          route: {
-            name: 'upload-manifests',
-          },
-          label: 'Upload Manifests',
+          to: 'upload-manifests',
+          name: 'Upload Manifests',
         },
       ]
     },

@@ -9,41 +9,39 @@
       </p>
     </template>
 
-    <el-tooltip
-      placement="top"
-      :content="tooltipContent"
-      :value="visibility"
-      :manual="true"
-    >
-      <el-input
-        class="concept-id-field"
-        :disabled="true"
-        :value="conceptId"
-      >
-        <template #suffix>
-          <i
-            class="copy-icon-wrapper"
-          >
-            <button
-              class="copy-icon-button"
-              @click="copyId"
-            >
-              <IconDocument
-                :height="20"
-                :width="20"
-              />
-            </button>
-          </i>
-        </template>
 
-      </el-input>
-    </el-tooltip>
+      <div class="concept-id-field">
+        <div class="concept-id">
+          {{conceptId}}
+        </div>
+        <el-tooltip
+          placement="top"
+          content="Copy Model ID"
+          :value="visibility"
+          :manual="true"
+        >
+          <button
+            class="copy-icon-button"
+            @click="copyId"
+          >
+            <IconDocument
+              :height="20"
+              :width="20"
+            />
+          </button>
+        </el-tooltip>
+
+      </div>
+
   </sidebar-message>
 </template>
 
 <script>
 import SidebarMessage from '../../../shared/SidebarMessage/SidebarMessage.vue'
 import IconDocument from "../../../icons/IconDocument.vue";
+import EventBus from "../../../../utils/event-bus";
+import {copyText} from "vue3-clipboard";
+
 
 export default {
   name: 'CopyConceptId',
@@ -81,8 +79,13 @@ export default {
      * Copies the concept id to clipboard
      */
     copyId: function() {
-      this.$clipboard(this.conceptId)
-      this.displayMessage()
+      copyText(this.conceptId)
+      EventBus.$emit('toast', {
+        detail: {
+          msg: 'Model ID copied to clipboard',
+          type: 'success'
+        }
+      })
     },
     /**
      * Displays success copy message for 2s
@@ -108,27 +111,23 @@ export default {
 
   .concept-id-field {
     height: 40px;
-    width: 264px;
-  }
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 
-  .copy-icon-wrapper {
-    background: $purple_1;
-    border: solid 1px transparent;
-    border-radius: 0 2px 2px 0;
-    cursor: pointer;
-    width: 34px;
-    height: 38px;
-    line-height: 34px;
-    text-align: center;
-    position: absolute;
+    .concept-id {
+      color: $purple_2;
+      font-size: medium;
+    }
 
     .copy-icon-button {
       height: 100%;
-      width: 100%;
-    }
+      color: $purple_3;
 
-    &:hover {
-      background: $purple_3;
+      &:hover {
+        color: $purple_2;
+      }
     }
   }
 </style>

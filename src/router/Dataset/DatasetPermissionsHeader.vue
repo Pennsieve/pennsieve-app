@@ -17,19 +17,7 @@ let route = useRoute();
     </template>
 
     <template #tabs>
-      <ul
-        slot="tabs"
-        class="tabs unstyled"
-      >
-        <li
-          v-for="tab in tabs"
-          :key="tab.route.name"
-        >
-          <router-link :to="tab.route">
-            {{ tab.label }}
-          </router-link>
-        </li>
-      </ul>
+      <router-tabs :tabs="tabs" class="secondary"/>
     </template>
 
   </bf-rafter>
@@ -42,6 +30,7 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
+import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
 
 export default {
@@ -49,7 +38,8 @@ export default {
   components: {
     BfRafter,
     IconArrowLeft,
-    LockedBanner
+    LockedBanner,
+    RouterTabs
   },
   computed: {
 
@@ -60,16 +50,12 @@ export default {
     tabs: function() {
       return [
         {
-          route: {
-            name: 'user-permissions',
-          },
-          label: 'User Permissions',
+          name: 'User Permissions',
+          to:  'user-permissions'
         },
         {
-          route: {
-            name: 'embargo-permissions',
-          },
-          label: 'Embargo Permissions',
+          to: 'embargo-permissions',
+          name: 'Embargo Permissions',
         },
       ]
     },

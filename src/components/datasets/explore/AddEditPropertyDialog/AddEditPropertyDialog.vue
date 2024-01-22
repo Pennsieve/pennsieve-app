@@ -1,180 +1,173 @@
 <template>
   <el-dialog
-    :visible="visible"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
     class="add-property-dialog"
     :show-close="false"
     @open="onOpen"
     @close="closeDialog"
   >
-    <bf-dialog-header
-      slot="title"
-      :title="dialogTitle"
-    >
-      <ul
-        slot="tabs"
-        class="tabs unstyled"
+    <template #header>
+      <bf-dialog-header
+        slot="title"
+        :title="dialogTitle"
       >
-        <li
-          v-for="tab in tabData"
-          :key="tab.name"
-          :item="tab"
-        >
-          <a
-            href="#"
-            :class="tabClass(tab.active, tab.name)"
-            @click.prevent="tabClicked(tab.name)"
-          >
-            {{ tab.name }}
-          </a>
-        </li>
-      </ul>
-    </bf-dialog-header>
+        <template #tabs>
+            <ul
+              class="tabs unstyled"
+            >
+              <li
+                v-for="tab in tabData"
+                :key="tab.name"
+                :item="tab"
+              >
+                <a
+                  href="#"
+                  :class="tabClass(tab.active, tab.name)"
+                  @click.prevent="tabClicked(tab.name)"
+                >
+                  {{ tab.name }}
+                </a>
+              </li>
+            </ul>
+        </template>
+
+      </bf-dialog-header>
+    </template>
 
     <dialog-body>
       <!-- Overview -->
       <el-form
-        v-show="shouldShow('Overview')"
         ref="propertyForm"
+        label-position="top"
         :model="property"
         :rules="rules"
         @submit.native.prevent="createProperty"
       >
-        <el-form-item prop="displayName">
-          <template slot="label">
-            Display Name <span class="label-helper">
+        <div v-show="shouldShow('Overview')">
+          <el-form-item prop="displayName">
+            <template #label>
+              Display Name <span class="label-helper">
               required
             </span>
-          </template>
-          <el-input
-            v-model="property.displayName"
-            placeholder="For example Protocol, Type, Species"
-            autofocus
-          />
-        </el-form-item>
+            </template>
+            <el-input
+              v-model="property.displayName"
+              placeholder="For example Protocol, Type, Species"
+              autofocus
+            />
+          </el-form-item>
 
-        <el-form-item prop="name">
-          <template slot="label">
-            Property Identifier <span class="label-helper">
+          <el-form-item prop="name">
+            <template #label>
+              Property Identifier <span class="label-helper">
               generated from name
             </span>
-          </template>
-          <el-input
-            v-model="property.name"
-            :disabled="editingProperty"
-          />
-        </el-form-item>
+            </template>
+            <el-input
+              v-model="property.name"
+              :disabled="editingProperty"
+            />
+          </el-form-item>
 
-        <el-form-item prop="dataType">
-          <template slot="label">
-            Type <span class="label-helper">
+          <el-form-item prop="dataType">
+            <template #label>
+              Type <span class="label-helper">
               required
             </span>
-          </template>
-          <el-select
-            v-model="property.dataType"
-            :disabled="editingProperty"
-            @change="savedEnumList = []"
-          >
-            <el-option
-              label="Text"
-              value="String"
-            />
-            <el-option
-              label="Boolean"
-              value="Boolean"
-            />
-            <el-option
-              label="Date"
-              value="Date"
-            />
-            <el-option
-              label="Number"
-              value="Long"
-            />
-            <el-option
-              label="Decimal"
-              value="Double"
-            />
-            <el-option
-              label="Model"
-              value="Model"
-            />
-          </el-select>
-        </el-form-item>
+            </template>
+            <el-select
+              v-model="property.dataType"
+              :disabled="editingProperty"
+              @change="savedEnumList = []"
+            >
+              <el-option
+                label="Text"
+                value="String"
+              />
+              <el-option
+                label="Boolean"
+                value="Boolean"
+              />
+              <el-option
+                label="Date"
+                value="Date"
+              />
+              <el-option
+                label="Number"
+                value="Long"
+              />
+              <el-option
+                label="Decimal"
+                value="Double"
+              />
+              <el-option
+                label="Model"
+                value="Model"
+              />
+            </el-select>
+          </el-form-item>
 
-        <el-form-item
-          v-if="isDataTypeModel"
-          prop="model"
-        >
-          <template slot="label">
-            Model <span class="label-helper">
+          <el-form-item
+            v-if="isDataTypeModel"
+            prop="model"
+          >
+            <template #label>
+              Model <span class="label-helper">
               required
             </span>
-          </template>
-          <el-select
-            v-model="property.to"
-            :disabled="editingProperty"
-          >
-            <el-option
-              v-for="concept in concepts"
-              :key="concept.id"
-              :label="concept.displayName"
-              :value="concept.id"
-            />
-          </el-select>
-        </el-form-item>
+            </template>
+            <el-select
+              v-model="property.to"
+              :disabled="editingProperty"
+            >
+              <el-option
+                v-for="concept in concepts"
+                :key="concept.id"
+                :label="concept.displayName"
+                :value="concept.id"
+              />
+            </el-select>
+          </el-form-item>
 
-        <el-form-item
-          class="item-checkbox"
-          prop="required"
-        >
-          <el-checkbox
-            v-model="property.required"
-            :disabled="editingProperty || isConceptTitle || isDataTypeModel"
-            label="This is a required property"
-          />
-        </el-form-item>
-      </el-form>
+          <el-form-item
+            class="item-checkbox"
+            prop="required"
+          >
+            <el-checkbox
+              v-model="property.required"
+              :disabled="editingProperty || isConceptTitle || isDataTypeModel"
+              label="This is a required property"
+            />
+          </el-form-item>
+        </div>
+
+<!--      </el-form>-->
 
       <!-- Configure -->
       <div
         v-show="shouldShow('Configure')"
       >
-        <el-form
-          ref="propertyFormConfigure"
-        >
           <el-form-item
             id="item-concept-title"
-            class="item-checkbox"
             prop="conceptTitle"
           >
             <el-checkbox
               v-model="property.conceptTitle"
               :disabled="disableConceptTitle"
               label="Use this property as the Model Title"
-            /> <a
+            />
+            <a
               href="https://docs.pennsieve.io/docs/creating-metadata-models"
               class="label-helper"
               target="_blank"
             >
               What's this?
             </a>
-            <div
-              v-if="conceptTitleName"
-              id="current-name"
-            >
-              <strong>{{ conceptTitleName }}</strong> is currently being used.
-            </div>
-            <div
-              v-if="!conceptTitleName"
-              id="current-name"
-            >
-              A title is required to save properties.
-            </div>
+
           </el-form-item>
 
           <el-form-item
-            class="item-checkbox"
             prop="allowMultiValues"
           >
             <el-checkbox
@@ -183,8 +176,7 @@
               label="Allow multiple values"
             />
           </el-form-item>
-
-          <el-form-item
+            <el-form-item
             class="item-checkbox has-enums"
             prop="enum"
           >
@@ -193,40 +185,42 @@
               :disabled="editingProperty || invalidEnumType || applyStringSubtype"
               label="Accept only specific values"
             />
-            <div class="info">
-              Users will be able to select multiple values from the list you create.
-            </div>
+
           </el-form-item>
+
+
           <el-form-item v-if="property.dataType === 'Long' || property.dataType === 'Double'">
             <el-checkbox
               v-model="scientificUnitCheckbox"
               label="Apply a Scientific Unit to this property"
-            />
-            <p :class="scientificUnitCheckbox ? 'info scientific-label' : 'info disabled-label'">
-              Updating the Scientific Unit will not convert data values
-            </p>
-            <el-select
-              v-model="scientificValue"
-              placeholder="Select a Unit"
-              class="item-dropdown scientific-unit"
-              placement="bottom"
-              :disabled="!scientificUnitCheckbox"
             >
-              <el-option-group
-                v-for="group in scientificUnits"
-                :key="group.dimension"
-                :label="group.dimension"
-                class="dropdown-group__title"
-              >
-                <el-option
-                  v-for="item in group.units"
-                  :key="item.name"
-                  :label="item.description"
-                  :value="item.displayName"
-                />
-              </el-option-group>
-            </el-select>
+            </el-checkbox>
+
+
           </el-form-item>
+          <el-select
+            v-if="property.dataType === 'Long' || property.dataType === 'Double'"
+            v-model="scientificValue"
+            placeholder="Select a Unit"
+            class="item-dropdown scientific-unit"
+            placement="bottom"
+            :disabled="!scientificUnitCheckbox"
+          >
+            <el-option-group
+              v-for="group in scientificUnits"
+              :key="group.dimension"
+              :label="group.dimension"
+              class="dropdown-group__title"
+            >
+              <el-option
+                v-for="item in group.units"
+                :key="item.name"
+                :label="item.description"
+                :value="item.displayName"
+              />
+            </el-option-group>
+          </el-select>
+
           <el-form-item
             v-if="scientificValue === 'Other'"
             class="item-dropdown scientific-unit"
@@ -290,50 +284,55 @@
             :property="property"
             @enum-list-updated="handleEnumListUpdated"
           />
-        </el-form>
+<!--        </el-form>-->
       </div>
+      </el-form>
     </dialog-body>
 
     <!-- Overview buttons -->
-    <div
-      v-show="shouldShow('Overview')"
-      slot="footer"
-      class="dialog-footer"
-    >
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
+    <template #footer>
+      <div
+        v-show="shouldShow('Overview')"
+        slot="footer"
+        class="dialog-footer"
       >
-        Cancel
-      </bf-button>
-      <bf-button @click="createProperty">
-        {{ createText }}
-      </bf-button>
-      <button
-        class="configure-property-btn"
-        :disabled="isDataTypeModel"
-        @click="tabClicked('Configure')"
-      >
-        {{ configureText }}
-      </button>
-    </div>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button @click="createProperty">
+          {{ createText }}
+        </bf-button>
+        <button
+          class="configure-property-btn"
+          :disabled="isDataTypeModel"
+          @click="tabClicked('Configure')"
+        >
+          {{ configureText }}
+        </button>
+      </div>
 
-    <!-- Configure buttons -->
-    <div
-      v-show="shouldShow('Configure')"
-      slot="footer"
-      class="dialog-footer"
-    >
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
+
+      <!-- Configure buttons -->
+      <div
+        v-show="shouldShow('Configure')"
+        slot="footer"
+        class="dialog-footer"
       >
-        Cancel
-      </bf-button>
-      <bf-button @click="createProperty">
-        Save
-      </bf-button>
-    </div>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button @click="createProperty">
+          Save
+        </bf-button>
+      </div>
+    </template>
+
   </el-dialog>
 </template>
 
@@ -390,7 +389,10 @@
         type: Array,
         default: () => []
       },
-      visible: Boolean,
+      dialogVisible: {
+        type: Boolean,
+        default: false
+      },
       conceptTitleName: {
         type: String,
         default: ''
@@ -727,17 +729,16 @@
        * Closes the dialog
        */
       closeDialog: function() {
-        this.$emit('update:visible', false)
-
+        this.$emit('close')
+        this.property = defaultProperty()
         // delays the reset for the tab state
         setTimeout(() => {
           this.tabData = this.tabData.map((tab, idx) => {
-            tab.active = idx === 0 ? true : false
-            return tab
-        })
-        this.property = defaultProperty()
+              tab.active = idx === 0 ? true : false
+              return tab
+          })
+
         this.$refs.propertyForm.resetFields()
-        this.$refs.propertyFormConfigure.resetFields()
         this.savedEnumList = []
         this.$emit('update:propertyEdit', {})
         }, 500)
@@ -956,8 +957,8 @@
     }
 
     .scientific-unit {
-      margin-top: -17px;
-      margin-left: 24px;
+      //margin-top: -17px;
+      //margin-left: 24px;
       &.el-select {
         margin-bottom: 10px;
         width: 434px;
@@ -984,7 +985,7 @@
       font-size: 12px;
       color: $gray_4;
       &.scientific-label {
-        margin-top: -18px;
+        //margin-top: -18px;
         height: 26px;
         margin-left: 25px;
       }

@@ -3,8 +3,6 @@
       slot="stage"
       :is-editing="hasChanges"
     >
-
-
       <template #actions>
         <stage-actions>
           <template #left>
@@ -25,23 +23,23 @@
             <div class="buttons">
               <bf-button
                 v-if="hasChanges"
-                class="secondary"
+                class="action-button secondary"
                 @click="cancelChanges"
               >
                 Cancel
               </bf-button>
               <bf-button
                 v-if="hasChanges"
-                class="green"
+                class="action-button green"
                 :processing="savingChanges"
-                processing-text="Saving Changes"
+                processing-text="action-button Saving Changes"
                 @click="validateChanges"
               >
                 Save Changes
               </bf-button>
               <bf-button
                 :disabled="datasetLocked"
-                class="add-property primary"
+                class="action-button add-property primary"
                 @click="openCreateProperty"
               >
                 Add Property
@@ -49,10 +47,10 @@
               <el-dropdown
                 v-if="!hasChanges && !datasetLocked"
                 trigger="click"
-                placement="bottom-end"
+                placement="action-button bottom-end"
                 @command="onMenuSelect"
               >
-                <bf-button class="primary icon el-dropdown-link">
+                <bf-button class="action-button primary icon el-dropdown-link">
                   <IconMenu
                     name="icon-menu"
                     :height="16"
@@ -117,12 +115,13 @@
       </template>
 
       <rename-concept-dialog
-        :visible.sync="renameConceptDialogVisible"
+        :dialog-visible="renameConceptDialogVisible"
         :updating-concept="model"
+        @close="closeRenameDialog"
       />
 
       <delete-concept-dialog
-        :visible="deleteDialogVisible"
+        :dialog-visible="deleteDialogVisible"
         :property-deletion-state="propertyDeletionState"
         :property="propertyEdit"
         :model-name="modelName"
@@ -134,13 +133,14 @@
 
       <add-edit-property-dialog
         ref="addPropertyDialog"
-        :visible.sync="addEditPropertyDialogVisible"
+        :dialog-visible="addEditPropertyDialogVisible"
         :concept-title-name="getConceptTitleVal('name', properties)"
         :properties="properties"
-        :property-edit.sync="propertyEdit"
+        v-model:property-edit="propertyEdit"
         :string-subtypes="stringSubtypes"
         @add-property="onAddProperty"
         @edit-property="onEditProperty"
+        @close="closeEditPropertyDialog"
       />
     </bf-stage>
 <!--  </bf-page>-->
@@ -243,11 +243,13 @@ export default {
       'activeOrganization',
     ]),
     ...mapGetters([
-      'concepts',
       'config',
       'userToken',
       'hasFeature',
       'datasetLocked'
+    ]),
+    ...mapState('metadataModule',[
+      'models'
     ]),
 
     /**
@@ -282,10 +284,7 @@ export default {
         return
       }
 
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const mId = pathOr('', ['params', 'conceptId'], this.$route)
-
-      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${mId}/linked`
+      return `${this.config.conceptsUrl}/datasets/${this.datasetId}/concepts/${this.modelId}/linked`
     },
 
     /**
@@ -314,14 +313,6 @@ export default {
     modelPropertyCount: function() {
       return propOr(0, 'propertyCount', this.model)
     },
-
-    // /**
-    //  * Returns model id
-    //  * @returns {String}
-    //  */
-    // modelId: function() {
-    //   return propOr('', 'id', this.model)
-    // },
 
     /**
      * Compute total records in model
@@ -430,11 +421,7 @@ export default {
   },
 
   watch: {
-
-    // '$route.query.open'() {
-    //   this.addEditPropertyDialogVisible = true
-    // },
-    concepts: {
+    models: {
       handler() {
         if (this.properties.length === 0) {
           this.fetchModelSchema()
@@ -462,11 +449,6 @@ export default {
     if (token) {
       this.fetchModels()
     }
-    // this.$nextTick(() => {
-    //   if (this.$route.query.open) {
-    //     this.addEditPropertyDialogVisible = true
-    //   }
-    // })
   },
 
   beforeDestroy() {
@@ -481,7 +463,14 @@ export default {
     ]),
     ...mapActions('metadataModule', [
       'fetchModels',
+      'removeModel'
     ]),
+    closeEditPropertyDialog: function(){
+      this.addEditPropertyDialogVisible = false
+    },
+    closeRenameDialog: function() {
+      this.renameConceptDialogVisible = false
+    },
 
     /**
      * Get concept
@@ -572,7 +561,7 @@ export default {
       const commands = {
         rename: () => this.renameConceptDialogVisible = true,
         archive: () => this.openDeleteDialog(),
-        newRecord: () => this.$router.push({ name: 'concept-instance', params: { instanceId: 'new' }})
+        newRecord: () => this.$router.push({ name: 'metadata-record', params: { instanceId: 'new' }})
       }
       const fn = commands[command]
       if (typeof fn === 'function') {
@@ -631,12 +620,9 @@ export default {
       })
       .then(() => {
         const displayName = this.model.displayName
-        const index = findIndex(propEq('name', this.model.name), this.concepts)
+        const index = findIndex(propEq('name', this.model.name), this.models)
 
-        const updatedConcepts = this.concepts.slice()
-        updatedConcepts.splice(index, 1)
-
-        this.updateConcepts(updatedConcepts).then(() => {
+        this.removeModel(this.model.id).then(() => {
           this.deleteDialogVisible = false
 
           this.$router.push({
@@ -864,7 +850,7 @@ export default {
      */
     incrementPropertyCount: function(count) {
       const id = pathOr('', ['params', 'conceptId'], this.$route)
-      const updatedConcepts = this.concepts.map(concept => {
+      const updatedConcepts = this.models.map(concept => {
         if (concept && concept.id === id) {
           concept.propertyCount = count
         }
@@ -1156,6 +1142,10 @@ export default {
 .buttons {
   .add-property {
     margin-right: 8px;
+  }
+
+  .action-button {
+    margin-left: 8px;
   }
 }
 
