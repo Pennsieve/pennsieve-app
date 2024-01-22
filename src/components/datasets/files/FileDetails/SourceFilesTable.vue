@@ -1,5 +1,4 @@
 <template>
-    <!-- SOURCE FILES TABLE -->
     <el-collapse-item
       v-if="showCollapse"
       title="Source Files"
@@ -11,7 +10,7 @@
           class="relationship-title"
         >
           <IconArrowUp
-            :class="[ arrowDirection('sourcefiles') === 'up' ? 'svg-flip' : '' ]"
+            :class="[ arrowDirection('sourcefiles') === 'down' ? 'svg-flip' : '' ]"
             :height="10"
             :width="10"
           />
@@ -121,6 +120,7 @@ import IconMenu from "../../../icons/IconMenu.vue";
 import IconRemove from "../../../icons/IconRemove.vue";
 import BfFileLabel from '../../../datasets/files/bf-file/BfFileLabel.vue'
 import IconUpload from "../../../icons/IconUpload.vue";
+import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
 
 export default {
   name: 'SourceFilesTable',
@@ -132,7 +132,8 @@ export default {
     IconUpload,
     BfWaitingIcon,
     PaginationPageMenu,
-    BfFileLabel
+    BfFileLabel,
+    PennsieveTable
   },
 
   mixins: [

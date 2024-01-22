@@ -1,18 +1,25 @@
 <template>
   <bf-stage>
     <template #actions>
-      <bf-button
-        :disabled="datasetLocked || !hasRelationships"
-        @click="openRelationshipTypeModal"
-      >
-        <template #prefix>
-          <IconPlus
-            color="currentColor"
-          />
+      <StageActions>
+        <template #left>
+          <div
+            class="model-name-heading"
+          >
+            Relationship Types in Your Graph
+          </div>
         </template>
 
-        Add Relationship Type
-      </bf-button>
+        <template #right>
+          <bf-button
+            :disabled="datasetLocked || !hasRelationships"
+            @click="onCreateNewRelationship"
+          >
+            Add Relationship Type
+          </bf-button>
+        </template>
+      </StageActions>
+
 
     </template>
 
@@ -77,12 +84,13 @@
       <template v-else>
 
         <div class="relationship-types-table-wrapper">
-          <div class="table-info">
-            <h2>Relationship Types in Your Graph</h2>
-          </div>
+<!--          <div class="table-info">-->
+<!--            <h2>Relationship Types in Your Graph</h2>-->
+<!--          </div>-->
 
 
           <pennsieve-table
+            ref="relationshipTable"
             :data="transformedRelationshipTypes"
             :is-loading="false"
             :single-select="true"
@@ -92,7 +100,7 @@
 
                   <button class="linked btn-selection-action mr-8"
                           :disabled="datasetLocked"
-                          @click="onUpdate">
+                          @click="onEditRelationship">
                     Update
                   </button>
 
@@ -105,6 +113,7 @@
             </template>
 
             <template #columns>
+
               <el-table-column
                 width="60"
                 class="checkbox"
@@ -152,13 +161,12 @@
       </template>
 
       <create-relationship-type-dialog
-        :relationship-type-edit.sync="relationshipTypeEdit"
+        :relationship-type-edit="relationshipTypeEdit"
         :relationship-types="relationshipTypes"
         :url="relationshipsUrl"
-        :dialog-visible="createRelationshipDialogVisible"
+        v-model:dialogVisible="createRelationshipDialogVisible"
         @add-relationship-type="onAddRelationshipType"
         @update-relationship-type="onUpdateRelationshipType"
-        @close="closeRelationshipDialog"
       />
 
       <delete-relationship-type-dialog
@@ -199,11 +207,13 @@
   import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
   import IconArrow from "../../../icons/IconArrow.vue";
   import Cookies from "js-cookie";
+  import StageActions from "../../../shared/StageActions/StageActions.vue";
 
   export default {
     name: 'RelationshipTypes',
 
     components: {
+      StageActions,
       PennsieveTable,
       IconArrowUp,
       IconMenu,
@@ -401,21 +411,21 @@
         'fetchModels'
       ]),
 
-      closeRelationshipDialog: function() {
-        this.createRelationshipDialogVisible = false
-      },
+      // closeRelationshipDialog: function() {
+      //   this.createRelationshipDialogVisible = false
+      // },
       getRelationshipLinkedProperties: function() {
         if (!this.linkedPropertiesUrl) {
           return
         }
-      this.sendXhr(this.linkedPropertiesUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-       .then(response => {
-         this.propRelTypesResponse = response
-      })
+        this.sendXhr(this.linkedPropertiesUrl, {
+          header: {
+            Authorization: `bearer ${this.userToken}`
+          }
+        })
+         .then(response => {
+           this.propRelTypesResponse = response
+        })
         .catch(this.handleXhrError.bind(this))
       },
 
@@ -456,10 +466,20 @@
         return propOr('', prop, model)
       },
 
+
       /**
        * Open relationship type modal
        */
-      openRelationshipTypeModal: function() {
+      onCreateNewRelationship: function() {
+        this.$refs.relationshipTable.clearSelection()
+        this.relationshipTypeEdit = {}
+        this.createRelationshipDialogVisible = true
+      },
+
+      /**
+       * Open relationship type modal
+       */
+      onEditRelationship: function() {
         this.createRelationshipDialogVisible = true
       },
 
@@ -501,21 +521,6 @@
           destinationModel: propOr('', 'destinationName', selectedRelationship),
           destinationModelDisplayName: propOr('', 'destination', selectedRelationship),
         }
-
-
-        // switch (command) {
-        //   case 'edit':
-        //     // Open edit dialog
-        //     this.createRelationshipDialogVisible = true
-        //     break;
-        //
-        //   case 'remove':
-        //     // Open delete dialog
-        //     this.deleteRelationshipDialogVisible = true
-        //
-        //   default:
-        //     break;
-        // }
       },
 
       /**
@@ -695,6 +700,7 @@
        * @param {Object} relationship
        */
       onUpdateRelationshipType: function(relationship) {
+        console.log(relationship)
         this.updateRelationshipType(relationship)
 
         const chart = this.$refs.dataModelGraph
@@ -734,6 +740,15 @@
 <style lang="scss">
   @import '../../../../assets/_variables.scss';
   @import './_filter-menu.scss';
+
+  .model-name-heading {
+    color: $purple_3;
+    margin: 0 0 0 16px;
+    text-transform: capitalize;
+    font-size: 18px;
+    align-items: center;
+    display: flex;
+  }
 
   .relationship-wrapper {
     display: flex;

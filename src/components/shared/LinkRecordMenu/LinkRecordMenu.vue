@@ -2,31 +2,20 @@
   <div class="link-record-menu">
     <el-popover
       ref="menu"
-      v-model="menuOpen"
+      :visible="menuOpen"
       popper-class="no-padding scroll"
       placement="bottom-start"
       width="300"
-      trigger="click"
       transition=""
       :visible-arrow="false"
     >
       <template #reference>
         <bf-button
-          v-popover:menu
-          class="compact"
           :disabled="datasetLocked"
+          @click="onMenuClick"
         >
-          Link to ...
-          <template #suffix>
-            <IconArrow
-              class="icon-caret"
-              icon="icon-arrow-up"
-              color="#fff"
-              :dir="arrowDir"
-              :height="10"
-              :width="10"
-            />
-          </template>
+          Link to...
+
         </bf-button>
       </template>
       <div
@@ -94,14 +83,12 @@
 import { mapState, mapGetters } from 'vuex'
 import { prop, uniqBy, reject, propEq } from 'ramda'
 
-import BfButton from '../../../shared/bf-button/BfButton.vue'
-import IconArrow from "../../../icons/IconArrow.vue";
+import BfButton from '../bf-button/BfButton.vue'
 
 export default {
   name: 'LinkRecordMenu',
 
   components: {
-    IconArrow,
     BfButton
   },
 
@@ -191,25 +178,19 @@ export default {
      * @param {String} command
      */
     onMenuClick: function(command) {
-      this.menuOpen = false
-      this.$emit('menu-click', command)
+      if (this.menuOpen) {
+        this.$emit('menu-click', command)
+      }
+      this.menuOpen = !this.menuOpen
+
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
-  .link-record-menu {
-    .bf-button {
-      border: none;
-      font-size: 12px;
-      line-height: 17px;
-      &:hover {
-        box-shadow: none !important;
-      }
-    }
-  }
+  @import 'src/assets/variables';
+
   .existing-file-menu {
     border-bottom: 1px solid $gray_2;
   }

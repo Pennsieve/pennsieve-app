@@ -2,167 +2,182 @@
   <div
     class="search-filter-input"
   >
-    <template v-if="!isDate">
-      <input
-        v-if="!isNumber"
-        ref="input"
-        type="text"
-        :value="modelValue"
-        :readonly="isInputReadOnly"
-        @input="$emit('update:modelValue', $event.target.value)"
-        @focus="onInputFocus"
-        @keydown.delete="onDelete"
-      >
 
-      <input
-        v-if="isNumber"
-        ref="input"
-        type="number"
-        :value="modelValue"
-        :readonly="isInputReadOnly"
-        @input="onNumberInput"
-        @focus="onInputFocus"
-        @keydown.delete="onDelete"
-      >
-    </template>
 
-    <!-- Date property type -->
-    <el-date-picker
-      v-if="isDate"
-      ref="datePicker"
-      :value="modelValue"
-      :append-to-body="false"
-      type="date"
-      prefix-icon=""
-      placeholder="Choose a date"
-      transition=""
-      format="M/d/yyyy"
-      value-format="yyyy-MM-ddTHH:mm:ss.000+00:00"
-      :default-value="suggestedDateFirst"
-      :picker-options="pickerOptions"
-      @change="$emit('input', $event)"
-      @input="$emit('input', $event)"
-      @focus="onInputFocus"
-      @keydown.native.delete="onDelete"
-    />
 
-    <el-popover
-      ref="popover"
-      v-model="isPopoverVisible"
-      popper-class="no-padding scroll"
-      placement="bottom-start"
-      trigger="manual"
-      :append-to-body="false"
-      :visible-arrow="false"
-      :popper-options="{
-        modifiers: [ 'offset', 'preventOverflow', popoverModifier, 'applyStyle' ]
-      }"
-    >
-      <div
-        v-if="loading"
-        class="bf-menu"
+
+<!--    <el-popover-->
+<!--      ref="popover"-->
+<!--      v-model="isPopoverVisible"-->
+<!--      popper-class="no-padding scroll"-->
+<!--      placement="bottom-start"-->
+<!--      trigger="manual"-->
+<!--      :append-to-body="false"-->
+<!--      :visible-arrow="false"-->
+<!--      :popper-options="{-->
+<!--        modifiers: [ 'offset', 'preventOverflow', popoverModifier, 'applyStyle' ]-->
+<!--      }"-->
+<!--    >-->
+      <el-popover
+        ref="popover"
+        :visible="isPopoverVisible"
+        popper-class="no-padding scroll"
+        placement="bottom-start"
       >
-        <div class="loading-list">
-          Loading
+      <template #reference>
+        <template v-if="!isDate">
+          <input
+            v-if="!isNumber"
+            ref="input"
+            type="text"
+            :value="modelValue"
+            :readonly="isInputReadOnly"
+            @input="$emit('update:modelValue', $event.target.value)"
+            @focus="onInputFocus"
+            @keydown.delete="onDelete"
+          >
+
+          <input
+            v-if="isNumber"
+            ref="input"
+            type="number"
+            :value="modelValue"
+            :readonly="isInputReadOnly"
+            @input="onNumberInput"
+            @focus="onInputFocus"
+            @keydown.delete="onDelete"
+          >
+        </template>
+        <!-- Date property type -->
+        <el-date-picker
+          v-if="isDate"
+          ref="datePicker"
+          :value="modelValue"
+          :append-to-body="false"
+          type="date"
+          prefix-icon=""
+          placeholder="Choose a date"
+          transition=""
+          format="M/d/yyyy"
+          value-format="yyyy-MM-ddTHH:mm:ss.000+00:00"
+          :default-value="suggestedDateFirst"
+          :picker-options="pickerOptions"
+          @change="$emit('input', $event)"
+          @input="$emit('input', $event)"
+          @focus="onInputFocus"
+          @keydown.native.delete="onDelete"
+        />
+      </template>
+
+      <template #default>
+        <div
+          v-if="loading"
+          class="bf-menu"
+        >
+          <div class="loading-list">
+            Loading
+          </div>
         </div>
-      </div>
 
-      <!-- Autosuggestions for values -->
-      <div
-        v-if="!isEnum && !isNumber && !isBoolean && !isDate && !loading"
-        class="bf-menu scroll-menu"
-      >
-        <ul v-if="valueSuggestions && valueSuggestions.length">
-          <h2>Suggested values</h2>
-          <ul>
-            <li
-              v-for="option in valueSuggestions"
-              :key="option"
-            >
-              <a
-                href="#"
-                class="bf-menu-item"
-                @click.prevent="onOptionClick(option)"
-              >
-                {{ option }}
-              </a>
-            </li>
-          </ul>
-        </ul>
-        <p
-          v-if="valueSuggestions === null || valueSuggestions.length === 0"
-          class="filter-empty-state"
+        <!-- Autosuggestions for values -->
+        <div
+          v-if="!isEnum && !isNumber && !isBoolean && !isDate && !loading"
+          class="bf-menu scroll-menu"
         >
-          No suggestions found
-        </p>
-      </div>
-
-      <!-- Show range for number and datee property type -->
-      <div
-        v-if="isNumber && !loading"
-        class="bf-menu scroll-menu"
-      >
-        <ul v-if="valueSuggestions.length">
-          <h2>Suggested values</h2>
-          <p class="filter-suggestion-range mb-0">
-            {{ valueRangeSuggestion }}
+          <div v-if="valueSuggestions && valueSuggestions.length">
+            <h2>Suggested values</h2>
+            <ul>
+              <li
+                v-for="option in valueSuggestions"
+                :key="option"
+              >
+                <a
+                  href="#"
+                  class="bf-menu-item"
+                  @click.prevent="onOptionClick(option)"
+                >
+                  {{ option }}
+                </a>
+              </li>
+            </ul>
+          </div>
+          <p
+            v-if="valueSuggestions === null || valueSuggestions.length === 0"
+            class="filter-empty-state"
+          >
+            No suggestions found
           </p>
-        </ul>
-        <p
-          v-if="valueSuggestions.length === 0"
-          class="filter-empty-state"
+        </div>
+
+        <!-- Show range for number and datee property type -->
+        <div
+          v-if="isNumber && !loading"
+          class="bf-menu scroll-menu"
         >
-          No suggestions found
-        </p>
-      </div>
+          <div v-if="valueSuggestions.length">
+            <h2>Suggested values</h2>
+            <p class="filter-suggestion-range mb-0">
+              {{ valueRangeSuggestion }}
+            </p>
+          </div>
+          <p
+            v-if="valueSuggestions.length === 0"
+            class="filter-empty-state"
+          >
+            No suggestions found
+          </p>
+        </div>
 
-      <!-- Enum property type -->
-      <div
-        v-if="isEnum && !loading"
-        class="bf-menu scroll-menu"
-      >
-        <ul>
-          <h2>Values</h2>
-          <ul>
-            <li
-              v-for="option in enumOptions"
-              :key="option"
-            >
-              <a
-                href="#"
-                class="bf-menu-item"
-                @click.prevent="onOptionClick(option)"
+        <!-- Enum property type -->
+        <div
+          v-if="isEnum && !loading"
+          class="bf-menu scroll-menu"
+        >
+          <div>
+            <h2>Values</h2>
+            <ul>
+              <li
+                v-for="option in enumOptions"
+                :key="option"
               >
-                {{ option }}
-              </a>
-            </li>
-          </ul>
-        </ul>
-      </div>
+                <a
+                  href="#"
+                  class="bf-menu-item"
+                  @click.prevent="onOptionClick(option)"
+                >
+                  {{ option }}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
 
-      <!-- Boolean property type -->
-      <div
-        v-if="isBoolean && !loading"
-        class="bf-menu scroll-menu"
-      >
-        <ul>
-          <h2>Values</h2>
-          <ul>
-            <li
-              v-for="option in booleanOptions"
-              :key="option.value"
-            >
-              <a
-                href="#"
-                class="bf-menu-item"
-                @click.prevent="onOptionClick(option.value)"
+        <!-- Boolean property type -->
+        <div
+          v-if="isBoolean && !loading"
+          class="bf-menu scroll-menu"
+        >
+          <div>
+            <h2>Values</h2>
+            <ul>
+              <li
+                v-for="option in booleanOptions"
+                :key="option.value"
               >
-                {{ option.label }}
-              </a>
-            </li>
-          </ul>
-        </ul>
-      </div>
+                <a
+                  href="#"
+                  class="bf-menu-item"
+                  @click.prevent="onOptionClick(option.value)"
+                >
+                  {{ option.label }}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </template>
+
+
     </el-popover>
   </div>
 </template>
@@ -358,7 +373,7 @@ export default {
      * Set the popover references so they can be positioned and full width
      * `el-popover` doesn't allow for this to be dynamic
      */
-    this.$refs.popover.$refs.reference = this.$parent.$refs.inputWrap
+    // this.$refs.popover.$refs.reference = this.$parent.$refs.inputWrap
 
     if (this.isDate) {
       this.setupDatePicker()
@@ -461,8 +476,9 @@ export default {
      * @param {String} value
      */
     onOptionClick: function(value) {
+      console.log('option clicked: ' + value)
       this.dismissPopover()
-      this.$emit('@update:modelValue', value)
+      this.$emit('update:modelValue', value)
     },
 
     /**
