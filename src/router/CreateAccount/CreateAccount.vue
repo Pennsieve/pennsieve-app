@@ -144,7 +144,6 @@ export default {
   },
 
   async mounted() {
-    console.log("**", this);
     await this.recaptchaLoaded();
     this.recaptchaInstance.showBadge();
   },
@@ -165,6 +164,7 @@ export default {
      * send request to the endpoint
      */
     onFormSubmit: function () {
+      console.log("this.$refs", this.$refs);
       this.$refs.signupForm.validate((valid) => {
         if (!valid) {
           return;
@@ -185,6 +185,7 @@ export default {
 
       try {
         const recaptchaToken = await this.recaptcha();
+        console.log("**", recaptchaToken);
 
         await this.sendXhr(`${this.config.apiUrl}/account/sign-up`, {
           method: "POST",
@@ -258,9 +259,21 @@ h2 {
     margin-right: 8px;
   }
 }
-.button-wrap .el-form-item__content {
-  display: flex;
+
+.el-form-item__content {
+  border: 1px solid red;
 }
+
+///deep/ .bf-button {
+//  width: 50%;
+//  &:first-child {
+//   margin-right: 8px;
+//  }
+//}
+// /deep/ .button-wrap .el-form-item__content {
+// display: flex;
+// }
+
 .error-copy {
   color: $error-color;
 }

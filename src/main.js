@@ -5,7 +5,6 @@ import router from "./router";
 import store from "./store";
 import striptags from 'striptags';
 import Cookies from 'js-cookie'
-import { VueReCaptcha, useReCaptcha } from 'vue-recaptcha-v3'
 import * as siteConfig from '@/site-config/site.json'
 
 import Amplify from '@aws-amplify/core'
@@ -23,10 +22,10 @@ import 'element-plus/es/components/message/style/index';
 Amplify.configure(AWSConfig)
 
 
-const app = createApp(App).use(VueReCaptcha, { siteKey: siteConfig.reCAPTCHASiteKey })
+const app = createApp(App)
 
 
-app.use(VueReCaptcha, { siteKey: siteConfig.reCAPTCHASiteKey })
+
 
 app.directive('click-outside', ClickOutside)
 

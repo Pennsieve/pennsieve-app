@@ -31,6 +31,20 @@ let route = useRoute();
 
   <PsAnalytics />
   <bf-download-file ref="downloadFile" />
+  <vue-recaptcha
+    v-show="showRecaptcha"
+    sitekey="key"
+    size="normal"
+    theme="light"
+    hl="tr"
+    :loading-timeout="loadingTimeout"
+    @verify="recaptchaVerified"
+    @expire="recaptchaExpired"
+    @fail="recaptchaFailed"
+    @error="recaptchaError"
+    ref="vueRecaptcha"
+  >
+  </vue-recaptcha>
   <!--  This is the websocket connection-->
   <!--  <bf-notifications />-->
 </template>
@@ -44,11 +58,11 @@ import { mergeDeepLeft, pathOr, propOr } from "ramda";
 import EventBus from "./utils/event-bus";
 import Cookies from "js-cookie";
 import toQueryParams from "./utils/toQueryParams.js";
-import { VueReCaptcha, useReCaptcha } from "vue-recaptcha-v3";
 import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
+import vueRecaptcha from "vue3-recaptcha2";
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -58,6 +72,7 @@ export default {
   components: {
     PsAnalytics,
     BfDownloadFile,
+    vueRecaptcha,
   },
   mixins: [globalMessageHandler, request],
 
@@ -69,6 +84,8 @@ export default {
       sessionTimedOut: false,
       showSessionTimerThreshold: 120,
       sessionLogoutThreshold: 5,
+      showRecaptcha: false,
+      loadingTimeout: 30000, // 30 seconds
     };
   },
 
@@ -137,24 +154,6 @@ export default {
       },
       deep: true,
     },
-    setup() {
-      const { executeRecaptcha, recaptchaLoaded } = useReCaptcha();
-
-      const recaptcha = async () => {
-        // (optional) Wait until recaptcha has been loaded.
-        await recaptchaLoaded();
-
-        // Execute reCAPTCHA with action "login".
-        const token = await executeRecaptcha("login");
-
-        // Do stuff with the received token.
-      };
-
-      return {
-        recaptcha,
-      };
-    },
-    template: '<button @click="recaptcha">Execute recaptcha</button>',
   },
 
   computed: {
@@ -258,6 +257,12 @@ export default {
     onRefreshToken: function () {
       this.refreshToken();
     },
+    recaptchaVerified(response) {},
+    recaptchaExpired() {
+      this.$refs.vueRecaptcha.reset();
+    },
+    recaptchaFailed() {},
+    recaptchaError(reason) {},
     /**
      * Manually refresh token.
      */
