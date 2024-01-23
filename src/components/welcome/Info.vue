@@ -7,7 +7,7 @@
       element-loading-background="transparent"
     >
 
-      <PennsieveLogoContainer class="logo-container" />
+<!--      <PennsieveLogoContainer class="logo-container" />-->
 
 
       <data-card

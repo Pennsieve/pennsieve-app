@@ -20,11 +20,13 @@
 
           <IconHelpMessage
             class="icon-main"
+            :width="20"
+            :height="20"
             />
 
-          <span class="label">
-        Get Help
-      </span>
+          <span v-if="!condensed" class="label">
+            Get Help
+          </span>
           <IconArrowRight
             :height="10"
             :width="10"
@@ -89,6 +91,13 @@ import IconArrowRight from "../../icons/IconArrowRight.vue";
 
 export default {
   name: 'HelpMenu',
+
+  props: {
+    condensed: {
+      type: Boolean,
+      default: false
+    },
+  },
 
   components: {
     IconArrowRight,

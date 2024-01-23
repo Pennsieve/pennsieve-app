@@ -13,17 +13,10 @@
       >
 
         <component :is="MarkComponent"
-          :is-visible="!primaryNavCondensed || secondaryNavOpen"
+          v-show="!primaryNavCondensed || secondaryNavOpen"
           :class="logoClass"
           color="currentColor"
           />
-<!--        <pennsieve-mark-->
-<!--          :is-visible="!primaryNavCondensed || secondaryNavOpen"-->
-<!--          class="logo"-->
-<!--          :width="24"-->
-<!--          :height="24"-->
-<!--          color="currentColor">-->
-<!--        </pennsieve-mark>-->
 
       </router-link>
       <a
@@ -31,7 +24,7 @@
         :href="logoLink"
       >
         <pennsieve-mark
-            :is-visible="!primaryNavCondensed || secondaryNavOpen"
+            v-show="!primaryNavCondensed || secondaryNavOpen"
             class="logo"
             :width="24"
             :height="24"
@@ -65,38 +58,39 @@
     </div>
 
     <div class="menu-wrap">
-      <bf-navigation-item
-        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"
-        label="Welcome"
-        icon="icon-organization"
-        :condensed="primaryNavCondensed"
-        :styleColor="navStyleColor"
-      >
-        <template v-slot:icon>
-          <IconOrganization
-            :width="20"
-            :height="20"
-            color="currentColor"
-          />
-        </template>
-      </bf-navigation-item>
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"-->
+<!--        label="My Pennsieve"-->
+<!--        icon="icon-organization"-->
+<!--        :condensed="primaryNavCondensed"-->
+<!--        :styleColor="navStyleColor"-->
+<!--      >-->
+<!--        <template v-slot:icon>-->
+<!--          <IconOrganization-->
+<!--            :width="20"-->
+<!--            :height="20"-->
+<!--            color="currentColor"-->
+<!--          />-->
+<!--        </template>-->
+<!--      </bf-navigation-item>-->
 
-      <bf-navigation-item
-        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"
-        label="Submit Datasets"
-        icon="icon-document"
-        :condensed="primaryNavCondensed"
-        :styleColor="navStyleColor"
+<!--      <hr class="menu-divider">-->
+<!--      <bf-navigation-item-->
+<!--        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"-->
+<!--        label="Submit Datasets"-->
+<!--        icon="icon-document"-->
+<!--        :condensed="primaryNavCondensed"-->
+<!--        :styleColor="navStyleColor"-->
 
-      >
-        <template v-slot:icon>
-          <IconDocument
-            :width="20"
-            :height="20"
-            color="currentColor"
-          />
-        </template>
-      </bf-navigation-item>
+<!--      >-->
+<!--        <template v-slot:icon>-->
+<!--          <IconDocument-->
+<!--            :width="20"-->
+<!--            :height="20"-->
+<!--            color="currentColor"-->
+<!--          />-->
+<!--        </template>-->
+<!--      </bf-navigation-item>-->
 
 
 <!--      <bf-navigation-item-->
@@ -213,7 +207,7 @@
       class="collapse-handle"
       @click="toggleMenu"
     />
-    <bf-navigation-tertiary :bkColor="userMenuBackgroundColor"/>
+    <bf-navigation-tertiary :bkColor="userMenuBackgroundColor" :org-id="orgId"/>
   </div>
 </template>
 
@@ -419,6 +413,11 @@
   @import '../../assets/_variables.scss';
   @import './bf-navigation.scss';
   @import './logo.scss';
+
+  .menu-divider {
+    margin:8px;
+    color: $gray_6;
+  }
 
   .bf-navigation {
     color: $white;
