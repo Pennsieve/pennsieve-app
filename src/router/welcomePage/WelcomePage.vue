@@ -50,7 +50,7 @@ export default {
           to: "my-settings-container"
         },
         {
-          name: "My Dataset Proposals",
+          name: "My Dataset Submissions",
           to: "submit"
         },
         {

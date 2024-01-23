@@ -21,7 +21,7 @@
 
     <bf-navigation-item
       :link="{ name: 'about-pennsieve', params: {orgId: activeOrganizationId} }"
-      label="About Pennsieve"
+      label="Help and Support"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"
     >
