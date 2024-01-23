@@ -14,6 +14,9 @@ import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 import request from './mixins/request'
 
+// This does not work correctly with Vite:
+// import Vue3Sanitize from "vue-3-sanitize";
+
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
@@ -36,6 +39,8 @@ app.use(VueClipboard, {
 })
 
 app.use(router);
+// app.use(Vue3Sanitize);
+
 
 app.mount("#app");
 

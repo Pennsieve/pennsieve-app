@@ -13,7 +13,7 @@ describe('RecordsTable.vue', () => {
     // TODO add test logic when sorting works
   })
 
-  it('searchAllDataMenu: true', async () => {
+  it('[searchAllDataMenu: true', async () => {
     const searchAllDataMenu = true
     await cmp.setProps({
       searchAllDataMenu

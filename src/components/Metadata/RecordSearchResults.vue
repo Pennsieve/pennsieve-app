@@ -33,18 +33,12 @@
           />
         </el-radio-group>
       </div>
-      <div class="results-table">
-        <div class="file-pagination">
-          <div>
-            <pagination-page-menu
-              class="mr-16"
-              pagination-item-label="Records"
-              :page-size="tableSearchParams.limit"
-              @update-page-size="updateTableSearchLimit"
-            />
+
+      <div class="search-actions">
+        <stage-actions>
+          <template #right>
             <button
-              v-if= "showDownloadResults"
-              class="dataset-filter-dropdown el-dropdown-link"
+              class="actions-item"
               @click="downloadRecordCsv"
             >
               <span class="el-dropdown-text-link">
@@ -56,28 +50,82 @@
                 :width="20"
               />
             </button>
-          </div>
-          <el-pagination
-            :page-size="tableSearchParams.limit"
-            :pager-count="5"
-            :current-page="curFileSearchPage"
-            layout="prev, pager, next"
-            :total="tableResultsTotalCount"
-            @current-change="onPaginationPageChange"
-          />
-        </div>
-        <records-table
-          class="search-results-records-table"
+          </template>
+        </stage-actions>
+
+
+      </div>
+
+      <div class="results-table">
+        <pennsieve-table
+          ref="relationshipTable"
           :data="mappedResult"
-          :headings="recordHeadings"
-          :show-menu-column="showMenuColumn"
-          :search-all-data-menu="true"
-          :search-all-data-records="true"
-          :is-sortable="isRecordsSortable"
-          :table-search-params="tableSearchParams"
-          @navigate-to-record="navigateToRecord"
-          @sort="$emit('sort', $event)"
-        />
+          :is-loading="false"
+          :total-row-count="tableResultsTotalCount"
+          :single-select="true"
+          @selection-change="handleTableSelectionChange"
+          @update-limit="onUpdateLimit"
+          @change-page="onPaginationPageChange"
+          :limit="tableSearchParams.limit"
+          :offset="tableSearchParams.offset"
+        >
+          <template #actions>
+
+            <button class="linked btn-selection-action mr-8"
+                    @click="navigateToRecord(selectedRecord)">
+              Open
+            </button>
+
+          </template>
+
+          <template #columns>
+
+            <el-table-column
+              v-for="heading in recordHeadings"
+              :key="heading.name"
+              :prop="heading.name"
+              :minWidth="widthForColumn(heading)"
+              :label="heading.displayName"
+              :sortable="isRecordsSortable ? 'custom' : false"
+            >
+              <template #header>
+                <el-tooltip
+                  v-if="isRecordsSortable"
+                  :content="heading.displayName"
+                  placement="top"
+                >
+                  <button :class="{ 'sort-active': tableSearchParams.orderBy === heading.name }">
+                    {{ heading.displayName }}
+<!--                    <IconSort-->
+<!--                      class="sort-icon"-->
+<!--                      :class="[ tableSearchParams.ascending && tableSearchParams.orderBy === heading.name ? 'svg-flip' : '' ]"-->
+<!--                    />-->
+                  </button>
+                </el-tooltip>
+
+                <template v-else>
+                  {{ heading.displayName }}
+                </template>
+              </template>
+
+              <template #default="scope">
+
+                <div class="header-select-wrapper">
+                  <div
+                    v-if="heading.modelTitle"
+                    :class="{ 'model-title': heading.modelTitle }"
+                    v-html="$sanitize(scope.row[heading.name], ['a'])"
+                    @click="navigateToRecord(scope.row)"
+                  />
+                </div>
+                <div
+                  v-html="$sanitize(scope.row[heading.name], ['a'])"
+                />
+              </template>
+            </el-table-column>
+          </template>
+        </pennsieve-table>
+
       </div>
     </div>
   </div>
@@ -97,6 +145,9 @@ import EventBus from '../../utils/event-bus'
 import FormatDisplay from '../../components/datasets/explore/ConceptInstance/format-display-value'
 import { getFormatter } from '../../mixins/data-type/utils';
 import IconDirectDownload from "../icons/IconDirectDownload.vue";
+import PennsieveTable from "../shared/PennsieveTable/PennsieveTable.vue";
+import IconSort from "../icons/IconSort.vue";
+import StageActions from "../shared/StageActions/StageActions.vue";
 
 /**
  * Compute query from searchCriteria
@@ -151,9 +202,12 @@ export default {
   name: 'RecordSearchResults',
 
   components: {
+    StageActions,
+    PennsieveTable,
     IconDirectDownload,
     RecordsTable,
-    PaginationPageMenu
+    PaginationPageMenu,
+    IconSort
   },
 
   mixins: [GetFileProperty, Request, FormatDate, FormatDisplay],
@@ -231,26 +285,26 @@ export default {
       recordResults: [],
       recordHeadings: ['externalparticipantid'],
       selectedButton: 'Records',
-      selectedFiles: [],
+      selectedRecord: {},
       tableResultsTotalCount: 0,
       datasetId: '',
       datasetName: '',
-      isLoadingRecords: false,
+      isLoadingRecords: true,
       recordDownloadQuery: {},
-      mappedResult: []
+      mappedResult: [],
+      unsubscribe: {}
     }
   },
 
   mounted: function() {
-
-    console.log('subscribing')
     // Subscribe to changes to the records of the model.
     this.unsubscribe = this.$store.subscribe((mutation) => {
       let needsUpdate = mutation.type == 'metadataModule/SET_RECORDS_FOR_MODEL'
       let needsUpdateModelProps = mutation.type == 'metadataModule/SET_PROPS_FOR_MODEL'
-      if (mutation.payload && needsUpdate) {
-        console.log('mutation detected')
 
+
+      if (mutation.payload && needsUpdate) {
+        this.isLoadingRecords = false
         this.recordResults = mutation.payload.result.records
         this.tableResultsTotalCount = mutation.payload.result.total
 
@@ -277,7 +331,7 @@ export default {
     })
 
     if (this.model.name != '') {
-      console.log('fetching records')
+      this.isLoadingRecords = true
       this.fetchRecords( {
         modelName: this.model.name,
         limit: this.tableSearchParams.limit,
@@ -290,9 +344,8 @@ export default {
     }
   },
   beforeUnmount: function() {
-    console.log('unsubscribing')
-
     this.unsubscribe()
+
   },
 
   computed: {
@@ -324,13 +377,6 @@ export default {
       return this.tableSearchParams.offset / this.tableSearchParams.limit + 1
     },
 
-    /**
-     * Compute if multiple files are selected
-     * @returns {Boolean}
-     */
-    multipleSelected: function() {
-      return this.selectedFiles.length > 1
-    },
 
     /**
      * Indicates that no search results were found
@@ -371,6 +417,7 @@ export default {
     model: {
       handler: function(ev) {
         this.recordHeadings = getRecordsHeading(this.model.props)
+        this.isLoadingRecords = true
         this.fetchRecords( {
           modelName: this.model.name,
           limit: this.tableSearchParams.limit,
@@ -396,6 +443,7 @@ export default {
       deep: true,
       handler: function() {
         if (this.dataset.content) {
+          this.isLoadingRecords = true
           this.fetchRecords( {
             modelName: this.model.name,
             limit: this.tableSearchParams.limit,
@@ -417,6 +465,32 @@ export default {
       'fetchModels',
       'fetchModelProps'
     ]),
+    getTextWidth: function(text, font) {
+      // if given, use cached canvas for better performance
+      // else, create new canvas
+      var canvas = this.getTextWidth.canvas || (this.getTextWidth.canvas = document.createElement("canvas"));
+      var context = canvas.getContext("2d");
+      context.font = font;
+      var metrics = context.measureText(text);
+      return metrics.width;
+    },
+
+    widthForColumn: function(heading) {
+      if (this.mappedResult.length > 0) {
+        let longestValue = heading.name + ">>"
+        for (let i = 0; i < this.mappedResult.length; i++) {
+          let curValue = this.mappedResult[i][heading.name]
+          if (curValue) {
+            longestValue =  ((curValue.length > longestValue.length) ? curValue : longestValue)
+          }
+        }
+
+        let tw = this.getTextWidth(longestValue, '14pt sans-serif')
+
+        return (tw < 300) ? tw: 300
+      }
+      return "200"
+    },
 
     /**
      * Formats and flattens search results before rendering
@@ -460,15 +534,24 @@ export default {
     },
 
     downloadRecordCsv: function() {
-      EventBus.$emit('trigger-record-csv-download', this.recordDownloadQuery)
+      EventBus.$emit('trigger-record-csv-download', {
+        model: this.model.name,
+        datasets: [this.dataset.content.intId],
+        filters: this.searchCriteria.filters})
     },
+
+    handleTableSelectionChange: function(record) {
+      this.selectedRecord = record[0]
+    },
+
 
     /**
      * Updates file search limit based on pagination selection
      * @param {Nunber} limit
      */
-    updateTableSearchLimit: function(limit) {
+    onUpdateLimit: function(limit) {
       this.tableSearchParams.limit = limit
+      this.isLoadingRecords = true
       this.fetchRecords( {
         modelName: this.model.name,
         limit: this.tableSearchParams.limit,
@@ -483,6 +566,7 @@ export default {
     onPaginationPageChange: function(page) {
       const offset = (page - 1) * this.tableSearchParams.limit
       this.tableSearchParams.offset = offset
+      this.isLoadingRecords = true
       this.fetchRecords( {
         modelName: this.model.name,
         limit: this.tableSearchParams.limit,
@@ -491,33 +575,33 @@ export default {
 
     },
 
-    /**
-     * Handler for clicking filea
-     * @param {Object} file
-     */
-    onClickLabel: function(file) {
-      const datasetId = pathOr('', ['content', 'datasetNodeId'], file)
-      const packageType = pathOr('', ['content', 'packageType'], file)
-      const id = pathOr('', ['content', 'nodeId'], file)
-
-      if (id === '') {
-        return
-      }
-
-      if (packageType === 'Collection') {
-        this.navigateToFile(id)
-      } else {
-        this.$router.push({
-          name: 'file-record',
-          params: {
-            instanceId: id,
-            datasetId: datasetId,
-            conceptId: conceptId
-          }
-        })
-      }
-      this.updateSearchModalVisible(false)
-    },
+    // /**
+    //  * Handler for clicking filea
+    //  * @param {Object} file
+    //  */
+    // onClickLabel: function(file) {
+    //   const datasetId = pathOr('', ['content', 'datasetNodeId'], file)
+    //   const packageType = pathOr('', ['content', 'packageType'], file)
+    //   const id = pathOr('', ['content', 'nodeId'], file)
+    //
+    //   if (id === '') {
+    //     return
+    //   }
+    //
+    //   if (packageType === 'Collection') {
+    //     this.navigateToFile(id)
+    //   } else {
+    //     this.$router.push({
+    //       name: 'file-record',
+    //       params: {
+    //         instanceId: id,
+    //         datasetId: datasetId,
+    //         conceptId: conceptId
+    //       }
+    //     })
+    //   }
+    //   this.updateSearchModalVisible(false)
+    // },
 
     /**
      * Navigate to records details route
@@ -536,7 +620,7 @@ export default {
           datasetId: datasetId
         }
       })
-      this.updateSearchModalVisible(false)
+      // this.updateSearchModalVisible(false)
     },
 
     /**
@@ -558,6 +642,12 @@ h3 {
   font-weight: normal;
   letter-spacing: 0.5px;
   color: $gray_6;
+}
+
+.actions-item {
+  display: flex;
+  color: $purple_3;
+  margin-bottom: 8px;
 }
 
 .no-results-container {
@@ -633,6 +723,21 @@ h3 {
   color: $disabled-radio-button-text-color;
   border-color: $disabled-radio-button-border-color;
   background-color: $disabled-radio-button-background-color;
+}
+
+ .header-select-wrapper {
+   display: flex;
+   flex-direction: row;
+ }
+
+.model-title {
+  color: $purple_2;
+  text-decoration: none;
+  &:hover, &:focus {
+    outline: none;
+    text-decoration: underline;
+    cursor:pointer;
+  }
 }
 
 .download-icon {

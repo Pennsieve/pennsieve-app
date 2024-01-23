@@ -64,6 +64,7 @@
     "sass": "^1.57.1",
     "unplugin-auto-import": "^0.16.6",
     "unplugin-vue-components": "^0.25.1",
+    "vite-plugin-node-polyfills": "^0.19.0",
     "vitest": "^0.34.6"
   }
 }

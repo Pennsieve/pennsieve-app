@@ -1,6 +1,8 @@
 <template>
-  <div
-    v-click-outside="clearSelection">
+<!--  <div-->
+<!--    v-click-outside="clearSelection">-->
+  <div>
+
     <div
       class="content-section"
       id="source-files-table"
@@ -27,7 +29,8 @@
       </div>
 
       <div class="table-wrap">
-        <div v-if="selection.length > 0" class="selection-menu-wrap mb-16">
+        <div v-if="selection.length > 0"
+             :class="[singleSelect ? 'single-select' : '', 'selection-menu-wrap mb-16']">
 
           <el-checkbox
             v-if="!singleSelect"
@@ -38,7 +41,12 @@
             :indeterminate="isIndeterminate"
 
           />
-          <div v-else></div>
+          <div v-else>
+            <button class="btn-action"
+                    @click="clearSelection">
+              Clear Selection
+            </button>
+          </div>
 
           <div class="right-actions">
             <slot name="actions" />
@@ -50,7 +58,6 @@
           <el-table
             ref="Table"
             :data="data"
-            max-height="467"
             :border="true"
             @row-click="onRowClick"
             @selection-change="handleTableSelectionChange"
@@ -125,6 +132,8 @@ export default {
 
   methods: {
 
+
+
     /**
      * Handle table selection change
      * @param {Array} selection
@@ -139,6 +148,7 @@ export default {
       this.$refs.Table.clearSelection()
       this.$refs.Table.toggleRowSelection(row, true)
     },
+
     clearSelection: function() {
       this.$refs.Table.clearSelection()
       this.$refs.Table.setCurrentRow(null)
@@ -175,6 +185,10 @@ export default {
 <style scoped lang="scss">
 @import '../../../assets/_variables.scss';
 
+
+.btn-action {
+  color: $purple_2;
+}
 .selection-menu-wrap {
   background: #e9edf6;
   border: 1px solid $gray_2;
@@ -188,6 +202,10 @@ export default {
   z-index: 10;
   align-items: center;
   min-height: 40px;
+
+  &.single-select {
+    padding: 3px 17px 3px 8px;
+  }
 }
 
 .right-actions {

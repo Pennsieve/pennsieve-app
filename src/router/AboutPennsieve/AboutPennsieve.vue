@@ -2,13 +2,13 @@
   <bf-page>
     <bf-rafter
       slot="heading"
-      title="User Dashboard"
+      title="About Pennsieve"
       class="primary"
     >
-      <template #description>
-        <p> Manage your user-profile, developer tools as well as submit and track any dataset proposals and public datasets.</p>
+<!--      <template #description>-->
+<!--        <p> Pennsieve is a cloud-based data management and publication platform which supports several public repositories as well as private consortium workspaces.</p>-->
 
-      </template>
+<!--      </template>-->
 
       <template #tabs>
         <router-tabs :tabs="tabs"/>
@@ -24,15 +24,20 @@
 
 <script>
 import {mapActions, mapState} from "vuex";
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 
 export default {
-  name: "WelcomePage",
+  name: "AboutPennsieve",
   props: {
     orgId: {
       type: String,
       default: ''
     }
   },
+
+  components:[
+    BfRafter
+  ],
 
   computed: {
     ...mapState('repositoryModule', [
@@ -46,27 +51,23 @@ export default {
     return {
       tabs: [
         {
-          name: "My Profile",
-          to: "my-settings-container"
+          name: "Overview",
+          to: "info"
         },
         {
-          name: "My Dataset Submissions",
-          to: "submit"
+          name: "Getting Help",
+          to: "support"
         },
         {
-          name: "My Public Datasets",
-          to: "submit"
+          name: "Repositories",
+          to: "welcome"
         },
-        {
-          name: "Developer Tools",
-          to: "submit"
-        }
+
       ]
     }
   },
   mounted () {
     this.fetchRepositories()
-    this.fetchProposals()
   },
 
   methods: {

@@ -6,6 +6,8 @@ import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
 import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
 import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
+import AboutPennsieve from "./AboutPennsieve/AboutPennsieve.vue";
+import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
@@ -144,31 +146,69 @@ const router = createRouter({
       // which is lazy-loaded when the route is visited.
       component: () => import("./Login/Login.vue"),
     },
-    /**
-     * Information Panel for organization
-     */
     {
-      path: '/:orgId/information',
+
+      path: "/:orgId/pennsieve",
+      name: "about-pennsieve",
       components: {
-        page: WelcomePage,
+        page: AboutPennsieve,
         navigation: BfNavigation
       },
       props: true,
+      redirect: {
+        name: 'info'
+      },
       children: [
         {
+          name: 'welcome',
+          path: 'welcome',
+          components: {
+            stage: WelcomeInfo
+          }
+        },
+        {
+          name: 'support',
+          path: 'support',
+          components: {
+            stage: GettingHelpStage
+          }
+        },
+        {
           name: 'info',
-          path: '',
+          path: 'info',
           components: {
             stage: PennsieveInfo
           }
         },
-      ],
+      ]
     },
+    // /**
+    //  * Information Panel for organization
+    //  */
+    // {
+    //   path: '/:orgId/user',
+    //   components: {
+    //     page: WelcomePage,
+    //     navigation: BfNavigation
+    //   },
+    //   props: true,
+    //   children: [
+    //
+    //     {
+    //       name: 'info',
+    //       path: '',
+    //       components: {
+    //         stage: WelcomePage
+    //       }
+    //     },
+    //   ],
+    // },
     /**
      * Welcome Org routes
      */
     {
       path: '/:orgId/overview',
+      name: 'user-overview',
       components: {
         page: WelcomePage,
         navigation: BfNavigation
@@ -177,33 +217,28 @@ const router = createRouter({
         page: true,
         navigation: true,
       },
+      redirect: {
+        name: 'my-settings-container'
+      },
       children: [
+
         {
-          name: 'welcome',
-          path: '',
+          name: 'my-settings-container',
+          path: '/:orgId/profile',
           components: {
-            stage: WelcomeInfo
+            stage: MySettingsContainer
           }
         },
-      ],
-    },
-    {
-      path: '/:orgId/submit',
-      components: {
-        page: SubmitDatasetPage,
-        navigation: BfNavigation
-      },
-      props: true,
-      children: [
         {
           name: 'submit',
-          path: '',
+          path: '/:orgId/submit',
           components: {
             stage: SubmitDatasets
           }
         },
       ],
     },
+
     /**
      * Datasets routes
      */
@@ -669,23 +704,7 @@ const router = createRouter({
       ],
       props: true
     },
-    {
-      path: '/:orgId/profile',
-      components: {
-        page: MySettings,
-        navigation: BfNavigation
-      },
-      children: [
-        {
-          name: 'my-settings-container',
-          path: '',
-          components: {
-            stage: MySettingsContainer
-          }
-        },
-      ],
-      props: true
-    },
+
     {
       name: 'invitation',
       path: '/invitation',

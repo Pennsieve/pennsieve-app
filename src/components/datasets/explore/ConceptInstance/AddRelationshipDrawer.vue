@@ -10,7 +10,7 @@
       <div>
         <template v-if="isFile">
           <p class="mb-0">
-            Attach files you've uploaded to the platform to any record.
+            Associate the selected file with one or more metadata records in the dataset.
           </p>
         </template>
 
@@ -357,7 +357,7 @@ export default {
      * @returns {String}
      */
     drawerHeading: function() {
-      return this.isFile ? 'Link to Records' : 'Create Relationship'
+      return this.isFile ? 'Attach File to Metadata Records' : 'Create Relationship'
     },
 
     /**
@@ -698,7 +698,7 @@ export default {
 
       const queues = Array.from(this.selectedItemIds).map(itemId => {
         const recordId = itemId
-        const packageId = pathOr('', ['params', 'instanceId'], this.$route)
+        const packageId = pathOr('', ['params', 'fileId'], this.$route)
         const linkTarget = {
           'ConceptInstance': {
             id: recordId

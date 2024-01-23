@@ -7,7 +7,7 @@
 
       <template #actions>
         <stage-actions>
-          <template #rigth>
+          <template #right>
             <link-record-menu
               v-if="getPermission('editor')"
               class="mr-8"
@@ -100,8 +100,6 @@
             </el-dropdown>
           </template>
         </stage-actions>
-
-
       </template>
 
         <div
@@ -402,16 +400,17 @@
             v-model="activeSections"
             class="concept-instance-section zero-padding no-border"
           >
-            <file-relationships-table
+            <relationships-table
               :id="relationship.displayName"
               :ref="relationship.name"
               :active-sections="activeSections"
               :relationship="relationship"
               :show-collapse="true"
               :dataset-id="datasetId"
+              :can-add-relationship="false"
               :package-id="fileId"
+              :url="getRecordRelationshipsUrl(relationship.name)"
               @remove-relationships="handleRemoveRelationships"
-              @unlink-files="handleUnlinkFiles"
             />
           </el-collapse>
         </template>
@@ -446,15 +445,22 @@
 <!--          />-->
 <!--        </div>-->
 <!--      </themplate>-->
+
+<!--      <add-file-relationship-drawer-->
+<!--        ref="addFileRelationshipDrawer"-->
+<!--        :concept="model"-->
+<!--        :related-files="relatedFiles"-->
+<!--      />-->
+      <add-relationship-drawer
+        ref="addRelationshipDrawer"
+        :relationship-types="relationshipTypes"
+        :record="proxyRecord.content"
+        :record-name="drawerOriginatingName"
+        :is-file=true
+      />
     </bf-stage>
 
-<!--    <add-relationship-drawer-->
-<!--      ref="addRelationshipDrawer"-->
-<!--      :relationship-types="relationshipTypes"-->
-<!--      :record="instance"-->
-<!--      :record-name="drawerOriginatingName"-->
-<!--      :is-file="isFile"-->
-<!--    />-->
+
 
 <!--    <remove-relationships ref="removeRelDialog" />-->
 
@@ -469,11 +475,7 @@
 <!--      @file-delete="onDelete"-->
 <!--    />-->
 
-<!--    <add-file-relationship-drawer-->
-<!--      ref="addFileRelationshipDrawer"-->
-<!--      :concept="model"-->
-<!--      :related-files="relatedFiles"-->
-<!--    />-->
+
 
 <!--    <add-linked-property-drawer-->
 <!--      ref="addLinkedPropertyDrawer"-->
@@ -569,14 +571,14 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 // import ConceptInstanceProperty from './ConceptInstanceProperty.vue'
 import ConceptInstanceStaticProperty from '../../explore/ConceptInstance/ConceptInstanceStaticProperty.vue'
 // import ConceptInstanceLinkedProperty from './ConceptInstanceLinkedProperty.vue'
-// import AddRelationshipDrawer from './AddRelationshipDrawer.vue'
+import AddRelationshipDrawer from '../../explore/ConceptInstance/AddRelationshipDrawer.vue'
 // import AddFileRelationshipDrawer from './AddFileRelationshipDrawer.vue'
 // import RelationshipsTable from './RelationshipsTable.vue'
 // import RemoveRelationships from './RemoveRelationships.vue'
 // import UnlinkFiles from './UnlinkFiles.vue'
 // import AddEditPropertyDialog from '../AddEditPropertyDialog/AddEditPropertyDialog.vue'
 // import ConceptDialog from '../ConceptDialog/ConceptDialog.vue'
-import LinkRecordMenu from '../LinkRecordMenu/LinkRecordMenu.vue'
+import LinkRecordMenu from '../../../shared/LinkRecordMenu/LinkRecordMenu.vue'
 // import BfPackageDialog from '../../files/bf-package-dialog/BfPackageDialog.vue'
 // import BfMoveDialog from '../../files/bf-move-dialog/BfMoveDialog.vue'
 // import AddLinkedPropertyDrawer from './AddLinkedPropertyDrawer.vue'
@@ -598,25 +600,23 @@ import Cookie from 'js-cookie'
 import IconMenu from "../../../icons/IconMenu.vue";
 import StageActions from "../../../shared/StageActions/StageActions.vue";
 import SourceFilesTable from "./SourceFilesTable.vue";
-import FileRelationshipsTable from "./FileRelationshipsTable.vue";
 
 export default {
   name: 'FileDetails',
 
   components: {
-    FileRelationshipsTable,
     SourceFilesTable,
     StageActions,
     IconMenu,
     // BfRafter,
-    // BfButton,
+    BfButton,
     // PillLink,
     // ConceptInstanceProperty,
     ConceptInstanceStaticProperty,
     LinkRecordMenu,
     RelationshipsTable,
     // ConceptInstanceLinkedProperty,
-    // AddRelationshipDrawer,
+    AddRelationshipDrawer,
     // AddFileRelationshipDrawer,
     // RemoveRelationships,
     // UnlinkFiles,
@@ -1556,7 +1556,7 @@ export default {
 
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     EventBus.$off('instance-value-changed', this.onValueChanged)
     EventBus.$off('instance-value-error', this.onValueError)
     EventBus.$off('refresh-table-data', this.refreshTableData)
@@ -2615,20 +2615,12 @@ export default {
         return
       }
       const datasetId = this.datasetId
-      const conceptId = this.$route.params.conceptId
-      const conceptInstanceId = this.$route.params.instanceId
+      const fileId = this.$route.params.fileId
 
-      let url = `${
+      return `${
         this.config.conceptsUrl
-      }/datasets/${datasetId}/concepts/${conceptId}/instances/${conceptInstanceId}/relations/${conceptName}`
+      }/datasets/${datasetId}/proxy/package/external/${fileId}/relations/${conceptName}/files`
 
-      if (this.isFile) {
-        url = `${
-          this.config.conceptsUrl
-        }/datasets/${datasetId}/proxy/package/external/${conceptInstanceId}/relations/${conceptName}/files`
-      }
-
-      return url
     },
 
     breadcrumbNavigate: function() {

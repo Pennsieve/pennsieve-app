@@ -154,6 +154,12 @@
   export default {
     name: 'CreateRelationshipTypeDialog',
 
+    emits: [
+      'update-relationship-type',
+      'add-relationship-type',
+      'update:dialogVisible'
+    ],
+
     components: {
       IconLockFilled,
       BfDialogHeader,
@@ -230,7 +236,6 @@
         const vals = values(this.relationship)
         const validValues = vals.filter(Boolean)
 
-        console.log("check disabled: " + vals + " " + validValues)
         return vals.length !== validValues.length
       },
 
@@ -284,12 +289,11 @@
        * Closes the dialog and resets form
        */
       closeDialog: function() {
-        this.$emit('update:visible', false)
-        this.$emit('update:relationshipTypeEdit', {})
+        this.$emit('update:dialogVisible', false)
+        // this.$emit('update:relationshipTypeEdit', {})
+        // this.$emit('update:relationshipTypeEdit', {})
         this.relationship = {}
-        this.$emit('close')
         this.isCreating = false
-
         this.$refs.form.resetFields()
       },
 
@@ -345,7 +349,7 @@
             if (this.editing === false) {
               this.$emit('add-relationship-type', response)
             } else {
-              this.$emit('update-relationship-type', response)
+              this.$emit('update-relationship-type', response[0])
             }
             this.closeDialog()
           })
@@ -359,17 +363,22 @@
     }
   }
 </script>
-
-<style lang="scss">
+<style scoped lang="scss">
   @import '../../../../../assets/_variables.scss';
+
+
+  .text-disabled {
+    width: 100%;
+    background-color: red;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
 
   .create-relationship-type-dialog {
     .el-select {
       width: 100%
-    }
-
-    .text-disabled.icon .svg-icon {
-      right: 12px
     }
 
     .button-spinner {

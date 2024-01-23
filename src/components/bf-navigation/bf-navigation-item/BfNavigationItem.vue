@@ -12,7 +12,10 @@
         <slot name="icon" ></slot>
       </div>
 
-      <span ref="routerlink"  class="label">
+      <span
+        v-if="!condensed"
+        ref="routerlink"
+        class="label">
         {{ label }}
       </span>
 

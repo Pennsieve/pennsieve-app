@@ -421,7 +421,7 @@ export default {
       // Dismiss target popover
       this.isTargetPopoverVisible = false
 
-      console.log(this.$refs.criteriaProperty)
+      console.log("adas" + this.$refs.criteriaProperty)
 
       // this.$refs.criteriaProperty.focus()
       console.log('set popover visible')
@@ -632,11 +632,14 @@ export default {
      */
     onFilterInput: function(evt) {
       this.$emit('input-value')
+      console.log('onFilterInput')
       this.getValueSuggestions(evt)
     },
 
     async autocomplete (prefix) {
       const url = `${this.config.api2Url}/metadata/query/autocomplete?dataset_id=${this.$route.params.datasetId}`
+
+      console.log(this.filterParams)
 
       let requestFilters = this.filterParams.filter(value => {
         return value.value != ''
@@ -675,8 +678,7 @@ export default {
 
 
     getValueSuggestions: debounce(function(evt) {
-      console.log(evt)
-      const prefix = defaultTo('', evt.target.value)
+      const prefix = pathOr('', ['target', 'value'], evt)
 
       /**
        * Do not make the request if the prefix
@@ -693,6 +695,7 @@ export default {
 
       // Reset current value suggestions
       this.valueSuggestions = []
+
       this.autocomplete((prefix))
     })
   }
