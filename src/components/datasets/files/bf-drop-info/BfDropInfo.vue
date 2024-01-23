@@ -120,7 +120,7 @@
     }
   }
   .bf-drop-info-content {
-    background: $app-primary-color;
+    background: $purple_1;
     border-radius: 5px;
     box-shadow: 0 2px 15px 0 rgba(0,0,0,0.25), 0 28px 41px 0 rgba(33,43,54,0.2);
     box-sizing: border-box;
@@ -152,7 +152,7 @@
     max-width: 460px;
   }
   .circle {
-    background: #376df7;
+    background: $purple_2;
     border-radius: 50%;
     display: block;
     height: 193px;
