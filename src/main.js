@@ -1,14 +1,15 @@
 
-import { createApp, getCurrentInstance } from "vue";
+import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import store from "./store";
 import striptags from 'striptags';
 import Cookies from 'js-cookie'
+import * as siteConfig from '@/site-config/site.json'
 
 import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
-import {ElMessage} from 'element-plus'
+import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 import request from './mixins/request'
@@ -23,7 +24,11 @@ import 'element-plus/es/components/message/style/index';
 
 Amplify.configure(AWSConfig)
 
-const app = createApp(App);
+
+const app = createApp(App)
+
+
+
 
 app.directive('click-outside', ClickOutside)
 

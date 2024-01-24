@@ -62,6 +62,7 @@ const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
 const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
+const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 
 
 
@@ -133,7 +134,7 @@ const router = createRouter({
       name: "create-account",
       path: "/sign-up",
       components: {
-        page: () => import("./Login/Login.vue"),
+        page: CreateAccount
       },
       props: true,
     },
