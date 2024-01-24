@@ -1,101 +1,64 @@
 <template>
-  <transition name="dialog-fade">
-    <div
-      class="bf-drop-info"
-      @dragenter="onDragEnter"
-      @dragleave="onDragLeave"
-      @dragover.prevent
-      @drop="onDrop"
-    >
-      <div class="bf-drop-info-content">
-        <img
-          src="/src/assets/images/illustrations/illo-drag-and-drop.svg"
-          alt="Illustration of file system"
-          height="225"
-          width="339"
-        >
-        <h2>Drag and drop files here</h2>
-        <p>We don’t recommend uploading more than 10GB through the web UI, due to browser limitations. If you’re uploading large amounts of data, please use the Pennsieve API.</p>
-        <span class="circle one" />
-        <span class="circle two" />
-        <span class="circle three" />
+  <div class="bf-drop-info">
+      <div v-bind="getRootProps()" >
+        <input v-bind="getInputProps()">
+        <div class="bf-drop-info-content">
+          <img
+            src="/src/assets/images/illustrations/illo-drag-and-drop.svg"
+            alt="Illustration of file system"
+            height="225"
+            width="339"
+          >
+          <h2>Drag and drop files here</h2>
+          <p>We don’t recommend uploading more than 10GB through the web UI, due to browser limitations. If you’re uploading large amounts of data, please use the Pennsieve API.</p>
+          <span class="circle one" />
+          <span class="circle two" />
+          <span class="circle three" />
+        </div>
       </div>
-    </div>
-  </transition>
+  </div>
+
 </template>
 
-<script>
+<script lang="ts" setup>
+  import { reactive } from 'vue'
+  import { pathOr } from 'ramda'
+  import { useDropzone } from 'vue3-dropzone'
+  import type { FileRejectReason } from 'vue3-dropzone'
   import EventBus from '../../../../utils/event-bus'
+  import { useStore } from 'vuex'
 
-  export default {
-    name: 'BfDropInfo',
+  const store = useStore()
 
-    props: {
-      showDropInfo: Boolean,
-      file: {
-        type: Object,
-        default: function() {
-          return {}
-        }
-      }
-    },
+  const emit = defineEmits([
+    'update:showDropInfo'
+  ])
 
-    data: function() {
-      return {
-        dragCounter: 0
-      }
-    },
+  const props = defineProps({
+    file: Object
+  })
 
-    methods: {
-      /**
-       * On drag enter, hide drop info
-       * @param {Object} evt
-       */
-      onDragEnter: function(evt) {
-        this.dragCounter += 1
-        if (evt.dataTransfer.types && this.dragCounter === 1) {
-          for (let i = 0; i < evt.dataTransfer.types.length; i++) {
-            if (evt.dataTransfer.types[i] === 'Files') {
-              evt.dataTransfer.dropEffect = 'copy'
-              evt.preventDefault()
-              this.$emit('update:showDropInfo', true)
-            }
-          }
-        }
-      },
+  function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
+    emit('update:showDropInfo', false)
+    const destinationId = pathOr('', ['file', 'content', 'id'], props)
+    store.dispatch('uploadModule/setUploadDestination', props.file.content.id)
 
-      /**
-       * On drag leave, hide drop info
-       * @param {Object} evt
-       */
-      onDragLeave: function(evt) {
-        evt.preventDefault()
-        this.dragCounter -= 1
-
-        if (this.dragCounter === 0) {
-          this.$emit('update:showDropInfo', false)
-        }
-      },
-
-      /**
-       * On drop, send files to BfUpload
-       * @param {Object} evt
-       */
-      onDrop: function(evt) {
-        evt.preventDefault()
-
-        // Close the dialog
-        this.$emit('update:showDropInfo', false)
-
-        // Set the upload destination
-        this.$store.dispatch('updateUploadDestination', this.file)
-
-        EventBus.$emit('add-to-upload-queue', {
-          dataTransfer: evt.dataTransfer
-        })
-      },
-    }
+    EventBus.$emit('add-to-upload-queue', acceptedFiles)
   }
+
+  const options = reactive({
+    multiple: true,
+    onDrop,
+  })
+
+  const {
+    getRootProps,
+    getInputProps,
+    isFocused,
+    isDragReject,
+    open
+  } = useDropzone(options)
+
 </script>
 
 <style scoped lang="scss">

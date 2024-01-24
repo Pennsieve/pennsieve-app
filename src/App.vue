@@ -24,7 +24,15 @@
     </div>
   </div>
 
+<!--  <bf-upload ref="bfUpload" />-->
+
+  <pennsieve-upload
+    ref="pennsieveUpload"
+    :dialog-visible="showUploadDialog"
+  />
+
   <PsAnalytics />
+
   <bf-download-file ref="downloadFile" />
 <!--  This is the websocket connection-->
 <!--  <bf-notifications />-->
@@ -45,6 +53,7 @@ import PsAnalytics from './components/analytics/Analytics.vue'
 import BfDownloadFile from './components/bf-download-file/BfDownloadFile.vue'
 import {Auth} from "@aws-amplify/auth";
 import request from './mixins/request'
+import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 
 
 // import BfNotifications from './components/notifications/Notifications.vue'
@@ -55,6 +64,7 @@ export default {
   components: {
     PsAnalytics,
     BfDownloadFile,
+    PennsieveUpload
   },
   mixins: [
     globalMessageHandler,
@@ -63,6 +73,7 @@ export default {
 
   data() {
     return {
+      showUploadDialog: false,
       defaultPageTitle: 'Sign In | Pennsieve',
       defaultPageDescription: 'Pennsieve secure Sign In page. Sign in to your Pennsieve customer account.',
       sessionTimedOut: false,

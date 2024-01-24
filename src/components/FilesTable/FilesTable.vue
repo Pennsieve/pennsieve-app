@@ -356,6 +356,7 @@ export default {
      */
     handleTableSelectionChange: function(selection) {
       this.selection = selection
+      this.$emit('selection-change', selection)
       this.checkAll = this.data.length === selection.length
     },
 

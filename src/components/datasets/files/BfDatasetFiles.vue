@@ -25,13 +25,6 @@
 
             Restore Deleted
           </bf-button>
-
-
-<!--          <button class="undelete-button actions-item" @click="NavToDeleted">-->
-<!--            <IconTrash class="mr-8"  :height="22" :width="22" />-->
-<!--            <div>Restore Deleted</div>-->
-<!--          </button>-->
-
           <bf-button
             v-if="getPermission('editor')"
             :disabled="datasetLocked"
@@ -47,20 +40,6 @@
             </template>
             New Folder
           </bf-button>
-<!--          <button-->
-<!--            v-if="getPermission('editor')"-->
-<!--            class="actions-item"-->
-<!--            :disabled="datasetLocked"-->
-<!--            data-cy="createNewFolder"-->
-<!--            @click="openPackageDialog"-->
-<!--          >-->
-<!--            <IconPlus-->
-<!--              class="mr-8 actions-icon plus-icon"-->
-<!--              :height="36"-->
-<!--              :width="36"-->
-<!--            />-->
-<!--            <div>New Folder</div>-->
-<!--          </button>-->
         </template>
       </stage-actions>
     </template>
@@ -147,7 +126,7 @@
 
     <bf-drop-info
       v-if="showDropInfo"
-      :show-drop-info.sync="showDropInfo"
+      v-model:show-drop-info="showDropInfo"
       :file="file"
     />
 
@@ -454,6 +433,7 @@ export default {
      * @param {Array} selection
      */
     setSelectedFiles: function(selection) {
+      console.log('set selected files' + selection)
       this.selectedFiles = selection
     },
 

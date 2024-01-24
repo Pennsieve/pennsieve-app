@@ -48,7 +48,7 @@ export default {
     EventBus.$on('update-organization-members', this.getOrgMembers.bind(this))
   },
 
-  beforeDestroy() {
+  beforeUnmount() {
     // Vue event listeners
     EventBus.$off('logout', this.onLogout.bind(this))
     EventBus.$off('toast', this.onToast.bind(this))
@@ -605,17 +605,19 @@ export default {
      * @param {Boolean} isAddingFiles
      */
     onOpenUploader: function(isAddingFiles) {
-      const bfUpload = this.$refs.bfUpload
-      bfUpload.isOpen = true
-      bfUpload.isAddingFiles = isAddingFiles
+      this.showUploadDialog = true
+      const psUpload = this.$refs.pennsieveUpload
+      // psUpload.dialogVisible = true
+      psUpload.isAddingFiles = isAddingFiles
     },
 
     /**
      * Close upload component
      */
     onCloseUploader: function() {
-      const bfUpload = this.$refs.bfUpload
-      bfUpload.isOpen = false
+      const bfUpload = this.$refs.pennsieveUpload
+      this.showUploadDialog = false
+      // bfUpload.dialogVisible = false
       bfUpload.clearUploadedFiles()
     },
 
@@ -624,7 +626,9 @@ export default {
      * @param {Object} dataTransfer
      */
     addToUploadQueue: function(dataTransfer) {
-      const bfUpload = this.$refs.bfUpload
+      console.log(dataTransfer)
+      const bfUpload = this.$refs.pennsieveUpload
+      console.log(bfUpload)
       bfUpload.onDrop(dataTransfer)
 
       this.onOpenUploader({
@@ -638,7 +642,7 @@ export default {
      * @param {Object} e
      */
     addInputFilesToUploadQueue: function(e) {
-      const bfUpload = this.$refs.bfUpload
+      const bfUpload = this.$refs.pennsieveUpload
       bfUpload.onInputFileChange(e)
 
       this.onOpenUploader({
