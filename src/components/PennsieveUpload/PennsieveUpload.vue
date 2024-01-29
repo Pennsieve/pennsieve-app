@@ -36,10 +36,21 @@ User archives manifest -> remove activeManifest from memory
 
       </template>
 
+
+
       <div
+        v-if="isUploading || uploadComplete"
+        v-for="[key, value] in uploadMap" :key="key">
+
+        <PsUploadFile :upload-object="value"/>
+
+      </div>
+      <div
+        v-else
         v-for="item in uploadFiles">
 
-        <PsUploadFile :file="item"/>
+
+        <PsManifestFile :file="item"/>
 
       </div>
 
@@ -71,6 +82,7 @@ import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
 import {FileRejectReason} from "vue3-dropzone";
 import {pathOr} from "ramda";
 import PsUploadFile from './PsUploadFile.vue'
+import PsManifestFile from "./PsManifestFile.vue";
 
 const store = useStore()
 
@@ -78,13 +90,15 @@ defineExpose({
   onDrop
 })
 
-
 const props = defineProps({
   file: Object,
   dialogVisible: Boolean
 })
 
 const uploadFiles = computed(() => store.getters['uploadModule/getManifestFiles']())
+const uploadMap = computed( () => store.getters['uploadModule/getUploadMap']())
+const isUploading = computed( () => store.getters['uploadModule/getIsUploading']())
+const uploadComplete = computed( () => store.getters['uploadModule/getUploadComplete']())
 
 const dialogTitle = computed( () => {
   return 'Add Files to Upload'
@@ -99,10 +113,11 @@ function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
 function startUpload() {
   console.log('Starting Upload')
 
-  // Get Cognito Role for Uploading
-  const cognitoConfig = store.dispatch('uploadModule/getCognitoConfig')
-
-  //
+  store.dispatch('uploadModule/getManifestNodeId').then(
+    () => store.dispatch('uploadModule/syncManifest')
+  ).then(
+    () => store.dispatch('uploadModule/UploadFiles')
+  )
 
 }
 

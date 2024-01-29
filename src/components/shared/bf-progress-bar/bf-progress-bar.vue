@@ -1,5 +1,5 @@
 <template>
-  <div class="bf-progress-bar">
+  <div class="ps-progress-bar">
     <div
       class="bar"
       :style="{ width: Math.ceil(progress) + '%' }"
@@ -37,13 +37,13 @@
 <style scoped lang="scss">
   @import '../../../assets/_variables.scss';
 
-  .bf-progress-bar {
-    background: #EFF1F3;
+  .ps-progress-bar {
+    background: $gray_1;
     border-radius: 3px;
     display: inline-block;
     height: 8px;
     overflow: hidden;
-    width: 70px;
+    width: 100%;
     .bar {
       background: $green_1;
       height: 100%;

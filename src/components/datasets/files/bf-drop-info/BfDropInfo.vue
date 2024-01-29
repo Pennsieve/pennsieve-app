@@ -41,7 +41,7 @@
   function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
     emit('update:showDropInfo', false)
     const destinationId = pathOr('', ['file', 'content', 'id'], props)
-    store.dispatch('uploadModule/setUploadDestination', props.file.content.id)
+    store.dispatch('uploadModule/setUploadDestination', props.file)
 
     EventBus.$emit('add-to-upload-queue', acceptedFiles)
   }

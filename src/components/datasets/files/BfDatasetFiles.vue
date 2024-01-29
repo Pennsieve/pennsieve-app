@@ -478,6 +478,9 @@ export default {
         .then(response => {
           this.filesLoading = true
           this.file = response
+
+
+
           const newFiles = response.children.map(file => {
             if (!file.storage) {
               file.storage = 0

@@ -339,6 +339,8 @@ export default {
      * @param {Object} response
      */
     handleLoginSuccess: function (user) {
+      console.log(user)
+
       const token = pathOr(
         "",
         ["signInUserSession", "accessToken", "jwtToken"],
