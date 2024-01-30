@@ -88,6 +88,7 @@
 
 <script>
 import { mapState } from "vuex";
+import { onMounted } from "vue";
 
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import Request from "@/mixins/request";
@@ -143,14 +144,6 @@ export default {
     ...mapState(["config"]),
   },
 
-  async mounted() {
-    await this.recaptchaLoaded();
-    this.recaptchaInstance.showBadge();
-  },
-  destroyed() {
-    this.recaptchaInstance.hideBadge();
-  },
-
   methods: {
     /**
      * Take the user back home
@@ -164,13 +157,12 @@ export default {
      * send request to the endpoint
      */
     onFormSubmit: function () {
-      // console.log("this.$refs", this.$refs);
-      // this.$refs.signupForm.validate((valid) => {
-      //   if (!valid) {
-      //     return;
-      //   }
-      //   this.createAccount();
-      // });
+      this.$refs.signupForm.validate((valid) => {
+        if (!valid) {
+          return;
+        }
+        this.createAccount();
+      });
     },
 
     /**
@@ -181,11 +173,8 @@ export default {
       this.isCreatingAccount = true;
       this.hasError = false;
 
-      console.log("this", this);
-
       try {
-        const recaptchaToken = await this.recaptcha();
-        console.log("**", recaptchaToken);
+        const recaptchaToken = await this.$recaptcha();
 
         await this.sendXhr(`${this.config.apiUrl}/account/sign-up`, {
           method: "POST",
@@ -198,6 +187,7 @@ export default {
         this.accountCreated = true;
         this.isCreatingAccount = false;
       } catch (error) {
+        console.error(error);
         this.isCreatingAccount = false;
         this.hasError = true;
       }
@@ -231,9 +221,13 @@ export default {
     box-sizing: border-box;
     color: $gray_4;
     max-width: 720px;
-    flex: 1;
     width: 360px;
   }
+}
+
+:deep(.el-form-item__label) {
+  margin-bottom: -10px;
+  align-self: flex-start;
 }
 
 p {
@@ -254,26 +248,17 @@ h2 {
 }
 
 .bf-button {
-  width: 50%;
+  width: 48.8%;
   &:first-child {
     margin-right: 8px;
   }
 }
 
-.el-form-item__content {
-  border: 1px solid red;
+.el-form-item {
+  display: flex;
+  flex-direction: column;
+  align-content: flex-start;
 }
-
-///deep/ .bf-button {
-//  width: 50%;
-//  &:first-child {
-//   margin-right: 8px;
-//  }
-//}
-// /deep/ .button-wrap .el-form-item__content {
-// display: flex;
-// }
-
 .error-copy {
   color: $error-color;
 }

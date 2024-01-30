@@ -29,29 +29,17 @@ let route = useRoute();
     </div>
   </div>
 
-<!--  <bf-upload ref="bfUpload" />-->
+  <!--  <bf-upload ref="bfUpload" />-->
 
   <pennsieve-upload
     ref="pennsieveUpload"
     v-model:dialogVisible="showUploadDialog"
   />
 
+
   <PsAnalytics />
 
   <bf-download-file ref="downloadFile" />
-  <vue-recaptcha
-    sitekey="key"
-    size="normal"
-    theme="light"
-    hl="tr"
-    :loading-timeout="loadingTimeout"
-    @verify="recaptchaVerified"
-    @expire="recaptchaExpired"
-    @fail="recaptchaFailed"
-    @error="recaptchaError"
-    ref="vuetcha"
-  >
-  </vue-recaptcha>
   <!--  This is the websocket connection-->
   <!--  <bf-notifications />-->
 </template>
@@ -70,8 +58,7 @@ import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
-import  vueRecaptcha  from "vue3-recaptcha2";
-import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue"
+import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -82,19 +69,18 @@ export default {
     PennsieveUpload,
     PsAnalytics,
     BfDownloadFile,
-    vueRecaptcha,
   },
   mixins: [globalMessageHandler, request],
 
   data() {
     return {
       showUploadDialog: false,
-      defaultPageTitle: 'Sign In | Pennsieve',
-      defaultPageDescription: 'Pennsieve secure Sign In page. Sign in to your Pennsieve customer account.',
+      defaultPageTitle: "Sign In | Pennsieve",
+      defaultPageDescription:
+        "Pennsieve secure Sign In page. Sign in to your Pennsieve customer account.",
       sessionTimedOut: false,
       showSessionTimerThreshold: 120,
       sessionLogoutThreshold: 5,
-      showRecaptcha: false,
       loadingTimeout: 30000, // 30 seconds
     };
   },
