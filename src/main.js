@@ -6,7 +6,7 @@ import store from "./store";
 import striptags from 'striptags';
 import Cookies from 'js-cookie'
 import * as siteConfig from '@/site-config/site.json'
-
+import { VueReCaptcha } from 'vue-recaptcha-v3'
 import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
 import { ElMessage } from 'element-plus'
@@ -27,9 +27,6 @@ Amplify.configure(AWSConfig)
 
 const app = createApp(App)
 
-
-
-
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
@@ -37,6 +34,15 @@ app.use(VueClipboard, {
     autoSetContainer: true,
     appendToBody: true,
 })
+
+app.use(VueReCaptcha, {
+    siteKey: siteConfig.reCAPTCHASiteKey,
+    loaderOptions: {
+      explicitRenderParameters: {
+        badge: 'bottomright'
+      }
+    },
+  })
 
 app.use(router);
 // app.use(Vue3Sanitize);
