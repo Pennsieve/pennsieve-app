@@ -20,17 +20,13 @@
 
 <script lang=ts setup>
 
-import { reactive } from 'vue'
-import {computed} from "vue/dist/vue";
-import bfProgressBar from "../shared/bf-progress-bar/bf-progress-bar.vue"
-
-
+import { reactive, computed } from 'vue'
+import BfProgressBar from "../shared/bf-progress-bar/bf-progress-bar.vue";
 
 const props = defineProps({
   uploadObject: Object,
 })
 
-// const uploadFile = computed(() => props.file.value)
 
 
 </script>

@@ -626,9 +626,7 @@ export default {
      * @param {Object} dataTransfer
      */
     addToUploadQueue: function(dataTransfer) {
-      console.log(dataTransfer)
       const bfUpload = this.$refs.pennsieveUpload
-      console.log(bfUpload)
       bfUpload.onDrop(dataTransfer)
 
       this.onOpenUploader({

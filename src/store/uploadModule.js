@@ -4,7 +4,7 @@ import {compose, defaultTo, find, join, map, prepend, propEq, reverse} from "ram
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import { GetCredentialsForIdentityCommand, CognitoIdentityClient, GetIdCommand } from "@aws-sdk/client-cognito-identity";
 import { Upload } from "@aws-sdk/lib-storage"
-import { S3Client } from "@aws-sdk/client-s3"
+import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
 
 
@@ -286,10 +286,15 @@ export const actions = {
 
         commit('SET_IS_UPLOADING', true)
 
+        const currentRoute = router.currentRoute.value
+        const datasetId = currentRoute.params.datasetId
+
         // Iterate over the file-list and upload sequentially
         // TODO: Add concurrency
         for (let [key, value] of state.uploadFileMap) {
             try {
+                const tags = "OrgId=" + rootState.activeOrganization.organization.id + "&DatasetId=" + datasetId
+
                 const parallelUploads3 = new Upload({
                     client: new S3Client({
                         region: 'us-east-1',
@@ -303,9 +308,10 @@ export const actions = {
                     queueSize: 4,
                     leavePartsOnError: false,
                     params: {
-                        Bucket: "pennsieve-dev-uploads-v2-use1",
+                        Bucket: rootState.config.bucketName,
                         Key: value.config.s3_key,
-                        Body: value.file
+                        Body: value.file,
+                        Tagging: tags
                     }
                 })
 
@@ -330,7 +336,6 @@ export const actions = {
 
         // Current assumptions:
         // 1. Uploads through browser can sync manifest in single call.
-        // 2. No folders at this point.
         // 3. All files are uploaded to the folder specified in 'destinationPackageId'
 
         //
@@ -349,10 +354,17 @@ export const actions = {
 
             const uploadId = uuidv1()
             const s3Key = state.manifestNodeId + '/' + uploadId
+
+            const curFile = state.manifestFiles[mf]
+
+            let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length-curFile.name.length)
+            fileLocation = fileLocation.replace(/^\//, '') // remove leading '/' if it exists
+            fileLocation = fileLocation.replace(/\/$/, '') // remove trailing '/' if it exists
+
             const f = new UploadFile(
                 uploadId,
                 s3Key,
-                state.uploadDestination.path,
+                fileLocation,
                 state.manifestFiles[mf].name,
                 state.manifestFiles[mf]
             )
@@ -410,6 +422,9 @@ export const getters = {
     },
     getUploadComplete: state => () => {
         return state.uploadComplete
+    },
+    getTotalProgress: state => () => {
+
     }
 }
 

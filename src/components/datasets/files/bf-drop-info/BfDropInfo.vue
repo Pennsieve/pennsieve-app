@@ -1,19 +1,26 @@
 <template>
-  <div class="bf-drop-info">
-      <div v-bind="getRootProps()" >
+  <div class="bf-drop-info"
+       >
+      <div v-bind="getRootProps()">
         <input v-bind="getInputProps()">
-        <div class="bf-drop-info-content">
+        <div
+          :class="[ isInDropZone ? 'bf-drop-info-content hover' : 'bf-drop-info-content' ]"
+          @dragenter.self="onDragEnter"
+          @dragleave.self="onDragLeave"
+        >
           <img
             src="/src/assets/images/illustrations/illo-drag-and-drop.svg"
             alt="Illustration of file system"
             height="225"
             width="339"
+            class="no-pointer"
           >
-          <h2>Drag and drop files here</h2>
-          <p>We don’t recommend uploading more than 10GB through the web UI, due to browser limitations. If you’re uploading large amounts of data, please use the Pennsieve API.</p>
-          <span class="circle one" />
-          <span class="circle two" />
-          <span class="circle three" />
+          <h2 class="no-pointer">Drag and drop files here</h2>
+          <p class="no-pointer">Uploading through the browser is limited to 100 files within a single folder. If you’re uploading large amounts of data, please use the Pennsieve API.</p>
+
+          <span class="no-pointer circle one" />
+          <span class="no-pointer circle two" />
+          <span class="no-pointer circle three" />
         </div>
       </div>
   </div>
@@ -21,7 +28,7 @@
 </template>
 
 <script lang="ts" setup>
-  import { reactive } from 'vue'
+  import { ref, reactive } from 'vue'
   import { pathOr } from 'ramda'
   import { useDropzone } from 'vue3-dropzone'
   import type { FileRejectReason } from 'vue3-dropzone'
@@ -38,6 +45,9 @@
     file: Object
   })
 
+  let isInDropZone = ref(false)
+  function onDragEnter() {isInDropZone.value = true}
+  function onDragLeave() { isInDropZone.value = false}
   function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
     emit('update:showDropInfo', false)
     const destinationId = pathOr('', ['file', 'content', 'id'], props)
@@ -64,6 +74,9 @@
 <style scoped lang="scss">
   @import '../../../../assets/_variables.scss';
 
+  .no-pointer {
+    pointer-events: none;
+  }
   .bf-drop-info {
     height: 100%;
     left: 0;
@@ -71,6 +84,7 @@
     top: 0;
     width: 100%;
     z-index: 3000;
+
     &:after {
       background: rgba(0,0,0,.5);
       content: '';
@@ -96,6 +110,10 @@
     text-align: center;
     width: 540px;
     z-index: 2;
+
+    &.hover {
+      box-shadow: 0 2px 15px 0 $purple_2;
+    }
   }
   img, h2, p {
     position: relative;

@@ -33,7 +33,7 @@ let route = useRoute();
 
   <pennsieve-upload
     ref="pennsieveUpload"
-    :dialog-visible="showUploadDialog"
+    v-model:dialogVisible="showUploadDialog"
   />
 
   <PsAnalytics />

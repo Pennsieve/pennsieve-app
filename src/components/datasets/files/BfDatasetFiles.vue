@@ -3,6 +3,7 @@
     class="bf-stage-file"
     slot="stage"
     element-loading-background="transparent"
+    @drop="onDrop"
   >
     <template #actions>
       <stage-actions>
@@ -225,7 +226,7 @@ export default {
       selectedFiles: [],
       moveConflict: {},
       showDropInfo: false,
-      showUploadInfo: false,
+      // showUploadInfo: false,
       sortDirection: 'asc',
       singleFile: {},
       deletedDialogOpen: false,
@@ -253,6 +254,15 @@ export default {
       'getPermission',
       'datasetLocked'
     ]),
+    ...mapGetters('uploadModule',[
+      'getIsUploading',
+      'getUploadComplete'
+    ]),
+
+    showUploadInfo: function() {
+      return this.getUploadComplete() || this.getIsUploading()
+    },
+
     /**
      * Item has files
      */
@@ -314,14 +324,6 @@ export default {
       this.fetchFiles()
     },
 
-    uploading: {
-      handler: function(uploading) {
-        if (uploading) {
-          this.showUploadInfo = true
-        }
-      },
-      immediate: true
-    },
 
     '$route.query.pkgId': {
       handler: function(val, old) {
@@ -384,6 +386,12 @@ export default {
   },
 
   methods: {
+    // Ignore drops to component outside the drop target and close drop-target
+    onDrop: function(e) {
+      e.preventDefault()
+      e.stopPropagation()
+      this.showDropInfo = false
+    },
     onCloseRenameFileDialog: function() {
       this.renameDialogVisible = false
     },
@@ -885,9 +893,9 @@ export default {
      * Handle dismiss upload info event
      */
     onDismissUploadInfo: function() {
-      this.showUploadInfo = false
-      this.$store.dispatch('updateTotalUploadSize', 0)
-      this.$store.dispatch('updateUploadCount', 0)
+      // this.showUploadInfo = false
+      // this.$store.dispatch('updateTotalUploadSize', 0)
+      // this.$store.dispatch('updateUploadCount', 0)
     },
 
     /**
