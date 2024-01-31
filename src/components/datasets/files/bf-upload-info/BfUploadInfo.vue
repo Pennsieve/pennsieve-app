@@ -2,14 +2,14 @@
   <transition name="dialog-fade">
     <div class="bf-upload-info">
       <div
-        v-if="uploadRemaining"
+        v-if="getIsUploading"
         class="copy"
       >
-        <strong>Uploading {{ uploadCopy }}</strong>
+        <strong> {{ uploadCopy }}</strong>
 
         <bf-progress-bar
-          :loaded="loaded"
-          :total="totalUploadSize"
+          :loaded="getUploadProgress().loaded"
+          :total="getUploadProgress().total"
         />
       </div>
       <div
@@ -25,9 +25,9 @@
         >
           Show details
         </button>
-        <div v-if="uploadRemaining">
-          <strong>{{ currentTotal }}</strong>
-          of {{ total }}
+        <div v-if="getIsUploading">
+          <strong>{{ loadedStr }}</strong>
+          of {{ totalStr }}
         </div>
       </div>
     </div>
@@ -52,43 +52,37 @@ export default {
 
   data() {
     return {
-      packages: {},
-      loaded: 0,
-      currentTotal: '10GB',
-      uploadTotal: ''
     }
   },
 
   computed: {
-    ...mapGetters(['uploadRemaining', 'uploadCount']),
 
-    ...mapState(['totalUploadSize']),
+    ...mapGetters('uploadModule',[
+      'getUploadProgress',
+      'getIsUploading',
+      'getUploadMap',
+      'getUploadComplete'
+    ]),
 
     /**
      * Compute copy based on how many files are being uploaded
      * @returns {String}
      */
     uploadCopy: function() {
-      if (!this.uploadRemaining) {
-        this.$store.dispatch('updateTotalUploadSize', 0)
-        this.$store.dispatch('updateUploadCount', 0)
+      if (this.getUploadComplete()) {
         return 'All Files have finished uploading.'
       }
-      const file = this.uploadCount > 1 ? 'files' : 'file'
-      return `${this.uploadCount} ${file}`
+      const file = this.getUploadMap().size > 1 ? 'files' : 'file'
+      return `Uploading ${this.getUploadMap().size} ${file}`
     },
 
-    /**
-     * Computes total upload size of all files
-     * @returns {String}
-     */
-    total: function() {
-      return this.formatMetric(this.totalUploadSize)
-    }
-  },
 
-  mounted() {
-    EventBus.$on('total-uploaded', this.displayTotalUploaded.bind(this))
+    loadedStr: function() {
+      return this.formatMetric(this.getUploadProgress().loaded)
+    },
+    totalStr: function() {
+      return this.formatMetric(this.getUploadProgress().total)
+    }
   },
 
   methods: {
@@ -108,20 +102,6 @@ export default {
       EventBus.$emit('close-uploader')
     },
 
-    /**
-     * Displays current total uploaded
-     * @param {Object} packageInfo
-     */
-    displayTotalUploaded: function(packageInfo) {
-      const totalUploaded = propOr(0, 'total', packageInfo)
-      const packageName = propOr('name', 'name', packageInfo)
-      this.packages[packageName] = totalUploaded
-      // sum all the packages uploading
-      const values = Object.values(this.packages)
-      this.loaded = values.reduce((acc, item) => (acc += item), 0)
-      // format totals
-      this.currentTotal = this.formatMetric(this.loaded)
-    }
   }
 }
 </script>

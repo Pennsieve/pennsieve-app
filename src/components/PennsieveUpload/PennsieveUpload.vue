@@ -199,6 +199,9 @@ const {
 @import '../../assets/_variables.scss';
 
 .manifest-file-wrapper {
+  max-height: 400px;
+  overflow: scroll;
+
   &:first-child {
     border-top: 1px solid $gray_2;
   }

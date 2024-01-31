@@ -6,8 +6,6 @@ import { GetCredentialsForIdentityCommand, CognitoIdentityClient, GetIdCommand }
 import { Upload } from "@aws-sdk/lib-storage"
 import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
-
-
 import * as fs from "fs";
 
 
@@ -32,7 +30,8 @@ const initialState = () => ({
     uploadDestination: '',
     identityCreds: {},
     isUploading: false,
-    uploadComplete: false
+    uploadComplete: false,
+    uploadProgress: {total: 0, loaded:0}
 })
 
 export const state = initialState()
@@ -43,6 +42,9 @@ export const mutations = {
     },
     ADD_FILES_TO_MANIFEST(state, files) {
         state.manifestFiles.push(...files)
+    },
+    RESET_MANIFEST_FILES(state) {
+      state.manifestFiles = []
     },
     SET_UPLOAD_DESTINATION(state, obj) {
         state.uploadDestination = obj
@@ -55,16 +57,29 @@ export const mutations = {
     },
     UPDATE_UPLOAD_PROGRESS(state, progressInfo) {
         let curMap = state.uploadFileMap.get(progressInfo.key)
+        const diff = progressInfo.loaded - curMap.progress.loaded
         curMap.progress = {
             loaded: progressInfo.loaded,
             total: progressInfo.total
         }
+
+        // update total progress and loaded
+        state.uploadProgress.loaded += diff
+
     },
     SET_IS_UPLOADING(state, value) {
         state.isUploading = value
     },
     SET_UPLOAD_COMPLETE(state, value) {
         state.uploadComplete = value
+    },
+    RESET_UPLOADER(state) {
+        state.uploadFileMap = new Map()
+        state.manifestFiles = []
+        state.progress = {total: 0, loaded:0}
+        state.uploadDestination = ''
+        state.isUploading = false
+        state.uploadComplete = false
     }
 
 
@@ -178,13 +193,9 @@ export const actions = {
     // This can be a folder-package-id or a dataset-package-id
     setUploadDestination: async ({rootState, commit}, targetPackage) => {
 
-        console.log('targetPackage')
-        console.log(targetPackage)
-
         // check that target location is foler
         if (!(targetPackage.content.packageType === 'Collection' || targetPackage.content.packageType === 'DataSet')) {
             const errMsg = 'Error: Trying to set target folder to a non-folder type package'
-            console.log(errMsg)
             Promise.reject(new Error(errMsg)).then(resolved, rejected);
         }
 
@@ -350,6 +361,7 @@ export const actions = {
 
         let uploadMap =  new Map()
         let requestFiles = []
+        let total = 0
         for (let mf in state.manifestFiles) {
 
             const uploadId = uuidv1()
@@ -365,20 +377,26 @@ export const actions = {
                 uploadId,
                 s3Key,
                 fileLocation,
-                state.manifestFiles[mf].name,
-                state.manifestFiles[mf]
+                curFile.name,
+                curFile
             )
 
             uploadMap.set(s3Key, {
-                file: state.manifestFiles[mf],
+                file: curFile,
                 config: f,
-                progress: 0
+                progress: {loaded:0, total: curFile.total}
             })
+
+            total += curFile.size
 
             requestFiles.push(f)
         }
 
+        // Set the map
         commit("SET_UPLOAD_FILE_MAP", uploadMap)
+
+        // Set the total number of bytes of all files combined
+        state.uploadProgress.total = total
 
         let requestBody = {
             id: state.manifestNodeId,
@@ -396,13 +414,17 @@ export const actions = {
                 },
                 body: JSON.stringify(requestBody)
             }).then(function (resp) {
-                console.log(resp)
                 console.log('Sync Successful')
             });
         } catch (e) {
             console.log(e)
             throw new Error("Unable to sync manifest.")
         }
+    },
+
+    // Reset upload action
+    resetUpload: async({ commit}, evt ) => {
+        commit("RESET_UPLOADER")
     }
 
 }
@@ -423,8 +445,8 @@ export const getters = {
     getUploadComplete: state => () => {
         return state.uploadComplete
     },
-    getTotalProgress: state => () => {
-
+    getUploadProgress: state => () => {
+        return state.uploadProgress
     }
 }
 

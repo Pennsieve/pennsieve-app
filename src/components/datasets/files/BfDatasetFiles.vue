@@ -137,7 +137,7 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
+import { mapGetters, mapActions } from 'vuex'
 import {
   assocPath,
   head,
@@ -324,6 +324,14 @@ export default {
       this.fetchFiles()
     },
 
+    '$store.state.uploadModule.uploadComplete': function() {
+      console.log('upload complete timer')
+      setTimeout(() => {
+        this.showUploadInfo = false
+        this.resetUpload()
+      }, 3000)
+    },
+
 
     '$route.query.pkgId': {
       handler: function(val, old) {
@@ -386,6 +394,11 @@ export default {
   },
 
   methods: {
+    ...mapActions('uploadModule',[
+      'resetUpload'
+    ]),
+
+
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function(e) {
       e.preventDefault()
