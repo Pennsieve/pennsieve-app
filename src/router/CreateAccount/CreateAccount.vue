@@ -71,11 +71,12 @@
               Privacy Policy
             </a>
           </p>
-          This site is protected by reCAPTCHA and the Google
-          <a href="https://policies.google.com/privacy">Privacy Policy</a> and
-          <a href="https://policies.google.com/terms">Terms of Service</a>
+          <p class="agreement">
+            This site is protected by reCAPTCHA and the Google
+            <a href="https://policies.google.com/privacy">Privacy Policy</a> and
+            <a href="https://policies.google.com/terms">Terms of Service</a>
           apply.
-          <p class="agreement"></p>
+          </p>
         </div>
         <div v-else>
           <h2 class="sharp-sans">Thank You</h2>
