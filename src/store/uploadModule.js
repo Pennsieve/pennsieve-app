@@ -43,6 +43,10 @@ export const mutations = {
     ADD_FILES_TO_MANIFEST(state, files) {
         state.manifestFiles.push(...files)
     },
+    REMOVE_FILE_FROM_MANIFEST(state, f) {
+        const idx = find(propEq(f.id, 'id'))(state.manifestFiles)
+        state.manifestFiles.splice(idx, 1);
+    },
     RESET_MANIFEST_FILES(state) {
       state.manifestFiles = []
     },
@@ -81,8 +85,6 @@ export const mutations = {
         state.isUploading = false
         state.uploadComplete = false
     }
-
-
 }
 
 export const actions = {
@@ -186,6 +188,13 @@ export const actions = {
         } else {
             commit('SET_UPLOAD_COMPLETE', false)
             commit('ADD_FILES_TO_MANIFEST', files)
+        }
+    },
+
+    // Remove file from manifest
+    removeFromManifest: async({state, commit}, files) => {
+        for (let i in files) {
+            commit('REMOVE_FILE_FROM_MANIFEST', files[i])
         }
     },
 
@@ -339,7 +348,7 @@ export const actions = {
                 console.log(e);
             }
         }
-        commit('SET_UPLOAD_COMPLETE', true)
+        // commit('SET_UPLOAD_COMPLETE', true)
     },
 
     // Sync Manifest Files with Server

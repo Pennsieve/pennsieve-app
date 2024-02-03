@@ -108,6 +108,10 @@
     text-transform: none;
     min-height: 40px;
 
+    &.flex {
+      min-width: 40px;
+    }
+
     &.hasPrefix {
       padding: 4px 16px;
     }

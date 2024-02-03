@@ -17,17 +17,8 @@
         </template>
         <template #right>
           <bf-button
-            @click="NavToDeleted"
-            class="mr-8"
-          >
-            <template #prefix>
-              <IconTrash class="mr-8"  :height="20" :width="20" />
-            </template>
-
-            Restore Deleted
-          </bf-button>
-          <bf-button
             v-if="getPermission('editor')"
+            class="flex mr-8"
             :disabled="datasetLocked"
             data-cy="createNewFolder"
             @click="openPackageDialog"
@@ -35,11 +26,33 @@
             <template #prefix>
               <IconPlus
                 class="mr-8"
-                :height="30"
-                :width="30"
+                :height="20"
+                :width="20"
               />
             </template>
             New Folder
+          </bf-button>
+
+          <bf-button
+            @click="showUpload"
+            class="mr-8 flex"
+          >
+            <template #prefix>
+              <IconUpload class="mr-8"  :height="20" :width="20" />
+            </template>
+
+            Upload
+          </bf-button>
+
+          <bf-button
+            @click="NavToDeleted"
+            class="flex"
+          >
+            <template #prefix>
+              <IconTrash class="mr-8"  :height="20" :width="20" />
+            </template>
+
+            Restore
           </bf-button>
         </template>
       </stage-actions>
@@ -173,12 +186,14 @@ import IconTrash from "../../icons/IconTrash.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import {copyText} from "vue3-clipboard";
+import IconUpload from "../../icons/IconUpload.vue";
 
 
 export default {
   name: 'BfDatasetFiles',
 
   components: {
+    IconUpload,
     RenameFileDialog,
     StageActions,
     IconTrash,

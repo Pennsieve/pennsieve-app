@@ -4,7 +4,7 @@
     :width="width"
     :height="height"
     :fill="color"
-    viewBox="0 0 24 24"
+    viewBox="6 6 12 12"
   >
     <path pid="0" d="M16 11h-3V8a1 1 0 0 0-2 0v3H8a1 1 0 0 0 0 2h3v3a1 1 0 0 0 2 0v-3h3a1 1 0 0 0 0-2z"/>
 

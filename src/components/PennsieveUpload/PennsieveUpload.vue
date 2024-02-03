@@ -28,6 +28,7 @@ User archives manifest -> remove activeManifest from memory
       :modelValue="dialogVisible"
       @update:modelValue="dialogVisible = $event"
       :show-close="true"
+      :close-on-click-modal="false"
       @close="onClose"
     >
       <template #header>
@@ -37,7 +38,12 @@ User archives manifest -> remove activeManifest from memory
 
       </template>
 
-      <div v-bind="getRootProps()">
+      <p class="upload-text"><b>Note:</b> Files can take up to a minute of processing after upload completes. You can check import status of files in the
+        <router-link :to="{ name: 'upload-manifests'}"
+        @click.native="onClose"> upload manifest tracker.</router-link> You might have to refresh your browser window to see the newly uploaded files. </p>
+
+      <div v-if="!isUploading" v-bind="getRootProps()">
+
         <input v-bind="getInputProps()">
         <div
           :class="[ isInDropZone ? 'bf-drop-info-content hover condensed' : 'bf-drop-info-content condensed' ]"
@@ -45,6 +51,24 @@ User archives manifest -> remove activeManifest from memory
           @dragover.prevent="onDragEnter"
           @dragleave.self="onDragLeave"
         >
+          <div class="upload-icons-wrap">
+            <IconPDF class="file-icon"/>
+            <img
+              class="file-icon"
+
+              :src="fileIcon('Image', 'Image')"
+              alt="Image Icon"
+            >
+            <IconUpload class="file-icon upload"/>
+            <IconTimeseries class="file-icon time-series"/>
+
+            <img
+              class="file-icon microscope"
+              :src="fileIcon('Microscope', 'Slide')"
+              alt="Microscopy Icon"
+            >
+
+          </div>
           <h3>
             Drag and drop files here or
             <a
@@ -65,14 +89,14 @@ User archives manifest -> remove activeManifest from memory
       >
 
       <div
+        v-if="isUploading || uploadComplete">
+        <div
+          v-for="[key, value] in uploadMap" :key="key" class="manifest-file-wrapper">
+          <PsUploadFile :upload-object="value"/>
 
-        v-if="isUploading || uploadComplete"
-        v-for="[key, value] in uploadMap" :key="key">
-
-        <PsUploadFile :upload-object="value"/>
-
+        </div>
       </div>
-      <div v-else class="manifest-file-wrapper">
+      <div v-else>
         <div v-for="item in uploadFiles" class="manifest-file-wrapper">
 
           <PsManifestFile :file="item"/>
@@ -86,7 +110,7 @@ User archives manifest -> remove activeManifest from memory
           class="secondary"
           @click="cancelQueue"
         >
-          Cancel
+          {{cancelBtnText}}
         </bf-button>
         <bf-button
           @click="startUpload"
@@ -114,6 +138,10 @@ import {FileRejectReason, useDropzone} from "vue3-dropzone";
 import {pathOr} from "ramda";
 import PsUploadFile from './PsUploadFile.vue'
 import PsManifestFile from "./PsManifestFile.vue";
+import IconPDF from "../icons/IconPDF.vue";
+import IconTimeseries from "../icons/IconTimeseries.vue";
+import IconUpload from "../icons/IconUpload.vue";
+import { fileIcon } from '../../mixins/file-icon/file-icon.js';
 
 
 const store = useStore()
@@ -135,7 +163,7 @@ const uploadFiles = computed(() => store.getters['uploadModule/getManifestFiles'
 const uploadMap = computed( () => store.getters['uploadModule/getUploadMap']())
 const isUploading = computed( () => store.getters['uploadModule/getIsUploading']())
 const uploadComplete = computed( () => store.getters['uploadModule/getUploadComplete']())
-
+const cancelBtnText = computed(() => isUploading.value?  "Hide" : "Reset" )
 const dialogTitle = computed( () => {
   return 'Add Files to Upload'
 })
@@ -145,29 +173,29 @@ function hasItems(list) {
 }
 
 function cancelQueue() {
-  onClose()
+  if (isUploading.value) {
+    onClose()
+  } else {
+    store.dispatch('uploadModule/resetUpload')
+  }
 }
 
 function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
-  console.log('on-drop in pennsieve-upload')
   isInDropZone.value = false
   store.dispatch('uploadModule/addManifestFiles', acceptedFiles)
-
 }
 
 function startUpload() {
-  console.log('Starting Upload')
-
   store.dispatch('uploadModule/getManifestNodeId').then(
     () => store.dispatch('uploadModule/syncManifest')
   ).then(
     () => store.dispatch('uploadModule/UploadFiles')
   )
 
+  onClose()
 }
 
 function onClose() {
-  console.log('close')
   emit('update:dialogVisible', false)
 }
 
@@ -197,6 +225,28 @@ const {
 
 <style scoped lang="scss">
 @import '../../assets/_variables.scss';
+
+.upload-text {
+  margin: 0 0 16px 0;
+}
+
+.file-icon {
+  width: 24px;
+  height: 24px;
+  color:red;
+
+  &.microscope {
+    color: $purple_2
+  }
+
+  &.time-series {
+    color: $purple_1;
+  }
+
+  &.upload {
+    color: $purple_2
+  }
+}
 
 .manifest-file-wrapper {
   max-height: 400px;

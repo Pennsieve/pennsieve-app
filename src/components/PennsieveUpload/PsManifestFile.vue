@@ -1,10 +1,12 @@
 <template>
-
   <div class="manifest-file">
     {{file.name}}
     <div class="right">
       <div class="storage-value"> {{storageStr}} </div>
-      <CircleIcon class="remove-icon">
+      <CircleIcon
+        class="remove-icon"
+        @click="removeItem"
+      >
         <template #icon>
           <IconRemove
             :width="8"
@@ -24,6 +26,7 @@ import {computed, reactive} from 'vue'
 import IconRemove from "../icons/IconRemove.vue";
 import CircleIcon from "../shared/CircleIcon/CircleIcon.vue"
 import { formatMetric } from "../../mixins/bf-storage-metrics/storageMetrics.js"
+import {useStore} from "vuex";
 
 const storageStr = computed(() => {
   return formatMetric(props.file.size)
@@ -32,6 +35,13 @@ const storageStr = computed(() => {
 const props = defineProps({
   file: Object,
 })
+
+const store = useStore()
+
+function removeItem() {
+  store.dispatch('uploadModule/removeFromManifest', [props.file])
+
+}
 
 </script>
 
