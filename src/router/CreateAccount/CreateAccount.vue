@@ -102,6 +102,14 @@ export default {
 
   mixins: [Request],
 
+  mounted: async function() {
+    await this.$recaptchaLoaded()
+    this.$recaptchaInstance.value.showBadge()
+  },
+  unmounted() {
+    this.$recaptchaInstance.value.hideBadge()
+  },
+
   data() {
     return {
       isCreatingAccount: false,
@@ -143,6 +151,7 @@ export default {
   computed: {
     ...mapState(["config"]),
   },
+
 
   methods: {
     /**

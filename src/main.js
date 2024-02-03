@@ -38,9 +38,10 @@ app.use(VueClipboard, {
 app.use(VueReCaptcha, {
     siteKey: siteConfig.reCAPTCHASiteKey,
     loaderOptions: {
-      explicitRenderParameters: {
-        badge: 'bottomright'
-      }
+        autoHideBadge: true,
+        explicitRenderParameters: {
+            badge: 'bottomright'
+        }
     },
   })
 
