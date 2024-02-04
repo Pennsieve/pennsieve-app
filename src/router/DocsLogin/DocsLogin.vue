@@ -6,7 +6,7 @@
 import { mapState } from 'vuex'
 import Cookies from 'js-cookie'
 
-import Login from '../login/Login.vue'
+import Login from '../Login/Login.vue'
 
 import Request from '../../mixins/request'
 
