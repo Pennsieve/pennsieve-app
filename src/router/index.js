@@ -11,6 +11,8 @@ import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
 import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
+const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
+
 
 
 
@@ -70,6 +72,9 @@ const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 
 
+// const Viewer = () => import('../components/viewer/BfViewer/BfViewer.vue')
+
+
 
 
 
@@ -125,6 +130,13 @@ const router = createRouter({
         page: () => import("./Login/Login.vue"),
       },
       props: true,
+    },
+    {
+      name: 'docs-login',
+      path: '/docs-login',
+      components: {
+        page: DocsLogin
+      }
     },
     {
       path: '/orcid-redirect',
@@ -739,6 +751,15 @@ const router = createRouter({
         },
       ]
     },
+
+    // {
+    //   name: 'viewer',
+    //   path: '/:orgId/datasets/:datasetId/viewer/:fileId',
+    //   components: {
+    //     page: Viewer
+    //   },
+    //   props: true
+    // },
 
     {
       name: 'password',

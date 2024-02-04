@@ -1,5 +1,7 @@
 <template>
   <div class="wrapper">
+    <PennsieveLogoContainer class="logo-container"/>
+
     <div
       v-if="!isUserSignInFailed"
       class="login-wrap"
@@ -406,10 +408,19 @@ export default {
   max-width: 720px;
   min-height: 100vh;
   padding-bottom: 20px;
-  padding-top: 130px;
+  padding-top: 96px;
   display: flex;
   flex-direction: column;
   align-items: center;
+
+  .logo-container {
+    width: 300px;
+    margin-bottom: 64px;
+  }
+
+  h2 {
+    color: $purple_3;
+  }
 }
 
 .login-wrap {
@@ -510,6 +521,7 @@ form {
 }
 
 h2 {
+  color: $purple_3;
   font-size: 20px;
   line-height: 24px;
   font-weight: 400;
