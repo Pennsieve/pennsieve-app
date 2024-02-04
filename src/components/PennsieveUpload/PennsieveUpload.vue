@@ -130,7 +130,7 @@ User archives manifest -> remove activeManifest from memory
 
 <script lang=ts setup>
 
-import {reactive, computed, ref, defineEmits} from 'vue'
+import {reactive, computed, ref} from 'vue'
 import { useStore } from 'vuex'
 import BfButton from '../shared/bf-button/BfButton.vue';
 import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";

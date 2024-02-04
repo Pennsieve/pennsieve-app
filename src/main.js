@@ -83,14 +83,21 @@ const allowList = [
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
 
-    if (allowList.indexOf(to.name) >= 0) {
-        // Support Unauthenticated Access for AllowList Routes
+    const token = Cookies.get('user_token')
+    const savedOrgId = Cookies.get('preferred_org_id')
+
+    if (to.name === 'home' && token && savedOrgId) {
+        // Special case for 'home' page; if previously logged in, and session stored, then
+        // forward to dataset listing page for the organization.
+
+        next(`/${savedOrgId}/datasets`)
+    } else if (allowList.indexOf(to.name) >= 0) {
+        // Support Unauthenticated Access for AllowList Routes including 'home'
+
         next()
     } else {
         // Requires Authenticated Access
 
-        const token = Cookies.get('user_token')
-        const savedOrgId = Cookies.get('preferred_org_id')
         const stateToken = store.state.userToken
 
         if (token && !stateToken) {
@@ -129,20 +136,18 @@ router.beforeEach((to, from, next) => {
                 }
             }
 
+            next()
 
-            if (token && to.name === 'home' && savedOrgId) {
-                next(`/${savedOrgId}/datasets`)
-            } else {
-                next()
-            }
         }
     }
 })
 
 router.beforeResolve(async to => {
-    if (allowList.indexOf(to.name) < 0 &&
-        !store.state.activeOrgSynced &&
-        store.state.userToken) {
+    const destination = to.fullPath
+
+    if (destination.name != 'home' &&
+        allowList.indexOf(to.name) < 0 &&
+        !store.state.activeOrgSynced && store.state.userToken) {
         // Org is not synced yet --> Sync org and get org assets.
 
         // TODO: Need to sync Workspace and get Workspace assets here

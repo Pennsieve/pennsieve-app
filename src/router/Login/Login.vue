@@ -133,7 +133,6 @@
 </template>
 
 <script>
-// import * as Vue from "vue";
 import { mapGetters, mapActions, mapState } from "vuex";
 import { propOr, pathOr } from "ramda";
 import { Auth } from "@aws-amplify/auth";
@@ -153,8 +152,8 @@ import collabIcon from "../../assets/images/icons/collaboration.svg"
 
 import EventBus from "../../utils/event-bus";
 import PennsieveLogoContainer from "../../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
-// import AutoFocus from "../../mixins/auto-focus";
-// import Request from "../../mixins/request";
+import Cookies from "js-cookie";
+
 
 export default {
   name: "bf-login",
@@ -167,8 +166,6 @@ export default {
   components: {
     PennsieveLogoContainer,
     BfButton,
-    // A11yKeys,
-    // BfFooter,
     PennsieveHeader,
     DatasetSearch,
     PennsieveFooter,
@@ -279,6 +276,7 @@ export default {
   },
 
   mounted: function () {
+    console.log('login mounted')
     this.doneMounting();
   },
 
@@ -464,10 +462,17 @@ export default {
     },
 
     doneMounting: async function () {
-      var access_token = this.getFragmentParameterByName("access_token");
+      const access_token = this.getFragmentParameterByName("access_token");
+
       if (access_token) {
         const user = await Auth.currentAuthenticatedUser();
         this.handleLoginSuccess(user);
+      } else {
+        // const token = Cookies.get("user_token");
+        // if (token) {
+        //   const user = await Auth.currentAuthenticatedUser();
+        //   this.handleLoginSuccess(user);
+        // }
       }
 
       var error = this.getFragmentParameterByName("error_description");

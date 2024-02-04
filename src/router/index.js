@@ -9,6 +9,11 @@ import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
 import AboutPennsieve from "./AboutPennsieve/AboutPennsieve.vue";
 import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
+import NotFound from './not-found/NotFound.vue'
+const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
+
+
+
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
 
@@ -103,6 +108,12 @@ const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/G
 const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
+
+/**
+ * 404
+ */
+const PS404 = () => import('../components/PS-404/PS-404.vue')
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -706,8 +717,8 @@ const router = createRouter({
     },
 
     {
-      name: 'invitation',
       path: '/invitation',
+      name: 'invitation',
       components: {
         page: Invite
       },
@@ -728,6 +739,42 @@ const router = createRouter({
         },
       ]
     },
+
+    {
+      name: 'password',
+      path: '/password',
+      components: {
+        page: ResetPassword
+      },
+      props: {
+        page: (route) => {
+          return { resetToken: route.query.resetToken }
+        }
+      }
+    },
+
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      components: {
+        page: NotFound,
+      },
+      redirect: {
+        name: 'page-not-found'
+      },
+      children: [
+        {
+          name: 'page-not-found',
+          path: '',
+          components: {
+            stage: PS404
+          }
+        },
+      ],
+      props: true
+    },
+
+
 
   ],
 });
