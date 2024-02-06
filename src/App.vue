@@ -40,6 +40,9 @@ let route = useRoute();
   <PsAnalytics />
 
   <bf-download-file ref="downloadFile" />
+
+  <office-365-dialog/>
+
   <!--  This is the websocket connection-->
   <!--  <bf-notifications />-->
 </template>
@@ -59,6 +62,7 @@ import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
+import Office365Dialog from './components/datasets/files/Office365Dialog/Office365Dialog.vue'
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -323,6 +327,16 @@ export default {
           }.bind(this),
           1000
         );
+      }).catch((e) => {
+        // Token expired
+        Cookies.remove('user_token')
+
+        // route user to login page
+        this.$router.replace({
+          name: 'home',
+          query
+        })
+
       });
 
       // If bootup is called from Login, only get Profile and org as login

@@ -2563,6 +2563,7 @@ export default {
     max-width: 460px;
     margin: 0 auto;
     text-align: center;
+    padding: 8px;
 
     .relationship-inner-text {
       color: $gray_4;

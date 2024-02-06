@@ -1,3 +1,5 @@
+import {isNil, path, pathOr, propOr} from "ramda";
+
 export default {
   data: function() {
     return {
@@ -9,7 +11,8 @@ export default {
         Tabular: 'tabular',
         TimeSeries: 'timeseries',
         Video: 'video',
-        Text: 'text'
+        Text: 'text',
+        ZIP: 'zip'
       },
       fileTypes: [
         {
@@ -395,6 +398,7 @@ export default {
       ],
 
       whitelist: [
+          'go',
         'c#',
         'c++',
         'java',
@@ -423,16 +427,48 @@ export default {
         'mathematica',
         'stata',
         'text',
-        'code',
-        'ms powerpoint',
-        'ms word',
-        'ms excel'
+        'code'
       ]
     }
   },
 
-  viewerForType: function(type) {
-    const retValue = this.typeMapper[type];
-    return retValue ? retValue : 'default';
+  methods: {
+    checkViewerType: function(pkg) {
+      const packageState = path(['content', 'state'], pkg)
+
+      const packageType = pathOr('unknown', ['content', 'packageType'], pkg)
+      const packageProperties = propOr([], 'properties', pkg)
+      let component = packageType.toLowerCase()
+      if (isNil(this.typeMapper[packageType]) || packageState === 'ERROR') {
+        component = 'unknown';
+      }
+
+      // NOTE: temporary logic to handle "Unsupported" packageType value for text files
+      const subtype = this.getFilePropertyVal(packageProperties, 'subtype').toLowerCase()
+      if (this.whitelist.indexOf(subtype) >= 0) {
+        component = 'text'
+      }
+
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries']
+      const vueViewerMap = {
+        image: 'ImageViewer',
+        pdf: 'PDFViewer',
+        text: 'TextViewer',
+        unknown:'UnknownViewer',
+        video:'VideoViewer',
+        slide:'SlideViewer',
+        timeseries:'TimeseriesViewer',
+      }
+
+      if (vueViewers.indexOf(component) >= 0) {
+        return vueViewerMap[component]
+      } else{
+        console.log('Error loading viewer')
+        return 'UnknownViewer'
+      }
+
+    }
   }
+
+
 }

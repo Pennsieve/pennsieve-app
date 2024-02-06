@@ -72,7 +72,7 @@ const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 
 
-// const Viewer = () => import('../components/viewer/BfViewer/BfViewer.vue')
+const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 
 
@@ -279,6 +279,7 @@ const router = createRouter({
       },
       meta: { hideSecondaryNav: false},
       children: [
+
         {
           name: 'datasets-list',
           path: '',
@@ -288,6 +289,15 @@ const router = createRouter({
           },
           props: true,
           meta: { hideSecondaryNav: true},
+        },
+        {
+          name: 'viewer',
+          path: ':datasetId/viewer/:fileId',
+          components: {
+            stage: Viewer,
+            stageHeader:SecondaryPageHeader,
+          },
+          props: true
         },
         {
           name: 'dataset-overview',
@@ -752,14 +762,7 @@ const router = createRouter({
       ]
     },
 
-    // {
-    //   name: 'viewer',
-    //   path: '/:orgId/datasets/:datasetId/viewer/:fileId',
-    //   components: {
-    //     page: Viewer
-    //   },
-    //   props: true
-    // },
+
 
     {
       name: 'password',

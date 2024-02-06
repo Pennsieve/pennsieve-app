@@ -1239,6 +1239,7 @@ export default {
   display: flex;
   color: $purple_2;
   h2 {
+    font-family: 'roboto';
     color: $purple_2;
     flex: 1;
     font-size: 18px;

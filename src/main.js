@@ -83,6 +83,8 @@ const allowList = [
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
 
+    console.log('before each')
+
     const token = Cookies.get('user_token')
     const savedOrgId = Cookies.get('preferred_org_id')
 
@@ -100,6 +102,7 @@ router.beforeEach((to, from, next) => {
 
         const stateToken = store.state.userToken
 
+        // Store usertoken in Vuex
         if (token && !stateToken) {
             store.dispatch('updateUserToken', token)
         }
@@ -117,19 +120,20 @@ router.beforeEach((to, from, next) => {
 
             // Check for session time-out and refresh token if within refresh threshold
             const sessionT = store.state.sessionTimer
+
             if (!store.state.isRefreshing && sessionT && sessionT < sessionRefreshThreshold) {
                 const usr = store.state.cognitoUser
-                if (usr){
+                if (usr) {
                     const currentSession = usr.signInUserSession;
                     if (currentSession) {
                         console.log('Session automatically refreshed during pre-route.')
-                        store.dispatch('setIsRefreshing',true)
+                        store.dispatch('setIsRefreshing', true)
 
                         usr.refreshSession(usr.signInUserSession.refreshToken, async (err, session) => {
                             const timeOut = session.accessToken.payload.exp
-                            await store.dispatch('setSessionTimer', Math.round((timeOut*1000 - Date.now())/1000))
-                            await store.dispatch('updateUserToken',session.accessToken.jwtToken)
-                                .then(() => store.dispatch('setIsRefreshing',false))
+                            await store.dispatch('setSessionTimer', Math.round((timeOut * 1000 - Date.now()) / 1000))
+                            await store.dispatch('updateUserToken', session.accessToken.jwtToken)
+                                .then(() => store.dispatch('setIsRefreshing', false))
 
                         })
                     }

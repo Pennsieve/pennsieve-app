@@ -16,9 +16,19 @@
               @menu-click="onLinkRecordMenuClick"
             />
 
+
+
+<!--            <bf-button-->
+<!--              class="primary mr-8 flex"-->
+<!--              :disabled="!isOpenViewerBtnEnabled"-->
+<!--              @click="openViewer"-->
+<!--            >-->
+<!--              Open Viewer-->
+<!--            </bf-button>-->
+
             <bf-button
               :disabled="isUploading || isFileProcessing"
-              class="primary mr-8"
+              class="primary mr-8 flex"
               data-cy="btnDownloadFiles"
               @click="downloadFile"
             >
@@ -458,6 +468,33 @@
         :record-name="drawerOriginatingName"
         :is-file=true
       />
+
+      <div class="viewer-pane-wrap">
+        <div class="header">
+          <div>Preview</div>
+          <bf-button
+            v-if="isMSOfficeFile"
+            class="primary"
+            @click="openMSOfficeFile"
+          >
+            Open with Office 365
+          </bf-button>
+          <bf-button
+            v-else
+            class="primary"
+            :disabled="!isOpenViewerBtnEnabled"
+            @click="openViewer"
+          >
+            Open Full Viewer
+          </bf-button>
+        </div>
+
+
+        <viewer-pane
+          class="viewer-pane"
+          :pkg="proxyRecord"/>
+      </div>
+
     </bf-stage>
 
 
@@ -562,87 +599,45 @@ import {
   isNil,
   isEmpty
 } from 'ramda'
-// import validUrl from 'valid-url'
-// import BfRafter from '../../../shared/bf-rafter/BfRafter.vue'
+
 import BfButton from '../../../shared/bf-button/BfButton.vue'
-// import PillLink from '../../../shared/PillLink/PillLink.vue'
-// import BfPill from '../../../shared/BfPill/BfPill.vue'
-// import BfDeleteDialog from '../../files/bf-delete-dialog/BfDeleteDialog.vue'
-// import ConceptInstanceProperty from './ConceptInstanceProperty.vue'
 import ConceptInstanceStaticProperty from '../../explore/ConceptInstance/ConceptInstanceStaticProperty.vue'
-// import ConceptInstanceLinkedProperty from './ConceptInstanceLinkedProperty.vue'
 import AddRelationshipDrawer from '../../explore/ConceptInstance/AddRelationshipDrawer.vue'
-// import AddFileRelationshipDrawer from './AddFileRelationshipDrawer.vue'
-// import RelationshipsTable from './RelationshipsTable.vue'
-// import RemoveRelationships from './RemoveRelationships.vue'
-// import UnlinkFiles from './UnlinkFiles.vue'
-// import AddEditPropertyDialog from '../AddEditPropertyDialog/AddEditPropertyDialog.vue'
-// import ConceptDialog from '../ConceptDialog/ConceptDialog.vue'
 import LinkRecordMenu from '../../../shared/LinkRecordMenu/LinkRecordMenu.vue'
-// import BfPackageDialog from '../../files/bf-package-dialog/BfPackageDialog.vue'
-// import BfMoveDialog from '../../files/bf-move-dialog/BfMoveDialog.vue'
-// import AddLinkedPropertyDrawer from './AddLinkedPropertyDrawer.vue'
-// import RemoveLinkedPropertyDialog from './RemoveLinkedPropertyDialog.vue'
-// import DirectoryViewer from '@/components/viewers/DirectoryViewer.vue'
 import GetFileProperty from '../../../../mixins/get-file-property'
 import RelationshipsTable from "../../explore/ConceptInstance/RelationshipsTable.vue";
-
 import EventBus from '../../../../utils/event-bus'
 import Request from '../../../../mixins/request'
-// import TableFunctions from '../../../../mixins/table-functions'
 import StorageMetrics from '../../../../mixins/bf-storage-metrics'
-// import ConfirmChanges from '../../../..//mixins/confirm-changes'
 import FileIcon from '../../../../mixins/file-icon'
-import DataType from '../../../../mixins/data-type'
-// import formatUniqueDisplayValues from './format-display-value'
-// import GetConceptTitleVal from '../GetConceptTitleVal'
-import Cookie from 'js-cookie'
 import IconMenu from "../../../icons/IconMenu.vue";
 import StageActions from "../../../shared/StageActions/StageActions.vue";
 import SourceFilesTable from "./SourceFilesTable.vue";
+import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
+import FileTypeMapper from "../../../../mixins/FileTypeMapper";
 
 export default {
   name: 'FileDetails',
 
   components: {
+    ViewerPane,
     SourceFilesTable,
     StageActions,
     IconMenu,
-    // BfRafter,
     BfButton,
-    // PillLink,
-    // ConceptInstanceProperty,
     ConceptInstanceStaticProperty,
     LinkRecordMenu,
     RelationshipsTable,
-    // ConceptInstanceLinkedProperty,
     AddRelationshipDrawer,
-    // AddFileRelationshipDrawer,
-    // RemoveRelationships,
-    // UnlinkFiles,
-    // RelationshipsTable,
-    // AddEditPropertyDialog,
-    // ConceptDialog,
-    // BfDeleteDialog,
-    // LinkRecordMenu,
-    // BfPackageDialog,
-    // BfMoveDialog,
-    // AddLinkedPropertyDrawer,
-    // RemoveLinkedPropertyDialog,
-    // DirectoryViewer,
-    // BfPill
   },
 
   mixins: [
     Request,
-    // TableFunctions,
     StorageMetrics,
-    // formatUniqueDisplayValues,
-    // ConfirmChanges,
-    // GetConceptTitleVal,
     FileIcon,
-    // DataType,
-    GetFileProperty
+    GetFileProperty,
+    FileTypeMapper,
+
   ],
 
   props: {
@@ -750,12 +745,12 @@ export default {
      * @returns {Boolean}
      */
     isOpenViewerBtnEnabled: function() {
-      return this.isFile
-             && !this.isUploading
-             && this.getFileStatus !== 'Failed'
-             && this.computePackageType !== 'Unknown'
-             && !this.displayDirectoryViewer
-             && this.fileType !== 'External File'
+       return this.checkViewerType(this.proxyRecord) !== 'UnknownViewer'
+         && !this.isUploading
+         && this.getFileStatus !== 'Failed'
+         && this.computePackageType !== 'Unknown'
+         && !this.displayDirectoryViewer
+         && this.fileType !== 'External File'
     },
 
     /**
@@ -2602,7 +2597,7 @@ export default {
       this.$router.replace({
         name: 'viewer',
         params: {
-          fileId: `${this.$route.params.instanceId}`
+          fileId: `${this.fileId}`
         }
       })
     },
@@ -3182,9 +3177,11 @@ export default {
     }
   }
   .relationship-title {
+
     align-items: center;
     flex: 1;
     h2 {
+      font-family: 'roboto';
       color: $purple_1;
       flex: 1;
       font-size: 20px;
@@ -3324,6 +3321,7 @@ export default {
     max-width: 460px;
     margin: 0 auto;
     text-align: center;
+    padding: 8px;
 
     .relationship-inner-text {
       color: $gray_4;
@@ -3368,6 +3366,28 @@ export default {
     display: flex;
     flex-direction: column;
   }
+
+  .viewer-pane-wrap {
+    color: $purple_2;
+    flex: 1;
+    font-size: 12px;
+    font-weight: 300;
+    line-height: 1;
+    margin: 40px 0px 0 0px;
+
+    .header {
+      font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+    }
+
+    .viewer-pane {
+      margin-top: 8px;
+    }
+  }
+
 
   .instance-type {
   color: $gray_4;

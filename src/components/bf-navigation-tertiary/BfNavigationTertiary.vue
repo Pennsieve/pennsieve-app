@@ -4,7 +4,7 @@
 
     <bf-navigation-item
       :link="{ name: 'user-overview', params: {orgId: activeOrganizationId} }"
-      label="My Dashboard"
+      label="My Workspace"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"
     >

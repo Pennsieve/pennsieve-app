@@ -26,7 +26,7 @@
 <script>
 
 import IconFile from "../../icons/IconFile.vue";
-const VJstree = require('../../shared/vue-jstree/dist/vue-jstree.js')['vue-jstree'].default
+import VJstree from 'vue-jstree'
 
   export default {
     name: 'DirectoryTree',

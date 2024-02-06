@@ -1,5 +1,5 @@
 import { mergeRight,propOr, propEq, findIndex, flatten, compose, pluck, pathOr, includes, remove, find } from 'ramda'
-import { viewerSidePanelTypes, viewerToolTypes } from '@/utils/constants'
+import { viewerSidePanelTypes, viewerToolTypes } from '../utils/constants'
 
 const getLayerIndex = (key, data, viewerAnnotations) => {
   const layerId = propOr('', key, data)
@@ -304,7 +304,7 @@ export const getters = {
   )(state.activeViewer)
 }
 
-const viewModule = {
+const viewerModule = {
   namespaced: true,
   state,
   mutations,
@@ -312,4 +312,4 @@ const viewModule = {
   getters
 }
 
-export default viewModule
+export default viewerModule

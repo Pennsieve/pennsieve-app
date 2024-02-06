@@ -66,6 +66,8 @@ export default {
           return "Dataset Integrations"
         case "collection-files":
           return "Files"
+        case "viewer":
+          return "File Viewer"
 
 
       }

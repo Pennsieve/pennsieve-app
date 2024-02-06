@@ -30,6 +30,12 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
   css: {
     preprocessorOptions: {
       scss: {
