@@ -1,4 +1,3 @@
-import Vue from 'vue'
 import {shallow, shallowMount} from '@vue/test-utils'
 
 import FileIcon from './'

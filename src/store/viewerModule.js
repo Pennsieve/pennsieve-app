@@ -155,7 +155,7 @@ export const mutations = {
 
     if (hasDiscussion === false) {
       discussions.push(data.discussion)
-      Vue.set(state.viewerDiscussions.comments, commentDiscussionId, [data.comment])
+      state.viewerDiscussions.comments[commentDiscussionId] = [data.comment]
     }
   },
 
@@ -177,7 +177,7 @@ export const mutations = {
 
     const updatedComments = remove(commentIdx, 1, comments)
 
-    Vue.set(state.viewerDiscussions.comments, discussionId, updatedComments)
+    state.viewerDiscussions.comments[discussionId] = updatedComments
 
     // Remove discussion if there are no more comments
     if (updatedComments.length === 0) {
@@ -199,6 +199,7 @@ export const mutations = {
 }
 
 export const actions = {
+  setActiveViewer: ({commit}, evt) => commit('OPEN_VIEWER', evt),
   openViewer: ({ commit }, evt) =>
     commit('OPEN_VIEWER', evt),
   closeViewer: ({ commit }, evt) =>

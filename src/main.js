@@ -83,8 +83,6 @@ const allowList = [
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
 
-    console.log('before each')
-
     const token = Cookies.get('user_token')
     const savedOrgId = Cookies.get('preferred_org_id')
 

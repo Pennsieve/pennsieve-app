@@ -661,7 +661,10 @@ export const actions = {
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
-  updateUserToken: ({ commit }, evt) => commit("UPDATE_USER_TOKEN", evt),
+  updateUserToken: ({ commit }, evt) => {
+    Cookies.set('user_token', evt)
+    commit("UPDATE_USER_TOKEN", evt)
+  },
   clearState: ({ commit }) => {
     commit("CLEAR_STATE");
     commit("viewerModule/CLEAR_STATE");

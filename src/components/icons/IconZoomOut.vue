@@ -14,7 +14,7 @@
 
 <script>
 export default {
-  name: "IconZoomIn",
+  name: "IconZoomOut",
   props: {
     width: {
       type: Number,

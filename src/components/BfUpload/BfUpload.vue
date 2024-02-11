@@ -271,7 +271,6 @@
 </template>
 
 <script>
-  import Vue from 'vue'
   import { mapActions, mapGetters, mapState } from 'vuex';
   import BfButton from '../shared/bf-button/BfButton.vue'
   import BfDialog from '../shared/bf-dialog/bf-dialog.vue'

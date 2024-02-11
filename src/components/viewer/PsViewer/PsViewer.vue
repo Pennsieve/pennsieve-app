@@ -1,45 +1,61 @@
 <template>
-  <bf-stage>
-    <template #actions>
-      <stage-actions class="stage-actions">
-        <template #left>
-          <h2>
-            File: {{packageName}}
-          </h2>
-
-        </template>
-      </stage-actions>
-    </template>
-
+  <div>
     <div class="bf-viewer">
-      <!--    <bf-header :has-changes="hasChanges" />-->
+
+      <bf-rafter class="viewer-rafter">
+        <template #heading>
+          <stage-actions class="stage-actions">
+            <template #left>
+              <div class="file-info">
+                File: {{packageName}}
+              </div>
+
+            </template>
+            <template #right>
+              <router-link
+                class="close-action"
+                :to="{
+                name: 'file-record',
+                params: {
+
+                }
+              }"
+              >
+                <div  @click="">
+                  Close
+                </div>
+              </router-link>
+
+            </template>
+          </stage-actions>
+        </template>
+      </bf-rafter>
 
       <div id="viewer-wrap">
-        <!--      <viewer-toolbar-->
-        <!--        v-show="!hideToolbars"-->
-        <!--        class="left"-->
-        <!--      >-->
-        <!--        <el-tooltip-->
-        <!--          v-for="tool in availableTools"-->
-        <!--          :key="tool.eventName"-->
-        <!--          placement="right"-->
-        <!--          :content="tool.tooltip"-->
-        <!--        >-->
-        <!--          <button-->
-        <!--            class="btn-icon"-->
-        <!--            :class="[-->
-        <!--              tool.eventName === viewerActiveTool ? `selected ${tool.icon}` : `${tool.icon}`-->
-        <!--            ]"-->
-        <!--            @click="setActiveTool(tool.eventName)"-->
-        <!--          >-->
-        <!--            <svg-icon-->
-        <!--              :name="tool.icon"-->
-        <!--              height="20"-->
-        <!--              width="20"-->
-        <!--            />-->
-        <!--          </button>-->
-        <!--        </el-tooltip>-->
-        <!--      </viewer-toolbar>-->
+        <viewer-toolbar
+          v-show="!hideToolbars"
+          class="left"
+        >
+          <el-tooltip
+            v-for="tool in availableTools"
+            :key="tool.eventName"
+            placement="right"
+            :content="tool.tooltip"
+          >
+            <button
+              class="btn-icon"
+              :class="[
+                tool.eventName === viewerActiveTool ? `selected ${tool.icon}` : `${tool.icon}`
+              ]"
+              @click="setActiveTool(tool.eventName)"
+            >
+              <component :is="tool.icon"
+                :height="20"
+                :width="20"
+              />
+            </button>
+          </el-tooltip>
+        </viewer-toolbar>
 
         <div
           v-if="!hasItems"
@@ -66,34 +82,35 @@
                      :pkg="activeViewer"
         />
 
-        <!--      <viewer-toolbar-->
-        <!--        v-show="!hideToolbars"-->
-        <!--        class="right"-->
-        <!--      >-->
-        <!--        <el-tooltip-->
-        <!--          v-for="palette in availablePalettes"-->
-        <!--          :key="palette.eventName"-->
-        <!--          placement="left"-->
-        <!--          :content="palette.tooltip"-->
-        <!--        >-->
-        <!--          <button-->
-        <!--            class="btn-icon"-->
-        <!--            :class="computePaletteClass(palette.eventName)"-->
-        <!--            @click="togglePanel(palette)"-->
-        <!--          >-->
-        <!--            <svg-icon-->
-        <!--              :name="palette.icon"-->
-        <!--              height="20"-->
-        <!--              width="20"-->
-        <!--            />-->
-        <!--          </button>-->
-        <!--        </el-tooltip>-->
-        <!--      </viewer-toolbar>-->
+        <viewer-toolbar
+          v-show="!hideToolbars"
+          class="right"
+        >
+          <el-tooltip
+            v-for="palette in availablePalettes"
+            :key="palette.eventName"
+            placement="left"
+            :content="palette.tooltip"
+          >
+            <button
+              class="btn-icon"
+              :class="computePaletteClass(palette.eventName)"
+              @click="togglePanel(palette)"
+            >
 
-        <!--      <bf-viewer-side-panel-->
-        <!--        :side-panel-open="viewerSidePanelOpen"-->
-        <!--        :side-panel-view="viewerSidePanelView"-->
-        <!--      />-->
+              <component :is="palette.icon"
+                         :height="20"
+                         :width="20"
+              />
+
+            </button>
+          </el-tooltip>
+        </viewer-toolbar>
+
+        <bf-viewer-side-panel
+          :side-panel-open="viewerSidePanelOpen"
+          :side-panel-view="viewerSidePanelView"
+        />
       </div>
 
       <!--    <montage-error-dialog-->
@@ -102,7 +119,7 @@
       <!--      @close="onMontageDialogClose"-->
       <!--    />-->
     </div>
-  </bf-stage>
+  </div>
 
 
 </template>
@@ -111,11 +128,11 @@
 import { mapState, mapActions } from 'vuex'
 import { propOr, pathOr, path, defaultTo, prop, find, propEq } from 'ramda'
 
-// import ViewerToolsPalettes from '../ViewerToolsPalettes'
+import ViewerToolsPalettes from '../ViewerToolsPalettes'
 import ViewerPane from '../ViewerPane/ViewerPane.vue'
 // import BfHeader from '../../bf-header/BfHeader.vue'
-// import BfViewerSidePanel from '../BfViewerSidePanel/BfViewerSidePanel.vue'
-// import ViewerToolbar from '../ViewerToolbar/ViewerToolbar.vue'
+import BfViewerSidePanel from '../BfViewerSidePanel/BfViewerSidePanel.vue'
+import ViewerToolbar from '../ViewerToolbar/ViewerToolbar.vue'
 // import MontageErrorDialog from '../MontageErrorDialog/MontageErrorDialog.vue'
 
 import Request from '../../../mixins/request'
@@ -125,22 +142,47 @@ import { viewerSidePanelTypes, viewerToolTypes } from '@/utils/constants'
 import IconNeural from "../../icons/IconNeural.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import BfStage from "../../layout/BfStage/BfStage.vue";
+import IconHand from "../../icons/IconHand.vue";
+import IconDashedAnnotation from "../../icons/IconDashedAnnotation.vue";
+import IconPencil from "../../icons/IconPencil.vue";
+import IconRuler from "../../icons/IconRuler.vue";
+import IconAnnotation from "../../icons/IconAnnotation.vue";
+import IconCompass from "../../icons/IconCompass.vue";
+import IconChannel from "../../icons/IconChannel.vue";
+import IconInfo from "../../icons/IconInfo.vue";
+import IconDiscussion from "../../icons/IconDiscussion.vue";
+import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
+import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
+import IconMouseCursor from "../../icons/IconMouseCursor.vue";
+
 
 export default {
   name: 'PsViewer',
   components: {
+    CircleIcon,
+    BfRafter,
     StageActions,
     IconNeural,
     ViewerPane,
     BfStage,
-    // BfViewerSidePanel,
+    BfViewerSidePanel,
     // BfHeader,
-    // ViewerToolbar,
+    ViewerToolbar,
     // MontageErrorDialog
+    IconHand,
+    IconDashedAnnotation,
+    IconPencil,
+    IconRuler,
+    IconAnnotation,
+    IconCompass,
+    IconChannel,
+    IconInfo,
+    IconDiscussion,
+    IconMouseCursor
   },
   mixins: [
     Request,
-    // ViewerToolsPalettes,
+    ViewerToolsPalettes,
     ConfirmChanges
   ],
   data: function() {
@@ -408,12 +450,27 @@ export default {
 <style lang="scss" scoped>
   @import '../../../assets/_variables.scss';
 
+  .close-action {
+    align-self: center;
+    cursor: pointer;
+    color: $white;
+  }
+
+  .file-info {
+    align-self: center;
+    color: $white;
+  }
+
+
   .stage-actions {
-    border-bottom: 1px solid $gray_2;
+
+    height: 32px;
+    align-items: center;
   }
   .bf-viewer {
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
   #viewer-wrap {
     flex: 1;

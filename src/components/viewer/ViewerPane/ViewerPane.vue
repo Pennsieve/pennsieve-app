@@ -1,7 +1,8 @@
 <template>
-  <div class="viewer-pane">
+  <div class="viewer-pane" v-if="cmpViewer">
     <component
       :is='cmpViewer'
+      :isPreview="isPreview"
       ref="viewer"
       :idx="0"
       :pkg="pkg"
@@ -12,35 +13,24 @@
 
 <script>
   import { propOr, pathOr, path, isNil } from 'ramda'
+  import { defineAsyncComponent } from 'vue'
+
 
   import ImportHref from '../../../mixins/import-href'
   import FileTypeMapper from '../../../mixins/FileTypeMapper'
   import GetFileProperty from '../../../mixins/get-file-property'
 
-  import PDFViewer from '../../viewers/PDFViewer.vue'
-  import UnknownViewer from "../../viewers/UnknownViewer.vue";
-  import TextViewer from "../../viewers/TextViewer.vue";
-  import VideoViewer from "../../viewers/VideoViewer.vue"
-  import ImageViewer from "../../viewers/ImageViewer.vue"
-  // import DirectoryViewer from "../../viewers/DirectoryViewer.vue";
-
   export default {
     name: 'ViewerPane',
 
     components: {
-      PDFViewer,
-      UnknownViewer,
-      TextViewer,
-      VideoViewer,
-      ImageViewer,
-      // DirectoryViewer,
-      // 'slide-viewer': () => import('@/components/viewers/SlideViewer/SlideViewer.vue'),
-      // 'image-viewer': () => import('@/components/viewers/ImageViewer.vue'),
-      // 'pdf-viewer': () => import('../../viewers/PDFViewer/PDFViewer.vue'),
-      // 'text-viewer': () => import('@/components/viewers/TextViewer.vue'),
-      'unknown-viewer': () => import('../../viewers/UnknownViewer.vue'),
-      // 'video-viewer': () => import('@/components/viewers/VideoViewer.vue'),
-      // 'timeseries-viewer': () => import('@/components/viewers/TSViewer/TSViewer.vue')
+      // 'slide-viewer': defineAsyncComponent( () => import('@/components/viewers/SlideViewer/SlideViewer.vue')),
+      'ImageViewer': defineAsyncComponent( () => import('@/components/viewers/ImageViewer.vue')),
+      'PDFViewer': defineAsyncComponent( () => import('../../viewers/PDFViewer.vue')),
+      'TextViewer': defineAsyncComponent( () => import('@/components/TextViewer.vue')),
+      'UnknownViewer': defineAsyncComponent( () => import('../../viewers/UnknownViewer.vue')),
+      'VideoViewer': defineAsyncComponent( () => import('@/components/viewers/VideoViewer.vue')),
+      'TimeseriesViewer': defineAsyncComponent( () => import('../../viewers/TSViewer/TSViewer.vue'))
     },
 
     mixins: [
@@ -50,6 +40,10 @@
     ],
 
     props: {
+      isPreview: {
+        type: Boolean,
+        default: false,
+      },
       pkg: {
         type: Object,
         default: () => {}
@@ -65,7 +59,6 @@
     watch: {
       pkg: {
         handler: function(pkg) {
-          console.log(pkg)
           if (Object.keys(pkg).length > 0 ) {
             this.loadViewer()
           }

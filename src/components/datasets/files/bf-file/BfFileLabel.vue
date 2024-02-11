@@ -46,6 +46,7 @@
       v-if="getFileState !== 'Processing' && getFileState !== 'Uploading'"
       class="svg-icon icon-item mr-16"
       :src="fileIcon(icon, file.content.packageType)"
+      alt="package icon"
     >
 
     <button
@@ -81,13 +82,15 @@ import { packageDisplayName } from '../../../../utils/packages'
 
 import validUrl from 'valid-url'
 import IconEyeball from "../../../icons/IconEyeball.vue";
+import IconLink from "../../../icons/IconLink.vue";
 
 export default {
   name: 'BfFileLabel',
 
   components: {
     IconEyeball,
-    BfWaitingIcon
+    BfWaitingIcon,
+    IconLink
   },
 
   mixins: [

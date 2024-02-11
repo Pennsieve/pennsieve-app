@@ -154,6 +154,14 @@ const router = createRouter({
       ],
     },
     {
+      name: 'viewer',
+      path: '/:orgId/datasets/:datasetId/viewer/:fileId',
+      components: {
+        page: Viewer
+      },
+      props: true
+    },
+    {
       name: "create-account",
       path: "/sign-up",
       components: {
@@ -290,15 +298,7 @@ const router = createRouter({
           props: true,
           meta: { hideSecondaryNav: true},
         },
-        {
-          name: 'viewer',
-          path: ':datasetId/viewer/:fileId',
-          components: {
-            stage: Viewer,
-            stageHeader:SecondaryPageHeader,
-          },
-          props: true
-        },
+
         {
           name: 'dataset-overview',
           path: ':datasetId/overview',

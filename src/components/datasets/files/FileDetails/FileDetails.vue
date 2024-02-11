@@ -16,16 +16,6 @@
               @menu-click="onLinkRecordMenuClick"
             />
 
-
-
-<!--            <bf-button-->
-<!--              class="primary mr-8 flex"-->
-<!--              :disabled="!isOpenViewerBtnEnabled"-->
-<!--              @click="openViewer"-->
-<!--            >-->
-<!--              Open Viewer-->
-<!--            </bf-button>-->
-
             <bf-button
               :disabled="isUploading || isFileProcessing"
               class="primary mr-8 flex"
@@ -424,43 +414,7 @@
             />
           </el-collapse>
         </template>
-<!--      </template>-->
-      <!-- END RELATIONSHIPS TABLE -->
 
-      <!-- this renders a template with some properties for the model in it -->
-<!--      <themplate v-else>-->
-<!--        <h2 v-if="properties.length > 0">-->
-<!--          Properties-->
-<!--        </h2>-->
-<!--        <div class="required">-->
-<!--          *Required-->
-<!--        </div>-->
-<!--        <div>-->
-<!--          <concept-instance-property-->
-<!--            v-for="property in properties"-->
-<!--            :key="property.name"-->
-<!--            :property="property"-->
-<!--            :editing="true"-->
-<!--            :string-subtypes="stringSubtypes"-->
-<!--            @add-property-value="handleAddPropertyValue"-->
-<!--          />-->
-
-<!--          <concept-instance-linked-property-->
-<!--            v-for="property in linkedProperties"-->
-<!--            :key="property.to.modelId"-->
-<!--            :property="property"-->
-<!--            :label="property.schemaLinkedProperty.displayName"-->
-<!--            @edit-linked-property="editLinkedProperty"-->
-<!--            @confirm-remove-linked-property="removeLinkedPropertyEditScreen"-->
-<!--          />-->
-<!--        </div>-->
-<!--      </themplate>-->
-
-<!--      <add-file-relationship-drawer-->
-<!--        ref="addFileRelationshipDrawer"-->
-<!--        :concept="model"-->
-<!--        :related-files="relatedFiles"-->
-<!--      />-->
       <add-relationship-drawer
         ref="addRelationshipDrawer"
         :relationship-types="relationshipTypes"
@@ -489,10 +443,12 @@
           </bf-button>
         </div>
 
-
+        <!-- Show preview of viewer-->
         <viewer-pane
           class="viewer-pane"
-          :pkg="proxyRecord"/>
+          :is-preview="true"
+          :pkg="proxyRecord"
+        />
       </div>
 
     </bf-stage>
@@ -615,6 +571,8 @@ import StageActions from "../../../shared/StageActions/StageActions.vue";
 import SourceFilesTable from "./SourceFilesTable.vue";
 import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
+import { viewerToolTypes } from '../../../../utils/constants'
+
 
 export default {
   name: 'FileDetails',
@@ -1549,6 +1507,8 @@ export default {
 
     EventBus.$on('update-external-file', this.onExternalFileUpdate)
 
+    // In FileDetails window, the tool for viewing should be limited/set to PAN for panning the image/timeseries etc.
+    this.setActiveTool(viewerToolTypes.PAN)
   },
 
   beforeUnmount() {
@@ -1569,6 +1529,11 @@ export default {
 
     ...mapActions('filesModule', [
        'openOffice365File'
+    ]),
+
+    ...mapActions('viewerModule',[
+      'setActiveViewer',
+      'setActiveTool'
     ]),
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
@@ -2586,6 +2551,9 @@ export default {
     setProxyAsRecord: function(response) {
       // Set the proxyRecord
       this.proxyRecord = response
+
+      // Set Active Viewer
+      this.setActiveViewer(this.proxyRecord)
 
       this.selectedFiles.push(response)
     },
