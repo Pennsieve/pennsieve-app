@@ -1,6 +1,6 @@
 #!groovy
 
-if (env.BRANCH_NAME == "prod") {
+if (env.BRANCH_NAME == "main") {
     buildEnv = "production"
     executorEnv = "prod"
 } else {
@@ -39,18 +39,16 @@ node('executor') {
                 throw e
             }
         }
-        if (["main", "prod"].contains(env.BRANCH_NAME)) {
+        if (["main", "dev"].contains(env.BRANCH_NAME)) {
             stage('Deploy') {
                 node("${executorEnv}-executor") {
                     def bucketName = "pennsieve-${executorEnv}-app2-use1"
 
                     try {
                         unstash 'dist'
-//                         unstash 'buildComponents'
                         sh "aws s3 --region us-east-1 rm --recursive s3://$bucketName/"
                         sh "aws s3 --region us-east-1 cp --recursive dist s3://$bucketName"
                         sh "aws s3 --region us-east-1 cp --cache-control 0 dist/index.html s3://$bucketName/"
-//                         sh "aws s3 --region us-east-1 cp --recursive web-components/build s3://$bucketName/web-components"
                         def distributionId = sh(
                             script: "aws cloudfront list-distributions --query \"DistributionList.Items[?contains(Origins.Items[0].DomainName, '${bucketName}.s3.amazonaws.com')].Id\" --output text",
                             returnStdout: true

@@ -12,7 +12,14 @@
 </template>
 
 <script>
+
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
+
 export default {
-  name: 'BfMySettings'
+  name: 'BfMySettings',
+
+  components: {
+    BfRafter
+  }
 }
 </script>

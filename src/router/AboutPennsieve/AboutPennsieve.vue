@@ -51,17 +51,18 @@ export default {
     return {
       tabs: [
         {
-          name: "Overview",
+          name: "Our Team and Funding",
           to: "info"
+        },
+        {
+          name: "Open Repositories",
+          to: "welcome"
         },
         {
           name: "Getting Help",
           to: "support"
         },
-        {
-          name: "Repositories",
-          to: "welcome"
-        },
+
 
       ]
     }
