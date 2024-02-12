@@ -21,13 +21,15 @@
 </template>
 
 <script>
-import hljs from 'highlightjs'
+import hljs from 'highlight.js'
 
 import StaticViewer from '../../mixins/static-viewer'
 import GetFileProperty from '../../mixins/get-file-property'
 import Request from '../../mixins/request'
 
-import 'highlightjs/styles/color-brewer.css'
+import 'highlight.js/styles/github.css';
+
+// import 'highlightjs/styles/color-brewer.css'
 const escapeHTML = str => (str+'').replace(/[&<>"'`=\/]/g, s => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;','/': '&#x2F;','`': '&#x60;','=': '&#x3D;'})[s]);
 
 
