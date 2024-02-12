@@ -2,6 +2,13 @@
 
 This template should help get you started developing with Vue 3 in Vite..
 
+## Deployement Strategy
+
+- Merge into __dev__ branch to deploy to development stage
+- Merge into __main__ branch to deploy to production stage
+
+
+
 ## Recommended IDE Setup
 
 [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
