@@ -12,7 +12,8 @@ export default {
         TimeSeries: 'timeseries',
         Video: 'video',
         Text: 'text',
-        ZIP: 'zip'
+        ZIP: 'zip',
+        CSV: 'csv'
       },
       fileTypes: [
         {
@@ -449,7 +450,13 @@ export default {
         component = 'text'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries']
+      if (subtype === 'ms excel') {
+        component = 'xls'
+      }
+
+      console.log(component)
+
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls']
       const vueViewerMap = {
         image: 'ImageViewer',
         pdf: 'PDFViewer',
@@ -458,9 +465,12 @@ export default {
         video:'VideoViewer',
         slide:'SlideViewer',
         timeseries:'TimeseriesViewer',
+        csv:'CSVViewer',
+        xls: 'XLSViewer'
       }
 
       if (vueViewers.indexOf(component) >= 0) {
+        console.log(component + subtype)
         return vueViewerMap[component]
       } else{
         console.log('Error loading viewer')
