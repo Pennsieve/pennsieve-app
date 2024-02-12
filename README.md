@@ -12,8 +12,8 @@ This template should help get you started developing with Vue 3 in Vite..
 - Keep your feature branch up to date with __main__
 - Merge feature branches into __main__ branch to deploy to production environment
 - After a production deployment, an admin needs to update __dev__ environment by resetting it be up to date with __main__
-  - `git reset --hard origin/prod`
-  - `git push origin main --force`
+  - `git reset --hard origin/main`
+  - `git push origin dev --force`
 
 
 
