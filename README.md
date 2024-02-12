@@ -4,15 +4,18 @@ This template should help get you started developing with Vue 3 in Vite..
 
 ## Deployment Strategy
 
-- Merge branches into __dev__ branch to deploy to development environment
-- Merge feature branches into __main__ branch to deploy to production environment
+- __main__ branch reflects what is in production.
+- __dev__ branch reflects features that are currently in development.<br><br>
+
 
 - Create new feature branches off of __main__ branch
 - Name feature branches `feature/descriptive-name`
 - Name bug fix branches `fix/descriptive-name` 
+- Merge branches into __dev__ branch to deploy to development environment
 - Do not delete your feature branch until it is merged to production 
 - Keep your feature branch up to date with __main__
-- After a production deployment, an admin needs to update __dev__ environment by resetting it be up to date with __main__
+- Merge feature branches into __main__ branch to deploy to production environment
+- After a production deployment, an admin needs to update __dev__ environment by resetting it to be up to date with __main__
   - `git reset --hard origin/main`
   - `git push origin dev --force`
 
