@@ -14,7 +14,7 @@
       :show-arrow="false"
     >
       <template #reference>
-        <button
+        <div
           id="create-button"
           class="bf-navigation-item"
           :class="{ 'open' : createMenuOpen }"
@@ -25,80 +25,9 @@
               src="../../../assets/images/icons/lock-create.svg"
               alt="icon for locked dataset"
             >
-            <svg
-              v-if="!datasetLocked"
-              id="create-button-icon"
-              xmlns="http://www.w3.org/2000/svg"
-              xmlns:xlink="http://www.w3.org/1999/xlink"
-              viewBox="0 0 24 24"
-            >
-              <defs>
-                <linearGradient
-                  id="create_icon_gradient"
-                  x1="15.9987"
-                  y1="5.0012"
-                  x2="21.9987"
-                  y2="5.0012"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop
-                    offset="0.0161"
-                    stop-color="#fff"
-                    stop-opacity="0.2"
-                  /><stop
-                  offset="0.322"
-                  stop-color="#f2f3f4"
-                  stop-opacity="0.1875"
-                /><stop
-                  offset="0.5772"
-                  stop-color="#cacdd1"
-                  stop-opacity="0.1487"
-                /><stop
-                  offset="0.8134"
-                  stop-color="#878d96"
-                  stop-opacity="0.0836"
-                /><stop
-                  offset="1"
-                  stop-color="#3b4554"
-                  stop-opacity="0.01"
-                />
-                </linearGradient>
-              </defs><g id="document">
-              <polygon
-                points="21.999 22.001 1.999 22.001 1.999 2.001 15.999 2.001 21.999 7.97 21.999 22.001"
-                fill="#dadada"
-              /><path
-              d="M15.9987,2.0012v4.5a1.5,1.5,0,0,0,1.5,1.5h4.5Z"
-              fill="#71747c"
-            /><g
-              id="_generic_"
-              data-name="&lt;generic&gt;"
-            >
-              <g
-                id="_artwork_"
-                data-name="&lt;artwork&gt;"
-              >
-                <polygon
-                  points="21.999 22.001 1.999 22.001 1.999 2.001 15.999 2.001 21.999 7.97 21.999 22.001"
-                  fill="#dadada"
-                /><path
-                d="M15.9987,2.0012v4.5a1.5,1.5,0,0,0,1.5,1.5h4.5Z"
-                fill="#71747c"
-              />
-              </g><path
-              id="_gradient_"
-              data-name="&lt;gradient&gt;"
-              d="M15.9987,2.0012v4.5a1.5,1.5,0,0,0,1.5,1.5h4.5Z"
-              fill="url(#create_icon_gradient)"
-            />
-            </g>
-            </g><g id="plus-sign">
-              <path
-                d="M15.9987,11.0012h-3v-3a1,1,0,0,0-2,0v3h-3a1,1,0,1,0,0,2h3v3a1,1,0,0,0,2,0v-3h3a1,1,0,0,0,0-2Z"
-                fill="currentColor"
-              />
-            </g>
-            </svg>
+
+            <IconAddItem/>
+
             <div class="" v-show="!condensed">
             <span
               v-if="datasetLocked"
@@ -116,13 +45,12 @@
           </div>
 
           <IconArrowUp
-            color="#71747C"
             class="icon-arrow"
             :class="[ createArrowDir === 'down' ? 'svg-flip' : '' ]"
             :width="10"
             :height="10"
           />
-        </button>
+        </div>
       </template>
 
       <template v-if="datasetLocked">
@@ -151,13 +79,11 @@
             Get Help
           </a>
         </template>
+
       <template v-else>
           <div class="bf-menu">
             <template v-if="getPermission('editor')">
               <ul v-show="hasConcepts">
-
-
-
                 <li>
                   <el-popover
 
@@ -199,19 +125,19 @@
                             v-for="item in filteredConcepts"
                             :key="item.id"
                           >
-                            <!--            <router-link-->
-                            <!--              class="bf-menu-item"-->
-                            <!--              :to="{-->
-                            <!--                name: 'concept-instance',-->
-                            <!--                params: {-->
-                            <!--                  conceptId: item.id,-->
-                            <!--                  instanceId: 'new'-->
-                            <!--                }-->
-                            <!--              }"-->
-                            <!--              @click.native="closeMenus"-->
-                            <!--            >-->
+                              <router-link
+                                class="bf-menu-item"
+                                :to="{
+                                  name: 'metadata-record',
+                                  params: {
+                                    modelId: item.id,
+                                    instanceId: 'new'
+                                  }
+                                }"
+                                @click.native="closeMenus"
+                              >
                             {{ item.displayName }}
-                            <!--            </router-link>-->
+                            </router-link>
                           </li>
                         </ul>
                       </div>
@@ -223,19 +149,16 @@
                         <h3>You don't have any records</h3>
                         <p>
                           Once you set up
-                          <!--          <router-link-->
-                          <!--            :to="{ name: 'models' }"-->
-                          <!--            class=""-->
-                          <!--          >-->
-                          <!--            models-->
-                          <!--          </router-link>-->
+                                    <router-link
+                                      :to="{ name: 'models' }"
+                                      class=""
+                                    >
+                                      models
+                                    </router-link>
                           , you'll be able to create records.
                         </p>
                       </filter-empty-state>
                   </el-popover>
-
-
-
 
                 </li>
               </ul>
@@ -261,43 +184,43 @@
 
               <ul>
                 <li>
-  <!--                <router-link-->
-  <!--                  class="bf-menu-item"-->
-  <!--                  :to="{-->
-  <!--                    name: 'models',-->
-  <!--                    query: {-->
-  <!--                      openNewModelDialog: true-->
-  <!--                    }-->
-  <!--                  }"-->
-  <!--                  @click.native="closeMenus"-->
-  <!--                >-->
+                  <router-link
+                    class="bf-menu-item"
+                    :to="{
+                      name: 'models',
+                      query: {
+                        openNewModelDialog: true
+                      }
+                    }"
+                    @click.native="closeMenus"
+                  >
                     New Model
-  <!--                </router-link>-->
+                  </router-link>
                 </li>
                 <li v-if="modelTemplates.length > 0">
-  <!--                <router-link-->
-  <!--                  class="bf-menu-item"-->
-  <!--                  :to="{-->
-  <!--                    name: 'model-templates'-->
-  <!--                  }"-->
-  <!--                  @click.native="closeMenus"-->
-  <!--                >-->
+                  <router-link
+                    class="bf-menu-item"
+                    :to="{
+                      name: 'model-templates'
+                    }"
+                    @click.native="closeMenus"
+                  >
                     Model from Template
-  <!--                </router-link>-->
+                  </router-link>
                 </li>
                 <li>
-  <!--                <router-link-->
-  <!--                  class="bf-menu-item"-->
-  <!--                  :to="{-->
-  <!--                    name: 'relationships',-->
-  <!--                    query: {-->
-  <!--                      createRelationshipType: true-->
-  <!--                    }-->
-  <!--                  }"-->
-  <!--                  @click.native="closeMenus"-->
-  <!--                >-->
+                  <router-link
+                    class="bf-menu-item"
+                    :to="{
+                      name: 'relationships',
+                      query: {
+                        createRelationshipType: true
+                      }
+                    }"
+                    @click.native="closeMenus"
+                  >
                     Create Relationship Type
-  <!--                </router-link>-->
+                  </router-link>
                 </li>
               </ul>
             </template>
@@ -324,12 +247,14 @@ import { DatasetLockedMessaging } from '../../../utils/constants'
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconArrowUp from "../../icons/IconArrowUp.vue";
 import IconHelpMessage from "../../icons/IconHelpMessage.vue";
+import IconAddItem from "../../icons/IconAddItem.vue";
 
 
 export default {
   name: 'CreateButton',
 
   components: {
+    IconAddItem,
     IconHelpMessage,
     IconArrowUp,
     IconArrowRight,
