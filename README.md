@@ -4,8 +4,8 @@ This template should help get you started developing with Vue 3 in Vite..
 
 ## Deployment Strategy
 
-- __main__ branch reflects what is in production.
-- __dev__ branch reflects features that are currently in development.<br><br>
+- __main__ branch reflects the version of the application that is in production. 
+- __dev__ branch reflects a version of the application with features that are currently in development.<br><br>
 
 
 - Create new feature branches off of __main__ branch
