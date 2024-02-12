@@ -2,10 +2,17 @@
 
 This template should help get you started developing with Vue 3 in Vite..
 
-## Deployement Strategy
+## Deployment Strategy
 
-- Merge into __dev__ branch to deploy to development stage
-- Merge into __main__ branch to deploy to production stage
+- Create new feature branches off of __main__ branch
+- Name feature branches `feature/descriptive-name`
+- Name bug fix branches `fix/descriptive-name` 
+- Merge branches into __dev__ branch to deploy to development stage
+- Do not delete your feature branch, and keep your feature branch up to date with __main__ through development process
+- Merge branches into __main__ branch to deploy to production stage
+- After a production deployment, an admin needs to update __dev__ environment by resetting it be up to date with __main__
+  - `git reset --hard origin/prod`
+  - `git push origin main --force`
 
 
 
@@ -55,6 +62,7 @@ We use [test-utils](https://test-utils.vuejs.org/) for unit testing.
 
 The mock API can be found in ```/src/test/mocks```
 For an example using the mock API look here: ```/src/mixins/request/request.spec.js```
+
 
 
 ``` sh
