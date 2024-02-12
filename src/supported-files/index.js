@@ -24,13 +24,15 @@ const getUniqueIcons = R.compose(
 )
 
 const filepath = path.join(path.dirname(fs.realpathSync(__filename)), './')
+console.log(filepath)
 const tsv = fs.readFileSync(filepath + 'files.tsv', 'utf-8')
 
 const json = tsvert(tsv, 'json')
+// console.log(json)
 const jsonStr = json.substr(0, json.length - 1)
 const body = getUniqueIcons(jsonStr)
 
-fs.writeFile(filepath + 'files.json', body, function(err) {
+fs.writeFile(filepath + 'files2.json', body, function(err) {
   if (err) {
     throw err
   }

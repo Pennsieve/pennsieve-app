@@ -9,15 +9,36 @@
 
 <script>
 import StaticViewer from '../../mixins/static-viewer'
-import VuePdfApp from "vue3-pdf-app";
+// import VuePdfApp from "vue3-pdf-app";
 // import this to use default icons for buttons
 import "vue3-pdf-app/dist/icons/main.css";
+import { defineAsyncComponent } from 'vue'
 
 export default {
   name: 'PDFViewer',
 
   components: {
-    VuePdfApp
+
+    'vue-pdf-app': defineAsyncComponent({
+      // the loader function
+      loader: () => import('vue3-pdf-app'),
+
+      // A component to use while the async component is loading
+      // loadingComponent: LoadingComponent,
+
+      // Delay before showing the loading component. Default: 200ms.
+      delay: 200,
+
+      // A component to use if the load fails
+      // errorComponent: ErrorComponent,
+
+      // The error component will be displayed if a timeout is
+      // provided and exceeded. Default: Infinity.
+      timeout: 3000
+    })
+
+
+    // VuePdfApp
     // PDFWindow,
   },
 

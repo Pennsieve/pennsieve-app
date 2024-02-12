@@ -85,11 +85,6 @@ Plexon	Plexon				Timeseries	icon-timeseries.svg	Time Series
 Spike2	Spike2	Timeseries		.smr	Timeseries	icon-timeseries.svg	Time Series	Single file
 TDMS	TDMS	Timeseries		.tdm, .tdms	TImeseries	icon-timeseries.svg	Time Series	Single file
 Video	MP4, AVI, WEBM, MOV, OGG, MPEG	Video		.mp4, .avi, .webm, .mov, .ogg, .mpeg	Video	icon-video.svg	Video	Single file
-
-
-
-
-
 3i SlideBook		Image	NDStack	.sld	Microscope	icon-microscope.svg	Image	Single file
 Andor Bio-Imaging Division (ABD) TIFF		Image	NDStack	.tif	Microscope	icon-microscope.svg	Image	Single file
 AIM		Image	NDStack	.aim	Microscope	icon-microscope.svg	Image	Single file

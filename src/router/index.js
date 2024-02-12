@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
-import DatasetSettings from "./Dataset/DatasetSettings.vue";
 import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
 import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";

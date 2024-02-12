@@ -1,89 +1,95 @@
 <template>
-    <bf-dialog
+    <el-dialog
         class="timeseries-filter-modal"
         ref="filter-modal"
         title="Set Filter"
         :open="filterWindowOpen"
         @close='close'>
 
+      <template #default>
         <div slot="body">
-            <div class="select-wrapper">
-                <el-select
-                    v-model="selectedFilter"
-                    placeholder="Select" >
-                    <el-option
-                        v-for="item in filterOptions"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value">
-                    </el-option>
-                </el-select>
+          <div class="select-wrapper">
+            <el-select
+              v-model="selectedFilter"
+              placeholder="Select" >
+              <el-option
+                v-for="item in filterOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+              </el-option>
+            </el-select>
 
-                <div v-if="computeVisible0">
-                    {{computePlaceholder1}}
-                    <el-input-number
-                        class="filterInput"
-                        v-model="input0"
-                        controls-position="right"
-                        :precision="2"
-                        @change="handleChange"
-                        ></el-input-number>
-                </div>
-
-                <div v-if="computeVisible1">
-                    {{computePlaceholder2}}
-                    <el-input-number
-                        class="filterInput"
-                        v-model="input1"
-                        controls-position="right"
-                        :precision="2"
-                        @change="handleChange"
-                        ></el-input-number>
-                </div>
-
-                <el-select
-                    v-model="selectedNotch"
-                    v-if="computeVisible2"
-                    placeholder="Select" >
-                    <el-option
-                        v-for="item in notchOptions"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value">
-                    </el-option>
-                </el-select>
-
+            <div v-if="computeVisible0">
+              {{computePlaceholder1}}
+              <el-input-number
+                class="filterInput"
+                v-model="input0"
+                controls-position="right"
+                :precision="2"
+                @change="handleChange"
+              ></el-input-number>
             </div>
+
+            <div v-if="computeVisible1">
+              {{computePlaceholder2}}
+              <el-input-number
+                class="filterInput"
+                v-model="input1"
+                controls-position="right"
+                :precision="2"
+                @change="handleChange"
+              ></el-input-number>
+            </div>
+
+            <el-select
+              v-model="selectedNotch"
+              v-if="computeVisible2"
+              placeholder="Select" >
+              <el-option
+                v-for="item in notchOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+              </el-option>
+            </el-select>
+
+          </div>
         </div>
 
+      </template>
+
+      <template #footer>
         <div slot="footer">
-            <div class="button-wrapper">
-                <div class="channelsSelected">
+          <div class="button-wrapper">
+            <div class="channelsSelected">
 
-                    <svg-icon
-                        name="icon-selection"
-                        height="16"
-                        width="16"/>
+              <svg-icon
+                name="icon-selection"
+                height="16"
+                width="16"/>
 
-                    <div v-if="onSingleChannel">
-                        Adding to single channel
-                    </div>
-                    <div v-else>
-                        Adding to {{selectedChannels}} Selected Channels
-                    </div>
+              <div v-if="onSingleChannel">
+                Adding to single channel
+              </div>
+              <div v-else>
+                Adding to {{selectedChannels}} Selected Channels
+              </div>
 
-                </div>
-                <div class="buttons">
-                    <bf-button
-                        @click="submitForm"
-                    >Set Filter
-                    </bf-button>
-                </div>
             </div>
+            <div class="buttons">
+              <bf-button
+                @click="submitForm"
+              >Set Filter
+              </bf-button>
+            </div>
+          </div>
 
         </div>
+      </template>
 
-    </bf-dialog>
+
+    </el-dialog>
 
 </template>
 
@@ -110,7 +116,6 @@
         name: 'TimeseriesFilterModal',
 
         components:{
-            'bf-dialog': () => import('@/components/shared/bf-dialog/bf-dialog.vue'),
             'bf-button': () => import('@/components/shared/bf-button/BfButton.vue')
         },
 

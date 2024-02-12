@@ -47,6 +47,7 @@
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
     "tributejs": "^5.1.3",
+    "tsvert": "^0.0.4",
     "uuid": "^9.0.1",
     "valid-url": "^1.0.9",
     "vite": "^4.5.0",

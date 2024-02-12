@@ -6,7 +6,6 @@ import { GetCredentialsForIdentityCommand, CognitoIdentityClient, GetIdCommand }
 import { Upload } from "@aws-sdk/lib-storage"
 import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
-import * as fs from "fs";
 
 
 import {v1 as uuidv1} from "uuid";

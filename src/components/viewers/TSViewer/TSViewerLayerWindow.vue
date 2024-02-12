@@ -1,57 +1,63 @@
 <template>
-    <bf-dialog 
+    <el-dialog
         class="timeseries-annotation-layer-modal" 
         ref="timeseries-filter-modal"
         title="Annotation Layers"
         :open="annotationLayerWindowOpen"
         @close='close'>
 
+      <template #default>
         <div slot="body">
-            <div class="input-section">
-                Layer Name:
-                <el-input
-                    placeholder="Add a Layer Name"
-                    v-model="name"
-                    ref="input"
-                />
-            </div>
-            <div class="input-section">
-                Select Color:
-                <el-select v-model="selectedColor" placeholder="Select">
-                    <!-- <div slot="prefix">
-                        <circle-icon class="team-avatar" icon="icon-color" :currentColor="selectedColor"></circle-icon>
-                    </div> -->
-                    <el-option
-                        v-for="item in colorOptions"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value">
+          <div class="input-section">
+            Layer Name:
+            <el-input
+              placeholder="Add a Layer Name"
+              v-model="name"
+              ref="input"
+            />
+          </div>
+          <div class="input-section">
+            Select Color:
+            <el-select v-model="selectedColor" placeholder="Select">
+              <!-- <div slot="prefix">
+                  <circle-icon class="team-avatar" icon="icon-color" :currentColor="selectedColor"></circle-icon>
+              </div> -->
+              <el-option
+                v-for="item in colorOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
                         <span style="float: left">
                             <circle-icon class="team-avatar" icon="icon-color" :currentColor="item.value"></circle-icon>
                         </span>
-                        <span style="float: right; color: #8492a6; font-size: 13px">{{ item.label }}</span>
-                    </el-option>
-                </el-select>
-            </div>
+                <span style="float: right; color: #8492a6; font-size: 13px">{{ item.label }}</span>
+              </el-option>
+            </el-select>
+          </div>
         </div>
+      </template>
 
+
+      <template #footer>
         <div slot="footer">
-            <div class="button-wrapper">
-                <div class="buttons">
-                    <bf-button
-                        @click="handleFormCancel"
-                    >Cancel
-                    </bf-button>
-                    <bf-button
-                        @click="handleFormSubmit"
-                    >Save
-                    </bf-button>
-                </div>
-            </div> 
+          <div class="button-wrapper">
+            <div class="buttons">
+              <bf-button
+                @click="handleFormCancel"
+              >Cancel
+              </bf-button>
+              <bf-button
+                @click="handleFormSubmit"
+              >Save
+              </bf-button>
+            </div>
+          </div>
 
         </div>
+      </template>
 
-    </bf-dialog>
+
+    </el-dialog>
 
 </template>
 
@@ -73,15 +79,15 @@
     } from 'ramda'
 
     import EventBus from '../../../utils/event-bus'
-    import { defineAsyncComponent } from 'vue'
+    import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
+    import BfButton from "../../shared/bf-button/BfButton.vue";
 
     export default {
         name: 'AnnotationLayerWindow',
 
         components:{
-            'circle-icon': defineAsyncComponent(() => import('@/components/shared/circle-icon/CircleIcon.vue')),
-            'bf-dialog': defineAsyncComponent(() => import('@/components/shared/bf-dialog/bf-dialog.vue')),
-            'bf-button': defineAsyncComponent(() => import('@/components/shared/bf-button/BfButton.vue'))
+          CircleIcon,
+          BfButton
         },
 
         mixins: [

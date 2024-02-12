@@ -25,11 +25,11 @@
 
     components: {
       // 'slide-viewer': defineAsyncComponent( () => import('@/components/viewers/SlideViewer/SlideViewer.vue')),
-      'ImageViewer': defineAsyncComponent( () => import('@/components/viewers/ImageViewer.vue')),
+      'ImageViewer': defineAsyncComponent( () => import('../../viewers/ImageViewer.vue')),
       'PDFViewer': defineAsyncComponent( () => import('../../viewers/PDFViewer.vue')),
-      'TextViewer': defineAsyncComponent( () => import('@/components/TextViewer.vue')),
+      'TextViewer': defineAsyncComponent( () => import('../../viewers/TextViewer.vue')),
       'UnknownViewer': defineAsyncComponent( () => import('../../viewers/UnknownViewer.vue')),
-      'VideoViewer': defineAsyncComponent( () => import('@/components/viewers/VideoViewer.vue')),
+      'VideoViewer': defineAsyncComponent( () => import('../../viewers/VideoViewer.vue')),
       'TimeseriesViewer': defineAsyncComponent( () => import('../../viewers/TSViewer/TSViewer.vue'))
     },
 
