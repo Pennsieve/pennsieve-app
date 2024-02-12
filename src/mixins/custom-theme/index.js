@@ -2,10 +2,10 @@ export default {
     methods: {
         getTheme: function(orgId) {
             console.log(orgId)
-            if (orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80') {
+            if (orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80' || this.orgId === 'N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2') {
                 return [ '#a33936','#532962']
                 return [ '#C35A00','#82AFD3']
-            } else if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5') {
+            } else if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5' || this.orgId === 'N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0') {
                 // return [ '#a33936','#532962']
                 return ['#011F5B', '#7516A5']
             } else {
