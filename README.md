@@ -8,7 +8,8 @@ This template should help get you started developing with Vue 3 in Vite..
 - Name feature branches `feature/descriptive-name`
 - Name bug fix branches `fix/descriptive-name` 
 - Merge branches into __dev__ branch to deploy to development environment
-- Do not delete your feature branch until it is merged to production. Keep your feature branch up to date with __main__
+- Do not delete your feature branch until it is merged to production 
+- Keep your feature branch up to date with __main__
 - Merge feature branches into __main__ branch to deploy to production environment
 - After a production deployment, an admin needs to update __dev__ environment by resetting it be up to date with __main__
   - `git reset --hard origin/prod`
