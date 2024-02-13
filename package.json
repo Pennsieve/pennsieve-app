@@ -40,6 +40,7 @@
     "marked": "^9.0.0",
     "moment": "^2.29.4",
     "moment-range": "^4.0.2",
+    "papaparse": "^5.4.1",
     "pdfjs-dist": "^4.0.379",
     "protobufjs": "^7.2.6",
     "ramda": "^0.28.0",
@@ -61,7 +62,8 @@
     "vue3-pdf-app": "^1.0.3",
     "vue3-swatches": "^1.2.3",
     "vuex": "^4.0.2",
-    "woofmark": "^4.2.6"
+    "woofmark": "^4.2.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@aws-amplify/auth": "^5.1.5",

@@ -30,7 +30,9 @@
       'TextViewer': defineAsyncComponent( () => import('../../viewers/TextViewer.vue')),
       'UnknownViewer': defineAsyncComponent( () => import('../../viewers/UnknownViewer.vue')),
       'VideoViewer': defineAsyncComponent( () => import('../../viewers/VideoViewer.vue')),
-      'TimeseriesViewer': defineAsyncComponent( () => import('../../viewers/TSViewer/TSViewer.vue'))
+      'TimeseriesViewer': defineAsyncComponent( () => import('../../viewers/TSViewer/TSViewer.vue')),
+      'CSVViewer': defineAsyncComponent( () => import('../../viewers/CSVViewer.vue')),
+      'XLSViewer': defineAsyncComponent( () => import('../../viewers/XLSViewer.vue')),
     },
 
     mixins: [
