@@ -15,7 +15,7 @@ This template should help get you started developing with Vue 3 in Vite..
 - Do not delete your feature branch until it is merged to production 
 - Keep your feature branch up to date with __main__
 - Merge feature branches into __main__ branch to deploy to production environment
-- After a production deployment, an admin needs to update __dev__ environment by resetting it to be up to date with __main__
+- After a production deployment, an admin needs to update __dev__ environment by resetting it to be up to date with __main__. Developers with features currently merged to dev env but not yet deployed to production should be advised to merge their features back into dev if they need to continue testing them in dev environment. 
   - `git reset --hard origin/main`
   - `git push origin dev --force`
 
