@@ -17,7 +17,8 @@ This template should help get you started developing with Vue 3 in Vite.
 - Merge feature branches into __main__ branch to deploy to production environment
 - After a production deployment, an admin needs to update __dev__ environment by resetting it to be up to date with __main__. Developers with features currently merged to dev env but not yet deployed to production should be advised to merge their features back into dev if they need to continue testing them in dev environment. 
   - Navigate to `dev` branch in the terminal and run `git reset --hard origin/main`
-  - Force push dev branch `git push origin dev --force` This will trigger a new build of the `dev` branch to be deployed to the dev env. 
+  - Force push dev branch `git push origin dev --force` This will trigger a new build of the `dev` branch to be deployed to the dev env.
+- Each release should be titled with it's release number using the [Semantic Versioning](https://semver.org/) convention (v1.0.0) Please create a Release in github ([Managing Releases in A Repository](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)). 
 
 
 
