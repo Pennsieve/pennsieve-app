@@ -1,6 +1,6 @@
-# PennsieveApp
+# Pennsieve App
 
-This template should help get you started developing with Vue 3 in Vite.
+New and improved Pennsieve web app, now with Vue3!
 
 ## Deployment Strategy
 
