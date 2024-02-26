@@ -24,32 +24,22 @@
             @click="openPackageDialog"
           >
             <template #prefix>
-              <IconPlus
-                class="mr-8"
-                :height="20"
-                :width="20"
-              />
+              <IconPlus class="mr-8" :height="20" :width="20" />
             </template>
             New Folder
           </bf-button>
 
-          <bf-button
-            @click="showUpload"
-            class="mr-8 flex"
-          >
+          <bf-button @click="showUpload" class="mr-8 flex">
             <template #prefix>
-              <IconUpload class="mr-8"  :height="20" :width="20" />
+              <IconUpload class="mr-8" :height="20" :width="20" />
             </template>
 
             Upload
           </bf-button>
 
-          <bf-button
-            @click="NavToDeleted"
-            class="flex"
-          >
+          <bf-button @click="NavToDeleted" class="flex">
             <template #prefix>
-              <IconTrash class="mr-8"  :height="20" :width="20" />
+              <IconTrash class="mr-8" :height="20" :width="20" />
             </template>
 
             Restore
@@ -59,11 +49,7 @@
     </template>
 
     <div class="file-meta-wrapper">
-      <div
-        class="table-container"
-        ref="tableContainer"
-        @scroll="handleScroll"
-      >
+      <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
           :data="files"
           :multiple-selected="multipleSelected"
@@ -77,11 +63,8 @@
           @selection-change="setSelectedFiles"
           @click-file-label="onClickLabel"
         />
-        <div
-          class="loading-spinner-container"
-          v-if="filesLoading && !lastPage"
-        >
-<!--              <el-spinner class="loading-spinner" />-->
+        <div class="loading-spinner-container" v-if="filesLoading && !lastPage">
+          <!--              <el-spinner class="loading-spinner" />-->
         </div>
       </div>
       <file-metadata-info
@@ -123,7 +106,7 @@
       :file="selectedFileForAction"
       @file-renamed="onFileRenamed"
       @close="onCloseRenameFileDialog"
-      />
+    />
 
     <bf-delete-dialog
       ref="deleteDialog"
@@ -146,11 +129,10 @@
 
     <bf-upload-info v-if="showUploadInfo" />
   </bf-stage>
-
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import { mapGetters, mapActions } from "vuex";
 import {
   assocPath,
   head,
@@ -159,38 +141,37 @@ import {
   find,
   pathEq,
   findIndex,
-  pluck
-} from 'ramda'
+  pluck,
+} from "ramda";
 
-import BfRafter from '../../shared/bf-rafter/BfRafter.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
-import BfPackageDialog from './bf-package-dialog/BfPackageDialog.vue'
-import BfDeleteDialog from './bf-delete-dialog/BfDeleteDialog.vue'
-import CustomActionsDialog from './custom-actions-dialog/CustomActionsDialog.vue'
-import BfMoveDialog from './bf-move-dialog/BfMoveDialog.vue'
-import BreadcrumbNavigation from './BreadcrumbNavigation/BreadcrumbNavigation.vue'
-import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
-import BfDropInfo from './bf-drop-info/BfDropInfo.vue'
-import BfUploadInfo from './bf-upload-info/BfUploadInfo.vue'
-import FilesTable from '../../FilesTable/FilesTable.vue'
-import BfUploadMenu from './bf-upload-menu/BfUploadMenu.vue'
-import DeletedFiles from '../../DeletedFiles/DeletedFiles.vue'
-import Sorter from '../../../mixins/sorter/index'
-import Request from '../../../mixins/request/index'
-import EventBus from '../../../utils/event-bus'
-import GetFileProperty from '../../../mixins/get-file-property'
-import FileMetadataInfo from './Metadata/FileMetadataInfo.vue'
-import LockedBanner from '../LockedBanner/LockedBanner.vue'
+import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
+import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
+import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
+import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
+import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
+import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import BfDropInfo from "./bf-drop-info/BfDropInfo.vue";
+import BfUploadInfo from "./bf-upload-info/BfUploadInfo.vue";
+import FilesTable from "../../FilesTable/FilesTable.vue";
+import BfUploadMenu from "./bf-upload-menu/BfUploadMenu.vue";
+import DeletedFiles from "../../DeletedFiles/DeletedFiles.vue";
+import Sorter from "../../../mixins/sorter/index";
+import Request from "../../../mixins/request/index";
+import EventBus from "../../../utils/event-bus";
+import GetFileProperty from "../../../mixins/get-file-property";
+import FileMetadataInfo from "./Metadata/FileMetadataInfo.vue";
+import LockedBanner from "../LockedBanner/LockedBanner.vue";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
-import {copyText} from "vue3-clipboard";
+import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
 
-
 export default {
-  name: 'BfDatasetFiles',
+  name: "BfDatasetFiles",
 
   components: {
     IconUpload,
@@ -212,28 +193,28 @@ export default {
     FilesTable,
     LockedBanner,
     DeletedFiles,
-    FileMetadataInfo
+    FileMetadataInfo,
   },
 
   props: {
     fileId: {
       type: String,
-      default: ''
+      default: "",
     },
     datasetId: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
 
   mixins: [Sorter, Request, GetFileProperty],
 
-  data: function() {
+  data: function () {
     return {
       file: {
         content: {
-          name: ''
-        }
+          name: "",
+        },
       },
       ancestors: null,
       files: [],
@@ -242,7 +223,7 @@ export default {
       moveConflict: {},
       showDropInfo: false,
       // showUploadInfo: false,
-      sortDirection: 'asc',
+      sortDirection: "asc",
       singleFile: {},
       deletedDialogOpen: false,
       limit: 100,
@@ -254,53 +235,46 @@ export default {
       deleteDialogVisible: false,
       renameDialogVisible: false,
       moveDialogVisible: false,
-      selectedFileForAction: {}
-    }
+      selectedFileForAction: {},
+    };
   },
 
   computed: {
     ...mapGetters([
-      'userToken',
-      'config',
-      'uploading',
-      'dataset',
-      'hasFeature',
-      'filesProxyId',
-      'getPermission',
-      'datasetLocked'
+      "userToken",
+      "config",
+      "uploading",
+      "dataset",
+      "hasFeature",
+      "filesProxyId",
+      "getPermission",
+      "datasetLocked",
     ]),
-    ...mapGetters('uploadModule',[
-      'getIsUploading',
-      'getUploadComplete'
-    ]),
+    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    showUploadInfo: function() {
-      return this.getUploadComplete() || this.getIsUploading()
+    showUploadInfo: function () {
+      return this.getUploadComplete() || this.getIsUploading();
     },
 
     /**
      * Item has files
      */
-    hasFiles: function() {
-      return this.files.length > 0
+    hasFiles: function () {
+      return this.files.length > 0;
     },
 
     /**
      * Get files URL for dataset
      * @returns {String}
      */
-    getFilesUrl: function() {
+    getFilesUrl: function () {
       if (this.config.apiUrl && this.userToken) {
         const baseUrl =
-          this.$route.name === 'dataset-files' ? 'datasets' : 'packages'
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
-          this.$route.name === 'dataset-files'
-            ? this.datasetId
-            : this.fileId
+          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
 
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${
-          this.userToken
-        }&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
 
@@ -308,92 +282,91 @@ export default {
      * Get move URL
      * @returns {String}
      */
-    moveUrl: function() {
+    moveUrl: function () {
       if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/data/move?api_key=${this.userToken}`
-      } else return null
+        return `${this.config.apiUrl}/data/move?api_key=${this.userToken}`;
+      } else return null;
     },
 
     /**
      * Compute if multiple files are selected
      * @returns {Boolean}
      */
-    multipleSelected: function() {
-      return this.selectedFiles.length > 1
+    multipleSelected: function () {
+      return this.selectedFiles.length > 1;
     },
 
     /**
      * Compute if the user has explore feature flag
      * @returns {Boolean}
      */
-    isExploreEnabled: function() {
-      return this.hasFeature('concepts_feature')
-    }
+    isExploreEnabled: function () {
+      return this.hasFeature("concepts_feature");
+    },
   },
 
   watch: {
     /**
      * Trigger API request when URL is changed
      */
-    getFilesUrl: function() {
-      this.fetchFiles()
+    getFilesUrl: function () {
+      this.fetchFiles();
     },
 
-    '$store.state.uploadModule.uploadComplete': function() {
-      console.log('upload complete timer')
+    "$store.state.uploadModule.uploadComplete": function () {
+      console.log("upload complete timer");
       setTimeout(() => {
-        this.showUploadInfo = false
-        this.resetUpload()
-      }, 3000)
+        this.showUploadInfo = false;
+        this.resetUpload();
+      }, 3000);
     },
 
-
-    '$route.query.pkgId': {
-      handler: function(val, old) {
+    "$route.query.pkgId": {
+      handler: function (val, old) {
         if (val !== old) {
-          this.scrollToFile(val)
+          this.scrollToFile(val);
         }
-      }
-    }
+      },
+    },
   },
 
-  mounted: function() {
+  mounted: function () {
     if (this.getFilesUrl && !this.files.length) {
-      this.fetchFiles()
+      this.fetchFiles();
     }
-    this.$el.addEventListener('dragenter', this.onDragEnter.bind(this))
-    EventBus.$on('add-uploaded-file', this.onAddUploadedFile.bind(this))
-    EventBus.$on('dismiss-upload-info', this.onDismissUploadInfo.bind(this))
-    EventBus.$on('rename-file', this.showRenameFileDialog.bind(this))
+    this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
+    EventBus.$on("add-uploaded-file", this.onAddUploadedFile.bind(this));
+    EventBus.$on("dismiss-upload-info", this.onDismissUploadInfo.bind(this));
+    EventBus.$on("rename-file", this.showRenameFileDialog.bind(this));
 
     EventBus.$on(
-      'update-uploaded-file-state',
+      "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
-    )
-    EventBus.$on('update-external-file', this.onFileRenamed)
-    EventBus.$on('openDeletedModal', data => {
-      this.deletedDialogOpen = data
-      this.fetchDeleted()
-    })
-    EventBus.$on('refreshAfterDeleteModal', data => {
-      var temp = data
-      this.fetchFiles()
-    })
-    EventBus.$on('refreshAfterRestore', () => {
-      this.fetchFiles()
-    })
+    );
+    EventBus.$on("update-external-file", this.onFileRenamed);
+    EventBus.$on("openDeletedModal", (data) => {
+      this.deletedDialogOpen = data;
+      this.fetchDeleted();
+    });
+    EventBus.$on("refreshAfterDeleteModal", (data) => {
+      var temp = data;
+      this.fetchFiles();
+    });
+    EventBus.$on("refreshAfterRestore", () => {
+      this.fetchFiles();
+    });
   },
 
-  unmounted: function() {
-    this.$el.removeEventListener('dragenter', this.onDragEnter.bind(this))
-    EventBus.$off('rename-file', this.showRenameFileDialog.bind(this))
-    EventBus.$off('add-uploaded-file', this.onAddUploadedFile.bind(this))
-    EventBus.$off('dismiss-upload-info', this.onDismissUploadInfo.bind(this))
+  unmounted: function () {
+    this.$el.removeEventListener("dragenter", this.onDragEnter.bind(this));
+    EventBus.$off("rename-file", this.showRenameFileDialog.bind(this));
+    EventBus.$off("add-uploaded-file", this.onAddUploadedFile.bind(this));
+    EventBus.$off("dismiss-upload-info", this.onDismissUploadInfo.bind(this));
     EventBus.$off(
-      'update-uploaded-file-state',
+      "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
-    )
-    EventBus.$off('update-external-file', this.onFileRenamed)
+    );
+    EventBus.$off("update-external-file", this.onFileRenamed);
   },
 
   /**
@@ -403,82 +376,79 @@ export default {
    * @param {Function} next
    */
   beforeRouteUpdate(to, from, next) {
-    this.resetSelectedFiles()
+    this.resetSelectedFiles();
 
-    next()
+    next();
   },
 
   methods: {
-    ...mapActions('uploadModule',[
-      'resetUpload'
-    ]),
-
+    ...mapActions("uploadModule", ["resetUpload"]),
 
     // Ignore drops to component outside the drop target and close drop-target
-    onDrop: function(e) {
-      e.preventDefault()
-      e.stopPropagation()
-      this.showDropInfo = false
+    onDrop: function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showDropInfo = false;
     },
-    onCloseRenameFileDialog: function() {
-      this.renameDialogVisible = false
+    onCloseRenameFileDialog: function () {
+      this.renameDialogVisible = false;
     },
-    showRenameFileDialog: function() {
-      this.selectedFileForAction = this.selectedFiles[0]
-      this.renameDialogVisible = true
+    showRenameFileDialog: function () {
+      this.selectedFileForAction = this.selectedFiles[0];
+      this.renameDialogVisible = true;
     },
-    showDeleteDialog: function() {
-      this.selectedFileForAction = {}
-      this.deleteDialogVisible = true
+    showDeleteDialog: function () {
+      this.selectedFileForAction = {};
+      this.deleteDialogVisible = true;
     },
-    onCloseDeleteDialog: function() {
-      this.deleteDialogVisible = false
+    onCloseDeleteDialog: function () {
+      this.deleteDialogVisible = false;
     },
-    onClosePackageDialog: function(){
-      this.packageDialogVisible = false
+    onClosePackageDialog: function () {
+      this.packageDialogVisible = false;
     },
-    handleScroll: function(event) {
-      const { clientHeight, scrollTop, scrollHeight } = event.currentTarget
+    handleScroll: function (event) {
+      const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
 
-      const atBottomOfWindow = clientHeight === scrollHeight - scrollTop
+      const atBottomOfWindow = clientHeight === scrollHeight - scrollTop;
       if (
         atBottomOfWindow &&
         this.files.length >= this.limit &&
         this.allowFetch
       ) {
-        this.allowFetch = false
-        this.offset = this.offset + this.limit
-        event.currentTarget.scrollTop = scrollTop - 20
+        this.allowFetch = false;
+        this.offset = this.offset + this.limit;
+        event.currentTarget.scrollTop = scrollTop - 20;
       }
     },
     //Navigates to dataset trash bin modal
-    NavToDeleted: function() {
+    NavToDeleted: function () {
       //CONSIDER DOING SOMETHING LIKE FETCHFILES()
-      EventBus.$emit('openDeletedModal', true)
+      EventBus.$emit("openDeletedModal", true);
     },
-    fetchDeleted: function() {
-      EventBus.$emit('fetchDeleted', true)
+    fetchDeleted: function () {
+      EventBus.$emit("fetchDeleted", true);
     },
 
-    closeDeletedDialog: function() {
-      this.deletedDialogOpen = false
+    closeDeletedDialog: function () {
+      this.deletedDialogOpen = false;
     },
 
     /**
      * Set selected files
      * @param {Array} selection
      */
-    setSelectedFiles: function(selection) {
-      console.log('set selected files' + selection)
-      this.selectedFiles = selection
+    setSelectedFiles: function (selection) {
+      console.log("set selected files" + selection);
+      this.selectedFiles = selection;
     },
 
     /**
      * Reset selected files state
      */
-    resetSelectedFiles: function() {
-      this.selectedFiles = []
-      this.lastSelectedFile = {}
+    resetSelectedFiles: function () {
+      this.selectedFiles = [];
+      this.lastSelectedFile = {};
     },
 
     /**
@@ -486,100 +456,98 @@ export default {
      * @param {Object} file
      * @returns {String}
      */
-    getSubType: function(file) {
-      const subtype = this.getFilePropertyVal(file.properties, 'subtype')
+    getSubType: function (file) {
+      const subtype = this.getFilePropertyVal(file.properties, "subtype");
 
-      let defaultType = ''
-      const packageType = pathOr('', ['content', 'packageType'], file)
+      let defaultType = "";
+      const packageType = pathOr("", ["content", "packageType"], file);
       switch (packageType) {
-        case 'Collection':
-          defaultType = 'Folder'
-          break
-        case 'ExternalFile':
-          defaultType = 'External File'
-          break
+        case "Collection":
+          defaultType = "Folder";
+          break;
+        case "ExternalFile":
+          defaultType = "External File";
+          break;
         default:
-          break
+          break;
       }
 
-      return subtype ? subtype : defaultType
+      return subtype ? subtype : defaultType;
     },
 
     /**
      * Send API request to get files for item
      */
-    fetchFiles: function() {
-      this.filesLoading = true
+    fetchFiles: function () {
+      this.filesLoading = true;
       this.sendXhr(this.getFilesUrl)
-        .then(response => {
-          this.filesLoading = true
-          this.file = response
+        .then((response) => {
+          this.filesLoading = true;
+          this.file = response;
 
-
-
-          const newFiles = response.children.map(file => {
+          const newFiles = response.children.map((file) => {
             if (!file.storage) {
-              file.storage = 0
+              file.storage = 0;
             }
             file.icon =
-              file.icon || this.getFilePropertyVal(file.properties, 'icon')
-            file.subtype = this.getSubType(file)
-            return file
-          })
+              file.icon || this.getFilePropertyVal(file.properties, "icon");
+            file.subtype = this.getSubType(file);
+            return file;
+          });
           if (newFiles.length < this.limit) {
-            this.lastPage = true
+            this.lastPage = true;
           }
-          this.files = this.offset > 0 ? [...this.files, ...newFiles] : newFiles
+          this.files =
+            this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
           this.sortedFiles = this.returnSort(
-            'content.name',
+            "content.name",
             this.files,
             this.sortDirection
-          )
-          this.ancestors = response.ancestors
+          );
+          this.ancestors = response.ancestors;
 
-          const pkgId = pathOr('', ['query', 'pkgId'], this.$route)
+          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
           if (pkgId) {
-            this.scrollToFile(pkgId)
+            this.scrollToFile(pkgId);
           }
-          this.allowFetch = true
-          this.filesLoading = false
+          this.allowFetch = true;
+          this.filesLoading = false;
         })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+        .catch((response) => {
+          this.handleXhrError(response);
+        });
     },
     /**
      * Sort table by column
      * @param {String} path
      * @param {String} dir
      */
-    sortColumn: function(path, dir = '') {
-      this.sortedFiles = this.returnSort(path, this.files, dir)
+    sortColumn: function (path, dir = "") {
+      this.sortedFiles = this.returnSort(path, this.files, dir);
     },
 
     /**
      * Handler for clicking file
      * @param {Object} file
      */
-    onClickLabel: function(file) {
-      this.files = []
-      this.offset = 0
-      this.getFilesUrl
-      const id = pathOr('', ['content', 'id'], file)
-      const packageType = pathOr('', ['content', 'packageType'], file)
+    onClickLabel: function (file) {
+      this.files = [];
+      this.offset = 0;
+      this.getFilesUrl;
+      const id = pathOr("", ["content", "id"], file);
+      const packageType = pathOr("", ["content", "packageType"], file);
 
-      if (id === '') {
-        return
+      if (id === "") {
+        return;
       }
 
-      if (packageType === 'Collection') {
-        this.navigateToFile(id)
+      if (packageType === "Collection") {
+        this.navigateToFile(id);
       } else {
         this.$router.push({
-          name: 'file-record',
-          params: { fileId: id }
-        })
-
+          name: "file-record",
+          params: { fileId: id },
+        });
       }
     },
 
@@ -587,11 +555,11 @@ export default {
      * Handler for clicking the file's menu button
      * @param {Object} file
      */
-    onClickMenu: function(file) {
+    onClickMenu: function (file) {
       // Check if the file is selected, and add it if it is not
       if (this.selectedFiles.indexOf(file) < 0) {
-        this.selectedFiles = [file]
-        this.lastSelectedFile = file
+        this.selectedFiles = [file];
+        this.lastSelectedFile = file;
       }
     },
 
@@ -599,15 +567,15 @@ export default {
      * Handler for breadcrumb overflow navigation
      * @param {String} id
      */
-    handleNavigateBreadcrumb: function(id = '') {
-      this.files = []
-      this.offset = 0
-      this.getFilesUrl
-      console.log("id: " + id)
+    handleNavigateBreadcrumb: function (id = "") {
+      this.files = [];
+      this.offset = 0;
+      this.getFilesUrl;
+      console.log("id: " + id);
       if (id) {
-        this.navigateToFile(id)
+        this.navigateToFile(id);
       } else {
-        this.navigateToDataset()
+        this.navigateToDataset();
       }
     },
 
@@ -615,44 +583,44 @@ export default {
      * Navigate to file
      * @param {String} id
      */
-    navigateToFile: function(id) {
-      this.$router.push({ name: 'collection-files', params: { fileId: id } })
+    navigateToFile: function (id) {
+      this.$router.push({ name: "collection-files", params: { fileId: id } });
     },
 
     /**
      * Navigate to dataset route
      */
-    navigateToDataset: function() {
-      this.$router.push({ name: 'dataset-files' })
+    navigateToDataset: function () {
+      this.$router.push({ name: "dataset-files" });
     },
 
     /**
      * Handler for renaming file
      * @param {Object} updatedFile
      */
-    onFileRenamed: function(updatedFile) {
-      const id = pathOr('', ['content', 'id'], updatedFile)
-      const file = find(pathEq(['content', 'id'], id), this.files)
+    onFileRenamed: function (updatedFile) {
+      const id = pathOr("", ["content", "id"], updatedFile);
+      const file = find(pathEq(["content", "id"], id), this.files);
 
       if (file) {
-        file.content.name = updatedFile.content.name
+        file.content.name = updatedFile.content.name;
       }
-      this.sortColumn(this.sortBy, this.sortDirection)
+      this.sortColumn(this.sortBy, this.sortDirection);
     },
 
     /**
      * Handler for creating folder
      * @param {Object} folder
      */
-    onFolderCreated: function(folder) {
-      this.files.push(folder)
-      this.sortColumn(this.sortBy, this.sortDirection)
+    onFolderCreated: function (folder) {
+      this.files.push(folder);
+      this.sortColumn(this.sortBy, this.sortDirection);
     },
 
     /**
      * Open the package dialog
      */
-    openPackageDialog: function() {
+    openPackageDialog: function () {
       this.packageDialogVisible = true;
       // this.$refs.packageDialog.visible = true
     },
@@ -660,47 +628,48 @@ export default {
     /**
      * Show customActions dialog
      */
-    showCustomActionsDialog: function() {
-      this.$refs.customActionsDialog.visible = true
+    showCustomActionsDialog: function () {
+      console.log("**this.$refs", this.$refs.customActionsDialog.visible);
+      this.$refs.customActionsDialog.visible = true;
     },
 
     /**
      * Handler for delete XHR
      */
-    onDelete: function(response) {
-      const successItems = propOr([], 'success', response)
-      this.removeItems(successItems)
+    onDelete: function (response) {
+      const successItems = propOr([], "success", response);
+      this.removeItems(successItems);
     },
 
     /**
      * Remove items from files list
      * @param {Object} items
      */
-    removeItems: function(items) {
+    removeItems: function (items) {
       // Remove all successfully deleted files
       for (let i = 0; i < items.length; i++) {
         const fileIndex = findIndex(
-          pathEq(['content', 'id'], items[i]),
+          pathEq(["content", "id"], items[i]),
           this.files
-        )
-        this.files.splice(fileIndex, 1)
+        );
+        this.files.splice(fileIndex, 1);
       }
       // Resort files
-      this.sortColumn(this.sortBy, this.sortDirection)
-      this.resetSelectedFiles()
+      this.sortColumn(this.sortBy, this.sortDirection);
+      this.resetSelectedFiles();
     },
 
     /**
      * Show move dialog
      */
-    showMove: function() {
-      this.moveDialogVisible = true
-      const moveDialog = this.$refs.moveDialog
-      moveDialog.file = this.file
-      moveDialog.visible = true
+    showMove: function () {
+      this.moveDialogVisible = true;
+      const moveDialog = this.$refs.moveDialog;
+      moveDialog.file = this.file;
+      moveDialog.visible = true;
     },
-    onCloseMoveDialog: function() {
-      this.moveDialogVisible = false
+    onCloseMoveDialog: function () {
+      this.moveDialogVisible = false;
     },
 
     /**
@@ -708,22 +677,22 @@ export default {
      * @param {String} destination}
      * @param {Array} items
      */
-    moveItems: function(destination, items) {
+    moveItems: function (destination, items) {
       if (this.moveUrl) {
-        const things = items.map(item => item.content.id)
+        const things = items.map((item) => item.content.id);
         this.sendXhr(this.moveUrl, {
-          method: 'POST',
+          method: "POST",
           body: {
             destination,
-            things
-          }
+            things,
+          },
         })
-          .then(response => {
-            this.onMoveItems(response)
+          .then((response) => {
+            this.onMoveItems(response);
           })
-          .catch(response => {
-            this.handleXhrError(response)
-          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
       }
     },
 
@@ -731,28 +700,28 @@ export default {
      * Handler for move items endpoint request
      * @param {Object} response
      */
-    onMoveItems: function(response) {
+    onMoveItems: function (response) {
       // Remove successful items from the files list
-      const successItems = propOr([], 'success', response)
-      this.removeItems(successItems)
+      const successItems = propOr([], "success", response);
+      this.removeItems(successItems);
 
       // Handle conflict items
-      const failures = propOr([], 'failures', response)
-      const failureIds = pluck('id', failures)
-      const failureItems = failureIds.map(id => {
-        return find(pathEq(['content', 'id'], id), this.files)
-      })
+      const failures = propOr([], "failures", response);
+      const failureIds = pluck("id", failures);
+      const failureItems = failureIds.map((id) => {
+        return find(pathEq(["content", "id"], id), this.files);
+      });
 
       // Show failure dialog
       if (failureItems.length > 0) {
         this.moveConflict = {
           display: failureItems,
           files: failures,
-          destination: propOr(null, 'destination', response)
-        }
+          destination: propOr(null, "destination", response),
+        };
 
         // Show user notice of conflicts
-        this.$refs.moveDialog.visible = true
+        this.$refs.moveDialog.visible = true;
       }
     },
 
@@ -761,87 +730,85 @@ export default {
      * @param {String} destination
      * @param {Array} files
      */
-    onRenameConflicts: function(destination, files) {
+    onRenameConflicts: function (destination, files) {
       // Rename each file with proposed new name
-      const promises = files.map(obj => {
-        const id = propOr('', 'id', obj)
-        const url = `${this.config.apiUrl}/packages/${id}?api_key=${
-          this.userToken
-        }`
+      const promises = files.map((obj) => {
+        const id = propOr("", "id", obj);
+        const url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}`;
 
         return this.sendXhr(url, {
-          method: 'PUT',
+          method: "PUT",
           body: {
-            name: propOr('', 'generatedName', obj)
-          }
-        })
-      })
-      Promise.all(promises).then(response => {
+            name: propOr("", "generatedName", obj),
+          },
+        });
+      });
+      Promise.all(promises).then((response) => {
         // Move files again, now with new name
-        this.moveItems(destination, response)
+        this.moveItems(destination, response);
 
         // Reset
-        this.moveConflict = {}
+        this.moveConflict = {};
 
         // Hide user notice of conflicts
-        this.$refs.moveDialog.visible = false
-      })
+        this.$refs.moveDialog.visible = false;
+      });
     },
 
     /**
      * On drag enter, hide drop info
      * @param {Object} evt
      */
-    onDragEnter: function(evt) {
+    onDragEnter: function (evt) {
       if (
         evt.dataTransfer.types &&
         this.datasetLocked === false &&
-        this.getPermission('editor')
+        this.getPermission("editor")
       ) {
         for (let i = 0; i < evt.dataTransfer.types.length; i++) {
-          if (evt.dataTransfer.types[i] === 'Files') {
-            evt.dataTransfer.dropEffect = 'copy'
-            evt.preventDefault()
-            this.showDropInfo = true
-            return true
+          if (evt.dataTransfer.types[i] === "Files") {
+            evt.dataTransfer.dropEffect = "copy";
+            evt.preventDefault();
+            this.showDropInfo = true;
+            return true;
           }
         }
       }
-      this.showDropInfo = false
+      this.showDropInfo = false;
     },
 
     /**
      * Show upload
      */
-    showUpload: function() {
-      EventBus.$emit('open-uploader', true)
+    showUpload: function () {
+      EventBus.$emit("open-uploader", true);
 
       // Update upload location
-      this.$store.dispatch('updateUploadDestination', this.file)
+      this.$store.dispatch("updateUploadDestination", this.file);
     },
 
     /**
      * Update files list
      * @param {Object} evt
      */
-    onAddUploadedFile: function(evt) {
-      const { packageDTO, uploadDestination } = evt
-      const uploadId = propOr('', 'id', uploadDestination)
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const fId = pathOr('', ['params', 'fileId'], this.$route)
+    onAddUploadedFile: function (evt) {
+      const { packageDTO, uploadDestination } = evt;
+      const uploadId = propOr("", "id", uploadDestination);
+      const datasetId = pathOr("", ["params", "datasetId"], this.$route);
+      const fId = pathOr("", ["params", "fileId"], this.$route);
 
-      const exists = this.checkExists(packageDTO)
-      const isParent = this.checkIsParent(packageDTO)
+      const exists = this.checkExists(packageDTO);
+      const isParent = this.checkIsParent(packageDTO);
 
       if (
         (uploadId === datasetId || uploadId === fId) &&
         exists === false &&
         isParent
       ) {
-        this.files.push(packageDTO)
+        this.files.push(packageDTO);
         // Resort files
-        this.sortColumn(this.sortBy, this.sortDirection)
-        this.resetSelectedFiles()
+        this.sortColumn(this.sortBy, this.sortDirection);
+        this.resetSelectedFiles();
       }
     },
 
@@ -851,10 +818,10 @@ export default {
      * @param {Object} item
      * @returns {Boolean}
      */
-    checkExists: function(item) {
-      const id = pathOr('', ['content', 'id'], item)
-      const idx = findIndex(pathEq(['content', 'id'], id), this.files)
-      return idx >= 0
+    checkExists: function (item) {
+      const id = pathOr("", ["content", "id"], item);
+      const idx = findIndex(pathEq(["content", "id"], id), this.files);
+      return idx >= 0;
     },
 
     /**
@@ -862,35 +829,35 @@ export default {
      * @param {Object} item
      * @returns {Boolean}
      */
-    checkIsParent: function(item) {
-      const datasetId = pathOr('', ['content', 'id'], this.dataset)
-      const parentId = pathOr(datasetId, ['parent', 'content', 'id'], item)
-      const currentId = pathOr(0, ['content', 'id'], this.file)
+    checkIsParent: function (item) {
+      const datasetId = pathOr("", ["content", "id"], this.dataset);
+      const parentId = pathOr(datasetId, ["parent", "content", "id"], item);
+      const currentId = pathOr(0, ["content", "id"], this.file);
 
-      return parentId === currentId
+      return parentId === currentId;
     },
 
     /**
      * Update uploaded file state
      * @param {Object} evt
      */
-    onUpdateUploadedFileState: function(evt) {
-      const { packageDTO } = evt
-      const pkgId = pathOr('', ['content', 'id'], packageDTO)
+    onUpdateUploadedFileState: function (evt) {
+      const { packageDTO } = evt;
+      const pkgId = pathOr("", ["content", "id"], packageDTO);
 
-      const idx = this.files.findIndex(file => {
-        const id = propOr('', 'id', file.content)
+      const idx = this.files.findIndex((file) => {
+        const id = propOr("", "id", file.content);
         if (id === pkgId) {
-          return file
+          return file;
         }
-      })
+      });
 
       if (idx >= 0) {
-        this.$set(this.files, idx, packageDTO)
+        this.$set(this.files, idx, packageDTO);
 
         // Resort files
-        this.sortColumn(this.sortBy, this.sortDirection)
-        this.resetSelectedFiles()
+        this.sortColumn(this.sortBy, this.sortDirection);
+        this.resetSelectedFiles();
       }
     },
 
@@ -898,29 +865,29 @@ export default {
      * Scroll to file in list
      * @param {String} pkgId
      */
-    scrollToFile: function(pkgId) {
+    scrollToFile: function (pkgId) {
       this.$nextTick(() => {
-        const trimmedId = pkgId.replace(/:/g, '')
-        const element = document.querySelectorAll(`.file-row-${trimmedId}`)
+        const trimmedId = pkgId.replace(/:/g, "");
+        const element = document.querySelectorAll(`.file-row-${trimmedId}`);
 
         if (element.length) {
-          head(element).scrollIntoView()
+          head(element).scrollIntoView();
 
-          element.forEach(row => {
-            row.classList.add('highlight')
+          element.forEach((row) => {
+            row.classList.add("highlight");
 
             setTimeout(() => {
-              row.classList.remove('highlight')
-            }, 500)
-          })
+              row.classList.remove("highlight");
+            }, 500);
+          });
         }
-      })
+      });
     },
 
     /**
      * Handle dismiss upload info event
      */
-    onDismissUploadInfo: function() {
+    onDismissUploadInfo: function () {
       // this.showUploadInfo = false
       // this.$store.dispatch('updateTotalUploadSize', 0)
       // this.$store.dispatch('updateUploadCount', 0)
@@ -930,118 +897,106 @@ export default {
      * Handle upload menu click event
      * @param {String} command
      */
-    onUploadMenuClick: function(command) {
+    onUploadMenuClick: function (command) {
       const options = {
         file: this.showUpload,
-        'external-file': this.openUploadExternalFileDialog
-      }
+        "external-file": this.openUploadExternalFileDialog,
+      };
 
-      const handler = options[command]
-      if (typeof handler === 'function') {
-        handler()
+      const handler = options[command];
+      if (typeof handler === "function") {
+        handler();
       }
     },
 
     /**
      * Open upload external file modal
      */
-    openUploadExternalFileDialog: function() {
-      EventBus.$emit('open-external-file-modal')
+    openUploadExternalFileDialog: function () {
+      EventBus.$emit("open-external-file-modal");
     },
 
     /**
      * Process file and update the state of the file
      * @param {Object} file
      */
-    processFile: function(file) {
-      const packageId = pathOr('', ['content', 'id'], file)
-      const url = `${
-        this.config.apiUrl
-      }/packages/${packageId}/process?api_key=${this.userToken}`
+    processFile: function (file) {
+      const packageId = pathOr("", ["content", "id"], file);
+      const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${this.userToken}`;
 
       this.sendXhr(url, {
-        method: 'PUT',
+        method: "PUT",
         header: {
-          Authorization: `bearer ${this.userToken}`
-        }
+          Authorization: `bearer ${this.userToken}`,
+        },
       })
         .then(() => {
           // Update the file's state to show that it is processing
           const updatedFile = assocPath(
-            ['content', 'state'],
-            'PROCESSING',
+            ["content", "state"],
+            "PROCESSING",
             file
-          )
-          this.onUpdateUploadedFileState({ packageDTO: updatedFile })
+          );
+          this.onUpdateUploadedFileState({ packageDTO: updatedFile });
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(this.handleXhrError.bind(this));
     },
 
     /**
      * Get a presigned URL and copy the URL to the clipboard
      * @param {Object} file
      */
-    getPresignedUrl: function(file) {
-      const packageId = pathOr('', ['content', 'id'], file)
+    getPresignedUrl: function (file) {
+      const packageId = pathOr("", ["content", "id"], file);
 
       // Get the files for the package
-      const url = `${
-        this.config.apiUrl
-      }/packages/${packageId}?include=sources&includeAncestors=false&api_key=${
-        this.userToken
-      }`
+      const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${this.userToken}`;
       this.sendXhr(url, {
-        method: 'GET',
+        method: "GET",
         header: {
-          Authorization: `bearer ${this.userToken}`
-        }
+          Authorization: `bearer ${this.userToken}`,
+        },
       })
-        .then(response => {
+        .then((response) => {
           const fId = pathOr(
-            '',
-            ['objects', 'source', 0, 'content', 'id'],
+            "",
+            ["objects", "source", 0, "content", "id"],
             response
-          )
-          const url = `${
-            this.config.apiUrl
-          }/packages/${packageId}/files/${fId}?short=true&api_key=${
-            this.userToken
-          }`
+          );
+          const url = `${this.config.apiUrl}/packages/${packageId}/files/${fId}?short=true&api_key=${this.userToken}`;
           this.sendXhr(url, {
-            method: 'GET',
+            method: "GET",
             header: {
-              Authorization: `bearer ${this.userToken}`
-            }
+              Authorization: `bearer ${this.userToken}`,
+            },
           })
-            .then(response => {
-              copyText(pathOr('', ['url'], response))
-              const msg = 'Temporary link to file copied to clipboard'
-              EventBus.$emit('toast', {
+            .then((response) => {
+              copyText(pathOr("", ["url"], response));
+              const msg = "Temporary link to file copied to clipboard";
+              EventBus.$emit("toast", {
                 detail: {
-                  type: 'success',
-                  msg
-                }
-              })
+                  type: "success",
+                  msg,
+                },
+              });
             })
-            .catch(response => {
-              this.handleXhrError(response)
-            })
+            .catch((response) => {
+              this.handleXhrError(response);
+            });
         })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
-    }
-  }
-
-}
+        .catch((response) => {
+          this.handleXhrError(response);
+        });
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
-
+@import "../../../assets/_variables.scss";
 
 .bf-stage-file {
- height: calc(100vh - 180px);
+  height: calc(100vh - 180px);
 }
 .loading-spinner-container {
   display: flex;
@@ -1059,7 +1014,6 @@ export default {
   display: block;
   margin-top: 1px;
   border: 1px solid $gray_2;
-
 }
 
 .actions-container {
@@ -1098,8 +1052,7 @@ export default {
   position: relative;
   display: flex;
   flex-direction: row;
-  flex:1;
-
+  flex: 1;
 }
 
 .bf-dataset-files {

@@ -19,11 +19,7 @@
               :disabled="datasetLocked"
               @click="$emit('restore')"
             >
-              <IconMoveFile
-                class="mr-8"
-                :height="16"
-                :width="16"
-              />
+              <IconMoveFile class="mr-8" :height="16" :width="16" />
               Restore the {{ selectionCountLabel }}
             </button>
           </li>
@@ -45,55 +41,43 @@
               :disabled="datasetLocked"
               @click="$emit('move')"
             >
-              <IconMoveFile
-                class="mr-8"
-                :height="16"
-                :width="16"
-              />
+              <IconMoveFile class="mr-8" :height="16" :width="16" />
               Move to&hellip;
             </button>
           </li>
-          <li class="mr-8" v-if="false">
+          <li class="mr-8">
             <button
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('custom-actions-click')"
             >
-              <IconDoneCheckCircle
-                class="mr-8"
-                :height="16"
-                :width="16"
-              />
+              <IconDoneCheckCircle class="mr-8" :height="16" :width="16" />
               Actions
             </button>
           </li>
         </template>
         <li>
-          <button class="linked btn-selection-action mr-8" @click="onDownloadClick">
-            <IconUpload
-              class="mr-8"
-              :height="16"
-              :width="16"
-            />
+          <button
+            class="linked btn-selection-action mr-8"
+            @click="onDownloadClick"
+          >
+            <IconUpload class="mr-8" :height="16" :width="16" />
             Download
           </button>
         </li>
         <li>
-            <table-menu
-              v-if="getPermission('editor') || searchAllDataMenu"
-              :file="activeRow"
-              :multiple-selected="multipleSelected"
-              :search-all-data-menu="searchAllDataMenu"
-              @delete="deleteFile"
-              @move="moveFile"
-              @download-file="downloadFile"
-              @process-file="processFile"
-              @copy-url="getPresignedUrl"
-            />
+          <table-menu
+            v-if="getPermission('editor') || searchAllDataMenu"
+            :file="activeRow"
+            :multiple-selected="multipleSelected"
+            :search-all-data-menu="searchAllDataMenu"
+            @delete="deleteFile"
+            @move="moveFile"
+            @download-file="downloadFile"
+            @process-file="processFile"
+            @copy-url="getPresignedUrl"
+          />
         </li>
-
-
-
       </ul>
     </div>
 
@@ -114,20 +98,20 @@
         fixed
         width="50"
       />
-<!--      <el-table-column-->
-<!--        v-if="searchAllDataMenu"-->
-<!--        prop="datasetName"-->
-<!--        label="Dataset"-->
-<!--        :sortable="true"-->
-<!--        :sort-orders="sortOrders"-->
-<!--      >-->
-<!--        <template #header>-->
-<!--          <div class="column-header">-->
-<!--            Dataset-->
-<!--          </div>-->
+      <!--      <el-table-column-->
+      <!--        v-if="searchAllDataMenu"-->
+      <!--        prop="datasetName"-->
+      <!--        label="Dataset"-->
+      <!--        :sortable="true"-->
+      <!--        :sort-orders="sortOrders"-->
+      <!--      >-->
+      <!--        <template #header>-->
+      <!--          <div class="column-header">-->
+      <!--            Dataset-->
+      <!--          </div>-->
 
-<!--        </template>-->
-<!--      </el-table-column>-->
+      <!--        </template>-->
+      <!--      </el-table-column>-->
       <el-table-column
         prop="content.name"
         label="Name"
@@ -137,10 +121,7 @@
         :sortable="!isSearchResults"
         :sort-orders="sortOrders"
       >
-        <template #header>
-
-              Name
-        </template>
+        <template #header> Name </template>
         <template #default="scope">
           <bf-file-label
             :file="scope.row"
@@ -157,9 +138,7 @@
           :sortable="!isSearchResults"
           :sort-orders="sortOrders"
         >
-          <template #header>
-            Kind
-          </template>
+          <template #header> Kind </template>
         </el-table-column>
 
         <el-table-column
@@ -168,9 +147,7 @@
           :sortable="!isSearchResults"
           :sort-orders="sortOrders"
         >
-          <template #header>
-            Size
-          </template>
+          <template #header> Size </template>
           <template #default="scope">
             {{ formatMetric(scope.row.storage) }}
           </template>
@@ -182,62 +159,60 @@
           :sortable="!isSearchResults"
           :sort-orders="sortOrders"
         >
-          <template #header>
-            Date Created
-          </template>
+          <template #header> Date Created </template>
           <template #default="scope">
             {{ formatDate(scope.row.content.createdAt) }}
           </template>
         </el-table-column>
-<!--        <el-table-column-->
-<!--          label=""-->
-<!--          fixed="right"-->
-<!--          align="right"-->
-<!--          width="54"-->
-<!--          :sortable="false"-->
-<!--          :resizable="false"-->
-<!--        >-->
-<!--          <template #default="scope">-->
-<!--            <div class="file-actions-wrap">-->
-<!--              <table-menu-->
-<!--                v-if="getPermission('editor') || searchAllDataMenu"-->
-<!--                :file="scope.row"-->
-<!--                :multiple-selected="multipleSelected"-->
-<!--                :search-all-data-menu="searchAllDataMenu"-->
-<!--                @delete="deleteFile"-->
-<!--                @move="moveFile"-->
-<!--                @download-file="downloadFile"-->
-<!--                @process-file="processFile"-->
-<!--                @copy-url="getPresignedUrl"-->
-<!--              />-->
-<!--            </div>-->
-<!--          </template>-->
-<!--        </el-table-column>-->
+        <!--        <el-table-column-->
+        <!--          label=""-->
+        <!--          fixed="right"-->
+        <!--          align="right"-->
+        <!--          width="54"-->
+        <!--          :sortable="false"-->
+        <!--          :resizable="false"-->
+        <!--        >-->
+        <!--          <template #default="scope">-->
+        <!--            <div class="file-actions-wrap">-->
+        <!--              <table-menu-->
+        <!--                v-if="getPermission('editor') || searchAllDataMenu"-->
+        <!--                :file="scope.row"-->
+        <!--                :multiple-selected="multipleSelected"-->
+        <!--                :search-all-data-menu="searchAllDataMenu"-->
+        <!--                @delete="deleteFile"-->
+        <!--                @move="moveFile"-->
+        <!--                @download-file="downloadFile"-->
+        <!--                @process-file="processFile"-->
+        <!--                @copy-url="getPresignedUrl"-->
+        <!--              />-->
+        <!--            </div>-->
+        <!--          </template>-->
+        <!--        </el-table-column>-->
       </template>
     </el-table>
   </div>
 </template>
 
 <script>
-import { pathOr, propOr } from 'ramda'
-import { mapGetters, mapState } from 'vuex'
-import EventBus from '../../utils/event-bus'
+import { pathOr, propOr } from "ramda";
+import { mapGetters, mapState } from "vuex";
+import EventBus from "../../utils/event-bus";
 
-import BfFileLabel from '../datasets/files/bf-file/BfFileLabel.vue'
-import TableMenu from '../TableMenu/TableMenu.vue'
+import BfFileLabel from "../datasets/files/bf-file/BfFileLabel.vue";
+import TableMenu from "../TableMenu/TableMenu.vue";
 
-import BfStorageMetrics from '../../mixins/bf-storage-metrics'
-import FileIcon from '../../mixins/file-icon/index'
-import FormatDate from '../../mixins/format-date'
-import TableFunctions from '../../mixins/table-functions'
-import Sorter from '../../mixins/sorter'
+import BfStorageMetrics from "../../mixins/bf-storage-metrics";
+import FileIcon from "../../mixins/file-icon/index";
+import FormatDate from "../../mixins/format-date";
+import TableFunctions from "../../mixins/table-functions";
+import Sorter from "../../mixins/sorter";
 import IconMoveFile from "../icons/IconMoveFile.vue";
 import IconDoneCheckCircle from "../icons/IconDoneCheckCircle.vue";
 import IconUpload from "../icons/IconUpload.vue";
-import IconMenu from "../icons/IconMenu.vue"
+import IconMenu from "../icons/IconMenu.vue";
 
 export default {
-  name: 'FilesTable',
+  name: "FilesTable",
 
   components: {
     IconUpload,
@@ -245,7 +220,7 @@ export default {
     IconMoveFile,
     BfFileLabel,
     TableMenu,
-    IconMenu
+    IconMenu,
   },
 
   mixins: [BfStorageMetrics, FileIcon, FormatDate, Sorter, TableFunctions],
@@ -253,67 +228,67 @@ export default {
   props: {
     data: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     multipleSelected: {
       type: Boolean,
-      default: false
+      default: false,
     },
     searchAllDataMenu: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isSearchResults: {
       type: Boolean,
-      default: false
+      default: false,
     },
     nonSortableColumns: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     withinDeleteMenu: {
       type: Boolean,
-      default: false
+      default: false,
     },
     tableLoading: {
       type: Boolean,
-      default: true
-    }
+      default: true,
+    },
   },
 
   data() {
     return {
       activeRow: {},
       selection: [],
-      sortOrders: ['ascending', 'descending'],
-      checkAll: false
-    }
+      sortOrders: ["ascending", "descending"],
+      checkAll: false,
+    };
   },
 
   computed: {
-    ...mapGetters(['getPermission', 'datasetLocked']),
+    ...mapGetters(["getPermission", "datasetLocked"]),
 
-    ...mapState(['dataset', 'filesProxyId']),
+    ...mapState(["dataset", "filesProxyId"]),
 
     /**
      * Compute if the checkbox is indeterminate
      * @returns {Boolean}
      */
-    isIndeterminate: function() {
+    isIndeterminate: function () {
       return (
         this.selection.length > 0 && this.selection.length < this.data.length
-      )
+      );
     },
 
     /**
      * Compute selection count label
      * @returns {String}
      */
-    selectionCountLabel: function() {
-      const selectionCount = this.selection.length
-      const fileWord = selectionCount === 1 ? 'file' : 'files'
-      return `${selectionCount} ${fileWord} selected`
-    }
+    selectionCountLabel: function () {
+      const selectionCount = this.selection.length;
+      const fileWord = selectionCount === 1 ? "file" : "files";
+      return `${selectionCount} ${fileWord} selected`;
+    },
   },
   methods: {
     /**
@@ -321,43 +296,43 @@ export default {
      * @param {Object} row
      * @param {Boolean} selected
      */
-    selectRow: function(row, selected = null) {
-      this.$refs.table.toggleRowSelection(row, selected)
+    selectRow: function (row, selected = null) {
+      this.$refs.table.toggleRowSelection(row, selected);
     },
 
-    canSelectRow: row => {
-      return row.state === 'DELETED'
+    canSelectRow: (row) => {
+      return row.state === "DELETED";
     },
 
     /**
      * Checkbox display logic
      * @param {Object} store
      */
-    showRowCheckbox: function(store) {
+    showRowCheckbox: function (store) {
       if (this.datasetLocked) {
-        return false
+        return false;
       }
 
-      const tableSelection = pathOr([], ['states', 'selection'], store)
-      return tableSelection.length > 0
+      const tableSelection = pathOr([], ["states", "selection"], store);
+      return tableSelection.length > 0;
     },
 
     /**
      * Sets the active row for the menu clicked
      * @param {Object} row
      */
-    setActiveRow: function(row) {
-      this.activeRow = row
+    setActiveRow: function (row) {
+      this.activeRow = row;
     },
 
     /**
      * Handle table selection change
      * @param {Array} selection
      */
-    handleTableSelectionChange: function(selection) {
-      this.selection = selection
-      this.$emit('selection-change', selection)
-      this.checkAll = this.data.length === selection.length
+    handleTableSelectionChange: function (selection) {
+      this.selection = selection;
+      this.$emit("selection-change", selection);
+      this.checkAll = this.data.length === selection.length;
     },
 
     /**
@@ -365,135 +340,137 @@ export default {
      * Set new sort order and property
      * @param {Object} evt
      */
-    onSortChange: function(evt) {
-      const order = propOr('', 'order', evt)
-      const property = propOr('', 'prop', evt)
-      this.sortBy = property
+    onSortChange: function (evt) {
+      const order = propOr("", "order", evt);
+      const property = propOr("", "prop", evt);
+      this.sortBy = property;
 
-      const sortOrder = order === 'descending' ? 'desc' : 'asc'
-      this.sortDirection = sortOrder
+      const sortOrder = order === "descending" ? "desc" : "asc";
+      this.sortDirection = sortOrder;
     },
 
     /**
      * Emit event for file label click
      * @param {Object} file
      */
-    onFileLabelClick: function(file) {
-      this.$emit('click-file-label', file)
+    onFileLabelClick: function (file) {
+      this.$emit("click-file-label", file);
     },
 
     /**
      * Deselect all files
      */
-    deselectAll: function() {
-      this.$refs.table.clearSelection()
+    deselectAll: function () {
+      this.$refs.table.clearSelection();
     },
 
     /**
      * Check all, or clear the selection
      * @param {Boolean} shouldCheckAll
      */
-    onCheckAllChange: function(shouldCheckAll) {
+    onCheckAllChange: function (shouldCheckAll) {
       if (shouldCheckAll) {
-        this.$refs.table.toggleAllSelection()
+        this.$refs.table.toggleAllSelection();
       } else {
-        this.$refs.table.clearSelection()
+        this.$refs.table.clearSelection();
       }
     },
 
-    onRowClick: function(row, selected) {
-      console.log('onRowClick: ' + row)
-      this.$refs.table.clearSelection()
-      setTimeout(function() {
-        this.$refs.table.toggleRowSelection(row, true)
+    onRowClick: function (row, selected) {
+      console.log("onRowClick: " + row);
+      this.$refs.table.clearSelection();
+      setTimeout(function () {
+        this.$refs.table.toggleRowSelection(row, true);
       }, 100);
     },
 
     /**
      * handle the table header download click
      */
-    onDownloadClick: function() {
-      EventBus.$emit('trigger-download', this.selection)
+    onDownloadClick: function () {
+      EventBus.$emit("trigger-download", this.selection);
     },
 
     /**
      * delete file from file menu
      * @param {Object} file
      */
-    deleteFile: function(file) {
-      this.setFileMenuSelection(file)
-      this.$emit('delete')
+    deleteFile: function (file) {
+      this.setFileMenuSelection(file);
+      this.$emit("delete");
     },
 
     /**
      * Movie file from file menu
      * @param {Object} file
      */
-    moveFile: function(file) {
-      this.setFileMenuSelection(file)
-      this.$emit('move')
+    moveFile: function (file) {
+      this.setFileMenuSelection(file);
+      this.$emit("move");
     },
 
     /**
      * Downloads file from the file menu
      */
-    downloadFile: function(file) {
-      this.setFileMenuSelection(file)
-      this.$emit('download', file)
+    downloadFile: function (file) {
+      this.setFileMenuSelection(file);
+      this.$emit("download", file);
     },
 
     /**
      * Process file
      * @param {Object} file
      */
-    processFile: function(file) {
-      this.$emit('process', file)
+    processFile: function (file) {
+      this.$emit("process", file);
     },
 
     /**
      * Get presigned URL and copy to clipboard
      * @param {Object} file
      */
-    getPresignedUrl: function(file) {
-      this.$emit('copy-url', file)
+    getPresignedUrl: function (file) {
+      this.$emit("copy-url", file);
     },
 
     /**
      * Select file for file menu action
      * @param {Object} file
      */
-    setFileMenuSelection: function(file) {
-      this.deselectAll()
-      this.selectRow(file, true)
+    setFileMenuSelection: function (file) {
+      this.deselectAll();
+      this.selectRow(file, true);
     },
 
     /**
      * Compute row class name
      * @returns {String}
      */
-    getRowClassName: function(tableRow) {
-      const { row } = tableRow
+    getRowClassName: function (tableRow) {
+      const { row } = tableRow;
 
-      const id = pathOr('', ['content', 'nodeId'], row)
-      const trimmedId = id.replace(/:/g, '')
+      const id = pathOr("", ["content", "nodeId"], row);
+      const trimmedId = id.replace(/:/g, "");
 
-      return `${tableRow.row.state !== 'DELETED' &&
+      return `${
+        tableRow.row.state !== "DELETED" &&
         this.withinDeleteMenu &&
-        'disable-select'} ${tableRow.row.state === 'READY' &&
-        'allow-file-navigation'} file-row-${trimmedId}`
-    }
-  }
-}
+        "disable-select"
+      } ${
+        tableRow.row.state === "READY" && "allow-file-navigation"
+      } file-row-${trimmedId}`;
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../assets/_variables.scss';
-
+@import "../../assets/_variables.scss";
 
 .slim-checkbox {
   height: 8px;
   margin-left: 2px;
-  margin-right:32px;
+  margin-right: 32px;
 }
 
 .files-table {
@@ -515,11 +492,11 @@ export default {
   width: 100%;
 }
 
-.el-table--border  {
+.el-table--border {
   border: none;
 }
 
-.el-table--border  td {
+.el-table--border td {
   //border: none;
   border-right: 1px solid transparent;
 }
