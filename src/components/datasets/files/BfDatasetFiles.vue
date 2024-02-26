@@ -629,7 +629,6 @@ export default {
      * Show customActions dialog
      */
     showCustomActionsDialog: function () {
-      console.log("**this.$refs", this.$refs.customActionsDialog.visible);
       this.$refs.customActionsDialog.visible = true;
     },
 

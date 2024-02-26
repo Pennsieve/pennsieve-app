@@ -7,8 +7,8 @@
     @close="closeDialog"
   >
     <template #header>
-      <bf-dialog-header title="Custom Actions" slot="title"
-    /></template>
+      <bf-dialog-header title="Custom Actions" slot="title" />
+    </template>
     <dialog-body>
       <div class="flex">
         <h2>Run the Custom Event on {{ totalFiles }} {{ headline }}</h2>
@@ -45,7 +45,6 @@
         data-cy="run-custom-event"
         @click="runCustomEvent"
         :disabled="false"
-        processing
       >
         Run Event
       </bf-button>

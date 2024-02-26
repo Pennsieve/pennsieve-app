@@ -83,7 +83,7 @@
 
     <el-table
       ref="table"
-      v-loading="tableLoading"
+      v-loading="withinDeleteMenu ? false : tableLoading"
       :border="true"
       :data="data"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
