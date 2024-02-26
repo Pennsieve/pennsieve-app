@@ -1,6 +1,6 @@
 # Pennsieve App
 
-New and improved Pennsieve web app, now with Vue3!
+New and improved Pennsieve web app, now leveraging Vue3. 
 
 ## Deployment Strategy
 
