@@ -1,6 +1,5 @@
 <template>
   <div class="deleted-files">
-    
     <el-dialog
       :modelValue="isOpen"
       @close="onClose"
