@@ -1,12 +1,14 @@
 <template>
   <el-dialog
-    :visible.sync="visible"
+    :modelValue="visible"
     data-cy="customActionsDialog"
     class="bf-delete-dialog"
     :show-close="false"
     @close="closeDialog"
   >
-    <bf-dialog-header slot="title" title="Custom Actions" />
+    <template #header>
+      <bf-dialog-header title="Custom Actions" slot="title"
+    /></template>
     <dialog-body>
       <div class="flex">
         <h2>Run the Custom Event on {{ totalFiles }} {{ headline }}</h2>
@@ -24,12 +26,13 @@
         </el-select>
       </div>
       <br />
+
       <el-input
         v-model="targetDirectory"
         placeholder="Target Directory (optional)"
       />
     </dialog-body>
-    <div slot="footer" class="dialog-footer">
+    <template #footer>
       <bf-button
         class="secondary"
         data-cy="closeDeleteDialog"
@@ -54,7 +57,7 @@
       >
         Run Event
       </bf-button>
-    </div>
+    </template>
   </el-dialog>
 </template>
 
@@ -256,6 +259,9 @@ export default {
 <style scoped lang="scss">
 @import "../../../../assets/_variables.scss";
 
+.secondary {
+  margin-right: 8px;
+}
 .svg-icon {
   color: $app-primary-color;
 }
