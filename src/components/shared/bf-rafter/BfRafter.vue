@@ -30,9 +30,9 @@ let route = useRoute();
       </template>
 
       <div
-        v-if="this.$slots.breadcrumb"
+        v-if="$slots.breadcrumb"
         class="row bf-rafter-breadcrumb"
-        :class="[this.$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
+        :class="[$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
       >
         <slot name="breadcrumb" />
       </div>
