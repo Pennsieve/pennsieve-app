@@ -821,6 +821,12 @@ export default {
 <style scoped lang="scss">
 @import '../../../assets/_variables';
 
+.flex-heading {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .dataset-v {
   background: #fff;
 }

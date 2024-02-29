@@ -1,63 +1,105 @@
+<script setup>
+import { useRoute } from "vue-router";
+let route = useRoute();
+</script>
+
 <template>
   <header
     class="bf-rafter"
     :class="[$slots['tabs'] ? 'with-tabs' : '', isEditing ? 'editing' : '']"
   >
-
-    <template v-if="datasetNameVisible">
-      <div class="parent">
-        <div class="dataset-name">{{ datasetNameDisplay() }}</div>
-      </div>
-    </template>
-
-    <template v-if="showLinkBack">
-      <a @click="backRoute" class="link-back">
-        <IconArrowLeft
-          :height="10"
-          :width="10"
-        />
-        Back to {{ this.linkBack.name }}
-      </a>
-    </template>
-
     <div
-      v-if="this.$slots.breadcrumb"
-      class="row bf-rafter-breadcrumb"
-      :class="[this.$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
+      :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']"
     >
-      <slot name="breadcrumb" />
-    </div>
 
-    <div class="row main">
-      <div class="col">
-        <h1 v-if="title">{{ title }}</h1>
 
-        <div v-if="$slots['heading']" class="bf-rafter-heading">
-          <slot name="heading" />
+      <template v-if="datasetNameVisible">
+        <div class="parent">
+          <div class="dataset-name">{{ datasetNameDisplay() }}</div>
+        </div>
+      </template>
+
+      <template v-if="showLinkBack">
+        <a @click="backRoute" class="link-back">
+          <IconArrowLeft
+            :height="10"
+            :width="10"
+          />
+          Back to {{ this.linkBack.name }}
+        </a>
+      </template>
+
+      <div
+        v-if="this.$slots.breadcrumb"
+        class="row bf-rafter-breadcrumb"
+        :class="[this.$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
+      >
+        <slot name="breadcrumb" />
+      </div>
+
+      <div class="row main">
+        <div class="col">
+          <h1 v-if="title">{{ title }}</h1>
+
+          <div v-if="$slots['heading']" class="bf-rafter-heading">
+            <slot name="heading" />
+            <button v-if='!isDatasetOverview' @click="toggleHelp">
+              <component
+                :is="showHelp?  'IconArrowUp': 'IconHelp' "
+                :width="showHelp? 16: 24"
+                :height="showHelp? 16: 24"
+                color="white"
+              />
+            </button>
+          </div>
+
+          <div v-if="$slots['description']" class="bf-rafter-description">
+            <slot name="description" />
+          </div>
+        </div>
+        <div v-if="$slots['buttons']" class="col bf-rafter-buttons">
+          <slot name="buttons" />
+        </div>
+      </div>
+
+      <div v-if="$slots['bottom']" class="row bf-rafter-bottom">
+        <slot name="bottom" />
+      </div>
+
+      <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
+        <div class="help-title-wrapper">
+          <div class="help-title">{{ docTitle }}</div>
+          <a href="https://docs.pennsieve.io" class="link-item">
+            <IconUpload :width="14" :height="14" style="margin-right: 4px; transform: rotate(90deg) scaleX(-1)"/>
+            <div class="person-circle">
+              Documentation Hub
+            </div>
+          </a>
+        </div>
+        <div
+          class='help-section'
+          v-html="docSummary"/>
+      </div>
+
+
+      <div class="tabs-stats-wrap">
+        <div v-if="$slots['tabs']" class="row bf-rafter-tabs">
+          <slot name="tabs" />
         </div>
 
-        <div v-if="$slots['description']" class="bf-rafter-description">
-          <slot name="description" />
+        <div v-if="$slots['stats']" class="col bf-rafter-stats mb-16">
+          <slot name="stats" />
         </div>
       </div>
-      <div v-if="$slots['buttons']" class="col bf-rafter-buttons">
-        <slot name="buttons" />
-      </div>
+
     </div>
 
-    <div v-if="$slots['bottom']" class="row bf-rafter-bottom">
-      <slot name="bottom" />
-    </div>
 
-    <div class="tabs-stats-wrap">
-      <div v-if="$slots['tabs']" class="row bf-rafter-tabs">
-        <slot name="tabs" />
-      </div>
+<!--    <div v-if="$slots['help']" class="row bf-rafter-help">-->
+<!--      <slot name="help" />-->
+<!--    </div>-->
 
-      <div v-if="$slots['stats']" class="col bf-rafter-stats mb-16">
-        <slot name="stats" />
-      </div>
-    </div>
+
   </header>
 </template>
 
@@ -71,6 +113,10 @@ import Request from '../../../mixins/request/index'
 import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import IconUpload from "../../../components/icons/IconUpload.vue";
+import ReadmeDocs from "../../../mixins/readme-docs";
+import IconArrowUp from "../../icons/IconArrowUp.vue";
+import IconHelp from "../../icons/IconHelp.vue";
 
 export default {
   name: 'BfRafter',
@@ -106,16 +152,25 @@ export default {
 
   components: {
     BfButton,
-    IconArrowLeft
+    IconArrowLeft,
+    IconUpload,
+    IconArrowUp,
+    IconHelp
   },
 
-  mixins: [Request, CustomTheme],
+  mixins: [Request, CustomTheme, ReadmeDocs],
+
+  mounted() {
+    const r = useRoute()
+    this.getReadmeDocument(r.meta.helpSection)
+  },
 
   data: function() {
     return {
       datasetNameTruncated: false,
       datasetname: '',
       datasetFilterOpen: false,
+      showHelp: false,
       datasetPageList: [
         'upload-manifests',
         'publishing-settings',
@@ -146,6 +201,19 @@ export default {
       'datasetRafterVisStatus',
       'datasetRafterVisStatus2'
     ]),
+
+    docTitle: function() {
+      if (this.summary) {
+        return this.summary.excerpt
+      }
+      return ''
+    },
+    docSummary: function() {
+      if (this.summary) {
+        return this.summary.body_html
+      }
+      return ''
+    },
 
     showLinkBack: function() {
       return Object.keys(this.linkBack).length > 0
@@ -228,6 +296,10 @@ export default {
       }
     },
 
+    isDatasetOverview: function() {
+      return this.currentRouteName === 'dataset-overview'
+    },
+
     onFilesPage: function() {
       let filesTable = 'dataset-files'
       if (filesTable.includes(this.currentRouteName)) {
@@ -240,6 +312,10 @@ export default {
 
   methods: {
     ...mapActions(['updateDataset', 'setDataset']),
+
+    toggleHelp: function () {
+      this.showHelp = !this.showHelp
+    },
 
     backRoute: function() {
       this.$router.push({ name: this.linkBack.to, params: { datasetId: this.datasetId, orgId: this.orgId}})
@@ -321,6 +397,19 @@ export default {
   font-weight: 700;
   display: flex;
   align-items: center;
+}
+
+.bf-rafter-heading {
+  display:flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.rafter-inset {
+  //padding: 8px 32px 8px 32px;
+  &.with-tabs {
+    padding-bottom: 0px;
+  }
 }
 
 .bf-rafter {
@@ -469,6 +558,23 @@ export default {
   display: flex;
   color: white;
 }
+.bf-rafter-help {
+  display: flex;
+  flex-direction: row;
+  color: white;
+  width: 100%;
+
+  :slotted(.header-scroll) {
+    color: $purple_3;
+  }
+  :slotted(h3) {
+    color: red;
+  }
+
+}
+
+
+
 .dataset-filter-status-check {
   margin: -2px 0;
   float: right;
@@ -504,5 +610,53 @@ export default {
     display: flex;
     align-items: center;
   }
+}
+
+.help-section {
+  padding-left: 16px;
+  padding-right: 10%;
+  padding-top: 8px;
+  background-color: $purple_tint;
+  :deep(.header-scroll) {
+    color: $purple_2
+  }
+  :deep(.magic-block-textarea) {
+    p {
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+.help-title-wrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 8px;
+
+  .help-title {
+    color: $purple_3;
+    font-size: 12pt;
+    margin: 8px 0px;
+
+  }
+}
+.help-wrapper {
+  background-color: white;
+  color: $gray_6;
+  max-height: 0;
+  transition: max-height 0.15s, padding-top 0.15s ease-out;
+  overflow-y:scroll;
+
+  &.open {
+    max-height: 250px;
+    transition: max-height 0.25s ease-in, padding-top 0.25s ease-in;
+    border-radius: 4px;
+  }
+}
+.link-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 </style>

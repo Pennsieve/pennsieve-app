@@ -20,11 +20,14 @@ let route = useRoute();
     </template>
 
     <template #heading>
-      <h1
-        class="flex-heading"
-      >
-        {{pageName}}
-      </h1>
+      <div class="title-wrapper">
+        <h1
+          class="flex-heading"
+        >
+          {{pageName}}
+        </h1>
+      </div>
+
     </template>
 
   </bf-rafter>
@@ -37,16 +40,46 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
+import ReadmeDocs from "../../mixins/readme-docs";
+import IconGuide from "../../components/icons/IconGuide.vue";
+import IconHelp from "../../components/icons/IconHelp.vue";
+import IconArrowRight from "../../components/icons/IconArrowRight.vue";
+import IconUpload from "../../components/icons/IconUpload.vue";
 
 
 export default {
   name: 'SecondaryPageHeader',
+  mixins:[
+    ReadmeDocs
+  ],
   components: {
     BfRafter,
     IconArrowLeft,
-    LockedBanner
+    LockedBanner,
+    IconGuide,
+    IconHelp,
+    IconArrowRight,
+    IconUpload
+  },
+  mounted() {
+    const r = useRoute()
+    console.log(r.meta)
+    this.getReadmeDocument(r.meta.helpSection)
+
   },
   computed: {
+    docTitle: function() {
+      if (this.summary) {
+        return this.summary.excerpt
+      }
+      return ''
+    },
+    docSummary: function() {
+      if (this.summary) {
+        return this.summary.body_html
+      }
+      return ''
+    },
 
     pageName: function() {
       const r = useRoute()
@@ -73,20 +106,42 @@ export default {
       }
       return "Unknown"
     }
+  },
+
+  data() {
+    return {
+      showHelp: false
+    }
+  },
+
+  methods: {
+    toggleHelp: function () {
+      this.showHelp = !this.showHelp
+    }
   }
+
+
 
 }
 </script>
 
-<!--<style lang="scss">-->
-<!--@import '../../assets/_variables.scss';-->
-<!---->
-<!--</style>-->
-
 <style scoped lang="scss">
 @import '../../assets/_variables.scss';
+
+.flex-heading {
+  background-color: $purple_1;
+}
+
+.el-collapse-item__header {
+  background: $purple_2;
+}
 
 .link-to-files {
   color: $white;
 }
+
+
+
+
+
 </style>
