@@ -328,6 +328,7 @@ const router = createRouter({
               props: {
                 stage: true,
               },
+              meta: { helpSection: 'files-tab'},
             },
             {
               name: 'collection-files',

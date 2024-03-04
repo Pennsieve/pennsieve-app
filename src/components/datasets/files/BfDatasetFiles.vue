@@ -995,7 +995,8 @@ export default {
 @import "../../../assets/_variables.scss";
 
 .bf-stage-file {
-  height: calc(100vh - 180px);
+  //height: calc(100vh - 180px);
+  height: 100%;
 }
 .loading-spinner-container {
   display: flex;
