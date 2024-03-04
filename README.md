@@ -2,7 +2,7 @@
 
 New and improved Pennsieve web app, now leveraging Vue3. 
 
-## Deployment Strategy
+## Branching and Deployment Strategy
 
 - __main__ branch reflects the version of the application that is in production. 
 - __dev__ branch reflects a version of the application with features that are currently in development.<br><br>
