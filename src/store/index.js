@@ -988,6 +988,9 @@ export const getters = {
   hasOrcidId: (state) => {
     return R.pathOr(false, ["profile", "orcid", "orcid"], state);
   },
+  publishToOrcid:(state)=>{
+    return state.profile.orcid.scope && state.profile.orcid.scope[1] && state.profile.orcid.scope[1]==='/activities/update';
+  },
   datasetOwnerHasOrcidId: (state, getters) => {
     const owner = getters.datasetOwner;
     return R.pathOr(false, ["orcid", "orcid"], owner).length > 0;
