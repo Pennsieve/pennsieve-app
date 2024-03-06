@@ -1,4 +1,5 @@
 <template>
+  
   <div class="owner-orcid">
     <div v-if="!hasOrcidId">
       <p class="sharing-blurb">
