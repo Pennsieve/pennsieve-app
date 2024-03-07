@@ -1,378 +1,322 @@
 <template>
-    <bf-stage slot="stage">
-      <!-- update profile -->
-      <el-form
-        id="update-profile-form"
-        ref="updateProfileForm"
-        :model="ruleForm"
-        :rules="rules"
-        label-position="top"
+  <bf-stage slot="stage">
+    <!-- update profile -->
+    <el-form
+      id="update-profile-form"
+      ref="updateProfileForm"
+      :model="ruleForm"
+      :rules="rules"
+      label-position="top"
+    >
+      <el-form-item label="First Name" prop="firstName">
+        <el-input v-model="ruleForm.firstName" />
+      </el-form-item>
+      <el-form-item
+        id="input-middle-initial"
+        label="Middle Initial"
+        prop="middleInitial"
       >
-        <el-form-item
-          label="First Name"
-          prop="firstName"
-        >
-          <el-input
-            v-model="ruleForm.firstName"
-          />
-        </el-form-item>
-        <el-form-item
-          id="input-middle-initial"
-          label="Middle Initial"
-          prop="middleInitial"
-        >
-          <el-input
-            v-model="ruleForm.middleInitial"
-            :maxlength="1"
-          />
-        </el-form-item>
-        <el-form-item
-          label="Last Name"
-          prop="lastName"
-        >
-          <el-input
-            v-model="ruleForm.lastName"
-          />
-        </el-form-item>
-        <el-form-item
-          label="Title"
-          prop="credential"
-        >
-          <el-input
-            v-model="ruleForm.credential"
-          />
-        </el-form-item>
-        <el-form-item
-          label="Degree"
-          prop="degree"
-        >
-          <degree-select
-            v-model="ruleForm.degree"
-          />
-        </el-form-item>
-        <el-form-item>
-          <bf-button @click="handleUpdateProfileSubmit">
-            Update Profile
-          </bf-button>
-        </el-form-item>
-      </el-form>
-      <div
-        class="divider"
-      />
-      <!-- reset password -->
-<!--      TODO: bring this back, need to update to directly hit Cognito instead of a non-existing API call.-->
+        <el-input v-model="ruleForm.middleInitial" :maxlength="1" />
+      </el-form-item>
+      <el-form-item label="Last Name" prop="lastName">
+        <el-input v-model="ruleForm.lastName" />
+      </el-form-item>
+      <el-form-item label="Title" prop="credential">
+        <el-input v-model="ruleForm.credential" />
+      </el-form-item>
+      <el-form-item label="Degree" prop="degree">
+        <degree-select v-model="ruleForm.degree" />
+      </el-form-item>
+      <el-form-item>
+        <bf-button @click="handleUpdateProfileSubmit">
+          Update Profile
+        </bf-button>
+      </el-form-item>
+    </el-form>
+    <div class="divider" />
+    <!-- reset password -->
+    <!--      TODO: bring this back, need to update to directly hit Cognito instead of a non-existing API call.-->
 
-      <el-row>
-        <el-col :span="12">
-          <h2>Password</h2>
-            <p>To reset your password, please log out and use the 'forgot my password' link on the login page. We'll send you an email containing a link to reset your password.</p>
-        </el-col>
-      </el-row>
-      <div
-        class="divider"
-      />
-      <!-- email reset -->
-      <el-row>
+    <el-row>
+      <el-col :span="12">
+        <h2>Password</h2>
+        <p>
+          To reset your password, please log out and use the 'forgot my
+          password' link on the login page. We'll send you an email containing a
+          link to reset your password.
+        </p>
+      </el-col>
+    </el-row>
+    <div class="divider" />
+    <!-- email reset -->
+    <el-row>
       <el-col :span="12">
         <h2>Email</h2>
         <el-row class="mb-20">
           <p>We'll send you an email to confirm your new preferred address.</p>
         </el-row>
-          <!-- change div info -->
-          <el-form
-            id="update-email-form"
-            ref="updateEmailForm"
-            :model="emailForm"
-            :rules="emailRules"
-            @submit.native.prevent="handleUpdateEmailSubmit"
-          >
-            <el-form-item
-              prop="email"
+        <!-- change div info -->
+        <el-form
+          id="update-email-form"
+          ref="updateEmailForm"
+          :model="emailForm"
+          :rules="emailRules"
+          @submit.native.prevent="handleUpdateEmailSubmit"
+        >
+          <el-form-item prop="email">
+            <el-input v-model="emailForm.email" />
+          </el-form-item>
+          <el-form-item>
+            <bf-button
+              :disabled="isEmailButtonDisabled"
+              @click="handleUpdateEmailSubmit"
             >
-              <el-input
-                v-model="emailForm.email"
-              />
-            </el-form-item>
-            <el-form-item>
-              <bf-button :disabled='isEmailButtonDisabled' @click="handleUpdateEmailSubmit">
-                Update Email
-              </bf-button>
-            </el-form-item>
-          </el-form>
-        </el-col>
-      </el-row>
-      <div
-        class="divider"
-      />
-      <!-- two-factor auth -->
-      <el-row>
-        <el-col :span="12">
-          <h2>Two-Factor Authentication</h2>
-          <el-row class="mb-20">
-            <p>
-              Keep your account secure by providing a security code from a trusted device each time you sign in.
-              Two-factor authentication requires the free
-              <a
-                href="https://authy.com/download/"
-                target="_blank"
-              >
-                Authy
-              </a> app for iOS or Android.
-            </p>
-          </el-row>
-          <el-row
-            class="two-factor-wrap"
-            justify="space-between"
-          >
-            <el-col :span="12">
-              <div class="two-factor-status-wrap">
-                <span class="status-text">
-                  Status: {{ authEnabled ? 'On' : 'Off' }}
-                </span>
-                <span
-                  class="status-icon"
-                  :class="{ enabled: authEnabled }"
-                >
-
-                  <IconLock
-                    :isLocked = "authEnabled"
-                    :height = "20"
-                    :width = "20"
-                    color = "currentColor"
-                  />
-
-                </span>
-              </div>
-            </el-col>
-            <el-col :span="12" class="two-factor-col-btn">
-              <bf-button
-                @click="handleTwoFactorBtnClick(authEnabled)"
-              >
-                {{ authEnabled ? 'Disable' : 'Enable' }}
-              </bf-button>
-            </el-col>
-          </el-row>
-        </el-col>
-      </el-row>
-      <div
-        class="divider"
-      />
-      <!-- api keys -->
-      <el-row>
-        <el-col :span="12">
-          <h2>API Keys</h2>
-          <el-row v-if="hasApiKeys">
-            <p>This is the list of API keys associated with your account and organization.</p>
-          </el-row>
-          <el-row class="mb-20">
-            <bf-button @click="openApiKeyWindow('createApiKeyDialog')">
-              Create API Key
+              Update Email
             </bf-button>
-          </el-row>
-          <el-row class="mb-20">
-            <template v-if="!hasApiKeys">
-              <p>There are no API keys associated with this account and organization.</p>
-            </template>
-            <template v-else>
-              <div
-                v-loading="isApiKeysLoading"
-                class="bf-table"
-                element-loading-background="transparent"
-              >
-                <div class="bf-table-header">
-                  <el-row
-                    type="flex"
-                    :gutter="20"
-                  >
-                    <el-col>
-                      <button
-                        :class="[isSorting('name') ? 'sort-active' : '']"
-                        @click="sortColumn('name')"
-                      >
-                        Name
-                        <IconSort
-                          color="currentColor"
-                          :class="[ this.sortDirection === 'desc' ? 'svg-flip' : '' ]"
-                        />
-                      </button>
-                    </el-col>
-                  </el-row>
-                </div>
-                <div
-                  v-for="apiKey in apiKeys"
-                  :key="apiKey.key"
-                  class="bf-table-row"
-                  :item="apiKey"
-                >
-                  <el-row
-                    align="middle"
-                  >
-                    <el-col :span="16">
-                      <span>
-                        {{ apiKey.name }}
-                      </span>
-                    </el-col>
-                    <el-col :span="8" class="api-key-col-delete-btn">
-                      <button @click="openApiKeyWindow('deleteApiKeyDialog', apiKey)">
-                        <IconRemove
-                          :height="10"
-                          :width="10"
-                          color="black"
-                        />
-                      </button>
-                    </el-col>
-                  </el-row>
-                </div>
-              </div>
-            </template>
-          </el-row>
-        </el-col>
-      </el-row>
-      <div
-        class="divider"
-      />
-      <!-- ORCID -->
-      <el-row>
-        <el-col :span="12">
-          <h2 id="orcid-id">
-            ORCID
-          </h2>
-          <div v-if="!hasOrcidId">
+          </el-form-item>
+        </el-form>
+      </el-col>
+    </el-row>
+    <div class="divider" />
+    <!-- two-factor auth -->
+    <el-row>
+      <el-col :span="12">
+        <h2>Two-Factor Authentication</h2>
+        <el-row class="mb-20">
+          <p>
+            Keep your account secure by providing a security code from a trusted
+            device each time you sign in. Two-factor authentication requires the
+            free
+            <a href="https://authy.com/download/" target="_blank"> Authy </a>
+            app for iOS or Android.
+          </p>
+        </el-row>
+        <el-row class="two-factor-wrap" justify="space-between">
+          <el-col :span="12">
+            <div class="two-factor-status-wrap">
+              <span class="status-text">
+                Status: {{ authEnabled ? "On" : "Off" }}
+              </span>
+              <span class="status-icon" :class="{ enabled: authEnabled }">
+                <IconLock
+                  :isLocked="authEnabled"
+                  :height="20"
+                  :width="20"
+                  color="currentColor"
+                />
+              </span>
+            </div>
+          </el-col>
+          <el-col :span="12" class="two-factor-col-btn">
+            <bf-button @click="handleTwoFactorBtnClick(authEnabled)">
+              {{ authEnabled ? "Disable" : "Enable" }}
+            </bf-button>
+          </el-col>
+        </el-row>
+      </el-col>
+    </el-row>
+    <div class="divider" />
+    <!-- api keys -->
+    <el-row>
+      <el-col :span="12">
+        <h2>API Keys</h2>
+        <el-row v-if="hasApiKeys">
+          <p>
+            This is the list of API keys associated with your account and
+            organization.
+          </p>
+        </el-row>
+        <el-row class="mb-20">
+          <bf-button @click="openApiKeyWindow('createApiKeyDialog')">
+            Create API Key
+          </bf-button>
+        </el-row>
+        <el-row class="mb-20">
+          <template v-if="!hasApiKeys">
             <p>
-              Connect your Pennsieve Profile to your ORCID. <a href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform">
-                Learn More
-              </a>
+              There are no API keys associated with this account and
+              organization.
             </p>
-
-            <button
-              id="connect-orcid-button"
-              @click="openORCID"
+          </template>
+          <template v-else>
+            <div
+              v-loading="isApiKeysLoading"
+              class="bf-table"
+              element-loading-background="transparent"
             >
-              <img
-                id="orcid-id-icon"
-                src="../../assets/images/orcid_24x24.png"
-                width="24"
-                height="24"
-                alt="Logo for ORCID"
-              >
-              Register or Connect your ORCID iD
-            </button>
-          </div>
-          <el-row v-else>
-            <div>
-              <p class="orcid-success-text">
-                Below is the ORCID associated with your Pennsieve account. <a
-                  href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
-                  target="_blank"
-                >
-                  Learn More
-                </a>
-              </p>
-              <div
-                v-if="!loading"
-                class="orcid-success"
-              >
-                <img src="../../assets/images/orcid.png">
-                <el-row
-                  class="orcid-success-info"
-                  align="middle"
-                  alt="Logo for ORCID"
-                >
+              <div class="bf-table-header">
+                <el-row type="flex" :gutter="20">
                   <el-col>
-                    <a
-                      :href="getORCIDResultUrl"
-                      target="_blank"
+                    <button
+                      :class="[isSorting('name') ? 'sort-active' : '']"
+                      @click="sortColumn('name')"
                     >
-                      {{ getORCIDResultUrl }}
-                    </a>
+                      Name
+                      <IconSort
+                        color="currentColor"
+                        :class="[
+                          this.sortDirection === 'desc' ? 'svg-flip' : '',
+                        ]"
+                      />
+                    </button>
                   </el-col>
                 </el-row>
-                <el-col class="orcid-delete-button">
-                  <button @click="isDeleteOrcidDialogVisible = true">
-                    <IconRemove
-                      :height="10"
-                      :width="10"
-                      color="black"
-                    />
-
-                  </button>
-                </el-col>
               </div>
               <div
-                v-else
-                class="orcid-waiting"
+                v-for="apiKey in apiKeys"
+                :key="apiKey.key"
+                class="bf-table-row"
+                :item="apiKey"
               >
-                <el-row>
-                  <div
-                    v-loading="loading"
-                    class="orcid-loader"
-                  />
+                <el-row align="middle">
+                  <el-col :span="16">
+                    <span>
+                      {{ apiKey.name }}
+                    </span>
+                  </el-col>
+                  <el-col :span="8" class="api-key-col-delete-btn">
+                    <button
+                      @click="openApiKeyWindow('deleteApiKeyDialog', apiKey)"
+                    >
+                      <IconRemove :height="10" :width="10" color="black" />
+                    </button>
+                  </el-col>
                 </el-row>
               </div>
             </div>
-          </el-row>
-        </el-col>
-      </el-row>
+          </template>
+        </el-row>
+      </el-col>
+    </el-row>
+    <div class="divider" />
+    <!-- ORCID -->
+    <el-row>
+      <el-col :span="12">
+        <h2 id="orcid-id">ORCID</h2>
+        <div v-if="!hasOrcidId">
+          <p>
+            Connect your Pennsieve Profile to your ORCID.
+            <a
+              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
+            >
+              Learn More
+            </a>
+          </p>
 
-      <create-two-factor
-        ref="addTwoFactorDialog"
-        @change-status="changeStatus"
-      />
+          <button id="connect-orcid-button" @click="openORCID">
+            <img
+              id="orcid-id-icon"
+              src="../../assets/images/orcid_24x24.png"
+              width="24"
+              height="24"
+              alt="Logo for ORCID"
+            />
+            Register or Connect your ORCID iD
+          </button>
+        </div>
+        <el-row v-else>
+          <div>
+            <p class="orcid-success-text">
+              Below is the ORCID associated with your Pennsieve account.
+              <a
+                href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
+                target="_blank"
+              >
+                Learn More
+              </a>
+            </p>
+            <div v-if="!loading" class="orcid-success">
+              <img src="../../assets/images/orcid.png" />
+              <el-row
+                class="orcid-success-info"
+                align="middle"
+                alt="Logo for ORCID"
+              >
+                <el-col>
+                  <a :href="getORCIDResultUrl" target="_blank">
+                    {{ getORCIDResultUrl }}
+                  </a>
+                </el-col>
+              </el-row>
+              <el-col class="orcid-delete-button">
+                <button @click="isDeleteOrcidDialogVisible = true">
+                  <IconRemove :height="10" :width="10" color="black" />
+                </button>
+              </el-col>
+            </div>
+            <div v-else class="orcid-waiting">
+              <el-row>
+                <div v-loading="loading" class="orcid-loader" />
+              </el-row>
+            </div>
+            <el-row class="mt-20" v-if="!publishToOrcid">
+              <el-tooltip
+                placement="right"
+                content="Authorize Pennsieve to update ORCID with all of your Published Datasets"
+              >
+                <bf-button @click="openORCID">
+                  Update ORCID Publish Preferences
+                </bf-button>
+              </el-tooltip>
+            </el-row>
+          </div>
+        </el-row>
+      </el-col>
+    </el-row>
 
-      <delete-two-factor
-        ref="deleteTwoFactorDialog"
-        @change-status="changeStatus"
-      />
+    <create-two-factor ref="addTwoFactorDialog" @change-status="changeStatus" />
 
-      <create-api-key
-        ref="createApiKeyDialog"
-        @api-key-created="updateApiKeys"
-        :api-keys="apiKeys"
-      />
+    <delete-two-factor
+      ref="deleteTwoFactorDialog"
+      @change-status="changeStatus"
+    />
 
-      <delete-api-key
-        ref="deleteApiKeyDialog"
-        :api-key="apiKey"
-        @api-key-deleted="updateApiKeys"
-      />
+    <create-api-key
+      ref="createApiKeyDialog"
+      @api-key-created="updateApiKeys"
+      :api-keys="apiKeys"
+    />
 
-      <api-key-detail
-        ref="apiKeyDetailDialog"
-        :api-key="apiKey"
-      />
+    <delete-api-key
+      ref="deleteApiKeyDialog"
+      :api-key="apiKey"
+      @api-key-deleted="updateApiKeys"
+    />
 
-      <delete-orcid
-        ref="deleteOrcidDialog"
-        :visible.sync="isDeleteOrcidDialogVisible"
-        @orcid-deleted-success="updateORCID"
-        @orcid-close="updateORCID2"
-      />
-    </bf-stage>
+    <api-key-detail ref="apiKeyDetailDialog" :api-key="apiKey" />
+
+    <delete-orcid
+      ref="deleteOrcidDialog"
+      :visible.sync="isDeleteOrcidDialogVisible"
+      @orcid-deleted-success="updateORCID"
+      @orcid-close="updateORCID2"
+    />
+  </bf-stage>
 </template>
 
 <script>
-import { mapActions, mapGetters, mapState } from 'vuex'
-import EventBus from '../../utils/event-bus'
-import { pathOr, propOr, prop } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import { mapActions, mapGetters, mapState } from "vuex";
+import EventBus from "../../utils/event-bus";
+import { pathOr, propOr, prop } from "ramda";
+import Auth from "@aws-amplify/auth";
 
-import BfRafter from '../shared/bf-rafter/BfRafter.vue'
-import BfButton from '../shared/bf-button/BfButton.vue'
-import CreateTwoFactor from './windows/CreateTwoFactor.vue'
-import DeleteTwoFactor from './windows/DeleteTwoFactor.vue'
-import CreateApiKey from './windows/CreateApiKey.vue'
-import DeleteApiKey from './windows/DeleteApiKey.vue'
-import DeleteOrcid from './windows/DeleteOrcid.vue'
-import ApiKeyDetail from './windows/ApiKeyDetail.vue'
-import DegreeSelect from '../shared/DegreeSelect/DegreeSelect.vue'
+import BfRafter from "../shared/bf-rafter/BfRafter.vue";
+import BfButton from "../shared/bf-button/BfButton.vue";
+import CreateTwoFactor from "./windows/CreateTwoFactor.vue";
+import DeleteTwoFactor from "./windows/DeleteTwoFactor.vue";
+import CreateApiKey from "./windows/CreateApiKey.vue";
+import DeleteApiKey from "./windows/DeleteApiKey.vue";
+import DeleteOrcid from "./windows/DeleteOrcid.vue";
+import ApiKeyDetail from "./windows/ApiKeyDetail.vue";
+import DegreeSelect from "../shared/DegreeSelect/DegreeSelect.vue";
 
-import Request from '../../mixins/request'
-import Sorter from '../../mixins/sorter'
+import Request from "../../mixins/request";
+import Sorter from "../../mixins/sorter";
 import IconRemove from "../icons/IconRemove.vue";
 import IconSort from "../icons/IconSort.vue";
 
 export default {
-  name: 'MySettingsContainer',
+  name: "MySettingsContainer",
 
   components: {
     IconSort,
@@ -385,7 +329,7 @@ export default {
     CreateApiKey,
     DeleteApiKey,
     DeleteOrcid,
-    ApiKeyDetail
+    ApiKeyDetail,
   },
 
   mixins: [Request, Sorter],
@@ -398,194 +342,199 @@ export default {
       mfaStatus: false,
       isApiKeysLoading: true,
       ruleForm: {
-        firstName: '',
-        middleInitial: '',
-        lastName: '',
-        credential: '',
-        degree: null
+        firstName: "",
+        middleInitial: "",
+        lastName: "",
+        credential: "",
+        degree: null,
       },
       rules: {
         firstName: [
           {
             required: true,
-            message: 'Please provide your first name',
-            trigger: 'false'
-          }
+            message: "Please provide your first name",
+            trigger: "false",
+          },
         ],
         lastName: [
           {
             required: true,
-            message: 'Please provide your last name',
-            trigger: 'false'
-          }
-        ]
+            message: "Please provide your last name",
+            trigger: "false",
+          },
+        ],
       },
       emailForm: {
-        email: ''
+        email: "",
       },
       emailRules: {
-        email: [{
-          required: true,
-          message: 'Please provide your new email address',
-          trigger: false
-        }]
+        email: [
+          {
+            required: true,
+            message: "Please provide your new email address",
+            trigger: false,
+          },
+        ],
       },
-      oauthWindow: '',
-      oauthCode: '',
+      oauthWindow: "",
+      oauthCode: "",
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
-      prevEmail: '',
+      prevEmail: "",
       apiKey: {
-        name: '',
-        key: ''
-      }
-
-    }
+        name: "",
+        key: "",
+      },
+    };
   },
 
   computed: {
-     ...mapState([
-      'profile',
-      'activeOrganization',
-      'userToken',
-      'config',
-      'onboardingEvents',
-      'cognitoUser'
+    ...mapState([
+      "profile",
+      "activeOrganization",
+      "userToken",
+      "config",
+      "onboardingEvents",
+      "cognitoUser",
     ]),
 
-    ...mapGetters(['hasOrcidId']),
+    ...mapGetters(["hasOrcidId", "publishToOrcid"]),
 
     /**
      * Checks whether or not auth is enabled
      * @returns {Boolean}
      */
-    authEnabled: function() {
-      return this.cognitoUser.preferredMFA === 'SOFTWARE_TOKEN_MFA' || this.cognitoUser.challengeName === 'SOFTWARE_TOKEN_MFA' || this.mfaStatus
+    authEnabled: function () {
+      return (
+        this.cognitoUser.preferredMFA === "SOFTWARE_TOKEN_MFA" ||
+        this.cognitoUser.challengeName === "SOFTWARE_TOKEN_MFA" ||
+        this.mfaStatus
+      );
     },
 
-    hasApiKeys: function() {
-      return this.apiKeys.length > 0
+    hasApiKeys: function () {
+      return this.apiKeys.length > 0;
     },
 
-    getApiKeysUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
+    getApiKeysUrl: function () {
+      const url = pathOr("", ["config", "apiUrl"])(this);
+      const userToken = prop("userToken", this);
 
       if (!url || !userToken) {
-        return ''
+        return "";
       }
-      return `${url}/token?api_key=${userToken}`
+      return `${url}/token?api_key=${userToken}`;
     },
-    updateProfileUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
+    updateProfileUrl: function () {
+      const url = pathOr("", ["config", "apiUrl"])(this);
+      const userToken = prop("userToken", this);
 
       if (!url || !userToken) {
-        return ''
+        return "";
       }
 
-      return `${url}/user?api_key=${userToken}`
+      return `${url}/user?api_key=${userToken}`;
     },
-    updateEmailUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
+    updateEmailUrl: function () {
+      const url = pathOr("", ["config", "apiUrl"])(this);
+      const userToken = prop("userToken", this);
       if (!url || !userToken) {
-        return ''
+        return "";
       }
-      return `${url}/user/email?api_key=${userToken}`
+      return `${url}/user/email?api_key=${userToken}`;
     },
     /**
      * Retrieves the API URL for adding ORCID
      */
-    getORCIDApiUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
+    getORCIDApiUrl: function () {
+      const url = pathOr("", ["config", "apiUrl"])(this);
 
       if (!url) {
-        return ''
+        return "";
       }
 
-      return `${url}/user/orcid?api_key=${this.userToken}`
+      return `${url}/user/orcid?api_key=${this.userToken}`;
     },
 
     /**
      * Retrieves URL for ORCID redirect, based on environment
      */
-    getORCIDUrl: function() {
-      const url = pathOr('', ['config', 'ORCIDUrl'])(this)
+    getORCIDUrl: function () {
+      const url = pathOr("", ["config", "ORCIDUrl"])(this);
 
       if (!url) {
-        return ''
+        return "";
       }
-      return url
+      return url;
     },
 
     /**
      * Retrieves Url to display with name once ORCID is connected to user profile
      */
-    getORCIDResultUrl: function() {
-      const env = pathOr('', ['config', 'environment'])(this)
-      return env === 'dev'
+    getORCIDResultUrl: function () {
+      const env = pathOr("", ["config", "environment"])(this);
+      return env === "dev"
         ? `https://sandbox.orcid.org/${this.profile.orcid.orcid}`
-        : `https://orcid.org/${this.profile.orcid.orcid}`
+        : `https://orcid.org/${this.profile.orcid.orcid}`;
     },
 
-    isEmailButtonDisabled: function(){
-      return this.emailButtonDisabled
-    }
+    isEmailButtonDisabled: function () {
+      return this.emailButtonDisabled;
+    },
   },
 
   watch: {
-    profile: function(profile) {
-      this.setRuleFormData(profile)
+    profile: function (profile) {
+      this.setRuleFormData(profile);
     },
-    getApiKeysUrl: function(url) {
+    getApiKeysUrl: function (url) {
       if (!url) {
-        return
+        return;
       }
-      this.getApiKeys()
+      this.getApiKeys();
     },
-
   },
 
   mounted() {
-    this.setRuleFormData(this.profile)
-    this.setEmailFormData(this.profile.email)
-    this.getApiKeys()
-    this.scrollToElement()
-    this.getCognitoUser()
-    this.prevEmail = this.profile.email
+    this.setRuleFormData(this.profile);
+    this.setEmailFormData(this.profile.email);
+    this.getApiKeys();
+    this.scrollToElement();
+    this.getCognitoUser();
+    this.prevEmail = this.profile.email;
   },
 
   methods: {
-    ...mapActions(['updateProfile', 'updateCognitoUser']),
+    ...mapActions(["updateProfile", "updateCognitoUser"]),
 
-    changeStatus: function(val) {
-      this.mfaStatus = val
+    changeStatus: function (val) {
+      this.mfaStatus = val;
     },
 
     /**
      * Get current authenticated Cognito user
      */
-    getCognitoUser: function() {
-      Auth.currentAuthenticatedUser().then(user => {
-        this.updateCognitoUser(user)
-      })
-      .catch(this.handleXhrError.bind(this));
+    getCognitoUser: function () {
+      Auth.currentAuthenticatedUser()
+        .then((user) => {
+          this.updateCognitoUser(user);
+        })
+        .catch(this.handleXhrError.bind(this));
     },
 
     /**
      * Scroll to element
      */
-    scrollToElement: function() {
-      const scrollTo = pathOr('', ['query', 'scrollTo'], this.$route)
+    scrollToElement: function () {
+      const scrollTo = pathOr("", ["query", "scrollTo"], this.$route);
       if (scrollTo && this.$el) {
-        const scrollToEl = this.$el.querySelector(`#${scrollTo}`)
+        const scrollToEl = this.$el.querySelector(`#${scrollTo}`);
         if (scrollToEl) {
-          scrollToEl.scrollIntoView()
+          scrollToEl.scrollIntoView();
 
           // Remove query
-          this.$router.replace({ query: {} })
+          this.$router.replace({ query: {} });
         }
       }
     },
@@ -594,58 +543,59 @@ export default {
      * Makes call to resort table by column
      * @param {String} key
      */
-    sortColumn: function(key) {
-      this.apiKeys = this.returnSort(key, this.apiKeys)
+    sortColumn: function (key) {
+      this.apiKeys = this.returnSort(key, this.apiKeys);
     },
     /**
      * Opens proper two factor dialog
      * @param {Boolean} hasAuthyId
      */
-    handleTwoFactorBtnClick: function(authEnabled) {
+    handleTwoFactorBtnClick: function (authEnabled) {
       if (!authEnabled) {
-        this.$refs.addTwoFactorDialog.dialogVisible = true
+        this.$refs.addTwoFactorDialog.dialogVisible = true;
       } else {
-        this.$refs.deleteTwoFactorDialog.dialogVisible = true
+        this.$refs.deleteTwoFactorDialog.dialogVisible = true;
       }
     },
     /**
      * Update profile form data
      */
-    setRuleFormData: function(profile) {
+    setRuleFormData: function (profile) {
       if (!profile) {
-        return
+        return;
       }
-      const { firstName, lastName, credential, degree, middleInitial } = profile
+      const { firstName, lastName, credential, degree, middleInitial } =
+        profile;
 
       this.ruleForm = {
         firstName,
         lastName,
         credential,
         degree,
-        middleInitial
-      }
+        middleInitial,
+      };
     },
-    setEmailFormData: function(newEmail) {
-      const email = newEmail
+    setEmailFormData: function (newEmail) {
+      const email = newEmail;
       this.emailForm = {
-        email
-      }
+        email,
+      };
     },
     /**
      * Validates user profile form
      */
-    handleUpdateProfileSubmit: function() {
-      this.$refs.updateProfileForm.validate(valid => {
+    handleUpdateProfileSubmit: function () {
+      this.$refs.updateProfileForm.validate((valid) => {
         if (!valid) {
-          return
+          return;
         }
 
-        this.submitUpdateProfileRequest()
-      })
+        this.submitUpdateProfileRequest();
+      });
     },
 
     //validate email form
-    handleUpdateEmailSubmit: function() {
+    handleUpdateEmailSubmit: function () {
       var temp = this.$refs.updateEmailForm;
       //UNCOMMENT AFTER DEBUGGING:
       /*
@@ -657,138 +607,137 @@ export default {
         this.submitUpdateEmailRequest()
       })
       */
-      this.submitUpdateEmailRequest()
+      this.submitUpdateEmailRequest();
     },
     /**
      * Makes XHR call to update a user profile
      */
-    submitUpdateProfileRequest: function() {
+    submitUpdateProfileRequest: function () {
       this.sendXhr(this.updateProfileUrl, {
-        method: 'PUT',
+        method: "PUT",
         body: {
           organization: this.profile.preferredOrganization,
           email: this.profile.email,
           url: this.profile.url,
           color: this.profile.color,
-          ...this.ruleForm
-        }
+          ...this.ruleForm,
+        },
       })
         .then(this.handleUpdateProfileXhrSuccess.bind(this))
-        .catch(this.handleXhrError.bind(this))
+        .catch(this.handleXhrError.bind(this));
     },
     //XHR call to update email address
-    submitUpdateEmailRequest: function() {
+    submitUpdateEmailRequest: function () {
       this.emailButtonDisabled = true;
-      this.sendXhr(this.updateEmailUrl,{
-        method: 'PUT',
+      this.sendXhr(this.updateEmailUrl, {
+        method: "PUT",
         body: {
           organization: this.profile.preferredOrganization,
           url: this.profile.url,
           color: this.profile.color,
           userRequestedChange: true,
           ...this.emailForm,
-          ...this.ruleForm
-        }
+          ...this.ruleForm,
+        },
       })
-      .then(this.handleUpdateEmailXhrSuccess.bind(this))
-      .catch(this.handleXhrEmailError.bind(this))
+        .then(this.handleUpdateEmailXhrSuccess.bind(this))
+        .catch(this.handleXhrEmailError.bind(this));
     },
     /**
      * Handles successful two factor xhr response
      * @param {Object} response
      */
-    handleUpdateProfileXhrSuccess: function(response) {
+    handleUpdateProfileXhrSuccess: function (response) {
       this.emailButtonDisabled = false;
-      EventBus.$emit('toast', {
+      EventBus.$emit("toast", {
         detail: {
-          type: 'success',
-          msg: 'Profile Updated'
-        }
-      })
+          type: "success",
+          msg: "Profile Updated",
+        },
+      });
       this.updateProfile({
         ...this.profile,
-        ...response
-      })
+        ...response,
+      });
     },
     /**
      * Handles successful two factor xhr response
      * @param {Object} response
      */
-    handleUpdateEmailXhrSuccess: function(response) {
-      EventBus.$emit('toast', {
+    handleUpdateEmailXhrSuccess: function (response) {
+      EventBus.$emit("toast", {
         detail: {
-          type: 'success',
-          msg: 'Email Successfully Updated'
-        }
-      })
+          type: "success",
+          msg: "Email Successfully Updated",
+        },
+      });
 
       //NOTE: Should update profile with email update
       this.updateProfile({
         ...this.profile,
-        ...response
-      })
-
+        ...response,
+      });
     },
 
-    handleXhrEmailError: function(response){
-      EventBus.$emit('toast', {
+    handleXhrEmailError: function (response) {
+      EventBus.$emit("toast", {
         detail: {
-          type: 'error',
-          msg: 'ERROR: Email was not successfully updated. Please try again or use another email.'
-        }
-      })
+          type: "error",
+          msg: "ERROR: Email was not successfully updated. Please try again or use another email.",
+        },
+      });
     },
     /**
      * Fetches api keys for logged in user
      */
-    getApiKeys: function() {
+    getApiKeys: function () {
       if (!this.getApiKeysUrl) {
-        return
+        return;
       }
 
       this.sendXhr(this.getApiKeysUrl)
-        .then(response => {
-          this.apiKeys = this.returnSort('name', response)
-          this.isApiKeysLoading = false
+        .then((response) => {
+          this.apiKeys = this.returnSort("name", response);
+          this.isApiKeysLoading = false;
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(this.handleXhrError.bind(this));
     },
     /**
      * Update API keys after CREATE & DELETE XHR calls
      * @param {Object} payload
      */
-    updateApiKeys: function(payload) {
-      const { apiKey, type } = payload
-      const apiKeys = [...this.apiKeys]
+    updateApiKeys: function (payload) {
+      const { apiKey, type } = payload;
+      const apiKeys = [...this.apiKeys];
 
-      if (type === 'CREATED') {
+      if (type === "CREATED") {
         // render api key detail dialog
-        this.openApiKeyWindow('apiKeyDetailDialog', apiKey)
+        this.openApiKeyWindow("apiKeyDetailDialog", apiKey);
 
         // add key to list
-        apiKeys.push(payload.apiKey)
+        apiKeys.push(payload.apiKey);
 
         // update keys list
-        this.apiKeys = this.returnSort('name', apiKeys)
-      } else if (type === 'DELETED') {
-        const index = this.apiKeys.findIndex(item => item.key === apiKey.key)
-        apiKeys.splice(index, 1)
-        this.apiKeys = this.returnSort('name', apiKeys)
+        this.apiKeys = this.returnSort("name", apiKeys);
+      } else if (type === "DELETED") {
+        const index = this.apiKeys.findIndex((item) => item.key === apiKey.key);
+        apiKeys.splice(index, 1);
+        this.apiKeys = this.returnSort("name", apiKeys);
       }
     },
 
     /**
      * Function that's called after ORCID is deleted
      */
-    updateORCID: function() {
-      this.isDeleteOrcidDialogVisible = false
+    updateORCID: function () {
+      this.isDeleteOrcidDialogVisible = false;
       this.updateProfile({
         ...this.profile,
-        orcid: {}
-      })
+        orcid: {},
+      });
     },
-    updateORCID2: function(){
-      this.isDeleteOrcidDialogVisible = false
+    updateORCID2: function () {
+      this.isDeleteOrcidDialogVisible = false;
     },
 
     /**
@@ -796,76 +745,84 @@ export default {
      * @param {String} refName
      * @param {Object} apiKey
      */
-    openApiKeyWindow: function(refName, apiKey = {}) {
+    openApiKeyWindow: function (refName, apiKey = {}) {
+      this.apiKey = apiKey;
 
-      this.apiKey = apiKey
-
-      const dialog = this.$refs[refName]
-      dialog.dialogVisible = true
+      const dialog = this.$refs[refName];
+      dialog.dialogVisible = true;
     },
     /**
      * Logout the user
      */
-    logout: function() {
-      EventBus.$emit('logout')
+    logout: function () {
+      EventBus.$emit("logout");
     },
 
     /**
      * Logic to connect to user's ORCID
      */
-    openORCID: function() {
-      this.oauthWindow = window.open(this.getORCIDUrl, "_blank", "toolbar=no, scrollbars=yes, width=500, height=600, top=500, left=500");
-      const self = this
-      window.addEventListener('message', function(event) {
-          if (event.data && event.data.source && event.data.source === 'orcid-redirect-response' && event.data.code) {
-            this.oauthCode = event.data.code
-            if (this.oauthCode !== '') {
-
-              if (!self.getORCIDApiUrl) {
-                return
-              }
-
-              self.sendXhr(self.getORCIDApiUrl, {
-                method: 'POST',
-                body: {
-                  "authorizationCode": this.oauthCode
-                }
-              })
-                .then((response) => {
-                  // response logic goes here
-                  self.oauthInfo = response
-
-                  self.updateProfile({
-                    ...self.profile,
-                    orcid: self.oauthInfo
-                  })
-
-                  EventBus.$emit('toast', {
-                    detail: {
-                      type: 'success',
-                      msg: 'Your ORCID has been successfully added'
-                    }
-                  })
-                })
-                .catch(self.handleXhrError.bind(this))
+    openORCID: function () {
+      this.oauthWindow = window.open(
+        this.getORCIDUrl,
+        "_blank",
+        "toolbar=no, scrollbars=yes, width=500, height=600, top=500, left=500"
+      );
+      const self = this;
+      window.addEventListener("message", function (event) {
+        if (
+          event.data &&
+          event.data.source &&
+          event.data.source === "orcid-redirect-response" &&
+          event.data.code
+        ) {
+          this.oauthCode = event.data.code;
+          if (this.oauthCode !== "") {
+            if (!self.getORCIDApiUrl) {
+              return;
             }
+
+            self
+              .sendXhr(self.getORCIDApiUrl, {
+                method: "POST",
+                body: {
+                  authorizationCode: this.oauthCode,
+                },
+              })
+              .then((response) => {
+                // response logic goes here
+                self.oauthInfo = response;
+
+                self.updateProfile({
+                  ...self.profile,
+                  orcid: self.oauthInfo,
+                });
+
+                EventBus.$emit("toast", {
+                  detail: {
+                    type: "success",
+                    msg: "Your ORCID has been successfully added",
+                  },
+                });
+              })
+              .catch(self.handleXhrError.bind(this));
           }
-      })
+        }
+      });
     },
 
     /**
      * Opens deleteORCID modal
      * @param {String} refName
      */
-    openORCIDWindow: function() {
-      this.$refs.deleteOrcidDialog.dialogVisible = true
-    }
-  }
-}
+    openORCIDWindow: function () {
+      this.$refs.deleteOrcidDialog.dialogVisible = true;
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables';
+@import "../../assets/_variables";
 
 .mt-20 {
   margin-top: 20px;
@@ -1031,7 +988,7 @@ p {
 }
 #update-profile-form {
   .el-form-item__content {
-  max-width: 330px;
+    max-width: 330px;
   }
 }
 </style>

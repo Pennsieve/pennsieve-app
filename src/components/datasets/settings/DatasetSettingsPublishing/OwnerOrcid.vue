@@ -1,4 +1,5 @@
 <template>
+  
   <div class="owner-orcid">
     <div v-if="!hasOrcidId">
       <p class="sharing-blurb">
@@ -15,7 +16,7 @@
         class="bf-menu-item"
         :to="{
           name: 'my-settings-container',
-          params: { orgId: this.activeOrganizationId }
+          params: { orgId: this.activeOrganizationId },
         }"
       >
         Connect ORCID iD in user profile menu
@@ -56,6 +57,17 @@
         <div v-else class="orcid-waiting">
           <el-row><div v-loading="loadingOrcid" class="orcid-loader" /></el-row>
         </div>
+        <el-row class="mt-20" v-if="!publishToOrcid">
+          <router-link
+            class="bf-menu-item"
+            :to="{
+              name: 'my-settings-container',
+              params: { orgId: this.activeOrganizationId },
+            }"
+          >
+            Allow Pennsieve to publish works to ORCHID
+          </router-link>
+        </el-row>
       </div>
     </div>
     <delete-orcid
@@ -67,87 +79,92 @@
 </template>
 
 <script>
-import BfButton from '../../../shared/bf-button/BfButton.vue'
-import DeleteOrcid from '../../../my-settings/windows/DeleteOrcid.vue'
-import { mapGetters, mapState, mapActions } from 'vuex'
-import { pathOr } from 'ramda'
+import BfButton from "../../../shared/bf-button/BfButton.vue";
+import DeleteOrcid from "../../../my-settings/windows/DeleteOrcid.vue";
+import { mapGetters, mapState, mapActions } from "vuex";
+import { pathOr } from "ramda";
 import IconRemove from "../../../icons/IconRemove.vue";
 export default {
-  name: 'OwnerOrcid',
+  name: "OwnerOrcid",
 
   components: {
     IconRemove,
     BfButton,
-    DeleteOrcid
+    DeleteOrcid,
   },
 
   data() {
     return {
       loadingOrcid: false,
-      deleteOrcidDialogVisible: false
-    }
+      deleteOrcidDialogVisible: false,
+    };
   },
 
   computed: {
-    ...mapGetters(['datasetOwnerHasOrcidId', 'hasOrcidId', 'profile']),
+    ...mapGetters([
+      "datasetOwnerHasOrcidId",
+      "hasOrcidId",
+      "publishToOrchid",
+      "profile",
+    ]),
 
-    ...mapState(['config', 'activeOrganization']),
+    ...mapState(["config", "activeOrganization"]),
 
     /**
      * Compute active organization id
      * @returns {String}
      */
-    activeOrganizationId: function() {
+    activeOrganizationId: function () {
       return pathOr(
-        'Organization',
-        ['organization', 'id'],
+        "Organization",
+        ["organization", "id"],
         this.activeOrganization
-      )
+      );
     },
     /**
      * Retrieves Url to display with name once ORCID is connected to user profile
      */
-    getORCIDResultUrl: function() {
-      const env = pathOr('', ['config', 'environment'])(this)
-      return env === 'dev'
+    getORCIDResultUrl: function () {
+      const env = pathOr("", ["config", "environment"])(this);
+      return env === "dev"
         ? `https://sandbox.orcid.org/${this.profile.orcid.orcid}`
-        : `https://orcid.org/${this.profile.orcid.orcid}`
-    }
+        : `https://orcid.org/${this.profile.orcid.orcid}`;
+    },
   },
 
   methods: {
-    ...mapActions(['updateProfile']),
+    ...mapActions(["updateProfile"]),
 
     /**
      * Function that's called after ORCID is deleted
      */
-    updateORCID: function() {
+    updateORCID: function () {
       this.updateProfile({
         ...this.profile,
-        orcid: {}
-      })
+        orcid: {},
+      });
     },
 
     /**
      * Opens deleteORCID modal
      * @param {String} refName
      */
-    openORCIDWindow: function() {
-      this.deleteOrcidDialogVisible = true
+    openORCIDWindow: function () {
+      this.deleteOrcidDialogVisible = true;
     },
 
     /**
      * Closes deleteORCID modal
      */
-    closeOrcidDialog: function() {
-      this.deleteOrcidDialogVisible = false
-    }
-  }
-}
+    closeOrcidDialog: function () {
+      this.deleteOrcidDialogVisible = false;
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@import "../../../../assets/_variables.scss";
 
 .orcid-success {
   border: solid 1px #dadada;
@@ -207,6 +224,10 @@ export default {
   .el-row--flex.is-align-middle {
     flex: 27;
   }
+}
+
+.mt-20 {
+  margin-top: 20px;
 }
 
 p {
