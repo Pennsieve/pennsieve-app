@@ -23,7 +23,7 @@
         <IconHelp :class="iconSpacing" :height="22" :width="22" />
         {{ helpLinkCopy }}
       </a>
-      <a target="_blank" class="mr-16" @click="showContactUsDialog">
+      <a target="_blank" class="mr-16" @click="openContactUsDialog">
         <IconInfo :class="iconSpacing" :height="22" :width="22" />
         Contact Us
       </a>
@@ -43,7 +43,11 @@
       @succesfulLogin="loginUser"
       @close-log-in-dialog="closeLogInModal"
     />
-    <contact-us-dialog v-model:visible="isContactUsModalVisible" />
+    <contact-us-dialog
+      v-model:isOpen="isContactUsDialogOpen"
+      @close-contact-us-dialog="closeContactUsDialog"
+      :icon-spacing="iconSpacing"
+    />
   </div>
 </template>
 
@@ -87,7 +91,7 @@ export default {
     return {
       isMobileSearchOpen: false,
       isLogInModalVisible: false,
-      isContactUsModalVisible: false,
+      isContactUsDialogOpen: false,
       displayName: "",
       windowWidth: "",
     };
@@ -156,15 +160,13 @@ export default {
     this.windowWidth = window.innerWidth;
     window.onresize = () => this.onResize(window.innerWidth);
   },
+  mounted() {
+    EventBus.$on("openContactUsDialog", (data) => {
+      this.isContactUsDialogOpen = data;
+    });
+  },
 
   methods: {
-    /**
-     * Show Contact Us Dialog
-     */
-    showContactUsDialog: function () {
-      this.$refs.contactUsDialog.visible = true;
-      EventBus.$emit("openContactUsDialog", true);
-    },
     /**
      * Toggle search and focus
      * Timeout is used so the input focuses
@@ -200,15 +202,15 @@ export default {
     /**
      * Display log in modal
      */
-    openContactUsModal() {
-      this.isContactUsModalVisible = true;
+    openContactUsDialog() {
+      EventBus.$emit("isContactUsDialogOpen", true);
     },
 
     /**
      * Hide log in modal
      */
-    closeContactUsModal() {
-      this.isContactUsModalVisible = false;
+    closeContactUsDialog() {
+      EventBus.$emit("isContactUsDialogOpen", false);
     },
 
     /**
