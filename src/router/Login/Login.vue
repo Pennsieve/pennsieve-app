@@ -12,7 +12,10 @@
           <div class="row">
             <div class="col-xs-12">
               <div class="pennsieve-logo">
-                <PennsieveLogoContainer :dark-background="false" :show-penn-logo="false" />
+                <PennsieveLogoContainer
+                  :dark-background="false"
+                  :show-penn-logo="false"
+                />
               </div>
               <h1>Scientific Data Management, Integration and Publishing.</h1>
               <p>
@@ -23,9 +26,9 @@
           </div>
         </div>
         <img
-            class="login-image"
-            src="/src/assets/images/illustrations/illo-neuron-mural.svg"
-            alt="Neuron Mural Image"
+          class="login-image"
+          src="/src/assets/images/illustrations/illo-neuron-mural.svg"
+          alt="Neuron Mural Image"
         />
       </div>
     </div>
@@ -98,6 +101,12 @@
     <div class="org-section">
       <img
         ref="img"
+        src="/src/assets/images/logos/nih-logo.png"
+        alt="NIH"
+        class="logo"
+      />
+      <img
+        ref="img"
         src="/src/assets/images/logos/psom_logo_blue.svg"
         alt="Perelman School of Medicine at the University of Pennsylvania"
         class="logo"
@@ -128,7 +137,7 @@
       />
     </div>
 
-     <PennsieveFooter />
+    <PennsieveFooter />
   </div>
 </template>
 
@@ -142,26 +151,24 @@ import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFo
 import PublicDatasetsGrid from "../../components/PublicDatasets/PublicDatasetsGrid.vue";
 import BfButton from "../../components/shared/bf-button/BfButton.vue";
 
-import analyzeIcon from "../../assets/images/icons/analyze.svg"
-import securityIcon from "../../assets/images/icons/security.svg"
-import eegIcon from "../../assets/images/icons/eeg-data.svg"
-import storageIcon from "../../assets/images/icons/storage.svg"
-import logformsIcon from "../../assets/images/icons/log-forms.svg"
-import collabIcon from "../../assets/images/icons/collaboration.svg"
-
+import analyzeIcon from "../../assets/images/icons/analyze.svg";
+import securityIcon from "../../assets/images/icons/security.svg";
+import eegIcon from "../../assets/images/icons/eeg-data.svg";
+import storageIcon from "../../assets/images/icons/storage.svg";
+import logformsIcon from "../../assets/images/icons/log-forms.svg";
+import collabIcon from "../../assets/images/icons/collaboration.svg";
 
 import EventBus from "../../utils/event-bus";
 import PennsieveLogoContainer from "../../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
 import Cookies from "js-cookie";
-
 
 export default {
   name: "bf-login",
   props: {
     submitButtonType: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
   components: {
     PennsieveLogoContainer,
@@ -276,7 +283,7 @@ export default {
   },
 
   mounted: function () {
-    console.log('login mounted')
+    console.log("login mounted");
     this.doneMounting();
   },
 
@@ -337,7 +344,7 @@ export default {
      * @param {Object} response
      */
     handleLoginSuccess: function (user) {
-      console.log(user)
+      console.log(user);
 
       const token = pathOr(
         "",
@@ -757,7 +764,7 @@ export default {
   padding: 32px 0 8px;
   position: relative;
   overflow: hidden;
-  background-image: linear-gradient(to left, #b3bcce , $gray_1);
+  background-image: linear-gradient(to left, #b3bcce, $gray_1);
   @media only screen and (max-width: 550px) {
     padding-top: 40px;
   }
