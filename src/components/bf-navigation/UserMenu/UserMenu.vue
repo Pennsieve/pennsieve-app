@@ -11,7 +11,6 @@
       :show-arrow="false"
       :disabled="pageNotFound"
     >
-
       <template #reference>
         <button
           v-if="!pageNotFound"
@@ -102,17 +101,6 @@
               </router-link>
 
             </li>
-
-
-            <li>
-              <a
-                href="#"
-                class="bf-menu-item"
-                @click.prevent="switchOrganization(welcomeOrganization)"
-              >
-                Submit to Public Repository
-              </a>
-            </li>
             <li>
               <el-popover
                 ref="orgMenu"
@@ -173,18 +161,6 @@
                           />
                         </a>
                       </li>
-                      <hr>
-                      <li>
-                        <a
-                          href="#"
-                          class="bf-menu-item"
-                          :class="[maxOrgsCreated ? 'disabled': '']"
-
-                          @click.prevent="requestCreateOrganization"
-                        >
-                          Request to Create Private Workspace
-                        </a>
-                      </li>
                     </ul>
                   </div>
 
@@ -224,12 +200,6 @@
         </div>
       </div>
     </el-popover>
-
-
-<!--    <create-organization-dialog-->
-<!--      :visible.sync="isCreateOrgDialogVisible"-->
-<!--      @close-dialog="onCloseDialog"-->
-<!--    />-->
   </div>
 </template>
 
@@ -241,7 +211,6 @@ import BfNavigationItem from '../bf-navigation-item/BfNavigationItem.vue'
 import Avatar from '../../shared/avatar/Avatar.vue'
 import FilterInput from '../../shared/FilterInput/FilterInput.vue'
 import FilterEmptyState from '../../shared/FilterEmptyState/FilterEmptyState.vue'
-import CreateOrganizationDialog from '../../CreateOrganizationDialog/CreateOrganizationDialog.vue'
 
 import EventBus from '../../../utils/event-bus'
 import IconArrowRight from "../../icons/IconArrowRight.vue";
@@ -259,7 +228,6 @@ export default {
     Avatar,
     FilterInput,
     FilterEmptyState,
-    CreateOrganizationDialog
   },
 
   data() {
@@ -278,16 +246,6 @@ export default {
       'activeOrganization',
       'organizations'
     ]),
-
-    /**
-     * Checks where user has created the maximum number of organizations
-     * @returns {Boolean}
-     */
-    maxOrgsCreated: function() {
-      // NOTE: Adding the first condition so that this can go through
-      // as these properties do not exist in the profile object yet
-      return this.profile.maxOrganizationsAllowed === 3 && this.profile.organizationsCreated === this.profile.maxOrganizationsAllowed
-    },
 
     /**
        * Checks if route is a 404 page
@@ -368,23 +326,6 @@ export default {
   },
 
   methods: {
-
-    /**
-     * Open Create Organization Dialog
-     */
-    openCreateOrganizationDialog: function() {
-      if (!this.maxOrgsCreated) {
-        this.isCreateOrgDialogVisible = true
-      }
-    },
-
-    /**
-     * Close Create Organization Dialog
-     */
-    onCloseDialog: function() {
-      this.isCreateOrgDialogVisible = false
-    },
-
 
     /**
      * Close all menus
@@ -497,17 +438,6 @@ export default {
 
       EventBus.$emit('logout')
     },
-
-    /**
-     * Show the intercom window to allow
-     * user to talk to supprt to create an
-     * organization
-     */
-    requestCreateOrganization: function() {
-      this.closeMenus()
-
-      // window.Intercom('show')
-    }
   }
 }
 </script>
