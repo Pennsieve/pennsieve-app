@@ -21,7 +21,6 @@ New and improved Pennsieve web app, now leveraging Vue3.
 - When deploying to production, please create a corresponding Release in github ([Managing Releases in A Repository](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)). Each release PR should be   titled with it's release number using the [Semantic Versioning](https://semver.org/) convention (v1.0.0). 
 
 
-
 ## Recommended IDE Setup
 
 [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
