@@ -11,7 +11,6 @@
       :show-arrow="false"
       :disabled="pageNotFound"
     >
-
       <template #reference>
         <button
           v-if="!pageNotFound"
