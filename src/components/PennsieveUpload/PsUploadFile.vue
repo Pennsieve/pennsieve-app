@@ -3,10 +3,6 @@
     <div class="upload-file">
       {{uploadObject.file.name}}
       <div class="right">
-        <div class="status">
-          {{uploadObject.status}}
-        </div>
-
         <div class="storage-value"> {{storageStr}} </div>
       </div>
     </div>
@@ -58,11 +54,6 @@ const props = defineProps({
   .right {
     display: flex;
     align-items: center;
-
-    .status {
-      margin-right: 8px;
-      color: $purple_3
-    }
   }
 
   .svg-icon {
