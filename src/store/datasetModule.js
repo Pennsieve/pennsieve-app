@@ -73,13 +73,11 @@ const initialState = () => ({
   isLoadingManifestsActivity: false,
   datasetActivity: [],
   datasetManifests: [],
-  pusherChannel: {}
 })
 
 export const state = initialState()
 
 export const mutations = {
-
   CLEAR_STATE(state) {
     //reset all state to initial state
     const _initialState = initialState()
@@ -175,9 +173,6 @@ export const mutations = {
   UPDATE_IS_LOADING_MANIFESTS(state, isLoading) {
     state.isLoadingManifestsActivity = isLoading
   },
-  SET_PUSHER_CHANNEL(state, channel) {
-    state.pusherChannel = channel
-  }
 
 
 }
@@ -326,20 +321,12 @@ export const actions = {
   clearDatasetActivityState: ({commit}) => {
     commit('CLEAR_DATASET_ACTIVITY_STATE')
   },
-
-  setPusherChannel: async({commit}, channel) => {
-    commit('SET_PUSHER_CHANNEL', channel)
-  }
 }
 
 export const getters = {
   curDatasetSearchPage: state => {
     return state.datasetSearchParams.offset / state.datasetSearchParams.limit + 1
-  },
-  getPusherChannel: state => {
-    return state.pusherChannel
   }
-
 }
 
 const datasetsModule = {
