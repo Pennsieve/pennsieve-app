@@ -236,8 +236,6 @@ export default {
       renameDialogVisible: false,
       moveDialogVisible: false,
       selectedFileForAction: {},
-      pusherChannelName: "",
-      pusherChannel: {}
     };
   },
 
@@ -253,8 +251,6 @@ export default {
       "datasetLocked",
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
-
-    ...mapGetters('datasetModule', ["getPusherChannel"]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -320,8 +316,9 @@ export default {
     "$store.state.uploadModule.uploadComplete": function () {
       console.log("upload complete timer");
       setTimeout(() => {
+        this.showUploadInfo = false;
         this.resetUpload();
-      }, 120000);
+      }, 3000);
     },
 
     "$route.query.pkgId": {
@@ -331,38 +328,6 @@ export default {
         }
       },
     },
-    getPusherChannel: {
-      handler(channel) {
-
-        function isEmpty(obj) {
-          for (const prop in obj) {
-            if (Object.hasOwn(obj, prop)) {
-              return false;
-            }
-          }
-          return true;
-        }
-
-        if (!isEmpty(channel)) {
-          channel.bind('upload-event', function(data) {
-
-            let curFolderId = this.file.content.intId
-            for (let x in data) {
-              this.updateFileStatus({key: data[x].upload_id.String, status: "complete"})
-            }
-
-            for (let x in data) {
-              if (data[x].parent_id.Int64 = curFolderId){
-                console.log('Refetching files.')
-                this.fetchFiles()
-                break
-              }
-            }
-          }.bind(this))
-        }
-      },
-      immediate: true
-    }
   },
 
   mounted: function () {
@@ -390,13 +355,8 @@ export default {
     EventBus.$on("refreshAfterRestore", () => {
       this.fetchFiles();
     });
-
   },
 
-  beforeUnmount() {
-    const pusherCh = this.getPusherChannel
-    pusherCh.unbind('upload-event')
-  },
   unmounted: function () {
     this.$el.removeEventListener("dragenter", this.onDragEnter.bind(this));
     EventBus.$off("rename-file", this.showRenameFileDialog.bind(this));
@@ -407,8 +367,6 @@ export default {
       this.onUpdateUploadedFileState.bind(this)
     );
     EventBus.$off("update-external-file", this.onFileRenamed);
-
-
   },
 
   /**
@@ -424,7 +382,7 @@ export default {
   },
 
   methods: {
-    ...mapActions("uploadModule", ["resetUpload","updateFileStatus"]),
+    ...mapActions("uploadModule", ["resetUpload"]),
 
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function (e) {

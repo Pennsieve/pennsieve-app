@@ -12,6 +12,7 @@ let route = useRoute();
       :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']"
     >
 
+
       <template v-if="datasetNameVisible">
         <div class="parent">
           <div class="dataset-name">{{ datasetNameDisplay() }}</div>

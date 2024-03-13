@@ -14,7 +14,6 @@ import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 import request from './mixins/request'
 
-
 // This does not work correctly with Vite:
 // import Vue3Sanitize from "vue-3-sanitize";
 
@@ -25,18 +24,6 @@ import 'element-plus/es/components/message/style/index';
 
 Amplify.configure(AWSConfig)
 
-// Enabling this will log debug messages to the console.
-// Pusher.logToConsole = true;
-
-// const pusher = new Pusher(siteConfig.pusherConfig.appId, {
-//     cluster: siteConfig.pusherConfig.region
-// });
-
-// var channel = pusher.subscribe('dataset-d5d316ca-ae61-4633-bb0c-39a6dec18407');
-// channel.bind('upload-event', function(data) {
-//     console.log('call back')
-//     console.log(data)
-// });
 
 const app = createApp(App)
 
@@ -66,9 +53,7 @@ app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
-app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
-    cluster: siteConfig.pusherConfig.region
-});
+
 
 const sessionRefreshThreshold = 300;
 
