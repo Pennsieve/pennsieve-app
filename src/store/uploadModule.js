@@ -58,6 +58,11 @@ export const mutations = {
     SET_UPLOAD_FILE_MAP(state,uploadFileMap) {
         state.uploadFileMap = uploadFileMap
     },
+    SET_FILE_STATUS(state, statusInfo) {
+        console.log(statusInfo.key)
+        let curMap = state.uploadFileMap.get(statusInfo.key)
+        curMap.status = statusInfo.status
+    },
     UPDATE_UPLOAD_PROGRESS(state, progressInfo) {
         let curMap = state.uploadFileMap.get(progressInfo.key)
         const diff = progressInfo.loaded - curMap.progress.loaded
@@ -312,6 +317,8 @@ export const actions = {
         // TODO: Add concurrency
         for (let [key, value] of state.uploadFileMap) {
             try {
+                commit('SET_FILE_STATUS', {key: key, status: "uploading"})
+
                 const tags = "OrgId=" + rootState.activeOrganization.organization.id + "&DatasetId=" + datasetId
 
                 const parallelUploads3 = new Upload({
@@ -343,6 +350,9 @@ export const actions = {
                 });
 
                 await parallelUploads3.done();
+
+                commit('SET_FILE_STATUS', {key: key, status: "processing"})
+
             } catch (e) {
                 console.log(e);
             }
@@ -392,7 +402,8 @@ export const actions = {
             uploadMap.set(s3Key, {
                 file: curFile,
                 config: f,
-                progress: {loaded:0, total: curFile.total}
+                progress: {loaded:0, total: curFile.total},
+                status: "waiting"
             })
 
             total += curFile.size
@@ -427,7 +438,21 @@ export const actions = {
         } catch (e) {
             console.log(e)
             throw new Error("Unable to sync manifest.")
+        } finally {
+
+            // Set Manifest Files array to empty as this is now in upload file map
+            state.manifestFiles = []
         }
+    },
+
+    // Update status of an upload File
+    updateFileStatus: async ({commit, state}, fileInfo) => {
+        let s3_key = state.manifestNodeId + "/" + fileInfo.key
+
+        if (state.uploadFileMap.get(s3_key)) {
+            commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
+        }
+
     },
 
     // Reset upload action
