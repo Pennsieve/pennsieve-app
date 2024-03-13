@@ -125,15 +125,34 @@
           }
         },
         immediate: true
+      },
+      /**
+       * Not sure if this ever is the case but if the datasetID changes,
+       * we should start listening to new pusher channel
+       */
+      datasetId: function() {
+        this.$pusher.unsubscribe(this.pusherChannelName)
+        this.pusherChannelName = this.datasetId.replace("N:dataset:","dataset-")
+        console.log("Updating pusher in watcher: " + this.pusherChannelName)
+        const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
+        this.setPusherChannel(pusherChannel)
+
       }
     },
 
     mounted() {
       EventBus.$on('get-dataset-contributors', this.getDatasetContributors.bind(this))
+
+      this.pusherChannelName = this.datasetId.replace("N:dataset:","dataset-")
+      console.log("Updating pusher in Mounted: " + this.pusherChannelName)
+      const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
+      this.setPusherChannel(pusherChannel)
     },
 
     beforeUnmount() {
       EventBus.$off('get-dataset-contributors', this.getDatasetContributors.bind(this))
+      this.$pusher.unsubscribe(this.pusherChannelName)
+      this.pusherChannelName = ""
     },
 
     methods: {
@@ -160,6 +179,9 @@
         'setDatasetContributors',
         'updateScientificUnits',
         'setChangelogText'
+      ]),
+      ...mapActions('datasetModule',[
+        'setPusherChannel'
       ]),
 
 
