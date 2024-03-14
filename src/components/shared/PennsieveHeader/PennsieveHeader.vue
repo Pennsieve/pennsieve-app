@@ -1,7 +1,10 @@
 <template>
   <div class="pennsieve-header">
-
-    <PennsieveLogoContainer class="logo-container" :dark-background="true" :show-pennsieve-logo="false"/>
+    <PennsieveLogoContainer
+      class="logo-container"
+      :dark-background="true"
+      :show-pennsieve-logo="false"
+    />
 
     <div class="nav-links">
       <a
@@ -17,11 +20,15 @@
         />
       </a>
       <a href="https://docs.pennsieve.io" target="_blank" class="mr-16">
-        <IconHelp :class="iconSpacing" :height=22 :width=22 />
+        <IconHelp :class="iconSpacing" :height="22" :width="22" />
         {{ helpLinkCopy }}
       </a>
+      <a target="_blank" class="mr-16" @click="openContactUsDialog">
+        <IconInfo :class="iconSpacing" :height="22" :width="22" />
+        Contact Us
+      </a>
       <router-link tag="a" class="mr-16" :to="signupRoute">
-        <IconUpload :class="iconSpacing" :height=22 :width=22 />
+        <IconUpload :class="iconSpacing" :height="22" :width="22" />
         {{ createAccountCopy }}
       </router-link>
       <bf-user-dropdown-menu
@@ -36,6 +43,11 @@
       @succesfulLogin="loginUser"
       @close-log-in-dialog="closeLogInModal"
     />
+    <contact-us-dialog
+      v-model:isOpen="isContactUsDialogOpen"
+      @close-contact-us-dialog="closeContactUsDialog"
+      :icon-spacing="iconSpacing"
+    />
   </div>
 </template>
 
@@ -45,11 +57,14 @@ import IconHelp from "../../icons/IconHelp.vue";
 import IconRemove from "../../icons/IconRemove.vue";
 import PennsieveLogo from "../../icons/IconPennsieveLogo.vue";
 import IconUpload from "../../icons/IconUpload.vue";
- 
+import IconInfo from "../../icons/IconInfo.vue";
+import EventBus from "../../../utils/event-bus";
+
 // import DatasetSearch from "@/components/DatasetSearch/DatasetSearch.vue";
 import PsLogInDialog from "../PsLoginDialog/PsLogInDialog.vue";
 import BfUserDropdownMenu from "../../shared/BfUserDropdownMenu/BfUserDropdownMenu.vue";
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
+import ContactUsDialog from "./contact-us-dialog/ContactUsDialog.vue";
 
 export default {
   name: "PennsieveHeader",
@@ -61,8 +76,9 @@ export default {
     IconHelp,
     IconUpload,
     PsLogInDialog,
-    BfUserDropdownMenu
-},
+    BfUserDropdownMenu,
+    ContactUsDialog,
+  },
 
   props: {
     isSearchVisible: {
@@ -75,6 +91,7 @@ export default {
     return {
       isMobileSearchOpen: false,
       isLogInModalVisible: false,
+      isContactUsDialogOpen: false,
       displayName: "",
       windowWidth: "",
     };
@@ -143,6 +160,11 @@ export default {
     this.windowWidth = window.innerWidth;
     window.onresize = () => this.onResize(window.innerWidth);
   },
+  mounted() {
+    EventBus.$on("openContactUsDialog", (data) => {
+      this.isContactUsDialogOpen = data;
+    });
+  },
 
   methods: {
     /**
@@ -176,6 +198,19 @@ export default {
      */
     closeLogInModal() {
       this.isLogInModalVisible = false;
+    },
+    /**
+     * Display log in modal
+     */
+    openContactUsDialog() {
+      EventBus.$emit("isContactUsDialogOpen", true);
+    },
+
+    /**
+     * Hide log in modal
+     */
+    closeContactUsDialog() {
+      EventBus.$emit("isContactUsDialogOpen", false);
     },
 
     /**
@@ -212,8 +247,7 @@ export default {
     border-right: 1px solid white;
     margin-left: 8px;
     padding: 0 8px;
-    width:100px;
-
+    width: 100px;
   }
 
   .pennsieve-logo {
