@@ -491,7 +491,6 @@ const router = createRouter({
                 },
               ]
             },
-
             {
               path: 'relationships',
               name: 'relationships',
@@ -561,26 +560,6 @@ const router = createRouter({
         },
       ]
     },
-    // {
-    //   path: '/:orgId/datasets/:datasetId',
-    //   components: {
-    //     page: Dataset,
-    //     navigation: BfNavigation,
-    //     navigationSecondary: BfNavigationSecondary
-    //   },
-    //   children: [
-    //     {
-    //       name: 'dataset-overview',
-    //       path: 'overview',
-    //       components: {
-    //         stage: DatasetOverview
-    //       },
-    //       props: {
-    //         stage: true
-    //       }
-    //     },
-    //   ]
-    // },
     {
       name: "people",
       path: '/:orgId/people',
