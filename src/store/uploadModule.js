@@ -347,7 +347,7 @@ export const actions = {
                 console.log(e);
             }
         }
-        // commit('SET_UPLOAD_COMPLETE', true)
+        commit('SET_UPLOAD_COMPLETE', true)
     },
 
     // Sync Manifest Files with Server
