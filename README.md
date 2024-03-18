@@ -9,8 +9,8 @@ New and improved Pennsieve web app, now leveraging Vue3.
 
 
 - Create new feature branches off of __main__ branch
-- Name feature branches `feature/descriptive-name`
-- Name bug fix branches `fix/descriptive-name` 
+- Name feature branches `feature_descriptive-name`
+- Name bug fix branches `fix_descriptive-name` 
 - Merge branches into __dev__ branch to deploy to development environment
 - Do not delete your feature branch until it is merged to production 
 - Keep your feature branch up to date with __main__
