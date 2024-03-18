@@ -62,6 +62,10 @@ export default {
           name: "Getting Help",
           to: "support"
         },
+        {
+          name: "Developer Tools",
+          to: "developer-tools"
+        },
 
 
       ]
