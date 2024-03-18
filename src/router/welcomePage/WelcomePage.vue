@@ -56,10 +56,6 @@ export default {
         {
           name: "My Public Datasets",
           to: "submit"
-        },
-        {
-          name: "Developer Tools",
-          to: "submit"
         }
       ]
     }
