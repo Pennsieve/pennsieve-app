@@ -64,7 +64,7 @@
           @click-file-label="onClickLabel"
         />
         <div class="loading-spinner-container" v-if="filesLoading && !lastPage">
-          <!--              <el-spinner class="loading-spinner" />-->
+          <!-- <el-spinner class="loading-spinner" /> -->
         </div>
       </div>
       <file-metadata-info
@@ -1056,6 +1056,7 @@ export default {
   display: block;
   margin-top: 1px;
   border: 1px solid $gray_2;
+  max-height: calc(100vh - 200px);
 }
 
 .actions-container {
