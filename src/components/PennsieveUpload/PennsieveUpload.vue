@@ -40,7 +40,9 @@ User archives manifest -> remove activeManifest from memory
 
       <p class="upload-text"><b>Note:</b> Files can take up to a minute of processing after upload completes. You can check import status of files in the
         <router-link :to="{ name: 'upload-manifests'}"
-        @click.native="onClose"> upload manifest tracker.</router-link> You might have to refresh your browser window to see the newly uploaded files. </p>
+        @click.native="onClose"> upload manifest tracker.</router-link></p>
+
+      <div class="clear-action-wrapper"> <div class="clear-action" @click="clearQueue">Clear</div> </div>
 
       <div v-if="!isUploading" v-bind="getRootProps()">
 
@@ -172,6 +174,10 @@ function hasItems(list) {
   return list && list.length > 0
 }
 
+function clearQueue() {
+  store.dispatch('uploadModule/resetUpload')
+}
+
 function cancelQueue() {
   if (isUploading.value) {
     onClose()
@@ -225,6 +231,18 @@ const {
 
 <style scoped lang="scss">
 @import '../../assets/_variables.scss';
+
+.clear-action-wrapper {
+  display: flex;
+  align-items: end;
+  flex-direction: column;
+
+  .clear-action {
+    color: $purple_3;
+    cursor: pointer;
+    margin-right: 4px;
+  }
+}
 
 .upload-text {
   margin: 0 0 16px 0;

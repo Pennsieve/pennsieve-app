@@ -69,6 +69,7 @@ const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
 const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
+const DeveloperTools = () => import('../components/welcome/DeveloperTools.vue')
 
 
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
@@ -208,6 +209,13 @@ const router = createRouter({
           path: 'info',
           components: {
             stage: PennsieveInfo
+          }
+        },
+        {
+          name: 'developer-tools',
+          path: 'developer',
+          components: {
+            stage: DeveloperTools
           }
         },
       ]
@@ -491,7 +499,6 @@ const router = createRouter({
                 },
               ]
             },
-
             {
               path: 'relationships',
               name: 'relationships',
@@ -561,26 +568,6 @@ const router = createRouter({
         },
       ]
     },
-    // {
-    //   path: '/:orgId/datasets/:datasetId',
-    //   components: {
-    //     page: Dataset,
-    //     navigation: BfNavigation,
-    //     navigationSecondary: BfNavigationSecondary
-    //   },
-    //   children: [
-    //     {
-    //       name: 'dataset-overview',
-    //       path: 'overview',
-    //       components: {
-    //         stage: DatasetOverview
-    //       },
-    //       props: {
-    //         stage: true
-    //       }
-    //     },
-    //   ]
-    // },
     {
       name: "people",
       path: '/:orgId/people',

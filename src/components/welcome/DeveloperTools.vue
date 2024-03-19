@@ -5,22 +5,20 @@
   >
 
     <template #actions>
-      <a href="https://docs.pennsieve.io" target="_blank" class="mr-16"><bf-button>Visit Documentation Hub</bf-button></a>
+      <a href="https://docs.pennsieve.io/reference" target="_blank" class="mr-16"><bf-button>Visit API Reference</bf-button></a>
     </template>
-    <div>
-      <div class="highlight-image">
-        <img
-          src="/src/assets/images/illustrations/illo-dr_azumi_1.svg"
-          class="highlight"
-          alt="azumi"
-        />
-      </div>
-      <div
-        class='developer-docs'
-        v-html="docSummary"
-      />
 
+    <div class="highlight-image">
+      <img
+        src="/src/assets/images/illustrations/spot-blackfynn-view-package.svg"
+        class="highlight"
+        alt="azumi"
+      />
     </div>
+    <div
+    class='developer-docs'
+    v-html="docSummary"
+    />
 
   </bf-stage>
 </template>
@@ -54,7 +52,7 @@ export default {
   },
 
   mounted() {
-    this.getReadmeDocument('getting-help')
+    this.getReadmeDocument('developer-tools')
   },
 
   computed: {
@@ -74,6 +72,17 @@ export default {
 </script>
 
 <style scoped lang="scss">
+
+
+.highlight-image {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  .highlight {
+    height:80px;
+  }
+
+}
 
 h1 {
   font-size: 22px;
@@ -114,18 +123,8 @@ p {
   width: 500px;
 }
 
-.highlight-image {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  margin-bottom: 16px;
-  .highlight {
-    height:120px;
-  }
-
-}
-
 .developer-docs {
+  //border: 1px solid $purple_tint;
   padding: 8px;
   border-radius: 4px;
 
