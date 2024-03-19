@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="isOpen" @close="closeDialog">
+  <el-dialog class="contact-us-dialog" v-model="isOpen" @close="closeDialog">
     <template #header>
       <bf-dialog-header title="Contact Us" />
     </template>
@@ -114,9 +114,15 @@ export default {
   },
 };
 </script>
-
+<style lang="scss">
+  .contact-us-dialog{
+    width:540px;
+    padding:0;
+  }
+</style>
 <style scoped lang="scss">
 @import "../../../../assets/_variables.scss";
+
 .margin-top {
   margin-top: 10px;
 }
