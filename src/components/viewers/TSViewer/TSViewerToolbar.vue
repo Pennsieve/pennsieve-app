@@ -231,11 +231,9 @@
         },
         methods: {
           updateMontageScheme: function (value) {
-            console.log('Updating Montage Scheme:' + value)
             this.$store.dispatch('viewerModule/setViewerMontageScheme', value)
           },
           updatePlaybackSpeed: function (value) {
-            console.log('Updating Playback Speed:' + value)
           },
           toggleTimeZoom: function () {
             this.showTimeZoom = !this.showTimeZoom

@@ -427,9 +427,6 @@ export const mutations = {
             R.propEq("id", relationship.id),
             state.relationshipTypes
         );
-        console.log(relationship)
-        console.log('relid: ' + relationship.id)
-        console.log('ID: ' + idx)
         state.relationshipTypes[idx] = relationship
       },
 

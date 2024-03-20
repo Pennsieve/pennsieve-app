@@ -1383,7 +1383,6 @@ export default {
       // standard relationships
       const model = this.getModelByName(this.relationship.name)
       if (model && recordId) {
-        console.log('powerpoei')
         return {
           name: 'metadata-record',
           params: {

@@ -297,8 +297,6 @@ export default {
      * @returns {Promise}
      */
     bootUp: async function (userToken, fromLogin = false) {
-      console.log("Booting up: login=" + fromLogin);
-
       // Get the current Cognito User and store in Vuex
       await Auth.currentAuthenticatedUser()
         .then((user) => {
@@ -316,12 +314,12 @@ export default {
                   Math.round((timeOut * 1000 - Date.now()) / 1000)
                 );
                 if (this.sessionTimer() < this.sessionLogoutThreshold) {
-                  console.log("Logging out due to expired session.");
+                  console.warn("Logging out due to expired session.");
                   this.sessionTimedOut = true;
                   EventBus.$emit("logout");
                 }
               } catch (e) {
-                console.log(
+                console.error(
                   "Error checking for session timer -- prevent further checking"
                 );
                 clearInterval(this.interval);
@@ -362,7 +360,6 @@ export default {
     },
 
     beforeUnmount: function () {
-      console.log("Unmounting app, clearing sessionToken check timer.");
       clearInterval(this.interval);
     },
 

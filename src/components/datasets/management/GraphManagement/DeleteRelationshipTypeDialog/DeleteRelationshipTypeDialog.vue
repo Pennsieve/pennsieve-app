@@ -155,7 +155,6 @@ export default {
      * Handler for form submit and validation
      */
     onFormSubmit: function() {
-      console.log("123" + this.relationshipTypeEdit.id)
       this.deleteRelationshipType()
     },
 
@@ -163,7 +162,6 @@ export default {
      * Request all relationship instances of the current relationship type
      */
     getRelationshipInstances: function() {
-      console.log(this.relationshipTypeEdit.id)
       this.sendXhr(this.relationshipInstancesUrl, {
         header: {
           'Authorization': `bearer ${this.userToken}`
@@ -180,7 +178,6 @@ export default {
      * Delete relationship type and all associated relationships
      */
     deleteRelationshipType: function() {
-      console.log(this.relationshipTypeEdit)
       const relationshipId = propOr('', 'id', this.relationshipTypeEdit)
       const url = `${this.url}/${relationshipId}`
 

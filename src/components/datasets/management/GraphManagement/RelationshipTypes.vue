@@ -326,9 +326,7 @@
           return ''
         },
       transformedRelationshipTypes:  function() {
-          console.log("addasfdsaasd")
           return this.relationshipTypes.map(item => {
-            console.log("hello: " + item)
             // debugger
             const sourceDisplayName = this.getModelProperty(item.from, 'displayName')
             const sourceName = this.getModelProperty(item.from, 'name')
@@ -380,7 +378,6 @@
       },
       relationshipTypes: {
         handler: function(val) {
-          console.log('in getRElation')
           this.setupRelationshipTypes.bind(this)
         }
 
@@ -393,9 +390,8 @@
       if (token) {
         this.fetchModels()
       }
-      // console.log('in mounted')
+
       // this.getRelationshipTypes().then(() => {
-      //   console.log('in getRElation')
       //   this.setupRelationshipTypes.bind(this)
       // })
       this.getRelationshipLinkedProperties()
@@ -664,7 +660,6 @@
        * @returns {Object}
        */
       popperModifier: function(data) {
-        console.log(data)
         const activeColumn = this.activeColumn
         const column = document.querySelector(`.column-${activeColumn}`)
 
@@ -700,7 +695,6 @@
        * @param {Object} relationship
        */
       onUpdateRelationshipType: function(relationship) {
-        console.log(relationship)
         this.updateRelationshipType(relationship)
 
         const chart = this.$refs.dataModelGraph

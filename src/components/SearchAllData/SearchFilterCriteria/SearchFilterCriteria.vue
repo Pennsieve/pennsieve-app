@@ -281,7 +281,6 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
        * Dismiss popover
        */
       dismissPopover: function() {
-        console.log('vivivisbl close')
         this.isPopoverVisible = false
       },
 
@@ -292,7 +291,6 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
        * @param {String} type
        */
       onOptionClick: function(item, type = '') {
-        console.log("option click" + item)
         this.input = ''
         this.$emit('input', '')
         this.dismissPopover()

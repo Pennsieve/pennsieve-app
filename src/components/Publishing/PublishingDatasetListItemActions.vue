@@ -374,7 +374,6 @@ export default {
      * Called when user clicks on REJECT in rejectDialog
      */
     rejectPublishingRequest: function(message) {
-      console.log('rejecting request: ' + message)
       this.isRejectRequestDialogVisible = false
       this.triggerRequest(PublicationStatus.REJECTED, this.datasetPublicationType, message)
     },

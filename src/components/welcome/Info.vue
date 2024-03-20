@@ -120,7 +120,7 @@ export default {
     getInfo: function() {
       this.fetchPublishingInfo()
         .then(_ => this.loadInfo())
-        .catch(err => {console.log(`Info::getInfo() err: ${err}`)})
+        .catch(err => {console.error(`Info::getInfo() err: ${err}`)})
     },
 
     loadInfo: function() {
@@ -131,15 +131,14 @@ export default {
         if (publishingInfo && publishingInfo.url) {
           this.loadText(publishingInfo.url)
             .then(result => this.publishingInfo[infoType] = result)
-            .catch(err => {console.log(`Info::loadInfo( ${infoType} ) err: ${err}`)})
+            .catch(err => {console.error(`Info::loadInfo( ${infoType} ) err: ${err}`)})
         } else {
-          console.log(`Info::loadInfo() publishingInfo for ${infoType} not found`)
+          console.warn(`Info::loadInfo() publishingInfo for ${infoType} not found`)
         }
       }
     },
 
     loadText: async function(url) {
-      console.log(`Info::loadText() url: ${url}`)
       let result = ""
       let response = await fetch(url)
         if (response.ok) {

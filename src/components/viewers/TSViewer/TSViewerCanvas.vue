@@ -203,17 +203,14 @@
 
               switch (this.pointerMode) {
                 case 'cursor_hover':
-                  console.log('hover')
                   this.$refs.iArea.removeAttribute('point')
                   this.$refs.iArea.setAttribute('cursor_hover', true)
                   break
                 case 'annResize-left':
-                  console.log('left')
 
                   this.$refs.iArea.setAttribute('col_resize', true)
                   break
                 case 'annResize-right':
-                  console.log('right')
 
                   this.$refs.iArea.setAttribute('col_resize', true)
                   break
@@ -229,7 +226,6 @@
                   this.$refs.iArea.setAttribute('point', true);
                   break;
                 default:
-                  console.log('other')
 
                   this.$refs.iArea.removeAttribute('point');
                   this.$refs.iArea.removeAttribute('cursor_hover');

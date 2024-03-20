@@ -828,7 +828,6 @@ export default {
             const { displayName, name, id } = this.getModelById(relModelId)
 
             // update relationship types state, adding modelName and modelId to DTO
-            console.log('relType')
 
             this.relationshipTypes.push({
               ...relType,
@@ -1077,7 +1076,6 @@ export default {
      * @param {Object} data
      */
     handleUnlinkFiles: function(data) {
-      console.log('handleUnlinkFiles')
       this.isUnlinkFileDialogVisible = true
       this.unlinkFileData = {
         tableName: data.tableName,

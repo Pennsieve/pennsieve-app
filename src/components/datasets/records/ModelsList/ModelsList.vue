@@ -219,7 +219,6 @@
 
     methods: {
       clickModel: function(ev) {
-        console.log('click event')
         this.$emit('click', ev)
       },
       /**

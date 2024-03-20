@@ -379,7 +379,6 @@ export default {
     ),
 
     openDialog: function() {
-      console.log("RequestSurvey::openDialog()")
 
       // populate name
       if (this.datasetRequest && this.datasetRequest.name) {
@@ -391,10 +390,8 @@ export default {
       }
       // populate list of contributors
       if (this.datasetRequest && this.datasetRequest.contributors) {
-        console.log("RequestSurvey::openDialog() loading from datasetRequest")
         this.proposal.contributors = this.datasetRequest.contributors
       } // else {
-      //   console.log("RequestSurvey::openDialog() populating with fake data")
       //   this.proposal.contributors.push({firstName: 'Some', lastName: 'Researcher', emailAddress: 'scientist@research.org'})
       //   this.proposal.contributors.push({firstName: 'Another', lastName: 'Professor', emailAddress: 'professor@university.edu'})
       // }
@@ -434,7 +431,6 @@ export default {
       this.isSavingMarkdown = false
     },
     saveDraft: function() {
-      console.log("RequestSurvey::saveDraft()")
       // this.datasetRequest: prop (if empty, then this is a new request)
       // this.proposal: form data
       // this.selectedRepoForRequest
@@ -465,20 +461,15 @@ export default {
       this.selectedContributor = {}
     },
     onClickAddContributor: function() {
-      console.log("RequestSurvey::onClickAddContributor()")
       this.resetContributorDialog()
       this.contributorDialogVisible = true
     },
     editContributor: function(event) {
-      console.log("RequestSurvey::editContributor() event:")
-      console.log(event)
       this.selectedContributorId = event.id
       this.selectedContributor = event.contributor
       this.contributorDialogVisible = true
     },
     removeContributor: function(event) {
-      console.log("RequestSurvey::removeContributor() event:")
-      console.log(event)
       // search this.proposal.contributors where email === event.id, and remove it
       let update = this.proposal.contributors.filter(e => e.emailAddress !== event.id)
       this.proposal.contributors = update
@@ -486,8 +477,6 @@ export default {
       this.contributorDialogVisible = false
     },
     addContributor: function(event) {
-      console.log("RequestSurvey::addContributor() event:")
-      console.log(event)
       this.proposal.contributors.push({
         firstName: event.contributor.firstName,
         lastName: event.contributor.lastName,
@@ -497,13 +486,10 @@ export default {
       this.contributorDialogVisible = false
     },
     updateContributor: function(event) {
-      console.log("RequestSurvey::updateContributor() event:")
-      console.log(event)
       // search this.proposal.contributors where email === event.id, and replace that with event.contributor
       // let update = this.proposal.contributors.map(c =>  || c)
       // this.proposal.contributors = update
       let index = this.proposal.contributors.findIndex(e => e.emailAddress === event.id)
-      console.log(`RequestSurvey::updateContributor() index: ${index}`)
       if (index >= 0) {
         this.proposal.contributors[index] = event.contributor
       }
@@ -511,8 +497,6 @@ export default {
       this.contributorDialogVisible = false
     },
     closeContributorDialog: function(event) {
-      console.log("RequestSurvey::closeContributorDialog() event:")
-      console.log(event)
       this.resetContributorDialog()
       this.contributorDialogVisible = false
     },
@@ -520,7 +504,6 @@ export default {
      *
      */
     synthesizeProposal: function() {
-      console.log("RequestSurvey::synthesizeProposal()")
       let proposal = {
         nodeId: propOr(undefined, "nodeId", this.datasetRequest),
         name: this.proposal.name,
@@ -533,13 +516,10 @@ export default {
         createdAt: propOr(undefined, "createdAt", this.datasetRequest),
         updatedAt: propOr(undefined, "updatedAt", this.datasetRequest),
       }
-      console.log("RequestSurvey::synthesizeProposal() proposal:")
-      console.log(proposal)
       return proposal
     },
 
     triggerAction: function(action) {
-      console.log(`RequestSurvey::triggerAction() action: ${action}`)
       switch (action) {
         case DatasetProposalAction.SAVE:
           this.saveDraft()
@@ -558,27 +538,20 @@ export default {
 
     // TODO: note that this.proposal.survey[] has a [0] entry that should be ignored
     createProposal: function() {
-      console.log("RequestSurvey::createProposal()")
       this.$emit("create-proposal", this.synthesizeProposal())
       this.closeDialog()
     },
     updateProposal: function() {
-      console.log("RequestSurvey::updateProposal()")
       this.$emit("update-proposal", this.synthesizeProposal())
       this.closeDialog()
     },
 
     submitProposal: function() {
-      console.log("RequestSurvey::submitProposal()")
     },
     acceptProposal: function() {
-      console.log("RequestSurvey::acceptProposal() proposal:")
-      console.log(this.datasetRequest)
       this.$emit("accept", this.datasetRequest)
     },
     rejectProposal: function() {
-      console.log("RequestSurvey::rejectProposal() proposal:")
-      console.log(this.datasetRequest)
       this.$emit("reject", this.datasetRequest)
     },
 

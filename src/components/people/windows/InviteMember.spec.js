@@ -72,7 +72,6 @@ describe('InviteMember.vue', () => {
   // it('onHandleKeyPressed', async () => {
   //   const spy = vi.spyOn(cmp.vm, 'sendInvite')
   //   let invForm = cmp.findComponent({ ref: 'abcd' })
-  //   console.log(invForm)
   //
   //   invForm.validate = () => true
   //   await cmp.vm.onHandleKeyPressed()

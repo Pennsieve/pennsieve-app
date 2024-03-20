@@ -32,7 +32,7 @@
 
 <!--    mounted() {-->
 <!--      let slots = this.$slots-->
-<!--      console.log(slots)-->
+
 <!--      // slots.default.forEach(vnode => {-->
 <!--      //   vnode.elm.addEventListener('keypress', this.handleKeyPress.bind(this))-->
 <!--      // })-->

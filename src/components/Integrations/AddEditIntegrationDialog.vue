@@ -620,10 +620,7 @@ export default {
      */
     createIntegration: function() {
       let isValid = true
-      console.log('validate 1')
       this.$refs.integrationFormStep1.validate((valid) => {
-        console.log("in callback")
-        console.log(valid)
         if (!valid) {
           // switch tab views
           isValid = false
@@ -707,8 +704,6 @@ export default {
       callback()
     },
     validateDescription: function(rule, value, callback) {
-      console.log(value)
-      console.log(rule)
       if (value === '' || value.length < 20) {
         callback(new Error(`Please provide a short description (>50 characters)`))
       }

@@ -6,7 +6,7 @@
       class="primary"
     >
       <template #description>
-        <p> Manage your user-profile, developer tools as well as submit and track any dataset proposals and public datasets.</p>
+        <p> Manage your user-profile, developer tools as well as submit and track any dataset proposals.</p>
 
       </template>
 
@@ -53,10 +53,10 @@ export default {
           name: "My Dataset Submissions",
           to: "submit"
         },
-        {
-          name: "My Public Datasets",
-          to: "submit"
-        }
+        // {
+        //   name: "My Public Datasets",
+        //   to: "submit"
+        // }
       ]
     }
   },

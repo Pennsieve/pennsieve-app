@@ -476,7 +476,6 @@ export default {
      * @param {String} value
      */
     onOptionClick: function(value) {
-      console.log('option clicked: ' + value)
       this.dismissPopover()
       this.$emit('update:modelValue', value)
     },

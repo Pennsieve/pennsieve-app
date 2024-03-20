@@ -176,7 +176,6 @@ export default {
       ]
     ),
     openInfoPanel: function(event) {
-      console.log("RequestListItem::openInfoPanel() event:")
       this.$emit("open", this.datasetRequest)
     },
     surveyComplete: function() {
@@ -197,7 +196,6 @@ export default {
       return result
     },
     triggerRequest: function(request) {
-      console.log(`RequestListItem::triggerRequest() request: ${request}`)
       this.$emit(request, this.datasetRequest)
     },
   }

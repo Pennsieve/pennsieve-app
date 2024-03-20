@@ -95,7 +95,6 @@ export default {
      */
     _watchUserToken: function(userToken) {
       if ((userToken && userToken.length > 0) && !this.websocket) {
-        console.log('opening socket + ' +site.notificationUrl)
         this.socketUrl = `${site.notificationUrl}?access_token=${userToken}`
         this.openWebSocket()
       }

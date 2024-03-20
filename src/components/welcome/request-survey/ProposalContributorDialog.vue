@@ -246,11 +246,9 @@ export default {
      * @param {Function} callback
      */
     checkCollaborators: function(rule, value, callback) {
-      console.log(value)
       if (!value) {
         callback(new Error('Email address is required'))
       } else {
-        console.log(this.allContributors)
         const result = this.allContributors.filter(contributor => value === contributor.emailAddress );
         if (result.length !== 0 && !this.isEditing) {
           callback(new Error('Contributor with this email address already exists'));
@@ -271,7 +269,6 @@ export default {
      * Emit event to update the synced property
      */
     onClose: function() {
-      console.log("ProposalContributorDialog::onClose()")
       this.reset()
       this.$emit('close', {})
     },
@@ -281,7 +278,6 @@ export default {
      * Reset dialog
      */
     onClosed: function() {
-      console.log("ProposalContributorDialog::onClosed()")
       this.reset()
       this.$emit('close', {})
     },
@@ -323,15 +319,10 @@ export default {
      * Submit form and emit event
      */
     submitForm: function() {
-      console.log("ProposalContributorDialog::submitForm()")
       const eventName = this.isEditing
         ? 'update-contributor'
         : 'add-contributor'
-      console.log(`ProposalContributorDialog::submitForm() eventName: ${eventName}`)
-      console.log(`ProposalContributorDialog::submitForm() id: ${this.id}`)
       let result = {firstName: this.form.firstName, lastName: this.form.lastName, emailAddress: this.form.emailAddress}
-      console.log("ProposalContributorDialog::submitForm() result:")
-      console.log(result)
       this.$emit(eventName, {id: this.id, contributor: result})
     },
 

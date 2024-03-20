@@ -454,8 +454,6 @@ export default {
         component = 'xls'
       }
 
-      console.log(component)
-
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls']
       const vueViewerMap = {
         image: 'ImageViewer',
@@ -470,10 +468,9 @@ export default {
       }
 
       if (vueViewers.indexOf(component) >= 0) {
-        console.log(component + subtype)
         return vueViewerMap[component]
       } else{
-        console.log('Error loading viewer')
+        console.error('Error loading viewer')
         return 'UnknownViewer'
       }
 

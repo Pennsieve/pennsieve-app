@@ -213,7 +213,6 @@ export default {
       this.removeIntegrationDialogVisible = true
     },
     onDeleteIntegrationConfirm: function(integration) {
-      console.log("do deletion on " + integration.id)
       this.removeIntegration(integration.id)
       this.removeIntegrationDialogVisible = false
     },
@@ -339,7 +338,6 @@ export default {
             secret: response.tokenSecret.secret
           }
           this.APIKeyDetailsVisisble = true
-          console.log(response)
         }
       )
     },
