@@ -163,7 +163,6 @@ export default {
     },
 
     triggerRequest: function(request) {
-      console.log(`PublishingProposalListItem::triggerRequest() request: ${request}`)
       this.$emit(request, this.proposal)
     },
 

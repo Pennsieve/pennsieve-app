@@ -159,7 +159,7 @@ export default {
        Auth.setupTOTP(this.cognitoUser).then((code) => {
           this.totpCode = code
         })
-      .catch(err => console.log(err));
+      .catch(err => console.error(err));
     },
 
     /**

@@ -443,7 +443,6 @@
                 this.$store.dispatch('viewerModule/setChannels', channels)
             },
             updateStart: function(value) {
-                // console.log('setting start to: ' + value)
                 this.start = value
             },
             setCursor: function(value) {
@@ -451,7 +450,6 @@
                 this.cursorLoc = value
             },
             setGlobalZoom: function(value) {
-                // console.log('setGlobalZoom')
                 this.globalZoomMult = value
             },
             setDuration: function(value) {

@@ -63,7 +63,6 @@ export default {
   },
   mounted() {
     const r = useRoute()
-    console.log(r.meta)
     this.getReadmeDocument(r.meta.helpSection)
 
   },

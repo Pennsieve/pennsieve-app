@@ -346,7 +346,6 @@
        * Closes the dialog
        */
       closeDialog: function() {
-        console.log('called close dialog')
         this.$emit('close-dialog')
         this.duplicateName = false
         for (let x in this.integrations) {
@@ -428,9 +427,7 @@
        * @param {Object} response
        */
       handleSuccess: function(response) {
-        console.log('successfully created dataset')
         this.addDataset(response).then(() => {
-          console.log('in then')
           this.closeDialog()
 
           // check for onboarding event state for creating a dataset

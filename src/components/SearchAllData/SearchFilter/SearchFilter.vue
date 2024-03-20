@@ -421,10 +421,7 @@ export default {
       // Dismiss target popover
       this.isTargetPopoverVisible = false
 
-      console.log("adas" + this.$refs.criteriaProperty)
-
       // this.$refs.criteriaProperty.focus()
-      console.log('set popover visible')
 
       // Focus on the next input
       setTimeout(function(){
@@ -446,7 +443,6 @@ export default {
      */
     setPropertyFilter: function(item) {
 
-      console.log('update property filter')
       const property = propOr('', 'value', item)
       const propertyLabel = propOr('', 'label', item)
       const propertyType = propOr({}, 'dataType', item)
@@ -471,7 +467,6 @@ export default {
       this.resetValueSuggestions()
 
       // Emit event to update filter
-      console.log('emit filter')
       this.$emit('update:filter', filter)
 
       // Dismiss target popover
@@ -632,14 +627,11 @@ export default {
      */
     onFilterInput: function(evt) {
       this.$emit('input-value')
-      console.log('onFilterInput')
       this.getValueSuggestions(evt)
     },
 
     async autocomplete (prefix) {
       const url = `${this.config.api2Url}/metadata/query/autocomplete?dataset_id=${this.$route.params.datasetId}`
-
-      console.log(this.filterParams)
 
       let requestFilters = this.filterParams.filter(value => {
         return value.value != ''

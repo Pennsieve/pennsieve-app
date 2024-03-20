@@ -304,7 +304,6 @@
 
 
       closeCreateConceptDialog: function() {
-        console.log('closing dialog')
         this.createConceptDialogVisible = false
       },
 
@@ -314,7 +313,6 @@
        * @returns {Promise}
        */
       buildLinkedPromises: function(models) {
-        console.log('linked promise build')
         const datasetId = this.$route.params.datasetId
         const promises = models.map(model => {
           const modelId = model.id

@@ -273,7 +273,6 @@
                             // append to global
                             const pxStart = Math.floor(((resp[j][0]-this.ts_start)/ (this.ts_end - this.ts_start))*5000);
                             const pxEnd = Math.ceil(((resp[j][1]-this.ts_start) / (this.ts_end - this.ts_start))*5000);
-                            // console.log('st: ' + pxStart + '  nd: ' + pxEnd)
                             this.segments.fill(1, pxStart, pxEnd);
                         }
 
@@ -346,7 +345,6 @@
                 }
                 this.sendXhr(url)
                 .then(resp => {
-                    // console.log(resp)
                     this.annotations = resp;
                     this.render();
                 })

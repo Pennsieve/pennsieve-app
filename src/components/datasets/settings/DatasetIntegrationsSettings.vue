@@ -343,7 +343,6 @@ export default {
         }
       })
         // .then(response => {
-        //   console.log('Integration enabled')
         // })
         .catch(this.handleXhrError.bind(this))
         .finally(() => {

@@ -283,7 +283,6 @@
 
     methods: {
       setRelationship: function(ev) {
-        console.log('huh' +ev)
       },
       /**
        * Closes the dialog and resets form

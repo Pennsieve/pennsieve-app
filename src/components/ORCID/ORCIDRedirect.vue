@@ -24,7 +24,6 @@
      * this redirect window
      */
     mounted() {
-      console.log("ORCIDRedirect.mounted()")
       const search = window.location.search.substring(1)
       const code = search.substring(5, search.length)
       const parentWindow = window.opener
