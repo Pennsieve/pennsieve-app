@@ -1,19 +1,21 @@
 <template>
-  <div v-if="showBanner" class="locked-banner">
-    <span />
-    <div>
-      Welcome to the new Pennsieve App experience! If you would like to access
-      the previous version, it's still available. Just click
-      <a :href="getUrl" target="_blank">here.</a>
-    </div>
+  <div v-if="!isDismissed">
+    <div v-if="showBanner" class="release-banner">
+      <span />
+      <div>
+        Welcome to the new Pennsieve App experience! If you would like to access
+        the previous version, it's still available. Just click
+        <a :href="getUrl" target="_blank">here.</a>
+      </div>
 
-    <IconRemove
-      @click="handleClose"
-      class="close-btn"
-      :height="12"
-      :width="12"
-      color="white"
-    />
+      <IconRemove
+        @click="handleClose"
+        class="close-btn"
+        :height="12"
+        :width="12"
+        color="white"
+      />
+    </div>
   </div>
 </template>
 
@@ -26,11 +28,14 @@ import Cookies from "js-cookie";
 export default {
   setup() {
     const showBanner = ref(true);
+    const isDismissed = ref(Cookies.get("hideReleaseBanner"));
     function handleClose() {
       showBanner.value = false;
+      Cookies.set("hideReleaseBanner", "true");
     }
 
     return {
+      isDismissed,
       handleClose,
       showBanner,
     };
@@ -63,7 +68,7 @@ export default {
 <style scoped lang="scss">
 @import "../../../assets/_variables";
 
-.locked-banner {
+.release-banner {
   background-color: $purple_2;
   padding: 8px 0 8px 0;
   color: white;
