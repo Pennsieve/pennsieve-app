@@ -634,8 +634,6 @@ export default {
       //   return
       // }
 
-      console.log(this.relationshipUrl)
-
       this.sendXhr(this.relationshipUrl, {
         header: {
           Authorization: `bearer ${this.userToken}`
@@ -647,7 +645,6 @@ export default {
           //   return
           // }
 
-          console.log('response: ' + data)
           if (typeof callback !== 'function') {
             this.handleXhrResponse(data)
           } else {

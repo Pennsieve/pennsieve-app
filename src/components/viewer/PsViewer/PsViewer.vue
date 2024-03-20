@@ -325,7 +325,6 @@ export default {
     * Get file data to send to bf-viewer
     */
     getFile: function() {
-      console.log('getting file')
       if (!this.fileUrl) {
         return
       }

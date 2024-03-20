@@ -103,14 +103,11 @@ export default {
   methods: {
     parseFile: function(){
       let workbook = read(this.fileData,{type: 'base64'})
-      console.log(workbook)
       let sheetNames = workbook.SheetNames;
-      console.log(sheetNames)
 
       const sheetIndex = 1;
 
       this.content = utils.sheet_to_json(workbook.Sheets[sheetNames[sheetIndex-1]]);
-      console.log(this.content)
       this.parsed = true;
 
 

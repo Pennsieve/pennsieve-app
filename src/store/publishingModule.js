@@ -251,7 +251,6 @@ export const actions = {
   },
 
   getDatasetProposalCount: async ({commit, rootState}, type) => {
-    console.log(`publishingModule::getDatasetProposalCount() type: ${type}`)
     let url = `${rootState.config.api2Url}/publishing/submission`
     const apiKey = rootState.userToken
     const myHeaders = new Headers();
@@ -264,7 +263,6 @@ export const actions = {
       })
       if (response.ok) {
         const { totalCount } = await response.json()
-        console.log(`publishingModule::getDatasetProposalCount() totalCount: ${totalCount}`)
         commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: totalCount })
       } else {
         throw new Error(response.statusText)
@@ -275,12 +273,11 @@ export const actions = {
   },
 
   fetchDatasetProposals: async ({state, commit, rootState}) => {
-    console.log("publishingModule::fetchDatasetProposals()")
     // const publicationStatus = PublicationTabsStatuses[rootState.route.name]
     // if(!publicationStatus) {
     //   return
     // }
-    // console.log(`publishingModule::fetchDatasetProposals() publicationStatus: ${publicationStatus}`)
+   
     let url = `${rootState.config.api2Url}/publishing/submission`
     const apiKey = rootState.userToken || Cookies.get('user_token')
     const myHeaders = new Headers();
@@ -294,8 +291,6 @@ export const actions = {
       if (response.ok) {
         const { proposals, totalCount } = await response.json()
         commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', totalCount);
-        console.log("publishingModule::fetchDatasetProposals() proposals:")
-        console.log(proposals)
         commit('UPDATE_DATASETS', { type: rootState.route.name, datasets: proposals });
         commit('UPDATE_IS_LOADING_DATASETS', false);
 

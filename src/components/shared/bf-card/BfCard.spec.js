@@ -44,7 +44,6 @@ describe('BfCard.vue', () => {
   //   await cmp.setProps({ cardCopy: copy })
   //   cmp.vm.$nextTick(() => {
   //     let formattedCopy = cmp.vm.formattedCopy
-  //     console.log(formattedCopy)
   //     expect(formattedCopy.length).toBe(copy.length)
   //   });
   //

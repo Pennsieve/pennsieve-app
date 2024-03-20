@@ -78,7 +78,6 @@
        * @param {Object} evt
        */
       // handleClick(evt) {
-      //   console.log("Button clicked", evt)
       //   // this.$emit('click', evt)
       // }
     }

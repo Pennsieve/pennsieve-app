@@ -510,17 +510,13 @@ export default {
       const originName = propOr('', 'type', this.record)
       const destinationName = propOr('', 'name', this.concept)
 
-      console.log("origin: " + originName + " dest: " + destinationName)
-
       const originModelId = propOr('', 'id', this.getModelByName(originName))
       const destinationModelId = propOr('', 'id', this.getModelByName(destinationName))
 
       let from = originModelId
       let to = destinationModelId
 
-      console.log(direction)
       if (direction === 'inverse') {
-        console.log('inverse')
         from = destinationModelId
         to = originModelId
       }
@@ -535,7 +531,6 @@ export default {
      * @returns {Promise}
      */
     getRelationships: function(direction) {
-      console.log(this.relationshipTypesUrl(direction))
       return this.sendXhr(this.relationshipTypesUrl(direction), {
         header: {
           'Authorization': `bearer ${this.userToken}`
@@ -835,7 +830,6 @@ export default {
      * Handles close-side-drawer event
      */
     closeSideDrawer: function() {
-      console.log('trying to close')
       this.visible = false
 
       this.$nextTick(() => {

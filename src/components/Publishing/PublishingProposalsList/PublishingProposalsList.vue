@@ -305,8 +305,6 @@ export default {
     },
 
     viewProposal: function(proposal) {
-      console.log("PublishingProposalsList::viewProposal() proposal:")
-      console.log(proposal)
       // set selected proposal
       if (proposal) {
         this.selectedRequest = proposal
@@ -314,10 +312,7 @@ export default {
       }
       // set selected repo
       if (proposal && proposal.organizationNodeId) {
-        console.log(`PublishingProposalsList::viewProposal() proposal.organizationNodeId: ${proposal.organizationNodeId}`)
         let repository = this.getRepositoryByNodeId(proposal.organizationNodeId)
-        console.log("PublishingProposalsList::viewProposal() repository:")
-        console.log(repository)
         this.setSelectedRepo(repository)
       }
       // enable modal visibility
@@ -339,27 +334,23 @@ export default {
     },
 
     confirmedAction: async function(event) {
-      console.log("PublishingProposalsList::confirmedAction() event:")
-      console.log(event)
       this.updateRequestModalVisible(false)
       this.resetConfirmation()
       if (event.action && event.resource) {
         switch (event.action) {
           case "accept":
             this.acceptDatasetProposal(event.resource)
-              .catch(err => console.log(err))
+              .catch(err => console.error(err))
             break;
           case "reject":
             this.rejectDatasetProposal(event.resource)
-              .catch(err => console.log(err))
+              .catch(err => console.error(err))
             break;
         }
       }
     },
 
     acceptDatasetProposalRequest: function(proposal) {
-      console.log("PublishingProposalsList::acceptDatasetProposalRequest() proposal:")
-      console.log(proposal)
       // raise Confirmation Dialog
       this.resetConfirmation()
       this.confirmationDialog = {
@@ -374,17 +365,13 @@ export default {
     },
 
     acceptDatasetProposal: async function(proposal) {
-      console.log("PublishingProposalsList::acceptDatasetProposal() proposal:")
-      console.log(proposal)
       // invoke repositoryModule::acceptProposal()
       this.acceptProposal(proposal)
         .then(() => this.fetchDatasetProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
     rejectDatasetProposalRequest: function(proposal) {
-      console.log("PublishingProposalsList::rejectDatasetProposalRequest() proposal:")
-      console.log(proposal)
       // raise Confirmation Dialog
       this.resetConfirmation()
       this.confirmationDialog = {
@@ -399,12 +386,10 @@ export default {
     },
 
     rejectDatasetProposal: function(proposal) {
-      console.log("PublishingProposalsList::rejectProposalConfirmed() proposal:")
-      console.log(proposal)
       // invoke repositoryModule::rejectProposal()
       this.rejectProposal(proposal)
         .then(() => this.fetchDatasetProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
   },

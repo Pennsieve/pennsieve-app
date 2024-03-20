@@ -34,8 +34,6 @@ Amplify.configure(AWSConfig)
 
 // var channel = pusher.subscribe('dataset-d5d316ca-ae61-4633-bb0c-39a6dec18407');
 // channel.bind('upload-event', function(data) {
-//     console.log('call back')
-//     console.log(data)
 // });
 
 const app = createApp(App)
@@ -139,7 +137,6 @@ router.beforeEach((to, from, next) => {
                 if (usr) {
                     const currentSession = usr.signInUserSession;
                     if (currentSession) {
-                        console.log('Session automatically refreshed during pre-route.')
                         store.dispatch('setIsRefreshing', true)
 
                         usr.refreshSession(usr.signInUserSession.refreshToken, async (err, session) => {
@@ -170,8 +167,6 @@ router.beforeResolve(async to => {
         // TODO: Need to sync Workspace and get Workspace assets here
         // This now happens in app.vue/bootup, and getProfileAndOrg in GlobalMessageHandler
         // If we handle that here, we should be able to remove some watchers that might introduce race conditions.
-
-        console.log("Router Resolve Requires fetching of Workspace data")
 
     }
 })

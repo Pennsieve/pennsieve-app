@@ -171,54 +171,44 @@ export default {
     },
 
     confirmedAction: async function(event) {
-      console.log("SubmitDatasets::confirmedAction() event:")
-      console.log(event)
       this.resetConfirmation()
       if (event.action && event.resource) {
         switch (event.action) {
           case "delete":
             this.removeDatasetProposal(event.resource)
-              .catch(err => console.log(err))
+              .catch(err => console.error(err))
             break;
           case "submit":
             this.submitDatasetProposal(event.resource)
-              .catch(err => console.log(err))
+              .catch(err => console.error(err))
             break;
           case "withdraw":
             this.withdrawDatasetProposal(event.resource)
-              .catch(err => console.log(err))
+              .catch(err => console.error(err))
             break;
         }
       }
     },
 
     removeDatasetProposal: async function(proposal) {
-      console.log("SubmitDatasets::removeDatasetProposal() proposal:")
-      console.log(proposal)
       this.removeProposal(proposal)
         .then(() => this.fetchProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
     submitDatasetProposal: async function(proposal) {
-      console.log("SubmitDatasets::submitDatasetProposal() proposal:")
-      console.log(proposal)
       this.submitProposal(proposal)
         .then(() => this.fetchProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
     withdrawDatasetProposal: async function(proposal) {
-      console.log("SubmitDatasets::withdrawDatasetProposal() proposal:")
-      console.log(proposal)
       this.withdrawProposal(proposal)
         .then(() => this.fetchProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
     removeDatasetProposalRequest: function(proposal) {
-      console.log("SubmitDatasets::removeDatasetProposalRequest() proposal:")
-      console.log(proposal)
       this.resetConfirmation()
       this.confirmationDialog = {
         action: 'delete',
@@ -232,8 +222,6 @@ export default {
     },
 
     submitDatasetProposalRequest: function(proposal) {
-      console.log("SubmitDatasets::submitDatasetProposalRequest() proposal:")
-      console.log(proposal)
       let repositoryName = "???"
       let repository = this.getRepositoryByNodeId(proposal.organizationNodeId)
       if (repository) {
@@ -252,8 +240,6 @@ export default {
     },
 
     withdrawDatasetProposalRequest: function(proposal) {
-      console.log("SubmitDatasets::withdrawDatasetProposalRequest() proposal:")
-      console.log(proposal)
       let repositoryName = "???"
       let repository = this.getRepositoryByNodeId(proposal.organizationNodeId)
       if (repository) {
@@ -272,17 +258,11 @@ export default {
     },
 
     openDatasetRequest: function(proposal) {
-      console.log("SubmitDatasets::openDatasetRequest() proposal:")
-      console.log(proposal)
-      console.log("SubmitDatasets::openDatasetRequest() organizations:")
-      console.log(this.organizations())
       let evt = this.organizations().filter(org => org.organization.id === proposal.organizationNodeId)[0]
       evt.destination = {
         datasetNodeId: proposal.datasetNodeId,
         view: "overview"
       }
-      console.log("SubmitDatasets::openDatasetRequest() evt:")
-      console.log(evt)
       EventBus.$emit('switch-organization', evt)
       // this.$router.push(`/${proposal.organizationNodeId}/datasets/${proposal.datasetNodeId}/overview`)
     },
@@ -294,21 +274,17 @@ export default {
     },
 
     createProposal: async function(proposal) {
-      console.log("SubmitDatasets::createProposal() proposal:")
-      console.log(proposal)
       // TODO: make storeNewProposal an async function
       // TODO: if storeNewProposal() succeeds, then call fetchProposals
       this.storeNewProposal(proposal)
         .then(() => this.fetchProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
 
     updateProposal: async function(proposal) {
-      console.log("SubmitDatasets::updateProposal() proposal:")
-      console.log(proposal)
       this.storeChangedProposal(proposal)
         .then(() => this.fetchProposals())
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     },
   }
 }

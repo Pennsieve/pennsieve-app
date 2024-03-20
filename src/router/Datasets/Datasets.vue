@@ -133,7 +133,6 @@
       datasetId: function() {
         this.$pusher.unsubscribe(this.pusherChannelName)
         this.pusherChannelName = this.datasetId.replace("N:dataset:","dataset-")
-        console.log("Updating pusher in watcher: " + this.pusherChannelName)
         const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
         this.setPusherChannel(pusherChannel)
 
@@ -144,7 +143,6 @@
       EventBus.$on('get-dataset-contributors', this.getDatasetContributors.bind(this))
 
       this.pusherChannelName = this.datasetId.replace("N:dataset:","dataset-")
-      console.log("Updating pusher in Mounted: " + this.pusherChannelName)
       const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
       this.setPusherChannel(pusherChannel)
     },

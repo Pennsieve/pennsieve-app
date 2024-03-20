@@ -244,10 +244,8 @@
                 this.$emit('closeWindow')
             },
             handleChange: function() {
-                // console.log('hello')
             },
             onButtonClick: function () {
-                console.log('clicked')
             },
             submitForm: function(e) {
                 // this.set('processing', true);

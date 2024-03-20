@@ -23,7 +23,6 @@ export const fetchRetry = (input, init) => {
                     const delay = attempt === 0
                         ? config.retryDelay
                         : config.retryDelay * (config.retryBackoff * attempt);
-                    console.log(`fetch error, retrying in ${delay} ms`, error);
                     setTimeout(() => wrappedFetch(++attempt), delay);
                 }
                 else {

@@ -283,7 +283,6 @@ export default {
   },
 
   mounted: function () {
-    console.log("login mounted");
     this.doneMounting();
   },
 
@@ -344,7 +343,6 @@ export default {
      * @param {Object} response
      */
     handleLoginSuccess: function (user) {
-      console.log(user);
 
       const token = pathOr(
         "",
@@ -494,7 +492,6 @@ export default {
         });
       } else if (error) {
         // TODO: present the error on the login page
-        console.log("doneMounting() error: " + error);
       }
     },
   },

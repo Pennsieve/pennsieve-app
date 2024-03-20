@@ -1399,7 +1399,6 @@ export default {
     sourceFilesUrl: {
       handler: function(val) {
         const packageId = this.fileId
-        console.log('get sourceFIle url')
         if (val && packageId !== '') {
           this.getSourceFiles()
         }
@@ -1648,8 +1647,6 @@ export default {
           }
         }).then(response => {
           // get model id
-
-          console.log('get ksf;dasodfjdsoh i')
           const modelId = pathOr('', ['params', 'conceptId'], this.$route)
 
           // check to see which relationship types are related to the current record id
@@ -1780,7 +1777,6 @@ export default {
           this.isRelationshipsLoading = false
         })
         .catch( () => {
-          console.log('failed to get relationships.')
           this.handleXhrError.bind(this)
           }
         )

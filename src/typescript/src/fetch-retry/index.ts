@@ -33,7 +33,6 @@ export const fetchRetry = (input: RequestInfo, init?: RetryInit): Promise<Respon
           const delay = attempt === 0
             ? config.retryDelay
             : config.retryDelay * (config.retryBackoff * attempt)
-          console.log(`fetch error, retrying in ${delay} ms`, error)
           setTimeout(() => wrappedFetch(++attempt), delay)
         } else {
           reject(error)

@@ -98,7 +98,6 @@ export default {
       'setSelectedRepo'
     ]),
     onSelect: function(cmd) {
-      console.log(cmd)
 
       this.setSelectedRepo(this.repositories[cmd] )
     }

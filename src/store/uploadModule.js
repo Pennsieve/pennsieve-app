@@ -59,7 +59,6 @@ export const mutations = {
         state.uploadFileMap = uploadFileMap
     },
     SET_FILE_STATUS(state, statusInfo) {
-        console.log(statusInfo.key)
         let curMap = state.uploadFileMap.get(statusInfo.key)
         curMap.status = statusInfo.status
     },
@@ -354,7 +353,7 @@ export const actions = {
                 commit('SET_FILE_STATUS', {key: key, status: "processing"})
 
             } catch (e) {
-                console.log(e);
+                console.error(e);
             }
         }
         commit('SET_UPLOAD_COMPLETE', true)
@@ -433,10 +432,9 @@ export const actions = {
                 },
                 body: JSON.stringify(requestBody)
             }).then(function (resp) {
-                console.log('Sync Successful')
             });
         } catch (e) {
-            console.log(e)
+            console.error(e)
             throw new Error("Unable to sync manifest.")
         } finally {
 
