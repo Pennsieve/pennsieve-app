@@ -68,22 +68,18 @@
                 :key="annotation.id"
                 :annotation="annotation"
               />
+              <image-annotation
+                v-else
+                :id="`ann-${annotation.id}`"
+                :key="annotation.id"
+                :layer-id="layer.id"
+                :annotation="annotation"
+                :can-crud-annotation="getPermission('editor')"
+                @click="onAnnTap(annotation)"
+              />
             </template>
           </div>
         </template>
-
-
-<!--            TODO Bring Back Support for Image annotations.-->
-<!--            <bf-annotation-->
-<!--              v-else-->
-<!--              :id="`ann-${annotation.id}`"-->
-<!--              :key="annotation.id"-->
-<!--              :layer-id="layer.id"-->
-<!--              :annotation="JSON.stringify(annotation)"-->
-<!--              :can-crud-annotation="getPermission('editor')"-->
-<!--              @click="onAnnTap(annotation)"-->
-<!--            />-->
-
       </accordion>
     </div>
   </div>
@@ -106,6 +102,7 @@ import AnnotationGroup from './AnnotationGroup.vue'
 import TsAnnotation from './TSAnnotation.vue'
 import IconPlus from "../../../icons/IconPlus.vue";
 import IconEyeball from "../../../icons/IconEyeball.vue";
+import ImageAnnotation from "./ImageAnnotation.vue";
 
 export default {
   name: 'PaletteAnnotations',

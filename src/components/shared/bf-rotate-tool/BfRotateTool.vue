@@ -29,6 +29,7 @@
   import EventBus from '../../../utils/event-bus.js'
   import IconRotateRight from "../../icons/IconRotateRight.vue";
   import IconRotateLeft from "../../icons/IconRotateLeft.vue";
+  import * as R from "ramda" ;
   export default {
     name: 'BfRotateTool',
 

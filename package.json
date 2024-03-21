@@ -31,6 +31,7 @@
     "cropperjs": "^1.6.1",
     "d3": "^7.8.5",
     "element-plus": "^2.3.9",
+    "fabric": "^5.3.0",
     "flush-promises": "^1.0.2",
     "highlight.js": "^11.9.0",
     "js-cookie": "^3.0.1",
