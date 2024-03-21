@@ -263,9 +263,7 @@ export default {
     datasetLink: function() {
       const datasetId = path(['content', 'id'], this.dataset)
 
-      //TODO: Move back to dataset-overview
-      const routeName = 'home'
-      // const routeName = 'dataset-overview'
+       const routeName = 'dataset-overview'
 
       const link = { name: routeName, params: { datasetId }}
 
