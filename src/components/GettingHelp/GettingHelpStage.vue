@@ -7,20 +7,19 @@
     <template #actions>
       <a href="https://docs.pennsieve.io" target="_blank" class="mr-16"><bf-button>Visit Documentation Hub</bf-button></a>
     </template>
-    <div>
-      <div class="highlight-image">
-        <img
-          src="/src/assets/images/illustrations/illo-dr_azumi_1.svg"
-          class="highlight"
-          alt="azumi"
-        />
-      </div>
-      <div
-        class='developer-docs'
-        v-html="docSummary"
-      />
 
-    </div>
+    <readme-doc slug="getting-help">
+      <template #pre>
+        <div class="highlight-image">
+          <img
+            src="/src/assets/images/illustrations/illo-dr_azumi_1.svg"
+            class="highlight"
+            alt="azumi"
+          />
+        </div>
+      </template>
+    </readme-doc>
+
 
   </bf-stage>
 </template>
@@ -30,7 +29,7 @@ import { mapGetters } from 'vuex'
 
 import BfButton from '../shared/bf-button/BfButton.vue'
 import PaginationPageMenu from '../shared/PaginationPageMenu/PaginationPageMenu.vue'
-import ReadmeDocs from "../../mixins/readme-docs";
+import ReadmeDoc from "../shared/readme-doc/ReadmeDoc.vue";
 
 export default {
   name: 'DeveloperTools',
@@ -38,35 +37,15 @@ export default {
   components: {
     BfButton,
     PaginationPageMenu,
+    ReadmeDoc
   },
 
-  mixins: [
-    ReadmeDocs
-  ],
 
-  props: {
-  },
-
-  data() {
-    return {
-      summary: {},
-    }
-  },
-
-  mounted() {
-    this.getReadmeDocument('getting-help')
-  },
 
   computed: {
     ...mapGetters([
       'activeOrganization'
     ]),
-    docSummary: function() {
-      if (this.summary) {
-        return this.summary.body_html
-      }
-      return ''
-    },
 
   },
 
@@ -123,55 +102,6 @@ p {
     height:120px;
   }
 
-}
-
-.developer-docs {
-  padding: 8px;
-  border-radius: 4px;
-
-  :deep(.header-scroll) {
-    color: $purple_2;
-    font-weight: 500;
-  ;
-  }
-  :deep(.magic-block-textarea) {
-    h1 {
-      margin-bottom: 16px;
-    }
-    h2 {
-      margin-top: 24px;
-      margin-bottom: 8px;
-    }
-    h3 {
-      font-weight: 300;
-      margin-left: 16px;
-      margin-top: 16px;
-      margin-bottom: 8px;
-    }
-    p {
-      margin-left: 16px;
-      &:last-child {
-        margin-bottom: 0;
-      }
-    }
-    .marked-table {
-      margin-left: 16px;
-      margin-bottom: 16px;
-
-      table {
-        border-collapse:collapse;
-        border: 1px solid $gray_3;
-      }
-
-      td {
-        border: 1px solid $gray_3;
-        padding: 8px;
-      }
-    }
-    pre {
-      margin-left: 16px;
-    }
-  }
 }
 
 </style>
