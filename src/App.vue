@@ -5,6 +5,7 @@ let route = useRoute();
 
 <template>
   <div id="app-wrap">
+    <release-banner />
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -36,12 +37,11 @@ let route = useRoute();
     v-model:dialogVisible="showUploadDialog"
   />
 
-
   <PsAnalytics />
 
   <bf-download-file ref="downloadFile" />
 
-  <office-365-dialog/>
+  <office-365-dialog />
 
   <!--  This is the websocket connection-->
   <!--  <bf-notifications />-->
@@ -62,7 +62,8 @@ import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
-import Office365Dialog from './components/datasets/files/Office365Dialog/Office365Dialog.vue'
+import Office365Dialog from "./components/datasets/files/Office365Dialog/Office365Dialog.vue";
+import ReleaseBanner from "./components/shared/ReleaseBanner/ReleaseBanner.vue";
 
 // import BfNotifications from './components/notifications/Notifications.vue'
 
@@ -296,47 +297,47 @@ export default {
      * @returns {Promise}
      */
     bootUp: async function (userToken, fromLogin = false) {
-
       // Get the current Cognito User and store in Vuex
-      await Auth.currentAuthenticatedUser().then((user) => {
-        this.updateCognitoUser(user);
+      await Auth.currentAuthenticatedUser()
+        .then((user) => {
+          this.updateCognitoUser(user);
 
-        // Setting recurring check for token life-cycle
-        clearInterval(this.interval);
-        this.interval = setInterval(
-          function () {
-            try {
-              const usr = this.getCognitoUser();
-              const timeOut = usr.signInUserSession.accessToken.payload.exp;
+          // Setting recurring check for token life-cycle
+          clearInterval(this.interval);
+          this.interval = setInterval(
+            function () {
+              try {
+                const usr = this.getCognitoUser();
+                const timeOut = usr.signInUserSession.accessToken.payload.exp;
 
-              this.setSessionTimer(
-                Math.round((timeOut * 1000 - Date.now()) / 1000)
-              );
-              if (this.sessionTimer() < this.sessionLogoutThreshold) {
-                console.warn("Logging out due to expired session.");
-                this.sessionTimedOut = true;
-                EventBus.$emit("logout");
+                this.setSessionTimer(
+                  Math.round((timeOut * 1000 - Date.now()) / 1000)
+                );
+                if (this.sessionTimer() < this.sessionLogoutThreshold) {
+                  console.warn("Logging out due to expired session.");
+                  this.sessionTimedOut = true;
+                  EventBus.$emit("logout");
+                }
+              } catch (e) {
+                console.error(
+                  "Error checking for session timer -- prevent further checking"
+                );
+                clearInterval(this.interval);
               }
-            } catch (e) {
-              console.error(
-                "Error checking for session timer -- prevent further checking"
-              );
-              clearInterval(this.interval);
-            }
-          }.bind(this),
-          1000
-        );
-      }).catch((e) => {
-        // Token expired
-        Cookies.remove('user_token')
-
-        // route user to login page
-        this.$router.replace({
-          name: 'home',
-          query
+            }.bind(this),
+            1000
+          );
         })
+        .catch((e) => {
+          // Token expired
+          Cookies.remove("user_token");
 
-      });
+          // route user to login page
+          this.$router.replace({
+            name: "home",
+            query,
+          });
+        });
 
       // If bootup is called from Login, only get Profile and org as login
       // will re-trigger bootup when it updates the route to the correct org.
