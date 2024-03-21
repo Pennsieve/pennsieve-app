@@ -3,55 +3,39 @@ import { useRoute } from "vue-router";
 let route = useRoute();
 </script>
 
-<template >
+<template>
   <locked-banner slot="banner" />
 
   <bf-rafter slot="heading">
-
     <template #breadcrumb v-if="route.meta.showBackToFiles">
       <a @click="$router.go(-1)" class="link-to-files">
-        <IconArrowLeft
-          :height="10"
-          :width="10"
-        />
+        <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
-
     </template>
 
     <template #heading>
       <div class="title-wrapper">
-        <h1
-          class="flex-heading"
-        >
-          {{pageName}}
+        <h1 class="flex-heading">
+          {{ pageName }}
         </h1>
       </div>
-
     </template>
-
   </bf-rafter>
 </template>
 
-
-
 <script>
-
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
-import ReadmeDocs from "../../mixins/readme-docs";
 import IconGuide from "../../components/icons/IconGuide.vue";
 import IconHelp from "../../components/icons/IconHelp.vue";
 import IconArrowRight from "../../components/icons/IconArrowRight.vue";
 import IconUpload from "../../components/icons/IconUpload.vue";
 
-
 export default {
-  name: 'SecondaryPageHeader',
-  mixins:[
-    ReadmeDocs
-  ],
+  name: "SecondaryPageHeader",
+
   components: {
     BfRafter,
     IconArrowLeft,
@@ -59,73 +43,55 @@ export default {
     IconGuide,
     IconHelp,
     IconArrowRight,
-    IconUpload
+    IconUpload,
   },
   mounted() {
-    const r = useRoute()
-    this.getReadmeDocument(r.meta.helpSection)
-
+    const r = useRoute();
+    this.getReadmeDocument(r.meta.helpSection);
   },
-  computed: {
-    docTitle: function() {
-      if (this.summary) {
-        return this.summary.excerpt
-      }
-      return ''
-    },
-    docSummary: function() {
-      if (this.summary) {
-        return this.summary.body_html
-      }
-      return ''
-    },
 
-    pageName: function() {
-      const r = useRoute()
+  computed: {
+    pageName: function () {
+      const r = useRoute();
 
       switch (r.name) {
         case "dataset-settings":
-          return "Dataset Settings"
+          return "Dataset Settings";
         case "dataset-files":
-          return "Files"
+          return "Files";
         case "file-record":
-          return "File Details"
+          return "File Details";
         case "publishing-settings":
-          return "Dataset Publishing"
+          return "Dataset Publishing";
         case "dataset-activity":
-          return "Dataset Activity"
+          return "Dataset Activity";
         case "integrations-settings":
-          return "Dataset Integrations"
+          return "Dataset Integrations";
         case "collection-files":
-          return "Files"
+          return "Files";
         case "viewer":
-          return "File Viewer"
-
-
+          return "File Viewer";
       }
-      return "Unknown"
-    }
+      return "Unknown";
+    },
   },
 
   data() {
     return {
-      showHelp: false
-    }
+      showHelp: false,
+    };
   },
 
   methods: {
     toggleHelp: function () {
-      this.showHelp = !this.showHelp
-    }
-  }
-
-
-
-}
+      this.showHelp = !this.showHelp;
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 .flex-heading {
   background-color: $purple_1;
@@ -138,9 +104,4 @@ export default {
 .link-to-files {
   color: $white;
 }
-
-
-
-
-
 </style>

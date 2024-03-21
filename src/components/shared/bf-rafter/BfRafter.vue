@@ -42,7 +42,7 @@ let route = useRoute();
 
           <div v-if="$slots['heading']" class="bf-rafter-heading">
             <slot name="heading" />
-            <button v-if='!isDatasetOverview' @click="toggleHelp">
+            <button v-if='!isDatasetOverview && slug' @click="toggleHelp">
               <component
                 :is="showHelp?  'IconArrowUp': 'IconHelp' "
                 :width="showHelp? 16: 24"
@@ -66,18 +66,9 @@ let route = useRoute();
       </div>
 
       <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
-        <div class="help-title-wrapper">
-          <div class="help-title">{{ docTitle }}</div>
-          <a href="https://docs.pennsieve.io" class="link-item">
-            <IconUpload :width="14" :height="14" style="margin-right: 4px; transform: rotate(90deg) scaleX(-1)"/>
-            <div class="person-circle">
-              Documentation Hub
-            </div>
-          </a>
-        </div>
-        <div
-          class='help-section'
-          v-html="docSummary"/>
+
+        <readme-doc :slug="slug" :show-header=true />
+
       </div>
 
 
@@ -113,9 +104,9 @@ import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 import IconUpload from "../../../components/icons/IconUpload.vue";
-import ReadmeDocs from "../../../mixins/readme-docs";
 import IconArrowUp from "../../icons/IconArrowUp.vue";
 import IconHelp from "../../icons/IconHelp.vue";
+import ReadmeDoc from "../readme-doc/ReadmeDoc.vue";
 
 export default {
   name: 'BfRafter',
@@ -154,14 +145,17 @@ export default {
     IconArrowLeft,
     IconUpload,
     IconArrowUp,
-    IconHelp
+    IconHelp,
+    ReadmeDoc
   },
 
-  mixins: [Request, CustomTheme, ReadmeDocs],
+  mixins: [Request, CustomTheme],
 
   mounted() {
     const r = useRoute()
-    this.getReadmeDocument(r.meta.helpSection)
+    if (r.meta.helpSection) {
+      this.slug = r.meta.helpSection
+    }
   },
 
   data: function() {
@@ -189,7 +183,8 @@ export default {
         'user-permissions',
         'embargo-permissions',
         'models-list'
-      ]
+      ],
+      slug: ''
     }
   },
 
@@ -396,6 +391,7 @@ export default {
   font-weight: 700;
   display: flex;
   align-items: center;
+  cursor: pointer;
 }
 
 .bf-rafter-heading {
@@ -627,19 +623,7 @@ export default {
     }
   }
 }
-.help-title-wrapper {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  padding: 8px;
 
-  .help-title {
-    color: $purple_3;
-    font-size: 12pt;
-    margin: 8px 0px;
-
-  }
-}
 .help-wrapper {
   background-color: white;
   color: $gray_6;
@@ -653,9 +637,5 @@ export default {
     border-radius: 4px;
   }
 }
-.link-item {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
+
 </style>
