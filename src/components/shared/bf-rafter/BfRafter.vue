@@ -104,7 +104,6 @@ import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 import IconUpload from "../../../components/icons/IconUpload.vue";
-import ReadmeDocs from "../../../mixins/readme-docs";
 import IconArrowUp from "../../icons/IconArrowUp.vue";
 import IconHelp from "../../icons/IconHelp.vue";
 import ReadmeDoc from "../readme-doc/ReadmeDoc.vue";
@@ -150,7 +149,7 @@ export default {
     ReadmeDoc
   },
 
-  mixins: [Request, CustomTheme, ReadmeDocs],
+  mixins: [Request, CustomTheme],
 
   mounted() {
     const r = useRoute()

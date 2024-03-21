@@ -6,7 +6,7 @@ let route = useRoute();
 <template >
   <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading">
+  <bf-rafter slot="heading" >
 
     <template #breadcrumb v-if="route.meta.showBackToFiles">
       <a @click="$router.go(-1)" class="link-to-files">
@@ -40,7 +40,6 @@ let route = useRoute();
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
-import ReadmeDocs from "../../mixins/readme-docs";
 import IconGuide from "../../components/icons/IconGuide.vue";
 import IconHelp from "../../components/icons/IconHelp.vue";
 import IconArrowRight from "../../components/icons/IconArrowRight.vue";
@@ -49,9 +48,7 @@ import IconUpload from "../../components/icons/IconUpload.vue";
 
 export default {
   name: 'SecondaryPageHeader',
-  mixins:[
-    ReadmeDocs
-  ],
+
   components: {
     BfRafter,
     IconArrowLeft,
@@ -61,25 +58,9 @@ export default {
     IconArrowRight,
     IconUpload
   },
-  mounted() {
-    const r = useRoute()
-    console.log(r.meta)
-    this.getReadmeDocument(r.meta.helpSection)
 
-  },
   computed: {
-    docTitle: function() {
-      if (this.summary) {
-        return this.summary.excerpt
-      }
-      return ''
-    },
-    docSummary: function() {
-      if (this.summary) {
-        return this.summary.body_html
-      }
-      return ''
-    },
+
 
     pageName: function() {
       const r = useRoute()

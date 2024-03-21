@@ -28,7 +28,6 @@ import { mapGetters } from 'vuex'
 
 import BfButton from '../shared/bf-button/BfButton.vue'
 import PaginationPageMenu from '../shared/PaginationPageMenu/PaginationPageMenu.vue'
-import ReadmeDocs from "../../mixins/readme-docs";
 import ReadmeDoc from "../shared/readme-doc/ReadmeDoc.vue";
 
 export default {
@@ -40,10 +39,6 @@ export default {
     PaginationPageMenu,
   },
 
-  // mixins: [
-  //   ReadmeDocs
-  // ],
-
   props: {
   },
 
@@ -52,11 +47,6 @@ export default {
       summary: {},
     }
   },
-
-  // mounted() {
-  //
-  //   this.getReadmeDocument('developer-tools')
-  // },
 
   computed: {
     ...mapGetters([
