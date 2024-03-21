@@ -24,7 +24,7 @@
     name: 'ViewerPane',
 
     components: {
-      // 'slide-viewer': defineAsyncComponent( () => import('@/components/viewers/SlideViewer/SlideViewer.vue')),
+      'SlideViewer': defineAsyncComponent( () => import('../../viewers/SlideViewer/SlideViewer.vue')),
       'ImageViewer': defineAsyncComponent( () => import('../../viewers/ImageViewer.vue')),
       'PDFViewer': defineAsyncComponent( () => import('../../viewers/PDFViewer.vue')),
       'TextViewer': defineAsyncComponent( () => import('../../viewers/TextViewer.vue')),

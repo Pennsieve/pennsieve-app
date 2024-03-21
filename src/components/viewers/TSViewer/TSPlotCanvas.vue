@@ -896,7 +896,6 @@
                                     inViewport: curRequest.isInViewport} );
 
                         } else {
-                            console.log('Websocket Closed')
                             return false;
                         }
                     }
@@ -906,7 +905,6 @@
             },
 
             invalidate: function() {
-                console.log('Invalidating')
 
                 clearTimeout(this.preFetchTime);
                 this.aSyncPreRequests = [];
@@ -1300,7 +1298,7 @@
                     }
                 }
                 ctx.restore();
-               // console.log('render time: ' + allTimes)
+
             },
 
             // Function that is called with the throttledDataRenderer
@@ -1317,7 +1315,6 @@
             // Method sets the global zoom multiplier based on the viewport data buffer.
             // This is called once when first page is available
             autoScaleViewData: function() {
-                console.log('autoscale')
                 let sumMedian = 0;
                 let nrSeg = 0;
                 let allChannels = this.viewData.channels;
@@ -1440,16 +1437,13 @@
                 }
             },
             _onWebsocketClose: function(e) {
-                console.log('Websocket closed function')
                 clearTimeout(this.preFetchTime);
                 this.aSyncPreRequests = [];
                 this.openWebsocket();
             },
             _onWebsocketFinalClose: function(e) {
-                console.log('Websocket closed forever');
             },
             _onWebsocketOpen: function(e) {
-                console.log('Websocket is opened')
                 if (this.initWebsocket) {
                     let chIds = [];
                     for (let i=0; i<this.viewerChannels.length; i++) {
@@ -1797,7 +1791,6 @@
                             }
                             if (isComplete) {
                                 this.requestedPages.delete(obj.data.pageStart);
-                                // console.log('isComplete')
                             }
 
                         }
@@ -1824,7 +1817,6 @@
                     break;
 
                 case 'realtime':
-                    console.log('No Longer Supporting RealTime Data')
                     break;
                 }
 

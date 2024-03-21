@@ -122,7 +122,6 @@ export default {
      */
     onClick: function(ev) {
       // EventBus.$emit('concepts-list-item-click', this.item)
-      console.log('onclick in list-item')
       ev.stopPropagation()
       this.$emit('clickModel', this.item)
     },

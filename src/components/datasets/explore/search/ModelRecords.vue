@@ -287,7 +287,6 @@ export default {
     if (token) {
       this.fetchModels()
     }
-    console.log("fetch models")
   },
 
   props: {
@@ -517,7 +516,6 @@ export default {
 
     clickModel: function(ev) {
       this.setSelectedModel(ev.name)
-      console.log('model clicked in records' + ev)
     },
     /**
      * Add filter

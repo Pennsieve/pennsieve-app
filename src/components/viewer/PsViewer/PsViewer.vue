@@ -317,15 +317,14 @@ export default {
      * @param {Object} evt
      */
     onActiveViewerAction: function(evt) {
-      // if (this.$refs.viewerPane) {
-      //   this.$refs.viewerPane.activeViewerAction(evt)
-      // }
+      if (this.$refs.viewerPane) {
+        this.$refs.viewerPane.activeViewerAction(evt)
+      }
     },
     /**
     * Get file data to send to bf-viewer
     */
     getFile: function() {
-      console.log('getting file')
       if (!this.fileUrl) {
         return
       }

@@ -224,7 +224,7 @@ export default {
             try {
               link.click();
             } catch (err) {
-              console.log('not available')
+              console.error(err)
             }
 
 

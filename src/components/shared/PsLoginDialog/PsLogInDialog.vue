@@ -481,7 +481,7 @@ export default {
      * Handle login request after validation
      */
     async sendLoginRequest() {
-      console.log('send login request')
+
       this.isLoggingIn = true
       try {
         const user = await Auth.signIn(

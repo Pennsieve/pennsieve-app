@@ -318,7 +318,6 @@ export default {
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
-      console.log("upload complete timer");
       setTimeout(() => {
         this.resetUpload();
       }, 120000);
@@ -353,7 +352,6 @@ export default {
 
             for (let x in data) {
               if (data[x].parent_id.Int64 = curFolderId){
-                console.log('Refetching files.')
                 this.fetchFiles()
                 break
               }
@@ -481,7 +479,6 @@ export default {
      * @param {Array} selection
      */
     setSelectedFiles: function (selection) {
-      console.log("set selected files" + selection);
       this.selectedFiles = selection;
     },
 
@@ -613,7 +610,6 @@ export default {
       this.files = [];
       this.offset = 0;
       this.getFilesUrl;
-      console.log("id: " + id);
       if (id) {
         this.navigateToFile(id);
       } else {

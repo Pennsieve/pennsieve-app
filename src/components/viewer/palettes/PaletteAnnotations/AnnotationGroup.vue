@@ -171,7 +171,6 @@
       onToggleVisibility: function(event) {
         event.preventDefault()
         event.stopPropagation()
-        console.log('Toggle visibility')
       }
     }
   }
