@@ -13,7 +13,6 @@
         class="close-btn"
         :height="12"
         :width="12"
-        color="white"
       />
     </div>
   </div>
@@ -69,16 +68,16 @@ export default {
 @import "../../../assets/_variables";
 
 .release-banner {
-  background-color: $purple_2;
+  background-color: $purple_tint;
   padding: 8px 0 8px 0;
-  color: white;
+  color: $purple_2;
   display: flex;
   font-weight: bold;
   justify-content: space-between;
   text-align: center;
 
   a {
-    color: white;
+    color: $purple_2;
     text-decoration: underline;
   }
 }
