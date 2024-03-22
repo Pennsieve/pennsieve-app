@@ -796,7 +796,7 @@ export const actions = {
   },
   removeContributor: ({ commit, state }, id) => {
     const idx = R.findIndex(R.propEq("id", id), state.datasetContributors);
-        
+
     if (idx >= 0) {
       commit("REMOVE_DATASET_CONTRIBUTOR", idx);
     } else {
