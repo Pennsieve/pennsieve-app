@@ -44,8 +44,8 @@
           :width="20"
         />
       </button>
-      <el-dropdown-menu
-        slot="dropdown"
+      <template #dropdown>
+        <el-dropdown-menu
         class="bf-menu"
         :offset="9"
       >
@@ -76,6 +76,7 @@
           Move Down
         </el-dropdown-item>
       </el-dropdown-menu>
+      </template>
     </el-dropdown>
   </slat-info>
 </template>

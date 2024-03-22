@@ -542,7 +542,7 @@ export const mutations = {
       },
 
       REMOVE_DATASET_CONTRIBUTOR(state, idx) {
-        delete state.datasetContributors[idx]
+        state.datasetContributors.splice(idx, 1);
       },
 
       SET_ORG_CONTRIBUTORS(state, contributors) {
