@@ -341,6 +341,7 @@ export default {
      * @param {Object} contributor
      */
     removeContributor: function(contributor) {
+      console.log('remove contributor fired')
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const contributorId = propOr(0, 'id', contributor)
       const url = `${this.config.apiUrl}/datasets/${datasetId}/contributors/${contributorId}?api_key=${this.userToken}`
