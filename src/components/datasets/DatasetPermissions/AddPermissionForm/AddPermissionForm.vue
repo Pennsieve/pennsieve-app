@@ -134,6 +134,7 @@
           :dialog-visible="confirmDialogVisible"
           :role="permissionForm.role"
           @confirm="addPermission"
+          @close-dialog="onCloseConfirmRoleDialog"
         />
       </div>
       <div v-if="externalProvided" class="external-user-message">
@@ -451,6 +452,9 @@
         else {
           this.externalProvided = false
         }
+      },
+      onCloseConfirmRoleDialog: function(){
+        this.confirmDialogVisible = false;
       }
     }
   }
