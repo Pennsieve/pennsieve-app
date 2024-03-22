@@ -47,7 +47,7 @@ export default {
   },
   mounted() {
     const r = useRoute();
-    this.getReadmeDocument(r.meta.helpSection);
+    // this.getReadmeDocument(r.meta.helpSection);
   },
 
   computed: {
@@ -103,5 +103,6 @@ export default {
 
 .link-to-files {
   color: $white;
+  cursor: pointer;
 }
 </style>
