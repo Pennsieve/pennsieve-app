@@ -163,7 +163,7 @@
        * Emit event to update the synced property
        */
       close: function() {
-        this.$emit('close')
+        this.$emit('close-dialog')
       }
     }
   }
