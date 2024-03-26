@@ -68,14 +68,15 @@
         <li>
           <table-menu
             v-if="getPermission('editor') || searchAllDataMenu"
-            :file="activeRow"
+            :selection="selection"
             :multiple-selected="multipleSelected"
             :search-all-data-menu="searchAllDataMenu"
-            @delete="deleteFile"
-            @move="moveFile"
-            @download-file="downloadFile"
+            @delete="$emit('delete')"
+            @move="$emit('move')"
+            @download-file="onDownloadClick"
             @process-file="processFile"
             @copy-url="getPresignedUrl"
+            @open-office-file="onOpenOffice365"
           />
         </li>
       </ul>
@@ -98,20 +99,7 @@
         fixed
         width="50"
       />
-      <!--      <el-table-column-->
-      <!--        v-if="searchAllDataMenu"-->
-      <!--        prop="datasetName"-->
-      <!--        label="Dataset"-->
-      <!--        :sortable="true"-->
-      <!--        :sort-orders="sortOrders"-->
-      <!--      >-->
-      <!--        <template #header>-->
-      <!--          <div class="column-header">-->
-      <!--            Dataset-->
-      <!--          </div>-->
 
-      <!--        </template>-->
-      <!--      </el-table-column>-->
       <el-table-column
         prop="content.name"
         label="Name"
@@ -164,30 +152,7 @@
             {{ formatDate(scope.row.content.createdAt) }}
           </template>
         </el-table-column>
-        <!--        <el-table-column-->
-        <!--          label=""-->
-        <!--          fixed="right"-->
-        <!--          align="right"-->
-        <!--          width="54"-->
-        <!--          :sortable="false"-->
-        <!--          :resizable="false"-->
-        <!--        >-->
-        <!--          <template #default="scope">-->
-        <!--            <div class="file-actions-wrap">-->
-        <!--              <table-menu-->
-        <!--                v-if="getPermission('editor') || searchAllDataMenu"-->
-        <!--                :file="scope.row"-->
-        <!--                :multiple-selected="multipleSelected"-->
-        <!--                :search-all-data-menu="searchAllDataMenu"-->
-        <!--                @delete="deleteFile"-->
-        <!--                @move="moveFile"-->
-        <!--                @download-file="downloadFile"-->
-        <!--                @process-file="processFile"-->
-        <!--                @copy-url="getPresignedUrl"-->
-        <!--              />-->
-        <!--            </div>-->
-        <!--          </template>-->
-        <!--        </el-table-column>-->
+
       </template>
     </el-table>
   </div>
@@ -195,7 +160,7 @@
 
 <script>
 import { pathOr, propOr } from "ramda";
-import { mapGetters, mapState } from "vuex";
+import { mapGetters, mapState,mapActions } from "vuex";
 import EventBus from "../../utils/event-bus";
 
 import BfFileLabel from "../datasets/files/bf-file/BfFileLabel.vue";
@@ -258,7 +223,6 @@ export default {
 
   data() {
     return {
-      activeRow: {},
       selection: [],
       sortOrders: ["ascending", "descending"],
       checkAll: false,
@@ -291,6 +255,12 @@ export default {
     },
   },
   methods: {
+
+    ...mapActions('filesModule',['openOffice365File']),
+
+    onOpenOffice365: function(file) {
+      this.openOffice365File(file)
+    },
     /**
      * Select the row
      * @param {Object} row
@@ -315,14 +285,6 @@ export default {
 
       const tableSelection = pathOr([], ["states", "selection"], store);
       return tableSelection.length > 0;
-    },
-
-    /**
-     * Sets the active row for the menu clicked
-     * @param {Object} row
-     */
-    setActiveRow: function (row) {
-      this.activeRow = row;
     },
 
     /**
@@ -380,7 +342,7 @@ export default {
       this.$refs.table.clearSelection();
       setTimeout(function () {
         this.$refs.table.toggleRowSelection(row, true);
-      }, 100);
+      }.bind(this), 100);
     },
 
     /**

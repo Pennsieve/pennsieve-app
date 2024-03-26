@@ -54,8 +54,6 @@ export default {
 
   components: { IconRemove },
 
-  data() {},
-
   methods: {
     toggleVisible: function (val) {
       this.visible = val;
