@@ -1008,15 +1008,28 @@ export default {
             },
           })
             .then((response) => {
-              copyText(pathOr("", ["url"], response));
-              const msg = "Temporary link to file copied to clipboard";
-              EventBus.$emit("toast", {
-                detail: {
-                  type: "success",
-                  msg,
-                },
-              });
+              copyText(pathOr("", ["url"], response),undefined, (error, event) => {
+                if (error) {
+                  const msg = "Unable to copy to clipboard";
+                  EventBus.$emit("toast", {
+                    detail: {
+                      type: "error",
+                      msg,
+                    },
+                  });
+                } else {
+                  const msg = "Temporary link to file copied to clipboard";
+                  EventBus.$emit("toast", {
+                    detail: {
+                      type: "success",
+                      msg,
+                    },
+                  });
+                }}
+                );
+
             })
+
             .catch((response) => {
               this.handleXhrError(response);
             });
