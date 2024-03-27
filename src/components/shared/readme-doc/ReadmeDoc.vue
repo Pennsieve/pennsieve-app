@@ -88,7 +88,6 @@ export default {
 
   methods: {
     getReadmeDocument: function(val) {
-      console.log('get doc')
       const url = `${this.config.api2Url}/readme/docs/${val}`
 
       this.sendXhr(url, {
@@ -97,7 +96,6 @@ export default {
           'Authorization': `Bearer ${this.userToken}`
         },
       }).then( result => {
-        console.log(result)
         this.content = result
       })
     }
