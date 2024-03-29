@@ -8,7 +8,10 @@ let route = useRoute();
     class="bf-rafter"
     :class="[$slots['tabs'] ? 'with-tabs' : '', isEditing ? 'editing' : '']"
   >
-    <div :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']">
+    <div
+      :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']"
+    >
+
       <template v-if="datasetNameVisible">
         <div class="parent">
           <div class="dataset-name">{{ datasetNameDisplay() }}</div>
@@ -17,7 +20,10 @@ let route = useRoute();
 
       <template v-if="showLinkBack">
         <a @click="backRoute" class="link-back">
-          <IconArrowLeft :height="10" :width="10" />
+          <IconArrowLeft
+            :height="10"
+            :width="10"
+          />
           Back to {{ linkBack.name }}
         </a>
       </template>
@@ -36,11 +42,11 @@ let route = useRoute();
 
           <div v-if="$slots['heading']" class="bf-rafter-heading">
             <slot name="heading" />
-            <button v-if="!isDatasetOverview && slug" @click="toggleHelp">
+            <button v-if='!isDatasetOverview && slug' @click="toggleHelp">
               <component
-                :is="showHelp ? 'IconArrowUp' : 'IconHelp'"
-                :width="showHelp ? 16 : 24"
-                :height="showHelp ? 16 : 24"
+                :is="showHelp?  'IconArrowUp': 'IconHelp' "
+                :width="showHelp? 16: 24"
+                :height="showHelp? 16: 24"
                 color="white"
               />
             </button>
@@ -59,9 +65,12 @@ let route = useRoute();
         <slot name="bottom" />
       </div>
 
-      <div :class="[showHelp ? 'help-wrapper open' : 'help-wrapper']">
-        <readme-doc :slug="slug" :show-header="true" />
+      <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
+
+        <readme-doc :slug="slug" :show-header=true />
+
       </div>
+
 
       <div class="tabs-stats-wrap">
         <div v-if="$slots['tabs']" class="row bf-rafter-tabs">
@@ -72,20 +81,26 @@ let route = useRoute();
           <slot name="stats" />
         </div>
       </div>
+
     </div>
 
-    <!--    <div v-if="$slots['help']" class="row bf-rafter-help">-->
-    <!--      <slot name="help" />-->
-    <!--    </div>-->
+
+<!--    <div v-if="$slots['help']" class="row bf-rafter-help">-->
+<!--      <slot name="help" />-->
+<!--    </div>-->
+
+
   </header>
 </template>
 
+
+
 <script>
-import { mapState, mapGetters, mapActions } from "vuex";
-import { path, pathOr } from "ramda";
-import EventBus from "../../../utils/event-bus";
-import Request from "../../../mixins/request/index";
-import BfButton from "../bf-button/BfButton.vue";
+import { mapState, mapGetters, mapActions } from 'vuex'
+import { path, pathOr } from 'ramda'
+import EventBus from '../../../utils/event-bus'
+import Request from '../../../mixins/request/index'
+import BfButton from '../bf-button/BfButton.vue'
 import CustomTheme from "../../../mixins/custom-theme";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 import IconUpload from "../../../components/icons/IconUpload.vue";
@@ -94,35 +109,35 @@ import IconHelp from "../../icons/IconHelp.vue";
 import ReadmeDoc from "../readme-doc/ReadmeDoc.vue";
 
 export default {
-  name: "BfRafter",
+  name: 'BfRafter',
 
   props: {
     title: {
       type: String,
-      default: "",
+      default: ''
     },
     size: {
       type: String,
-      default: "",
+      default: ''
     },
     isEditing: {
       type: Boolean,
-      default: false,
+      default: false
     },
     linkBack: {
       type: Object,
       default: () => {
-        return {};
-      },
+        return {}
+      }
     },
     orgId: {
       type: String,
-      default: "",
+      default: ''
     },
     datasetId: {
       type: String,
-      default: "",
-    },
+      default: ''
+    }
   },
 
   components: {
@@ -131,247 +146,245 @@ export default {
     IconUpload,
     IconArrowUp,
     IconHelp,
-    ReadmeDoc,
+    ReadmeDoc
   },
 
   mixins: [Request, CustomTheme],
 
   mounted() {
-    const r = useRoute();
+    const r = useRoute()
     if (r.meta.helpSection) {
-      this.slug = r.meta.helpSection;
+      this.slug = r.meta.helpSection
     }
   },
 
-  data: function () {
+  data: function() {
     return {
       datasetNameTruncated: false,
-      datasetname: "",
+      datasetname: '',
       datasetFilterOpen: false,
       showHelp: false,
       datasetPageList: [
-        "upload-manifests",
-        "publishing-settings",
-        "integrations-settings",
-        "embargoed-permissions",
-        "relationships",
-        "graph",
-        "collection-files",
-        "records-overview",
-        "dataset-files",
-        "models",
-        "dataset-permissions",
-        "activity-log",
-        "dataset-settings",
-        "metadata",
-        "records",
-        "user-permissions",
-        "embargo-permissions",
-        "models-list",
+        'upload-manifests',
+        'publishing-settings',
+        'integrations-settings',
+        'embargoed-permissions',
+        'relationships',
+        'graph',
+        'collection-files',
+        'records-overview',
+        'dataset-files',
+        'models',
+        'dataset-permissions',
+        'activity-log',
+        'dataset-settings',
+        'metadata',
+        'records',
+        'user-permissions',
+        'embargo-permissions',
+        'models-list'
       ],
-      slug: "",
-    };
+      slug: ''
+    }
   },
 
   computed: {
     ...mapState([
-      "dataset",
-      "orgDatasetStatuses",
-      "datasetRafterVisStatus",
-      "datasetRafterVisStatus2",
+      'dataset',
+      'orgDatasetStatuses',
+      'datasetRafterVisStatus',
+      'datasetRafterVisStatus2'
     ]),
 
-    docTitle: function () {
+    docTitle: function() {
       if (this.summary) {
-        return this.summary.excerpt;
+        return this.summary.excerpt
       }
-      return "";
+      return ''
     },
-    docSummary: function () {
+    docSummary: function() {
       if (this.summary) {
-        return this.summary.body_html;
+        return this.summary.body_html
       }
-      return "";
+      return ''
     },
 
-    showLinkBack: function () {
-      return Object.keys(this.linkBack).length > 0;
+    showLinkBack: function() {
+      return Object.keys(this.linkBack).length > 0
     },
 
-    getThemeColors: function () {
-      return this.getTheme(this.orgId);
+    getThemeColors: function() {
+      return this.getTheme(this.orgId)
     },
 
-    rafterBackgroundStyle: function () {
-      const color1 = this.pSBC(0.8, this.getThemeColors[1]);
-      return `${color1}`;
+    rafterBackgroundStyle: function() {
+      const color1 = this.pSBC(0.8, this.getThemeColors[1])
+      return `${color1}`
+
     },
 
-    isFileRecord: function () {
+    isFileRecord: function() {
       return this.$route.name === "file-record";
     },
 
-    ...mapGetters(["getPermission", "userToken", "config"]),
-    currentRouteName: function () {
-      return this.$route.name;
+    ...mapGetters(['getPermission', 'userToken', 'config']),
+    currentRouteName: function() {
+      return this.$route.name
     },
 
     /**
      * Filters empty status names from orgDatasetStatuses
      * @returns {Array}
      */
-    filterOrgStatusList: function () {
-      return this.orgDatasetStatuses.filter((status) => {
-        return status.displayName !== "";
-      });
+    filterOrgStatusList: function() {
+      return this.orgDatasetStatuses.filter(status => {
+        return status.displayName !== ''
+      })
     },
 
     /**
      * Returns the dataset status displayName
      * @returns {String}
      */
-    formatDatasetStatus: function () {
-      return pathOr("", ["status", "displayName"], this.dataset);
+    formatDatasetStatus: function() {
+      return pathOr('', ['status', 'displayName'], this.dataset)
     },
 
-    datasetNameDisplay: function () {
-      const name = this.datasetName;
-      this.datasetNameTruncated = false;
+    datasetNameDisplay: function() {
+      const name = this.datasetName
+      this.datasetNameTruncated = false
 
-      return name;
+      return name
     },
 
-    getDatasetUpdateUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const datasetId = path(["content", "id"], this.dataset);
+    getDatasetUpdateUrl: function() {
+      const url = pathOr('', ['config', 'apiUrl'])(this)
+      const datasetId = path(['content', 'id'], this.dataset)
 
       if (!url) {
-        return "";
+        return ''
       }
 
-      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`;
+      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`
     },
     /**
      * Returns dataset filter arrow direction
      * @returns {String}
      */
-    datasetFilterArrowDir: function () {
-      return this.datasetFilterOpen ? "up" : "down";
+    datasetFilterArrowDir: function() {
+      return this.datasetFilterOpen ? 'up' : 'down'
     },
     /**
      * Returns color for dataset status
      * @returns {String}
      */
-    checkStatusColor: function () {
-      return pathOr("", ["status", "color"], this.dataset);
+    checkStatusColor: function() {
+      return pathOr('', ['status', 'color'], this.dataset)
     },
 
-    datasetNameVisible: function () {
+    datasetNameVisible: function() {
       if (this.datasetPageList.includes(this.currentRouteName)) {
-        return true;
+        return true
       } else {
-        return false;
+        return false
       }
     },
 
-    isDatasetOverview: function () {
-      return this.currentRouteName === "dataset-overview";
+    isDatasetOverview: function() {
+      return this.currentRouteName === 'dataset-overview'
     },
 
-    onFilesPage: function () {
-      let filesTable = "dataset-files";
+    onFilesPage: function() {
+      let filesTable = 'dataset-files'
       if (filesTable.includes(this.currentRouteName)) {
-        return true;
+        return true
       } else {
-        return false;
+        return false
       }
-    },
+    }
   },
 
   methods: {
-    ...mapActions(["updateDataset", "setDataset"]),
+    ...mapActions(['updateDataset', 'setDataset']),
 
     toggleHelp: function () {
-      this.showHelp = !this.showHelp;
+      this.showHelp = !this.showHelp
     },
 
-    backRoute: function () {
-      this.$router.push({
-        name: this.linkBack.to,
-        params: { datasetId: this.datasetId, orgId: this.orgId },
-      });
+    backRoute: function() {
+      this.$router.push({ name: this.linkBack.to, params: { datasetId: this.datasetId, orgId: this.orgId}})
     },
 
-    pageBackRoute: function () {
-      this.$router.back();
+    pageBackRoute: function() {
+      this.$router.back()
     },
 
-    datasetName: function () {
-      return pathOr("", ["content", "name"], this.dataset);
+    datasetName: function() {
+      return pathOr('', ['content', 'name'], this.dataset)
     },
     /**
      * Returns dataset status name based on command selection in menu
      * @returns {String}
      */
-    getStatusCommand: function (status) {
-      return status.displayName;
+    getStatusCommand: function(status) {
+      return status.displayName
     },
     /**
      * Returns dataset status dot styling based on status color
      * @returns {Object}
      */
-    getDotColor: function (status) {
+    getDotColor: function(status) {
       const obj = {
-        backgroundColor: `${status.color}`,
-      };
+        backgroundColor: `${status.color}`
+      }
 
-      return obj;
+      return obj
     },
     /**
      * Updates a dataset's status based on
      * status menu selection
      * @param {String}
      */
-    updateDatasetStatus: function (command) {
-      const status = this.orgDatasetStatuses.find((status) => {
-        return status.displayName === command;
-      });
+    updateDatasetStatus: function(command) {
+      const status = this.orgDatasetStatuses.find(status => {
+        return status.displayName === command
+      })
 
       if (!this.getDatasetUpdateUrl) {
-        return;
+        return
       }
 
       // API request to update the status
       this.sendXhr(this.getDatasetUpdateUrl, {
-        method: "PUT",
+        method: 'PUT',
         body: {
-          status: status.name,
-        },
+          status: status.name
+        }
       })
-        .then((response) => {
-          EventBus.$emit("toast", {
+        .then(response => {
+          EventBus.$emit('toast', {
             detail: {
-              msg: "Your status has been saved",
-            },
-          });
+              msg: 'Your status has been saved'
+            }
+          })
 
-          this.updateDataset(response);
-          this.setDataset(response);
+          this.updateDataset(response)
+          this.setDataset(response)
         })
-        .catch(this.handleXhrError.bind(this));
+        .catch(this.handleXhrError.bind(this))
     },
     //Navigates to dataset trash bin modal
-    NavToDeleted: function () {
+    NavToDeleted: function() {
       //CONSIDER DOING SOMETHING LIKE FETCHFILES()
-      EventBus.$emit("openDeletedModal", true);
-    },
-  },
-};
+      EventBus.$emit('openDeletedModal', true)
+    }
+  }
+}
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
-@import "../../../assets/components/_dataset-status.scss";
+@import '../../../assets/_variables.scss';
+@import '../../../assets/components/_dataset-status.scss';
 
 .link-back {
   color: $white;
@@ -382,7 +395,7 @@ export default {
 }
 
 .bf-rafter-heading {
-  display: flex;
+  display:flex;
   flex-direction: row;
   justify-content: space-between;
 }
@@ -419,11 +432,14 @@ export default {
     }
   }
 
+
   .link-back {
     color: $gray_2;
     font-size: 12px;
     cursor: pointer;
   }
+
+
 
   &.primary {
     background: $gray_1;
@@ -441,6 +457,7 @@ export default {
         display: flex;
       }
     }
+
   }
   &.small {
     padding-top: 28px;
@@ -466,7 +483,7 @@ export default {
     }
   }
   .condensed & {
-    background: $purple_1;
+    background: $purple_1 ;
     &.primary {
       background: $gray_1;
     }
@@ -548,7 +565,10 @@ export default {
   :slotted(h3) {
     color: red;
   }
+
 }
+
+
 
 .dataset-filter-status-check {
   margin: -2px 0;
@@ -593,7 +613,7 @@ export default {
   padding-top: 8px;
   background-color: $purple_tint;
   :deep(.header-scroll) {
-    color: $purple_2;
+    color: $purple_2
   }
   :deep(.magic-block-textarea) {
     p {
@@ -609,7 +629,7 @@ export default {
   color: $gray_6;
   max-height: 0;
   transition: max-height 0.15s, padding-top 0.15s ease-out;
-  overflow-y: scroll;
+  overflow-y:scroll;
 
   &.open {
     max-height: 250px;
@@ -617,4 +637,5 @@ export default {
     border-radius: 4px;
   }
 }
+
 </style>
