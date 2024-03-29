@@ -24,7 +24,7 @@ let route = useRoute();
             :height="10"
             :width="10"
           />
-          Back to {{ this.linkBack.name }}
+          Back to {{ linkBack.name }}
         </a>
       </template>
 
@@ -83,12 +83,6 @@ let route = useRoute();
       </div>
 
     </div>
-
-
-<!--    <div v-if="$slots['help']" class="row bf-rafter-help">-->
-<!--      <slot name="help" />-->
-<!--    </div>-->
-
 
   </header>
 </template>
