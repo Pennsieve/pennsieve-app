@@ -9,6 +9,17 @@ let route = useRoute();
 
     <bf-rafter slot="heading" :link-back=route.meta.backLink :dataset-id="datasetId" :org-id="orgId">
 
+      <!--    <template #breadcrumb v-if="route.meta.backLinkName">-->
+      <!--      <a @click="$router.go(-1)" class="link-to-files">-->
+      <!--        <IconArrowLeft-->
+      <!--          :height="10"-->
+      <!--          :width="10"-->
+      <!--        />-->
+      <!--        Back to {{ route.meta.backLinkName }}-->
+      <!--      </a>-->
+
+      <!--    </template>-->
+
       <template #heading>
         <h1
           class="flex-heading"
