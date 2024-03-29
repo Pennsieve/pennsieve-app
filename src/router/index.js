@@ -492,7 +492,9 @@ const router = createRouter({
                   path: 'details/:modelId',
                   name: 'model-details',
                   props: true,
-                  meta: { backLink: {name: "Models", to: "models-list"}},
+                  meta: {
+                    backLink: {name: "Models", to: "models-list"}
+                  },
                   components: {
                     stage: ModelInstance
                   }
