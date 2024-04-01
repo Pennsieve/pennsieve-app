@@ -24,7 +24,7 @@ let route = useRoute();
             :height="10"
             :width="10"
           />
-          Back to {{ this.linkBack.name }}
+          Back to {{ linkBack.name }}
         </a>
       </template>
 

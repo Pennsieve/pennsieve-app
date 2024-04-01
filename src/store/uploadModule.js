@@ -8,7 +8,7 @@ import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
 
 
-import {v1 as uuidv1} from "uuid";
+import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
 
@@ -381,7 +381,7 @@ export const actions = {
         let total = 0
         for (let mf in state.manifestFiles) {
 
-            const uploadId = uuidv1()
+            const uploadId = uuidv4()
             const s3Key = state.manifestNodeId + '/' + uploadId
 
             const curFile = state.manifestFiles[mf]
