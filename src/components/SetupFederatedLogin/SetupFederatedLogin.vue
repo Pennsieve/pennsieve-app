@@ -200,13 +200,13 @@
       <h2 class="sharp-sans">
         Let's finalize ORCID iD integration.
       </h2>
-      <p>Clicking <strong>Finalize Integration</strong> initiates a process that allows the Pennsieve platform to access your ORCID record.</p
-      <p>A pop-up window will appear asking you to grant access to read and write to your ORCID record.<p>
+      <p>Clicking <strong>Finalize Integration</strong> initiates a process that allows the Pennsieve platform to access your ORCID record.</p>
+      <p>A pop-up window will appear asking you to grant access to read and write to your ORCID record.</p>
       <p>
-      <ul>
-      <li>Granting read access permits the Pennsieve platform to retrieve information from your ORCID record: ORCID iD, email address, and your name.</li>
-      <li>Granting write access permits the Pennsieve platform to send dataset publication details to ORCID.</li>
-      </ul>
+        <ul>
+          <li>Granting read access permits the Pennsieve platform to retrieve information from your ORCID record: ORCID iD, email address, and your name.</li>
+          <li>Granting write access permits the Pennsieve platform to send dataset publication details to ORCID.</li>
+        </ul>
       </p>
       <bf-button
         class="completeLogin"
