@@ -742,7 +742,7 @@ const router = createRouter({
         },
         {
           name: 'federated-sign-up',
-          path: 'federated-sign-up',
+          path: ':orgId/welcome/federated-sign-up',
           components: {
             stage: SetupFederatedLogin
           }
