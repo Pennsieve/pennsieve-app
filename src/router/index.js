@@ -60,6 +60,7 @@ const PublishingProposalsList = () => import ('../components/Publishing/Publishi
  */
 const Invite = () => import('./Invite/Invite.vue')
 const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
+const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/SetupFederatedLogin.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 const PennsieveInfo = () => import('../components/welcome/Info.vue')
 
@@ -737,6 +738,13 @@ const router = createRouter({
           path: 'accept/:username/:password',
           components: {
             stage: SetupProfile
+          }
+        },
+        {
+          name: 'federated-sign-up',
+          path: 'federated-sign-up',
+          components: {
+            stage: SetupFederatedLogin
           }
         },
         {
