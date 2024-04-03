@@ -64,10 +64,9 @@ app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
-// Enabling this will log debug messages to the console.
-// app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
-//     cluster: siteConfig.pusherConfig.region
-// });
+app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
+    cluster: siteConfig.pusherConfig.region
+});
 
 const sessionRefreshThreshold = 300;
 
