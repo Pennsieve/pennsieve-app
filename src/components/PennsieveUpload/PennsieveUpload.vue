@@ -87,7 +87,7 @@ User archives manifest -> remove activeManifest from memory
         ref="inputFile"
         class="visuallyhidden"
         type="file"
-        multiple="multiple"
+        @change="modifyManifestFiles"
       >
 
       <div
@@ -137,7 +137,6 @@ import { useStore } from 'vuex'
 import BfButton from '../shared/bf-button/BfButton.vue';
 import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
 import {FileRejectReason, useDropzone} from "vue3-dropzone";
-import {pathOr} from "ramda";
 import PsUploadFile from './PsUploadFile.vue'
 import PsManifestFile from "./PsManifestFile.vue";
 import IconPDF from "../icons/IconPDF.vue";
@@ -191,6 +190,10 @@ function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
   store.dispatch('uploadModule/addManifestFiles', acceptedFiles)
 }
 
+function modifyManifestFiles() {
+  store.dispatch('uploadModule/addManifestFiles', inputFile.value?.files)
+}
+
 function startUpload() {
   store.dispatch('uploadModule/getManifestNodeId').then(
     () => store.dispatch('uploadModule/syncManifest')
@@ -205,8 +208,9 @@ function onClose() {
   emit('update:dialogVisible', false)
 }
 
+let inputFile = ref<HTMLInputElement | null>(null)
 function triggerInputFile() {
-  this.$refs.inputFile.click()
+  inputFile.value?.click();
 }
 
 let isInDropZone = ref(false)
