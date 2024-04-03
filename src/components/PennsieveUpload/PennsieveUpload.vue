@@ -143,6 +143,7 @@ import IconPDF from "../icons/IconPDF.vue";
 import IconTimeseries from "../icons/IconTimeseries.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import { fileIcon } from '../../mixins/file-icon/file-icon.js';
+import { fromEvent } from 'file-selector';
 
 
 const store = useStore()
@@ -190,8 +191,9 @@ function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
   store.dispatch('uploadModule/addManifestFiles', acceptedFiles)
 }
 
-function modifyManifestFiles() {
-  store.dispatch('uploadModule/addManifestFiles', inputFile.value?.files)
+async function modifyManifestFiles(evt) {
+  let filesWithPath = await fromEvent(evt);
+  store.dispatch('uploadModule/addManifestFiles', filesWithPath)
 }
 
 function startUpload() {
