@@ -1,15 +1,17 @@
 <template>
   <el-dialog
-    :visible="visible"
+  :modelValue="visible"
     :show-close="false"
     @close="close"
     @closed="resetDialog"
+
+    module
   >
+  <template #header>
     <bf-dialog-header
-      slot="title"
       title="Describe the Reason for Rejection"
     />
-
+  </template>
     <dialog-body>
       <p>
         Please provide a reason for rejection of the publishing request. This will be included in the email that will be send to all collaborators on the dataset.
@@ -27,8 +29,7 @@
 
     </dialog-body>
 
-    <div
-      slot="footer"
+    <template #footer
       class="dialog-footer"
     >
       <bf-button
@@ -44,7 +45,7 @@
       >
         Reject
       </bf-button>
-    </div>
+    </template>
   </el-dialog>
 </template>
 
@@ -115,7 +116,7 @@ export default {
      * Emit event to update the synced property
      */
     close: function() {
-      this.$emit('update:visible', false)
+      this.$emit('close-reject-dialog', false)
     },
     resetDialog: function() {
       this.rejectRationale=""
@@ -131,7 +132,7 @@ export default {
 }
 </script>
 
-<style scoped>
+<style >
 .el-select,
 .el-date-editor {
   width: 100%;
