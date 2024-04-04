@@ -1,20 +1,19 @@
 <template>
   <el-dialog
-  :modelValue="visible"
+    :modelValue="visible"
     :show-close="false"
     @close="close"
     @closed="resetDialog"
-
     module
   >
-  <template #header>
-    <bf-dialog-header
-      title="Describe the Reason for Rejection"
-    />
-  </template>
+    <template #header>
+      <bf-dialog-header title="Describe the Reason for Rejection" />
+    </template>
     <dialog-body>
       <p>
-        Please provide a reason for rejection of the publishing request. This will be included in the email that will be send to all collaborators on the dataset.
+        Please provide a reason for rejection of the publishing request. This
+        will be included in the email that will be send to all collaborators on
+        the dataset.
       </p>
 
       <div class="input-area">
@@ -26,18 +25,10 @@
           show-word-limit
         />
       </div>
-
     </dialog-body>
 
-    <template #footer
-      class="dialog-footer"
-    >
-      <bf-button
-        class="secondary"
-        @click="close"
-      >
-        Cancel
-      </bf-button>
+    <template #footer class="dialog-footer">
+      <bf-button class="secondary" @click="close"> Cancel </bf-button>
       <bf-button
         processing-text="Submitting"
         :processing="isSubmitting"
@@ -50,40 +41,39 @@
 </template>
 
 <script>
-import { mapActions, mapState } from 'vuex'
+import { mapActions, mapState } from "vuex";
 
-import moment from 'moment'
+import moment from "moment";
 
-import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
-import Request from '@/mixins/request/index'
-import { PublicationStatus } from '@/utils/constants'
-import EventBus from '@/utils/event-bus'
-
+import Request from "@/mixins/request/index";
+import { PublicationStatus } from "@/utils/constants";
+import EventBus from "@/utils/event-bus";
 
 export default {
-  name: 'RejectRequestDialog',
+  name: "RejectRequestDialog",
 
   components: {
     BfDialogHeader,
     DialogBody,
-    BfButton
+    BfButton,
   },
 
   props: {
     visible: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
 
-  data: function() {
+  data: function () {
     return {
       isSubmitting: false,
-      rejectRationale: ""
-    }
+      rejectRationale: "",
+    };
   },
 
   watch: {
@@ -91,9 +81,9 @@ export default {
      * Watches visible value
      * @param {Boolean} visible
      */
-    visible: function(visible) {
+    visible: function (visible) {
       if (visible) {
-        this.rejectRationale = ''
+        this.rejectRationale = "";
       }
     },
 
@@ -115,24 +105,24 @@ export default {
     /**
      * Emit event to update the synced property
      */
-    close: function() {
-      this.$emit('close-reject-dialog', false)
+    close: function () {
+      this.$emit("close-reject-dialog", false);
     },
-    resetDialog: function() {
-      this.rejectRationale=""
+    resetDialog: function () {
+      this.rejectRationale = "";
     },
 
     /**
      * Reset values of the dialog
      */
-    rejectRequest: function() {
-      this.$emit('rejectRequest', this.rejectRationale)
-    }
-  }
-}
+    rejectRequest: function () {
+      this.$emit("rejectRequest", this.rejectRationale);
+    },
+  },
+};
 </script>
 
-<style >
+<style>
 .el-select,
 .el-date-editor {
   width: 100%;
@@ -145,6 +135,6 @@ export default {
 }
 
 .input-area {
-  margin-top:24px
+  margin-top: 24px;
 }
 </style>
