@@ -188,6 +188,7 @@
     <reject-request-dialog
       :visible.sync="isRejectRequestDialogVisible"
       @rejectRequest="rejectPublishingRequest"
+      @close-reject-dialog="isRejectRequestDialogVisible=false"
     />
   </div>
 </template>

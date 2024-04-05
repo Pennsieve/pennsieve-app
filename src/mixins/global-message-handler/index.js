@@ -261,12 +261,13 @@ export default {
      * Sequence of Xhr calls to get data for org-level. These data should always be present
      * in workspace.
      */
-    getPrimaryData: function() {
+    getPrimaryData: async function() {
+      const teamsPromise = await this.getTeams()
       const membersPromise = this.getOrgMembers()
       const publisherPromise = this.getPublishers()
       const orgContributorsPromise = this.getOrgContributors()
       const dataUseAgreementPromise = this.getDataUseAgreements()
-      const teamsPromise = this.getTeams()
+
 
       return Promise.all([membersPromise,
         publisherPromise,
