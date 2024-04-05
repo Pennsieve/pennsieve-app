@@ -137,7 +137,6 @@ import IconPDF from "../icons/IconPDF.vue";
 import IconTimeseries from "../icons/IconTimeseries.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import { fileIcon } from '../../mixins/file-icon/file-icon.js';
-import { fromEvent } from 'file-selector';
 
 
 const store = useStore()
