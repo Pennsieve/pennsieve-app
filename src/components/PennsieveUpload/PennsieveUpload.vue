@@ -77,20 +77,12 @@ User archives manifest -> remove activeManifest from memory
             Drag and drop files here or
             <a
               href="#"
-              @click.prevent.stop="triggerInputFile"
             >
               choose your files
             </a>.
           </h3>
         </div>
       </div>
-
-      <input
-        ref="inputFile"
-        class="visuallyhidden"
-        type="file"
-        @change="modifyManifestFiles"
-      >
 
       <div
         v-if="isUploading || uploadComplete">
@@ -193,11 +185,6 @@ function onDrop(acceptedFiles: File[]) {
   store.dispatch('uploadModule/addManifestFiles', acceptedFiles)
 }
 
-async function modifyManifestFiles(evt) {
-  let filesWithPath = await fromEvent(evt);
-  store.dispatch('uploadModule/addManifestFiles', filesWithPath)
-}
-
 function startUpload() {
   store.dispatch('uploadModule/getManifestNodeId').then(
     () => store.dispatch('uploadModule/syncManifest')
@@ -210,11 +197,6 @@ function startUpload() {
 
 function onClose() {
   emit('update:dialogVisible', false)
-}
-
-let inputFile = ref<HTMLInputElement | null>(null)
-function triggerInputFile() {
-  inputFile.value?.click();
 }
 
 let isInDropZone = ref(false)
