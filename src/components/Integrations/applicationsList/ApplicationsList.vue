@@ -337,7 +337,7 @@ export default {
             key: response.tokenSecret.key,
             secret: response.tokenSecret.secret
           }
-          this.APIKeyDetailsVisisble = true
+          this.APIKeyDetailsVisible = true
         }
       )
     },
