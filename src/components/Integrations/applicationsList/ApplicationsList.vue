@@ -198,7 +198,7 @@ export default {
     ]),
 
     onApiKeyCloseDialog: function() {
-      this.APIKeyDetailsVisisble = false
+      this.APIKeyDetailsVisible = false
     },
     onRemoveIntegrationCloseDialog: function() {
       this.removeIntegrationDialogVisible = false
