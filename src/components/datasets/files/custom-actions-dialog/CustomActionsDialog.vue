@@ -7,11 +7,11 @@
     @close="closeDialog"
   >
     <template #header>
-      <bf-dialog-header title="Custom Actions" slot="title" />
+      <bf-dialog-header title="Execute Application" slot="title" />
     </template>
     <dialog-body>
       <div class="flex">
-        <h2>Run the Custom Event on {{ totalFiles }} {{ headline }}</h2>
+        <h2>Execute on {{ totalFiles }} {{ headline }}</h2>
         <el-select
           v-model="value"
           placeholder="Select Application"
@@ -46,7 +46,7 @@
         @click="runCustomEvent"
         :disabled="false"
       >
-        Run Event
+        Execute
       </bf-button>
       <bf-button
         v-if="!isLoading"
@@ -54,7 +54,7 @@
         @click="runCustomEvent"
         :disabled="false"
       >
-        Run Event
+        Execute
       </bf-button>
     </template>
   </el-dialog>
