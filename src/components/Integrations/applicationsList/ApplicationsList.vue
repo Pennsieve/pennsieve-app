@@ -198,7 +198,7 @@ export default {
     ]),
 
     onApiKeyCloseDialog: function() {
-      this.APIKeyDetailsVisisble = false
+      this.APIKeyDetailsVisible = false
     },
     onRemoveIntegrationCloseDialog: function() {
       this.removeIntegrationDialogVisible = false
@@ -337,7 +337,7 @@ export default {
             key: response.tokenSecret.key,
             secret: response.tokenSecret.secret
           }
-          this.APIKeyDetailsVisisble = true
+          this.APIKeyDetailsVisible = true
         }
       )
     },
