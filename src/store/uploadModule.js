@@ -201,6 +201,7 @@ export const actions = {
     // Remove file from manifest
     removeFromManifest: async({state, commit}, files) => {
         for (let i in files) {
+            console.log('files[i]', files[i])
             commit('REMOVE_FILE_FROM_MANIFEST', files[i])
         }
     },
@@ -244,6 +245,7 @@ export const actions = {
                 return path.slice(1) + '/' + pkg.content.name
 
             } else {
+                
                 return pkg.content.name
             }
 
