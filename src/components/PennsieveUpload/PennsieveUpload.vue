@@ -24,7 +24,6 @@ User archives manifest -> remove activeManifest from memory
   <div class="bf-upload">
     <el-dialog
       :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
       :show-close="true"
       :close-on-click-modal="false"
       @close="onClose"
