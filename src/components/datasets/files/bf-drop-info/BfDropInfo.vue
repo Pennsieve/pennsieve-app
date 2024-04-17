@@ -57,7 +57,6 @@ function onDragLeave() {
 function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
   emit("update:showDropInfo", false);
   const destinationId = pathOr("", ["file", "content", "id"], props);
-  console.log("props.file in OnDrop from BfDropInfo.vue", props.file);
   store.dispatch("uploadModule/setUploadDestination", props.file);
 
   EventBus.$emit("add-to-upload-queue", acceptedFiles);
