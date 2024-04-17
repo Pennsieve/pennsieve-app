@@ -185,10 +185,6 @@ export const actions = {
 
     // Add files to manifest
     addManifestFiles: async ({state, commit}, files, path) => {
-        for (let i in files) {
-            console.log(files[i])
-            commit('SET_UPLOAD_DESTINATION', files[i])
-        }
         if (state.isUploading) {
             const errMsg = "Cannot add files while upload is in progress."
             Promise.reject(new Error(errMsg)).then(resolved, rejected);
@@ -201,7 +197,6 @@ export const actions = {
     // Remove file from manifest
     removeFromManifest: async({state, commit}, files) => {
         for (let i in files) {
-            console.log('files[i]', files[i])
             commit('REMOVE_FILE_FROM_MANIFEST', files[i])
         }
     },
@@ -209,8 +204,6 @@ export const actions = {
     // Define the packageId where files should be uploaded
     // This can be a folder-package-id or a dataset-package-id
     setUploadDestination: async ({rootState, commit}, targetPackage) => {
-        console.log('i ran')
-
         // check that target location is foler
         if (!(targetPackage.content.packageType === 'Collection' || targetPackage.content.packageType === 'DataSet')) {
             const errMsg = 'Error: Trying to set target folder to a non-folder type package'
