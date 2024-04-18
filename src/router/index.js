@@ -101,6 +101,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 const Integrations = () => import('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
+const AccountsList = () => import('../components/Integrations/accountsList/AccountsList.vue')
 
 
 /**
@@ -702,6 +703,14 @@ const router = createRouter({
           path: 'webhooks',
           components: {
             stage: IntegrationsList,
+          },
+          props: true
+        },
+        {
+          name: 'accounts',
+          path: 'accounts',
+          components: {
+            stage: AccountsList,
           },
           props: true
         },
