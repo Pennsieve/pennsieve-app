@@ -1,10 +1,7 @@
 <template>
   <transition name="dialog-fade">
     <div class="bf-upload-info">
-      <div
-        v-if="getIsUploading"
-        class="copy"
-      >
+      <div v-if="getIsUploading" class="copy">
         <strong> {{ uploadCopy }}</strong>
 
         <bf-progress-bar
@@ -12,19 +9,11 @@
           :total="getUploadProgress().total"
         />
       </div>
-      <div
-        v-else
-        class="copy"
-      >
+      <div v-else class="copy">
         {{ uploadCopy }}
       </div>
       <div class="upload-details">
-        <button
-          class="show-details"
-          @click="showUpload"
-        >
-          Show details
-        </button>
+        <button class="show-details" @click="showUpload">Show details</button>
         <div v-if="getIsUploading">
           <strong>{{ loadedStr }}</strong>
           of {{ totalStr }}
@@ -35,54 +24,51 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from 'vuex'
-import { propOr } from 'ramda'
-import BfProgressBar from '../../../shared/bf-progress-bar/bf-progress-bar.vue'
-import BfStorageMetrics from '../../../../mixins/bf-storage-metrics'
-import EventBus from '../../../../utils/event-bus'
+import { mapGetters, mapState } from "vuex";
+import { propOr } from "ramda";
+import BfProgressBar from "../../../shared/bf-progress-bar/bf-progress-bar.vue";
+import BfStorageMetrics from "../../../../mixins/bf-storage-metrics";
+import EventBus from "../../../../utils/event-bus";
 
 export default {
-  name: 'BfUploadInfo',
+  name: "BfUploadInfo",
 
   components: {
-    BfProgressBar
+    BfProgressBar,
   },
 
   mixins: [BfStorageMetrics],
 
   data() {
-    return {
-    }
+    return {};
   },
 
   computed: {
-
-    ...mapGetters('uploadModule',[
-      'getUploadProgress',
-      'getIsUploading',
-      'getUploadMap',
-      'getUploadComplete'
+    ...mapGetters("uploadModule", [
+      "getUploadProgress",
+      "getIsUploading",
+      "getUploadMap",
+      "getUploadComplete",
     ]),
 
     /**
      * Compute copy based on how many files are being uploaded
      * @returns {String}
      */
-    uploadCopy: function() {
+    uploadCopy: function () {
       if (this.getUploadComplete()) {
-        return 'All Files have finished uploading.'
+        return "";
       }
-      const file = this.getUploadMap().size > 1 ? 'files' : 'file'
-      return `Uploading ${this.getUploadMap().size} ${file}`
+      const file = this.getUploadMap().size > 1 ? "files" : "file";
+      return `Uploading ${this.getUploadMap().size} ${file}`;
     },
 
-
-    loadedStr: function() {
-      return this.formatMetric(this.getUploadProgress().loaded)
+    loadedStr: function () {
+      return this.formatMetric(this.getUploadProgress().loaded);
     },
-    totalStr: function() {
-      return this.formatMetric(this.getUploadProgress().total)
-    }
+    totalStr: function () {
+      return this.formatMetric(this.getUploadProgress().total);
+    },
   },
 
   methods: {
@@ -90,24 +76,23 @@ export default {
      * Show uploader
      * @returns {String}
      */
-    showUpload: function() {
-      EventBus.$emit('open-uploader', false)
+    showUpload: function () {
+      EventBus.$emit("open-uploader", false);
     },
 
     /**
      * Dismiss status bar and clear uploaded files in bf-upload
      */
-    onDismiss: function() {
-      EventBus.$emit('dismiss-upload-info')
-      EventBus.$emit('close-uploader')
+    onDismiss: function () {
+      EventBus.$emit("dismiss-upload-info");
+      EventBus.$emit("close-uploader");
     },
-
-  }
-}
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@import "../../../../assets/_variables.scss";
 
 .bf-upload-info {
   background: $gray_1;

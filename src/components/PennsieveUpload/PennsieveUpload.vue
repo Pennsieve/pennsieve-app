@@ -21,216 +21,185 @@ User archives manifest -> remove activeManifest from memory
 
 -->
 <template>
-  <div
-    class="bf-upload"
-  >
+  <div class="bf-upload">
     <el-dialog
       :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
       :show-close="true"
       :close-on-click-modal="false"
       @close="onClose"
     >
       <template #header>
-        <bf-dialog-header
-          :title="dialogTitle"
-        />
-
+        <bf-dialog-header :title="dialogTitle" />
       </template>
 
-      <p class="upload-text"><b>Note:</b> Files can take up to a minute of processing after upload completes. You can check import status of files in the
-        <router-link :to="{ name: 'upload-manifests'}"
-        @click.native="onClose"> upload manifest tracker.</router-link></p>
+      <p class="upload-text">
+        <b>Note:</b> Files can take up to a minute of processing after upload
+        completes. You can check import status of files in the
+        <!-- Can remove the native event modifier on the click event below, all native events to custom elements are now captured by default. 
+        This is deprecated since Vue3 and can be removed. -->
+        <router-link :to="{ name: 'upload-manifests' }" @click.native="onClose">
+          upload manifest tracker.</router-link
+        >
+      </p>
 
-      <div class="clear-action-wrapper"> <div class="clear-action" @click="clearQueue">Clear</div> </div>
+      <div class="clear-action-wrapper">
+        <div class="clear-action" @click="clearQueue">Clear</div>
+      </div>
 
       <div v-if="!isUploading" v-bind="getRootProps()">
-
-        <input v-bind="getInputProps()">
+        <input v-bind="getInputProps()" />
         <div
-          :class="[ isInDropZone ? 'bf-drop-info-content hover condensed' : 'bf-drop-info-content condensed' ]"
+          :class="[
+            isInDropZone
+              ? 'bf-drop-info-content hover condensed'
+              : 'bf-drop-info-content condensed',
+          ]"
           @dragenter.self="onDragEnter"
           @dragover.prevent="onDragEnter"
           @dragleave.self="onDragLeave"
         >
           <div class="upload-icons-wrap">
-            <IconPDF class="file-icon"/>
+            <IconPDF class="file-icon" />
             <img
               class="file-icon"
-
               :src="fileIcon('Image', 'Image')"
               alt="Image Icon"
-            >
-            <IconUpload class="file-icon upload"/>
-            <IconTimeseries class="file-icon time-series"/>
+            />
+            <IconUpload class="file-icon upload" />
+            <IconTimeseries class="file-icon time-series" />
 
             <img
               class="file-icon microscope"
               :src="fileIcon('Microscope', 'Slide')"
               alt="Microscopy Icon"
-            >
-
+            />
           </div>
           <h3>
             Drag and drop files here or
-            <a
-              href="#"
-              @click.prevent="triggerInputFile"
-            >
-              choose your files
-            </a>.
+            <a href="#"> choose your files </a>.
           </h3>
         </div>
       </div>
 
-      <input
-        ref="inputFile"
-        class="visuallyhidden"
-        type="file"
-        multiple="multiple"
-      >
-
-      <div
-        v-if="isUploading || uploadComplete">
+      <div v-if="isUploading || uploadComplete">
         <div
-          v-for="[key, value] in uploadMap" :key="key" class="manifest-file-wrapper">
-          <PsUploadFile :upload-object="value"/>
-
+          v-for="[key, value] in uploadMap"
+          :key="key"
+          class="manifest-file-wrapper"
+        >
+          <PsUploadFile :upload-object="value" />
         </div>
       </div>
       <div v-else>
         <div v-for="item in uploadFiles" class="manifest-file-wrapper">
-
-          <PsManifestFile :file="item"/>
-
+          <PsManifestFile :file="item" />
         </div>
       </div>
 
-
       <template #footer>
-        <bf-button
-          class="secondary"
-          @click="cancelQueue"
-        >
-          {{cancelBtnText}}
+        <bf-button class="secondary" @click="cancelQueue">
+          {{ cancelBtnText }}
         </bf-button>
-        <bf-button
-          @click="startUpload"
-        >
-          Start Upload
-        </bf-button>
-
+        <bf-button @click="startUpload"> Start Upload </bf-button>
       </template>
-
-
     </el-dialog>
-
   </div>
-
-
 </template>
 
-<script lang=ts setup>
-
-import {reactive, computed, ref} from 'vue'
-import { useStore } from 'vuex'
-import BfButton from '../shared/bf-button/BfButton.vue';
+<script lang="ts" setup>
+import { reactive, computed, ref } from "vue";
+import { useStore } from "vuex";
+import BfButton from "../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
-import {FileRejectReason, useDropzone} from "vue3-dropzone";
-import {pathOr} from "ramda";
-import PsUploadFile from './PsUploadFile.vue'
+import { FileRejectReason, useDropzone } from "vue3-dropzone";
+import PsUploadFile from "./PsUploadFile.vue";
 import PsManifestFile from "./PsManifestFile.vue";
 import IconPDF from "../icons/IconPDF.vue";
 import IconTimeseries from "../icons/IconTimeseries.vue";
 import IconUpload from "../icons/IconUpload.vue";
-import { fileIcon } from '../../mixins/file-icon/file-icon.js';
+import { fileIcon } from "../../mixins/file-icon/file-icon.js";
 
-
-const store = useStore()
+const store = useStore();
 
 defineExpose({
-  onDrop
-})
+  onDrop,
+});
 
-const emit = defineEmits([
-  'update:dialogVisible'
-])
+const emit = defineEmits(["update:dialogVisible"]);
 
 const props = defineProps({
   file: Object,
-  dialogVisible: Boolean
-})
+  dialogVisible: Boolean,
+});
 
-const uploadFiles = computed(() => store.getters['uploadModule/getManifestFiles']())
-const uploadMap = computed( () => store.getters['uploadModule/getUploadMap']())
-const isUploading = computed( () => store.getters['uploadModule/getIsUploading']())
-const uploadComplete = computed( () => store.getters['uploadModule/getUploadComplete']())
-const cancelBtnText = computed(() => isUploading.value?  "Hide" : "Reset" )
-const dialogTitle = computed( () => {
-  return 'Add Files to Upload'
-})
+const uploadFiles = computed(() =>
+  store.getters["uploadModule/getManifestFiles"]()
+);
+const uploadMap = computed(() => store.getters["uploadModule/getUploadMap"]());
+const isUploading = computed(() =>
+  store.getters["uploadModule/getIsUploading"]()
+);
+const uploadComplete = computed(() =>
+  store.getters["uploadModule/getUploadComplete"]()
+);
+const cancelBtnText = computed(() => (isUploading.value ? "Hide" : "Reset"));
+const dialogTitle = computed(() => {
+  return "Add Files to Upload";
+});
 
 function hasItems(list) {
-  return list && list.length > 0
+  return list && list.length > 0;
 }
 
 function clearQueue() {
-  store.dispatch('uploadModule/resetUpload')
+  store.dispatch("uploadModule/resetUpload");
 }
 
 function cancelQueue() {
   if (isUploading.value) {
-    onClose()
+    onClose();
   } else {
-    store.dispatch('uploadModule/resetUpload')
+    store.dispatch("uploadModule/resetUpload");
   }
 }
 
-function onDrop(acceptedFiles: File[], rejectReasons: FileRejectReason[]) {
-  isInDropZone.value = false
-  store.dispatch('uploadModule/addManifestFiles', acceptedFiles)
+function onDrop(acceptedFiles: File[]) {
+  isInDropZone.value = false;
+  store.dispatch("uploadModule/addManifestFiles", acceptedFiles);
 }
 
 function startUpload() {
-  store.dispatch('uploadModule/getManifestNodeId').then(
-    () => store.dispatch('uploadModule/syncManifest')
-  ).then(
-    () => store.dispatch('uploadModule/UploadFiles')
-  )
+  store
+    .dispatch("uploadModule/getManifestNodeId")
+    .then(() => store.dispatch("uploadModule/syncManifest"))
+    .then(() => store.dispatch("uploadModule/UploadFiles"));
 
-  onClose()
+  onClose();
 }
 
 function onClose() {
-  emit('update:dialogVisible', false)
+  emit("update:dialogVisible", false);
 }
 
-function triggerInputFile() {
-  this.$refs.inputFile.click()
+let isInDropZone = ref(false);
+function onDragEnter() {
+  isInDropZone.value = true;
 }
-
-let isInDropZone = ref(false)
-function onDragEnter() {isInDropZone.value = true}
-function onDragLeave() { isInDropZone.value = false}
-
+function onDragLeave() {
+  isInDropZone.value = false;
+}
 
 const options = reactive({
   multiple: true,
   onDrop,
-})
+});
 
-const {
-  getRootProps,
-  getInputProps,
-  isFocused,
-  isDragReject,
-  open
-} = useDropzone(options)
-
+const { getRootProps, getInputProps, isFocused, isDragReject, open } =
+  useDropzone(options);
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 .clear-action-wrapper {
   display: flex;
@@ -251,10 +220,10 @@ const {
 .file-icon {
   width: 24px;
   height: 24px;
-  color:red;
+  color: red;
 
   &.microscope {
-    color: $purple_2
+    color: $purple_2;
   }
 
   &.time-series {
@@ -262,7 +231,7 @@ const {
   }
 
   &.upload {
-    color: $purple_2
+    color: $purple_2;
   }
 }
 
@@ -276,91 +245,88 @@ const {
 }
 
 .bf-drop-info-content {
-    align-items: center;
-    border-style: dashed;
-    border-color: red;
-    border-image-source: url('/src/assets/images/dotted-border.svg');
-    border-image-slice: 8%;
-    border-image-repeat: repeat;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    justify-content: center;
-    padding: 20px;
-    position: relative;
-    text-align: center;
+  align-items: center;
+  border-style: dashed;
+  border-color: red;
+  border-image-source: url("/src/assets/images/dotted-border.svg");
+  border-image-slice: 8%;
+  border-image-repeat: repeat;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  text-align: center;
 
-    &.hover {
-      border: 2px solid $green_1;
+  &.hover {
+    border: 2px solid $green_1;
+  }
+
+  //&:after {
+  //  border: 4px solid $green_2;
+  //
+  //  content: '';
+  //  height: calc(100% - 4px);
+  //  left: -2px;
+  //  pointer-events: none;
+  //  position: absolute;
+  //  opacity: 0;
+  //  transition: opacity .2s ease-out;
+  //  top: -2px;
+  //  width: calc(100% - 4px);
+  //}
+  //&.is-dragging {
+  //  .icon-upload-extra {
+  //    opacity: 1;
+  //    transform: translateX(0);
+  //    &.outside {
+  //      transition-delay: .1s;
+  //      transition-duration: .3s
+  //    }
+  //  }
+  //}
+  //&.is-dragging:after {
+  //  opacity: 1;
+  //}
+  &.condensed {
+    color: $gray_4;
+    flex: none;
+    padding: 13px;
+    margin-bottom: 10px;
+
+    .dropzone-content {
+      align-items: center;
+      display: flex;
+      flex-direction: row;
     }
 
-    //&:after {
-    //  border: 4px solid $green_2;
-    //
-    //  content: '';
-    //  height: calc(100% - 4px);
-    //  left: -2px;
-    //  pointer-events: none;
-    //  position: absolute;
-    //  opacity: 0;
-    //  transition: opacity .2s ease-out;
-    //  top: -2px;
-    //  width: calc(100% - 4px);
-    //}
-    //&.is-dragging {
-    //  .icon-upload-extra {
-    //    opacity: 1;
-    //    transform: translateX(0);
-    //    &.outside {
-    //      transition-delay: .1s;
-    //      transition-duration: .3s
-    //    }
-    //  }
-    //}
-    //&.is-dragging:after {
-    //  opacity: 1;
-    //}
-    &.condensed {
-      color: $gray_4;
-      flex: none;
-      padding: 13px;
-      margin-bottom: 10px;
+    h3 {
+      margin: 0;
+      font-weight: 300;
 
-
-
-      .dropzone-content {
-        align-items: center;
-        display: flex;
-        flex-direction: row;
-
-      }
-
-      h3 {
-        margin: 0;
-        font-weight: 300;
-
-        a {
-          color: $purple_2;
-          text-decoration: underline;
-          cursor: pointer;
-        }
-      }
-
-      .icon-upload {
-        display: inline-flex;
-        height: 20px;
-        margin: 0 5px 0 0;
-        width: 20px;
-      }
-
-      .icon-upload-extra {
-        display: none;
-      }
-
-      .upload-icons-wrap {
-        margin: 0;
+      a {
+        color: $purple_2;
+        text-decoration: underline;
+        cursor: pointer;
       }
     }
+
+    .icon-upload {
+      display: inline-flex;
+      height: 20px;
+      margin: 0 5px 0 0;
+      width: 20px;
+    }
+
+    .icon-upload-extra {
+      display: none;
+    }
+
+    .upload-icons-wrap {
+      margin: 0;
+    }
+  }
 }
 
 .bf-upload .bf-dialog .bf-dialog-wrap {

@@ -237,7 +237,7 @@ export default {
       moveDialogVisible: false,
       selectedFileForAction: {},
       pusherChannelName: "",
-      pusherChannel: {}
+      pusherChannel: {},
     };
   },
 
@@ -254,7 +254,7 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters('datasetModule', ["getPusherChannel"]),
+    ...mapGetters("datasetModule", ["getPusherChannel"]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -332,7 +332,6 @@ export default {
     },
     getPusherChannel: {
       handler(channel) {
-
         function isEmpty(obj) {
           for (const prop in obj) {
             if (Object.hasOwn(obj, prop)) {
@@ -343,24 +342,29 @@ export default {
         }
 
         if (!isEmpty(channel)) {
-          channel.bind('upload-event', function(data) {
-
-            let curFolderId = this.file.content.intId
-            for (let x in data) {
-              this.updateFileStatus({key: data[x].upload_id.String, status: "complete"})
-            }
-
-            for (let x in data) {
-              if (data[x].parent_id.Int64 = curFolderId){
-                this.fetchFiles()
-                break
+          channel.bind(
+            "upload-event",
+            function (data) {
+              let curFolderId = this.file.content.intId;
+              for (let x in data) {
+                this.updateFileStatus({
+                  key: data[x].upload_id.String,
+                  status: "complete",
+                });
               }
-            }
-          }.bind(this))
+
+              for (let x in data) {
+                if ((data[x].parent_id.Int64 = curFolderId)) {
+                  this.fetchFiles();
+                  break;
+                }
+              }
+            }.bind(this)
+          );
         }
       },
-      immediate: true
-    }
+      immediate: true,
+    },
   },
 
   mounted: function () {
@@ -388,12 +392,11 @@ export default {
     EventBus.$on("refreshAfterRestore", () => {
       this.fetchFiles();
     });
-
   },
 
   beforeUnmount() {
-    const pusherCh = this.getPusherChannel
-    pusherCh.unbind('upload-event')
+    const pusherCh = this.getPusherChannel;
+    pusherCh.unbind("upload-event");
   },
   unmounted: function () {
     this.$el.removeEventListener("dragenter", this.onDragEnter.bind(this));
@@ -405,8 +408,6 @@ export default {
       this.onUpdateUploadedFileState.bind(this)
     );
     EventBus.$off("update-external-file", this.onFileRenamed);
-
-
   },
 
   /**
@@ -422,7 +423,11 @@ export default {
   },
 
   methods: {
-    ...mapActions("uploadModule", ["resetUpload","updateFileStatus"]),
+    ...mapActions("uploadModule", [
+      "resetUpload",
+      "updateFileStatus",
+      "setCurrentTargetPackage",
+    ]),
 
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function (e) {
@@ -522,6 +527,11 @@ export default {
       this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
+          // TODO: this is where I need to set currentTargetFile in the uploadModule of global state
+          this.$store.dispatch(
+            "uploadModule/setCurrentTargetPackage",
+            response
+          );
           this.file = response;
 
           const newFiles = response.children.map((file) => {
@@ -1008,26 +1018,29 @@ export default {
             },
           })
             .then((response) => {
-              copyText(pathOr("", ["url"], response),undefined, (error, event) => {
-                if (error) {
-                  const msg = "Unable to copy to clipboard";
-                  EventBus.$emit("toast", {
-                    detail: {
-                      type: "error",
-                      msg,
-                    },
-                  });
-                } else {
-                  const msg = "Temporary link to file copied to clipboard";
-                  EventBus.$emit("toast", {
-                    detail: {
-                      type: "success",
-                      msg,
-                    },
-                  });
-                }}
-                );
-
+              copyText(
+                pathOr("", ["url"], response),
+                undefined,
+                (error, event) => {
+                  if (error) {
+                    const msg = "Unable to copy to clipboard";
+                    EventBus.$emit("toast", {
+                      detail: {
+                        type: "error",
+                        msg,
+                      },
+                    });
+                  } else {
+                    const msg = "Temporary link to file copied to clipboard";
+                    EventBus.$emit("toast", {
+                      detail: {
+                        type: "success",
+                        msg,
+                      },
+                    });
+                  }
+                }
+              );
             })
 
             .catch((response) => {
