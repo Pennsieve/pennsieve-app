@@ -423,7 +423,11 @@ export default {
   },
 
   methods: {
-    ...mapActions("uploadModule", ["resetUpload", "updateFileStatus"]),
+    ...mapActions("uploadModule", [
+      "resetUpload",
+      "updateFileStatus",
+      "setCurrentTargetPackage",
+    ]),
 
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function (e) {
@@ -523,11 +527,11 @@ export default {
       this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
-          console.log(
-            "fetch files has run in BfDatasetFiles and sets this.file to the following",
+          // TODO: this is where I need to set currentTargetFile in the uploadModule of global state
+          this.$store.dispatch(
+            "uploadModule/setCurrentTargetPackage",
             response
           );
-          // TODO: this is where I need to set currentTargetFile in global state
           this.file = response;
 
           const newFiles = response.children.map((file) => {

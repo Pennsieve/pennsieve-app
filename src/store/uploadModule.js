@@ -30,12 +30,52 @@ const initialState = () => ({
     identityCreds: {},
     isUploading: false,
     uploadComplete: false,
-    uploadProgress: {total: 0, loaded:0}
+    uploadProgress: {total: 0, loaded:0},
+    currentTargetPackage: {}
 })
 
 export const state = initialState()
 
+const helpers = {
+    getFileLocation(pkg) {
+
+        // target location is '' when uploading to root folder (e.g. Dataset)
+        if (pkg.content.packageType === 'DataSet') {
+            return ''
+        }
+
+        const ancestors = pkg.ancestors
+
+        if (ancestors.length > 0) {
+            const rootNode = ''
+
+            let path = rootNode
+            if (pkg.ancestors && ancestors.length > 0) {
+                path = compose(
+                    join('/'),
+                    prepend(rootNode),
+                    map(ancestor => {
+                        return ancestor.content.name
+                    }),
+                    reverse()
+                )(ancestors)
+            }
+
+            // remove initial '/' and append target-package name
+            return path.slice(1) + '/' + pkg.content.name
+
+        } else {
+            
+            return pkg.content.name
+        }
+
+    }
+}
+
 export const mutations = {
+    SET_CURRENT_TARGET_PACKAGE(state, currentTargetPackage) {
+        state.currentTargetPackage = currentTargetPackage
+    },
     SET_COGNITO_CONFIG(state, config) {
         state.cognitoConfig = config
     },
@@ -91,6 +131,9 @@ export const mutations = {
 }
 
 export const actions = {
+    setCurrentTargetPackage: ({commit, rootState}, currentTargetPackage) => {
+        commit('SET_CURRENT_TARGET_PACKAGE', currentTargetPackage)
+    },
 
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
         try {
@@ -189,6 +232,15 @@ export const actions = {
             const errMsg = "Cannot add files while upload is in progress."
             Promise.reject(new Error(errMsg)).then(resolved, rejected);
         } else {
+
+
+
+            let uploadDestination = {
+                path: helpers.getFileLocation(state.currentTargetPackage),
+                file: files[0]
+            }
+
+            commit('SET_UPLOAD_DESTINATION', uploadDestination)
             commit('SET_UPLOAD_COMPLETE', false)
             commit('ADD_FILES_TO_MANIFEST', files)
         }
@@ -210,42 +262,8 @@ export const actions = {
             Promise.reject(new Error(errMsg)).then(resolved, rejected);
         }
 
-        const getFileLocation = (pkg) => {
-
-            // target location is '' when uploading to root folder (e.g. Dataset)
-            if (pkg.content.packageType === 'DataSet') {
-                return ''
-            }
-
-            const ancestors = pkg.ancestors
-
-            if (ancestors.length > 0) {
-                const rootNode = ''
-
-                let path = rootNode
-                if (pkg.ancestors && ancestors.length > 0) {
-                    path = compose(
-                        join('/'),
-                        prepend(rootNode),
-                        map(ancestor => {
-                            return ancestor.content.name
-                        }),
-                        reverse()
-                    )(ancestors)
-                }
-
-                // remove initial '/' and append target-package name
-                return path.slice(1) + '/' + pkg.content.name
-
-            } else {
-                
-                return pkg.content.name
-            }
-
-        }
-
         let uploadDestination = {
-            path: getFileLocation(targetPackage),
+            path: helpers.getFileLocation(targetPackage),
             file: targetPackage
         }
 
