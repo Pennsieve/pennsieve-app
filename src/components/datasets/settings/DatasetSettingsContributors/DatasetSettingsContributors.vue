@@ -90,6 +90,7 @@
         :dialog-visible="isContributorDialogVisible"
         :contributor.sync="editingContributor"
         :org-contributors="orgContributors"
+        @close-dialog = "closeContributorDialog"
         @add-contributor="createContributor"
         @edit-contributor="editContributor"
       />
@@ -356,9 +357,11 @@ export default {
 
     onEditContributorClick: function(contributor) {
       this.editingContributor = contributor
-      this.isContributorDialogVisible = true
+      this.isContributorDialogVisible = true;
     },
-
+    closeContributorDialog: function(){
+      this.isContributorDialogVisible = false;
+    },  
     /**
      * Edit contributor for dataset
      * @param {Object} contributor

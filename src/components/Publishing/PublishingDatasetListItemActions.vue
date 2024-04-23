@@ -178,9 +178,10 @@
     </template>
 
     <data-use-agreement-sign-dialog
-      :visible.sync="isDataUseAgreementSignDialogVisible"
+      :visible="isDataUseAgreementSignDialogVisible"
       :data-use-agreement="dataUseAgreement"
       :is-signing-agreement.sync="isSigningAgreement"
+      @close-dialog="closeDataUseAgreementSignDialog"
       @submit="requestAccess"
       @download="downloadAgreement"
     />
@@ -188,12 +189,13 @@
     <reject-request-dialog
       :visible.sync="isRejectRequestDialogVisible"
       @rejectRequest="rejectPublishingRequest"
-      @close-reject-dialog="isRejectRequestDialogVisible=false"
+      @close-dialog="closeRejectDialog"
     />
   </div>
 </template>
 
 <script>
+
 import { mapActions, mapGetters, mapState } from 'vuex';
 import { pathOr, propOr } from 'ramda';
 
@@ -370,7 +372,9 @@ export default {
     openRejectDialog: function() {
       this.isRejectRequestDialogVisible = true
     },
-
+    closeRejectDialog: function(){
+      this.isRejectRequestDialogVisible = false;
+    },
     /**
      * Called when user clicks on REJECT in rejectDialog
      */
@@ -499,7 +503,9 @@ export default {
       this.isSigningAgreement = false
       this.isDataUseAgreementSignDialogVisible = true
     },
-
+    closeDataUseAgreementSignDialog: function(){
+      isDataUseAgreementSignDialogVisible=false;
+    },
     /**
      * Download the agreement
      */

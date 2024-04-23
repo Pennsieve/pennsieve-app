@@ -330,7 +330,7 @@ export default {
      * Emit event to update the synced property
      */
     close: function() {
-      this.$emit('update:visible', false)
+      this.$emit('close-dialog')
     },
 
     /**
