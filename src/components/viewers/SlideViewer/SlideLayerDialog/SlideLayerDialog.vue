@@ -304,7 +304,7 @@ export default {
      */
     close: function() {
       if (this.isSubmitted) {
-        this.$emit('update:visible', false)
+        this.$emit('cancel')
         this.$emit('update:isCreating', false)
         this.$emit('update:isSubmitted', false)
         this.$emit('update:layer', {})

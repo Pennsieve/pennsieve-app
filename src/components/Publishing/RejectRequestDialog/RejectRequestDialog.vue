@@ -106,7 +106,7 @@ export default {
      * Emit event to update the synced property
      */
     close: function () {
-      this.$emit("close-reject-dialog", false);
+      this.$emit("close-dialog");
     },
     resetDialog: function () {
       this.rejectRationale = "";
