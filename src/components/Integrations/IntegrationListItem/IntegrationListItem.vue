@@ -1,35 +1,21 @@
 <template>
   <div class="integration-list-item">
-
-    <el-row
-      type="flex"
-      class="info"
-    >
-      <el-col
-        :sm="16"
-      >
-        <div class="intergration-type" >
-          {{isPrivateStr}}
+    <el-row type="flex" class="info">
+      <el-col :sm="16">
+        <div class="intergration-type">
+          {{ isPrivateStr }}
         </div>
       </el-col>
-      <el-col
-        :sm="8"
-        v-if="enableSwitch"
-        class="activeSwitch"
-      >
+      <el-col :sm="8" v-if="enableSwitch" class="activeSwitch">
         <el-switch
           v-model="isActive"
           active-color="#5039F7"
           inactive-color="#CAC5BF"
-          @change="toggleActive">
+          @change="toggleActive"
+        >
         </el-switch>
       </el-col>
-      <el-col
-        :sm="8"
-        class = "integration-menu"
-        v-else
-
-      >
+      <el-col :sm="8" class="integration-menu" v-else>
         <el-dropdown
           class="options-icon"
           trigger="click"
@@ -38,113 +24,91 @@
           @command="onIntegrationMenu"
         >
           <span class="btn-file-menu el-dropdown-link">
-            <IconMenu
-              :height="20"
-              :width="20"
-              />
+            <IconMenu :height="20" :width="20" />
           </span>
           <template #dropdown>
-            <el-dropdown-menu
-              slot="dropdown"
-              class="bf-menu"
-              :offset="9"
-            >
+            <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
               <el-dropdown-item command="openEditDialog">
                 Edit integration
               </el-dropdown-item>
-              <el-dropdown-item
-                command="openDeleteDialog"
-              >
+              <el-dropdown-item command="openDeleteDialog">
                 Remove integration
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
       </el-col>
-
     </el-row>
     <el-row>
       <div class="integration-title">
-        {{integration.displayName}}
+        {{ integration.displayName }}
       </div>
     </el-row>
     <el-row>
       <p class="integration-description">
-        {{integration.description}}
-
+        {{ integration.description }}
       </p>
     </el-row>
     <el-row class="userIcon">
-      <avatar
-        class="icon condensed"
-        :user="user"
-      />
+      <avatar class="icon condensed" :user="user" />
     </el-row>
   </div>
 </template>
 
 <script>
-
-import {
-  mapActions, mapState,
-} from 'vuex'
-import {find, propEq} from "ramda";
-import FormatDate from '../../../mixins/format-date'
-import Avatar from '../../shared/avatar/Avatar.vue'
+import { mapActions, mapState } from "vuex";
+import { find, propEq } from "ramda";
+import FormatDate from "../../../mixins/format-date";
+import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 
 export default {
-  name: 'IntegrationListItem',
+  name: "IntegrationListItem",
 
   components: {
     IconMenu,
     Avatar,
-    // PsSwitch
   },
-  mixins: [
-    FormatDate,
-  ],
+  mixins: [FormatDate],
 
   props: {
     integration: {
       type: Object,
-      default: () => ({})
+      default: () => ({}),
     },
     activeIntegrations: {
       type: Array,
-      default: () => (null)
+      default: () => null,
     },
     enableSwitch: {
       type: Boolean,
-      default: () => (false)
-    }
+      default: () => false,
+    },
   },
 
   computed: {
-    ...mapState([
-      'orgMembers','profile'
-    ]),
-    isOwner: function() {
-      return this.integration.createdBy == this.profile.intId
+    ...mapState(["orgMembers", "profile"]),
+    isOwner: function () {
+      return this.integration.createdBy == this.profile.intId;
     },
-    isPrivateStr: function() {
+    isPrivateStr: function () {
       if (this.integration.isPrivate) {
-        return "PRIVATE"
+        return "PRIVATE";
       }
-      return  "PUBLIC"
+      return "PUBLIC";
     },
-    user: function() {
-      return find(propEq('intId', this.integration.createdBy), this.orgMembers)
+    user: function () {
+      return find(propEq("intId", this.integration.createdBy), this.orgMembers);
     },
-    created: function() {
-      return this.formatDate(this.integration.createdAt)
+    created: function () {
+      return this.formatDate(this.integration.createdAt);
     },
-    userName: function() {
+    userName: function () {
       if (this.user) {
-        return this.user.firstName + " " + this.user.lastName
+        return this.user.firstName + " " + this.user.lastName;
       }
-      return ""
-    }
+      return "";
+    },
   },
 
   data: function () {
@@ -152,54 +116,58 @@ export default {
       isActive: false,
       integrationEdit: {
         type: Object,
-        default: function(){
-          return {}
-        }
+        default: function () {
+          return {};
+        },
       },
-    }
+    };
   },
   mounted() {
     this.$nextTick(function () {
-      if (this.enableSwitch){
-        this.isActive = find(propEq('webhookId', this.integration.id), this.activeIntegrations) != null
+      if (this.enableSwitch) {
+        this.isActive =
+          find(
+            propEq("webhookId", this.integration.id),
+            this.activeIntegrations
+          ) != null;
       }
-    })
+    });
   },
   watch: {
-    activeIntegrations: function() {
+    activeIntegrations: function () {
       if (this.enableSwitch) {
-        this.isActive = find(propEq('webhookId', this.integration.id), this.activeIntegrations) != null
+        this.isActive =
+          find(
+            propEq("webhookId", this.integration.id),
+            this.activeIntegrations
+          ) != null;
       }
-    }
+    },
   },
   methods: {
-    ...mapActions([
-      'updateDataset'
-    ]),
-    toggleActive: function() {
-      this.$emit('toggle-integration', this)
+    ...mapActions(["updateDataset"]),
+    toggleActive: function () {
+      this.$emit("toggle-integration", this);
     },
-    openDeleteDialog: function(integration) {
-      this.$emit('open-remove-integration', integration)
+    openDeleteDialog: function (integration) {
+      this.$emit("open-remove-integration", integration);
     },
-    openEditDialog: function(integration) {
-      this.$emit('open-edit-integration', integration)
+    openEditDialog: function (integration) {
+      this.$emit("open-edit-integration", integration);
     },
-    onIntegrationMenu: function(action) {
-      if (typeof this[action] === 'function') {
-        this[action](this.integration)
+    onIntegrationMenu: function (action) {
+      if (typeof this[action] === "function") {
+        this[action](this.integration);
       }
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@import "../../../assets/_variables.scss";
 
 .integration-menu {
-
   width: 24px;
 }
 
@@ -211,9 +179,8 @@ export default {
   margin: 0 8px 16px 8px;
   //padding:  16px 24px 8px 24px;
   background-color: white;
-  display:flex;
+  display: flex;
   flex-direction: column;
-
 }
 .info {
   background: $purple_tint;
@@ -222,13 +189,11 @@ export default {
   align-items: center;
 }
 
-
 .integration-title {
   font-size: 16px;
   margin: 16px 4px;
   color: black;
   text-align: center;
-
 }
 
 .intergration-type {
@@ -255,11 +220,10 @@ export default {
 }
 
 .options-icon {
-  float:right;
+  float: right;
 }
 
 .userIcon {
-
   /* bottom: 0; */
   height: 100%;
   /* right: 0; */
@@ -270,5 +234,4 @@ export default {
   flex-direction: column-reverse;
   margin: 8px;
 }
-
 </style>

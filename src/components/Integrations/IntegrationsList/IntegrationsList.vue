@@ -1,23 +1,13 @@
 <template>
   <bf-page class="integrations-list">
-    <bf-stage
-      slot="stage"
-      element-loading-background="transparent"
-    >
-
+    <bf-stage slot="stage" element-loading-background="transparent">
       <template #actions>
-        <bf-button
-          v-if="hasAdminRights"
-          @click="openAddIntegration"
-        >
+        <bf-button v-if="hasAdminRights" @click="openAddIntegration">
           Register Webhook
         </bf-button>
       </template>
 
-      <div
-        v-if="integrations.length > 0"
-        class="integration-list"
-      >
+      <div v-if="integrations.length > 0" class="integration-list">
         <integration-list-item
           v-for="integration in filteredWebhooks"
           :key="integration.id"
@@ -27,30 +17,27 @@
         />
       </div>
 
-      <bf-empty-page-state
-        v-else
-        class="empty"
-      >
+      <bf-empty-page-state v-else class="empty">
         <img
           src="../../../assets/images/illustrations/illo-collaboration.svg"
           :height="240"
           :width="247"
           alt="Teams illustration"
-        >
-        <div
-          v-if="hasAdminRights"
-          class="copy"
-        >
+        />
+        <div v-if="hasAdminRights" class="copy">
           <h2>There are no integrations yet</h2>
-          <p>Integrations allow external services to be notified when certain events occur on Pennsieve. These integrations are available to all members within the organization and can be managed at the dataset level under settings.</p>
-
+          <p>
+            Integrations allow external services to be notified when certain
+            events occur on Pennsieve. These integrations are available to all
+            members within the organization and can be managed at the dataset
+            level under settings.
+          </p>
         </div>
-        <div
-          v-if="!hasAdminRights"
-          class="copy"
-        >
+        <div v-if="!hasAdminRights" class="copy">
           <h2>{{ orgName }} doesn't have any integrations yet.</h2>
-          <p>Contact your administrator to get started working with Integrations.</p>
+          <p>
+            Contact your administrator to get started working with Integrations.
+          </p>
         </div>
       </bf-empty-page-state>
     </bf-stage>
@@ -76,31 +63,28 @@
       :dialog-visible="APIKeyDetailsVisible"
       @close="onApiKeyCloseDialog"
     />
-
-
   </bf-page>
 </template>
 
 <script>
-import { mapGetters, mapActions, mapState } from 'vuex'
+import { mapGetters, mapActions, mapState } from "vuex";
 
-import BfRafter from '../../shared/bf-rafter/BfRafter.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
-import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
+import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
-import AddEditIntegrationDialog from '../AddEditIntegrationDialog.vue'
-import IntegrationListItem from "../integration-list-item/IntegrationListItem.vue";
-import Sorter from  '../../../mixins/sorter'
-import UserRoles from  '../../../mixins/user-roles'
-import RemoveIntegrationDialog from  '../removeIntegrationDialog.vue'
+import AddEditIntegrationDialog from "../AddEditIntegrationDialog.vue";
+import IntegrationListItem from "../IntegrationListItem/IntegrationListItem.vue";
+import Sorter from "../../../mixins/sorter";
+import UserRoles from "../../../mixins/user-roles";
+import RemoveIntegrationDialog from "../removeIntegrationDialog.vue";
 
-
-import { pathOr, propOr} from 'ramda'
+import { pathOr, propOr } from "ramda";
 import DeleteApiKey from "../../my-settings/windows/DeleteApiKey.vue";
 import IntegrationApiKeyDetails from "../integrationApiKeyDetails.vue";
 
 export default {
-  name: 'IntegrationsList',
+  name: "IntegrationsList",
 
   components: {
     IntegrationApiKeyDetails,
@@ -113,16 +97,13 @@ export default {
     RemoveIntegrationDialog,
   },
 
-  mixins: [
-    Sorter,
-    UserRoles,
-  ],
+  mixins: [Sorter, UserRoles],
 
   props: {
     integrations: {
       type: Array,
-      default: () => []
-    }
+      default: () => [],
+    },
   },
 
   data() {
@@ -131,110 +112,105 @@ export default {
       removeIntegrationDialogVisible: false,
       APIKeyDetailsVisible: false,
       integrationDelete: null,
-      integrationEdit: {}
-    }
+      integrationEdit: {},
+    };
   },
 
   computed: {
-    ...mapGetters([
-      'activeOrganization',
-      'userToken',
-      'config',
-      'hasFeature'
-    ]),
+    ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
 
-    filteredWebhooks: function() {
-      let filteredArray =  this.integrations.filter(x=> !x.customTargets || x.customTargets.length == 0)
+    filteredWebhooks: function () {
+      let filteredArray = this.integrations.filter(
+        (x) => !x.customTargets || x.customTargets.length == 0
+      );
 
-      return filteredArray
+      return filteredArray;
     },
 
-    hasAdminRights: function() {
+    hasAdminRights: function () {
       if (this.activeOrganization) {
-        const isAdmin = propOr(false, 'isAdmin', this.activeOrganization)
-        const isOwner = propOr(false, 'isOwner', this.activeOrganization)
-        return isAdmin || isOwner
-      } else { return null}
+        const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
+        const isOwner = propOr(false, "isOwner", this.activeOrganization);
+        return isAdmin || isOwner;
+      } else {
+        return null;
+      }
     },
-    orgName: function() {
-      return pathOr('', ['organization', 'name'], this.activeOrganization)
-    }
+    orgName: function () {
+      return pathOr("", ["organization", "name"], this.activeOrganization);
+    },
   },
 
-  watch: {
-
-  },
+  watch: {},
 
   beforeRouteEnter(to, from, next) {
-    next(vm => {
-     if (vm.hasFeature('sandbox_org_feature')) {
-      vm.$router.push({name: 'create-org'})
-    }
-    })
+    next((vm) => {
+      if (vm.hasFeature("sandbox_org_feature")) {
+        vm.$router.push({ name: "create-org" });
+      }
+    });
   },
 
   methods: {
-    ...mapActions('integrationsModule', [
-      'createIntegration',
-      'removeIntegration',
-      'editIntegration'
+    ...mapActions("integrationsModule", [
+      "createIntegration",
+      "removeIntegration",
+      "editIntegration",
     ]),
 
-    ...mapState([
-    ]),
+    ...mapState([]),
 
-    onApiKeyCloseDialog: function() {
-      this.APIKeyDetailsVisisble = false
+    onApiKeyCloseDialog: function () {
+      this.APIKeyDetailsVisisble = false;
     },
-    onRemoveIntegrationCloseDialog: function() {
-      this.removeIntegrationDialogVisible = false
-    },
-
-    onCloseAddEditDialog: function() {
-      this.integrationEdit = {}
-      this.addEditIntegrationDialogVisible = false
+    onRemoveIntegrationCloseDialog: function () {
+      this.removeIntegrationDialogVisible = false;
     },
 
-    openDeleteIntegrationDialog: function(integration) {
-      this.$refs.removeIntegrationDialog.setIntegration(integration)
-      this.removeIntegrationDialogVisible = true
+    onCloseAddEditDialog: function () {
+      this.integrationEdit = {};
+      this.addEditIntegrationDialogVisible = false;
     },
-    onDeleteIntegrationConfirm: function(integration) {
-      this.removeIntegration(integration.id)
-      this.removeIntegrationDialogVisible = false
+
+    openDeleteIntegrationDialog: function (integration) {
+      this.$refs.removeIntegrationDialog.setIntegration(integration);
+      this.removeIntegrationDialogVisible = true;
+    },
+    onDeleteIntegrationConfirm: function (integration) {
+      this.removeIntegration(integration.id);
+      this.removeIntegrationDialogVisible = false;
     },
     /**
      * Model URL
      * @returns {String}
      */
-    getIntegrationUrl: function() {
+    getIntegrationUrl: function () {
       if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`
+        return `${this.config.apiUrl}/webhooks`;
       }
 
-      return ''
+      return "";
     },
-    openEditIntegrationDialog: function(integration) {
-
-      this.integrationEdit = integration
-      this.addEditIntegrationDialogVisible = true
+    openEditIntegrationDialog: function (integration) {
+      this.integrationEdit = integration;
+      this.addEditIntegrationDialogVisible = true;
     },
     /**
      * Open the add property dialog
      */
-    openAddIntegration: function() {
-      this.addEditIntegrationDialogVisible = true
+    openAddIntegration: function () {
+      this.addEditIntegrationDialogVisible = true;
     },
 
     /**
      * Update integration via API
      * @param {Object} Integration
      */
-    onEditIntegrationConfirm: function(integration){
-      let eventTargets = []
+    onEditIntegrationConfirm: function (integration) {
+      let eventTargets = [];
       for (const [key, value] of Object.entries(integration.eventTypeList)) {
         if (value) {
-          eventTargets.push(key)
+          eventTargets.push(key);
         }
       }
 
@@ -247,27 +223,25 @@ export default {
         imageUrl: integration.imageUrl,
         isDefault: integration.isDefault,
         hasAccess: integration.hasAccess,
-        targetEvents: eventTargets
-      }
+        targetEvents: eventTargets,
+      };
 
       if (integration.secret) {
-        integrationDTO.secret = integration.secret
+        integrationDTO.secret = integration.secret;
       }
 
-      this.editIntegration(integrationDTO)
-
+      this.editIntegration(integrationDTO);
     },
 
     /**
      * Send add integration request to API
      * @param {Object} integration
      */
-    onAddIntegrationConfirm: function(integration) {
-
-      let eventTargets = []
+    onAddIntegrationConfirm: function (integration) {
+      let eventTargets = [];
       for (const [key, value] of Object.entries(integration.eventTypeList)) {
         if (value) {
-          eventTargets.push(key)
+          eventTargets.push(key);
         }
       }
 
@@ -279,27 +253,25 @@ export default {
         isPrivate: !integration.isPublic,
         imageUrl: integration.imageUrl,
         isDefault: integration.isDefault,
-        hasAccess: integration.integrationType === 'viewer'? false: true,
-        targetEvents: eventTargets
-      }
+        hasAccess: integration.integrationType === "viewer" ? false : true,
+        targetEvents: eventTargets,
+      };
 
-      this.createIntegration(integrationDTO).then(response => {
-        let detailPopup = this.$refs.apiKeyDetails
+      this.createIntegration(integrationDTO).then((response) => {
+        let detailPopup = this.$refs.apiKeyDetails;
         detailPopup.apiKey = {
           key: response.tokenSecret.key,
-          secret: response.tokenSecret.secret
-        }
-        this.APIKeyDetailsVisisble = true
-        }
-      )
+          secret: response.tokenSecret.secret,
+        };
+        this.APIKeyDetailsVisisble = true;
+      });
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/variables';
-
+@import "../../../assets/variables";
 
 .addIntegrationContainer {
   display: flex;
@@ -341,12 +313,11 @@ export default {
   }
 
   p {
-    color: #71747C;
+    color: #71747c;
     font-size: 14px;
     line-height: 16px;
     text-align: center;
     margin-bottom: 16px;
   }
-
 }
 </style>

@@ -12,9 +12,6 @@ import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
 
-
-
-
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
 
@@ -37,8 +34,6 @@ const DatasetPermissions = () => import('../components/datasets/DatasetPermissio
 const EmbargoedPermissions = () => import('../components/datasets/DatasetPermissions/EmbargoedPermissions/EmbargoedPermissions.vue')
 const DatasetIntegrationsSettings = () => import('../components/datasets/settings/DatasetIntegrationsSettings.vue')
 
-
-
 /**
  * ORCIDRedirect
  * ORCIDRedirect
@@ -54,7 +49,6 @@ const Publishing = () => import('./Publishing/PublishingView.vue')
 const PublishingDatasetsList = () => import ('../components/Publishing/PublishingDatasetsList/PublishingDatasetsList.vue')
 const PublishingProposalsList = () => import ('../components/Publishing/PublishingProposalsList/PublishingProposalsList.vue')
 
-
 /**
  * Settings Components
  */
@@ -64,7 +58,6 @@ const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/Setu
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 const PennsieveInfo = () => import('../components/welcome/Info.vue')
 
-
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
 const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
@@ -72,18 +65,12 @@ const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const DeveloperTools = () => import('../components/welcome/DeveloperTools.vue')
 
-
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
-
-
-
-
 
 const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 const MySettings = () => import('./MySettings/MySettings.vue')
 const MySettingsContainer = () => import('../components/my-settings/MySettingsContainer.vue')
-
 
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
@@ -98,10 +85,11 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 /**
  * Integrations Components
  */
-const Integrations = () => import('./Integrations/Integrations.vue')
+const Integrations = () => import ('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
-const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
-
+const ApplicationsList = () => import ('../components/Integrations/ApplicationsList/ApplicationsList.vue')
+const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
+const AccountsList = () => import ('../components/Integrations/AccountsList/AccountsList.vue')
 
 /**
  * Metadata Components
@@ -119,7 +107,6 @@ const InstanceEdit = () => import('../components/datasets/explore/ConceptInstanc
  * 404
  */
 const PS404 = () => import('../components/PS-404/PS-404.vue')
-
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -705,6 +692,22 @@ const router = createRouter({
           },
           props: true
         },
+        {
+          name: 'accounts',
+          path: 'accounts',
+          components: {
+            stage: AccountsList,
+          },
+          props: true
+        },
+        {
+          name: 'compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList,
+          },
+          props: true
+        }
       ]
     },
 
