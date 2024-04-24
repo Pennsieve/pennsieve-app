@@ -306,7 +306,13 @@ const router = createRouter({
           props: true,
           meta: { hideSecondaryNav: true},
         },
-
+        {
+          name: 'dataset-overview-redirect',
+          path: ':datasetId',
+          redirect: {
+            name: 'dataset-overview'
+          }
+        },
         {
           name: 'dataset-overview',
           path: ':datasetId/overview',
