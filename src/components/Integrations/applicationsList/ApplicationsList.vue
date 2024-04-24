@@ -6,7 +6,7 @@
       </bf-button>
     </template>
     <div v-if="integrations.length > 0" class="integration-list">
-      <integration-list-item
+      <IntegrationsListItem
         v-for="integration in filteredApplications"
         :key="integration.id"
         :integration="integration"
@@ -71,7 +71,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
 import AddEditIntegrationDialog from "../AddEditIntegrationDialog.vue";
-import IntegrationListItem from "../IntegrationListItem/IntegrationListItem.vue";
+import IntegrationsListItem from "../IntegrationsListItem/IntegrationsListItem.vue";
 import Sorter from "../../../mixins/sorter";
 import UserRoles from "../../../mixins/user-roles";
 import RemoveIntegrationDialog from "../removeIntegrationDialog.vue";
@@ -89,7 +89,7 @@ export default {
     BfEmptyPageState,
     BfRafter,
     BfButton,
-    IntegrationListItem,
+    IntegrationsListItem,
     AddEditIntegrationDialog,
     RemoveIntegrationDialog,
   },

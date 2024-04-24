@@ -1,11 +1,11 @@
 <template>
   <bf-stage element-loading-background="transparent">
     <div v-if="accounts.length > 0" class="accounts-list">
-      <!-- <accounts-list-item
+      <accounts-list-item
         v-for="account in accounts"
         :key="account.accountId"
         :account="account"
-      /> -->
+      />
     </div>
 
     <bf-empty-page-state v-else class="empty">

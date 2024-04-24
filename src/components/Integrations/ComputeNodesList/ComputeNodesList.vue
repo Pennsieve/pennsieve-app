@@ -1,7 +1,7 @@
 <template>
   <bf-stage element-loading-background="transparent">
     <div v-if="computeNodes.length > 0" class="integration-list">
-      <compute-node-list-item
+      <compute-nodes-list-item
         v-for="computeNode in computeNodes"
         :key="computeId"
         :computeNode="computeNode"
@@ -41,7 +41,7 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
-import ComputeNodeListItem from "../ComputeNodeListItem/ComputeNodeListItem.vue";
+import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
 
 export default {
@@ -51,7 +51,7 @@ export default {
     BfEmptyPageState,
     BfRafter,
     BfButton,
-    ComputeNodeListItem,
+    ComputeNodesListItem,
   },
 
   props: {

@@ -75,14 +75,14 @@
 import Request from "@/mixins/request/index";
 import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr, propOr } from "ramda";
-import IntegrationListItem from "../../Integrations/IntegrationListItme/IntegrationListItem.vue";
+import IntegrationsListItem from "../../Integrations/IntegrationsListItem/IntegrationsListItem.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
 export default {
   name: "DatasetIntegrationsSettings",
 
   components: {
-    IntegrationListItem,
+    IntegrationsListItem,
     BfEmptyPageState,
   },
 
