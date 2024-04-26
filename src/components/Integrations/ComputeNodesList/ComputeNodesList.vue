@@ -100,7 +100,6 @@ export default {
 
   methods: {
     ...mapActions([]),
-
     ...mapState([]),
     /**
      * Model URL

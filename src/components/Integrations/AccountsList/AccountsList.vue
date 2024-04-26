@@ -62,19 +62,16 @@ export default {
           accountId: "x",
           accountType: "AWS",
           organizationId: "z",
-          userId: "someUserId",
         },
         {
           accountId: "x",
           accountType: "AWS",
           organizationId: "z",
-          userId: "someUserId",
         },
         {
           accountId: "x",
           accountType: "AWS",
           organizationId: "z",
-          userId: "someUserId",
         },
       ],
     },
@@ -112,7 +109,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(),
+    ...mapActions([]),
     ...mapState([]),
   },
 };
