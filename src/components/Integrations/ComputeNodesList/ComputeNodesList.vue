@@ -57,7 +57,13 @@ export default {
   props: {
     computeNodes: {
       type: Array,
-      default: () => [],
+      default: () => [
+        {
+          computeId: "x",
+          computeUrl: "y",
+          description: "z",
+        },
+      ],
     },
   },
 

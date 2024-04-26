@@ -15,7 +15,7 @@
       </p>
 
       <div v-if="integrations.length > 0" class="integration-list">
-        <integration-list-item
+        <integrations-list-item
           v-for="integration in integrations"
           :key="integration.id"
           :integration="integration"

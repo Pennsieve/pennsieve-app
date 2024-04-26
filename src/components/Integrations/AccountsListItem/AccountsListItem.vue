@@ -1,165 +1,51 @@
 <template>
   <div class="integration-list-item">
-    <el-row type="flex" class="info">
-      <el-col :sm="16">
-        <div class="intergration-type">
-          {{ isPrivateStr }}
-        </div>
-      </el-col>
-      <el-col :sm="8" v-if="enableSwitch" class="activeSwitch">
-        <el-switch
-          v-model="isActive"
-          active-color="#5039F7"
-          inactive-color="#CAC5BF"
-          @change="toggleActive"
-        >
-        </el-switch>
-      </el-col>
-      <el-col :sm="8" class="integration-menu" v-else>
-        <el-dropdown
-          class="options-icon"
-          trigger="click"
-          placement="bottom-end"
-          v-if="isOwner"
-          @command="onIntegrationMenu"
-        >
-          <span class="btn-file-menu el-dropdown-link">
-            <IconMenu :height="20" :width="20" />
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
-              <el-dropdown-item command="openEditDialog">
-                Edit integration
-              </el-dropdown-item>
-              <el-dropdown-item command="openDeleteDialog">
-                Remove integration
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </el-col>
-    </el-row>
+    <br />
     <el-row>
-      <div class="integration-title">
-        {{ integration.displayName }}
-      </div>
+      <p class="integration-description">Account Id: {{ account.accountId }}</p>
     </el-row>
     <el-row>
       <p class="integration-description">
-        {{ integration.description }}
+        Account Type: {{ account.accountType }}
       </p>
     </el-row>
-    <el-row class="userIcon">
-      <avatar class="icon condensed" :user="user" />
+    <el-row>
+      <p class="integration-description">
+        Organization Id: {{ account.organizationId }}
+      </p>
+    </el-row>
+    <el-row>
+      <p class="integration-description">User Id: {{ account.userId }}</p>
     </el-row>
   </div>
 </template>
 
 <script>
 import { mapActions, mapState } from "vuex";
-import { find, propEq } from "ramda";
-import FormatDate from "../../../mixins/format-date";
-import Avatar from "../../shared/avatar/Avatar.vue";
-import IconMenu from "../../icons/IconMenu.vue";
 
 export default {
   name: "AccountsListItem",
 
-  components: {
-    IconMenu,
-    Avatar,
-  },
-  mixins: [FormatDate],
+  components: {},
 
   props: {
-    integration: {
+    account: {
       type: Object,
       default: () => ({}),
-    },
-    activeIntegrations: {
-      type: Array,
-      default: () => null,
-    },
-    enableSwitch: {
-      type: Boolean,
-      default: () => false,
     },
   },
 
   computed: {
     ...mapState(["orgMembers", "profile"]),
-    isOwner: function () {
-      return this.integration.createdBy == this.profile.intId;
-    },
-    isPrivateStr: function () {
-      if (this.integration.isPrivate) {
-        return "PRIVATE";
-      }
-      return "PUBLIC";
-    },
-    user: function () {
-      return find(propEq("intId", this.integration.createdBy), this.orgMembers);
-    },
-    created: function () {
-      return this.formatDate(this.integration.createdAt);
-    },
-    userName: function () {
-      if (this.user) {
-        return this.user.firstName + " " + this.user.lastName;
-      }
-      return "";
-    },
   },
 
   data: function () {
-    return {
-      isActive: false,
-      integrationEdit: {
-        type: Object,
-        default: function () {
-          return {};
-        },
-      },
-    };
+    return {};
   },
-  mounted() {
-    this.$nextTick(function () {
-      if (this.enableSwitch) {
-        this.isActive =
-          find(
-            propEq("webhookId", this.integration.id),
-            this.activeIntegrations
-          ) != null;
-      }
-    });
-  },
-  watch: {
-    activeIntegrations: function () {
-      if (this.enableSwitch) {
-        this.isActive =
-          find(
-            propEq("webhookId", this.integration.id),
-            this.activeIntegrations
-          ) != null;
-      }
-    },
-  },
+  mounted() {},
+  watch: {},
   methods: {
     ...mapActions(["updateDataset"]),
-    toggleActive: function () {
-      this.$emit("toggle-integration", this);
-    },
-    openDeleteDialog: function (integration) {
-      this.$emit("open-remove-integration", integration);
-    },
-    openEditDialog: function (integration) {
-      this.$emit("open-edit-integration", integration);
-    },
-    onIntegrationMenu: function (action) {
-      if (typeof this[action] === "function") {
-        this[action](this.integration);
-      }
-    },
   },
 };
 </script>

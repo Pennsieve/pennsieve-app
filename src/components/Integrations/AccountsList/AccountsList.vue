@@ -57,7 +57,26 @@ export default {
   props: {
     accounts: {
       type: Array,
-      default: () => [],
+      default: () => [
+        {
+          accountId: "x",
+          accountType: "AWS",
+          organizationId: "z",
+          userId: "someUserId",
+        },
+        {
+          accountId: "x",
+          accountType: "AWS",
+          organizationId: "z",
+          userId: "someUserId",
+        },
+        {
+          accountId: "x",
+          accountType: "AWS",
+          organizationId: "z",
+          userId: "someUserId",
+        },
+      ],
     },
   },
 
