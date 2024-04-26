@@ -1,6 +1,5 @@
 <template>
   <div class="integration-list-item">
-    <br />
     <el-row>
       <p class="integration-description">Account Id: {{ account.accountId }}</p>
     </el-row>
@@ -13,9 +12,6 @@
       <p class="integration-description">
         Organization Id: {{ account.organizationId }}
       </p>
-    </el-row>
-    <el-row>
-      <p class="integration-description">User Id: {{ account.userId }}</p>
     </el-row>
   </div>
 </template>

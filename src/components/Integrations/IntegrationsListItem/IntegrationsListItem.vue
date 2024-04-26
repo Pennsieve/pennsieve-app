@@ -2,7 +2,7 @@
   <div class="integration-list-item">
     <el-row type="flex" class="info">
       <el-col :sm="16">
-        <div class="intergration-type">
+        <div class="integration-type">
           {{ isPrivateStr }}
         </div>
       </el-col>
