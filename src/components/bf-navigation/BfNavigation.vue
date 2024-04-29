@@ -298,6 +298,8 @@
         if (this.orgId === 'N:organization:050fae39-4412-43ef-a514-703ed8e299d5' || this.orgId === 'N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0') {
           name = "IconSPARCLogo"
         } else if (this.orgId === 'N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80' || this.orgId === 'N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2') {
+          name = "IconI3HLogo"
+        } else if (this.orgId === 'N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae' || this.orgId === 'N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f')  {
           name = "IconHealInitiative"
         }
         return name
