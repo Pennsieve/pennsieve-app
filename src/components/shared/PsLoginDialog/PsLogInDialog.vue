@@ -1,9 +1,8 @@
 <template>
   <el-dialog
-    class="light-header"
+    class="light-header ps-login-dialog"
     :modelValue="visible"
     @update:modelValue="visible = $event"
-    :show-close="false"
     :width="dialogWidth"
     @close="closeLogInDialog"
   >
@@ -370,7 +369,7 @@ export default {
     ...mapActions(['updateUserToken', 'updateProfile']),
 
     onEnter(event) {
-      if (event.currentTarget.__vue__ === this.$refs.pwdField) {
+      if (event.currentTarget === this.$refs.pwdField.ref) {
         this.onFormSubmit('logInForm')
       } else {
         this.$refs.pwdField.focus()
@@ -625,16 +624,15 @@ export default {
 <style lang="scss" scoped>
 @import '../../../assets/_variables.scss';
 
+
 .dialog-container {
   margin-bottom: 40px;
 }
 .log-in-dialog {
   //width: 540px;
-
   &__close-dialog {
     float: right;
   }
-
   &__container {
     display: flex;
     flex-direction: column;
@@ -678,8 +676,11 @@ export default {
       background-color: whitesmoke;
       border-color: darkgray;
       justify-content: flex-start;
-    }
 
+    }
+ &--federated-login-button:hover{
+    color:white;
+ }
     &--actions {
       &.log-in {
         margin-top: 32px;
@@ -717,12 +718,9 @@ export default {
     margin-bottom: 16px;
   }
 }
-//
-//:deep(.el-dialog__header) {
-//  padding: 50px;
-//  border-bottom: none;
-//  background: red;
-//}
+
+
+
 //
 //:deep(.el-dialog log-in-dialog ) {
 //
@@ -741,4 +739,10 @@ export default {
   text-align: left;
   width: 100%;
 }
+</style>
+<style lang="scss">
+@import '../../../assets/_variables.scss';
+.ps-login-dialog .el-dialog__close{
+    color:$purple_3!important;
+    }
 </style>
