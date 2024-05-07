@@ -7,6 +7,7 @@
     @close="closeLogInDialog"
   >
 
+    
     <div class="log-in-dialog__container" :class="containerClass">
       <PennsieveLogoContainer class="dialog-container" stacked="stacked" :show-penn-logo="false"/>
 
