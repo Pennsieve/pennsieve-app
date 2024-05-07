@@ -89,7 +89,6 @@ const Integrations = () => import ('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ApplicationsList = () => import ('../components/Integrations/ApplicationsList/ApplicationsList.vue')
 const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
-const AccountsList = () => import ('../components/Integrations/AccountsList/AccountsList.vue')
 
 /**
  * Metadata Components
@@ -665,8 +664,8 @@ const router = createRouter({
       props: true
     },
     {
-      name: 'integrations',
-      path: '/:orgId/integrations',
+      name: 'analysis',
+      path: '/:orgId/analysis',
       components: {
         page: Integrations,
         navigation: BfNavigation
@@ -689,14 +688,6 @@ const router = createRouter({
           path: 'webhooks',
           components: {
             stage: IntegrationsList,
-          },
-          props: true
-        },
-        {
-          name: 'accounts',
-          path: 'accounts',
-          components: {
-            stage: AccountsList,
           },
           props: true
         },

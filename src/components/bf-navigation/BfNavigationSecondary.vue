@@ -1,7 +1,7 @@
 <template>
   <div
     class="bf-navigation secondary"
-    :class="[ secondaryNavCondensed ? 'condensed' : '' ]"
+    :class="[secondaryNavCondensed ? 'condensed' : '']"
   >
     <div class="menu-wrap">
       <div
@@ -9,19 +9,18 @@
         :style="{ backgroundColor: `${secNavHeaderCollapsedStyle}` }"
       >
         <template v-if="!secondaryNavCondensed">
-
-            <div>
-              <el-dropdown
-                class="dataset-status-dropdown"
-                trigger="click"
-                placement="bottom-start"
-                @command="updateDatasetStatus"
-                @visible-change="datasetFilterOpen = $event"
+          <div>
+            <el-dropdown
+              class="dataset-status-dropdown"
+              trigger="click"
+              placement="bottom-start"
+              @command="updateDatasetStatus"
+              @visible-change="datasetFilterOpen = $event"
+            >
+              <button
+                class="dataset-filter-dropdown el-dropdown-link"
+                :disabled="!getPermission('manager')"
               >
-                <button
-                  class="dataset-filter-dropdown el-dropdown-link"
-                  :disabled="!(getPermission('manager'))"
-                >
                 <span class="dataset-info">
                   <div
                     :style="{ 'background-color': checkStatusColor }"
@@ -31,16 +30,16 @@
                     {{ formatDatasetStatus }}
                   </div>
                 </span>
-                  <IconArrowUp
-                    v-if="getPermission('manager')"
-                    :class="[ datasetFilterArrowDir === 'down' ? 'svg-flip' : '' ]"
-                    :height="7"
-                    :width="7"
-                    color="#000000"
-                  />
-                </button>
-                <template #dropdown>
-                  <el-dropdown-menu
+                <IconArrowUp
+                  v-if="getPermission('manager')"
+                  :class="[datasetFilterArrowDir === 'down' ? 'svg-flip' : '']"
+                  :height="7"
+                  :width="7"
+                  color="#000000"
+                />
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu
                   class="bf-menu auto-height"
                   :offset="14"
                   :arrow-offset="150"
@@ -51,10 +50,7 @@
                     class="status-item"
                     :command="getStatusCommand(status)"
                   >
-                  <span
-                    class="status-dot"
-                    :style="getDotColor(status)"
-                  />
+                    <span class="status-dot" :style="getDotColor(status)" />
                     {{ status.displayName }}
                     <IconCheck
                       v-if="formatDatasetStatus === `${status.displayName}`"
@@ -64,91 +60,70 @@
                     />
                   </el-dropdown-item>
                 </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-            <div>
-              <button
-                class="btn-expand-collapse"
-                name="Collapse Secondary Menu"
-                @click="toggleMenu"
-              >
-                <IconNavCollapse
-                  color="#71747C"
-                />
-              </button>
-            </div>
-
-
+              </template>
+            </el-dropdown>
+          </div>
+          <div>
+            <button
+              class="btn-expand-collapse"
+              name="Collapse Secondary Menu"
+              @click="toggleMenu"
+            >
+              <IconNavCollapse color="#71747C" />
+            </button>
+          </div>
         </template>
         <template v-else>
           <button
             class="btn-expand-collapse"
             name="Expand Secondary Menu"
             @click="toggleMenu"
-
           >
-            <IconNavExpand
-              color="#ffF"
-              :height="32"
-              :width="32"
-            />
+            <IconNavExpand color="#ffF" :height="32" :width="32" />
           </button>
         </template>
       </div>
 
       <template v-if="getPermission('editor')">
         <create-button :condensed="secondaryNavCondensed" />
-        <hr>
+        <hr />
       </template>
 
       <bf-navigation-item
         :link="{ name: 'dataset-overview' }"
         label="Overview"
         :condensed="secondaryNavCondensed"
-        :secondary=true
+        :secondary="true"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
       >
         <template #icon>
-          <IconOverview
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconOverview color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
 
+      <!--      <bf-navigation-item-->
+      <!--        :link="{ name: 'metadata' }"-->
+      <!--        icon="icon-explore-dataset"-->
+      <!--        label="Records"-->
+      <!--        class="secondary"-->
+      <!--        :condensed="secondaryNavCondensed"-->
 
-<!--      <bf-navigation-item-->
-<!--        :link="{ name: 'metadata' }"-->
-<!--        icon="icon-explore-dataset"-->
-<!--        label="Records"-->
-<!--        class="secondary"-->
-<!--        :condensed="secondaryNavCondensed"-->
-
-<!--      />-->
+      <!--      />-->
 
       <bf-navigation-item
         :link="{ name: 'dataset-files' }"
         label="Files"
         :condensed="secondaryNavCondensed"
-        :secondary=true
+        :secondary="true"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
       >
         <template #icon>
-          <IconFiles
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconFiles color="currentColor" :height="20" :width="20" />
         </template>
 
-        <bf-waiting-icon
-          v-if="uploading"
-          slot="suffix"
-        />
+        <bf-waiting-icon v-if="uploading" slot="suffix" />
       </bf-navigation-item>
 
       <bf-navigation-item
@@ -157,56 +132,38 @@
         label="Metadata"
         class="secondary"
         :condensed="secondaryNavCondensed"
-        :secondary=true
+        :secondary="true"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
-
       >
         <template #icon>
-          <IconGraph
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconGraph color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
-
-
-
-
 
       <bf-navigation-item
-          :link="{ name: 'dataset-activity' }"
-          label="Activity"
-          :secondary="true"
-          :condensed="secondaryNavCondensed"
-          :style-color="getThemeColors[0]"
-          :org-id="orgId"
-        >
+        :link="{ name: 'dataset-activity' }"
+        label="Activity"
+        :secondary="true"
+        :condensed="secondaryNavCondensed"
+        :style-color="getThemeColors[0]"
+        :org-id="orgId"
+      >
         <template #icon>
-          <IconActivity
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconActivity color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
-
 
       <bf-navigation-item
         :link="{ name: 'integrations-settings' }"
-        label="Integrations"
+        label="Applications"
         :condensed="secondaryNavCondensed"
-        :secondary=true
+        :secondary="true"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
       >
         <template #icon>
-          <IconIntegrations
-            color="currentColor"
-            :height="20"
-            :width="20"
-            />
+          <IconIntegrations color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
 
@@ -215,16 +172,12 @@
         label="Publishing"
         class="secondary"
         :condensed="secondaryNavCondensed"
-        :secondary=true
+        :secondary="true"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
       >
         <template #icon>
-          <IconGlobeCheck
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconGlobeCheck color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
 
@@ -238,56 +191,44 @@
         :org-id="orgId"
       >
         <template #icon>
-          <IconCollaborators
-            color="currentColor"
-            :height="20"
-            :width="20"
-            />
+          <IconCollaborators color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
-
 
       <bf-navigation-item
         v-if="getPermission('manager')"
         :link="{ name: 'dataset-settings' }"
         label="Settings"
-        :secondary=true
+        :secondary="true"
         :condensed="secondaryNavCondensed"
         :style-color="getThemeColors[0]"
         :org-id="orgId"
       >
         <template #icon>
-          <IconDatasetSettings
-            color="currentColor"
-            :height="20"
-            :width="20"
-          />
+          <IconDatasetSettings color="currentColor" :height="20" :width="20" />
         </template>
-
       </bf-navigation-item>
     </div>
 
-    <span
-      class="collapse-handle"
-      @click="toggleMenu"
-    />
-    <bf-navigation-tertiary v-if="secondaryNavCondensed"
-                            :bk-color="tertiaryNavColor"
+    <span class="collapse-handle" @click="toggleMenu" />
+    <bf-navigation-tertiary
+      v-if="secondaryNavCondensed"
+      :bk-color="tertiaryNavColor"
     />
   </div>
 </template>
 
 <script>
-import BfNavigationItem from './bf-navigation-item/BfNavigationItem.vue'
-import BfNavigationTertiary from '../bf-navigation-tertiary/BfNavigationTertiary.vue'
-import BfWaitingIcon from '../shared/bf-waiting-icon/bf-waiting-icon.vue'
-import CreateButton from './create-button/CreateButton.vue'
+import BfNavigationItem from "./bf-navigation-item/BfNavigationItem.vue";
+import BfNavigationTertiary from "../bf-navigation-tertiary/BfNavigationTertiary.vue";
+import BfWaitingIcon from "../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import CreateButton from "./create-button/CreateButton.vue";
 
-import { mapGetters, mapActions, mapState } from 'vuex'
-import { path, pathOr } from 'ramda'
-import EventBus from '../../utils/event-bus'
+import { mapGetters, mapActions, mapState } from "vuex";
+import { path, pathOr } from "ramda";
+import EventBus from "../../utils/event-bus";
 
-import Request from '../../mixins/request/index'
+import Request from "../../mixins/request/index";
 import IconArrowUp from "../icons/IconArrowUp.vue";
 import IconNavCollapse from "../icons/IconNavCollapse.vue";
 import IconNavExpand from "../icons/IconNavExpand.vue";
@@ -300,9 +241,8 @@ import IconCollaborators from "../icons/IconCollaborators.vue";
 import IconGraph from "../icons/IconGraph.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
-
 export default {
-  name: 'BfNavigationSecondary',
+  name: "BfNavigationSecondary",
 
   components: {
     IconGraph,
@@ -318,70 +258,65 @@ export default {
     BfNavigationItem,
     BfNavigationTertiary,
     BfWaitingIcon,
-    CreateButton
+    CreateButton,
   },
 
-  mixins: [
-    Request,
-    CustomTheme
-  ],
+  mixins: [Request, CustomTheme],
   props: {
     orgId: {
       type: String,
-      default: ''
+      default: "",
     },
     datasetId: {
       ype: String,
-      default: ''
-    }
+      default: "",
+    },
   },
 
-  data: function() {
+  data: function () {
     return {
       datasetNameTruncated: false,
       // @NOTE - static data for now. Remove once data dynamic and in vuex
       datasetFilterOpen: false,
-      statusDropdownDisabled: false
-    }
+      statusDropdownDisabled: false,
+    };
   },
 
   computed: {
-    ...mapState(['dataset', 'secondaryNavCondensed', 'orgDatasetStatuses']),
+    ...mapState(["dataset", "secondaryNavCondensed", "orgDatasetStatuses"]),
 
     ...mapGetters([
-      'activeOrganization',
-      'primaryNavOpen',
-      'uploading',
-      'hasFeature',
-      'getPermission',
-      'userToken',
-      'config'
+      "activeOrganization",
+      "primaryNavOpen",
+      "uploading",
+      "hasFeature",
+      "getPermission",
+      "userToken",
+      "config",
     ]),
-    getThemeColors: function() {
-      return this.getTheme(this.orgId)
+    getThemeColors: function () {
+      return this.getTheme(this.orgId);
     },
-    secNavHeaderCollapsedStyle: function() {
+    secNavHeaderCollapsedStyle: function () {
       if (this.secondaryNavCondensed) {
-        const themeColors = this.getThemeColors
-        const color1 =  themeColors[1]
-        return `${color1}`
+        const themeColors = this.getThemeColors;
+        const color1 = themeColors[1];
+        return `${color1}`;
       } else {
-        return ''
+        return "";
       }
-
     },
-    workspaceBackgroundStyle: function() {
-        const color1 = this.pSBC(0.8, this.getThemeColors[1])
-        return `${color1}`
-
+    workspaceBackgroundStyle: function () {
+      const color1 = this.pSBC(0.8, this.getThemeColors[1]);
+      return `${color1}`;
     },
-    tertiaryNavColor: function() {
+    tertiaryNavColor: function () {
       if (this.secondaryNavCondensed) {
-        const themeColors = this.getThemeColors
-        const color1 = themeColors[0]
-        return `${color1}`
+        const themeColors = this.getThemeColors;
+        const color1 = themeColors[0];
+        return `${color1}`;
       } else {
-        return ''
+        return "";
       }
     },
 
@@ -389,60 +324,60 @@ export default {
      * Filters empty status names from orgDatasetStatuses
      * @returns {Array}
      */
-    filterOrgStatusList: function() {
-      return this.orgDatasetStatuses.filter(status => {
-        return status.displayName !== ''
-    })
-  },
+    filterOrgStatusList: function () {
+      return this.orgDatasetStatuses.filter((status) => {
+        return status.displayName !== "";
+      });
+    },
 
     /**
      * Active organization id
      * @returns {String}
      */
-    activeOrgId: function() {
-      return pathOr('', ['organization', 'id'], this.activeOrganization)
+    activeOrgId: function () {
+      return pathOr("", ["organization", "id"], this.activeOrganization);
     },
 
     /**
      * Compute full dataset name
      * @returns {String}
      */
-    datasetName: function() {
-      return pathOr('', ['content', 'name'], this.dataset)
+    datasetName: function () {
+      return pathOr("", ["content", "name"], this.dataset);
     },
 
     /**
      * Check if status dropdown is disabled based on user permission
      * @returns {Boolean}
      */
-    checkStatusPermission: function() {
-      return !this.getPermission('owner') || !this.getPermission('manager')
+    checkStatusPermission: function () {
+      return !this.getPermission("owner") || !this.getPermission("manager")
         ? true
-        : false
+        : false;
     },
 
     /**
      * Returns the dataset status displayName
      * @returns {String}
      */
-    formatDatasetStatus: function() {
-      return pathOr('', ['status', 'displayName'], this.dataset)
+    formatDatasetStatus: function () {
+      return pathOr("", ["status", "displayName"], this.dataset);
     },
 
     /**
      * Returns dataset filter arrow direction
      * @returns {String}
      */
-    datasetFilterArrowDir: function() {
-      return this.datasetFilterOpen ? 'up' : 'down'
+    datasetFilterArrowDir: function () {
+      return this.datasetFilterOpen ? "up" : "down";
     },
 
     /**
      * Returns color for dataset status
      * @returns {String}
      */
-    checkStatusColor: function() {
-      return pathOr('', ['status', 'color'], this.dataset)
+    checkStatusColor: function () {
+      return pathOr("", ["status", "color"], this.dataset);
     },
 
     /**
@@ -450,28 +385,28 @@ export default {
      * Truncates after 20 characters
      * @returns {String}
      */
-    datasetNameDisplay: function() {
-      const name = this.datasetName
+    datasetNameDisplay: function () {
+      const name = this.datasetName;
 
       if (name.length > 20) {
-        this.datasetNameTruncated = true
-        return `${name.slice(0, 17)}...`
+        this.datasetNameTruncated = true;
+        return `${name.slice(0, 17)}...`;
       } else {
-        this.datasetNameTruncated = false
+        this.datasetNameTruncated = false;
       }
-      return name
+      return name;
     },
 
-    getDatasetUpdateUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const datasetId = path(['content', 'id'], this.dataset)
+    getDatasetUpdateUrl: function () {
+      const url = pathOr("", ["config", "apiUrl"])(this);
+      const datasetId = path(["content", "id"], this.dataset);
 
       if (!url) {
-        return ''
+        return "";
       }
 
-      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`
-    }
+      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`;
+    },
   },
 
   watch: {
@@ -479,56 +414,55 @@ export default {
      * Watcher for dataset status url
      */
     getDatasetStatusUrl: {
-      handler: function(val) {
+      handler: function (val) {
         if (val && this.activeOrgId) {
-          this.getAllDatasetStatuses()
+          this.getAllDatasetStatuses();
         }
       },
-      immediate: true
-    }
+      immediate: true,
+    },
   },
 
   mounted() {
-    this.toggleSecondaryNav(true)
+    this.toggleSecondaryNav(true);
   },
 
   beforeUnmount() {
-    this.toggleSecondaryNav(false)
+    this.toggleSecondaryNav(false);
   },
 
   methods: {
     ...mapActions([
-      'toggleSecondaryNav',
-      'togglePrimaryNav',
-      'condenseSecondaryNav',
-      'updateDataset',
-      'setDataset'
+      "toggleSecondaryNav",
+      "togglePrimaryNav",
+      "condenseSecondaryNav",
+      "updateDataset",
+      "setDataset",
     ]),
-
 
     /**
      * Returns dataset status name based on command selection in menu
      * @returns {String}
      */
-    getStatusCommand: function(status) {
-      return status.displayName
+    getStatusCommand: function (status) {
+      return status.displayName;
     },
 
     /**
      * Returns dataset status dot styling based on status color
      * @returns {Object}
      */
-    getDotColor: function(status) {
+    getDotColor: function (status) {
       const obj = {
-        backgroundColor: `${status.color}`
-      }
+        backgroundColor: `${status.color}`,
+      };
 
-      return obj
+      return obj;
     },
 
-    toggleMenu: function() {
-      this.togglePrimaryNav(!this.primaryNavOpen)
-      this.condenseSecondaryNav(!this.secondaryNavCondensed)
+    toggleMenu: function () {
+      this.togglePrimaryNav(!this.primaryNavOpen);
+      this.condenseSecondaryNav(!this.secondaryNavCondensed);
     },
 
     /**
@@ -536,43 +470,42 @@ export default {
      * status menu selection
      * @param {String}
      */
-    updateDatasetStatus: function(command) {
-      const status = this.orgDatasetStatuses.find(status => {
-        return status.displayName === command
-      })
+    updateDatasetStatus: function (command) {
+      const status = this.orgDatasetStatuses.find((status) => {
+        return status.displayName === command;
+      });
 
       if (!this.getDatasetUpdateUrl) {
-        return
+        return;
       }
 
       // API request to update the status
       this.sendXhr(this.getDatasetUpdateUrl, {
-        method: 'PUT',
+        method: "PUT",
         body: {
-          status: status.name
-        }
+          status: status.name,
+        },
       })
-        .then(response => {
-          EventBus.$emit('toast', {
+        .then((response) => {
+          EventBus.$emit("toast", {
             detail: {
-              msg: 'Your status has been saved'
-            }
-          })
+              msg: "Your status has been saved",
+            },
+          });
 
-          this.updateDataset(response)
-          this.setDataset(response)
-
+          this.updateDataset(response);
+          this.setDataset(response);
         })
-        .catch(this.handleXhrError.bind(this))
-    }
-  }
-}
+        .catch(this.handleXhrError.bind(this));
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import 'bf-navigation';
-@import '../../assets/_variables.scss';
-@import '../../assets/components/_dataset-status.scss';
+@import "bf-navigation";
+@import "../../assets/_variables.scss";
+@import "../../assets/components/_dataset-status.scss";
 
 .bf-navigation {
   background: $gray_1;
@@ -624,7 +557,6 @@ hr {
     height: 24px;
   }
 }
-
 
 .dataset-info {
   display: flex;
@@ -681,7 +613,7 @@ hr {
   align-items: center;
 }
 
-.el-popper[x-placement^='bottom'] {
+.el-popper[x-placement^="bottom"] {
   margin-top: 5px;
   margin-left: -13px;
 }

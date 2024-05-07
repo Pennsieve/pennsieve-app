@@ -1,12 +1,15 @@
 <template>
   <bf-page>
-    <bf-rafter
-      slot="heading"
-      title="Integrations"
-      class="primary"
-      :org-id="orgId"
-    >
+    <bf-rafter slot="heading" title="Analysis" class="primary" :org-id="orgId">
       <template #description>
+        <div class="description">
+          <p>
+            The pennsieve platform allows users to register applications to
+            allow users to expand the functionality of the platform through
+            custom actions and webhooks.
+          </p>
+          <hr />
+        </div>
         <div slot="description" class="description">
           <p v-if="this.$route.name === 'applications'">
             Applications support actions on various entities on the platform
@@ -32,11 +35,10 @@
             </a>
           </p>
           <p v-if="this.$route.name === 'compute-nodes'">
-            Compute Nodes are compute resources that are available to your
-            organization for data analysis.
-          </p>
-          <p v-if="this.$route.name === 'accounts'">
-            Compute Resource Accounts that are available to your organization.
+            Compute Nodes are deployed to run analytic pipelines through the
+            Pennsieve platform. You can register compute nodes through the
+            Pennsieve Agent. Each Compute Node is associated with an account,
+            which can be a cloud-provider or a local cluster.
           </p>
         </div>
       </template>
@@ -91,10 +93,6 @@ export default {
         {
           name: "Compute Nodes",
           to: "compute-nodes",
-        },
-        {
-          name: "Accounts",
-          to: "accounts",
         },
       ],
     };

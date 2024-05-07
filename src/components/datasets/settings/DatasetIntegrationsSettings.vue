@@ -1,10 +1,10 @@
 <template>
   <bf-stage ref="bfStage" slot="stage">
     <template v-if="hasPermission">
-      <h4 class="integrations-info-title">Integrations</h4>
+      <h4 class="integrations-info-title">Applications</h4>
       <p class="mb-16">
-        Integrations allow third-party applications to receive events and
-        interact with datasets. Activate integrations for this dataset here.
+        Applications allow third-parties to receive events and interact with
+        datasets. Activate applications for this dataset here.
 
         <a
           href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
