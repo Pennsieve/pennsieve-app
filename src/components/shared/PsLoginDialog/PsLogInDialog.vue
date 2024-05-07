@@ -6,13 +6,16 @@
     :width="dialogWidth"
     @close="closeLogInDialog"
   >
-
+  
     <div class="log-in-dialog__container" :class="containerClass">
-      <PennsieveLogoContainer class="dialog-container" stacked="stacked" :show-penn-logo="false"/>
+      <PennsieveLogoContainer
+        class="dialog-container"
+        stacked="stacked"
+        :show-penn-logo="false"
+      />
 
       <template v-if="logInState !== states.TWO_FACTOR">
-        <p
-             class="log-in-dialog__container--top-copy">
+        <p class="log-in-dialog__container--top-copy">
           {{ formTopCopy }}
         </p>
         <template v-if="isLogInState">
@@ -23,8 +26,12 @@
             :validate-on-rule-change="false"
             @submit.native.prevent="onFormSubmit('logInForm')"
           >
-            <el-form-item prop="email" >
-              <el-input v-model="logInForm.email" placeholder="Email Address" @keyup.enter.native="onEnter"/>
+            <el-form-item prop="email">
+              <el-input
+                v-model="logInForm.email"
+                placeholder="Email Address"
+                @keyup.enter.native="onEnter"
+              />
             </el-form-item>
             <el-form-item prop="password">
               <el-input
@@ -45,23 +52,34 @@
               >
             </el-form-item>
           </el-form>
-          <div class="option-divider">  - or - </div>
+          <div class="option-divider">- or -</div>
           <bf-button
             class="log-in-dialog__container--federated-login-button"
             :processing="isLoggingIn"
             processing-text="Signing In"
             @click="initiateFederatedLogin('ORCID')"
-            ><img src="/src/assets/images/orcid_24x24.png" alt="iD" width="24" height="24" style="display: block; margin-left: 0; margin-right: 32px; width: 24px; height: 24px">Sign in with your ORCID iD</bf-button>
+            ><img
+              src="/src/assets/images/orcid_24x24.png"
+              alt="iD"
+              width="24"
+              height="24"
+              style="
+                display: block;
+                margin-left: 0;
+                margin-right: 32px;
+                width: 24px;
+                height: 24px;
+              "
+            />Sign in with your ORCID iD</bf-button
+          >
           <div class="log-in-dialog__container--actions" :class="actionsClass">
-            <router-link
-              tag="a"
-              class="ml-16"
-              :to="signupRoute"
-            >
+            <router-link tag="a" class="ml-16" :to="signupRoute">
               Create new account
             </router-link>
             |
-            <a class="mr-16" href="#" @click.prevent="toForgotPasswordState">Forgot password?</a>
+            <a class="mr-16" href="#" @click.prevent="toForgotPasswordState"
+              >Forgot password?</a
+            >
           </div>
         </template>
         <template v-else-if="isForgotPasswordState">
@@ -97,11 +115,7 @@
             href="#"
             @click.prevent="toLogInState"
           >
-
-            <IconArrowDown
-                width=20
-            />Back
-            to Sign In</a
+            <IconArrowDown width="20" />Back to Sign In</a
           >
         </template>
         <template v-else>
@@ -172,87 +186,86 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex'
-import { propOr, pathOr } from 'ramda'
-import Auth from '@aws-amplify/auth'
-import BfButton from '../bf-button/BfButton.vue'
-import EventBus from '../../../utils/event-bus'
-import IconRemove from "../../icons/IconRemove.vue"
-import IconArrowDown from "../../icons/IconArrowDown.vue"
+import { mapActions } from "vuex";
+import { propOr, pathOr } from "ramda";
+import Auth from "@aws-amplify/auth";
+import BfButton from "../bf-button/BfButton.vue";
+import EventBus from "../../../utils/event-bus";
+import IconRemove from "../../icons/IconRemove.vue";
+import IconArrowDown from "../../icons/IconArrowDown.vue";
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
-
 export default {
-  name: 'PsLogInDialog',
+  name: "PsLogInDialog",
 
   components: {
     PennsieveLogoContainer,
     BfButton,
     IconRemove,
-    IconArrowDown
+    IconArrowDown,
   },
 
   props: {
     visible: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isMobile: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
 
   data() {
     return {
       dialogVisible: false,
       logInForm: {
-        email: '',
-        password: ''
+        email: "",
+        password: "",
       },
       forgotPasswordForm: {
-        email: ''
+        email: "",
       },
-      logInState: '',
+      logInState: "",
       states: {
-        LOG_IN: 'logIn',
-        FORGOT_PASSWORD: 'forgotPassword',
-        RESET_PASSWORD: 'resetPassword',
-        TWO_FACTOR: 'twoFactor'
+        LOG_IN: "logIn",
+        FORGOT_PASSWORD: "forgotPassword",
+        RESET_PASSWORD: "resetPassword",
+        TWO_FACTOR: "twoFactor",
       },
       logInRules: {
         email: [
           {
             required: true,
-            message: 'Please add your Email',
-            trigger: 'submit'
-          }
+            message: "Please add your Email",
+            trigger: "submit",
+          },
         ],
         password: [
           {
             required: true,
-            message: 'Please add your Password',
-            trigger: 'submit'
-          }
-        ]
+            message: "Please add your Password",
+            trigger: "submit",
+          },
+        ],
       },
       twoFactorForm: {
-        token: ''
+        token: "",
       },
       twoFactorRules: {
         token: [
           {
             required: true,
-            message: 'Please add your Token',
-            trigger: 'submit'
-          }
-        ]
+            message: "Please add your Token",
+            trigger: "submit",
+          },
+        ],
       },
       isLoadingTwoFactor: false,
-      tempSessionToken: '',
+      tempSessionToken: "",
       isLoggingIn: false,
-      isSendingResetEmail: false
-    }
+      isSendingResetEmail: false,
+    };
   },
 
   computed: {
@@ -261,19 +274,20 @@ export default {
      * take the user based on their organization
      * @returns {Object}
      */
-    signupRoute: function() {
-      let routeName = 'create-account'
+    signupRoute: function () {
+      let routeName = "create-account";
 
       return {
-        name: routeName, params: {}
-      }
+        name: routeName,
+        params: {},
+      };
     },
     /**
      * True if user is on login dialog
      * @returns {Boolean}
      */
     isLogInState() {
-      return this.logInState === this.states.LOG_IN
+      return this.logInState === this.states.LOG_IN;
     },
 
     /**
@@ -281,7 +295,7 @@ export default {
      * @returns {Boolean}
      */
     isForgotPasswordState() {
-      return this.logInState === this.states.FORGOT_PASSWORD
+      return this.logInState === this.states.FORGOT_PASSWORD;
     },
 
     /**
@@ -289,7 +303,7 @@ export default {
      * @returns {Boolean}
      */
     isResetPasswordState() {
-      return this.logInState === this.states.RESET_PASSWORD
+      return this.logInState === this.states.RESET_PASSWORD;
     },
 
     /**
@@ -297,7 +311,7 @@ export default {
      * @returns {String}
      */
     dialogWidth() {
-      return this.isMobile ? '327px' : '374px'
+      return this.isMobile ? "327px" : "374px";
     },
 
     /**
@@ -307,8 +321,8 @@ export default {
      */
     containerClass() {
       return this.isForgotPasswordState || this.isResetPasswordState
-        ? 'password-reset-height'
-        : 'log-in-height'
+        ? "password-reset-height"
+        : "log-in-height";
     },
 
     /**
@@ -318,10 +332,10 @@ export default {
      */
     actionsClass() {
       return this.isResetPasswordState
-        ? 'reset-password'
+        ? "reset-password"
         : this.isForgotPasswordState
-        ? 'forgot-password'
-        : 'log-in'
+        ? "forgot-password"
+        : "log-in";
     },
 
     /**
@@ -331,11 +345,11 @@ export default {
      */
     formTopCopy() {
       if (this.isForgotPasswordState) {
-        return "We'll email you a link to reset your password."
+        return "We'll email you a link to reset your password.";
       } else if (this.isResetPasswordState) {
-        return "We've sent an email that contains a link to reset your password. Contact support if you have any issues or don't receive an email."
+        return "We've sent an email that contains a link to reset your password. Contact support if you have any issues or don't receive an email.";
       } else {
-        return 'Sign in with your email'
+        return "Sign in with your email";
       }
     },
 
@@ -344,11 +358,11 @@ export default {
      * @returns {String}
      */
     userUrl() {
-      return `${process.env.api_host}/user`
+      return `${process.env.api_host}/user`;
     },
 
     twoFactorUrl() {
-      return `${process.env.api_host}/account/login/twofactor?api_key=${this.tempSessionToken}`
+      return `${process.env.api_host}/account/login/twofactor?api_key=${this.tempSessionToken}`;
     },
 
     /**
@@ -356,38 +370,37 @@ export default {
      * @returns {Object}
      */
     forgotPasswordRules() {
-      return { email: this.logInRules.email }
-    }
+      return { email: this.logInRules.email };
+    },
   },
 
   beforeMount() {
     // Start on login dialog
-    this.toLogInState()
+    this.toLogInState();
   },
 
   methods: {
-    ...mapActions(['updateUserToken', 'updateProfile']),
+    ...mapActions(["updateUserToken", "updateProfile"]),
 
     onEnter(event) {
       if (event.currentTarget === this.$refs.pwdField.ref) {
-        this.onFormSubmit('logInForm')
+        this.onFormSubmit("logInForm");
       } else {
-        this.$refs.pwdField.focus()
+        this.$refs.pwdField.focus();
       }
-
     },
     /**
      * Reset all values and validation for
      * login form
      */
     resetLogInForm() {
-      this.$refs.logInForm.clearValidate('email')
-      this.$refs.logInForm.clearValidate('password')
-      this.logInForm.email = ''
-      this.logInForm.password = ''
+      this.$refs.logInForm.clearValidate("email");
+      this.$refs.logInForm.clearValidate("password");
+      this.logInForm.email = "";
+      this.logInForm.password = "";
 
-      this.twoFactorForm.token = ''
-      this.isLoadingTwoFactor = false
+      this.twoFactorForm.token = "";
+      this.isLoadingTwoFactor = false;
     },
 
     /**
@@ -395,8 +408,8 @@ export default {
      * forgot password form
      */
     resetForgotPasswordForm() {
-      this.$refs.forgotPasswordForm.clearValidate('email')
-      this.forgotPasswordForm.email = ''
+      this.$refs.forgotPasswordForm.clearValidate("email");
+      this.forgotPasswordForm.email = "";
     },
 
     /**
@@ -404,8 +417,8 @@ export default {
      * two factor form
      */
     resetTwoFactorForm() {
-      this.$refs.twoFactorForm.clearValidate('token')
-      this.twoFactorForm.token = ''
+      this.$refs.twoFactorForm.clearValidate("token");
+      this.twoFactorForm.token = "";
     },
 
     /**
@@ -414,14 +427,14 @@ export default {
      */
     closeLogInDialog() {
       if (this.isLogInState) {
-        this.resetLogInForm()
+        this.resetLogInForm();
       } else if (this.isForgotPasswordState) {
-        this.resetForgotPasswordForm()
+        this.resetForgotPasswordForm();
       }
       if (!this.isLogInState) {
-        this.toLogInState()
+        this.toLogInState();
       }
-      this.$emit('close-log-in-dialog')
+      this.$emit("close-log-in-dialog");
     },
 
     /**
@@ -429,12 +442,12 @@ export default {
      */
     toLogInState() {
       if (this.isForgotPasswordState) {
-        this.resetForgotPasswordForm()
+        this.resetForgotPasswordForm();
       }
       if (this.logInState === this.states.TWO_FACTOR) {
-        this.resetTwoFactorForm()
+        this.resetTwoFactorForm();
       }
-      this.logInState = this.states.LOG_IN
+      this.logInState = this.states.LOG_IN;
     },
 
     /**
@@ -442,10 +455,10 @@ export default {
      */
     toForgotPasswordState() {
       if (this.isLogInState) {
-        this.resetLogInForm()
+        this.resetLogInForm();
       }
-      this.logInState = this.states.FORGOT_PASSWORD
-      this.$nextTick(() => this.$refs.forgotPasswordEmailInput.focus())
+      this.logInState = this.states.FORGOT_PASSWORD;
+      this.$nextTick(() => this.$refs.forgotPasswordEmailInput.focus());
     },
 
     /**
@@ -454,9 +467,9 @@ export default {
      */
     toResetPasswordState() {
       if (this.isForgotPasswordState) {
-        this.resetForgotPasswordForm()
+        this.resetForgotPasswordForm();
       }
-      this.logInState = this.states.RESET_PASSWORD
+      this.logInState = this.states.RESET_PASSWORD;
     },
 
     /**
@@ -466,62 +479,61 @@ export default {
     onFormSubmit(e) {
       this.$refs[e].validate((valid) => {
         if (!valid) {
-          return
+          return;
         }
         if (this.isLogInState) {
-          this.sendLoginRequest()
+          this.sendLoginRequest();
         } else {
-          this.sendResetPasswordEmailRequest()
+          this.sendResetPasswordEmailRequest();
         }
-      })
+      });
     },
 
     /**
      * Handle login request after validation
      */
     async sendLoginRequest() {
-
-      this.isLoggingIn = true
+      this.isLoggingIn = true;
       try {
         const user = await Auth.signIn(
           this.logInForm.email,
           this.logInForm.password
-        )
+        );
         // this.handleLoginSuccess(user)
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
-            type: 'info',
+            type: "info",
             msg: `Login successful. Loading Workspace, please wait.`,
-            duration: 5000
-          }
-        })
-        this.$emit('succesfulLogin', user)
-        this.closeLogInDialog()
+            duration: 5000,
+          },
+        });
+        this.$emit("succesfulLogin", user);
+        this.closeLogInDialog();
       } catch (error) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
-            type: 'error',
-            msg: `Incorrect username or password. Please try again.`
-          }
-        })
-        this.logInForm.password = ''
+            type: "error",
+            msg: `Incorrect username or password. Please try again.`,
+          },
+        });
+        this.logInForm.password = "";
       }
-      this.isLoggingIn = false
+      this.isLoggingIn = false;
     },
 
     async initiateFederatedLogin(provider) {
-      this.isLoggingIn = true
-      this.closeLogInDialog()
+      this.isLoggingIn = true;
+      this.closeLogInDialog();
       try {
-        const cred = await Auth.federatedSignIn({customProvider: provider})
+        const cred = await Auth.federatedSignIn({ customProvider: provider });
       } catch (error) {
-        this.isLoggingIn = false
-        EventBus.$emit('toast', {
+        this.isLoggingIn = false;
+        EventBus.$emit("toast", {
           detail: {
-            type: 'error',
-            msg: `There was an error with your federated login attempt. Please try again.`
-          }
-        })
+            type: "error",
+            msg: `There was an error with your federated login attempt. Please try again.`,
+          },
+        });
       }
     },
 
@@ -531,33 +543,33 @@ export default {
      * @param {Object} profile
      */
     setLogin(token) {
-      this.$cookies.set('user_token', token)
+      this.$cookies.set("user_token", token);
 
-      this.updateUserToken(token)
-      const url = `${this.userUrl}` + `?api_key=${token}`
+      this.updateUserToken(token);
+      const url = `${this.userUrl}` + `?api_key=${token}`;
       this.$axios.$get(url).then((response) => {
-        this.updateProfile(response)
-      })
-      this.closeLogInDialog()
+        this.updateProfile(response);
+      });
+      this.closeLogInDialog();
     },
 
     /**
      * Handle password reset request after validation
      */
     sendResetPasswordEmailRequest() {
-      this.isSendingResetEmail = true
+      this.isSendingResetEmail = true;
       Auth.forgotPassword(this.forgotPasswordForm.email)
         .then(this.toResetPasswordState())
         .catch(() => {
-          EventBus.$emit('toast', {
+          EventBus.$emit("toast", {
             detail: {
-              msg: `There was an error sending a password reset request. Please try again.`
-            }
-          })
+              msg: `There was an error sending a password reset request. Please try again.`,
+            },
+          });
         })
         .finally(() => {
-          this.isSendingResetEmail = false
-        })
+          this.isSendingResetEmail = false;
+        });
     },
 
     /**
@@ -565,7 +577,7 @@ export default {
      * @param {String} email
      */
     generateResetPasswordEmailUrl(email) {
-      return `${process.env.api_host}/account/${email}/reset`
+      return `${process.env.api_host}/account/${email}/reset`;
     },
 
     /**
@@ -574,24 +586,24 @@ export default {
     onTwoFactorFormSubmit() {
       this.$refs.twoFactorForm.validate((valid) => {
         if (!valid) {
-          return
+          return;
         }
-        this.sendTwoFactorRequest()
-      })
+        this.sendTwoFactorRequest();
+      });
     },
 
     /**
      * Makes XHR call to login
      */
     sendTwoFactorRequest() {
-      this.isLoadingTwoFactor = true
+      this.isLoadingTwoFactor = true;
 
       this.$axios
         .$post(this.twoFactorUrl, {
-          token: this.twoFactorForm.token
+          token: this.twoFactorForm.token,
         })
         .then(this.handleTwoFactorSuccess.bind(this))
-        .catch(this.handleTwoFactorError.bind(this))
+        .catch(this.handleTwoFactorError.bind(this));
     },
 
     /**
@@ -599,7 +611,7 @@ export default {
      * @param {Object} response
      */
     handleTwoFactorSuccess(response) {
-      this.setLogin(response.sessionToken, response.profile)
+      this.setLogin(response.sessionToken, response.profile);
     },
 
     /**
@@ -607,23 +619,22 @@ export default {
      * @param {Object} response
      */
     handleTwoFactorError(response) {
-      this.isLoadingTwoFactor = false
-      this.$refs.twoFactor.focus()
+      this.isLoadingTwoFactor = false;
+      this.$refs.twoFactor.focus();
 
-      EventBus.$emit('toast', {
+      EventBus.$emit("toast", {
         detail: {
-          type: 'ERROR',
-          msg: `Two Factor validation failed: Token is invalid`
-        }
-      })
-    }
-  }
-}
+          type: "ERROR",
+          msg: `Two Factor validation failed: Token is invalid`,
+        },
+      });
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
-
+@import "../../../assets/_variables.scss";
 
 .dialog-container {
   margin-bottom: 40px;
@@ -676,11 +687,10 @@ export default {
       background-color: whitesmoke;
       border-color: darkgray;
       justify-content: flex-start;
-
     }
- &--federated-login-button:hover{
-    color:white;
- }
+    &--federated-login-button:hover {
+      color: white;
+    }
     &--actions {
       &.log-in {
         margin-top: 32px;
@@ -719,8 +729,6 @@ export default {
   }
 }
 
-
-
 //
 //:deep(.el-dialog log-in-dialog ) {
 //
@@ -741,8 +749,8 @@ export default {
 }
 </style>
 <style lang="scss">
-@import '../../../assets/_variables.scss';
-.ps-login-dialog .el-dialog__close{
-    color:$purple_3!important;
-    }
+@import "../../../assets/_variables.scss";
+.ps-login-dialog .el-dialog__close {
+  color: $purple_3 !important;
+}
 </style>
