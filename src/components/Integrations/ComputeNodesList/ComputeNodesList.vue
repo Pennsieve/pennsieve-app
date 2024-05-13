@@ -59,9 +59,24 @@ export default {
       type: Array,
       default: () => [
         {
-          computeId: "x",
-          computeUrl: "y",
-          description: "z",
+          account: {
+            uuid: "",
+            accountId: "932198931298",
+            accountType: "AWS",
+          },
+          environment: "Prod",
+          createdAt: "1620886366",
+          computeNodeName: "Immune Health AWS Account",
+        },
+        {
+          account: {
+            uuid: "",
+            accountId: "1233-123-1233",
+            accountType: "Azure",
+          },
+          environment: "Dev",
+          createdAt: "1620886366",
+          computeNodeName: "Immune Health Azure Account",
         },
       ],
     },

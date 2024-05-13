@@ -196,7 +196,7 @@ export default {
   text-align: center;
 }
 
-.intergration-type {
+.integration-type {
   color: $gray_5;
   font-weight: 500;
   font-size: 12px;

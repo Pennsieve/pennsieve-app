@@ -1,21 +1,25 @@
 <template>
   <div class="integration-list-item">
-    <br />
-    <el-row>
-      <p class="integration-description">
-        Compute Id: {{ computeNode.computeId }}
-      </p>
-    </el-row>
-    <el-row>
-      <p class="integration-description">
-        Compute Url: {{ computeNode.computeUrl }}
-      </p>
-    </el-row>
-    <el-row>
-      <p class="integration-description">
-        Description: {{ computeNode.description }}
-      </p>
-    </el-row>
+    <div class="flex-row">
+      <div class="compute-node-title">
+        {{ computeNode.computeNodeName }}
+      </div>
+      <div v-if="hasAdminRights" class="compute-node-account-info">
+        ({{ computeNode.account.accountType }}) #{{
+          computeNode.account.accountId
+        }}
+      </div>
+    </div>
+    <div>
+      <div>Production Node</div>
+      <div>Created Date</div>
+      <div>{{ computeNode.createdAt }}</div>
+      <hr />
+      <div>Development Node</div>
+      <div>Created Date</div>
+      <div>{{ computeNode.createdAt }}</div>
+      <div></div>
+    </div>
   </div>
 </template>
 
@@ -52,13 +56,22 @@ export default {
 <style scoped lang="scss">
 @import "../../../assets/_variables.scss";
 
+.flex-row {
+  display: flex;
+  justify-content: space-between;
+  background: $purple_tint;
+  padding: 8px 16px;
+  height: 64px;
+  align-items: center;
+}
+
 .integration-menu {
   width: 24px;
 }
 
 .integration-list-item {
-  width: 230px;
-  height: 300px;
+  width: 90%;
+  height: 200px;
   border: 1px solid $gray_3;
   //margin: 0 0 16px 0;
   margin: 0 8px 16px 8px;
@@ -66,12 +79,6 @@ export default {
   background-color: white;
   display: flex;
   flex-direction: column;
-}
-.info {
-  background: $purple_tint;
-  padding: 8px 16px;
-  height: 64px;
-  align-items: center;
 }
 
 .integration-title {
@@ -81,10 +88,16 @@ export default {
   text-align: center;
 }
 
-.intergration-type {
+.compute-node-title {
   color: $gray_5;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 18px;
+}
+
+.compute-node-account-info {
+  color: $gray_4;
+  font-weight: 500;
+  font-size: 18px;
 }
 
 .activeSwitch {
