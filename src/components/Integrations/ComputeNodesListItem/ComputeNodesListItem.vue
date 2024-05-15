@@ -25,6 +25,7 @@
 
 <script>
 import { mapActions, mapState } from "vuex";
+import FormatDate from "../../../mixins/format-date";
 
 export default {
   name: "ComputeNodesListItem",
@@ -37,6 +38,8 @@ export default {
       default: () => ({}),
     },
   },
+
+  mixins: [FormatDate],
 
   computed: {
     ...mapState(["orgMembers", "profile"]),
