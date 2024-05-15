@@ -201,7 +201,6 @@ export default {
       const banner = this.datasetBanner
       const datasetDescription = this.datasetDescription
 
-
       const isTrue = item => item === true
 
       return all(isTrue, [
@@ -212,7 +211,7 @@ export default {
         this.datasetTags.length > 0,
         contributors.length > 0,
         Boolean(datasetDescription),
-        Boolean(this.getPermission('owner') ||  this.isUserPublisher)
+        Boolean(this.getPermission('owner'))
       ])
     },
 
