@@ -201,7 +201,6 @@ export default {
       const banner = this.datasetBanner
       const datasetDescription = this.datasetDescription
 
-
       const isTrue = item => item === true
 
       return all(isTrue, [
