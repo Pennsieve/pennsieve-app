@@ -325,6 +325,77 @@ export default {
      * take the user based on their organization
      * @returns {Object}
      */
+    logoClass: function () {
+      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
+      if (
+        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80"
+      ) {
+        return "I3H-logo";
+      } else {
+        return "logo";
+      }
+    },
+    MarkComponent: function () {
+      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
+      let name = "PennsieveMark";
+      if (
+        this.orgId === "N:organization:050fae39-4412-43ef-a514-703ed8e299d5" ||
+        this.orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"
+      ) {
+        name = "IconSPARCLogo";
+      } else if (
+        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80" ||
+        this.orgId === "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2"
+      ) {
+        name = "IconI3HLogo";
+      } else if (
+        this.orgId === "N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae" ||
+        this.orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f"
+      ) {
+        name = "IconHealInitiative";
+      }
+      return name;
+    },
+    hasCustomTheme: function () {
+      return true;
+    },
+    getThemeColors: function () {
+      return this.getTheme(this.orgId);
+    },
+    navStyleColor: function () {
+      if (this.hasCustomTheme) {
+        return this.pSBC(0.1, this.getThemeColors[1]);
+      }
+      return "";
+    },
+    workspaceBackgroundStyle: function () {
+      if (this.hasCustomTheme) {
+        const color1 = this.pSBC(
+          -0.1,
+          this.getThemeColors[0],
+          this.getThemeColors[1],
+          true
+        );
+        return `linear-gradient(to top, ${color1}, ${this.getThemeColors[1]})`;
+      }
+      return "";
+    },
+    userMenuBackgroundColor: function () {
+      if (this.hasCustomTheme) {
+        return this.getThemeColors[0]; // color1
+      }
+      return "";
+    },
+
+    PublicationTabs: function () {
+      return PublicationTabs;
+    },
+
+    /**
+     * Compute what route the logo should
+     * take the user based on their organization
+     * @returns {Object}
+     */
     logoRoute: function () {
       let routeName = "datasets-list";
 
