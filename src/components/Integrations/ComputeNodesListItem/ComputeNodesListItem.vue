@@ -2,30 +2,32 @@
   <div class="integration-list-item">
     <div class="flex-row">
       <div class="compute-node-title">
-        {{ computeNode.computeNodeName }}
+        {{ this.activeOrgName }}
+        {{ computeNode.environment }}
+        Compute Node
       </div>
-      <div v-if="hasAdminRights" class="compute-node-account-info">
+      <div class="compute-node-account-info">
         ({{ computeNode.account.accountType }}) #{{
           computeNode.account.accountId
         }}
       </div>
     </div>
-    <div>
-      <div>Production Node</div>
-      <div>Created Date</div>
-      <div>{{ computeNode.createdAt }}</div>
-      <hr />
-      <div>Development Node</div>
-      <div>Created Date</div>
-      <div>{{ computeNode.createdAt }}</div>
-      <div></div>
+    <div class="margin-10">
+      <div>
+        <div class="margin-10">{{ computeNode.environment }} Node</div>
+        <div class="margin-10">
+          Created Date: {{ this.formatDate(computeNode.createdAt) }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import { mapGetters } from "vuex";
 import { mapActions, mapState } from "vuex";
 import FormatDate from "../../../mixins/format-date";
+import { pathOr } from "ramda";
 
 export default {
   name: "ComputeNodesListItem",
@@ -39,10 +41,18 @@ export default {
     },
   },
 
-  mixins: [FormatDate],
+  mixins: [FormatDate, Request],
 
   computed: {
     ...mapState(["orgMembers", "profile"]),
+    ...mapGetters(["activeOrganization", "userToken", "config"]),
+    /**
+     * Active organization name
+     * @returns {String}
+     */
+    activeOrgName: function () {
+      return pathOr("", ["organization", "name"], this.activeOrganization);
+    },
   },
 
   data: function () {
@@ -53,11 +63,16 @@ export default {
   methods: {
     ...mapActions(["updateDataset"]),
   },
+  methods: {},
 };
 </script>
 
 <style scoped lang="scss">
 @import "../../../assets/_variables.scss";
+
+.margin-10 {
+  margin: 10px;
+}
 
 .flex-row {
   display: flex;
@@ -74,7 +89,7 @@ export default {
 
 .integration-list-item {
   width: 90%;
-  height: 200px;
+  height: 150px;
   border: 1px solid $gray_3;
   //margin: 0 0 16px 0;
   margin: 0 8px 16px 8px;
@@ -95,6 +110,7 @@ export default {
   color: $gray_5;
   font-weight: 500;
   font-size: 18px;
+  margin: 20px 0px;
 }
 
 .compute-node-account-info {

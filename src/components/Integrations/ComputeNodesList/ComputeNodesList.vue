@@ -3,7 +3,7 @@
     <div v-if="computeNodes.length > 0" class="integration-list">
       <compute-nodes-list-item
         v-for="computeNode in computeNodes"
-        :key="computeId"
+        :key="computeNode.uuid"
         :computeNode="computeNode"
       />
     </div>
@@ -40,6 +40,7 @@ import { mapGetters, mapActions, mapState } from "vuex";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import Request from "../../../mixins/request";
 
 import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
@@ -54,36 +55,18 @@ export default {
     ComputeNodesListItem,
   },
 
-  props: {
-    computeNodes: {
-      type: Array,
-      default: () => [
-        {
-          account: {
-            uuid: "",
-            accountId: "932198931298",
-            accountType: "AWS",
-          },
-          environment: "Prod",
-          createdAt: "1620886366",
-          computeNodeName: "Immune Health AWS Account",
-        },
-        {
-          account: {
-            uuid: "",
-            accountId: "1233-123-1233",
-            accountType: "Azure",
-          },
-          environment: "Dev",
-          createdAt: "1620886366",
-          computeNodeName: "Immune Health Azure Account",
-        },
-      ],
-    },
-  },
+  props: {},
+
+  mixins: [Request],
 
   data() {
-    return {};
+    return {
+      computeNodes: [],
+    };
+  },
+
+  created() {
+    this.fetchComputeNodes();
   },
 
   computed: {
@@ -116,6 +99,7 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
+    ...mapGetters(["activeOrganization", "userToken", "config"]),
     /**
      * Model URL
      * @returns {String}
@@ -126,6 +110,62 @@ export default {
       }
 
       return "";
+    },
+    /**
+     * Fetches Compute Nodes
+     */
+    fetchComputeNodes: function () {
+      const dummyData = [
+        {
+          uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
+          computeNodeGatewayUrl: "",
+          environment: "Development",
+          createdAt: "2024-05-16T18:43:00Z",
+          queueUrl: "",
+          organizationId: "N:organization:050fae39-4412-43ef-a514-703ed8e299d5",
+          userId: "",
+          account: {
+            uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
+            accountId: "537996532276",
+            accountType: "AWS",
+          },
+        },
+        {
+          uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
+          computeNodeGatewayUrl: "",
+          environment: "Production",
+          createdAt: "2024-05-16T18:43:00Z",
+          queueUrl: "",
+          organizationId: "N:organization:050fae39-4412-43ef-a514-703ed8e299d5",
+          userId: "",
+          account: {
+            uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
+            accountId: "537996532276",
+            accountType: "AWS",
+          },
+        },
+      ];
+
+      const url = `${this.config.api2Url}/compute-nodes`;
+
+      this.sendXhr(url, {
+        method: "GET",
+        header: {
+          Authorization: `Bearer ${this.userToken}`,
+        },
+      })
+        .then((response) => {
+          this.computeNodes = dummyData;
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Sorry! There was an issue fetching your data",
+              type: "error",
+            },
+          });
+        });
     },
   },
 };
