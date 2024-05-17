@@ -87,7 +87,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
  */
 const Integrations = () => import ('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
-const ApplicationsList = () => import ('../components/Integrations/ApplicationsList/ApplicationsList.vue')
+const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
 const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
 
 /**
