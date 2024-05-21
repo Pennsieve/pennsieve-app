@@ -12,17 +12,13 @@
     </div>
     <div class="margin-10">
       <div>
-        <div class="margin-10">
-          {{
-            computeNode.environment.charAt(0).toUpperCase() +
-            computeNode.environment.slice(1)
-          }}
-          Node
-        </div>
+        <div class="margin-10">{{ computeNode.environment }} Node</div>
         <div class="margin-10">
           Created Date: {{ this.formatDate(computeNode.createdAt) }}
         </div>
-        <div class="margin-10">{{ computeNode.description }}</div>
+        <div class="margin-10">
+          {{ computeNode.description }}
+        </div>
       </div>
     </div>
   </div>
@@ -94,7 +90,7 @@ export default {
 
 .integration-list-item {
   width: 90%;
-  height: 150px;
+  height: 175px;
   border: 1px solid $gray_3;
   //margin: 0 0 16px 0;
   margin: 0 8px 16px 8px;
