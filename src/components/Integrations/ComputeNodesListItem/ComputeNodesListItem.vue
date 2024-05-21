@@ -2,9 +2,7 @@
   <div class="integration-list-item">
     <div class="flex-row">
       <div class="compute-node-title">
-        {{ this.activeOrgName }}
-        {{ computeNode.environment }}
-        Compute Node
+        {{ computeNode.name }}
       </div>
       <div class="compute-node-account-info">
         ({{ computeNode.account.accountType }}) #{{
@@ -14,10 +12,17 @@
     </div>
     <div class="margin-10">
       <div>
-        <div class="margin-10">{{ computeNode.environment }} Node</div>
+        <div class="margin-10">
+          {{
+            computeNode.environment.charAt(0).toUpperCase() +
+            computeNode.environment.slice(1)
+          }}
+          Node
+        </div>
         <div class="margin-10">
           Created Date: {{ this.formatDate(computeNode.createdAt) }}
         </div>
+        <div class="margin-10">{{ computeNode.description }}</div>
       </div>
     </div>
   </div>
