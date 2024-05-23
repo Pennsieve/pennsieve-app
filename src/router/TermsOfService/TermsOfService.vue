@@ -187,11 +187,17 @@ export default {
      * Gets Terms of Service
      */
     getTermsOfService: function () {
-      fetch("../../public/tos_html.txt")
-        .then((response) => response.text())
-        .then((text) => {
-          this.termsOfService = text;
-        });
+      this.sendXhr(
+        `${this.config.api2Url}/readme/docs/pennsieve-terms-of-service`,
+        {
+          method: "GET",
+          header: {
+            Authorization: `Bearer ${this.userToken}`,
+          },
+        }
+      ).then((response) => {
+        this.termsOfService = response.body_html;
+      });
     },
 
     /**
