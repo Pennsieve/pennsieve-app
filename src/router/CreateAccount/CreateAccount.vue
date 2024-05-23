@@ -102,12 +102,12 @@ export default {
 
   mixins: [Request],
 
-  mounted: async function() {
-    await this.$recaptchaLoaded()
-    this.$recaptchaInstance.value.showBadge()
+  mounted: async function () {
+    await this.$recaptchaLoaded();
+    this.$recaptchaInstance.value.showBadge();
   },
   unmounted() {
-    this.$recaptchaInstance.value.hideBadge()
+    this.$recaptchaInstance.value.hideBadge();
   },
 
   data() {
@@ -151,7 +151,6 @@ export default {
   computed: {
     ...mapState(["config"]),
   },
-
 
   methods: {
     /**
