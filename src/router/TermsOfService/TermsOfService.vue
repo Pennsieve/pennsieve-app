@@ -43,7 +43,6 @@
       >
         Accept &amp; Continue
       </bf-button>
-
       <button class="decline-button" @click="decline">
         Decline &amp; Sign Out
       </button>
