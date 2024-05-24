@@ -115,37 +115,6 @@ export default {
      * Fetches Compute Nodes
      */
     fetchComputeNodes: function () {
-      const dummyData = [
-        {
-          uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
-          computeNodeGatewayUrl: "",
-          environment: "Development",
-          createdAt: "2024-05-16T18:43:00Z",
-          queueUrl: "",
-          organizationId: "N:organization:050fae39-4412-43ef-a514-703ed8e299d5",
-          userId: "",
-          account: {
-            uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
-            accountId: "537996532276",
-            accountType: "AWS",
-          },
-        },
-        {
-          uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
-          computeNodeGatewayUrl: "",
-          environment: "Production",
-          createdAt: "2024-05-16T18:43:00Z",
-          queueUrl: "",
-          organizationId: "N:organization:050fae39-4412-43ef-a514-703ed8e299d5",
-          userId: "",
-          account: {
-            uuid: "5f514ca1-e540-4b48-893d-2345d965fb39",
-            accountId: "537996532276",
-            accountType: "AWS",
-          },
-        },
-      ];
-
       const url = `${this.config.api2Url}/compute-nodes`;
 
       this.sendXhr(url, {
@@ -155,7 +124,7 @@ export default {
         },
       })
         .then((response) => {
-          this.computeNodes = dummyData;
+          this.computeNodes = response;
         })
         .catch((response) => {
           this.handleXhrError(response);
