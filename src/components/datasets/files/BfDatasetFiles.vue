@@ -16,6 +16,12 @@
           />
         </template>
         <template #right>
+          <bf-button @click="openRunAnalysisDialog" class="mr-8 flex">
+            <template #prefix>
+              <IconAnalysis class="mr-8" :height="20" :width="20" />
+            </template>
+            Run Analysis
+          </bf-button>
           <bf-button
             v-if="getPermission('editor')"
             class="flex mr-8"
@@ -121,6 +127,11 @@
       :selected-files="selectedFiles"
     />
 
+    <run-analysis-dialog
+      :dialog-visible="runAnalysisDialogVisible"
+      @close="onCloseRunAnalysisDialog"
+    />
+
     <bf-drop-info
       v-if="showDropInfo"
       v-model:show-drop-info="showDropInfo"
@@ -149,6 +160,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
 import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
+import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -165,6 +177,7 @@ import FileMetadataInfo from "./Metadata/FileMetadataInfo.vue";
 import LockedBanner from "../LockedBanner/LockedBanner.vue";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
+import IconAnalysis from "../../icons/IconAnalysis.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
@@ -194,6 +207,7 @@ export default {
     LockedBanner,
     DeletedFiles,
     FileMetadataInfo,
+    RunAnalysisDialog,
   },
 
   props: {
@@ -238,6 +252,7 @@ export default {
       selectedFileForAction: {},
       pusherChannelName: "",
       pusherChannel: {},
+      runAnalysisDialogVisible: false,
     };
   },
 
@@ -451,6 +466,9 @@ export default {
     },
     onClosePackageDialog: function () {
       this.packageDialogVisible = false;
+    },
+    onCloseRunAnalysisDialog: function () {
+      this.runAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
@@ -670,7 +688,6 @@ export default {
      */
     openPackageDialog: function () {
       this.packageDialogVisible = true;
-      // this.$refs.packageDialog.visible = true
     },
 
     /**
@@ -1050,6 +1067,9 @@ export default {
         .catch((response) => {
           this.handleXhrError(response);
         });
+    },
+    openRunAnalysisDialog: function () {
+      this.runAnalysisDialogVisible = true;
     },
   },
 };
