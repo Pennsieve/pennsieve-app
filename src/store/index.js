@@ -12,6 +12,7 @@ import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
 import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
+import analysisModule from "./analysisModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -117,7 +118,8 @@ export const state = {
   isLinkOrcidDialogVisible: false,
   userToken: '',
   sessionTimer: null,
-  isRefreshing: false
+  isRefreshing: false,
+  computeNodes: []
 }
 
 export const mutations = {
@@ -1029,6 +1031,7 @@ export default createStore({
     filesModule,
     uploadModule,
     metadataModule,
+    analysisModule
   }
 
 });
