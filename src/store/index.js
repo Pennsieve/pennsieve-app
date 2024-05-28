@@ -1013,6 +1013,9 @@ export const getters = {
   hasOrcidOnboardingEvent: (state) => {
     return state.onboardingEvents.includes("AddedOrcid") || false;
   },
+  getComputeNodes: (state) => {
+    return state.computeNodes
+  }
 }
 
 

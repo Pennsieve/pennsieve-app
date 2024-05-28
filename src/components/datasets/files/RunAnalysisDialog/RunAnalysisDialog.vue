@@ -10,10 +10,64 @@
     </template>
 
     <dialog-body>
-      <div v-show="shouldShow(1)">Step One</div>
-      <div v-show="shouldShow(2)">Step Two</div>
-      <div v-show="shouldShow(3)">Step Three</div>
-      <div v-show="shouldShow(4)">Step Four</div>
+      <div v-show="shouldShow(1)">
+        <el-select
+          class="margin-10"
+          v-model="computeNodeValue"
+          placeholder="Select Compute Node"
+          @change="setSelectedComputeNode(computeNodeValue)"
+        >
+          <el-option
+            v-for="(item, i) in computeNodeOptions"
+            :key="i"
+            :label="item.label"
+            :value="item.value"
+          ></el-option>
+        </el-select>
+      </div>
+      <div v-show="shouldShow(2)">
+        <el-select
+          class="margin flex"
+          v-model="preprocessorValue"
+          placeholder="Select Preprocessor"
+          @change="setSelectedPreprocessor(preprocessorValue)"
+        >
+          <el-option
+            v-for="(item, i) in preprocessorOptions"
+            :key="i"
+            :label="item.label"
+            :value="item.value"
+          ></el-option>
+        </el-select>
+        <el-select
+          class="margin flex"
+          v-model="processorValue"
+          placeholder="Select Processor"
+          @change="setSelectedProcessor(processorValue)"
+        >
+          <el-option
+            v-for="(item, i) in processorOptions"
+            :key="i"
+            :label="item.label"
+            :value="item.value"
+          ></el-option>
+        </el-select>
+        <el-select
+          class="margin flex"
+          v-model="postprocessorValue"
+          placeholder="Select Postprocessor"
+          @change="setSelectedPostprocessor(postprocessorValue)"
+        >
+          <el-option
+            v-for="(item, i) in postprocessorOptions"
+            :key="i"
+            :label="item.label"
+            :value="item.value"
+          ></el-option>
+        </el-select>
+      </div>
+      <div v-show="shouldShow(3)">Select Files</div>
+      <div v-show="shouldShow(4)">Run Analysis Workflow on Selected Files</div>
     </dialog-body>
 
     <template #footer>
@@ -32,10 +86,8 @@ import BfButton from "../../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../../shared/dialog-body/DialogBody.vue";
 import Request from "../../../../mixins/request/index";
-import EventBus from "../../../../utils/event-bus";
-import { pathOr } from "ramda";
 
-import { mapGetters, mapState, mapActions } from "vuex";
+import { mapState, mapActions } from "vuex";
 
 export default {
   name: "RunAnalysisDialog",
@@ -57,13 +109,29 @@ export default {
   data: function () {
     return {
       processStep: 1,
+      computeNodeOptions: [],
+      computeNodeValue: "",
+      selectedComputeNode: {},
+      preprocessorOptions: [],
+      preprocessorValue: "",
+      selectedPreprocessor: {},
+      preprocessorOptions: [],
+      processorValue: "",
+      selectedProcessor: {},
+      postprocessorOptions: [],
+      postprocessorValue: "",
+      selectedPostprocessor: {},
     };
   },
 
   computed: {
-    ...mapGetters([]),
     ...mapActions("analysisModule", ["fetchComputeNodes"]),
-    ...mapState(["computeNodes"]),
+    ...mapState("analysisModule", [
+      "computeNodes",
+      "preprocessors",
+      "processors",
+      "postprocessors",
+    ]),
     /**
      * Computes create property CTA
      * @returns {String}
@@ -76,9 +144,27 @@ export default {
     },
   },
 
-  watch: {},
+  watch: {
+    computeNodes: function () {
+      this.formatComputeNodeOptions();
+    },
+    processorValue: function () {
+      this.formatProcessorOptions();
+    },
+    preprocessorValue: function () {
+      this.formatPreprocessorOptions();
+    },
+    postprocessorValue: function () {
+      this.formatPostprocessorOptions();
+    },
+  },
 
-  mounted() {},
+  mounted() {
+    this.formatComputeNodeOptions();
+    this.formatPreprocessorOptions();
+    this.formatProcessorOptions();
+    this.formatPostprocessorOptions();
+  },
 
   methods: {
     /**
@@ -87,6 +173,14 @@ export default {
     closeDialog: function () {
       this.$emit("close");
       this.processStep = 1;
+      this.computeNodeValue = "";
+      this.selectedComputeNode = {};
+      this.preprocessorValue = "";
+      this.selectedPreprocessor = {};
+      this.processorValue = "";
+      this.selectedProcessor = {};
+      this.postprocessorValue = "";
+      this.selectedPostprocessor = {};
     },
     /**
      * Manages the Multi Step Functionality
@@ -98,7 +192,6 @@ export default {
       }
 
       if (this.processStep > 4) {
-        console.log("processStep", this.processStep);
         try {
           this.runAnalysis();
         } catch {
@@ -120,10 +213,94 @@ export default {
     shouldShow: function (key) {
       return this.processStep === key;
     },
+    /**
+     * Access integrations from global state and format options for input select
+     */
+    formatComputeNodeOptions: function () {
+      this.computeNodeOptions = this.computeNodes.map((computeNode) => {
+        return {
+          value: computeNode.name,
+          label: computeNode.name,
+        };
+      });
+    },
+    /**
+     * Access processors from global state and format options for input select
+     */
+    formatProcessorOptions: function () {
+      this.processorOptions = this.processors.map((processor) => {
+        return {
+          value: processor.name,
+          label: processor.name,
+        };
+      });
+    },
+    /**
+     * Access preprocessors from global state and format options for input select
+     */
+    formatPreprocessorOptions: function () {
+      this.preprocessorOptions = this.preprocessors.map((preprocessor) => {
+        return {
+          value: preprocessor.name,
+          label: preprocessor.name,
+        };
+      });
+    },
+    /**
+     * Access postprocessors from global state and format options for input select
+     */
+    formatPostprocessorOptions: function () {
+      this.postprocessorOptions = this.postprocessors.map((postprocessor) => {
+        return {
+          value: postprocessor.name,
+          label: postprocessor.name,
+        };
+      });
+    },
+    /**
+     * Set Selected Compute Node
+     */
+    setSelectedComputeNode: function (value) {
+      this.selectedComputeNode = this.computeNodes.find(
+        (computeNode) => computeNode.name === value
+      );
+    },
+    /**
+     * Set Selected Preprocessor
+     */
+    setSelectedPreprocessor: function (value) {
+      this.selectedPreprocessor = this.preprocessors.find(
+        (preprocessor) => preprocessor.name === value
+      );
+    },
+    /**
+     * Set Selected Processor
+     */
+    setSelectedProcessor: function (value) {
+      this.selectedProcessor = this.processors.find(
+        (processor) => processor.name === value
+      );
+    },
+    /**
+     * Set Selected Postprocessor
+     */
+    setSelectedPostprocessor: function (value) {
+      this.selectedPostprocessor = this.postprocessors.find(
+        (postprocessor) => postprocessor.name === value
+      );
+    },
   },
 };
 </script>
 
 <style scoped lang="scss">
 @import "../../../../assets/_variables.scss";
+
+.flex {
+  display: flex;
+}
+
+.margin {
+  margin: 20px;
+}
 </style>
