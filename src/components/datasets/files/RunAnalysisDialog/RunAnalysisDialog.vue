@@ -115,6 +115,7 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
+import FilesTable from "../../../FilesTable/FilesTable.vue";
 
 export default {
   name: "RunAnalysisDialog",
@@ -122,6 +123,7 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
+    FilesTable,
     BfButton,
   },
 
@@ -225,6 +227,8 @@ export default {
 
   mounted() {
     this.fetchFiles();
+    this.fetchComputeNodes();
+    this.fetchApplications();
   },
 
   methods: {
@@ -232,6 +236,8 @@ export default {
       "setSelectedFiles",
       "clearSelectedFiles",
       "setSelectedFile",
+      "fetchComputeNodes",
+      "fetchApplications",
     ]),
     /**
      * Get files URL for dataset
@@ -390,7 +396,7 @@ export default {
         .then((response) => {
           EventBus.$emit("toast", {
             detail: {
-              msg: "The selected event has been successfully initiated!",
+              msg: "Your workflow has been successfully initiated!",
               type: "success",
             },
           });
@@ -550,11 +556,62 @@ export default {
 <style scoped lang="scss">
 @import "../../../../assets/_variables.scss";
 
+.table-container {
+  overflow-y: scroll;
+  display: block;
+  max-height: 450px;
+  margin-top: 1px;
+}
+
 .flex {
   display: flex;
 }
 
 .margin {
   margin: 20px;
+}
+
+.lds-ring {
+  /* change color here */
+  color: #1c4c5b;
+}
+.lds-ring,
+.lds-ring div {
+  box-sizing: border-box;
+}
+.lds-ring {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.lds-ring div {
+  box-sizing: border-box;
+  display: block;
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: 8px;
+  border: 8px solid currentColor;
+  border-radius: 50%;
+  animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  border-color: currentColor transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+  animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+  animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>
