@@ -114,7 +114,6 @@ import DialogBody from "../../../shared/dialog-body/DialogBody.vue";
 import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
-
 import { mapState, mapActions, mapGetters } from "vuex";
 
 export default {
