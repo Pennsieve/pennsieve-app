@@ -67,6 +67,7 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
+        <div>Selected Files: {{ selectedFilesForAnalysis.length }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
             <breadcrumb-navigation
@@ -159,6 +160,7 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       selectedFiles: [],
+      fileCount: 50,
     };
   },
   computed: {
@@ -167,8 +169,10 @@ export default {
       "preprocessors",
       "processors",
       "postprocessors",
+      "selectedFilesForAnalysis",
     ]),
     ...mapGetters(["userToken", "config"]),
+
     /**
      * Item has files
      */
@@ -217,6 +221,15 @@ export default {
     files: function () {
       console.log("this.files", this.files);
     },
+    selectedFiles: function () {
+      console.log("this.selectedFiles", this.selectedFiles);
+    },
+    selectedFilesForAnalysis: function () {
+      console.log(
+        "this.selectedFilesForAnalysis",
+        this.selectedFilesForAnalysis
+      );
+    },
   },
 
   mounted() {
@@ -228,6 +241,7 @@ export default {
   },
 
   methods: {
+    ...mapActions("analysisModule", ["setSelectedFiles", "clearSelectedFiles"]),
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -290,9 +304,9 @@ export default {
         this.navigateToFile(this.fileId);
       }
     },
-    onFileSelect: function (val) {
-      console.log("runs on file select with the value:", val);
-      // we want to then take the selected file and assemble a cumulative array of selected files that we can select and deselect from.
+    onFileSelect: function (selectedFiles) {
+      console.log("runs on file select with the value:", selectedFiles);
+      this.setSelectedFiles(selectedFiles);
     },
     /**
      * Closes the dialog
@@ -308,6 +322,7 @@ export default {
       this.selectedProcessor = {};
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
+      this.clearSelectedFiles();
     },
     /**
      * Manages the Multi Step Functionality

@@ -1,6 +1,9 @@
 <template>
   <div class="files-table" :class="withinDeleteMenu && 'undelete-modal'">
-    <div v-if="selection.length > 0" class="selection-menu-wrap mb-16">
+    <div
+      v-if="selection.length > 0 && !withinRunAnalysisDialog"
+      class="selection-menu-wrap mb-16"
+    >
       <el-checkbox
         class="slim-checkbox"
         id="check-all"
@@ -9,7 +12,9 @@
         @change="onCheckAllChange"
       />
 
-      <span id="selection-count-label">{{ selectionCountLabel }}</span>
+      <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
+        selectionCountLabel
+      }}</span>
       <ul class="selection-actions unstyled">
         <template v-if="withinDeleteMenu || withinRunAnalysisDialog">
           <li class="mr-24">

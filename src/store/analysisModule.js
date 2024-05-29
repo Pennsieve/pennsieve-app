@@ -5,7 +5,8 @@
     preprocessors:[],
     processors: [],
     preprocessors:[],
-    selectedWorkflow: {}
+    selectedWorkflow: {},
+    selectedFilesForAnalysis: []
   })
   
   export const state = initialState()
@@ -27,6 +28,12 @@
     UPDATE_POSTPROCESSORS(state, postprocessors) {
       state.postprocessors = postprocessors 
     },
+    SET_SELECTED_FILES(state, files) {
+      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, ...files]
+    },
+    CLEAR_SELECTED_FILES(state) {
+      state.selectedFilesForAnalysis = []
+    }
  
   }
   
@@ -81,9 +88,14 @@
           return Promise.reject(err)
       }
     },
-    fetchFiles: async( {commit, rootState }) => {
-      console.log('howdy')
-    }
+    setSelectedFiles: async({ commit, rootState }, selectedFiles) => {
+      console.log('selectedFiles sent to setSelectedFiles', selectedFiles)
+      commit('SET_SELECTED_FILES', selectedFiles)
+    },
+    clearSelectedFiles: async({ commit, rootState }) => {
+      console.log('selectedFiles global state cleared')
+      commit('CLEAR_SELECTED_FILES')
+    },
   }
   
   export const getters = {}
