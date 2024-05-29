@@ -11,10 +11,10 @@
 
       <span id="selection-count-label">{{ selectionCountLabel }}</span>
       <ul class="selection-actions unstyled">
-        <template v-if="withinDeleteMenu">
+        <template v-if="withinDeleteMenu || withinRunAnalysisDialog">
           <li class="mr-24">
             <button
-              v-if="!searchAllDataMenu"
+              v-if="!searchAllDataMenu && !withinRunAnalysisDialog"
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('restore')"
@@ -58,6 +58,7 @@
         </template>
         <li>
           <button
+            v-if="!withinRunAnalysisDialog"
             class="linked btn-selection-action mr-8"
             @click="onDownloadClick"
           >
@@ -65,7 +66,7 @@
             Download
           </button>
         </li>
-        <li>
+        <li v-if="!withinRunAnalysisDialog">
           <table-menu
             v-if="getPermission('editor') || searchAllDataMenu"
             :selection="selection"
@@ -84,7 +85,9 @@
 
     <el-table
       ref="table"
-      v-loading="withinDeleteMenu ? false : tableLoading"
+      v-loading="
+        withinDeleteMenu || withinRunAnalysisDialog ? false : tableLoading
+      "
       :border="true"
       :data="data"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
@@ -119,7 +122,7 @@
           />
         </template>
       </el-table-column>
-      <template v-if="!withinDeleteMenu">
+      <template v-if="!withinDeleteMenu && !withinRunAnalysisDialog">
         <el-table-column
           prop="subtype"
           label="Kind"
@@ -152,7 +155,6 @@
             {{ formatDate(scope.row.content.createdAt) }}
           </template>
         </el-table-column>
-
       </template>
     </el-table>
   </div>
@@ -160,7 +162,7 @@
 
 <script>
 import { pathOr, propOr } from "ramda";
-import { mapGetters, mapState,mapActions } from "vuex";
+import { mapGetters, mapState, mapActions } from "vuex";
 import EventBus from "../../utils/event-bus";
 
 import BfFileLabel from "../datasets/files/bf-file/BfFileLabel.vue";
@@ -219,6 +221,10 @@ export default {
       type: Boolean,
       default: true,
     },
+    withinRunAnalysisDialog: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
@@ -255,11 +261,10 @@ export default {
     },
   },
   methods: {
+    ...mapActions("filesModule", ["openOffice365File"]),
 
-    ...mapActions('filesModule',['openOffice365File']),
-
-    onOpenOffice365: function(file) {
-      this.openOffice365File(file)
+    onOpenOffice365: function (file) {
+      this.openOffice365File(file);
     },
     /**
      * Select the row
@@ -340,9 +345,12 @@ export default {
 
     onRowClick: function (row, selected) {
       this.$refs.table.clearSelection();
-      setTimeout(function () {
-        this.$refs.table.toggleRowSelection(row, true);
-      }.bind(this), 100);
+      setTimeout(
+        function () {
+          this.$refs.table.toggleRowSelection(row, true);
+        }.bind(this),
+        100
+      );
     },
 
     /**

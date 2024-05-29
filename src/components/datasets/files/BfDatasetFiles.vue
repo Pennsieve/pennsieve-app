@@ -128,6 +128,7 @@
     />
 
     <run-analysis-dialog
+      :datasetId="datasetId"
       :dialog-visible="runAnalysisDialogVisible"
       @close="onCloseRunAnalysisDialog"
     />
@@ -545,7 +546,6 @@ export default {
       this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
-          // TODO: this is where I need to set currentTargetFile in the uploadModule of global state
           this.$store.dispatch(
             "uploadModule/setCurrentTargetPackage",
             response

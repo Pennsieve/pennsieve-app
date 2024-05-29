@@ -66,7 +66,28 @@
           ></el-option>
         </el-select>
       </div>
-      <div v-show="shouldShow(3)">Select Files</div>
+      <div v-show="shouldShow(3)">
+        <div slot="body" class="bf-upload-body">
+          <div class="bf-dataset-breadcrumbs">
+            <breadcrumb-navigation
+              is-light-background
+              :ancestors="ancestorList"
+              :file="file"
+              :file-id="fileId"
+              @navigate-breadcrumb="handleNavigateBreadcrumb(fileId)"
+            />
+          </div>
+          <div class="table-container">
+            <files-table
+              :data="files"
+              withinRunAnalysisDialog
+              :enable-download="false"
+              @selection-change="onFileSelect"
+              @click-file-label="onClickLabel"
+            />
+          </div>
+        </div>
+      </div>
       <div v-show="shouldShow(4)">Run Analysis Workflow on Selected Files</div>
     </dialog-body>
 
@@ -86,8 +107,9 @@ import BfButton from "../../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../../shared/dialog-body/DialogBody.vue";
 import Request from "../../../../mixins/request/index";
+import { isEmpty, pathOr, propOr } from "ramda";
 
-import { mapState, mapActions } from "vuex";
+import { mapState, mapActions, mapGetters } from "vuex";
 
 export default {
   name: "RunAnalysisDialog",
@@ -105,6 +127,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    datasetId: {
+      type: String,
+      default: "",
+    },
   },
   data: function () {
     return {
@@ -121,17 +147,28 @@ export default {
       postprocessorOptions: [],
       postprocessorValue: "",
       selectedPostprocessor: {},
+      filesLoading: false,
+      file: {
+        content: {
+          name: "",
+        },
+      },
+      files: [],
+      ancestorList: [],
+      offset: 0,
+      limit: 100,
+      tableResultsTotalCount: 0,
+      selectedFiles: [],
     };
   },
-
   computed: {
-    ...mapActions("analysisModule", ["fetchComputeNodes"]),
     ...mapState("analysisModule", [
       "computeNodes",
       "preprocessors",
       "processors",
       "postprocessors",
     ]),
+    ...mapGetters(["userToken", "config"]),
     /**
      * Computes create property CTA
      * @returns {String}
@@ -164,9 +201,76 @@ export default {
     this.formatPreprocessorOptions();
     this.formatProcessorOptions();
     this.formatPostprocessorOptions();
+    this.fetchFiles();
   },
 
   methods: {
+    /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+    getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl = "datasets";
+        const id = this.datasetId;
+
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
+    },
+    /**
+     * Send API request to get files for item
+     */
+    fetchFiles: function () {
+      this.sendXhr(this.getFilesUrl())
+        .then((response) => {
+          this.files = [...response.children];
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+        });
+    },
+    /**
+     * Handler for clicking file
+     * @param {Object} file
+     */
+    onClickLabel: function (file) {
+      if (file.content.packageType !== "Collection") {
+        return;
+      }
+
+      this.file = file;
+      this.fileId = file.content.id;
+      this.fileName = file.content.name;
+
+      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+
+      this.sendXhr(url)
+        .then((response) => {
+          this.files = [...response.children];
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+        });
+
+      if (file.content.packageType === "Collection") {
+        //If we click on a folder, we want to add that folder to the ancestors list
+        if (this.fileId && this.fileName) {
+          this.ancestorList.push({
+            content: {
+              id: this.fileId,
+              name: this.fileName,
+            },
+          });
+        }
+        console.log(this.ancestorList);
+        this.file = file;
+        this.navigateToFile(this.fileId);
+      }
+    },
+    onFileSelect: function (val) {
+      console.log("runs on file select with the value:", val);
+      // we want to then take the selected file and assemble a cumulative array of selected files that we can select and deselect from.
+    },
     /**
      * Closes the dialog
      */
@@ -203,7 +307,9 @@ export default {
     /**
      * Run Analaysis Workflow on Selected Files
      */
-    runAnalysis: function () {},
+    runAnalysis: function () {
+      console.log("run Analysis has run");
+    },
     /**
      * Determines if tab content is active
      * @param {number} key
@@ -288,6 +394,61 @@ export default {
       this.selectedPostprocessor = this.postprocessors.find(
         (postprocessor) => postprocessor.name === value
       );
+    },
+    /**
+     * Navigate to file
+     * @param {String} id
+     */
+    navigateToFile: function (id) {
+      console.log("navigateToFile ran with the id:", id);
+      this.fetchFilesAnalysisDialog(this.offset, this.limit, id);
+    },
+    /**
+     * Handler for breadcrumb overflow navigation
+     * @param {String} id
+     */
+    handleNavigateBreadcrumb: function (id = "") {
+      if (!isEmpty(id)) {
+        this.navigateToFile(id);
+        let index = this.ancestorList.findIndex(
+          (item) => item.content.id == id
+        );
+        if (index >= 0) {
+          this.file = this.ancestorList[index];
+          if (this.ancestorList.length - index - 1 > 0)
+            this.ancestorList.splice(
+              index,
+              this.ancestorList.length - index - 1
+            );
+          else this.ancestorList.splice(0, this.ancestorList.length);
+        }
+      } else {
+        this.ancestorList = [];
+        this.file = {};
+        this.fetchFilesAnalysisDialog(this.offset, this.limit);
+      }
+    },
+    /**
+     * Navigate to file
+     * @param {String} id
+     */
+    navigateToFile: function (root_node) {
+      this.fetchFilesForAnalysisDialog(this.offset, this.limit, root_node);
+    },
+    fetchFilesForAnalysisDialog: function (
+      offset,
+      limit,
+      root_node = undefined
+    ) {
+      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+
+      this.sendXhr(url)
+        .then((response) => {
+          this.files = [...response.children];
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+        });
     },
   },
 };

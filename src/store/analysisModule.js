@@ -66,7 +66,6 @@
   
         if (resp.ok) {
           const result = await resp.json()
-          console.log(result)
           commit('UPDATE_APPLICATIONS', result)
           const preprocessors = result.filter(application => application.applicationType === 'preprocessor')
           const processors = result.filter(application => application.applicationType === 'processor')
@@ -82,6 +81,9 @@
           return Promise.reject(err)
       }
     },
+    fetchFiles: async( {commit, rootState }) => {
+      console.log('howdy')
+    }
   }
   
   export const getters = {}
