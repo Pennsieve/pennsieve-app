@@ -74,7 +74,7 @@
               :ancestors="ancestorList"
               :file="file"
               :file-id="fileId"
-              @navigate-breadcrumb="handleNavigateBreadcrumb(fileId)"
+              @navigate-breadcrumb="handleNavigateBreadcrumb"
             />
           </div>
           <div class="table-container">
@@ -170,6 +170,26 @@ export default {
     ]),
     ...mapGetters(["userToken", "config"]),
     /**
+     * Item has files
+     */
+    // hasFiles: function () {
+    //   return this.files.length > 0;
+    // },
+    fileId() {
+      return pathOr(
+        propOr("", "node_id", this.file),
+        ["content", "id"],
+        this.file
+      );
+    },
+    fileName() {
+      return pathOr(
+        propOr("", "name", this.file),
+        ["content", "name"],
+        this.file
+      );
+    },
+    /**
      * Computes create property CTA
      * @returns {String}
      */
@@ -193,6 +213,9 @@ export default {
     },
     postprocessorValue: function () {
       this.formatPostprocessorOptions();
+    },
+    files: function () {
+      console.log("this.files", this.files);
     },
   },
 
@@ -262,7 +285,7 @@ export default {
             },
           });
         }
-        console.log(this.ancestorList);
+        console.log("ancestorList", this.ancestorList);
         this.file = file;
         this.navigateToFile(this.fileId);
       }
@@ -401,7 +424,7 @@ export default {
      */
     navigateToFile: function (id) {
       console.log("navigateToFile ran with the id:", id);
-      this.fetchFilesAnalysisDialog(this.offset, this.limit, id);
+      this.fetchFilesForAnalysisDialog(this.offset, this.limit, id);
     },
     /**
      * Handler for breadcrumb overflow navigation
@@ -425,25 +448,20 @@ export default {
       } else {
         this.ancestorList = [];
         this.file = {};
-        this.fetchFilesAnalysisDialog(this.offset, this.limit);
+        this.fetchFilesForAnalysisDialog(this.offset, this.limit, id);
       }
     },
-    /**
-     * Navigate to file
-     * @param {String} id
-     */
-    navigateToFile: function (root_node) {
-      this.fetchFilesForAnalysisDialog(this.offset, this.limit, root_node);
-    },
-    fetchFilesForAnalysisDialog: function (
-      offset,
-      limit,
-      root_node = undefined
-    ) {
-      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    fetchFilesForAnalysisDialog: function (offset, limit, id = null) {
+      let url;
+      if (this.ancestorList.length === 0) {
+        url = this.getFilesUrl();
+      } else {
+        url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
 
       this.sendXhr(url)
         .then((response) => {
+          console.log("response", response);
           this.files = [...response.children];
         })
         .catch((response) => {
