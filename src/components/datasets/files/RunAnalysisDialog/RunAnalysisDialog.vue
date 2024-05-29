@@ -147,7 +147,7 @@ export default {
       preprocessorOptions: [],
       preprocessorValue: "",
       selectedPreprocessor: {},
-      preprocessorOptions: [],
+      processorOptions: [],
       processorValue: "",
       selectedProcessor: {},
       postprocessorOptions: [],
