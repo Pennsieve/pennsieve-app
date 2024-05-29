@@ -115,6 +115,7 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
+import FilesTable from "../../../FilesTable/FilesTable.vue";
 
 export default {
   name: "RunAnalysisDialog",
@@ -122,6 +123,7 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
+    FilesTable,
     BfButton,
   },
 
@@ -553,6 +555,13 @@ export default {
 
 <style scoped lang="scss">
 @import "../../../../assets/_variables.scss";
+
+.table-container {
+  overflow-y: scroll;
+  display: block;
+  max-height: 450px;
+  margin-top: 1px;
+}
 
 .flex {
   display: flex;
