@@ -230,6 +230,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    preSelected: {
+      type: Array,
+      default: [],
+    },
   },
 
   data() {
@@ -263,6 +267,11 @@ export default {
       const selectionCount = this.selection.length;
       const fileWord = selectionCount === 1 ? "file" : "files";
       return `${selectionCount} ${fileWord} selected`;
+    },
+  },
+  watch: {
+    selection: function () {
+      console.log("this.selection", this.selection);
     },
   },
   methods: {
@@ -302,7 +311,12 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      this.selection = selection;
+      console.log("here", this.preSelected.length);
+      if (this.preSelected.length) {
+        this.selection = preSelected;
+      } else {
+        this.selection = selection;
+      }
       this.$emit("selection-change", selection);
       this.checkAll = this.data.length === selection.length;
     },

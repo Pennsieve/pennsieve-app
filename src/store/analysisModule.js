@@ -31,6 +31,9 @@
     SET_SELECTED_FILES(state, files) {
       state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, ...files]
     },
+    SET_SELECTED_FILE(state, file) {
+      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]
+    },
     CLEAR_SELECTED_FILES(state) {
       state.selectedFilesForAnalysis = []
     }
@@ -88,12 +91,15 @@
           return Promise.reject(err)
       }
     },
-    setSelectedFiles: async({ commit, rootState }, selectedFiles) => {
-      console.log('selectedFiles sent to setSelectedFiles', selectedFiles)
+    setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
+      console.log(selectedFiles)
       commit('SET_SELECTED_FILES', selectedFiles)
     },
+    setSelectedFile: async({ commit, rootState}, selectedFile) => {
+      console.log(selectedFile)
+      commit('SET_SELECTED_FILE', selectedFile)
+    },
     clearSelectedFiles: async({ commit, rootState }) => {
-      console.log('selectedFiles global state cleared')
       commit('CLEAR_SELECTED_FILES')
     },
   }

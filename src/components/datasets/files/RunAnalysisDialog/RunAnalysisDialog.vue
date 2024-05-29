@@ -159,8 +159,6 @@ export default {
       offset: 0,
       limit: 100,
       tableResultsTotalCount: 0,
-      selectedFiles: [],
-      fileCount: 50,
     };
   },
   computed: {
@@ -218,18 +216,6 @@ export default {
     postprocessorValue: function () {
       this.formatPostprocessorOptions();
     },
-    files: function () {
-      console.log("this.files", this.files);
-    },
-    selectedFiles: function () {
-      console.log("this.selectedFiles", this.selectedFiles);
-    },
-    selectedFilesForAnalysis: function () {
-      console.log(
-        "this.selectedFilesForAnalysis",
-        this.selectedFilesForAnalysis
-      );
-    },
   },
 
   mounted() {
@@ -241,7 +227,11 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["setSelectedFiles", "clearSelectedFiles"]),
+    ...mapActions("analysisModule", [
+      "setSelectedFiles",
+      "clearSelectedFiles",
+      "setSelectedFile",
+    ]),
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -299,14 +289,25 @@ export default {
             },
           });
         }
-        console.log("ancestorList", this.ancestorList);
         this.file = file;
         this.navigateToFile(this.fileId);
       }
     },
     onFileSelect: function (selectedFiles) {
-      console.log("runs on file select with the value:", selectedFiles);
-      this.setSelectedFiles(selectedFiles);
+      if (this.selectedFilesForAnalysis.length) {
+        selectedFiles.forEach((file) => {
+          const condition = !this.selectedFilesForAnalysis.find(
+            (globalSelectedFile) =>
+              globalSelectedFile.content.id === file.content.id
+          );
+          if (condition) {
+            this.setSelectedFile(file);
+          }
+          return;
+        });
+      } else {
+        this.setSelectedFiles(selectedFiles);
+      }
     },
     /**
      * Closes the dialog
