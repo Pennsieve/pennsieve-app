@@ -213,22 +213,18 @@ export default {
     computeNodes: function () {
       this.formatComputeNodeOptions();
     },
-    processorValue: function () {
+    processors: function () {
       this.formatProcessorOptions();
     },
-    preprocessorValue: function () {
+    preprocessors: function () {
       this.formatPreprocessorOptions();
     },
-    postprocessorValue: function () {
+    postprocessors: function () {
       this.formatPostprocessorOptions();
     },
   },
 
   mounted() {
-    this.formatComputeNodeOptions();
-    this.formatPreprocessorOptions();
-    this.formatProcessorOptions();
-    this.formatPostprocessorOptions();
     this.fetchFiles();
   },
 
