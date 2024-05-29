@@ -271,7 +271,7 @@ export default {
   },
   watch: {
     selection: function () {
-      console.log("this.selection", this.selection);
+      // console.log("this.selection", this.selection);
     },
   },
   methods: {
@@ -311,7 +311,7 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      console.log("here", this.preSelected.length);
+      // console.log("here", this.preSelected.length);
       if (this.preSelected.length) {
         this.selection = preSelected;
       } else {

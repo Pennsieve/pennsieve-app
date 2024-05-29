@@ -92,11 +92,9 @@
       }
     },
     setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
-      console.log(selectedFiles)
       commit('SET_SELECTED_FILES', selectedFiles)
     },
     setSelectedFile: async({ commit, rootState}, selectedFile) => {
-      console.log(selectedFile)
       commit('SET_SELECTED_FILE', selectedFile)
     },
     clearSelectedFiles: async({ commit, rootState }) => {

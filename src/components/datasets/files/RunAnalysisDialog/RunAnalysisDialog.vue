@@ -12,7 +12,7 @@
     <dialog-body>
       <div v-show="shouldShow(1)">
         <el-select
-          class="margin-10"
+          class="margin"
           v-model="computeNodeValue"
           placeholder="Select Compute Node"
           @change="setSelectedComputeNode(computeNodeValue)"
@@ -24,6 +24,11 @@
             :value="item.value"
           ></el-option>
         </el-select>
+        <el-input
+          class="margin"
+          v-model="targetDirectory"
+          placeholder="Target Directory (optional)"
+        />
       </div>
       <div v-show="shouldShow(2)">
         <el-select
@@ -89,7 +94,6 @@
           </div>
         </div>
       </div>
-      <div v-show="shouldShow(4)">Run Analysis Workflow on Selected Files</div>
     </dialog-body>
 
     <template #footer>
@@ -109,6 +113,7 @@ import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue"
 import DialogBody from "../../../shared/dialog-body/DialogBody.vue";
 import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
+import EventBus from "../../../../utils/event-bus";
 
 import { mapState, mapActions, mapGetters } from "vuex";
 
@@ -159,6 +164,7 @@ export default {
       offset: 0,
       limit: 100,
       tableResultsTotalCount: 0,
+      targetDirectory: "",
     };
   },
   computed: {
@@ -196,7 +202,7 @@ export default {
      * @returns {String}
      */
     proceedText: function () {
-      return this.processStep === 4 ? "Run Analysis" : "Next";
+      return this.processStep === 3 ? "Run Analysis" : "Next";
     },
     stepBackText: function () {
       return this.processStep > 1 ? "Back" : "Cancel";
@@ -324,6 +330,7 @@ export default {
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
+      this.targetDirectory = "";
     },
     /**
      * Manages the Multi Step Functionality
@@ -334,7 +341,7 @@ export default {
         this.closeDialog();
       }
 
-      if (this.processStep > 4) {
+      if (this.processStep > 3) {
         try {
           this.runAnalysis();
         } catch {
@@ -347,7 +354,67 @@ export default {
      * Run Analaysis Workflow on Selected Files
      */
     runAnalysis: function () {
-      console.log("run Analysis has run");
+      const url = `${this.config.api2Url}/workflows`;
+
+      const packageIds = this.selectedFilesForAnalysis.map((file) => {
+        return pathOr("", ["content", "id"], file);
+      });
+
+      const formatApplication = (application) => {
+        return {
+          uuid: application.uuid,
+          applicationId: application.applicationId,
+          applicationContainerName: application.applicationContainerName,
+          applicationType: application.applicationType,
+        };
+      };
+
+      const body = {
+        datasetId: this.datasetId,
+        packageIds: packageIds,
+        computeNode: {
+          uuid: this.selectedComputeNode.uuid,
+          computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
+        },
+        workflow: [
+          formatApplication(this.selectedPreprocessor),
+          formatApplication(this.selectedProcessor),
+          formatApplication(this.selectedPostprocessor),
+        ],
+        params: {
+          target_path: this.targetDirectory,
+        },
+      };
+      console.log("body", body);
+      this.sendXhr(url, {
+        method: "POST",
+        header: {
+          Authorization: `Bearer ${this.userToken}`,
+        },
+        body: body,
+      })
+        .then((response) => {
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "The selected event has been successfully initiated!",
+              type: "success",
+            },
+          });
+          this.closeDialog();
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Sorry! There was an issue initiating your event",
+              type: "error",
+            },
+          });
+          this.closeDialog();
+          this.targetDirectory = "";
+          this.selectedApplication = {};
+          this.value = "";
+        });
     },
     /**
      * Determines if tab content is active
@@ -477,7 +544,6 @@ export default {
 
       this.sendXhr(url)
         .then((response) => {
-          console.log("response", response);
           this.files = [...response.children];
         })
         .catch((response) => {
