@@ -381,7 +381,6 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      console.log("body", body);
       this.sendXhr(url, {
         method: "POST",
         header: {
@@ -502,7 +501,6 @@ export default {
      * @param {String} id
      */
     navigateToFile: function (id) {
-      console.log("navigateToFile ran with the id:", id);
       this.fetchFilesForAnalysisDialog(this.offset, this.limit, id);
     },
     /**
