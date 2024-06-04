@@ -7,19 +7,14 @@
     @close="closeDialog"
   >
     <template #title>
-      <bf-dialog-header title="Delete ORCID Integration?"/>
+      <bf-dialog-header title="Delete GitHub Integration?"/>
     </template>
 
     <dialog-body>
-<!--      <h2 slot="heading">-->
-<!--        Delete ORCID?-->
-<!--      </h2>-->
-      <p style="max-width: 450px">Are you sure you want to remove your linked ORCID account from your Pennsieve user profile?</p>
-      <li>
-        You will no longer be able to submit datasets for publication.
-      </li>
-      <li>Published datasets will no longer be listed in you ORCID account</li>
-      <li>Your ORCID profile will no longer be associated with a publication if you are a contributor</li>
+      <p style="max-width: 450px">Are you sure you want to remove your linked GitHub account from your Pennsieve user profile?</p>
+      <li>Pennsieve will no longer track GitHub repositories in your account.</li>
+      <li>GitHub releases will no longer result in Pennsieve GitHub Publications.</li>
+      <li>You can no longer create Applications and Workflows on Pennsieve.</li>
 
     </dialog-body>
 
@@ -52,7 +47,7 @@ import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
 
 export default {
-  name: 'DeleteOrcid',
+  name: 'DeleteGitHub',
 
   components: {
     BfButton,
@@ -78,30 +73,17 @@ export default {
   computed: {
     ...mapGetters(['profile', 'activeOrganization', 'userToken', 'config']),
 
-    apiKeyUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const apiKey = pathOr('', ['apiKey', 'key'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !apiKey || !userToken) {
-        return ''
-      }
-
-      return `${url}/token/${apiKey}?api_key=${userToken}`
-    },
-
     /**
      * Retrieves API URL to delete ORCID
      */
-    getORCIDApiUrl: function() {
-      const url = this.config.apiUrl
-
+    deleteGithubIntegrationUrl: function () {
+      const url = pathOr("", ["api2Url"])(this.config);
       if (!url) {
-        return ''
+        return "";
       }
 
-      return `${url}/user/orcid?api_key=${this.userToken}`
-    }
+      return `${url}/accounts/github/user`;
+    },
   },
 
   methods: {
@@ -111,12 +93,15 @@ export default {
      */
     sendRequest: function() {
       this.closeDialog()
-      if (!this.getORCIDApiUrl) {
+      if (!this.deleteGithubIntegrationUrl) {
         return
       }
 
-      this.sendXhr(this.getORCIDApiUrl, {
-        method: 'DELETE'
+      this.sendXhr(this.deleteGithubIntegrationUrl, {
+        method: 'DELETE',
+        header: {
+          'Authorization': `Bearer ${this.userToken}`
+        },
       })
         .then(this.handleXhrSuccess.bind(this))
         .catch(this.handleXhrError.bind(this))
@@ -128,20 +113,18 @@ export default {
       EventBus.$emit('toast', {
         detail: {
           type: 'MESSAGE',
-          msg: 'Your ORCID has been successfully removed'
+          msg: 'Your GitHub account has been successfully removed'
         }
       })
 
-      this.$emit('orcid-deleted-success', { orcid: 'orcid', type: 'DELETED' })
+      this.$emit('deleted-success', {})
     },
 
     /**
      * Closes the dialog
      */
     closeDialog: function() {
-      this.$emit('orcid-close')
-      //this.$emit('update:deleteOrcidDialog.dialogVisible', false)
-      //dialogVisible
+      this.$emit('close')
     }
   }
 }
