@@ -230,10 +230,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    preSelected: {
-      type: Array,
-      default: [],
-    },
   },
 
   data() {
@@ -269,13 +265,9 @@ export default {
       return `${selectionCount} ${fileWord} selected`;
     },
   },
-  watch: {
-    selection: function () {
-      // console.log("this.selection", this.selection);
-    },
-  },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
+    ...mapActions("analysisModule", ["clearSelectedFiles"]),
 
     onOpenOffice365: function (file) {
       this.openOffice365File(file);
@@ -311,12 +303,8 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      // console.log("here", this.preSelected.length);
-      if (this.preSelected.length) {
-        this.selection = preSelected;
-      } else {
-        this.selection = selection;
-      }
+      this.selection = selection;
+
       this.$emit("selection-change", selection);
       this.checkAll = this.data.length === selection.length;
     },
@@ -360,6 +348,9 @@ export default {
       } else {
         this.$refs.table.clearSelection();
       }
+    },
+    clearAllSelected: function () {
+      this.$refs.table.clearSelection();
     },
 
     onRowClick: function (row, selected) {

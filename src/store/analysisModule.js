@@ -29,7 +29,8 @@
       state.postprocessors = postprocessors 
     },
     SET_SELECTED_FILES(state, files) {
-      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, ...files]
+      console.log(files)
+      state.selectedFilesForAnalysis = files;
     },
     SET_SELECTED_FILE(state, file) {
       state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]

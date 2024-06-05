@@ -301,6 +301,7 @@ export default {
       }
     },
     onFileSelect: function (selectedFiles) {
+      console.log("selectedFiles", selectedFiles);
       if (this.selectedFilesForAnalysis.length) {
         selectedFiles.forEach((file) => {
           const condition = !this.selectedFilesForAnalysis.find(
@@ -315,6 +316,11 @@ export default {
       } else {
         this.setSelectedFiles(selectedFiles);
       }
+      if (selectedFiles.length === 0) {
+        this.clearSelectedFiles();
+      }
+
+      // this.setSelectedFiles(selectedFiles);
     },
     /**
      * Closes the dialog
@@ -386,35 +392,36 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      this.sendXhr(url, {
-        method: "POST",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: body,
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Your workflow has been successfully initiated!",
-              type: "success",
-            },
-          });
-          this.closeDialog();
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
-        });
+      console.log(body);
+      // this.sendXhr(url, {
+      //   method: "POST",
+      //   header: {
+      //     Authorization: `Bearer ${this.userToken}`,
+      //   },
+      //   body: body,
+      // })
+      //   .then((response) => {
+      //     EventBus.$emit("toast", {
+      //       detail: {
+      //         msg: "Your workflow has been successfully initiated!",
+      //         type: "success",
+      //       },
+      //     });
+      //     this.closeDialog();
+      //   })
+      //   .catch((response) => {
+      //     this.handleXhrError(response);
+      //     EventBus.$emit("toast", {
+      //       detail: {
+      //         msg: "Sorry! There was an issue initiating your event",
+      //         type: "error",
+      //       },
+      //     });
+      //     this.closeDialog();
+      //     this.targetDirectory = "";
+      //     this.selectedApplication = {};
+      //     this.value = "";
+      //   });
     },
     /**
      * Determines if tab content is active

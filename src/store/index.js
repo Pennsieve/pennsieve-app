@@ -118,8 +118,7 @@ export const state = {
   isLinkOrcidDialogVisible: false,
   userToken: '',
   sessionTimer: null,
-  isRefreshing: false,
-  computeNodes: []
+  isRefreshing: false
 }
 
 export const mutations = {
