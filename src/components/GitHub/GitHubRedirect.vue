@@ -25,7 +25,6 @@ export default {
    */
   mounted() {
     const urlParams = new URLSearchParams(window.location.search);
-    console.log(urlParams)
     const code = urlParams.get('code');
     const installationId = urlParams.get('installation_id')
     const parentWindow = window.opener
