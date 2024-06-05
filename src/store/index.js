@@ -119,7 +119,7 @@ export const state = {
   userToken: '',
   sessionTimer: null,
   isRefreshing: false,
-  gitHubProfile: null
+  gitHubProfile: null,
   computeNodes: []
 }
 
