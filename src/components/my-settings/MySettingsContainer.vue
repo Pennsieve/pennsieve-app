@@ -198,7 +198,7 @@
           <p>
             Register the Pennsieve GitHub Application in your Github account, and authorize Pennsieve to get notified about events.
             <a
-              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
+              href="https://docs.pennsieve.io/docs/github-integration"
             >
               Learn More
             </a>
