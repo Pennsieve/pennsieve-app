@@ -68,6 +68,7 @@ const PennsieveInfo = () => import('../components/welcome/Info.vue')
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
 const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
+const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const DeveloperTools = () => import('../components/welcome/DeveloperTools.vue')
@@ -187,7 +188,13 @@ const router = createRouter({
       component: () => import("./Login/Login.vue"),
     },
     {
-
+      path:'/:orgId/welcome/terms-of-service',
+      name:'terms-of-service',
+      components: {
+          page: TermsOfService
+      },
+    },
+    {
       path: "/:orgId/pennsieve",
       name: "about-pennsieve",
       components: {
