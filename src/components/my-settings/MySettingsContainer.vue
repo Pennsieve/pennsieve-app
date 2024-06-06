@@ -785,10 +785,7 @@ export default {
               .sendXhr(self.getORCIDApiUrl, {
                 method: "POST",
                 body: {
-                  authorizationCode: {
-                    source: "orcid-redirect-response",
-                    code: this.oauthCode
-                  }
+                  authorizationCode: this.oauthCode,
                 },
               })
               .then((response) => {
