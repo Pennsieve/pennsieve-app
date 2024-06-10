@@ -392,36 +392,35 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      console.log(body);
-      // this.sendXhr(url, {
-      //   method: "POST",
-      //   header: {
-      //     Authorization: `Bearer ${this.userToken}`,
-      //   },
-      //   body: body,
-      // })
-      //   .then((response) => {
-      //     EventBus.$emit("toast", {
-      //       detail: {
-      //         msg: "Your workflow has been successfully initiated!",
-      //         type: "success",
-      //       },
-      //     });
-      //     this.closeDialog();
-      //   })
-      //   .catch((response) => {
-      //     this.handleXhrError(response);
-      //     EventBus.$emit("toast", {
-      //       detail: {
-      //         msg: "Sorry! There was an issue initiating your event",
-      //         type: "error",
-      //       },
-      //     });
-      //     this.closeDialog();
-      //     this.targetDirectory = "";
-      //     this.selectedApplication = {};
-      //     this.value = "";
-      //   });
+      this.sendXhr(url, {
+        method: "POST",
+        header: {
+          Authorization: `Bearer ${this.userToken}`,
+        },
+        body: body,
+      })
+        .then((response) => {
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Your workflow has been successfully initiated!",
+              type: "success",
+            },
+          });
+          this.closeDialog();
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Sorry! There was an issue initiating your event",
+              type: "error",
+            },
+          });
+          this.closeDialog();
+          this.targetDirectory = "";
+          this.selectedApplication = {};
+          this.value = "";
+        });
     },
     /**
      * Determines if tab content is active
