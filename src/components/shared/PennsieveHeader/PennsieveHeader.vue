@@ -164,6 +164,11 @@ export default {
     EventBus.$on("openContactUsDialog", (data) => {
       this.isContactUsDialogOpen = data;
     });
+
+    EventBus.$on("redirect-detected", () => {
+      console.log("redirect was detected");
+      this.isLogInModalVisible = true;
+    });
   },
 
   methods: {
@@ -190,6 +195,7 @@ export default {
      * Display log in modal
      */
     openLogInModal() {
+      console.log("in openLogInModal in PennsieveHeader.vue");
       this.isLogInModalVisible = true;
     },
 

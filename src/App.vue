@@ -97,6 +97,10 @@ export default {
     );
     EventBus.$on("reload-datasets", this.fetchDatasets);
 
+    if (window.location.href.includes("?redirectTo=")) {
+      EventBus.$emit("redirect-detected");
+    }
+
     const token = Cookies.get("user_token");
     if (!token) {
       setPageTitle(this.defaultPageTitle);
@@ -254,6 +258,9 @@ export default {
 
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
+    callGlobalCustomEvent() {
+      EventBus.$emit("redirect-detected");
+    },
 
     onRefreshToken: function () {
       this.refreshToken();
