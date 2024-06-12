@@ -218,7 +218,7 @@ export default {
      */
     onHandleMemberInvited: function(newMember) {
       const updatedList = this.allPeople.concat([newMember])
-      this.allPeople = this.returnSort(this.sortBy, updatedList)
+      this.allPeople = this.returnSort(this.sortBy, updatedList, this.sortDirection)
     },
     /**
      * Generates invited org members GET url
@@ -238,7 +238,7 @@ export default {
       const updatedMember = Object.assign({}, member, { role })
       const idx = findIndex(propEq('id', member.id), this.allPeople)
       this.allPeople.splice(idx, 1, updatedMember)
-      this.allPeople = this.returnSort(this.sortBy, this.allPeople)
+      this.allPeople = this.returnSort(this.sortBy, this.allPeople, this.sortDirection)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -247,7 +247,7 @@ export default {
      */
     onPromoteToAdmin: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, role: 'manager' } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -256,7 +256,7 @@ export default {
      */
     onDemoteFromAdmin: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, role: 'editor' } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
       this.updateOrgMembers(this.allPeople)
     },
 
@@ -266,7 +266,7 @@ export default {
      */
     onPromoteToPublisher: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, isPublisher: true } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
       this.updateOrgMembers(this.allPeople)
     },
 
@@ -276,7 +276,7 @@ export default {
      */
     onDemoteFromPublisher: function(member) {
       const updatedPeople = this.allPeople.map(p => p.id === member.id ? { ...p, isPublisher: false } : p)
-      this.allPeople = this.returnSort(this.sortBy, updatedPeople)
+      this.allPeople = this.returnSort(this.sortBy, updatedPeople, this.sortDirection)
       this.updateOrgMembers(this.allPeople)
     },
     /**
@@ -357,7 +357,7 @@ export default {
           const currentMembers = this.updateCurrentMembers(values[1])
           const allUsers = union(pendingMembers, currentMembers)
           if (this.allPeople.length !== this.orgMembers.length) {
-            const sorted = this.returnSort('lastName', allUsers)
+            const sorted = this.returnSort('lastName', allUsers, this.sortDirection)
             this.allPeople = sorted
           } else {
             this.allPeople = allUsers
