@@ -166,7 +166,6 @@ export default {
     window.onresize = () => this.onResize(window.innerWidth);
   },
   mounted() {
-    console.log("mounted in PennsieveHeader");
     EventBus.$on("openContactUsDialog", (data) => {
       this.isContactUsDialogOpen = data;
     });
@@ -195,7 +194,6 @@ export default {
      * Display log in modal
      */
     openLogInModal() {
-      console.log("in openLogInModal in PennsieveHeader.vue");
       this.isLogInModalVisible = true;
     },
 

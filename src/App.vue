@@ -90,15 +90,12 @@ export default {
     };
   },
   mounted() {
-    // This setTimeout is here because we want to emit an event that is registered in PennsieveHeader,
-    // but all of Pennsieve Header's lifecycle events happen after App.vue's.
-    // The "redirect-detected" event opens the login modal when a user is redirected
     setTimeout(() => {
       if (window.location.href.includes("?redirectTo=")) {
         console.log("in the EventBus.$emit");
         EventBus.$emit("redirect-detected");
       }
-    }, "1000");
+    }, "1000"); // workaround for subscribing to an event that is registed in PennsieveHeader where lifecycle events all run after App.vue lifecycle events.
 
     this.$store.watch(
       this.getActiveOrganization,
