@@ -89,23 +89,31 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-
   mounted() {
+    // This setTimeout is here because we want to emit an event that is registered in PennsieveHeader,
+    // but all of Pennsieve Header's lifecycle events happen after App.vue's.
+    // The "redirect-detected" event opens the login modal when a user is redirected
+    setTimeout(() => {
+      if (window.location.href.includes("?redirectTo=")) {
+        console.log("in the EventBus.$emit");
+        EventBus.$emit("redirect-detected");
+      }
+    }, "1000");
+
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
     EventBus.$on("reload-datasets", this.fetchDatasets);
 
-    if (window.location.href.includes("?redirectTo=")) {
-      EventBus.$emit("redirect-detected");
-    }
-
     const token = Cookies.get("user_token");
     if (!token) {
       setPageTitle(this.defaultPageTitle);
       setMeta("name", "description", this.defaultPageDescription);
     }
+  },
+  unmounted() {
+    console.log("in unmounted in App.vue");
   },
 
   watch: {

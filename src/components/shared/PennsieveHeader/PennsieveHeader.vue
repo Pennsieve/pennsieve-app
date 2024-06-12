@@ -155,22 +155,22 @@ export default {
     },
   },
 
+  created() {
+    EventBus.$on("redirect-detected", () => {
+      this.isLogInModalVisible = true;
+    });
+  },
   beforeMount() {
     // Setup resize event listener
     this.windowWidth = window.innerWidth;
     window.onresize = () => this.onResize(window.innerWidth);
   },
   mounted() {
+    console.log("mounted in PennsieveHeader");
     EventBus.$on("openContactUsDialog", (data) => {
       this.isContactUsDialogOpen = data;
     });
-
-    EventBus.$on("redirect-detected", () => {
-      console.log("redirect was detected");
-      this.isLogInModalVisible = true;
-    });
   },
-
   methods: {
     /**
      * Toggle search and focus
