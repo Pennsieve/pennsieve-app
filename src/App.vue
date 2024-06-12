@@ -109,10 +109,6 @@ export default {
       setMeta("name", "description", this.defaultPageDescription);
     }
   },
-  unmounted() {
-    console.log("in unmounted in App.vue");
-  },
-
   watch: {
     /**
      * Watch to compute new dataset list
