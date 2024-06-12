@@ -294,7 +294,7 @@ export default {
     sortColumn: function(key) {
       this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc"
       this.offset = 0
-      this.allPeople = this.returnSort(key, this.allPeople, this.sortDirection, this.sortDirection)
+      this.allPeople = this.returnSort(key, this.allPeople, this.sortDirection)
     },
     /**
      * Updates pending users object with any missing fields required for sorting
