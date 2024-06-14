@@ -1,115 +1,102 @@
 <template>
   <div class="text-viewer">
     <div class="wrapper">
-      <table v-if="parsed" style="width: 100%;">
+      <table v-if="parsed" style="width: 100%">
         <thead>
-        <tr>
-<!--          <th v-for="(header, key) in content.meta.fields"-->
-<!--              v-bind:key="'header-'+key">-->
-<!--            {{ header }}-->
-<!--          </th>-->
-        </tr>
+          <tr>
+            <th v-for="column in uniqueColumns" :key="column">{{ column }}</th>
+          </tr>
         </thead>
         <tbody>
-        <tr v-for="(row, rowKey) in content"
-            v-bind:key="'row-'+rowKey">
-          <td v-for="(column, columnKey) in Object.keys(content[rowKey])"
-              v-bind:key="'row-'+rowKey+'-column-'+columnKey">
-            <div class="table-cell">
-              {{content[rowKey][column]}}
-            </div>
-          </td>
-        </tr>
+          <tr v-for="(row, rowKey) in content" :key="'row-' + rowKey">
+            <td
+              v-for="column in uniqueColumns"
+              :key="'row-' + rowKey + '-column-' + column"
+            >
+              <div class="table-cell">
+                {{ row[column] || "" }}
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
-
-
-
-      <!--      <pre>-->
-      <!--        <code-->
-      <!--          v-if="isText"-->
-      <!--          ref="codeblock"-->
-      <!--          class="codeblock"-->
-      <!--          :class="subtype"-->
-      <!--          v-html="escapeHTMLData(fileData)"-->
-      <!--        />-->
-      <!--        <code-->
-      <!--          v-if="!isText"-->
-      <!--          ref="codeblock"-->
-      <!--          class="codeblock"-->
-      <!--          :class="subtype"-->
-      <!--        >{{ fileData }}</code>-->
-      <!--      </pre>-->
     </div>
   </div>
 </template>
 
 <script>
-
-import StaticViewer from '../../mixins/static-viewer'
-import GetFileProperty from '../../mixins/get-file-property'
-import Request from '../../mixins/request'
-import Papa from 'papaparse';
-import { read, utils} from 'xlsx'
+import StaticViewer from "../../mixins/static-viewer";
+import GetFileProperty from "../../mixins/get-file-property";
+import Request from "../../mixins/request";
+import Papa from "papaparse";
+import { read, utils } from "xlsx";
+import { forEach } from "ramda";
 
 export default {
-  name: 'XLSViewer',
+  name: "XLSViewer",
 
-  mixins: [
-    StaticViewer,
-    GetFileProperty,
-    Request
-  ],
+  mixins: [StaticViewer, GetFileProperty, Request],
 
   props: {
     pkg: {
       type: Object,
-      default: () => {}
+      default: () => {},
     },
     idx: {
       type: Number,
-      default: 0
-    }
+      default: 0,
+    },
   },
 
   data() {
     return {
-      fileData: '',
+      fileData: "",
       content: {},
-      parsed: false
-    }
+      parsed: false,
+    };
   },
 
   computed: {
     /**
      * Compute subtype from Package DTO
      */
-    subtype: function() {
-      return this.getFilePropertyVal(this.pkg.properties, 'subtype').toLowerCase()
+    subtype: function () {
+      return this.getFilePropertyVal(
+        this.pkg.properties,
+        "subtype"
+      ).toLowerCase();
+    },
+    uniqueColumns() {
+      const columns = new Set();
+      this.content.forEach((row) => {
+        Object.keys(row).forEach((key) => columns.add(key));
+      });
+      return Array.from(columns);
     },
   },
 
   watch: {
     getFileUrl: {
-      handler: function(url) {
+      handler: function (url) {
         if (url) {
-          this.getData(url)
+          this.getData(url);
         }
       },
-      immediate: true
+      immediate: true,
     },
   },
 
   methods: {
-    parseFile: function(){
-      let workbook = read(this.fileData,{type: 'base64'})
+    parseFile: function () {
+      let workbook = read(this.fileData, { type: "base64" });
       let sheetNames = workbook.SheetNames;
 
       const sheetIndex = 1;
 
-      this.content = utils.sheet_to_json(workbook.Sheets[sheetNames[sheetIndex-1]]);
+      this.content = utils.sheet_to_json(
+        workbook.Sheets[sheetNames[sheetIndex - 1]]
+      );
       this.parsed = true;
-
 
       // Papa.parse( this.fileData, {
       //   header: true,
@@ -124,23 +111,23 @@ export default {
      * Fetch file data
      * @param {String} url
      */
-    getData: function(url) {
+    getData: function (url) {
       // NOTE: We could augment the Request mixin to handle text responses
       // instead of using fetch here
       fetch(url)
-        .then(response => response.arrayBuffer())
-        .then(data => {
-          this.fileData =  data
-          this.parseFile()
+        .then((response) => response.arrayBuffer())
+        .then((data) => {
+          this.fileData = data;
+          this.parseFile();
         })
-        .catch(this.handleXhrError.bind(this))
-    }
-  }
-}
+        .catch(this.handleXhrError.bind(this));
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 th {
   text-align: left;

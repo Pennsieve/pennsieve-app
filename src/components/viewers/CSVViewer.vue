@@ -1,138 +1,139 @@
 <template>
   <div class="text-viewer">
     <div class="wrapper">
-      <table v-if="parsed" style="width: 100%;">
+      <table v-if="parsed" style="width: 100%">
         <thead>
-        <tr>
-          <th v-for="(header, key) in content.meta.fields"
-              v-bind:key="'header-'+key">
-            {{ header }}
-          </th>
-        </tr>
+          <tr>
+            <th
+              v-for="(header, key) in content.meta.fields"
+              v-bind:key="'header-' + key"
+            >
+              {{ header }}
+            </th>
+          </tr>
         </thead>
         <tbody>
-        <tr v-for="(row, rowKey) in content.data"
-            v-bind:key="'row-'+rowKey">
-          <td v-for="(column, columnKey) in content.meta.fields"
-              v-bind:key="'row-'+rowKey+'-column-'+columnKey">
-            <div class="table-cell">
-              {{content.data[rowKey][column]}}
-            </div>
-<!--            <input v-model=""/>-->
-          </td>
-        </tr>
+          <tr
+            v-for="(row, rowKey) in content.data"
+            v-bind:key="'row-' + rowKey"
+          >
+            <td
+              v-for="(column, columnKey) in content.meta.fields"
+              v-bind:key="'row-' + rowKey + '-column-' + columnKey"
+            >
+              <div class="table-cell">
+                {{ content.data[rowKey][column] }}
+              </div>
+              <!--            <input v-model=""/>-->
+            </td>
+          </tr>
         </tbody>
       </table>
 
-
-
       <!--      <pre>-->
-<!--        <code-->
-<!--          v-if="isText"-->
-<!--          ref="codeblock"-->
-<!--          class="codeblock"-->
-<!--          :class="subtype"-->
-<!--          v-html="escapeHTMLData(fileData)"-->
-<!--        />-->
-<!--        <code-->
-<!--          v-if="!isText"-->
-<!--          ref="codeblock"-->
-<!--          class="codeblock"-->
-<!--          :class="subtype"-->
-<!--        >{{ fileData }}</code>-->
-<!--      </pre>-->
+      <!--        <code-->
+      <!--          v-if="isText"-->
+      <!--          ref="codeblock"-->
+      <!--          class="codeblock"-->
+      <!--          :class="subtype"-->
+      <!--          v-html="escapeHTMLData(fileData)"-->
+      <!--        />-->
+      <!--        <code-->
+      <!--          v-if="!isText"-->
+      <!--          ref="codeblock"-->
+      <!--          class="codeblock"-->
+      <!--          :class="subtype"-->
+      <!--        >{{ fileData }}</code>-->
+      <!--      </pre>-->
     </div>
   </div>
 </template>
 
 <script>
-
-import StaticViewer from '../../mixins/static-viewer'
-import GetFileProperty from '../../mixins/get-file-property'
-import Request from '../../mixins/request'
-import Papa from 'papaparse';
+import StaticViewer from "../../mixins/static-viewer";
+import GetFileProperty from "../../mixins/get-file-property";
+import Request from "../../mixins/request";
+import Papa from "papaparse";
 
 export default {
-  name: 'CSVViewer',
+  name: "CSVViewer",
 
-  mixins: [
-    StaticViewer,
-    GetFileProperty,
-    Request
-  ],
+  mixins: [StaticViewer, GetFileProperty, Request],
 
   props: {
     pkg: {
       type: Object,
-      default: () => {}
+      default: () => {},
     },
     idx: {
       type: Number,
-      default: 0
-    }
+      default: 0,
+    },
   },
 
   data() {
     return {
-      fileData: '',
+      fileData: "",
       content: {},
-      parsed: false
-    }
+      parsed: false,
+    };
   },
 
   computed: {
     /**
      * Compute subtype from Package DTO
      */
-    subtype: function() {
-      return this.getFilePropertyVal(this.pkg.properties, 'subtype').toLowerCase()
+    subtype: function () {
+      return this.getFilePropertyVal(
+        this.pkg.properties,
+        "subtype"
+      ).toLowerCase();
     },
   },
 
   watch: {
     getFileUrl: {
-      handler: function(url) {
+      handler: function (url) {
         if (url) {
-          this.getData(url)
+          this.getData(url);
         }
       },
-      immediate: true
+      immediate: true,
     },
   },
 
   methods: {
-    parseFile: function(){
-
-      Papa.parse( this.fileData, {
+    parseFile: function () {
+      Papa.parse(this.fileData, {
         header: true,
         skipEmptyLines: true,
-        complete: function( results ){
+        complete: function (results) {
           this.content = results;
           this.parsed = true;
-        }.bind(this)
-      } );
+        }.bind(this),
+      });
     },
     /**
      * Fetch file data
      * @param {String} url
      */
-    getData: function(url) {
+    getData: function (url) {
       // NOTE: We could augment the Request mixin to handle text responses
       // instead of using fetch here
       fetch(url)
-        .then(response => response.text())
-        .then(data => {
-          this.fileData = data
-          this.parseFile()
+        .then((response) => response.text())
+        .then((data) => {
+          this.fileData = data;
+          this.parseFile();
         })
-        .catch(this.handleXhrError.bind(this))
-    }
-  }
-}
+        .catch(this.handleXhrError.bind(this));
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 th {
   text-align: left;
