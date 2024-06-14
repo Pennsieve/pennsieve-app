@@ -22,9 +22,8 @@
               v-bind:key="'row-' + rowKey + '-column-' + columnKey"
             >
               <div class="table-cell">
-                {{ content.data[rowKey][column] }}
+                {{ content.data[rowKey][column] || "" }}
               </div>
-              <!--            <input v-model=""/>-->
             </td>
           </tr>
         </tbody>
