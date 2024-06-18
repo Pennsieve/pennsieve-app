@@ -142,7 +142,9 @@ export default {
             .then(() => this.fetchDatasetPublishedData())
             .then(() => this.fetchCollections())
             .then(() => this.fetchIntegrations())
-            .then(() => this.fetchDatasetStatuses());
+            .then(() => this.fetchDatasetStatuses())
+            .then(() => this.fetchComputeNodes())
+            .then(() => this.fetchApplications());
         }
       },
       immediate: true,
@@ -257,6 +259,7 @@ export default {
     ...mapActions("collectionsModule", ["fetchCollections"]),
 
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
+    ...mapActions("analysisModule", ["fetchComputeNodes", "fetchApplications"]),
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
     callGlobalCustomEvent() {
       EventBus.$emit("redirect-detected");
