@@ -4,7 +4,9 @@
       <table v-if="parsed" style="width: 100%">
         <thead>
           <tr>
-            <th v-for="column in uniqueColumns" :key="column">{{ column }}</th>
+            <th v-for="column in uniqueColumns" :key="column">
+              {{ column === "_EMPTY" ? "" : column }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -51,7 +53,7 @@ export default {
   data() {
     return {
       fileData: "",
-      content: {},
+      content: [],
       parsed: false,
     };
   },
@@ -68,6 +70,7 @@ export default {
     },
     uniqueColumns() {
       const columns = new Set();
+      console.log(Array.isArray(this.content));
       this.content.forEach((row) => {
         Object.keys(row).forEach((key) => columns.add(key));
       });
