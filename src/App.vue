@@ -89,8 +89,13 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-
   mounted() {
+    setTimeout(() => {
+      if (window.location.href.includes("?redirectTo=")) {
+        EventBus.$emit("redirect-detected");
+      }
+    }, "1000"); // workaround for subscribing to an event that is registed in PennsieveHeader where lifecycle events all run after App.vue lifecycle events.
+
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
@@ -103,7 +108,6 @@ export default {
       setMeta("name", "description", this.defaultPageDescription);
     }
   },
-
   watch: {
     /**
      * Watch to compute new dataset list
@@ -254,6 +258,9 @@ export default {
 
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
+    callGlobalCustomEvent() {
+      EventBus.$emit("redirect-detected");
+    },
 
     onRefreshToken: function () {
       this.refreshToken();
