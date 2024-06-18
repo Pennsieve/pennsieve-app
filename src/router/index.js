@@ -40,7 +40,14 @@ const DatasetIntegrationsSettings = () => import('../components/datasets/setting
  */
 
 const ORCIDRedirect = () => import('../components/ORCID/ORCIDRedirect.vue')
-const ORCID = () => import('./ORCID/ORCID.vue')
+const Redirect = () => import('./Redirect/Redirect.vue')
+
+/**
+ * GitHubRedirect
+ */
+const GitHubRedirect = () => import('../components/GitHub/GitHubRedirect.vue')
+
+
 
 /**
  * Publishing Components
@@ -127,9 +134,24 @@ const router = createRouter({
       }
     },
     {
+      path: '/github-redirect',
+      components: {
+        page: Redirect
+      },
+      children: [
+        {
+          name: 'github-redirect',
+          path: '',
+          components: {
+            stage: GitHubRedirect
+          }
+        },
+      ],
+    },
+    {
       path: '/orcid-redirect',
       components: {
-        page: ORCID
+        page: Redirect
       },
       children: [
         {
