@@ -29,16 +29,6 @@
           v-model="targetDirectory"
           placeholder="Target Directory (optional)"
         />
-        <el-input
-          class="margin"
-          v-model="paramOneTitle"
-          placeholder="Param Key"
-        />
-        <el-input
-          class="margin"
-          v-model="paramOneVal"
-          placeholder="Param Value"
-        />
       </div>
       <div v-show="shouldShow(2)">
         <el-select
@@ -176,8 +166,6 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
-      paramOneTitle: "",
-      paramOneVal: "",
     };
   },
   computed: {
@@ -350,8 +338,6 @@ export default {
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
       this.targetDirectory = "";
-      this.paramOneTitle = "";
-      this.paramOneVal = "";
     },
     /**
      * Manages the Multi Step Functionality
