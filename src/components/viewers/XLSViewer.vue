@@ -70,7 +70,6 @@ export default {
     },
     uniqueColumns() {
       const columns = new Set();
-      console.log(Array.isArray(this.content));
       this.content.forEach((row) => {
         Object.keys(row).forEach((key) => columns.add(key));
       });
