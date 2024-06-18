@@ -84,17 +84,11 @@ export default {
     RequestSurvey,
     BfEmptyPageState
   },
-
-  props: {
-    datasetProposals: {
-      type: Array,
-      default: () => []
-    }
-  },
   computed: {
     ...mapState('repositoryModule', [
       'requestModalVisible',
     ]),
+    ...mapState("repositoryModule", ["datasetProposals"]),
     ...mapGetters('repositoryModule',[
       'getRepositoryByNodeId',
     ]),
