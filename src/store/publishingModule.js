@@ -181,7 +181,7 @@ export const actions = {
      * Only fetch the datasets if the user is in the publishing tab
      */
     const publicationStatus = PublicationTabsStatuses[router.currentRoute.value.name]
-    if(!publicationStatus) {
+    if(!publicationStatus.length) {
       return
     }
 
@@ -291,7 +291,7 @@ export const actions = {
       if (response.ok) {
         const { proposals, totalCount } = await response.json()
         commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', totalCount);
-        commit('UPDATE_DATASETS', { type: rootState.route.name, datasets: proposals });
+        commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: proposals });
         commit('UPDATE_IS_LOADING_DATASETS', false);
 
       } else {

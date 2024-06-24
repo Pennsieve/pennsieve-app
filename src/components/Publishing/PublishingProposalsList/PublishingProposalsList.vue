@@ -152,7 +152,6 @@ export default {
   beforeRouteEnter: function(to, from, next) {
     next(vm => {
       vm.getInitialData()
-      next()
     })
   },
 
