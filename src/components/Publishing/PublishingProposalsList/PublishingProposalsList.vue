@@ -1,6 +1,8 @@
 <template>
-  <div>
-    <form
+  <bf-stage>
+    <template #actions>
+      <div class="actions-wrapper">
+        <form
       class="mb-8 dataset-search-form"
       @submit.prevent="searchProposalsByQuery"
     >
@@ -21,7 +23,11 @@
 
       </el-input>
     </form>
-    <p
+      </div>
+    </template>
+
+    <div>
+      <p
       v-if="hasProposals"
       class="mb-24"
     >
@@ -51,8 +57,8 @@
             :class="[ sortIconDirection === 'down' ? 'svg-flip' : '' ]"
             color="currentColor"
             :dir="sortIconDirection"
-            height="20"
-            width="20"
+            :height="20"
+            :width="20"
           />
         </button>
       </div>
@@ -112,7 +118,8 @@
       />
 
     </div>
-  </div>
+    </div>
+  </bf-stage>
 </template>
 
 <script>
@@ -412,5 +419,12 @@ export default {
 .dataset-search-form {
   max-width: 400px;
   width: 100%;
+}
+.actions-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  justify-content: space-between;
+
 }
 </style>
