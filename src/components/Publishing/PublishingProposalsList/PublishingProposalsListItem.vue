@@ -68,7 +68,8 @@
           <div
             class="dataset-actions"
           >
-            <p>
+            <div class="button-wrapper">
+              <p>
               <a
                 href="#"
                 @click.prevent="triggerRequest(DatasetProposalAction.ACCEPT)"
@@ -84,6 +85,7 @@
                 Reject Request
               </a>
             </p>
+            </div>
           </div>
         </div>
       </el-col>
@@ -235,6 +237,16 @@ export default {
 .publication-type {
   text-transform: capitalize;
 }
+
+.button-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+
+    a {
+      margin-bottom: 12px;
+    }
+  }
 
 @media only screen and (max-width: 1200px){
   .list-item-status-wrapper {
