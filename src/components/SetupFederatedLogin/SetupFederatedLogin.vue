@@ -148,6 +148,7 @@
             v-model="passwordForm.password"
             type="password"
             @enter="onSubmitAuthenticate"
+            show-password
           />
         </el-form-item>
         <el-form-item>
