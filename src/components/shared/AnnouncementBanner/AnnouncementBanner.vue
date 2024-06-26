@@ -1,11 +1,10 @@
 <template>
-  <div v-if="!isDismissed">
+  <div class="banner-wrapper" v-if="!isDismissed">
     <div v-if="showBanner" class="release-banner">
       <span />
       <div>
-        Welcome to the new Pennsieve App experience! If you would like to access
-        the previous version, it's still available. Just click
-        <a :href="getUrl" target="_blank">here.</a>
+        {{ copy }}
+        <a href="url" target="_blank">{{ linkText }}</a>
       </div>
 
       <IconRemove
@@ -25,12 +24,35 @@ import { ref } from "vue";
 import Cookies from "js-cookie";
 
 export default {
-  setup() {
+  name: "AnnouncementBanner",
+  props: {
+    copy: {
+      type: String,
+      default: "",
+    },
+    linkText: {
+      type: String,
+      default: "",
+    },
+    url: {
+      type: String,
+      default: "",
+    },
+    /**
+     * Please pass a unique cookie name to each instance of the Announcment Banner Component.
+     * **/
+    cookieName: {
+      type: String,
+      default: "",
+    },
+  },
+
+  setup(props) {
     const showBanner = ref(true);
-    const isDismissed = ref(Cookies.get("hideReleaseBanner"));
+    const isDismissed = ref(Cookies.get(`${props.cookieName}`));
     function handleClose() {
       showBanner.value = false;
-      Cookies.set("hideReleaseBanner", "true");
+      Cookies.set(`${props.cookieName}`, "true");
     }
 
     return {
@@ -41,15 +63,6 @@ export default {
   },
   computed: {
     ...mapState(["config"]),
-    /**
-     * Returns link to previous version of Pennsieve App
-     * @returns {String}
-     */
-    getUrl: function () {
-      return this.config.environment === "prod"
-        ? "https://app2.pennsieve.io"
-        : "https://app2.pennsieve.net";
-    },
   },
 
   components: { IconRemove },
@@ -65,8 +78,14 @@ export default {
 <style scoped lang="scss">
 @import "../../../assets/_variables";
 
+.banner-wrapper {
+  background-color: $purple_3;
+}
+
 .release-banner {
   background-color: $purple_tint;
+  border: 1px solid $purple_2;
+  margin: 5px;
   padding: 8px 0 8px 0;
   color: $purple_2;
   display: flex;
