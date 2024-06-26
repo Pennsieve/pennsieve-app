@@ -182,7 +182,6 @@ import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
 import IconArrowDown from "../../icons/IconArrowDown.vue"
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
-import { Hide, View, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'PsLogInDialog',
@@ -191,10 +190,7 @@ export default {
     PennsieveLogoContainer,
     BfButton,
     IconRemove,
-    IconArrowDown,
-    Hide,
-    View,
-    Delete
+    IconArrowDown
   },
 
   props: {
