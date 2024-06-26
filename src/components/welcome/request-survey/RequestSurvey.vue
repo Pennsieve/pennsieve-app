@@ -300,7 +300,6 @@ export default {
     },
 
     readyToSubmit: function () {
-      // readyToSave, and provided a description, and answered questions
       return (
         this.readyToSave &&
         this.proposal.description &&
