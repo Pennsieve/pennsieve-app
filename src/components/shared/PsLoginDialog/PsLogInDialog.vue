@@ -34,10 +34,7 @@
                 type="password"
                 placeholder="Password"
                 @keyup.enter.native="onEnter"
-              >
-              <template #suffix>
-                <el-icon class="el-input__icon"><hide /></el-icon>
-              </template>
+                show-password>
               </el-input>
             </el-form-item>
             <el-form-item>
@@ -185,7 +182,7 @@ import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
 import IconArrowDown from "../../icons/IconArrowDown.vue"
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
-import { Hide } from '@element-plus/icons-vue'
+import { Hide, View, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'PsLogInDialog',
@@ -195,7 +192,9 @@ export default {
     BfButton,
     IconRemove,
     IconArrowDown,
-    Hide
+    Hide,
+    View,
+    Delete
   },
 
   props: {
