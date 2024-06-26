@@ -8,25 +8,19 @@
     @close="closeDialog"
   >
     <template #header>
-      <bf-dialog-header
-        title="Dataset Submission Request"
-      />
+      <bf-dialog-header title="Dataset Submission Request" />
     </template>
-
 
     <div class="status-info">
       <div class="wrapper">
         <div>
-          <div class="status" >
-            {{statusStr}}
+          <div class="status">
+            {{ statusStr }}
           </div>
         </div>
         <div>
-          <repo-selector
-            :locked="proposalLocked"
-          />
+          <repo-selector :locked="proposalLocked" />
         </div>
-
       </div>
       <div>
         <bf-button
@@ -37,7 +31,7 @@
         >
           Save Draft
         </bf-button>
-        <!--
+
         <bf-button
           v-if="showSubmit"
           class="primary"
@@ -46,7 +40,6 @@
         >
           Submit Request
         </bf-button>
-        -->
 
         <bf-button
           v-if="showWithdraw"
@@ -81,7 +74,7 @@
       id="proposal-request-survey"
       ref="proposalRequestSurvey"
       :model="proposal"
-      >
+    >
       <data-card
         ref="titleDataCard"
         class="compact purple question-card"
@@ -89,11 +82,11 @@
         :is-expandable="true"
         :padding="false"
       >
-        <el-input
-          v-model="proposal.name"
-          :readonly="proposalLocked"
-        />
-        <p class="warning-message" v-if="invalidName">Invalid character! A dataset proposal name may not contain these characters: {{ reservedCharacters }}</p>
+        <el-input v-model="proposal.name" :readonly="proposalLocked" />
+        <p class="warning-message" v-if="invalidName">
+          Invalid character! A dataset proposal name may not contain these
+          characters: {{ reservedCharacters }}
+        </p>
       </data-card>
 
       <data-card
@@ -131,35 +124,35 @@
         />
       </data-card>
 
-<!--      TODO: Bring this back. Currently, it does not correctly check for email and not sure what the difference is between request and proposal in object-->
+      <!--      TODO: Bring this back. Currently, it does not correctly check for email and not sure what the difference is between request and proposal in object-->
 
-<!--      <data-card-->
-<!--        ref="contributorsDataCard"-->
-<!--        class="compact purple question-card"-->
-<!--        title="Invite other investigators to work on your dataset"-->
-<!--        :is-expandable="true"-->
-<!--        :padding="false"-->
-<!--      >-->
-<!--        <template v-if="!proposalLocked" #title-aux>-->
-<!--          <button-->
-<!--            class="linked mr-8"-->
-<!--            :disabled="proposalLocked"-->
-<!--            @click.prevent="onClickAddContributor"-->
-<!--          >-->
-<!--            Add-->
-<!--          </button>-->
-<!--        </template>-->
-<!--        <template v-for="(contributor, idx) in proposal.contributors">-->
-<!--          <proposal-contributor-->
-<!--            :id=contributor.emailAddress-->
-<!--            :index=idx-->
-<!--            :contributor=contributor-->
-<!--            :locked="proposalLocked"-->
-<!--            @edit-contributor="editContributor"-->
-<!--            @remove-contributor="removeContributor"-->
-<!--            />-->
-<!--        </template>-->
-<!--      </data-card>-->
+      <!--      <data-card-->
+      <!--        ref="contributorsDataCard"-->
+      <!--        class="compact purple question-card"-->
+      <!--        title="Invite other investigators to work on your dataset"-->
+      <!--        :is-expandable="true"-->
+      <!--        :padding="false"-->
+      <!--      >-->
+      <!--        <template v-if="!proposalLocked" #title-aux>-->
+      <!--          <button-->
+      <!--            class="linked mr-8"-->
+      <!--            :disabled="proposalLocked"-->
+      <!--            @click.prevent="onClickAddContributor"-->
+      <!--          >-->
+      <!--            Add-->
+      <!--          </button>-->
+      <!--        </template>-->
+      <!--        <template v-for="(contributor, idx) in proposal.contributors">-->
+      <!--          <proposal-contributor-->
+      <!--            :id=contributor.emailAddress-->
+      <!--            :index=idx-->
+      <!--            :contributor=contributor-->
+      <!--            :locked="proposalLocked"-->
+      <!--            @edit-contributor="editContributor"-->
+      <!--            @remove-contributor="removeContributor"-->
+      <!--            />-->
+      <!--        </template>-->
+      <!--      </data-card>-->
 
       <div class="questions">
         <data-card
@@ -179,38 +172,33 @@
       </div>
     </el-form>
 
-<!--    <proposal-contributor-dialog-->
-<!--      :dialog-visible="contributorDialogVisible"-->
-<!--      :all-contributors="proposal.contributors"-->
-<!--      :id="selectedContributorId"-->
-<!--      :contributor="selectedContributor"-->
-<!--      @add-contributor="addContributor"-->
-<!--      @update-contributor="updateContributor"-->
-<!--      @close="closeContributorDialog"-->
-<!--    />-->
-
+    <!--    <proposal-contributor-dialog-->
+    <!--      :dialog-visible="contributorDialogVisible"-->
+    <!--      :all-contributors="proposal.contributors"-->
+    <!--      :id="selectedContributorId"-->
+    <!--      :contributor="selectedContributor"-->
+    <!--      @add-contributor="addContributor"-->
+    <!--      @update-contributor="updateContributor"-->
+    <!--      @close="closeContributorDialog"-->
+    <!--    />-->
   </el-dialog>
-
 </template>
 
 <script>
-import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
-import RepoSelector from './RepoSelector.vue'
-import DataCard from "../../shared/DataCard/DataCard.vue"
-import datasetProposalEmptyState from './dataset-proposal-empty-state'
+import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import MarkdownEditor from "../../shared/MarkdownEditor/MarkdownEditor.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import RepoSelector from "./RepoSelector.vue";
+import DataCard from "../../shared/DataCard/DataCard.vue";
+import datasetProposalEmptyState from "./dataset-proposal-empty-state";
 import ProposalContributor from "./ProposalContributor.vue";
-import SanitizeName from '../../../mixins/sanitize-name'
+import SanitizeName from "../../../mixins/sanitize-name";
 
-import {
-  mapState,
-  mapActions,
-} from 'vuex'
+import { mapState, mapActions } from "vuex";
 import ProposalContributorDialog from "./ProposalContributorDialog.vue";
-import {propOr} from "ramda";
-import { DatasetProposalAction } from '../../../utils/constants';
+import { propOr } from "ramda";
+import { DatasetProposalAction } from "../../../utils/constants";
 
 export default {
   name: "RequestSurvey",
@@ -222,19 +210,17 @@ export default {
     MarkdownEditor,
     BfButton,
     RepoSelector,
-    DataCard
+    DataCard,
   },
-  mixins: [
-    SanitizeName
-  ],
+  mixins: [SanitizeName],
   props: {
     dialogVisible: {
       type: Boolean,
-      default: false
+      default: false,
     },
     role: {
       type: String,
-      default: "owner"
+      default: "owner",
     },
     datasetRequest: {
       type: Object,
@@ -243,267 +229,267 @@ export default {
         organizationNodeId: "",
         description: "",
         status: "",
-        contributors: []
-      }
-    }
+        contributors: [],
+      },
+    },
   },
-  data: function() {
+  data: function () {
     return {
       proposal: {
-        name: '',
-        description: '',
+        name: "",
+        description: "",
         contributors: [],
-        survey: []
+        survey: [],
       },
       isEditingMarkdown: false,
       isSavingMarkdown: false,
       isLoadingMarkdown: false,
       datasetProposalEmptyState,
-      selectedContributorId: '',
+      selectedContributorId: "",
       selectedContributor: {},
-      contributorDialogVisible: false
-    }
+      contributorDialogVisible: false,
+    };
   },
   computed: {
-    ...mapState([
-      'primaryNavCondensed',
-      'secondaryNavOpen',
-    ]),
-    ...mapState('repositoryModule',[
+    ...mapState(["primaryNavCondensed", "secondaryNavOpen"]),
+    ...mapState("repositoryModule", [
       "isLoadingRepositoryDescription",
       "activeRequest",
-      "selectedRepoForRequest"
+      "selectedRepoForRequest",
     ]),
 
-    DatasetProposalAction: function() {
-      return DatasetProposalAction
+    DatasetProposalAction: function () {
+      return DatasetProposalAction;
     },
 
-    invalidName: function() {
-      return this.containsReservedChars(this.proposal.name)
+    invalidName: function () {
+      return this.containsReservedChars(this.proposal.name);
     },
 
-    reservedCharacters: function() {
-      return this.reservedCharsStr
+    reservedCharacters: function () {
+      return this.reservedCharsStr;
     },
 
-    showSave: function() {
-      return this.role === "owner" && !this.proposalLocked
+    showSave: function () {
+      return this.role === "owner" && !this.proposalLocked;
     },
 
-    showSubmit: function() {
-      return this.role === "owner" && !this.proposalLocked
+    showSubmit: function () {
+      return this.role === "owner" && !this.proposalLocked;
     },
 
-    showAccept: function() {
-      return this.role === "publisher"
+    showAccept: function () {
+      return this.role === "publisher";
     },
 
-    showReject: function() {
-      return this.role === "publisher"
+    showReject: function () {
+      return this.role === "publisher";
     },
 
-    showWithdraw: function() {
-      return this.role === "owner" && this.statusStr === "SUBMITTED"
+    showWithdraw: function () {
+      return this.role === "owner" && this.statusStr === "SUBMITTED";
     },
 
-    readyToSave: function() {
+    readyToSave: function () {
       // must have: selected a repo, and provided a name
       if (this.selectedRepoForRequest && this.proposal.name) {
-        return true
+        return true;
       } else {
-        return false
+        return false;
       }
     },
 
-    readyToSubmit: function() {
+    readyToSubmit: function () {
       // readyToSave, and provided a description, and answered questions
-      return (this.readyToSave && this.proposal.description && this.allRepoQuestionsAnswered)
+      return (
+        this.readyToSave &&
+        this.proposal.description &&
+        this.allRepoQuestionsAnswered
+      );
     },
 
-    readyToAccept: function() {
-      return true
+    readyToAccept: function () {
+      return true;
     },
 
-    readyToReject: function() {
-      return true
+    readyToReject: function () {
+      return true;
     },
 
-    allRepoQuestionsAnswered: function() {
+    allRepoQuestionsAnswered: function () {
       if (this.selectedRepoForRequest) {
-        let answered = this.surveyResponses()
-        return answered.length === this.selectedRepoForRequest.questions.length
+        let answered = this.surveyResponses();
+        return answered.length === this.selectedRepoForRequest.questions.length;
       }
-      return false
+      return false;
     },
 
-    statusStr: function() {
+    statusStr: function () {
       if (this.datasetRequest.proposalStatus) {
         return this.datasetRequest.proposalStatus.toUpperCase();
       }
-      return "DRAFT"
+      return "DRAFT";
     },
 
-    proposalLocked: function() {
-      return this.statusStr !== "DRAFT"
+    proposalLocked: function () {
+      return this.statusStr !== "DRAFT";
     },
     /**
      * Calculate modal width based on navigation width
      * @returns {String}
      */
-    calculateModalWidth: function() {
+    calculateModalWidth: function () {
       return this.primaryNavCondensed || this.secondaryNavOpen
-        ? 'condensed-nav-modal-width'
-        : 'default-nav-modal-width'
+        ? "condensed-nav-modal-width"
+        : "default-nav-modal-width";
     },
     /**
      * If a repository has been selected, return the list of questions
      * @returns {*[]}
      */
-    repositoryQuestions: function() {
+    repositoryQuestions: function () {
       if (this.selectedRepoForRequest) {
-        return this.selectedRepoForRequest.questions
+        return this.selectedRepoForRequest.questions;
       }
-      return []
+      return [];
     },
   },
   watch: {
-    selectedRepoForRequest: function() {
-      this.proposal.survey = []
-    }
+    selectedRepoForRequest: function () {
+      this.proposal.survey = [];
+    },
   },
   methods: {
-    ...mapActions('repositoryModule',[
-        'updateRequestModalVisible'
-      ]
-    ),
+    ...mapActions("repositoryModule", ["updateRequestModalVisible"]),
 
-    openDialog: function() {
-
+    openDialog: function () {
       // populate name
       if (this.datasetRequest && this.datasetRequest.name) {
-        this.proposal.name = this.datasetRequest.name
+        this.proposal.name = this.datasetRequest.name;
       }
       // populate description
       if (this.datasetRequest && this.datasetRequest.description) {
-        this.proposal.description = this.datasetRequest.description
+        this.proposal.description = this.datasetRequest.description;
       }
       // populate list of contributors
       if (this.datasetRequest && this.datasetRequest.contributors) {
-        this.proposal.contributors = this.datasetRequest.contributors
+        this.proposal.contributors = this.datasetRequest.contributors;
       } // else {
       //   this.proposal.contributors.push({firstName: 'Some', lastName: 'Researcher', emailAddress: 'scientist@research.org'})
       //   this.proposal.contributors.push({firstName: 'Another', lastName: 'Professor', emailAddress: 'professor@university.edu'})
       // }
       // populate survey responses
       if (this.datasetRequest && this.datasetRequest.survey) {
-        this.datasetRequest.survey.forEach(e => {
-          this.proposal.survey[e.questionId] = e.response
-        })
+        this.datasetRequest.survey.forEach((e) => {
+          this.proposal.survey[e.questionId] = e.response;
+        });
       }
     },
     /**
      * Closes the Search Across All Datasets dialog
      */
-    closeDialog: function() {
-      this.clearForm()
-      this.updateRequestModalVisible(false)
+    closeDialog: function () {
+      this.clearForm();
+      this.updateRequestModalVisible(false);
     },
-    clearForm: function() {
+    clearForm: function () {
       this.proposal = {
-        name: '',
-        description: '',
+        name: "",
+        description: "",
         contributors: [],
-        survey: []
-      }
+        survey: [],
+      };
     },
-    onClickEditMarkdown: function(evt) {
-      evt.preventDefault()
-      this.isEditingMarkdown = true
+    onClickEditMarkdown: function (evt) {
+      evt.preventDefault();
+      this.isEditingMarkdown = true;
     },
-    onClickSaveMarkdown: function(evt) {
-      evt.preventDefault()
-      this.isSavingMarkdown = true
+    onClickSaveMarkdown: function (evt) {
+      evt.preventDefault();
+      this.isSavingMarkdown = true;
     },
-    saveDescription: function(markdown) {
-      this.proposal.description = markdown
-      this.isEditingMarkdown = false
-      this.isSavingMarkdown = false
+    saveDescription: function (markdown) {
+      this.proposal.description = markdown;
+      this.isEditingMarkdown = false;
+      this.isSavingMarkdown = false;
     },
-    saveDraft: function() {
+    saveDraft: function () {
       // this.datasetRequest: prop (if empty, then this is a new request)
       // this.proposal: form data
       // this.selectedRepoForRequest
       if (this.datasetRequest && this.datasetRequest.id) {
-        this.updateProposal()
-      }
-      else {
-        this.createProposal()
+        this.updateProposal();
+      } else {
+        this.createProposal();
       }
     },
-    surveyResponses: function() {
-      let responses = []
+    surveyResponses: function () {
+      let responses = [];
       for (let index = 0; index < this.proposal.survey.length; index++) {
         if (this.proposal.survey[index]) {
           responses.push({
             questionId: index,
-            response: this.proposal.survey[index]
-          })
+            response: this.proposal.survey[index],
+          });
         }
       }
-      return responses
+      return responses;
     },
     /**
      *
      */
-    resetContributorDialog: function() {
-      this.selectedContributorId = ''
-      this.selectedContributor = {}
+    resetContributorDialog: function () {
+      this.selectedContributorId = "";
+      this.selectedContributor = {};
     },
-    onClickAddContributor: function() {
-      this.resetContributorDialog()
-      this.contributorDialogVisible = true
+    onClickAddContributor: function () {
+      this.resetContributorDialog();
+      this.contributorDialogVisible = true;
     },
-    editContributor: function(event) {
-      this.selectedContributorId = event.id
-      this.selectedContributor = event.contributor
-      this.contributorDialogVisible = true
+    editContributor: function (event) {
+      this.selectedContributorId = event.id;
+      this.selectedContributor = event.contributor;
+      this.contributorDialogVisible = true;
     },
-    removeContributor: function(event) {
+    removeContributor: function (event) {
       // search this.proposal.contributors where email === event.id, and remove it
-      let update = this.proposal.contributors.filter(e => e.emailAddress !== event.id)
-      this.proposal.contributors = update
-      this.resetContributorDialog()
-      this.contributorDialogVisible = false
+      let update = this.proposal.contributors.filter(
+        (e) => e.emailAddress !== event.id
+      );
+      this.proposal.contributors = update;
+      this.resetContributorDialog();
+      this.contributorDialogVisible = false;
     },
-    addContributor: function(event) {
+    addContributor: function (event) {
       this.proposal.contributors.push({
         firstName: event.contributor.firstName,
         lastName: event.contributor.lastName,
-        emailAddress: event.contributor.emailAddress
-      })
-      this.resetContributorDialog()
-      this.contributorDialogVisible = false
+        emailAddress: event.contributor.emailAddress,
+      });
+      this.resetContributorDialog();
+      this.contributorDialogVisible = false;
     },
-    updateContributor: function(event) {
+    updateContributor: function (event) {
       // search this.proposal.contributors where email === event.id, and replace that with event.contributor
       // let update = this.proposal.contributors.map(c =>  || c)
       // this.proposal.contributors = update
-      let index = this.proposal.contributors.findIndex(e => e.emailAddress === event.id)
+      let index = this.proposal.contributors.findIndex(
+        (e) => e.emailAddress === event.id
+      );
       if (index >= 0) {
-        this.proposal.contributors[index] = event.contributor
+        this.proposal.contributors[index] = event.contributor;
       }
-      this.resetContributorDialog()
-      this.contributorDialogVisible = false
+      this.resetContributorDialog();
+      this.contributorDialogVisible = false;
     },
-    closeContributorDialog: function(event) {
-      this.resetContributorDialog()
-      this.contributorDialogVisible = false
+    closeContributorDialog: function (event) {
+      this.resetContributorDialog();
+      this.contributorDialogVisible = false;
     },
     /**
      *
      */
-    synthesizeProposal: function() {
+    synthesizeProposal: function () {
       let proposal = {
         nodeId: propOr(undefined, "nodeId", this.datasetRequest),
         name: this.proposal.name,
@@ -515,52 +501,50 @@ export default {
         contributors: this.proposal.contributors,
         createdAt: propOr(undefined, "createdAt", this.datasetRequest),
         updatedAt: propOr(undefined, "updatedAt", this.datasetRequest),
-      }
-      return proposal
+      };
+      return proposal;
     },
 
-    triggerAction: function(action) {
+    triggerAction: function (action) {
       switch (action) {
         case DatasetProposalAction.SAVE:
-          this.saveDraft()
+          this.saveDraft();
           break;
         case DatasetProposalAction.SUBMIT:
-          this.submitProposal()
+          this.submitProposal();
           break;
         case DatasetProposalAction.ACCEPT:
-          this.acceptProposal()
+          this.acceptProposal();
           break;
         case DatasetProposalAction.REJECT:
-          this.rejectProposal()
+          this.rejectProposal();
           break;
       }
     },
 
     // TODO: note that this.proposal.survey[] has a [0] entry that should be ignored
-    createProposal: function() {
-      this.$emit("create-proposal", this.synthesizeProposal())
-      this.closeDialog()
+    createProposal: function () {
+      this.$emit("create-proposal", this.synthesizeProposal());
+      this.closeDialog();
     },
-    updateProposal: function() {
-      this.$emit("update-proposal", this.synthesizeProposal())
-      this.closeDialog()
-    },
-
-    submitProposal: function() {
-    },
-    acceptProposal: function() {
-      this.$emit("accept", this.datasetRequest)
-    },
-    rejectProposal: function() {
-      this.$emit("reject", this.datasetRequest)
+    updateProposal: function () {
+      this.$emit("update-proposal", this.synthesizeProposal());
+      this.closeDialog();
     },
 
-  }
-}
+    submitProposal: function () {},
+    acceptProposal: function () {
+      this.$emit("accept", this.datasetRequest);
+    },
+    rejectProposal: function () {
+      this.$emit("reject", this.datasetRequest);
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@import "../../../assets/_variables";
 
 .status-info {
   display: flex;
@@ -581,7 +565,6 @@ export default {
   margin-left: 246px;
   overflow-y: auto;
   margin-top: 0px;
-
 }
 
 .condensed-nav-modal-width {
@@ -602,9 +585,6 @@ export default {
 //.el-input__inner {
 //  background-color: red !important;
 //}
-
 </style>
 
-<style scoped>
-
-</style>
+<style scoped></style>
