@@ -34,8 +34,7 @@
                 type="password"
                 placeholder="Password"
                 @keyup.enter.native="onEnter"
-                show-password>
-              </el-input>
+                show-password />
             </el-form-item>
             <el-form-item>
               <bf-button
@@ -182,6 +181,7 @@ import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
 import IconArrowDown from "../../icons/IconArrowDown.vue"
 import PennsieveLogoContainer from "../PennsieveLogoContainer/PennsieveLogoContainer.vue";
+
 
 export default {
   name: 'PsLogInDialog',
