@@ -1,6 +1,6 @@
 <template>
   <div class="banner-wrapper" v-if="!isDismissed">
-    <div v-if="showBanner" class="release-banner">
+    <div v-if="showBanner" class="banner">
       <span />
       <div>
         {{ copy }}
@@ -82,7 +82,7 @@ export default {
   background-color: $purple_3;
 }
 
-.release-banner {
+.banner {
   background-color: $purple_tint;
   border: 1px solid $purple_2;
   margin: 5px;
