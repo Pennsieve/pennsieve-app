@@ -5,7 +5,17 @@ let route = useRoute();
 
 <template>
   <div id="app-wrap">
-    <release-banner />
+    <announcement-banner
+      copy="Welcome to the new Pennsieve App experience! If you would like to access
+    the previous version, it's still available"
+      linkText="here."
+      url="getUrl"
+      cookieName="hideReleaseBanner"
+    />
+    <announcement-banner
+      copy="Our Metadata service will be unavailable on July 2nd from 6AM EST to July 3rd 6AM. This will not affect uploads or file access."
+      cookieName="july-2-2024-downtime"
+    />
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -63,9 +73,7 @@ import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "./components/datasets/files/Office365Dialog/Office365Dialog.vue";
-import ReleaseBanner from "./components/shared/ReleaseBanner/ReleaseBanner.vue";
-
-// import BfNotifications from './components/notifications/Notifications.vue'
+import AnnouncementBanner from "./components/shared/AnnouncementBanner/AnnouncementBanner.vue";
 
 export default {
   name: "app",
@@ -236,6 +244,15 @@ export default {
       } else {
         return "Not-found";
       }
+    },
+    /**
+     * Returns link to previous version of Pennsieve App
+     * @returns {String}
+     */
+    getUrl: function () {
+      return this.config.environment === "prod"
+        ? "https://app2.pennsieve.io"
+        : "https://app2.pennsieve.net";
     },
   },
 
