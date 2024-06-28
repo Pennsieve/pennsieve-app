@@ -2,7 +2,7 @@
   <div>
     <div v-if="showHeader" class="help-title-wrapper">
       <div class="help-title">{{ docTitle }}</div>
-      <a href="https://docs.pennsieve.io" class="link-item">
+      <a :href="docHub" class="link-item" target="_blank">
         <IconUpload :width="14" :height="14" style="margin-right: 4px; transform: rotate(90deg) scaleX(-1)"/>
         <div class="person-circle">
           Documentation Hub
@@ -77,6 +77,9 @@ export default {
     },
     docContent: function() {
       return propOr('', 'body_html', this.content)
+    },
+    docHub: function(){
+      return "https://docs.pennsieve.io/docs/"+this.slug;
     }
   },
 

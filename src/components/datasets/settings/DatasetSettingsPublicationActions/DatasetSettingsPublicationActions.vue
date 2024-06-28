@@ -11,7 +11,27 @@
       >
         Withdraw Dataset
       </bf-button>
+      <div>
+        <el-tooltip
+          placement="top"
+          :content="revisionDefined"
+          :open-delay="300"
+        >
+        <template #content>
+            <readme-doc class="help-wrapper open" :slug="revisionDefined" :show-header=true color="white"/>
+          </template>
+
+
+        <icon-help
+            :width="24"
+            :height="24"
+            color="black"
+        ></icon-help>
+      </el-tooltip>
+      </div>
+
       <h3>Request Revision</h3>
+
       <p>
         Request to publish a revision of your published dataset (only updates information). <a href="https://docs.pennsieve.io/docs/submitting-a-revised-dataset-for-publication">
           Learn More
@@ -63,6 +83,8 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 import WithdrawDatasetDialog from '../DatasetSettingsPublicationActions/WithdrawDatasetDialog/WithdrawDatasetDialog.vue'
 import RequestRevisionDialog from '../DatasetSettingsPublicationActions/RequestRevisionDialog/RequestRevisionDialog.vue'
 import RequestRemovalDialog from '../DatasetSettingsPublicationActions/RequestRemovalDialog/RequestRemovalDialog.vue'
+import ReadmeDoc from "../../../shared/readme-doc/ReadmeDoc.vue";
+import IconHelp from "../../../icons/IconHelp.vue";
 import Request from '../../../../mixins/request/index'
 import EventBus from '../../../../utils/event-bus.js'
 import { PublicationStatus, PublicationType } from '../../../../utils/constants';
@@ -86,7 +108,9 @@ export default {
       BfButton,
       WithdrawDatasetDialog,
       RequestRevisionDialog,
-      RequestRemovalDialog
+      RequestRemovalDialog,
+      ReadmeDoc,
+      IconHelp
     },
 
     mixins: [Request],
@@ -104,7 +128,8 @@ export default {
         requestRevisionDialogVisible: false,
         requestRemovalDialogVisible: false,
         PublicationStatus,
-        PublicationType
+        PublicationType,
+        revisionDefined:"versions-and-revisions"
       }
     },
 
@@ -347,5 +372,17 @@ p {
 .publication-blurb {
   margin-top: -11px;
 }
+.help-wrapper {
+  background-color: white;
+  color: $gray_6;
+  max-height: 0;
+  transition: max-height 0.15s, padding-top 0.15s ease-out;
+  overflow-y:scroll;
 
+  &.open {
+    max-height: 250px;
+    transition: max-height 0.25s ease-in, padding-top 0.25s ease-in;
+    border-radius: 4px;
+  }
+}
 </style>
