@@ -13,8 +13,8 @@ let route = useRoute();
       cookieName="hideReleaseBanner"
     />
     <announcement-banner
-      copy="Banner Announcing Downtime"
-      cookieName="newBanner"
+      copy="Our Metadata service will be unavailable on July 2nd from 6AM EST to July 3rd 6AM. This will not affect uploads or file access."
+      cookieName="july-2-2024-downtime"
     />
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
