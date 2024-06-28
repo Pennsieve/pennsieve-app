@@ -1,9 +1,6 @@
 <template>
   <div class="proposed-dataset-list-item">
-    <el-row
-      type="flex"
-      :gutter="4"
-    >
+    <el-row type="flex" :gutter="4">
       <el-col :sm="16">
         <div class="dataset-info">
           <div>
@@ -25,35 +22,18 @@
             </p>
             <template>
               <div v-if="email">
-              <p class="dataset-meta">
-                Email address
-                <strong>{{ email }}</strong>
-              </p>
-            </div>
-          </template>
+                <p class="dataset-meta">
+                  Email address
+                  <strong>{{ email }}</strong>
+                </p>
+              </div>
+            </template>
           </div>
         </div>
       </el-col>
 
-      <!--
       <el-col :sm="4">
         <div class="bf-dataset-list-item-storage">
-          <p class="bf-dataset-list-item-stat">
-            <strong class="col-label">
-              {{ storage }}
-            </strong>
-            Storage
-          </p>
-        </div>
-      </el-col>
-      -->
-
-      <el-col
-        :sm="4"
-      >
-        <div
-          class="bf-dataset-list-item-storage"
-        >
           <p class="bf-dataset-list-item-stat">
             <strong class="col-label publication-type">
               {{ publicationType }}
@@ -65,26 +45,24 @@
 
       <el-col :span="4">
         <div class="bf-dataset-list-item-stat-align">
-          <div
-            class="dataset-actions"
-          >
+          <div class="dataset-actions">
             <div class="button-wrapper">
               <p>
-              <a
-                href="#"
-                @click.prevent="triggerRequest(DatasetProposalAction.ACCEPT)"
-              >
-                Accept Request
-              </a>
-            </p>
-            <p>
-              <a
-                href="#"
-                @click.prevent="triggerRequest(DatasetProposalAction.REJECT)"
-              >
-                Reject Request
-              </a>
-            </p>
+                <a
+                  href="#"
+                  @click.prevent="triggerRequest(DatasetProposalAction.ACCEPT)"
+                >
+                  Accept Request
+                </a>
+              </p>
+              <p>
+                <a
+                  href="#"
+                  @click.prevent="triggerRequest(DatasetProposalAction.REJECT)"
+                >
+                  Reject Request
+                </a>
+              </p>
             </div>
           </div>
         </div>
@@ -93,88 +71,98 @@
   </div>
 </template>
 <script>
-
-import FormatDate from '../../../mixins/format-date'
-import { DatasetProposalAction } from '../../../utils/constants';
+import FormatDate from "../../../mixins/format-date";
+import { DatasetProposalAction } from "../../../utils/constants";
+import { mapActions, mapGetters, mapState } from "vuex";
 
 export default {
-  name: 'PublishingProposalsListItem',
+  name: "PublishingProposalsListItem",
 
-  mixins: [
-    FormatDate
-  ],
+  mixins: [FormatDate],
 
   props: {
     proposal: {
       type: Object,
-      default: () => {}
-    }
+      default: () => {},
+    },
   },
 
   computed: {
     /**
      * Compute title of dataset proposl
      */
-    proposalName: function() {
-      return this.proposal.name
+    proposalName: function () {
+      return this.proposal.name;
     },
     /**
      * Compute formatted timestamp
      * @returns {String}
      */
-    updated: function() {
-      let epochSeconds = 0
+    updated: function () {
+      let epochSeconds = 0;
       if (this.proposal.submittedAt) {
-        epochSeconds = this.proposal.submittedAt
+        epochSeconds = this.proposal.submittedAt;
       } else {
-        epochSeconds = this.proposal.updatedAt
+        epochSeconds = this.proposal.updatedAt;
       }
-      let isoTimestamp = this.epochToISO(epochSeconds)
-      return this.formatDate(isoTimestamp)
+      let isoTimestamp = this.epochToISO(epochSeconds);
+      return this.formatDate(isoTimestamp);
     },
     /**
      * Compute owner of dataset
      * @returns {String}
      */
-    owner: function() {
-      return this.proposal.ownerName
+    owner: function () {
+      return this.proposal.ownerName;
     },
     //proposer's email will render if the email is provided adn not an empty string
     email() {
-      if (this.proposal.emailAddress.length && this.proposal.emailAddress.trim().length){
+      if (
+        this.proposal.emailAddress.length &&
+        this.proposal.emailAddress.trim().length
+      ) {
         return this.proposal.emailAddress;
       } else {
-        return '';
+        return "";
       }
     },
 
-    storage: function() { return 0},
+    storage: function () {
+      return 0;
+    },
 
-    publicationType: function() {return "proposal"},
+    publicationType: function () {
+      return "proposal";
+    },
 
-    DatasetProposalAction: function() {
-      return DatasetProposalAction
+    DatasetProposalAction: function () {
+      return DatasetProposalAction;
     },
   },
 
   methods: {
-    epochToISO: function(seconds) {
-      let d = new Date(0)
-      d.setUTCSeconds(seconds)
-      return d.toISOString()
+    ...mapActions("repositoryModule", ["acceptProposal", "rejectProposal"]),
+    epochToISO: function (seconds) {
+      let d = new Date(0);
+      d.setUTCSeconds(seconds);
+      return d.toISOString();
     },
 
-    triggerRequest: function(request) {
-      this.$emit(request, this.proposal)
+    triggerRequest: function (request) {
+      if (request === "accept") {
+        this.acceptProposal(this.proposal);
+      }
+      if (request === "reject") {
+        this.rejectProposal(this.proposal);
+      }
+      this.$emit(request, this.proposal);
     },
-
-  }
-}
-
+  },
+};
 </script>
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
-@import '../../../assets/_list-item.scss';
+@import "../../../assets/_variables.scss";
+@import "../../../assets/_list-item.scss";
 
 .list-item-status-wrapper {
   color: $gray_4;
@@ -239,16 +227,16 @@ export default {
 }
 
 .button-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 
-    a {
-      margin-bottom: 12px;
-    }
+  a {
+    margin-bottom: 12px;
   }
+}
 
-@media only screen and (max-width: 1200px){
+@media only screen and (max-width: 1200px) {
   .list-item-status-wrapper {
     width: 70px;
     height: fit-content;
