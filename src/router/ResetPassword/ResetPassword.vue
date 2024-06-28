@@ -122,6 +122,7 @@
                 placeholder="New Password"
                 autofocus
                 @click="onPasswordFormSubmit"
+                show-password
               />
               <transition name="el-zoom-in-top">
                 <div
