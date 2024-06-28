@@ -113,6 +113,7 @@ export default {
      * Watch to compute new dataset list
      */
     "$route.params.orgId"(to, from) {
+      console.log("is this running");
       if (to) {
         this.onSwitchOrganization({
           organization: {
@@ -132,10 +133,14 @@ export default {
      */
     activeOrganization: {
       handler: function (val, oldVal) {
+        console.log("activeOrganization handler ran");
         const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
         const newOrgId = pathOr("NONE", ["organization", "id"], val);
 
         // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
+        console.log("this.userToken", this.userToken);
+        console.log("oldOrgId", oldOrgId);
+        console.log("newOrgId", newOrgId);
         if (this.userToken && oldOrgId !== newOrgId) {
           this.setActiveOrgSynced()
             .then(() => this.fetchDatasets())

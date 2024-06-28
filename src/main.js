@@ -96,6 +96,13 @@ const allowList = [
 router.beforeEach((to, from, next) => {
     // ensure user is authorized to use the app
 
+
+    console.log('to', to)
+    console.log('from', from)
+    console.log('token', Cookies.get('user_token'))
+    console.log('preferred org id', Cookies.get('preferred_org_id'))
+    console.log('stateToken', store.state.userToken)
+    console.log('destination', to.fullPath)
     const token = Cookies.get('user_token')
     const savedOrgId = Cookies.get('preferred_org_id')
 
@@ -106,7 +113,6 @@ router.beforeEach((to, from, next) => {
         next(`/${savedOrgId}/datasets`)
     } else if (allowList.indexOf(to.name) >= 0) {
         // Support Unauthenticated Access for AllowList Routes including 'home'
-
         next()
     } else {
         // Requires Authenticated Access
@@ -119,6 +125,7 @@ router.beforeEach((to, from, next) => {
         }
 
         if (!token) {
+            console.log('in here')
             // Not authenticated --> Route to login with optional redirect after login.
             const destination = to.fullPath
             if (destination && destination.name !== 'page-not-found') {
@@ -156,20 +163,30 @@ router.beforeEach((to, from, next) => {
     }
 })
 
-router.beforeResolve(async to => {
-    const destination = to.fullPath
+// router.beforeResolve(async (to, from, next) => {
+    // const destination = to.fullPath
+    // const token = Cookies.get('user_token')
 
-    if (destination.name != 'home' &&
-        allowList.indexOf(to.name) < 0 &&
-        !store.state.activeOrgSynced && store.state.userToken) {
-        // Org is not synced yet --> Sync org and get org assets.
+    // if (destination.name != 'home' &&
+    //     allowList.indexOf(to.name) < 0 &&
+    //     !store.state.activeOrgSynced && store.state.userToken) {
+    //         if (!token) {
+    //             // Not authenticated --> Route to login with optional redirect after login.
+    //             if (destination && destination.name !== 'page-not-found') {
+    //                 next(`/?redirectTo=${destination}`)
+    //             } else {
+    //                 next('/')
+    //             }
+    //         }
+    //     // Org is not synced yet --> Sync org and get org assets.
 
-        // TODO: Need to sync Workspace and get Workspace assets here
-        // This now happens in app.vue/bootup, and getProfileAndOrg in GlobalMessageHandler
-        // If we handle that here, we should be able to remove some watchers that might introduce race conditions.
+    //     // TODO: Need to sync Workspace and get Workspace assets here
+    //     // This now happens in app.vue/bootup, and getProfileAndOrg in GlobalMessageHandler
+    //     // If we handle that here, we should be able to remove some watchers that might introduce race conditions.
 
-    }
-})
+    // }
+    // next('/')
+// })
 
 router.afterEach((to, from) => {
 
