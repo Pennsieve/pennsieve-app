@@ -12,6 +12,7 @@ import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
 import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
+import analysisModule from "./analysisModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1011,6 +1012,9 @@ export const getters = {
   hasOrcidOnboardingEvent: (state) => {
     return state.onboardingEvents.includes("AddedOrcid") || false;
   },
+  getComputeNodes: (state) => {
+    return state.computeNodes
+  }
 }
 
 
@@ -1029,6 +1033,7 @@ export default createStore({
     filesModule,
     uploadModule,
     metadataModule,
+    analysisModule
   }
 
 });
