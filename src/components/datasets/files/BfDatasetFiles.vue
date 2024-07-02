@@ -17,6 +17,16 @@
         </template>
         <template #right>
           <bf-button
+            v-if="showRunAnalysisFlow"
+            @click="openRunAnalysisDialog"
+            class="mr-8 flex"
+          >
+            <template #prefix>
+              <IconAnalysis class="mr-8" :height="20" :width="20" />
+            </template>
+            Run Analysis
+          </bf-button>
+          <bf-button
             v-if="getPermission('editor')"
             class="flex mr-8"
             :disabled="datasetLocked"
@@ -121,6 +131,12 @@
       :selected-files="selectedFiles"
     />
 
+    <run-analysis-dialog
+      :datasetId="datasetId"
+      :dialog-visible="runAnalysisDialogVisible"
+      @close="onCloseRunAnalysisDialog"
+    />
+
     <bf-drop-info
       v-if="showDropInfo"
       v-model:show-drop-info="showDropInfo"
@@ -132,7 +148,7 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from "vuex";
+import { mapGetters, mapActions, mapState } from "vuex";
 import {
   assocPath,
   head,
@@ -149,6 +165,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
 import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
+import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -165,6 +182,7 @@ import FileMetadataInfo from "./Metadata/FileMetadataInfo.vue";
 import LockedBanner from "../LockedBanner/LockedBanner.vue";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
+import IconAnalysis from "../../icons/IconAnalysis.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
@@ -194,6 +212,7 @@ export default {
     LockedBanner,
     DeletedFiles,
     FileMetadataInfo,
+    RunAnalysisDialog,
   },
 
   props: {
@@ -238,10 +257,19 @@ export default {
       selectedFileForAction: {},
       pusherChannelName: "",
       pusherChannel: {},
+      runAnalysisDialogVisible: false,
     };
   },
 
   computed: {
+    ...mapState("analysisModule", [
+      "computeNodes",
+      "preprocessors",
+      "processors",
+      "postprocessors",
+      "selectedFilesForAnalysis",
+    ]),
+    ...mapState(["activeOrganization"]),
     ...mapGetters([
       "userToken",
       "config",
@@ -259,7 +287,30 @@ export default {
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-
+    /**
+     * Feature Flag for Run Analysis Flow
+     *
+     */
+    showRunAnalysisFlow: function () {
+      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
+      const isPennsieveTestDev =
+        this.organizationId ===
+        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
+      const isImmuneHealthProd =
+        this.organizationId ===
+        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
+      const isPennsieveTestProd =
+        this.organizationId ===
+        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
+      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
+    },
+    /**
+     * Compute organization's ID
+     * @returns {String}
+     */
+    organizationId: function () {
+      return pathOr("", ["organization", "id"], this.activeOrganization);
+    },
     /**
      * Item has files
      */
@@ -452,6 +503,9 @@ export default {
     onClosePackageDialog: function () {
       this.packageDialogVisible = false;
     },
+    onCloseRunAnalysisDialog: function () {
+      this.runAnalysisDialogVisible = false;
+    },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
 
@@ -527,7 +581,6 @@ export default {
       this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
-          // TODO: this is where I need to set currentTargetFile in the uploadModule of global state
           this.$store.dispatch(
             "uploadModule/setCurrentTargetPackage",
             response
@@ -670,7 +723,6 @@ export default {
      */
     openPackageDialog: function () {
       this.packageDialogVisible = true;
-      // this.$refs.packageDialog.visible = true
     },
 
     /**
@@ -1050,6 +1102,9 @@ export default {
         .catch((response) => {
           this.handleXhrError(response);
         });
+    },
+    openRunAnalysisDialog: function () {
+      this.runAnalysisDialogVisible = true;
     },
   },
 };
