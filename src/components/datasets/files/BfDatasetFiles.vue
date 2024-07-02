@@ -16,7 +16,11 @@
           />
         </template>
         <template #right>
-          <bf-button @click="openRunAnalysisDialog" class="mr-8 flex">
+          <bf-button
+            v-if="processors.length"
+            @click="openRunAnalysisDialog"
+            class="mr-8 flex"
+          >
             <template #prefix>
               <IconAnalysis class="mr-8" :height="20" :width="20" />
             </template>
@@ -144,7 +148,7 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from "vuex";
+import { mapGetters, mapActions, mapState } from "vuex";
 import {
   assocPath,
   head,
@@ -258,6 +262,13 @@ export default {
   },
 
   computed: {
+    ...mapState("analysisModule", [
+      "computeNodes",
+      "preprocessors",
+      "processors",
+      "postprocessors",
+      "selectedFilesForAnalysis",
+    ]),
     ...mapGetters([
       "userToken",
       "config",
