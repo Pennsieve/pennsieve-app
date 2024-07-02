@@ -27,6 +27,7 @@
             v-model="profileForm.password"
             type="password"
             @enter="onFormSubmit"
+            show-password
           />
           <transition name="el-zoom-in-top">
             <div
@@ -47,6 +48,7 @@
             v-model="profileForm.passwordConfirm"
             type="password"
             required
+            show-password
           />
         </el-form-item>
 <!--        <div class="helper">-->

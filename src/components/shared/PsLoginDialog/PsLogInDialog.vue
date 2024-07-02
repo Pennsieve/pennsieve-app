@@ -34,7 +34,7 @@
                 type="password"
                 placeholder="Password"
                 @keyup.enter.native="onEnter"
-              />
+                show-password />
             </el-form-item>
             <el-form-item>
               <bf-button

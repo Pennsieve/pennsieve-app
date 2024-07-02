@@ -155,6 +155,11 @@ export default {
     },
   },
 
+  created() {
+    EventBus.$on("redirect-detected", () => {
+      this.isLogInModalVisible = true;
+    });
+  },
   beforeMount() {
     // Setup resize event listener
     this.windowWidth = window.innerWidth;
@@ -165,7 +170,6 @@ export default {
       this.isContactUsDialogOpen = data;
     });
   },
-
   methods: {
     /**
      * Toggle search and focus
