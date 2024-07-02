@@ -17,7 +17,7 @@
         </template>
         <template #right>
           <bf-button
-            v-if="processors.length"
+            v-if="showRunAnalysisFlow"
             @click="openRunAnalysisDialog"
             class="mr-8 flex"
           >
@@ -269,6 +269,7 @@ export default {
       "postprocessors",
       "selectedFilesForAnalysis",
     ]),
+    ...mapState(["activeOrganization"]),
     ...mapGetters([
       "userToken",
       "config",
@@ -286,7 +287,30 @@ export default {
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-
+    /**
+     * Feature Flag for Run Analysis Flow
+     *
+     */
+    showRunAnalysisFlow: function () {
+      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
+      const isPennsieveTestDev =
+        this.organizationId ===
+        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
+      const isImmuneHealthProd =
+        this.organizationId ===
+        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
+      const isPennsieveTestProd =
+        this.organizationId ===
+        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
+      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
+    },
+    /**
+     * Compute organization's ID
+     * @returns {String}
+     */
+    organizationId: function () {
+      return pathOr("", ["organization", "id"], this.activeOrganization);
+    },
     /**
      * Item has files
      */
