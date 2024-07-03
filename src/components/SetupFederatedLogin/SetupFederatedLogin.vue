@@ -614,10 +614,7 @@ export default {
     openORCID: function() {
       this.oauthWindow = window.open(this.getORCIDUrl, "_blank", "toolbar=no, scrollbars=yes, width=500, height=600, top=500, left=500");
       window.addEventListener('message', function(event) {
-        console.log("window-event-listener")
-        console.log(event)
         if (event.data && event.data.source && event.data.source === 'orcid-redirect-response' && event.data.code) {
-          console.log("window-event-listener - sending event: " + event.data.code)
           EventBus.$emit('finalize-orcid-integration', {
               oauthCode: event.data.code
             }
