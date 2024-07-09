@@ -258,7 +258,7 @@ export default {
         view: "overview"
       }
       EventBus.$emit('switch-organization', evt)
-      // this.$router.push(`/${proposal.organizationNodeId}/datasets/${proposal.datasetNodeId}/overview`)
+      this.$router.push(`/${proposal.organizationNodeId}/datasets/${proposal.datasetNodeId}/overview`)
     },
 
     startNewRequest: function() {
