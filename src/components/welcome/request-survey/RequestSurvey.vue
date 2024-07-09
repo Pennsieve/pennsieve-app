@@ -37,30 +37,10 @@
         >
           Save Draft
         </bf-button>
-        <!--
-        <bf-button
-          v-if="showSubmit"
-          class="primary"
-          :disabled="!readyToSubmit"
-          @click="triggerAction(DatasetProposalAction.SUBMIT)"
-        >
-          Submit Request
-        </bf-button>
-        -->
-
-        <bf-button
-          v-if="showWithdraw"
-          class="primary"
-          :disabled="!readyToSubmit"
-          @click="triggerAction(DatasetProposalAction.WITHDRAW)"
-        >
-          Retract Request
-        </bf-button>
 
         <bf-button
           v-if="showAccept"
           class="primary"
-          :disabled="!readyToAccept"
           @click="triggerAction(DatasetProposalAction.ACCEPT)"
         >
           Accept Proposal
@@ -69,7 +49,6 @@
         <bf-button
           v-if="showReject"
           class="primary"
-          :disabled="!readyToReject"
           @click="triggerAction(DatasetProposalAction.REJECT)"
         >
           Reject Proposal
@@ -308,25 +287,12 @@ export default {
     },
 
     readyToSave: function() {
-      // must have: selected a repo, and provided a name
-      if (this.selectedRepoForRequest && this.proposal.name) {
+      // must have: selected a repo, provided a name, and provided a description
+      if (this.selectedRepoForRequest && this.proposal.name && this.proposal.description) {
         return true
       } else {
         return false
       }
-    },
-
-    readyToSubmit: function() {
-      // readyToSave, and provided a description, and answered questions
-      return (this.readyToSave && this.proposal.description && this.allRepoQuestionsAnswered)
-    },
-
-    readyToAccept: function() {
-      return true
-    },
-
-    readyToReject: function() {
-      return true
     },
 
     allRepoQuestionsAnswered: function() {
