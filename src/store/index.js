@@ -41,13 +41,13 @@ const initialFilterState = {
   sortDirection: "asc",
 };
 
-export const state = {
+const initialState = () => ({
   config: site,
   uploadRemaining: 0,
   uploading: false,
   uploadCount: 0,
   hasGravatar: false,
-  organizations: {},
+  organizations: [],
   activeOrganization: {},
   activeOrgSynced: false,
   isLoadingDatasets: true,
@@ -119,9 +119,14 @@ export const state = {
   userToken: '',
   sessionTimer: null,
   isRefreshing: false
-}
+})
+
+export const state = initialState();
 
 export const mutations = {
+    RESET_STATE(state) {
+      Object.assign(state, initialState());
+    },
     SET_IS_REFRESHING(state, data) {
       state.isRefreshing = data
     },
@@ -621,6 +626,9 @@ export const mutations = {
     }
 
 export const actions = {
+  resetState({ commit }) {
+    commit('resetState');
+  },
   setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),

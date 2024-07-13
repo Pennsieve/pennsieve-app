@@ -227,6 +227,7 @@ export default {
       if (!token) {
         return
       }
+      
 
       // add logic to only make organizations request if profile is defined
       let currentPath = this.$router.currentRoute.path
@@ -251,6 +252,7 @@ export default {
           const activeOrg = orgs.organizations[activeOrgIndex]
 
           // handle org switch
+          
           return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
 
         })
@@ -420,11 +422,12 @@ export default {
       const newOrgIntId = propOr(1, 'intId', newOrg)
       const activeOrgId = pathOr(0, ['organization', 'id'], this.activeOrganization)
       // Do nothing if the user is trying to switch to the organization that is already active or if no userToken found
-      if (newOrgId === activeOrgId || !this.isOrgSynced) {
+      if (newOrgId === activeOrgId || !this.userToken) {
         return
       }
       // switch org in vue app
       const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${newOrgIntId}&api_key=${this.userToken}`
+      
       this.sendXhr(switchOrgUrl, { method: 'PUT' })
         .then(response => {
           const updatedOrg = find(pathEq(['organization', 'id'], newOrgId), this.organizations)
@@ -464,7 +467,10 @@ export default {
                   .then(this.getTeams.bind(this))
                   .then(this.getOrgContributors.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch((error) => {
+          console.error(error)
+          this.handleXhrError.bind(this)
+        })
     },
     /**
      * Updates org users object with any missing fields required for sorting
