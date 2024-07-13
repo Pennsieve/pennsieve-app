@@ -97,7 +97,6 @@ export default {
     };
   },
   mounted() {
-    console.log("this.sessionTimedOut", this.sessionTimedOut);
     setTimeout(() => {
       if (window.location.href.includes("?redirectTo=")) {
         EventBus.$emit("redirect-detected");
@@ -146,7 +145,6 @@ export default {
      */
     activeOrganization: {
       handler: function (val, oldVal) {
-        // console.log("this.isOrgSynced", this.isOrgSynced);
         const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
         const newOrgId = pathOr("NONE", ["organization", "id"], val);
 
