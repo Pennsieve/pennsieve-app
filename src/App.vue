@@ -73,6 +73,9 @@ import AnnouncementBanner from "./components/shared/AnnouncementBanner/Announcem
 
 export default {
   name: "app",
+  created() {
+    this.getActiveOrganization, this.onActiveOrgChange.bind(this);
+  },
 
   components: {
     PennsieveUpload,
@@ -116,20 +119,26 @@ export default {
     /**
      * Watch to compute new dataset list
      */
-    "$route.params.orgId"(to, from) {
-      if (to) {
-        this.onSwitchOrganization({
-          organization: {
-            id: to,
-          },
-        });
-        this.$nextTick(() => {
-          const token = Cookies.get("user_token");
-          if (token) {
-            this.bootUp(token);
+    "$route.params.orgId": {
+      handler: async function (to, from) {
+        const token = Cookies.get("user_token");
+        console.log("this.token", !!token);
+        if (token) {
+          try {
+            await this.bootUp(token);
+          } catch (error) {
+            console.error(error);
+          } finally {
+            if (this.isOrgSynced) {
+              this.onSwitchOrganization({
+                organization: {
+                  id: to,
+                },
+              });
+            }
           }
-        });
-      }
+        }
+      },
     },
     /**
      * Trigger API request when active organization is changed
@@ -141,14 +150,18 @@ export default {
 
         // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
         if (this.userToken && oldOrgId !== newOrgId) {
-          this.setActiveOrgSynced()
-            .then(() => this.fetchDatasets())
-            .then(() => this.fetchDatasetPublishedData())
-            .then(() => this.fetchCollections())
-            .then(() => this.fetchIntegrations())
-            .then(() => this.fetchDatasetStatuses())
-            .then(() => this.fetchComputeNodes())
-            .then(() => this.fetchApplications());
+          try {
+            this.setActiveOrgSynced()
+              .then(() => this.fetchDatasets())
+              .then(() => this.fetchDatasetPublishedData())
+              .then(() => this.fetchCollections())
+              .then(() => this.fetchIntegrations())
+              .then(() => this.fetchDatasetStatuses())
+              .then(() => this.fetchComputeNodes())
+              .then(() => this.fetchApplications());
+          } catch (err) {
+            console.error(err);
+          }
         }
       },
       immediate: true,
