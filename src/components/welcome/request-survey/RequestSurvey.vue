@@ -28,16 +28,17 @@
         </div>
 
       </div>
-      <div class="cta-wrapper">
-        <bf-button
-          v-if="showSave"
+      <div>
+        <div v-if="showSave"  class="save-draft-cta-wrapper">
+          <bf-button
           class="primary"
           :disabled="!readyToSave || invalidName"
           @click="triggerAction(DatasetProposalAction.SAVE)"
         >
           Save Draft
         </bf-button>
-        <p v-if="showSave" class="cta-hint"> Complete all fields marked with Asterisk (*) to save draft</p>
+        <p class="cta-hint"> Complete all fields marked with Asterisk (*) to save draft</p>
+        </div>
         <bf-button
           v-if="showAccept"
           class="primary"
@@ -577,18 +578,22 @@ export default {
   width: inherit;
 }
 
-.bf-button + p {
-  margin-top: 12px;
-}
-
 //.el-input__inner {
 //  background-color: red !important;
 //}
 
-.cta-wrapper {
+.save-draft-cta-wrapper {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+
+  p {
+    margin-top: 12px;
+  }
+}
+
+.bf-button:not(:last-of-type) {
+  margin-right: 16px;
 }
 
 </style>
