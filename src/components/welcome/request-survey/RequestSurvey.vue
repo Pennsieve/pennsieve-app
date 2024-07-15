@@ -18,7 +18,7 @@
       <div class="wrapper">
         <div>
           <div class="status" >
-            {{statusStr}}
+           <span>Dataset submission status:</span> {{statusStr}}
           </div>
         </div>
         <div>
@@ -28,7 +28,7 @@
         </div>
 
       </div>
-      <div>
+      <div class="cta-wrapper">
         <bf-button
           v-if="showSave"
           class="primary"
@@ -37,7 +37,7 @@
         >
           Save Draft
         </bf-button>
-
+        <p v-if="showSave" class="cta-hint"> Complete all fields marked with Asterisk (*) to save draft</p>
         <bf-button
           v-if="showAccept"
           class="primary"
@@ -67,6 +67,7 @@
         title="What is the proposed name for the dataset?"
         :is-expandable="true"
         :padding="false"
+        :required="true"
       >
         <el-input
           v-model="proposal.name"
@@ -81,6 +82,7 @@
         title="Please describe the proposed dataset"
         :is-expandable="true"
         :padding="false"
+        :required="true"
       >
         <template v-if="!proposalLocked" #title-aux>
           <button
@@ -537,6 +539,10 @@ export default {
     display: flex;
     flex-direction: column;
   }
+
+  .status > span {
+    font-weight: 500;
+  }
 }
 
 .el-dialog {
@@ -565,9 +571,25 @@ export default {
   color: $red_1;
 }
 
+.cta-hint {
+  font-size: 14px;
+  display: inline-block;
+  width: inherit;
+}
+
+.bf-button + p {
+  margin-top: 12px;
+}
+
 //.el-input__inner {
 //  background-color: red !important;
 //}
+
+.cta-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
 
 </style>
 
