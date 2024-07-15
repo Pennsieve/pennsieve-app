@@ -204,7 +204,7 @@
             </a>
           </p>
           <bf-button @click="openGitHub">
-            Register your Github Account
+            Register your GitHub Account
           </bf-button>
         </div>
         <div v-else>
@@ -563,6 +563,15 @@ export default {
         : `https://orcid.org/${orcid}`;
     },
 
+    getGitHubAppUrl: function() {
+      const url = pathOr("", ["config", "GitHubAppUrl"])(this);
+
+      if (!url) {
+        return ""
+      }
+      return url
+    },
+
     isEmailButtonDisabled: function () {
       return this.emailButtonDisabled;
     },
@@ -852,7 +861,7 @@ export default {
 
     openGitHub: function() {
       this.oauthWindow = window.open(
-        `https://github.com/apps/pennsieve/installations/new?redirect_uri=${this.windowLocation}`,
+          `${this.getGitHubAppUrl}?redirect_uri=${this.windowLocation}`,
         "_blank",
         "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
       );
