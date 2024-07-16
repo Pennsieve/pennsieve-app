@@ -41,6 +41,8 @@ const app = createApp(App)
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
+
+
 app.use(VueClipboard, {
     autoSetContainer: true,
     appendToBody: true,
@@ -58,6 +60,11 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 // app.use(Vue3Sanitize);
+
+// In your main.js or App.vue
+window.addEventListener('beforeunload', () => {
+    store.dispatch('resetState');
+  });
 
 
 app.mount("#app");
