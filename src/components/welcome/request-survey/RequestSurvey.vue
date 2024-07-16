@@ -152,6 +152,7 @@
           :title="question.question"
           :is-expandable="true"
           :padding="false"
+          :required="true"
         >
           <el-input
             v-model="proposal.survey[question.id]"
