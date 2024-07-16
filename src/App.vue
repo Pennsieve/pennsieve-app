@@ -73,9 +73,6 @@ import AnnouncementBanner from "./components/shared/AnnouncementBanner/Announcem
 
 export default {
   name: "app",
-  created() {
-    this.getActiveOrganization, this.onActiveOrgChange.bind(this);
-  },
 
   components: {
     PennsieveUpload,
@@ -122,7 +119,6 @@ export default {
     "$route.params.orgId": {
       handler: async function (to, from) {
         const token = Cookies.get("user_token");
-        console.log("this.token", !!token);
         if (token) {
           try {
             await this.bootUp(token);
