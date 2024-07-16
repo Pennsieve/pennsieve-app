@@ -73,9 +73,6 @@ import AnnouncementBanner from "./components/shared/AnnouncementBanner/Announcem
 
 export default {
   name: "app",
-  created() {
-    this.getActiveOrganization, this.onActiveOrgChange.bind(this);
-  },
 
   components: {
     PennsieveUpload,
