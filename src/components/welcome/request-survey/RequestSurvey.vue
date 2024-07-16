@@ -290,8 +290,9 @@ export default {
     },
 
     readyToSave: function() {
-      // must have: selected a repo, provided a name, and provided a description
-      if (this.selectedRepoForRequest && this.proposal.name && this.proposal.description) {
+      // must have: selected a repo, provided a name, provided a description, and all questions are answered
+      // TODO: this.allRepoQuestionsAnswered does not need to be true, update backend to support it and make this change
+      if (this.selectedRepoForRequest && this.proposal.name && this.proposal.description && this.allRepoQuestionsAnswered) {
         return true
       } else {
         return false
