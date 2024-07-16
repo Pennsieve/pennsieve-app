@@ -18,7 +18,7 @@
       <div class="wrapper">
         <div>
           <div class="status" >
-            {{statusStr}}
+           <span>Dataset submission status:</span> {{statusStr}}
           </div>
         </div>
         <div>
@@ -29,38 +29,19 @@
 
       </div>
       <div>
-        <bf-button
-          v-if="showSave"
+        <div v-if="showSave"  class="save-draft-cta-wrapper">
+          <bf-button
           class="primary"
           :disabled="!readyToSave || invalidName"
           @click="triggerAction(DatasetProposalAction.SAVE)"
         >
           Save Draft
         </bf-button>
-        <!--
-        <bf-button
-          v-if="showSubmit"
-          class="primary"
-          :disabled="!readyToSubmit"
-          @click="triggerAction(DatasetProposalAction.SUBMIT)"
-        >
-          Submit Request
-        </bf-button>
-        -->
-
-        <bf-button
-          v-if="showWithdraw"
-          class="primary"
-          :disabled="!readyToSubmit"
-          @click="triggerAction(DatasetProposalAction.WITHDRAW)"
-        >
-          Retract Request
-        </bf-button>
-
+        <p class="cta-hint"> Complete all fields marked with Asterisk (*) to save draft</p>
+        </div>
         <bf-button
           v-if="showAccept"
           class="primary"
-          :disabled="!readyToAccept"
           @click="triggerAction(DatasetProposalAction.ACCEPT)"
         >
           Accept Proposal
@@ -69,7 +50,6 @@
         <bf-button
           v-if="showReject"
           class="primary"
-          :disabled="!readyToReject"
           @click="triggerAction(DatasetProposalAction.REJECT)"
         >
           Reject Proposal
@@ -88,6 +68,7 @@
         title="What is the proposed name for the dataset?"
         :is-expandable="true"
         :padding="false"
+        :required="true"
       >
         <el-input
           v-model="proposal.name"
@@ -102,6 +83,7 @@
         title="Please describe the proposed dataset"
         :is-expandable="true"
         :padding="false"
+        :required="true"
       >
         <template v-if="!proposalLocked" #title-aux>
           <button
@@ -308,25 +290,13 @@ export default {
     },
 
     readyToSave: function() {
-      // must have: selected a repo, and provided a name
-      if (this.selectedRepoForRequest && this.proposal.name) {
+      // must have: selected a repo, provided a name, provided a description, and all questions are answered
+      // TODO: this.allRepoQuestionsAnswered does not need to be true, update backend to support it and make this change
+      if (this.selectedRepoForRequest && this.proposal.name && this.proposal.description && this.allRepoQuestionsAnswered) {
         return true
       } else {
         return false
       }
-    },
-
-    readyToSubmit: function() {
-      // readyToSave, and provided a description, and answered questions
-      return (this.readyToSave && this.proposal.description && this.allRepoQuestionsAnswered)
-    },
-
-    readyToAccept: function() {
-      return true
-    },
-
-    readyToReject: function() {
-      return true
     },
 
     allRepoQuestionsAnswered: function() {
@@ -571,6 +541,10 @@ export default {
     display: flex;
     flex-direction: column;
   }
+
+  .status > span {
+    font-weight: 500;
+  }
 }
 
 .el-dialog {
@@ -599,9 +573,29 @@ export default {
   color: $red_1;
 }
 
+.cta-hint {
+  font-size: 14px;
+  display: inline-block;
+  width: inherit;
+}
+
 //.el-input__inner {
 //  background-color: red !important;
 //}
+
+.save-draft-cta-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+
+  p {
+    margin-top: 12px;
+  }
+}
+
+.bf-button:not(:last-of-type) {
+  margin-right: 16px;
+}
 
 </style>
 

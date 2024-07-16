@@ -9,8 +9,13 @@
     >
       <div class="button-wrapper">
         <div>
-          <div>
-            Submit To:
+          <div class="mb-8">
+            <h2 class="mb-0">Submit To:
+              <img class="svg-icon"
+                :src="fileIcon('Asterisk', 'Asterisk')"
+              >
+            </h2>
+
           </div>
           <div v-if="hasSelectedRepo" class="logo-wrapper">
             <img
@@ -56,10 +61,14 @@ import {
   mapActions
 } from 'vuex'
 import { has } from 'ramda'
+import FileIcon from '../../../mixins/file-icon/index';
 
 
 export default {
   name: "RepoSelector",
+  mixins: [
+    FileIcon
+  ],
   props: {
     locked: {
       type: Boolean,
@@ -146,6 +155,22 @@ export default {
 .el-popper[x-placement^='bottom'] {
   margin-top: 5px;
   margin-left: -13px;
+}
+
+h2 {
+  position: relative;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
+.svg-icon {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  top: -0.25em; 
+  right: -0.9em;
 }
 
 </style>
