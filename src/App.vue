@@ -122,7 +122,6 @@ export default {
     "$route.params.orgId": {
       handler: async function (to, from) {
         const token = Cookies.get("user_token");
-        console.log("this.token", !!token);
         if (token) {
           try {
             await this.bootUp(token);
