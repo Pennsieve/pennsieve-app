@@ -229,6 +229,10 @@ export default {
   padding-right: 20px;
   position: relative;
   width: 100%;
+
+  a {
+    cursor: pointer;
+  }
 }
 .logo-wrap {
   align-items: center;
