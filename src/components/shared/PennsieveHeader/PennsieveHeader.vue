@@ -44,9 +44,6 @@
       @close-log-in-dialog="closeLogInModal"
     />
     <contact-us-dialog
-      v-model:isOpen="isContactUsDialogOpen"
-      @close-contact-us-dialog="closeContactUsDialog"
-      :icon-spacing="iconSpacing"
     />
   </div>
 </template>
@@ -69,7 +66,8 @@ import ContactUsDialog from "./contact-us-dialog/ContactUsDialog.vue";
 export default {
   name: "PennsieveHeader",
 
-  components: {
+  components: 
+  {
     PennsieveLogoContainer,
     PennsieveLogo,
     IconRemove,
@@ -80,7 +78,8 @@ export default {
     ContactUsDialog,
   },
 
-  props: {
+  props: 
+  {
     isSearchVisible: {
       type: Boolean,
       default: true,
@@ -137,6 +136,7 @@ export default {
      * @returns {String}
      */
     iconSpacing() {
+      // TODO: “The mr-4 class isn’t applying the correct right margin. Our current styling in _spacing.scss allows for mr-0, mr-8, mr-16, and similar values, but not for mr-4. To apply margin-right: 4px, a different method should be used.”
       return this.isMobile ? "mr-4" : "mr-8";
     },
 
@@ -164,11 +164,6 @@ export default {
     // Setup resize event listener
     this.windowWidth = window.innerWidth;
     window.onresize = () => this.onResize(window.innerWidth);
-  },
-  mounted() {
-    EventBus.$on("openContactUsDialog", (data) => {
-      this.isContactUsDialogOpen = data;
-    });
   },
   methods: {
     /**
@@ -204,17 +199,10 @@ export default {
       this.isLogInModalVisible = false;
     },
     /**
-     * Display log in modal
+     * Display Contact us dialog
      */
     openContactUsDialog() {
       EventBus.$emit("isContactUsDialogOpen", true);
-    },
-
-    /**
-     * Hide log in modal
-     */
-    closeContactUsDialog() {
-      EventBus.$emit("isContactUsDialogOpen", false);
     },
 
     /**
@@ -241,6 +229,10 @@ export default {
   padding-right: 20px;
   position: relative;
   width: 100%;
+
+  a {
+    cursor: pointer;
+  }
 }
 .logo-wrap {
   align-items: center;
