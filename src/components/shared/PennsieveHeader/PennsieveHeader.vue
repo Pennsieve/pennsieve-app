@@ -136,7 +136,7 @@ export default {
      * @returns {String}
      */
     iconSpacing() {
-      // TODO: mr-4 class is not supported, check _spacing.scss, only mr-(multiples of 8) will work according to this. Could expand or look for alternative way
+      // TODO: “The mr-4 class isn’t applying the correct right margin. Our current styling in _spacing.scss allows for mr-0, mr-8, mr-16, and similar values, but not for mr-4. To apply margin-right: 4px, a different method should be used.”
       return this.isMobile ? "mr-4" : "mr-8";
     },
 
