@@ -4,7 +4,7 @@
       <span />
       <div>
         {{ copy }}
-        <a href="url" target="_blank">{{ linkText }}</a>
+        <a :href="getUrl" target="_blank">{{ linkText }}</a>
       </div>
 
       <IconRemove
@@ -34,10 +34,6 @@ export default {
       type: String,
       default: "",
     },
-    url: {
-      type: String,
-      default: "",
-    },
     /**
      * Please pass a unique cookie name to each instance of the Announcment Banner Component.
      * **/
@@ -63,6 +59,15 @@ export default {
   },
   computed: {
     ...mapState(["config"]),
+    /**
+     * Returns link to previous version of Pennsieve App
+     * @returns {String}
+     */
+    getUrl: function () {
+      return this.config.environment === "prod"
+        ? "https://app2.pennsieve.io"
+        : "https://app2.pennsieve.net";
+    },
   },
 
   components: { IconRemove },

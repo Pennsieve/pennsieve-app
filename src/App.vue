@@ -9,7 +9,6 @@ let route = useRoute();
       copy="Welcome to the new Pennsieve App experience! If you would like to access
     the previous version, it's still available"
       linkText="here."
-      url="getUrl"
       cookieName="hideReleaseBanner"
     />
     <router-view name="header" />
@@ -251,15 +250,6 @@ export default {
       } else {
         return "Not-found";
       }
-    },
-    /**
-     * Returns link to previous version of Pennsieve App
-     * @returns {String}
-     */
-    getUrl: function () {
-      return this.config.environment === "prod"
-        ? "https://app2.pennsieve.io"
-        : "https://app2.pennsieve.net";
     },
   },
 
