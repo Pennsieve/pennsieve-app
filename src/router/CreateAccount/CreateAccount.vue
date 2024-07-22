@@ -52,7 +52,7 @@
             Sorry, an error has occurred.
             <br />
             Please try again or
-            <a href="#">contact support</a>
+            <a target="_blank" @click="openContactUsDialog">contact support</a>
             .
           </p>
           <p class="agreement">
@@ -83,15 +83,16 @@
         </div>
       </div>
     </div>
+    <contact-us-dialog />
   </div>
 </template>
 
 <script>
 import { mapState } from "vuex";
-import { onMounted } from "vue";
 
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import Request from "@/mixins/request";
+import EventBus from "../../utils/event-bus";
 
 export default {
   name: "CreateAccount",
@@ -158,7 +159,7 @@ export default {
      * Take the user back home
      */
     onFormCancel: function () {
-      this.router.push({ name: "home" });
+      this.$router.push({ name: "home" });
     },
 
     /**
@@ -201,6 +202,12 @@ export default {
         this.hasError = true;
       }
     },
+    /**
+     * Display Contact us dialog
+     */
+    openContactUsDialog() {
+      EventBus.$emit("isContactUsDialogOpen", true);
+    },
   },
 };
 </script>
@@ -231,6 +238,10 @@ export default {
     color: $gray_4;
     max-width: 720px;
     width: 360px;
+  }
+  
+  a {
+    cursor: pointer;
   }
 }
 

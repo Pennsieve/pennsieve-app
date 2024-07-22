@@ -11,7 +11,7 @@
           <p>Contact us at support@pennsieve.io</p>
           <a href="mailto:support@pennsieve.io" target="_blank">
             Send email
-            <IconArrowRight :class="iconSpacing" :height="12" :width="12" />
+            <IconArrowRight :height="12" :width="12" />
           </a>
         </div>
         <div class="contact-method-container">
@@ -22,7 +22,7 @@
             target="_blank"
           >
             Join on Zoom
-            <IconArrowRight :class="iconSpacing" :height="12" :width="12" />
+            <IconArrowRight :height="12" :width="12" />
           </a>
         </div>
         <div class="contact-method-container">
@@ -34,7 +34,7 @@
               target="_blank"
             >
               Visit Twitter
-              <IconArrowRight :class="iconSpacing" :height="12" :width="12" />
+              <IconArrowRight :height="12" :width="12" />
             </a>
             <a
               href="https://wagenaarlab.org/"
@@ -42,7 +42,7 @@
               class="margin-top"
             >
               Visit Website
-              <IconArrowRight :class="iconSpacing" :height="12" :width="12" />
+              <IconArrowRight :height="12" :width="12" />
             </a>
           </div>
         </div>
@@ -69,10 +69,6 @@ export default {
   props: {
     selectedFiles: {
       type: Array,
-      default: () => {},
-    },
-    iconSpacing: {
-      type: String,
       default: () => {},
     },
   },
