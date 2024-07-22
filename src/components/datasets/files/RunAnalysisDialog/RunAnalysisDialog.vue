@@ -301,7 +301,6 @@ export default {
       }
     },
     onFileSelect: function (selectedFiles) {
-      console.log("selectedFiles", selectedFiles);
       if (this.selectedFilesForAnalysis.length) {
         selectedFiles.forEach((file) => {
           const condition = !this.selectedFilesForAnalysis.find(

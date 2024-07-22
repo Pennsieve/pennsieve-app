@@ -1,21 +1,10 @@
 <template>
-  <el-dropdown
-    trigger="click"
-    placement="bottom-end"
-    @command="onFileMenu"
-  >
+  <el-dropdown trigger="click" placement="bottom-end" @command="onFileMenu">
     <button class="btn-file-menu el-dropdown-link">
-      <IconMenu
-        :height="20"
-        :width="20"
-      />
+      <IconMenu :height="20" :width="20" />
     </button>
     <template #dropdown>
-      <el-dropdown-menu
-        slot="dropdown"
-        class="bf-menu"
-        :offset="9"
-      >
+      <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
         <el-dropdown-item
           v-if="getFileState === 'Unprocessed'"
           :disabled="datasetLocked"
@@ -24,27 +13,44 @@
           Process File
         </el-dropdown-item>
         <el-dropdown-item
-          v-if="isMSOfficeFile && getFileState !== 'Unprocessed' && getFileState !== 'Processing' && !isExternalFile"
+          v-if="
+            isMSOfficeFile &&
+            getFileState !== 'Unprocessed' &&
+            getFileState !== 'Processing' &&
+            !isExternalFile
+          "
           command="openMSOfficeFile"
         >
           Open with Office 365
         </el-dropdown-item>
         <el-dropdown-item
-          v-if="!isMSOfficeFile && packageType !== 'Collection' && packageType !== 'Unknown' && getFileState !== 'Unprocessed' && getFileState !== 'Processing' && getFileState !== 'Failed' && !isExternalFile"
+          v-if="
+            !isMSOfficeFile &&
+            packageType !== 'Collection' &&
+            packageType !== 'Unknown' &&
+            getFileState !== 'Unprocessed' &&
+            getFileState !== 'Processing' &&
+            getFileState !== 'Failed' &&
+            !isExternalFile
+          "
           :disabled="getFileState === 'Uploading'"
           command="openViewer"
         >
           Open Viewer
         </el-dropdown-item>
         <el-dropdown-item
-          v-if="packageType !== 'Collection' && !multipleSelected && !isExternalFile "
+          v-if="
+            packageType !== 'Collection' && !multipleSelected && !isExternalFile
+          "
           :disabled="isFileProcessing"
           command="download"
         >
           Download
         </el-dropdown-item>
         <el-dropdown-item
-          v-if="packageType !== 'Collection' && !multipleSelected && !isExternalFile"
+          v-if="
+            packageType !== 'Collection' && !multipleSelected && !isExternalFile
+          "
           :disabled="isFileProcessing"
           command="copyUrl"
         >
@@ -84,19 +90,19 @@
 </template>
 
 <script>
-import { mapGetters, mapState, mapActions } from 'vuex'
-import { path, pathOr, propOr } from 'ramda'
+import { mapGetters, mapState, mapActions } from "vuex";
+import { path, pathOr, propOr } from "ramda";
 
-import EventBus from '../../utils/event-bus'
-import GetFileProperty from '../../mixins/get-file-property'
+import EventBus from "../../utils/event-bus";
+import GetFileProperty from "../../mixins/get-file-property";
 import IconMenu from "../icons/IconMenu.vue";
 
-const conceptId = '00000000-0000-0000-0000-000000000000'
+const conceptId = "00000000-0000-0000-0000-000000000000";
 
 export default {
-  name: 'TableMenu',
+  name: "TableMenu",
   components: {
-    IconMenu
+    IconMenu,
   },
 
   mixins: [GetFileProperty],
@@ -104,163 +110,170 @@ export default {
   props: {
     selection: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     multipleSelected: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
 
   computed: {
-    ...mapGetters(['getPermission', 'datasetLocked']),
+    ...mapGetters(["getPermission", "datasetLocked"]),
 
-    ...mapState(['dataset']),
+    ...mapState(["dataset"]),
 
     /**
      * Checks if file type is an MS Office file
      * @returns {Boolean}
      */
-    isMSOfficeFile: function() {
+    isMSOfficeFile: function () {
       return (
-        this.kind === 'MS Powerpoint' ||
-        this.kind === 'MS Excel' ||
-        this.kind === 'MS Word'
-      )
+        this.kind === "MS Powerpoint" ||
+        this.kind === "MS Excel" ||
+        this.kind === "MS Word"
+      );
     },
 
     // /**
     //  * Generates the file type value for a file in the table
     //  * @returns {String}
     //  */
-    kind: function() {
-      if (this.packageType === 'Collection') {
-        return 'Folder'
+    kind: function () {
+      if (this.packageType === "Collection") {
+        return "Folder";
       }
 
       if (this.isExternalFile) {
-        return 'External File'
+        return "External File";
       }
 
-      const subtype = this.getFilePropertyVal(this.selection[0].properties, 'subtype')
-      return subtype ? subtype : propOr('Unknown', 'subtype', this.this.selection[0])
+      const subtype = this.getFilePropertyVal(
+        this.selection[0].properties,
+        "subtype"
+      );
+      return subtype
+        ? subtype
+        : propOr("Unknown", "subtype", this.selection[0] || []);
     },
 
     /**
      * Gets the state of a file in the table
      * @returns {String}
      */
-    getFileState: function() {
+    getFileState: function () {
       const states = {
-        UPLOADED: 'Unprocessed',
-        PROCESSING: 'Processing',
-        RUNNING: 'Processing',
-        UNAVAILABLE: 'Uploading',
-        PENDING: 'Processing',
-        ERROR: 'Failed'
-      }
-      const fileState = path(['content', 'state'], this.selection[0])
-      return states[fileState] ? states[fileState] : ''
+        UPLOADED: "Unprocessed",
+        PROCESSING: "Processing",
+        RUNNING: "Processing",
+        UNAVAILABLE: "Uploading",
+        PENDING: "Processing",
+        ERROR: "Failed",
+      };
+      const fileState = path(["content", "state"], this.selection[0] || []);
+      return states[fileState] ? states[fileState] : "";
     },
 
     /**
      * Computes if the file is processing
      * @returns {Boolean}
      */
-    isFileProcessing: function() {
-      return this.getFileState == 'Uploading' || this.getFileState == 'Processing'
+    isFileProcessing: function () {
+      return (
+        this.getFileState == "Uploading" || this.getFileState == "Processing"
+      );
     },
 
     /**
      * Compute if package is an external file
      * @returns {Boolean}
      */
-    isExternalFile: function() {
-      return this.packageType === 'ExternalFile'
+    isExternalFile: function () {
+      return this.packageType === "ExternalFile";
     },
 
     /**
      * Compute package type
      * @returns {String}
      */
-    packageType: function() {
-      return pathOr('', ['content', 'packageType'], this.selection[0])
-    }
+    packageType: function () {
+      return pathOr("", ["content", "packageType"], this.selection[0] || []);
+    },
   },
 
   methods: {
-    ...mapActions(['updateSearchModalVisible']),
+    ...mapActions(["updateSearchModalVisible"]),
     /**
      * Emit Office 365 modal event
      */
-    openMSOfficeFile: function() {
-      this.$emit('open-office-file', this.selection[0])
+    openMSOfficeFile: function () {
+      this.$emit("open-office-file", this.selection[0] || []);
     },
     /**
      * Handler for file menu click
      * @param {String} name
      */
-    onFileMenu: function(name) {
-      if (typeof this[name] === 'function') {
-        this[name]()
+    onFileMenu: function (name) {
+      if (typeof this[name] === "function") {
+        this[name]();
       }
     },
 
     /**
      * Emit download-file event
      */
-    download: function() {
-      EventBus.$emit('trigger-download', [this.selection])
+    download: function () {
+      EventBus.$emit("trigger-download", [this.selection]);
     },
 
     /**
      * Emit rename event
      */
-    rename: function() {
-      EventBus.$emit('rename-file', this.selection)
+    rename: function () {
+      EventBus.$emit("rename-file", this.selection);
     },
 
     /**
      * Emit delete event
      */
-    delete: function() {
-      this.$emit('delete', this.selection)
+    delete: function () {
+      this.$emit("delete", this.selection);
     },
 
     /**
      * Emit move event
      */
-    move: function() {
-      this.$emit('move', this.selection)
+    move: function () {
+      this.$emit("move", this.selection);
     },
 
     /**
      * Open viewer
      */
-    openViewer: function() {
-      const fileId = pathOr('', ['content', 'nodeId'], this.selection[0])
+    openViewer: function () {
+      const fileId = pathOr("", ["content", "nodeId"], this.selection[0] || []);
 
-      console.log(fileId)
+      console.log(fileId);
       if (fileId) {
         this.$router.push({
-          name: 'viewer',
-          params: { fileId }
-        })
+          name: "viewer",
+          params: { fileId },
+        });
       }
     },
 
     /**
      * Process file
      */
-    processFile: function() {
-      this.$emit('process-file', this.selection[0])
+    processFile: function () {
+      this.$emit("process-file", this.selection[0] || []);
     },
 
     /**
      * Copy url
      */
-    copyUrl: function() {
-      this.$emit('copy-url', this.selection[0])
+    copyUrl: function () {
+      this.$emit("copy-url", this.selection[0] || []);
     },
 
     /**
@@ -302,7 +315,6 @@ export default {
     //   })
     //   this.updateSearchModalVisible(false)
     // },
-
 
     /**
      * Navigate to records list route
@@ -363,9 +375,8 @@ export default {
     //   }
     //
     // }
-  }
-}
+  },
+};
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
