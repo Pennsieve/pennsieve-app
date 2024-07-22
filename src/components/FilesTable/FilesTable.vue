@@ -354,7 +354,6 @@ export default {
     },
 
     onRowClick: function (row, selected) {
-      this.$refs.table.clearSelection();
       setTimeout(
         function () {
           this.$refs.table.toggleRowSelection(row, true);
