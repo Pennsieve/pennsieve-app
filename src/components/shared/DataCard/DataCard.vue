@@ -13,6 +13,9 @@
       </template>
       <h2 v-else>
         {{ title }}
+          <img v-if="required" class="svg-icon icon-item"
+                :src="fileIcon('Asterisk', 'Asterisk')"
+              >
       </h2>
 
       <div
@@ -49,9 +52,14 @@
 
 <script>
   import IconArrowUp from "../../icons/IconArrowUp.vue";
+  import FileIcon from "../../../mixins/file-icon/index"
+
   export default {
     name: 'DataCard',
     components: {IconArrowUp},
+    mixins: [
+      FileIcon
+    ],
     props: {
       title: {
         type: String,
@@ -68,6 +76,10 @@
       maxHeight: {
         type: Number,
         default: 250
+      },
+      required: {
+        type: Boolean,
+        default: false
       }
     },
 
@@ -180,5 +192,18 @@
     &:hover, &:focus {
       background: $gray_2;
     }
+  }
+
+  h2 {
+    position: relative;
+    display: inline-block;
+  }
+
+  .svg-icon {
+    height: 8px;
+    width: 8px;
+    position: absolute;
+    top: -0.25em; 
+    right: -0.9em;
   }
 </style>
