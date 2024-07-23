@@ -3,7 +3,6 @@
     :modelValue="dialogVisible"
     @update:modelValue="dialogVisible = $event"
     :class="calculateModalWidth"
-    :show-close="false"
     @open="openDialog"
     @close="closeDialog"
   >
