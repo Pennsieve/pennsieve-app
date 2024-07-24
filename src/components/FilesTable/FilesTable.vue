@@ -240,11 +240,18 @@ export default {
     };
   },
 
+  mounted() {
+    this.preselectRows();
+  },
+
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
     ...mapState(["dataset", "filesProxyId"]),
-
+    ...mapState("analysisModule", ["selectedFilesForAnalysis"]),
+    preselectedValues(newValues) {
+      return this.selectedFilesForAnalysis;
+    },
     /**
      * Compute if the checkbox is indeterminate
      * @returns {Boolean}
@@ -265,10 +272,18 @@ export default {
       return `${selectionCount} ${fileWord} selected`;
     },
   },
+  watch: {
+    preselectedValues(newValues) {
+      console.log("*****", newValues);
+      // newValues is going to change when the user adds a new value to the global state
+    },
+  },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
     ...mapActions("analysisModule", ["clearSelectedFiles"]),
-
+    preselectRows: function () {
+      console.log("preselectRows has run");
+    },
     onOpenOffice365: function (file) {
       this.openOffice365File(file);
     },
