@@ -252,8 +252,6 @@ export default {
      */
     openViewer: function () {
       const fileId = pathOr("", ["content", "nodeId"], this.selection[0] || []);
-
-      console.log(fileId);
       if (fileId) {
         this.$router.push({
           name: "viewer",
