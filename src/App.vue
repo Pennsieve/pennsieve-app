@@ -6,10 +6,10 @@ let route = useRoute();
 <template>
   <div id="app-wrap">
     <announcement-banner
-      copy="Welcome to the new Pennsieve App experience! If you would like to access
-    the previous version, it's still available"
+      copy="Welcome to the new Pennsieve App experience! If
+    you would like to access the previous version, it's still available"
       linkText="here."
-      cookieName="hideReleaseBanner"
+      cookieName="vueMigrationBanner"
     />
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
