@@ -298,7 +298,7 @@ export default {
           }
         )
 
-        this.createUser(newUser.signInUserSession.accessToken.jwtToken)
+        this.createUser(newUser.signInUserSession.accessToken.jwtToken,this.$route.name)
       } catch (error) {
         this.handleFailedUserCreation()
       }
@@ -308,10 +308,38 @@ export default {
      * Create the user on Pennsieve
      * @param {String} jwt
      */
-    async createUser(jwt) {
+    //  async createUser(jwt, routeName) {
+    //   try {
+    //     let apiMethod = "POST"
+    //     if (routeName === "complete") {
+    //       apiMethod = "PUT"
+    //     }
+    //     const user = await this.sendXhr(this.createUserUrl, {
+    //       method: apiMethod,
+    //       header: {
+    //         'Authorization': `bearer ${jwt}`
+    //       },
+    //       body: {
+    //         lastName: this.profileForm.lastName,
+    //         firstName: this.profileForm.firstName,
+    //         title: this.profileForm.jobTitle,
+    //       }
+    //     })
+    //     this.handleCreateUserSuccess(user, jwt, routeName)
+    //   } catch (error) {
+    //     this.handleFailedUserCreation()
+    //   }
+    // },
+
+    async createUser(jwt, routeName) {
       try {
+        let apiMethod = "POST"
+        if (routeName === "complete-profile-accept") {
+          apiMethod = "PUT"
+        }
+
         const user = await this.sendXhr(this.createUserUrl, {
-          method: 'POST',
+          method: apiMethod,
           header: {
             'Authorization': `bearer ${jwt}`
           },

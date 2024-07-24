@@ -770,6 +770,13 @@ const router = createRouter({
           }
         },
         {
+          name: 'complete-profile-accept',
+          path: 'complete/:username/:password',
+          components: {
+            stage: SetupProfile
+          }
+        },
+        {
           name: 'federated-sign-up',
           path: '/:orgId/welcome/federated-sign-up',
           components: {
