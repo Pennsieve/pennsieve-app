@@ -29,10 +29,23 @@
       state.postprocessors = postprocessors 
     },
     SET_SELECTED_FILES(state, files) {
-      state.selectedFilesForAnalysis = files;
+      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, files];
     },
     SET_SELECTED_FILE(state, file) {
+      console.log('select runs')
       state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]
+    },
+    REMOVE_DESELECTED_FILE(state, file) {
+
+      console.log('deselect runs')
+      const result = state.selectedFilesForAnalysis.reduce((acc, selectedFile) => {
+        if (file.content.id !== selectedFile.content.id) {
+          acc.push(selectedFile);
+        }
+        return acc;
+      }, []);
+      console.log('result', result)
+      state.selectedFilesForAnalysis = result;
     },
     CLEAR_SELECTED_FILES(state) {
       state.selectedFilesForAnalysis = []
@@ -96,6 +109,9 @@
     },
     setSelectedFile: async({ commit, rootState}, selectedFile) => {
       commit('SET_SELECTED_FILE', selectedFile)
+    },
+    removeDeselectedFile: async({ commit, rootState }, deselectedFile) => {
+      commit('REMOVE_DESELECTED_FILE', deselectedFile)
     },
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')

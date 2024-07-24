@@ -301,24 +301,23 @@ export default {
       }
     },
     onFileSelect: function (selectedFiles) {
-      if (this.selectedFilesForAnalysis.length) {
-        selectedFiles.forEach((file) => {
-          const condition = !this.selectedFilesForAnalysis.find(
-            (globalSelectedFile) =>
-              globalSelectedFile.content.id === file.content.id
-          );
-          if (condition) {
-            this.setSelectedFile(file);
-          }
-          return;
-        });
-      } else {
-        this.setSelectedFiles(selectedFiles);
-      }
-      if (selectedFiles.length === 0) {
-        this.clearSelectedFiles();
-      }
-
+      // if (this.selectedFilesForAnalysis.length) {
+      //   selectedFiles.forEach((file) => {
+      //     const condition = !this.selectedFilesForAnalysis.find(
+      //       (globalSelectedFile) =>
+      //         globalSelectedFile.content.id === file.content.id
+      //     );
+      //     if (condition) {
+      //       this.setSelectedFile(file);
+      //     }
+      //     return;
+      //   });
+      // } else {
+      //   this.setSelectedFiles(selectedFiles);
+      // }
+      // if (selectedFiles.length === 0) {
+      //   this.clearSelectedFiles();
+      // }
       // this.setSelectedFiles(selectedFiles);
     },
     /**

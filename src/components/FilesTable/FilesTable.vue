@@ -99,6 +99,8 @@
       @selection-change="handleTableSelectionChange"
       @sort-change="onSortChange"
       @row-click="onRowClick"
+      @select="onSelect"
+      @select-all="onSelectAll"
     >
       <el-table-column
         type="selection"
@@ -240,10 +242,6 @@ export default {
     };
   },
 
-  mounted() {
-    this.preselectRows();
-  },
-
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
@@ -274,16 +272,19 @@ export default {
   },
   watch: {
     preselectedValues(newValues) {
-      console.log("*****", newValues);
-      // newValues is going to change when the user adds a new value to the global state
+      console.log("global selected Values", newValues);
+    },
+    data() {
+      console.log("data changed", this.selectedFilesForAnalysis);
     },
   },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
-    ...mapActions("analysisModule", ["clearSelectedFiles"]),
-    preselectRows: function () {
-      console.log("preselectRows has run");
-    },
+    ...mapActions("analysisModule", [
+      "setSelectedFiles",
+      "setSelectedFile",
+      "removeDeselectedFile",
+    ]),
     onOpenOffice365: function (file) {
       this.openOffice365File(file);
     },
@@ -366,6 +367,24 @@ export default {
     },
     clearAllSelected: function () {
       this.$refs.table.clearSelection();
+    },
+    onSelect: function (selection, row) {
+      if (
+        this.selectedFilesForAnalysis.length < selection.length ||
+        this.selectedFilesForAnalysis.length === selection.length
+      ) {
+        this.setSelectedFile(selection);
+        return;
+      }
+
+      if (this.selectedFilesForAnalysis.length > selection.length) {
+        this.removeDeselectedFile(row);
+      }
+
+      this.setSelectedFiles(this.$refs.table.getSelectionRows());
+    },
+    onSelectAll: function (selection, row) {
+      this.setSelectedFiles(this.$refs.table.getSelectionRows());
     },
 
     onRowClick: function (row, selected) {
