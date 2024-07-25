@@ -2,7 +2,7 @@
   <bf-stage element-loading-background="transparent">
     <template #actions>
       <bf-button v-if="hasAdminRights" @click="openAddIntegration">
-        Register Application
+        Register Integration
       </bf-button>
     </template>
     <div v-if="integrations.length > 0" class="integration-list">
@@ -81,7 +81,7 @@ import DeleteApiKey from "../../my-settings/windows/DeleteApiKey.vue";
 import IntegrationApiKeyDetails from "../integrationApiKeyDetails.vue";
 
 export default {
-  name: "ApplicationsList",
+  name: "IntegrationsList",
 
   components: {
     IntegrationApiKeyDetails,

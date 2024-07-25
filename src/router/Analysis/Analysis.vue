@@ -4,16 +4,16 @@
       <template #description>
         <div class="description">
           <p>
-            The pennsieve platform allows users to register applications to
+            The pennsieve platform allows users to register integrations to
             allow users to expand the functionality of the platform through
             custom actions and webhooks.
           </p>
           <hr />
         </div>
         <div slot="description" class="description">
-          <p v-if="this.$route.name === 'applications'">
-            Applications support actions on various entities on the platform
-            such as "Files", "Records", and "Datasets". Registered applications
+          <p v-if="this.$route.name === 'integrations'">
+            Integrations support actions on various entities on the platform
+            such as "Files", "Records", and "Datasets". Registered integrations
             can be triggered from the action-menu associated with the targeted
             entities.
             <a
@@ -83,8 +83,8 @@ export default {
     return {
       tabs: [
         {
-          name: "Applications",
-          to: "applications",
+          name: "Integrations",
+          to: "integrations",
         },
         {
           name: "Webhooks",
