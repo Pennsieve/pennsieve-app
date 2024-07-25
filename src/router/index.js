@@ -86,7 +86,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 /**
  * Integrations Components
  */
-const Integrations = () => import ('./Integrations/Integrations.vue')
+const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
 const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
@@ -680,7 +680,7 @@ const router = createRouter({
       name: 'analysis',
       path: '/:orgId/analysis',
       components: {
-        page: Integrations,
+        page: Analysis,
         navigation: BfNavigation
       },
       redirect: {
