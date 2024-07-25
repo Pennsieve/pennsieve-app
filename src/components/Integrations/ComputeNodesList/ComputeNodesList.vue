@@ -99,7 +99,6 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
-    ...mapGetters(["activeOrganization", "userToken", "config"]),
     /**
      * Model URL
      * @returns {String}
