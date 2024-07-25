@@ -84,7 +84,7 @@ import DeleteApiKey from "../../my-settings/windows/DeleteApiKey.vue";
 import IntegrationApiKeyDetails from "../integrationApiKeyDetails.vue";
 
 export default {
-  name: "IntegrationsList",
+  name: "WebhooksList",
 
   components: {
     IntegrationApiKeyDetails,
