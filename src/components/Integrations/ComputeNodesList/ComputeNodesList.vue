@@ -113,6 +113,7 @@ export default {
     /**
      * Fetches Compute Nodes
      */
+    // TODO: Use the fetchComputeNodes method in the analysisModule instead
     fetchComputeNodes: function () {
       const url = `${this.config.api2Url}/compute-nodes`;
 
