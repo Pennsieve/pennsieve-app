@@ -40,6 +40,9 @@
             Pennsieve Agent. Each Compute Node is associated with an account,
             which can be a cloud-provider or a local cluster.
           </p>
+          <p v-if="this.$route.name === 'applications'">
+            Applications allow users to run analytic workflows on the platform.
+          </p>
         </div>
       </template>
       <template #tabs>
@@ -93,6 +96,10 @@ export default {
         {
           name: "Compute Nodes",
           to: "compute-nodes",
+        },
+        {
+          name: "Applications",
+          to: "applications",
         },
       ],
     };

@@ -90,6 +90,7 @@ const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
+const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 
 /**
  * Metadata Components
@@ -709,6 +710,14 @@ const router = createRouter({
           path: 'compute-nodes',
           components: {
             stage: ComputeNodesList,
+          },
+          props: true
+        },
+        {
+          name: 'applications',
+          path: 'applications',
+          components: {
+            stage: ApplicationsList,
           },
           props: true
         }
