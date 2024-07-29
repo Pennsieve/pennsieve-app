@@ -163,9 +163,9 @@ export default {
     /**
      * POST to API to create new application
      */
-    handleCreateComputeNode: await function () {
+    handleCreateComputeNode: async function () {
       try {
-        this.createComputeNode(this.computeNode);
+        await this.createComputeNode(this.computeNode);
       } catch (error) {
         console.error(error);
       } finally {
