@@ -65,12 +65,9 @@ export default {
   data: function () {
     return {};
   },
-  mounted() {},
-  watch: {},
   methods: {
     ...mapActions(["updateDataset"]),
   },
-  methods: {},
 };
 </script>
 

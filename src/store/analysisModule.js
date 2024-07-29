@@ -100,6 +100,48 @@
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
+    createApplication: async ({ commit, rootState }, newApplication) => {
+      try {
+        const url = `${rootState.config.api2Url}/applications`;
+  
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rootState.userToken}`,
+          },
+          body: JSON.stringify(newApplication)
+        })
+  
+        if (resp.ok) {
+          const result = await resp.json()
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          return Promise.reject(err)
+      }
+    },
+    createComputeNode: async ({ commit, rootState }, newComputeNode) => {
+      try {
+        const url = `${rootState.config.api2Url}/compute-nodes`;
+  
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${rootState.userToken}`,
+          },
+          body: JSON.stringify(newComputeNode)
+        })
+  
+        if (resp.ok) {
+          const result = await resp.json()
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          return Promise.reject(err)
+      }
+    }
   }
   
   export const getters = {}

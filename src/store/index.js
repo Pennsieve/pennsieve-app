@@ -839,6 +839,13 @@ export const actions = {
 }
 
 export const getters = {
+
+  // NOTE: Getters need to have a different name than the state property. The syntax should be `getStatePropertyName` not `statePropertyName.`
+
+  // NOTE: Getters are used for manipulating data, not just reading it. If simple reading global state, use mapState instead of mapGetters. 
+
+  // TODO: Refactor usages of these simple data-accessing getters so the state property is accessed from mapState. 
+
   sessionTimer: (state) => state.sessionTimer,
   isRefreshing: (state) => state.isRefreshing,
   isWelcomeOrg: state => {
@@ -848,7 +855,7 @@ export const getters = {
   isOrgSynced: (state) => state.activeOrgSynced,
   config: (state) => state.config,
   profile: (state) => state.profile,
-  userToken: (state) => state.userToken,
+  userToken: (state) => state.userToken, 
   getProfile: (state) => () => state.profile,
   organizations: (state) => state.organizations,
   activeOrganization: (state) => state.activeOrganization,
