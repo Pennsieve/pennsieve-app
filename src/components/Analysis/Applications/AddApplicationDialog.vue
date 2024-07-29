@@ -120,16 +120,6 @@
             autofocus
           />
         </el-form-item>
-        <!-- <el-form-item prop="environment">
-          <template #label>
-            Environment <span class="label-helper"></span>
-          </template>
-          <el-input
-            v-model="application.environment"
-            placeholder="ex: production"
-            autofocus
-          />
-        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -167,6 +157,8 @@ const defaultApplicationFormValues = () => ({
     accountType: "",
   },
   computeNode: {
+    value: "",
+    label: "",
     uuid: "",
     efsId: "",
   },
@@ -206,64 +198,6 @@ export default {
           label: "Postprocessor",
         },
       ],
-      //   rules: {
-      //     name: [
-      //       {
-      //         required: true,
-      //         validator: this.validateName,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     description: [
-      //       {
-      //         required: true,
-      //         validator: this.validateDescription,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     applicationType: [
-      //       {
-      //         required: true,
-      //         message: "Please select an Application Type",
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     resourcesCpu: [
-      //       {
-      //         required: true,
-      //         validator: this.validateResourcesCpu,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     resourcesMemory: [
-      //       {
-      //         required: true,
-      //         validator: this.validateResourcesMemory,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     computeNode: [
-      //       {
-      //         required: true,
-      //         message: "Please select a Compute Node",
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     sourceType: [
-      //       {
-      //         required: true,
-      //         validator: this.validateSourceType,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //     sourceUrl: [
-      //       {
-      //         required: true,
-      //         validator: this.validateUrl,
-      //         trigger: "false",
-      //       },
-      //     ],
-      //   },
     };
   },
 
