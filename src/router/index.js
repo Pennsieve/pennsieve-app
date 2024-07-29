@@ -718,8 +718,7 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsList,
-          },
-          props: true
+          }
         }
       ]
     },

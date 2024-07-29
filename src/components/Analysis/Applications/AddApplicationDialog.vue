@@ -12,9 +12,8 @@
     <dialog-body>
       <el-form
         :model="application"
-        :rules="rules"
         label-position="top"
-        @submit.native.prevent="createApplication"
+        @submit.native.prevent="handleCreateApplication"
       >
         <el-form-item prop="name">
           <template #label>
@@ -97,7 +96,7 @@
               v-for="computeNode in computeNodes"
               :key="computeNode.name"
               :label="computeNode.name"
-              :value="computeNode.name"
+              :value="computeNode"
             />
           </el-select>
         </el-form-item>
@@ -111,7 +110,7 @@
             autofocus
           />
         </el-form-item>
-        <el-form-item prop="sourceType">
+        <el-form-item prop="sourceUrl">
           <template #label>
             Source Url <span class="label-helper"> required </span>
           </template>
@@ -121,6 +120,16 @@
             autofocus
           />
         </el-form-item>
+        <!-- <el-form-item prop="environment">
+          <template #label>
+            Environment <span class="label-helper"></span>
+          </template>
+          <el-input
+            v-model="application.environment"
+            placeholder="ex: production"
+            autofocus
+          />
+        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -165,7 +174,7 @@ const defaultApplicationFormValues = () => ({
     type: "",
     url: "",
   },
-  environment: {},
+  environment: "",
 });
 
 export default {
@@ -197,64 +206,64 @@ export default {
           label: "Postprocessor",
         },
       ],
-      rules: {
-        name: [
-          {
-            required: true,
-            validator: this.validateName,
-            trigger: "false",
-          },
-        ],
-        description: [
-          {
-            required: true,
-            validator: this.validateDescription,
-            trigger: "false",
-          },
-        ],
-        applicationType: [
-          {
-            required: true,
-            message: "Please select an Application Type",
-            trigger: "false",
-          },
-        ],
-        resourcesCpu: [
-          {
-            required: true,
-            validator: this.validateResourcesCpu,
-            trigger: "false",
-          },
-        ],
-        resourcesMemory: [
-          {
-            required: true,
-            validator: this.validateResourcesMemory,
-            trigger: "false",
-          },
-        ],
-        computeNode: [
-          {
-            required: true,
-            message: "Please select a Compute Node",
-            trigger: "false",
-          },
-        ],
-        sourceType: [
-          {
-            required: true,
-            validator: this.validateSourceType,
-            trigger: "false",
-          },
-        ],
-        sourceUrl: [
-          {
-            required: true,
-            validator: this.validateSourceUrl,
-            trigger: "false",
-          },
-        ],
-      },
+      //   rules: {
+      //     name: [
+      //       {
+      //         required: true,
+      //         validator: this.validateName,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     description: [
+      //       {
+      //         required: true,
+      //         validator: this.validateDescription,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     applicationType: [
+      //       {
+      //         required: true,
+      //         message: "Please select an Application Type",
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     resourcesCpu: [
+      //       {
+      //         required: true,
+      //         validator: this.validateResourcesCpu,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     resourcesMemory: [
+      //       {
+      //         required: true,
+      //         validator: this.validateResourcesMemory,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     computeNode: [
+      //       {
+      //         required: true,
+      //         message: "Please select a Compute Node",
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     sourceType: [
+      //       {
+      //         required: true,
+      //         validator: this.validateSourceType,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //     sourceUrl: [
+      //       {
+      //         required: true,
+      //         validator: this.validateUrl,
+      //         trigger: "false",
+      //       },
+      //     ],
+      //   },
     };
   },
 
@@ -282,11 +291,13 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["fetchComputeNodes"]),
-    handleCreateApplication: function () {
-      console.log("I was clicked!");
-    },
+    ...mapActions("analysisModule", ["fetchComputeNodes", "createApplication"]),
+    /**
+     * Validation Methods
+     */
+    validUrl: function (str) {},
 
+    validateName: function (rule, value, callback) {},
     /**
      * Closes the dialog
      */
@@ -295,9 +306,25 @@ export default {
     },
 
     /**
-     * Send integration to API to create it
+     * POST to API to create new application
      */
-    createApplication: function () {},
+    handleCreateApplication: function () {
+      const accountDetails = {
+        uuid: this.application.computeNode.account.uuid,
+        efsId: this.application.computeNode.account.accountId,
+        accountType: this.application.computeNode.account.accountType,
+      };
+      const computeNodeDetails = {
+        uuid: this.application.computeNode.uuid,
+        efsId: this.application.computeNode.efsId,
+      };
+      const formattedNewApplication = {
+        ...this.application,
+        account: accountDetails,
+        computeNode: computeNodeDetails,
+      };
+      this.createApplication(formattedNewApplication);
+    },
   },
 };
 </script>

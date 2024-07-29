@@ -5,7 +5,7 @@
         Create Application
       </bf-button>
     </template>
-    <div v-if="applications.length > 0" class="application-list">
+    <div v-if="applications.length" class="application-list">
       <ApplicationsListItem
         v-for="application in applications"
         :key="application.id"
@@ -93,13 +93,6 @@ export default {
 
   mixins: [Sorter, UserRoles],
 
-  props: {
-    applications: {
-      type: Array,
-      default: () => [],
-    },
-  },
-
   data() {
     return {
       addApplicationDialogVisible: false,
@@ -111,6 +104,7 @@ export default {
 
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
+    ...mapState("analysisModule", ["applications"]),
 
     hasAdminRights: function () {
       if (this.activeOrganization) {
@@ -126,8 +120,6 @@ export default {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
   },
-
-  watch: {},
 
   methods: {
     ...mapActions("analysisModule", [
