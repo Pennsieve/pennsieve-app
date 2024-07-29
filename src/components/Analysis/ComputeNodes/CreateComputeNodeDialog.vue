@@ -73,7 +73,7 @@
           />
         </el-form-item>
 
-        <el-form-item prop="environment">
+        <!-- <el-form-item prop="environment">
           <template #label>
             Environment <span class="label-helper"></span>
           </template>
@@ -82,7 +82,7 @@
             placeholder="ex: production"
             autofocus
           />
-        </el-form-item>
+        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -114,7 +114,7 @@ const defaultComputeNodeFormValues = () => ({
     accountId: "",
     accountType: "",
   },
-  environment: "",
+  //   environment: "",
 });
 
 export default {
