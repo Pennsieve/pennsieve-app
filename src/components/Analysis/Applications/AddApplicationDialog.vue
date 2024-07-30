@@ -138,6 +138,7 @@ import { mapState, mapGetters, mapActions } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import EventBus from "../../../utils/event-bus";
 
 /**
  * Returns the default values for a property
@@ -237,12 +238,13 @@ export default {
      */
     closeDialog: function () {
       this.$emit("close", false);
+      this.application = defaultApplicationFormValues();
     },
 
     /**
      * POST to API to create new application
      */
-    handleCreateApplication: function () {
+    handleCreateApplication: async function () {
       const accountDetails = {
         uuid: this.application.computeNode.account.uuid,
         efsId: this.application.computeNode.account.accountId,
@@ -257,7 +259,25 @@ export default {
         account: accountDetails,
         computeNode: computeNodeDetails,
       };
-      this.createApplication(formattedNewApplication);
+      try {
+        await this.createApplication(formattedNewApplication);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        this.closeDialog();
+      }
     },
   },
 };
