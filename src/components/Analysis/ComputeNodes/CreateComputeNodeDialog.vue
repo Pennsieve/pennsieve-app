@@ -101,6 +101,7 @@ import { mapState, mapGetters, mapActions } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import EventBus from "../../../utils/event-bus";
 
 /**
  * Returns the default values for a property
@@ -158,6 +159,7 @@ export default {
     ...mapActions("analysisModule", ["createComputeNode"]),
     closeDialog: function () {
       this.$emit("close", false);
+      this.computeNode = defaultComputeNodeFormValues();
     },
 
     /**
@@ -166,10 +168,21 @@ export default {
     handleCreateComputeNode: async function () {
       try {
         await this.createComputeNode(this.computeNode);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your Request has been Successfully Submitted",
+          },
+        });
       } catch (error) {
         console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
       } finally {
-        this.computeNode = defaultComputeNodeFormValues();
         this.closeDialog();
       }
     },
