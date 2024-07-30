@@ -11,6 +11,12 @@ let route = useRoute();
       linkText="here."
       cookieName="vueMigrationBanner"
     />
+    <announcement-banner
+      copy="The Pennsieve Platform will undergo maintenance on August 16th, 2024
+    from 9 to 10 PM EST. All data management features will be unavailable
+    during this time including file uploads and downloads."
+      cookieName="august-16-2-2024-downtime"
+    />
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
