@@ -72,17 +72,6 @@
             autofocus
           />
         </el-form-item>
-
-        <!-- <el-form-item prop="environment">
-          <template #label>
-            Environment <span class="label-helper"></span>
-          </template>
-          <el-input
-            v-model="computeNode.environment"
-            placeholder="ex: production"
-            autofocus
-          />
-        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -115,7 +104,6 @@ const defaultComputeNodeFormValues = () => ({
     accountId: "",
     accountType: "",
   },
-  //   environment: "",
 });
 
 export default {
