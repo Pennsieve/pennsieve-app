@@ -451,45 +451,6 @@ form {
   margin-top: 10px;
 }
 
-.el-input {
-  .el-input__inner {
-      display: flex;
-      flex-direction: row;
-      background: #FFFFFF;
-      border: 1px solid #DADADA;
-      border-radius: 5px;
-      box-sizing: border-box;
-      font-size: 14px;
-      line-height: inherit;
-      max-width: 100%;
-      padding: 10px;
-      position: relative;
-      width: 100%;
-    }
-  }
-
-  .el-form {
-    .el-form-item__content {
-      div {
-        line-height: 20px;
-      }
-
-      .el-form-item__error {
-        font-size: 13px;
-        line-height: 1;
-        padding: 13px 10px;
-        background: #FAFAFA;
-        border-radius: 0 0 5px 5px;
-        border: solid 1px #dadada;
-        height: 15px;
-        width: 94%;
-        position: absolute;
-        z-index: 0;
-        margin: 0;
-      }
-    }
-  }
-
 .pw-is-valid-text {
   color: #17bb62;
   font-size: 13px;
@@ -500,11 +461,10 @@ form {
   border: solid 1px #dadada;
   height: 15px;
   width: 93.5%;
-  position: absolute;
+  position: relative;
   z-index: 0;
   margin: 0;
 }
-
 
 .pw-recommendation-text {
   font-size: 13px;
