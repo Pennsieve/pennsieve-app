@@ -164,6 +164,21 @@
           <IconIntegrations :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        id="nav-integrations"
+        :link="{
+          name: 'analysis',
+          params: { orgId: activeOrganizationId },
+        }"
+        label="Releases"
+        :condensed="primaryNavCondensed"
+        :styleColor="navStyleColor"
+      >
+        <template v-slot:icon>
+          <IconGlobal :width="20" :height="20" color="currentColor" />
+        </template>
+      </bf-navigation-item>
 
       <bf-navigation-item
         v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
@@ -203,6 +218,7 @@ import IconPerson from "../icons/IconPerson.vue";
 import IconTeam from "../icons/IconTeam.vue";
 import IconSettings from "../icons/IconSettings.vue";
 import IconIntegrations from "../icons/IconIntegrations.vue";
+import IconGlobal from "../icons/IconGlobal.vue";
 import IconOrganization from "../icons/IconOrganization.vue";
 import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
@@ -226,6 +242,7 @@ export default {
   },
 
   components: {
+    IconGlobal,
     IconSPARCLogo,
     IconI3HLogo,
     IconPublic,
