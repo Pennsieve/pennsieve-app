@@ -120,6 +120,16 @@
             autofocus
           />
         </el-form-item>
+        <el-form-item prop="environment">
+          <template #label>
+            Environment <span class="label-helper"> required </span>
+          </template>
+          <el-input
+            v-model="application.environment"
+            placeholder="ex: dev or prod"
+            autofocus
+          />
+        </el-form-item>
       </el-form>
     </dialog-body>
 
