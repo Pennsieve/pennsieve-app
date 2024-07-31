@@ -447,21 +447,6 @@ form {
     }
   }
 
-.pw-no-match {
-  color: darkred;
-  font-size: 13px;
-  line-height: 1;
-  padding: 13px 10px;
-  background: #FAFAFA;
-  border-radius: 0 0 5px 5px;
-  border: solid 1px #dadada;
-  height: 15px;
-  width: 93.5%;
-  position: absolute;
-  z-index: 0;
-  margin: 0;
-}
-
 .pw-is-valid-text {
   color: #17bb62;
   font-size: 13px;
@@ -472,7 +457,7 @@ form {
   border: solid 1px #dadada;
   height: 15px;
   width: 93.5%;
-  position: absolute;
+  position: relative;
   z-index: 0;
   margin: 0;
 }
