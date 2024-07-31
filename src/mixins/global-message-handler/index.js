@@ -1,5 +1,5 @@
 import { mapGetters, mapActions, mapState } from 'vuex'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 import EventBus from '../../utils/event-bus'
 import Request from '../request'
 import UserRoles from '../../mixins/user-roles'
