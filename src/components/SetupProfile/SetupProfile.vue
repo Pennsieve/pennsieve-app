@@ -3,7 +3,7 @@
     <PennsieveLogoContainer class="logo-container"/>
 
     <div
-      v-if="!isUserSignInFailed && !hideSignInForm"
+      v-if="!hideSignInForm"
       class="login-wrap"
     >
       <h2 class="sharp-sans">
@@ -304,6 +304,7 @@ export default {
         } catch (error) {
           this.isSavingProfile = false
           this.isUserSignInFailed = true
+          this.hideSignInForm = true
         }
     },
     /**
