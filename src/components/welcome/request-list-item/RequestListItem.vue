@@ -182,7 +182,6 @@ export default {
       let result = false
       let organizationNodeId = this.datasetRequest.organizationNodeId
       let repository = this.getRepositoryByNodeId(organizationNodeId)
-
       if (repository && repository.questions != null && this.datasetRequest && this.datasetRequest.survey != null) {
         // for each question in repository.questions
         // check whether this.datasetRequest.survey contains an object with the same questionId
@@ -192,7 +191,6 @@ export default {
           return answer && answer.response !== ""
         }).reduce((a,c) => a && c, true)
       }
-
       return result
     },
     triggerRequest: function(request) {

@@ -1,5 +1,10 @@
 <template>
   <bf-stage element-loading-background="transparent">
+    <template #actions>
+      <bf-button v-if="hasAdminRights" @click="openCreateComputeNodeDialog">
+        Create Compute Node
+      </bf-button>
+    </template>
     <div v-if="computeNodes.length > 0" class="integration-list">
       <compute-nodes-list-item
         v-for="computeNode in computeNodes"
@@ -31,6 +36,10 @@
         </p>
       </div>
     </bf-empty-page-state>
+    <create-compute-node-dialog
+      :dialog-visible="createComputeNodeDialogVisible"
+      @close="onCloseCreateComputeNodeDialog"
+    />
   </bf-stage>
 </template>
 
@@ -41,6 +50,7 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import Request from "../../../mixins/request";
+import CreateComputeNodeDialog from "../../Analysis/ComputeNodes/CreateComputeNodeDialog.vue";
 
 import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
@@ -62,6 +72,7 @@ export default {
   data() {
     return {
       computeNodes: [],
+      createComputeNodeDialogVisible: false,
     };
   },
 
@@ -99,7 +110,12 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
-    ...mapGetters(["activeOrganization", "userToken", "config"]),
+    openCreateComputeNodeDialog: function () {
+      this.createComputeNodeDialogVisible = true;
+    },
+    onCloseCreateComputeNodeDialog: function () {
+      this.createComputeNodeDialogVisible = false;
+    },
     /**
      * Model URL
      * @returns {String}
@@ -114,6 +130,7 @@ export default {
     /**
      * Fetches Compute Nodes
      */
+    // TODO: Use the fetchComputeNodes method in the analysisModule instead
     fetchComputeNodes: function () {
       const url = `${this.config.api2Url}/compute-nodes`;
 

@@ -96,7 +96,7 @@
       </bf-empty-page-state>
 
       <request-survey
-        :visible.sync="requestModalVisible"
+        :dialog-visible="requestModalVisible"
         :dataset-request="selectedRequest"
         :role="role"
         @accept="acceptDatasetProposalRequest"

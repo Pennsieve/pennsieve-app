@@ -40,7 +40,14 @@ const DatasetIntegrationsSettings = () => import('../components/datasets/setting
  */
 
 const ORCIDRedirect = () => import('../components/ORCID/ORCIDRedirect.vue')
-const ORCID = () => import('./ORCID/ORCID.vue')
+const Redirect = () => import('./Redirect/Redirect.vue')
+
+/**
+ * GitHubRedirect
+ */
+const GitHubRedirect = () => import('../components/GitHub/GitHubRedirect.vue')
+
+
 
 /**
  * Publishing Components
@@ -86,10 +93,11 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 /**
  * Integrations Components
  */
-const Integrations = () => import ('./Integrations/Integrations.vue')
+const Analysis = () => import ('./Analysis/Analysis.vue')
+const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
-const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
 const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
+const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 
 /**
  * Metadata Components
@@ -127,9 +135,24 @@ const router = createRouter({
       }
     },
     {
+      path: '/github-redirect',
+      components: {
+        page: Redirect
+      },
+      children: [
+        {
+          name: 'github-redirect',
+          path: '',
+          components: {
+            stage: GitHubRedirect
+          }
+        },
+      ],
+    },
+    {
       path: '/orcid-redirect',
       components: {
-        page: ORCID
+        page: Redirect
       },
       children: [
         {
@@ -680,19 +703,19 @@ const router = createRouter({
       name: 'analysis',
       path: '/:orgId/analysis',
       components: {
-        page: Integrations,
+        page: Analysis,
         navigation: BfNavigation
       },
       redirect: {
-        name: 'applications'
+        name: 'integrations'
       },
       props: true,
       children: [
         {
-          name: 'applications',
-          path: 'applications',
+          name: 'integrations',
+          path: 'integrations',
           components: {
-            stage: ApplicationsList,
+            stage: IntegrationsList,
           },
           props: true
         },
@@ -700,7 +723,7 @@ const router = createRouter({
           name: 'webhooks',
           path: 'webhooks',
           components: {
-            stage: IntegrationsList,
+            stage: WebhooksList,
           },
           props: true
         },
@@ -711,6 +734,13 @@ const router = createRouter({
             stage: ComputeNodesList,
           },
           props: true
+        },
+        {
+          name: 'applications',
+          path: 'applications',
+          components: {
+            stage: ApplicationsList,
+          }
         }
       ]
     },

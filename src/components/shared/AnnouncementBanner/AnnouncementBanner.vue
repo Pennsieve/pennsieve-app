@@ -41,6 +41,10 @@ export default {
       type: String,
       default: "",
     },
+    url: {
+      type: String,
+      default: "",
+    },
   },
 
   setup(props) {
@@ -64,9 +68,11 @@ export default {
      * @returns {String}
      */
     getUrl: function () {
-      return this.config.environment === "prod"
-        ? "https://app2.pennsieve.io"
-        : "https://app2.pennsieve.net";
+      if (this.cookieName === "vueMigrationBanner") {
+        return this.config.environment === "prod"
+          ? "https://app2.pennsieve.io"
+          : "https://app2.pennsieve.net";
+      } else return this.url;
     },
   },
 
@@ -106,5 +112,6 @@ export default {
 
 .close-btn {
   margin-right: 20px;
+  cursor: pointer;
 }
 </style>
