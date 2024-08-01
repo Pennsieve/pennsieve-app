@@ -3,7 +3,7 @@
     <PennsieveLogoContainer class="logo-container"/>
 
     <div
-      v-if="!isUserSignInFailed && !hideSignInForm"
+      v-if="!hideSignInForm"
       class="login-wrap"
     >
       <h2 class="sharp-sans">
@@ -304,6 +304,7 @@ export default {
         } catch (error) {
           this.isSavingProfile = false
           this.isUserSignInFailed = true
+          this.hideSignInForm = true
         }
     },
     /**
@@ -315,8 +316,9 @@ export default {
           this.user,
           this.profileForm.password,
           {
-            email: this.$route.query.email
-          }
+            email: this.$route.query.email,
+
+          },
         )
 
         this.createUser(newUser.signInUserSession.accessToken.jwtToken,this.$route.name)
