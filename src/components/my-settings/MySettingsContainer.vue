@@ -348,8 +348,10 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
-import { pathOr, prop, has } from "ramda";
-import Auth from "@aws-amplify/auth";
+
+import { pathOr, propOr, prop } from "ramda";
+import {Auth} from "@aws-amplify/auth";
+
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";

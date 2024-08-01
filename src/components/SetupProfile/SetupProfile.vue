@@ -3,7 +3,7 @@
     <PennsieveLogoContainer class="logo-container"/>
 
     <div
-      v-if="!isUserSignInFailed"
+      v-if="!hideSignInForm"
       class="login-wrap"
     >
       <h2 class="sharp-sans">
@@ -111,6 +111,27 @@
       </p>
     </div>
     <div
+      v-if="isUserPasswordUpdated"
+      class="login-wrap"
+    >
+      <h2 class="sharp-sans">
+        Account creation completed.
+      </h2>
+      <p> You successfully created your Pennsieve account. You can now log in with your email and password.</p>
+      <p> We hope you will be able to use the platform to manage your scientific data and publish your datasets to the public domain when you are ready! </p>
+      <p> Please feel free to reach out to our support team if you have any questions or suggestions on how to improve the platform. You can leave us messages directly from within the app.</p>
+      <div class="user-already-created-wrap">
+        <router-link
+          class="btn-back-to-sign-in"
+          :to="{name: 'home' }"
+        >
+          <bf-button>
+            Return to Login Page
+          </bf-button>
+        </router-link>
+      </div>
+    </div>
+    <div
       v-if="isUserSignInFailed"
       class="login-wrap"
     >
@@ -143,7 +164,7 @@
 <script>
 import { mapState } from 'vuex'
 import { propOr } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 
 import BfButton from '../shared/bf-button/BfButton.vue'
 import PasswordValidator from '../../mixins/password-validator'
@@ -215,6 +236,8 @@ export default {
       },
       isSavingProfile: false,
       isPasswordFormValid: false,
+      isUserPasswordUpdated: false,
+      hideSignInForm:false,
       user: {},
       isUserSignInFailed: false
     }
@@ -266,7 +289,6 @@ export default {
         if (!valid) {
           return
         }
-
         this.isSavingProfile = true
         this.initialLogin()
       }.bind(this))
@@ -277,14 +299,14 @@ export default {
      */
     async initialLogin() {
       try {
-         this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
+          this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
          this.setupProfile()
         } catch (error) {
           this.isSavingProfile = false
           this.isUserSignInFailed = true
+          this.hideSignInForm = true
         }
     },
-
     /**
      * API Request to create a new user
      */
@@ -300,7 +322,13 @@ export default {
 
         this.createUser(newUser.signInUserSession.accessToken.jwtToken,this.$route.name)
       } catch (error) {
-        this.handleFailedUserCreation()
+        if (this.$route.name === "complete-profile-accept") {
+            this.isUserPasswordUpdated = true;
+            this.hideSignInForm = true
+            return;
+          }else{
+            this.handleFailedUserCreation(this)
+          }
       }
     },
 
@@ -328,7 +356,7 @@ export default {
         })
         this.handleCreateUserSuccess(user, jwt)
       } catch (error) {
-        this.handleFailedUserCreation()
+        this.handleFailedUserCreation(this)
       }
     },
 
@@ -358,7 +386,7 @@ export default {
       .then(() => {
         EventBus.$emit('login', loginBody)
       })
-      .catch(this.handleFailedUserCreation.bind(this))
+      .catch(this.handleFailedUserCreation(this))
     },
 
     /**
@@ -464,6 +492,7 @@ form {
   position: relative;
   z-index: 0;
   margin: 0;
+  top:3rem;
 }
 
 .pw-recommendation-text {

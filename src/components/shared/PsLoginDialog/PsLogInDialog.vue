@@ -175,7 +175,7 @@
 <script>
 import { mapActions } from 'vuex'
 import { propOr, pathOr } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 import BfButton from '../bf-button/BfButton.vue'
 import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
