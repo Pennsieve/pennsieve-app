@@ -353,7 +353,10 @@ export default {
       .then(() => {
         EventBus.$emit('login', loginBody)
       })
-      .catch(this.handleFailedUserCreation.bind(this))
+      .catch((error) => {
+          console.error(error);
+          this.handleFailedUserCreation(this);
+        });
     },
 
     /**

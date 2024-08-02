@@ -166,7 +166,7 @@
 <script>
 import { mapState } from 'vuex'
 import { pathOr, propOr } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
