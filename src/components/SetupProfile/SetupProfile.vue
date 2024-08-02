@@ -1,15 +1,13 @@
 <template>
   <div class="wrapper">
-    <PennsieveLogoContainer class="logo-container"/>
+    <PennsieveLogoContainer class="logo-container" />
 
-    <div
-      v-if="!hideSignInForm"
-      class="login-wrap"
-    >
-      <h2 class="sharp-sans">
-        Let's set up your profile.
-      </h2>
-      <p>Complete your profile so members of your team can easily identify you. <strong>All fields are required</strong>.</p>
+    <div v-if="!isUserSignInFailed" class="login-wrap">
+      <h2 class="sharp-sans">Let's set up your profile.</h2>
+      <p>
+        Complete your profile so members of your team can easily identify you.
+        <strong>All fields are required</strong>.
+      </p>
       <el-form
         id="profile-form"
         ref="profileForm"
@@ -19,10 +17,7 @@
         status-icon
         @submit.native.prevent="onFormSubmit"
       >
-        <el-form-item
-          label="First Name"
-          prop="firstName"
-        >
+        <el-form-item label="First Name" prop="firstName">
           <el-input
             v-model="profileForm.firstName"
             required
@@ -30,29 +25,13 @@
             autofocus
           />
         </el-form-item>
-        <el-form-item
-          label="Last Name"
-          prop="lastName"
-        >
-          <el-input
-            v-model="profileForm.lastName"
-            required
-          />
+        <el-form-item label="Last Name" prop="lastName">
+          <el-input v-model="profileForm.lastName" required />
         </el-form-item>
-        <el-form-item
-          label="Job Title"
-          prop="jobTitle"
-        >
-          <el-input
-            v-model="profileForm.jobTitle"
-            required
-          />
+        <el-form-item label="Job Title" prop="jobTitle">
+          <el-input v-model="profileForm.jobTitle" required />
         </el-form-item>
-        <el-form-item
-          label="Password"
-          prop="password"
-          class="password-valid"
-        >
+        <el-form-item label="Password" prop="password" class="password-valid">
           <el-input
             v-model="profileForm.password"
             type="password"
@@ -60,22 +39,18 @@
             show-password
           />
           <transition name="el-zoom-in-top">
-            <div
-              v-if="isPasswordFormValid"
-              class="pw-is-valid-text"
-            >
+            <div v-if="isPasswordFormValid" class="pw-is-valid-text">
               Strong Password!
             </div>
           </transition>
         </el-form-item>
         <div class="helper">
-          We recommend that you create a password that is more than 8 characters long and contains a combination of uppercase & lowercase characters, numbers and symbols.
+          We recommend that you create a password that is more than 8 characters
+          long and contains a combination of uppercase & lowercase characters,
+          numbers and symbols.
         </div>
 
-        <el-form-item
-          label="Retype Your Password"
-          prop="passwordConfirm"
-        >
+        <el-form-item label="Retype Your Password" prop="passwordConfirm">
           <el-input
             v-model="profileForm.passwordConfirm"
             type="password"
@@ -101,59 +76,28 @@
           target="_blank"
         >
           Terms of Use
-        </a> and
-        <a
-          href="https://docs.pennsieve.io/page/privacy-policy"
-          target="_blank"
-        >
-          Privacy Policy
-        </a>.
+        </a>
+        and
+        <a href="https://docs.pennsieve.io/page/privacy-policy" target="_blank">
+          Privacy Policy </a
+        >.
       </p>
     </div>
-    <div
-      v-if="isUserPasswordUpdated"
-      class="login-wrap"
-    >
+    <div v-if="isUserSignInFailed" class="login-wrap">
       <h2 class="sharp-sans">
-        Account creation completed.
+        {{ titleMessage }}
       </h2>
-      <p> You successfully created your Pennsieve account. You can now log in with your email and password.</p>
-      <p> We hope you will be able to use the platform to manage your scientific data and publish your datasets to the public domain when you are ready! </p>
-      <p> Please feel free to reach out to our support team if you have any questions or suggestions on how to improve the platform. You can leave us messages directly from within the app.</p>
-      <div class="user-already-created-wrap">
-        <router-link
-          class="btn-back-to-sign-in"
-          :to="{name: 'home' }"
-        >
-          <bf-button>
-            Return to Login Page
-          </bf-button>
-        </router-link>
-      </div>
-    </div>
-    <div
-      v-if="isUserSignInFailed"
-      class="login-wrap"
-    >
-      <h2 class="sharp-sans">
-        {{titleMessage}}
-      </h2>
-      <p>We were unable to set up a new profile. If you already have set up your profile and forgot your password, please select “I forgot my password” to receive an email to reset your password.</p>
+      <p>
+        We were unable to set up a new profile. If you already have set up your
+        profile and forgot your password, please select “I forgot my password”
+        to receive an email to reset your password.
+      </p>
       <p>Please contact Pennsieve support otherwise.</p>
       <div class="user-already-created-wrap">
-        <router-link
-          class="btn-back-to-sign-in"
-          :to="{name: 'home' }"
-        >
-          <bf-button>
-            Back to Sign In
-          </bf-button>
+        <router-link class="btn-back-to-sign-in" :to="{ name: 'home' }">
+          <bf-button> Back to Sign In </bf-button>
         </router-link>
-        <a
-          class="forgot-password"
-          href="#"
-          @click="onForgotPasswordClick"
-        >
+        <a class="forgot-password" href="#" @click="onForgotPasswordClick">
           I forgot my password
         </a>
       </div>
@@ -162,117 +106,126 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
-import { propOr } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+import { mapState } from "vuex";
+import { propOr } from "ramda";
+import Auth from "@aws-amplify/auth";
 
-import BfButton from '../shared/bf-button/BfButton.vue'
-import PasswordValidator from '../../mixins/password-validator'
+import BfButton from "../shared/bf-button/BfButton.vue";
+import PasswordValidator from "../../mixins/password-validator";
 
-import EventBus from '../../utils/event-bus'
-import Request from '../../mixins/request'
+import EventBus from "../../utils/event-bus";
+import Request from "../../mixins/request";
 
 export default {
-  name: 'SetupProfile',
+  name: "SetupProfile",
 
   components: {
-    BfButton
+    BfButton,
   },
 
-  mixins: [
-    PasswordValidator,
-    Request
-  ],
+  mixins: [PasswordValidator, Request],
 
   data() {
     const validatePasswordCheck = (rule, value, callback) => {
       if (this.profileForm.password !== value) {
-        return callback(new Error('Passwords do not match'))
+        return callback(new Error("Passwords do not match"));
       }
-      callback()
-    }
+      callback();
+    };
 
     const validatePassword = (rule, value, callback) => {
+      if (value === "") {
+        this.isPasswordFormValid = false;
+        return callback(new Error("Please input the password"));
+      }
 
-    if (value === '') {
-      this.isPasswordFormValid = false
-      return callback(new Error('Please input the password'))
-    }
+      const { isValid, feedback } = this.validatePassword(value);
 
-    const { isValid, feedback } = this.validatePassword(value)
-
-    if (!isValid) {
-      this.isPasswordFormValid = false
-      callback(new Error(feedback))
-    } else {
-      this.isPasswordFormValid = true
-      callback()
-    }
-  }
+      if (!isValid) {
+        this.isPasswordFormValid = false;
+        callback(new Error(feedback));
+      } else {
+        this.isPasswordFormValid = true;
+        callback();
+      }
+    };
     return {
       profileForm: {
-        firstName: '',
-        lastName: '',
-        jobTitle: '',
-        password: '',
-        passwordConfirm: ''
+        firstName: "",
+        lastName: "",
+        jobTitle: "",
+        password: "",
+        passwordConfirm: "",
       },
       profileRules: {
         firstName: [
-          { required: true, message: 'Please enter your first name', trigger: 'submit' }
+          {
+            required: true,
+            message: "Please enter your first name",
+            trigger: "submit",
+          },
         ],
         lastName: [
-          { required: true, message: 'Please enter your last name', trigger: 'submit' }
+          {
+            required: true,
+            message: "Please enter your last name",
+            trigger: "submit",
+          },
         ],
         jobTitle: [
-          { required: true, message: 'Please enter your job title', trigger: 'submit' }
+          {
+            required: true,
+            message: "Please enter your job title",
+            trigger: "submit",
+          },
         ],
         password: [
-          { required: true, validator: validatePassword, trigger: 'change' }
+          { required: true, validator: validatePassword, trigger: "change" },
         ],
         passwordConfirm: [
-          { required: true, validator: validatePasswordCheck, trigger: 'submit' }
-        ]
+          {
+            required: true,
+            validator: validatePasswordCheck,
+            trigger: "submit",
+          },
+        ],
       },
       isSavingProfile: false,
       isPasswordFormValid: false,
-      isUserPasswordUpdated: false,
-      hideSignInForm:false,
       user: {},
-      isUserSignInFailed: false
-    }
+      isUserSignInFailed: false,
+    };
   },
 
   computed: {
-    ...mapState([
-      'config',
-      'activeOrganization'
-    ]),
+    ...mapState(["config", "activeOrganization"]),
 
-    titleMessage: function() {
-      return this.isUserSignInFailed ? "Unable to set up profile.": "Let's set up your profile."
+    titleMessage: function () {
+      return this.isUserSignInFailed
+        ? "Unable to set up profile."
+        : "Let's set up your profile.";
     },
     /**
      * Compute API url to createUser on initial setup
      */
-    createUserUrl: function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      return `${apiUrl}/account/`
+    createUserUrl: function () {
+      const apiUrl = propOr("", "apiUrl", this.config);
+      return `${apiUrl}/account/`;
     },
 
     /**
      * Compute the organization ID from the URL
      * @returns {String}
      */
-    activeOrganizationId: function() {
-      return this.$route.params.orgId
+    activeOrganizationId: function () {
+      return this.$route.params.orgId;
     },
 
     /**
      * Get token for profile setup
-    */
-    setupProfileToken: function() {
-      return this.$route.query.token
+     */
+    setupProfileToken: function () {
+      return this.$route.query.token;
     },
   },
 
@@ -281,17 +234,20 @@ export default {
      * Submit the form to create the user
      * @param {Object} evt
      */
-    onFormSubmit: function(evt) {
+    onFormSubmit: function (evt) {
       // logic goes here
-      evt.preventDefault()
+      evt.preventDefault();
 
-      this.$refs.profileForm.validate(function(valid) {
-        if (!valid) {
-          return
-        }
-        this.isSavingProfile = true
-        this.initialLogin()
-      }.bind(this))
+      this.$refs.profileForm.validate(
+        function (valid) {
+          if (!valid) {
+            return;
+          }
+
+          this.isSavingProfile = true;
+          this.initialLogin();
+        }.bind(this)
+      );
     },
 
     /**
@@ -299,14 +255,18 @@ export default {
      */
     async initialLogin() {
       try {
-          this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
-         this.setupProfile()
-        } catch (error) {
-          this.isSavingProfile = false
-          this.isUserSignInFailed = true
-          this.hideSignInForm = true
-        }
+        this.user = await Auth.signIn(
+          this.$route.params.username,
+          this.$route.params.password
+        );
+        this.setupProfile();
+      } catch (error) {
+        this.isSavingProfile = false;
+        this.isUserSignInFailed = true;
+        this.hideSignInForm = true;
+      }
     },
+
     /**
      * API Request to create a new user
      */
@@ -316,19 +276,13 @@ export default {
           this.user,
           this.profileForm.password,
           {
-            email: this.$route.query.email
+            email: this.$route.query.email,
           }
-        )
+        );
 
-        this.createUser(newUser.signInUserSession.accessToken.jwtToken,this.$route.name)
+        this.createUser(newUser.signInUserSession.accessToken.jwtToken);
       } catch (error) {
-        if (this.$route.name === "complete-profile-accept") {
-            this.isUserPasswordUpdated = true;
-            this.hideSignInForm = true
-            return;
-          }else{
-            this.handleFailedUserCreation(this)
-          }
+        this.handleFailedUserCreation();
       }
     },
 
@@ -336,27 +290,22 @@ export default {
      * Create the user on Pennsieve
      * @param {String} jwt
      */
-    async createUser(jwt, routeName) {
+    async createUser(jwt) {
       try {
-        let apiMethod = "POST"
-        if (routeName === "complete-profile-accept") {
-          apiMethod = "PUT"
-        }
-
         const user = await this.sendXhr(this.createUserUrl, {
-          method: apiMethod,
+          method: "POST",
           header: {
-            'Authorization': `bearer ${jwt}`
+            Authorization: `bearer ${jwt}`,
           },
           body: {
             lastName: this.profileForm.lastName,
             firstName: this.profileForm.firstName,
             title: this.profileForm.jobTitle,
-          }
-        })
-        this.handleCreateUserSuccess(user, jwt)
+          },
+        });
+        this.handleCreateUserSuccess(user, jwt);
       } catch (error) {
-        this.handleFailedUserCreation(this)
+        this.handleFailedUserCreation();
       }
     },
 
@@ -366,75 +315,78 @@ export default {
      * @param {String} jwt
      *
      */
-    handleCreateUserSuccess: function(response, jwt) {
-      this.isSavingProfile = false
+    handleCreateUserSuccess: function (response, jwt) {
+      this.isSavingProfile = false;
       let loginBody = {
         token: jwt,
         profile: response.profile,
-        firstTimeSignOn: true
-      }
+        firstTimeSignOn: true,
+      };
 
-      const orgId = response.orgIds[0]
-      const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${orgId}`
+      const orgId = response.orgIds[0];
+      const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${orgId}`;
 
       this.sendXhr(switchOrgUrl, {
-        method: 'PUT',
+        method: "PUT",
         header: {
-          'Authorization': `Bearer ${jwt}`
-        }
+          Authorization: `Bearer ${jwt}`,
+        },
       })
-      .then(() => {
-        EventBus.$emit('login', loginBody)
-      })
-      .catch(this.handleFailedUserCreation(this))
+        .then(() => {
+          EventBus.$emit("login", loginBody);
+        })
+        .catch((error) => {
+          console.error(error);
+          this.handleFailedUserCreation(this);
+        });
     },
 
     /**
      * Handle API response error to createUser
      * @param {Object} response
      */
-    handleFailedUserCreation: function(response) {
-      this.isSavingProfile = false
-      const msg = response.status === 400 ?
-        'Sorry, but your token has expired. Please request a new invitation.' :
-        'Could not create a user with that username and password. Try adding more letters, numbers and punctuation.';
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'message',
-            msg: msg
-          }
-        })
-
+    handleFailedUserCreation: function (response) {
+      this.isSavingProfile = false;
+      const msg =
+        response.status === 400
+          ? "Sorry, but your token has expired. Please request a new invitation."
+          : "Could not create a user with that username and password. Try adding more letters, numbers and punctuation.";
+      EventBus.$emit("toast", {
+        detail: {
+          type: "message",
+          msg: msg,
+        },
+      });
     },
 
     /**
      * Submit forgot password request and take user to the forgot password page
      */
-    onForgotPasswordClick: function() {
+    onForgotPasswordClick: function () {
       Auth.forgotPassword(this.$route.params.username)
         .then(() => {
-          EventBus.$emit('toast', {
-          detail: {
-            type: 'info',
-            msg: 'Reset password email sent'
-          }
+          EventBus.$emit("toast", {
+            detail: {
+              type: "info",
+              msg: "Reset password email sent",
+            },
+          });
         })
-        })
-        .catch(error => {
-          EventBus.$emit('toast', {
-          detail: {
-            type: 'error',
-            msg: error.message
-          }
-        })
-        })
-    }
-  }
-}
+        .catch((error) => {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: error.message,
+            },
+          });
+        });
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 .wrapper {
   background: $white;
@@ -484,7 +436,7 @@ form {
   font-size: 13px;
   line-height: 1;
   padding: 13px 10px;
-  background: #FAFAFA;
+  background: #fafafa;
   border-radius: 0 0 5px 5px;
   border: solid 1px #dadada;
   height: 15px;
@@ -492,7 +444,6 @@ form {
   position: relative;
   z-index: 0;
   margin: 0;
-  top:3rem;
 }
 
 .pw-recommendation-text {
@@ -502,7 +453,7 @@ form {
 }
 
 .helper {
-  color: #71747C;
+  color: #71747c;
   font-size: 13px;
   margin-top: 51px;
   margin-bottom: 15px;
@@ -525,13 +476,13 @@ h2 {
 }
 
 a {
-  color: #71747C;
+  color: #71747c;
   text-decoration: underline;
 }
 
 .sharp-sans {
   color: #000;
-  font: 700 24px/31px 'SharpSans', sans-serif;
+  font: 700 24px/31px "SharpSans", sans-serif;
   display: flex;
 }
 
@@ -543,7 +494,7 @@ a {
   text-decoration: none;
   .bf-button {
     margin-top: 0;
-    text-decoration: none;;
+    text-decoration: none;
   }
 }
 .user-already-created-wrap {
