@@ -592,6 +592,16 @@ const router = createRouter({
       ]
     },
     {
+      name: "releases",
+      path: '/:orgId/releases',
+      // TODO: Add component after creating the page, this is a placeholder for now
+      components: {
+        page: People,
+        navigation: BfNavigation
+      },
+      props: true
+    },
+    {
       name: "people",
       path: '/:orgId/people',
       components: {
