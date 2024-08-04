@@ -88,6 +88,11 @@ const TeamsList = () => import('../components/teams/list/TeamsList.vue')
 const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
+const Releases = () => import('./releases/Releases.vue')
+
+const GitHubDatasets = () => import('../components/releases/github-datasets/GitHubDatasets.vue')
+const GitHubRepositories = () => import('../components/releases/github-repositories/GitHubRepositories.vue')
+
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
 /**
@@ -594,12 +599,32 @@ const router = createRouter({
     {
       name: "releases",
       path: '/:orgId/releases',
-      // TODO: Add component after creating the page, this is a placeholder for now
       components: {
-        page: People,
+        page: Releases,
         navigation: BfNavigation
       },
-      props: true
+      redirect: {
+        name: 'github-repos'
+      },
+      props: true,
+      children: [
+        {
+          name: 'github-repos',
+          path: 'github-repos',
+          components: {
+            stage: GitHubRepositories,
+          },
+          props: true
+        },
+        {
+          name: 'github-datasets',
+          path: 'github-datasets',
+          components: {
+            stage: GitHubDatasets,
+          },
+          props: true
+        }
+      ]
     },
     {
       name: "people",
