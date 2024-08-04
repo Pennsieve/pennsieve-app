@@ -53,49 +53,6 @@
     </div>
 
     <div class="menu-wrap">
-      <!--      <bf-navigation-item-->
-      <!--        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="My Pennsieve"-->
-      <!--        icon="icon-organization"-->
-      <!--        :condensed="primaryNavCondensed"-->
-      <!--        :styleColor="navStyleColor"-->
-      <!--      >-->
-      <!--        <template v-slot:icon>-->
-      <!--          <IconOrganization-->
-      <!--            :width="20"-->
-      <!--            :height="20"-->
-      <!--            color="currentColor"-->
-      <!--          />-->
-      <!--        </template>-->
-      <!--      </bf-navigation-item>-->
-
-      <!--      <hr class="menu-divider">-->
-      <!--      <bf-navigation-item-->
-      <!--        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="Submit Datasets"-->
-      <!--        icon="icon-document"-->
-      <!--        :condensed="primaryNavCondensed"-->
-      <!--        :styleColor="navStyleColor"-->
-
-      <!--      >-->
-      <!--        <template v-slot:icon>-->
-      <!--          <IconDocument-->
-      <!--            :width="20"-->
-      <!--            :height="20"-->
-      <!--            color="currentColor"-->
-      <!--          />-->
-      <!--        </template>-->
-      <!--      </bf-navigation-item>-->
-
-      <!--      <bf-navigation-item-->
-      <!--        v-if="!(pageNotFound) && isWelcomeOrg"-->
-      <!--        :link="{ name: 'info', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="More Information"-->
-      <!--        icon="icon-help"-->
-      <!--        :condensed="primaryNavCondensed"-->
-
-      <!--      />-->
-
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg)"
         :link="{
@@ -108,6 +65,21 @@
       >
         <template v-slot:icon>
           <IconDatasets :width="20" :height="20" color="currentColor" />
+        </template>
+      </bf-navigation-item>
+
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        :link="{
+          name: 'releases',
+          params: { orgId: activeOrganizationId },
+        }"
+        label="Releases"
+        :condensed="primaryNavCondensed"
+        :styleColor="navStyleColor"
+      >
+        <template v-slot:icon>
+          <IconGitHub :width="20" :height="20" />
         </template>
       </bf-navigation-item>
 
