@@ -79,7 +79,7 @@
         :styleColor="navStyleColor"
       >
         <template v-slot:icon>
-          <IconGitHub :width="20" :height="20" />
+          <IconGitHub :width="20" :height="20" color="currentColor"/>
         </template>
       </bf-navigation-item>
 
