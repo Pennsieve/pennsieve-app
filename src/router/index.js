@@ -89,9 +89,8 @@ const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 const Releases = () => import('./releases/Releases.vue')
-
-const GitHubDatasets = () => import('../components/releases/github-datasets/GitHubDatasets.vue')
 const GitHubRepositories = () => import('../components/releases/github-repositories/GitHubRepositories.vue')
+const GitHubDatasets = () => import('../components/releases/github-datasets/GitHubDatasets.vue')
 
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
@@ -610,7 +609,7 @@ const router = createRouter({
       children: [
         {
           name: 'github-repos',
-          path: 'github-repos',
+          path: 'github-repositories',
           components: {
             stage: GitHubRepositories,
           },

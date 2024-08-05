@@ -17,7 +17,6 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
@@ -36,21 +35,17 @@ export default {
     orgId: {
       type: String,
       default: "",
-    },
-    datasetId: {
-      type: String,
-      default: "",
-    },
+    }
   },
   data() {
     return {
       tabs: [
         {
-          name: "Github Repositories",
+          name: "Github Repositories", //display name
           to: "github-repos",
         },
         {
-          name: "Github Datasets",
+          name: "Github Datasets", //display name
           to: "github-datasets",
         },
       ],
