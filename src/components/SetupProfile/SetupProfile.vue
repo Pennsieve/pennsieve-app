@@ -200,6 +200,15 @@ export default {
   computed: {
     ...mapState(["config", "activeOrganization"]),
 
+    isGuestUserRegistration() {
+      // this is the route for guest user registration
+      return this.$route.path.includes("/invitation/complete");
+    },
+    isNewUserRegistration() {
+      // this is the route for new user registeration
+      return this.$route.path.includes("/invitation/accept");
+    },
+
     titleMessage: function () {
       return this.isUserSignInFailed
         ? "Unable to set up profile."
@@ -291,9 +300,12 @@ export default {
      * @param {String} jwt
      */
     async createUser(jwt) {
+      // Note: We need to call the createUserURL with a PUT if we are creating a Guest user
+      // and a POST if we are creating a new standard Pennsieve user account.
+
       try {
         const user = await this.sendXhr(this.createUserUrl, {
-          method: "POST",
+          method: this.isGuestUserRegistration ? "PUT" : "POST",
           header: {
             Authorization: `bearer ${jwt}`,
           },
