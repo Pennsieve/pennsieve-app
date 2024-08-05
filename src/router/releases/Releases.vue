@@ -45,7 +45,7 @@ export default {
           to: "github-repos",
         },
         {
-          name: "Github Datasets", //display name
+          name: "Github Release Datasets", //display name
           to: "github-datasets",
         },
       ],
