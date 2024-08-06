@@ -8,31 +8,34 @@
 </template>
 
 <script>
-import { mapGetters } from "vuex";
-import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
-
-import { propOr } from "ramda";
+import { computed } from 'vue';
+import { useStore } from 'vuex';
+import { useRouter, onBeforeRouteEnter } from 'vue-router';
+import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue';
 
 export default {
-  name: "GitHubRepositories",
-
+  name: 'GitHubRepositories',
   components: {
     BfEmptyPageState,
   },
+  setup() {
+    const store = useStore();
+    const router = useRouter();
 
-  computed: {
-    ...mapGetters(["hasFeature"]),
+    const hasFeature = computed(() => store.getters.hasFeature);
 
-  },
-
-  watch: {},
-
-  beforeRouteEnter(to, from, next) {
-    next((vm) => {
-      if (vm.hasFeature("sandbox_org_feature")) {
-        vm.$router.push({ name: "create-org" });
-      }
+    // Lifecycle hook equivalent for beforeRouteEnter
+    onBeforeRouteEnter((to, from, next) => {
+      next((vm) => {
+        if (hasFeature.value('sandbox_org_feature')) {
+          router.push({ name: 'create-org' });
+        }
+      });
     });
+
+    return {
+      hasFeature,
+    };
   },
 };
 </script>
