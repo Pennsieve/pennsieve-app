@@ -240,10 +240,45 @@ export default {
     };
   },
 
+  watch: {
+    data: {
+      handler: function (newVal, oldVal) {
+        console.log("THE WATCH ON DATA RUNS");
+        const newParentId = newVal[0].content.parentId || "root";
+        // console.log("newParentId", newParentId);
+        // console.log(
+        //   " this.selectedFilesForAnalysis[newParentId]",
+        //   this.selectedFilesForAnalysis[newParentId]
+        // );
+        // console.log(
+        //   " this.selectedFilesForAnalysis",
+        //   this.selectedFilesForAnalysis
+        // );
+
+        // for (const parentId in this.selectedFilesForAnalysis) {
+        //   this.selectedFilesForAnalysis[parentId].forEach((file) => {
+        //     return this.onRowClick(file, true);
+        //   });
+        // }
+
+        // if (Array.isArray(this.selectedFilesForAnalysis[newParentId])) {
+        //   this.selectedFilesForAnalysis[newParentId].forEach((elem) => {
+        //     this.$refs.table.toggleRowSelection(elem, true);
+        //   });
+        // }
+        // console.log("****", this.selectedFilesForAnalysis[`${newParentId}`]);
+        // this.handleTableSelectionChange(
+        //   this.selectedFilesForAnalysis[`${newParentId}`]
+        // );
+      },
+    },
+  },
+
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
     ...mapState(["dataset", "filesProxyId"]),
+    ...mapState("analysisModule", ["selectedFilesForAnalysis", "fileCount"]),
 
     /**
      * Compute if the checkbox is indeterminate
@@ -267,7 +302,7 @@ export default {
   },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
-    ...mapActions("analysisModule", ["clearSelectedFiles"]),
+    ...mapActions("analysisModule", ["clearSelectedFiles", "updateFileCount"]),
 
     onOpenOffice365: function (file) {
       this.openOffice365File(file);
@@ -303,8 +338,16 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
+      // if (this.withinRunAnalysisDialog) {
+      //   const selectionParentId = selection[0].content.parentId || "root";
+      //   this.selection = this.selectedFilesForAnalysis[selectionParentId];
+      //   this.updateFileCount();
+      // } else {
+      //   this.selection = selection;
+      //   this.$emit("selection-change", selection);
+      //   this.checkAll = this.data.length === selection.length;
+      // }
       this.selection = selection;
-
       this.$emit("selection-change", selection);
       this.checkAll = this.data.length === selection.length;
     },
@@ -354,6 +397,7 @@ export default {
     },
 
     onRowClick: function (row, selected) {
+      console.log("this happens with row:", row);
       setTimeout(
         function () {
           this.$refs.table.toggleRowSelection(row, true);

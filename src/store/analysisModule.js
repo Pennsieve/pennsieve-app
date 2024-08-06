@@ -6,7 +6,8 @@
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
-    selectedFilesForAnalysis: []
+    selectedFilesForAnalysis: {},
+    fileCount: 0
   })
   
   export const state = initialState()
@@ -28,11 +29,22 @@
     UPDATE_POSTPROCESSORS(state, postprocessors) {
       state.postprocessors = postprocessors 
     },
-    SET_SELECTED_FILES(state, files) {
-      state.selectedFilesForAnalysis = files;
+    UPDATE_SELECTED_FILE_COUNT(state) {
+      let total = 0;
+      for (const parentId in state.selectedFilesForAnalysis) {
+          total = total + state.selectedFilesForAnalysis[parentId].length
+      }
+    
+      state.fileCount = total;
     },
-    SET_SELECTED_FILE(state, file) {
-      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]
+    SET_SELECTED_FILES(state, files) {
+      if (files.length) {
+        const parentId = files[0]?.content.parentId || 'root';
+        const updatedObj = { ...state.selectedFilesForAnalysis }
+        updatedObj[parentId] = files;
+        state.selectedFilesForAnalysis = updatedObj;
+      }
+
     },
     CLEAR_SELECTED_FILES(state) {
       state.selectedFilesForAnalysis = []
@@ -94,12 +106,12 @@
     setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
       commit('SET_SELECTED_FILES', selectedFiles)
     },
-    setSelectedFile: async({ commit, rootState}, selectedFile) => {
-      commit('SET_SELECTED_FILE', selectedFile)
-    },
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
+    updateFileCount: async ({ commit, rootState }) => {
+      commit('UPDATE_SELECTED_FILE_COUNT')
+    }
   }
   
   export const getters = {}

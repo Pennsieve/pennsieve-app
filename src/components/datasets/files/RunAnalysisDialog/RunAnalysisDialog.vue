@@ -72,7 +72,7 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
-        <div>Selected Files: {{ selectedFilesForAnalysis.length }}</div>
+        <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
             <breadcrumb-navigation
@@ -175,15 +175,10 @@ export default {
       "processors",
       "postprocessors",
       "selectedFilesForAnalysis",
+      "fileCount",
     ]),
     ...mapGetters(["userToken", "config"]),
 
-    /**
-     * Item has files
-     */
-    // hasFiles: function () {
-    //   return this.files.length > 0;
-    // },
     fileId() {
       return pathOr(
         propOr("", "node_id", this.file),
@@ -235,9 +230,9 @@ export default {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "setSelectedFile",
       "fetchComputeNodes",
       "fetchApplications",
+      "updateFileCount",
     ]),
     /**
      * Get files URL for dataset
@@ -301,25 +296,11 @@ export default {
       }
     },
     onFileSelect: function (selectedFiles) {
-      if (this.selectedFilesForAnalysis.length) {
-        selectedFiles.forEach((file) => {
-          const condition = !this.selectedFilesForAnalysis.find(
-            (globalSelectedFile) =>
-              globalSelectedFile.content.id === file.content.id
-          );
-          if (condition) {
-            this.setSelectedFile(file);
-          }
-          return;
-        });
-      } else {
-        this.setSelectedFiles(selectedFiles);
-      }
-      if (selectedFiles.length === 0) {
+      this.setSelectedFiles(selectedFiles);
+      this.updateFileCount();
+      if (this.fileCount === 0) {
         this.clearSelectedFiles();
       }
-
-      // this.setSelectedFiles(selectedFiles);
     },
     /**
      * Closes the dialog
