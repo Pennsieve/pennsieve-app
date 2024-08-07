@@ -133,6 +133,8 @@
         <img
           src="../../../assets/images/illustrations/illo-datasets.svg"
           alt="Add datasets illustration"
+          height="80"
+          width="120"
         >
 
         <h2 class="bf-empty-state-title">
@@ -576,4 +578,5 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
     flex-shrink: 0
   }
 }
+
 </style>
