@@ -244,33 +244,29 @@ export default {
     data: {
       handler: function (newVal, oldVal) {
         console.log("THE WATCH ON DATA RUNS");
-        const newParentId = newVal[0].content.parentId || "root";
-        // console.log("newParentId", newParentId);
-        // console.log(
-        //   " this.selectedFilesForAnalysis[newParentId]",
-        //   this.selectedFilesForAnalysis[newParentId]
-        // );
-        // console.log(
-        //   " this.selectedFilesForAnalysis",
-        //   this.selectedFilesForAnalysis
-        // );
+        const newParentId = newVal[0]?.content.parentId || "root";
 
-        // for (const parentId in this.selectedFilesForAnalysis) {
-        //   this.selectedFilesForAnalysis[parentId].forEach((file) => {
-        //     return this.onRowClick(file, true);
-        //   });
-        // }
-
-        // if (Array.isArray(this.selectedFilesForAnalysis[newParentId])) {
-        //   this.selectedFilesForAnalysis[newParentId].forEach((elem) => {
-        //     this.$refs.table.toggleRowSelection(elem, true);
-        //   });
-        // }
-        // console.log("****", this.selectedFilesForAnalysis[`${newParentId}`]);
-        // this.handleTableSelectionChange(
-        //   this.selectedFilesForAnalysis[`${newParentId}`]
-        // );
+        if (this.withinRunAnalysisDialog) {
+          const filesToSelect = [];
+          const dataFilesToSelect = [];
+          for (const parentId in this.selectedFilesForAnalysis) {
+            this.selectedFilesForAnalysis[parentId].forEach((file) => {
+              filesToSelect.push(file);
+            });
+          }
+          filesToSelect.forEach((elem) => {
+            this.data.forEach((dataElem) => {
+              if (elem.content.id === dataElem.content.id) {
+                dataFilesToSelect.push(dataElem);
+              }
+            });
+          });
+          dataFilesToSelect.forEach((elem) => {
+            this.onRowClick(elem, true);
+          });
+        }
       },
+      deep: true,
     },
   },
 

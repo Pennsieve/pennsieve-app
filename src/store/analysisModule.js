@@ -39,7 +39,7 @@
     },
     SET_SELECTED_FILES(state, files) {
       if (files.length) {
-        const parentId = files[0]?.content.parentId || 'root';
+        const parentId = files[0].content.parentId || 'root';
         const updatedObj = { ...state.selectedFilesForAnalysis }
         updatedObj[parentId] = files;
         state.selectedFilesForAnalysis = updatedObj;
