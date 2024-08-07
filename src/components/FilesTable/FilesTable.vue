@@ -239,28 +239,25 @@ export default {
       checkAll: false,
     };
   },
-
   watch: {
-    data: {
-      handler: function (newVal, oldVal) {
-        console.log("THE WATCH ON DATA RUNS");
-        const newParentId = newVal[0]?.content.parentId || "root";
-
+    tableData: {
+      handler(newVal) {
         if (this.withinRunAnalysisDialog) {
-          const filesToSelect = [];
-          const dataFilesToSelect = [];
+          const selectedFilesMap = {};
+
+          // Create a map for quick lookup
           for (const parentId in this.selectedFilesForAnalysis) {
             this.selectedFilesForAnalysis[parentId].forEach((file) => {
-              filesToSelect.push(file);
+              selectedFilesMap[file.content.id] = true;
             });
           }
-          filesToSelect.forEach((elem) => {
-            this.data.forEach((dataElem) => {
-              if (elem.content.id === dataElem.content.id) {
-                dataFilesToSelect.push(dataElem);
-              }
-            });
-          });
+
+          // Filter table data based on selected files
+          const dataFilesToSelect = newVal.filter(
+            (dataElem) => selectedFilesMap[dataElem.content.id]
+          );
+
+          // Select rows
           dataFilesToSelect.forEach((elem) => {
             this.onRowClick(elem, true);
           });
@@ -269,6 +266,32 @@ export default {
       deep: true,
     },
   },
+  // watch: {
+  //   data: {
+  //     handler: function (newVal, oldVal) {
+  //       if (this.withinRunAnalysisDialog) {
+  //         const filesToSelect = [];
+  //         const dataFilesToSelect = [];
+  //         for (const parentId in this.selectedFilesForAnalysis) {
+  //           this.selectedFilesForAnalysis[parentId].forEach((file) => {
+  //             filesToSelect.push(file);
+  //           });
+  //         }
+  //         filesToSelect.forEach((elem) => {
+  //           this.data.forEach((dataElem) => {
+  //             if (elem.content.id === dataElem.content.id) {
+  //               dataFilesToSelect.push(dataElem);
+  //             }
+  //           });
+  //         });
+  //         dataFilesToSelect.forEach((elem) => {
+  //           this.onRowClick(elem, true);
+  //         });
+  //       }
+  //     },
+  //     deep: true,
+  //   },
+  // },
 
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
