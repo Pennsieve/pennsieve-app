@@ -37,17 +37,37 @@
     
       state.fileCount = total;
     },
-    SET_SELECTED_FILES(state, files) {
+    SET_SELECTED_FILES(state, { files, parentId }) {
       if (files.length) {
         const parentId = files[0].content.parentId || 'root';
-        const updatedObj = { ...state.selectedFilesForAnalysis }
-        updatedObj[parentId] = files;
+        const updatedObj = { ...state.selectedFilesForAnalysis };
+    
+        // Get the existing files for the parentId
+        const existingFiles = updatedObj[parentId] || [];
+    
+        // Filter out duplicates
+        const nonDuplicateFiles = files.filter(
+          newFile => !existingFiles.some(existingFile => existingFile.content.id === newFile.content.id)
+        );
+    
+        // Combine existing files with non-duplicate new files
+        const updatedFiles = [...existingFiles, ...nonDuplicateFiles];
+    
+        // Remove any files in existingFiles that are not present in files
+        updatedObj[parentId] = updatedFiles.filter(
+          file => files.some(newFile => newFile.content.id === file.content.id)
+        );
+    
         state.selectedFilesForAnalysis = updatedObj;
+      } else {
+        state.selectedFilesForAnalysis[`${parentId}`] = []
       }
-
     },
+   
+    
+    
     CLEAR_SELECTED_FILES(state) {
-      state.selectedFilesForAnalysis = []
+      state.selectedFilesForAnalysis = {}
     }
  
   }
@@ -103,8 +123,10 @@
           return Promise.reject(err)
       }
     },
-    setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
-      commit('SET_SELECTED_FILES', selectedFiles)
+    setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
+      console.log('selectedFiles', selectedFiles)
+      console.log('parentId', parentId)
+      commit('SET_SELECTED_FILES', { files: selectedFiles, parentId })
     },
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')

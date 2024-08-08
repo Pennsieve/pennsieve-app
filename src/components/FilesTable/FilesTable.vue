@@ -243,34 +243,20 @@ export default {
       checkAll: false,
     };
   },
-  // watch: {
-  //   tableData: {
-  //     handler(newVal) {
-  //       if (this.withinRunAnalysisDialog) {
-  //         const selectedFilesMap = {};
-
-  //         // Create a map for quick lookup
-  //         for (const parentId in this.selectedFilesForAnalysis) {
-  //           this.selectedFilesForAnalysis[parentId].forEach((file) => {
-  //             selectedFilesMap[file.content.id] = true;
-  //           });
-  //         }
-
-  //         // Filter table data based on selected files
-  //         const dataFilesToSelect = newVal.filter(
-  //           (dataElem) => selectedFilesMap[dataElem.content.id]
-  //         );
-
-  //         // Select rows
-  //         dataFilesToSelect.forEach((elem) => {
-  //           this.onRowClick(elem, true);
-  //         });
-  //       }
-  //     },
-  //     deep: true,
-  //   },
-  // },
   watch: {
+    // selectedFiles: {
+    //   handler(newVal, oldVal) {
+    //     console.log(
+    //       "selectedFilesForAnalysis changed from",
+    //       oldVal,
+    //       "to",
+    //       newVal
+    //     );
+    //     // Perform any additional logic when the property changes
+    //   },
+    //   deep: true, // Set to true if you want to watch for nested changes
+    //   immediate: true, // Trigger the watcher immediately with the current value
+    // },
     clearSelectedValues(newVal) {
       if (newVal) {
         this.handleCloseModal();
@@ -294,6 +280,7 @@ export default {
             });
           });
           dataFilesToSelect.forEach((elem) => {
+            console.log("elem", elem);
             this.onRowClick(elem, true);
           });
         }
@@ -307,7 +294,9 @@ export default {
 
     ...mapState(["dataset", "filesProxyId"]),
     ...mapState("analysisModule", ["selectedFilesForAnalysis", "fileCount"]),
-
+    selectedFiles() {
+      return this.selectedFilesForAnalysis;
+    },
     /**
      * Compute if the checkbox is indeterminate
      * @returns {Boolean}
@@ -370,17 +359,9 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      // if (this.withinRunAnalysisDialog) {
-      //   const selectionParentId = selection[0].content.parentId || "root";
-      //   this.selection = this.selectedFilesForAnalysis[selectionParentId];
-      //   this.updateFileCount();
-      // } else {
-      //   this.selection = selection;
-      //   this.$emit("selection-change", selection);
-      //   this.checkAll = this.data.length === selection.length;
-      // }
       this.selection = selection;
-      this.$emit("selection-change", selection);
+      const parentId = this.data[0].content.parentId || "root";
+      this.$emit("selection-change", selection, parentId);
       this.checkAll = this.data.length === selection.length;
     },
 
@@ -429,10 +410,9 @@ export default {
     },
 
     onRowClick: function (row, selected) {
-      console.log("this happens with row:", row);
       setTimeout(
         function () {
-          this.$refs.table.toggleRowSelection(row, true);
+          this.$refs.table.toggleRowSelection(row, selected);
         }.bind(this),
         100
       );

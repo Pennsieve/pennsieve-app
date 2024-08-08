@@ -300,8 +300,8 @@ export default {
         this.navigateToFile(this.fileId);
       }
     },
-    onFileSelect: function (selectedFiles) {
-      this.setSelectedFiles(selectedFiles);
+    onFileSelect: function (selectedFiles, parentId) {
+      this.setSelectedFiles({ selectedFiles, parentId });
       this.updateFileCount();
       if (this.fileCount === 0) {
         this.clearSelectedFiles();
