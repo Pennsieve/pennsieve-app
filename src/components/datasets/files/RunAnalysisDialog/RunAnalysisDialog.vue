@@ -86,6 +86,7 @@
           <div class="table-container">
             <files-table
               :data="files"
+              :clear-selected-values="clearSelectedValues"
               withinRunAnalysisDialog
               :enable-download="false"
               @selection-change="onFileSelect"
@@ -166,6 +167,7 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
+      clearSelectedValues: false,
     };
   },
   computed: {
@@ -234,6 +236,9 @@ export default {
       "fetchApplications",
       "updateFileCount",
     ]),
+    handleClearSelectedValues: function () {
+      this.clearSelectedValues = !this.clearSelected;
+    },
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -317,7 +322,9 @@ export default {
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
+      this.updateFileCount();
       this.targetDirectory = "";
+      this.handleClearSelectedValues();
     },
     /**
      * Manages the Multi Step Functionality
