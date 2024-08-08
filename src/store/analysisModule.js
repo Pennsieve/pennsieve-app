@@ -39,7 +39,6 @@
     },
     SET_SELECTED_FILES(state, { files, parentId }) {
       if (files.length) {
-        const parentId = files[0].content.parentId || 'root';
         const updatedObj = { ...state.selectedFilesForAnalysis };
     
         // Get the existing files for the parentId
@@ -60,7 +59,7 @@
     
         state.selectedFilesForAnalysis = updatedObj;
       } else {
-        state.selectedFilesForAnalysis[`${parentId}`] = []
+        state.selectedFilesForAnalysis[parentId] = []
       }
     },
    

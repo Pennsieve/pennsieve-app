@@ -303,9 +303,6 @@ export default {
     onFileSelect: function (selectedFiles, parentId) {
       this.setSelectedFiles({ selectedFiles, parentId });
       this.updateFileCount();
-      if (this.fileCount === 0) {
-        this.clearSelectedFiles();
-      }
     },
     /**
      * Closes the dialog

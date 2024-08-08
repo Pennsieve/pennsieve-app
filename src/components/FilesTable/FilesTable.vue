@@ -280,7 +280,6 @@ export default {
             });
           });
           dataFilesToSelect.forEach((elem) => {
-            console.log("elem", elem);
             this.onRowClick(elem, true);
           });
         }
