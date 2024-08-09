@@ -72,7 +72,7 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
-        <div>Selected Files: {{ selectedFilesForAnalysis.length }}</div>
+        <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
             <breadcrumb-navigation
@@ -86,6 +86,7 @@
           <div class="table-container">
             <files-table
               :data="files"
+              :clear-selected-values="clearSelectedValues"
               withinRunAnalysisDialog
               :enable-download="false"
               @selection-change="onFileSelect"
@@ -166,6 +167,7 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
+      clearSelectedValues: false,
     };
   },
   computed: {
@@ -175,15 +177,10 @@ export default {
       "processors",
       "postprocessors",
       "selectedFilesForAnalysis",
+      "fileCount",
     ]),
     ...mapGetters(["userToken", "config"]),
 
-    /**
-     * Item has files
-     */
-    // hasFiles: function () {
-    //   return this.files.length > 0;
-    // },
     fileId() {
       return pathOr(
         propOr("", "node_id", this.file),
@@ -235,10 +232,13 @@ export default {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "setSelectedFile",
       "fetchComputeNodes",
       "fetchApplications",
+      "updateFileCount",
     ]),
+    handleClearSelectedValues: function () {
+      this.clearSelectedValues = !this.clearSelected;
+    },
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -300,26 +300,12 @@ export default {
         this.navigateToFile(this.fileId);
       }
     },
-    onFileSelect: function (selectedFiles) {
-      if (this.selectedFilesForAnalysis.length) {
-        selectedFiles.forEach((file) => {
-          const condition = !this.selectedFilesForAnalysis.find(
-            (globalSelectedFile) =>
-              globalSelectedFile.content.id === file.content.id
-          );
-          if (condition) {
-            this.setSelectedFile(file);
-          }
-          return;
-        });
-      } else {
-        this.setSelectedFiles(selectedFiles);
-      }
-      if (selectedFiles.length === 0) {
+    onFileSelect: function (selectedFiles, parentId) {
+      this.setSelectedFiles({ selectedFiles, parentId });
+      this.updateFileCount();
+      if (this.fileCount === 0) {
         this.clearSelectedFiles();
       }
-
-      // this.setSelectedFiles(selectedFiles);
     },
     /**
      * Closes the dialog
@@ -336,7 +322,9 @@ export default {
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
+      this.updateFileCount();
       this.targetDirectory = "";
+      this.handleClearSelectedValues();
     },
     /**
      * Manages the Multi Step Functionality
