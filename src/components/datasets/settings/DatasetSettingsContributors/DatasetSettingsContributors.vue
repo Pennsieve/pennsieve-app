@@ -114,7 +114,8 @@ import {
   pathEq,
   prop,
   propEq,
-  propOr
+  propOr,
+  mergeLeft
 } from 'ramda'
 
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
@@ -138,8 +139,8 @@ const transformMemberToContributor = (member = {}) => {
   const orcid = pathOr('', ['orcid', 'orcid'], member)
 
   return compose(
-    merge({ orcid, userId }),
-    pick(['firstName', 'lastName', 'email'])
+      mergeLeft({ orcid, userId }),
+      pick(['firstName', 'lastName', 'email'])
   )(member)
 }
 

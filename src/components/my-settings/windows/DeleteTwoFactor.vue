@@ -32,7 +32,7 @@
 <script>
 import { mapGetters, mapState } from 'vuex'
 import { pathOr, prop } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'

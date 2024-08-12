@@ -94,6 +94,7 @@ const allowList = [
     'welcome',
     'setup-profile',
     'setup-profile-accept',
+    'complete-profile-accept',
     'verify-account',
     'welcome-to-pennsieve',
     'docs-login',

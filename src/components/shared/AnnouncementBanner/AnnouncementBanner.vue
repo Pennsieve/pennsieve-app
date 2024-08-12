@@ -112,5 +112,6 @@ export default {
 
 .close-btn {
   margin-right: 20px;
+  cursor: pointer;
 }
 </style>

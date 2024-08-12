@@ -166,7 +166,7 @@
 <script>
 import { mapState } from 'vuex'
 import { pathOr, propOr } from 'ramda'
-import Auth from '@aws-amplify/auth'
+import {Auth} from '@aws-amplify/auth'
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
@@ -478,26 +478,19 @@ export default {
     margin-bottom: 24px;
   }
 
-  .el-form-item {
-    &.is-success {
-      margin-bottom: 32px;
-    }
-
-    &.is-error {
-      margin-bottom: 32px;
-    }
-  }
-
   .pw-is-valid-text {
     color: #17bb62;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1;
-    padding-top: 8px;
-    position: absolute;
-  }
-
-  .el-form-item__error {
-    position: absolute;
+    padding: 13px 10px;
+    background: #FAFAFA;
+    border-radius: 0 0 5px 5px;
+    border: solid 1px #dadada;
+    height: 15px;
+    width: 93.5%;
+    position: relative;
+    z-index: 0;
+    margin: 0;
   }
 
   .button-spinner {
