@@ -159,8 +159,8 @@ const defaultApplicationFormValues = () => ({
   description: "",
   applicationType: "",
   resources: {
-    cpu: 0,
-    memory: 0,
+    cpu: "",
+    memory: "",
   },
   account: {
     uuid: "",
