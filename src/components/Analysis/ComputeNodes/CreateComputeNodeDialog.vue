@@ -155,7 +155,7 @@ export default {
      */
     handleCreateComputeNode: async function () {
       try {
-        await this.createComputeNode(this.computeNode);
+        const result = await this.createComputeNode(this.computeNode);
         EventBus.$emit("toast", {
           detail: {
             type: "success",
