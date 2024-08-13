@@ -349,7 +349,7 @@
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
 
-import { pathOr, propOr, prop } from "ramda";
+import { pathOr, propOr, prop, has } from "ramda";
 import {Auth} from "@aws-amplify/auth";
 
 
