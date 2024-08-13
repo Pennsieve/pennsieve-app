@@ -13,6 +13,7 @@ import filesModule from "./filesModule";
 import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
+import releasesModule from "./releasesModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1057,7 +1058,8 @@ export default createStore({
     filesModule,
     uploadModule,
     metadataModule,
-    analysisModule
+    analysisModule,
+    releasesModule
   }
 
 });
