@@ -1,4 +1,3 @@
-import {defaultTo, propEq, find } from 'ramda'
 import Cookies from "js-cookie";
 
 const initialState = () => ({
@@ -62,8 +61,9 @@ export const actions = {
       }
     }
     catch (err) {
-      // add error handling - unable to retrieve github repos, try again or something
+      // add error handling - display message or alert indicating the error
       commit('SET_GITHUB_REPOS', null)
+      commit('SET_GITHUB_REPOS_COUNT', 0)
     }
   },
 
@@ -88,8 +88,9 @@ export const actions = {
       }
     }
     catch (err) {
-      // add error handling - unable to retrieve github repos, try again or something
+      // add error handling - display message or alert indicating the error
       commit('SET_EXTERNAL_REPOS', null)
+      commit('SET_EXTERNAL_REPOS_COUNT', 0)
     }
   },
 
@@ -113,7 +114,7 @@ export const actions = {
       }
     }
     catch (err) {
-      // add error handling - could not enable repo tracking, try again or something
+      // add error handling - display message or alert indicating the error
     }
   },
 
@@ -137,15 +138,9 @@ export const actions = {
       }
     }
     catch (err) {
-      // add error handling - could not disable repo tracking, try again or something
+      // add error handling - display message or alert indicating the error
     }
   }
-}
-
-export const getters = {
-  getPublishingInfo: state => (tag) => {
-    return defaultTo({}, find(propEq('tag', tag), state.publishingInfo))
-  },
 }
 
 const releasesModule = {
@@ -153,7 +148,6 @@ const releasesModule = {
   state,
   mutations,
   actions,
-  getters
 }
 
 export default releasesModule
