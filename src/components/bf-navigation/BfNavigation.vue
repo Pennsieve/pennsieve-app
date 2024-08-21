@@ -71,15 +71,15 @@
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
         :link="{
-          name: 'releases',
+          name: 'code',
           params: { orgId: activeOrganizationId },
         }"
-        label="Releases"
+        label="Code"
         :condensed="primaryNavCondensed"
         :styleColor="navStyleColor"
       >
         <template v-slot:icon>
-          <IconGitHub :width="20" :height="20" color="currentColor"/>
+          <IconGitHub :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
 

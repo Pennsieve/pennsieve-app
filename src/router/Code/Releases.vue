@@ -1,10 +1,16 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" title="Releases" class="primary" :org-id="orgId">
+    <bf-rafter
+      slot="heading"
+      title="Code Repositories"
+      class="primary"
+      :org-id="orgId"
+    >
       <template #description>
         <div class="description">
           <p>
-            List of Github repositories, and the github type datasets for the organization
+            List of Github Code Repositories associated with your linked Github
+            Account.
           </p>
         </div>
       </template>
@@ -12,7 +18,7 @@
         <router-tabs :tabs="tabs" />
       </template>
     </bf-rafter>
-    <router-view name="stage"/>
+    <router-view name="stage" />
   </bf-page>
 </template>
 
@@ -35,17 +41,17 @@ export default {
     orgId: {
       type: String,
       default: "",
-    }
+    },
   },
   data() {
     return {
       tabs: [
         {
-          name: "Github Repositories", //display name
+          name: "My Repositories", //display name
           to: "github-repos",
         },
         {
-          name: "Github Release Datasets", //display name
+          name: "Workspace Repositories", //display name
           to: "github-datasets",
         },
       ],
@@ -55,7 +61,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-
 .description {
   max-width: 600px;
 }
