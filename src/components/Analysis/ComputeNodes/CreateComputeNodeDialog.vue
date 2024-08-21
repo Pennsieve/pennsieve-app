@@ -56,7 +56,7 @@
               v-for="account in computeResourceAccounts"
               :key="account.accountId"
               :label="account.accountId"
-              :value="account"
+              :value="account.accountId"
             />
           </el-select>
         </el-form-item>
@@ -87,11 +87,7 @@ import EventBus from "../../../utils/event-bus";
 const defaultComputeNodeFormValues = () => ({
   name: "",
   description: "",
-  account: {
-    uuid: "",
-    accountId: "",
-    accountType: "",
-  },
+  account: "",
 });
 
 export default {
@@ -129,25 +125,37 @@ export default {
      */
     handleCreateComputeNode: async function () {
       console.log("this.computeNode", this.computeNode);
-      // try {
-      //   const result = await this.createComputeNode(this.computeNode);
-      //   EventBus.$emit("toast", {
-      //     detail: {
-      //       type: "success",
-      //       msg: "Your Request has been Successfully Submitted",
-      //     },
-      //   });
-      // } catch (error) {
-      //   console.error(error);
-      //   EventBus.$emit("toast", {
-      //     detail: {
-      //       type: "error",
-      //       msg: "There was a problem submitting your request.",
-      //     },
-      //   });
-      // } finally {
-      //   this.closeDialog();
-      // }
+
+      const accountToSend = this.computeResourceAccounts.find(
+        (elem) => elem.accountId === this.computeNode.account
+      );
+
+      console.log("accountToSend", accountToSend);
+
+      const formattedComputeNode = {
+        ...this.computeNode,
+        account: accountToSend,
+      };
+
+      try {
+        const result = await this.createComputeNode(formattedComputeNode);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your Request has been Successfully Submitted and your Compute Node is currently being created. Please allow some time for the process to complete.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        this.closeDialog();
+      }
 
       this.closeDialog();
     },
