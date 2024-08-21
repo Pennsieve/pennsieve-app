@@ -42,35 +42,23 @@
             />
           </div>
         </el-form-item>
-        <el-form-item prop="accountUuid">
+        <el-form-item prop="account">
           <template #label>
-            Account UUID <span class="label-helper"></span>
+            Account <span class="label-helper"> required </span>
           </template>
-          <el-input
-            v-model="computeNode.account.uuid"
-            placeholder="the account UUID"
-            autofocus
-          />
-        </el-form-item>
-        <el-form-item prop="accountId">
-          <template #label>
-            Account Id <span class="label-helper"></span>
-          </template>
-          <el-input
-            v-model="computeNode.account.accountId"
-            placeholder="the account id"
-            autofocus
-          />
-        </el-form-item>
-        <el-form-item prop="accountType">
-          <template #label>
-            Account Type <span class="label-helper"></span>
-          </template>
-          <el-input
-            v-model="computeNode.account.accountType"
-            placeholder="the account type"
-            autofocus
-          />
+          <el-select
+            ref="enum"
+            v-model="computeNode.account"
+            class="input-property"
+            placeholder="Choose an Account"
+          >
+            <el-option
+              v-for="account in computeResourceAccounts"
+              :key="account.accountId"
+              :label="account.accountId"
+              :value="account"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
     </dialog-body>
@@ -85,7 +73,7 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapActions } from "vuex";
+import { mapState, mapActions } from "vuex";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
@@ -126,53 +114,42 @@ export default {
 
   computed: {
     ...mapState(["userToken", "config"]),
+    ...mapState("analysisModule", ["computeResourceAccounts"]),
   },
-
-  watch: {
-    /**
-     * Watch name and set form model to the value
-     * @param {String} val
-     */
-    name: function (val) {
-      this.application.name = val;
-    },
-    description: function (val) {
-      this.application.description = val;
-    },
-  },
-
-  mounted() {},
 
   methods: {
     ...mapActions("analysisModule", ["createComputeNode"]),
     closeDialog: function () {
-      this.$emit("close", false);
       this.computeNode = defaultComputeNodeFormValues();
+      this.$emit("close", false);
     },
 
     /**
      * POST to API to create new application
      */
     handleCreateComputeNode: async function () {
-      try {
-        const result = await this.createComputeNode(this.computeNode);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "success",
-            msg: "Your Request has been Successfully Submitted",
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "error",
-            msg: "There was a problem submitting your request.",
-          },
-        });
-      } finally {
-        this.closeDialog();
-      }
+      console.log("this.computeNode", this.computeNode);
+      // try {
+      //   const result = await this.createComputeNode(this.computeNode);
+      //   EventBus.$emit("toast", {
+      //     detail: {
+      //       type: "success",
+      //       msg: "Your Request has been Successfully Submitted",
+      //     },
+      //   });
+      // } catch (error) {
+      //   console.error(error);
+      //   EventBus.$emit("toast", {
+      //     detail: {
+      //       type: "error",
+      //       msg: "There was a problem submitting your request.",
+      //     },
+      //   });
+      // } finally {
+      //   this.closeDialog();
+      // }
+
+      this.closeDialog();
     },
   },
 };

@@ -81,7 +81,7 @@
             autofocus
           />
         </el-form-item>
-        <el-form-item prop="integrationType">
+        <el-form-item prop="computeNode">
           <template #label>
             Compute Node <span class="label-helper"> required </span>
           </template>
@@ -214,20 +214,6 @@ export default {
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeNodes"]),
-    ...mapGetters("analysisModule", ["getAnalysisAccounts"]),
-  },
-
-  watch: {
-    /**
-     * Watch name and set form model to the value
-     * @param {String} val
-     */
-    name: function (val) {
-      this.application.name = val;
-    },
-    description: function (val) {
-      this.application.description = val;
-    },
   },
 
   mounted() {
