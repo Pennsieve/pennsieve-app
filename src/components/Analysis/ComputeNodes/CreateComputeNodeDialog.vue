@@ -124,13 +124,9 @@ export default {
      * POST to API to create new application
      */
     handleCreateComputeNode: async function () {
-      console.log("this.computeNode", this.computeNode);
-
       const accountToSend = this.computeResourceAccounts.find(
         (elem) => elem.accountId === this.computeNode.account
       );
-
-      console.log("accountToSend", accountToSend);
 
       const formattedComputeNode = {
         ...this.computeNode,
