@@ -81,7 +81,7 @@
             autofocus
           />
         </el-form-item>
-        <el-form-item prop="integrationType">
+        <el-form-item prop="computeNode">
           <template #label>
             Compute Node <span class="label-helper"> required </span>
           </template>
@@ -120,7 +120,7 @@
             autofocus
           />
         </el-form-item>
-        <el-form-item prop="environment">
+        <!-- <el-form-item prop="environment">
           <template #label>
             Environment <span class="label-helper"> required </span>
           </template>
@@ -129,7 +129,7 @@
             placeholder="ex: dev or prod"
             autofocus
           />
-        </el-form-item>
+        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -177,7 +177,6 @@ const defaultApplicationFormValues = () => ({
     type: "",
     url: "",
   },
-  environment: "",
 });
 
 export default {
@@ -215,20 +214,6 @@ export default {
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeNodes"]),
-    ...mapGetters("analysisModule", ["getAnalysisAccounts"]),
-  },
-
-  watch: {
-    /**
-     * Watch name and set form model to the value
-     * @param {String} val
-     */
-    name: function (val) {
-      this.application.name = val;
-    },
-    description: function (val) {
-      this.application.description = val;
-    },
   },
 
   mounted() {
@@ -257,17 +242,22 @@ export default {
     handleCreateApplication: async function () {
       const accountDetails = {
         uuid: this.application.computeNode.account.uuid,
-        efsId: this.application.computeNode.account.accountId,
+        accountId: this.application.computeNode.account.accountId,
         accountType: this.application.computeNode.account.accountType,
       };
       const computeNodeDetails = {
         uuid: this.application.computeNode.uuid,
         efsId: this.application.computeNode.efsId,
       };
+      const formattedResources = {
+        cpu: Number(this.application.resources.cpu),
+        memory: Number(this.application.resources.memory),
+      };
       const formattedNewApplication = {
         ...this.application,
         account: accountDetails,
         computeNode: computeNodeDetails,
+        resources: formattedResources,
       };
       try {
         await this.createApplication(formattedNewApplication);
