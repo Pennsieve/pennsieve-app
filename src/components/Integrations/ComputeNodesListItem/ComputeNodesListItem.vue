@@ -20,7 +20,7 @@
           Node
         </div>
         <div class="margin-10">
-          Created Date: {{ this.formatDate(computeNode.createdAt) }}
+          Created Date: {{ this.formatDateFNS(computeNode.createdAt) }}
         </div>
         <div class="margin-10">
           {{ computeNode.description }}
