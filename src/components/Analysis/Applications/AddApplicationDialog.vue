@@ -222,6 +222,7 @@ export default {
 
   methods: {
     ...mapActions("analysisModule", ["fetchComputeNodes", "createApplication"]),
+
     /**
      * Validation Methods
      */

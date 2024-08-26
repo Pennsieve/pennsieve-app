@@ -17,7 +17,7 @@
         </template>
         <template #right>
           <bf-button
-            v-if="showRunAnalysisFlow"
+            v-if="isFeatureFlagEnabled()"
             @click="openRunAnalysisDialog"
             class="mr-8 flex"
           >
@@ -187,6 +187,10 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
 
 export default {
   name: "BfDatasetFiles",
@@ -287,23 +291,7 @@ export default {
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-    /**
-     * Feature Flag for Run Analysis Flow
-     *
-     */
-    showRunAnalysisFlow: function () {
-      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
-      const isPennsieveTestDev =
-        this.organizationId ===
-        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
-      const isImmuneHealthProd =
-        this.organizationId ===
-        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
-      const isPennsieveTestProd =
-        this.organizationId ===
-        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
-      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
-    },
+
     /**
      * Compute organization's ID
      * @returns {String}
@@ -479,6 +467,11 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    },
 
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function (e) {

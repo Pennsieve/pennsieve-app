@@ -1,7 +1,10 @@
 <template>
   <bf-stage element-loading-background="transparent">
     <template #actions>
-      <bf-button v-if="hasAdminRights" @click="openAddApplicationDialog">
+      <bf-button
+        v-if="hasAdminRights && isFeatureFlagEnabled()"
+        @click="openAddApplicationDialog"
+      >
         Create Application
       </bf-button>
     </template>
@@ -78,6 +81,11 @@ import UserRoles from "../../../mixins/user-roles";
 
 import { pathOr, propOr } from "ramda";
 
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
+
 export default {
   name: "ApplicationsList",
 
@@ -128,6 +136,11 @@ export default {
       "deleteApplication",
       "editApplication",
     ]),
+
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    },
 
     /**
      * Methods to open/close modals
