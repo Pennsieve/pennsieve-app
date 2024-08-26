@@ -1,5 +1,5 @@
 import moment from 'moment';
-
+import { format as formatFNS } from "date-fns";
 import { head } from 'ramda'
 
 
@@ -13,7 +13,9 @@ export default {
     formatDate: function(date) {
       return moment.utc(date).format('MMMM D, YYYY')
     },
-
+    formatDateFNS: function(date) {
+      return formatFNS(date, 'MMMM d, yyyy')
+    },
     /**
      * Formats a date range for display
      * @param {Date} date
