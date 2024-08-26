@@ -3,7 +3,7 @@
     <template #actions>
       <bf-button
         v-if="hasAdminRights && isFeatureFlagEnabled()"
-        @click="openAddApplicationDialog"
+        @click="openCreateApplicationDialog"
       >
         Create Application
       </bf-button>
@@ -71,7 +71,7 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
-import AddApplicationDialog from "./AddApplicationDialog.vue";
+import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 import EditApplicationDialog from "./EditApplicationDialog.vue";
 import DeleteApplicationDialog from "./DeleteApplicationDialog.vue";
 import ApplicationsListItem from "./ApplicationsListItem.vue";
@@ -94,7 +94,7 @@ export default {
     BfRafter,
     BfButton,
     ApplicationsListItem,
-    AddApplicationDialog,
+    CreateApplicationDialog,
     EditApplicationDialog,
     DeleteApplicationDialog,
   },
@@ -154,7 +154,7 @@ export default {
     onCloseEditDialog: function () {
       this.editApplicationDialogVisible = false;
     },
-    openAddApplicationDialog: function () {
+    openCreateApplicationDialog: function () {
       this.addApplicationDialogVisible = true;
     },
     openEditApplication: function () {

@@ -180,7 +180,7 @@ const defaultApplicationFormValues = () => ({
 });
 
 export default {
-  name: "AddApplicationDialog",
+  name: "CreateApplicationDialog",
 
   components: {
     BfDialogHeader,
