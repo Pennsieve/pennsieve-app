@@ -17,10 +17,7 @@
         label-position="top"
         @submit.native.prevent="handleCreateComputeNode"
       >
-        <el-form-item
-          prop="name"
-          :class="{ 'is-error': isFormSubmitted && !computeNode.name }"
-        >
+        <el-form-item prop="name">
           <template #label>
             <span>Name</span>
             <span class="label-helper"> required </span>
@@ -32,10 +29,7 @@
           />
         </el-form-item>
 
-        <el-form-item
-          prop="description"
-          :class="{ 'is-error': isFormSubmitted && !computeNode.description }"
-        >
+        <el-form-item prop="description">
           <template #label>
             <span>Description</span>
             <span class="label-helper"> required </span>
@@ -53,10 +47,7 @@
           </div>
         </el-form-item>
 
-        <el-form-item
-          prop="account"
-          :class="{ 'is-error': isFormSubmitted && !computeNode.account }"
-        >
+        <el-form-item prop="account">
           <template #label>
             <span>Account</span>
             <span class="label-helper"> required </span>
@@ -115,7 +106,6 @@ export default {
   data() {
     return {
       computeNode: defaultComputeNodeFormValues(),
-      isFormSubmitted: false,
       rules: {
         name: [
           { required: true, message: "Please input a name", trigger: "blur" },
@@ -131,7 +121,7 @@ export default {
           {
             required: true,
             message: "Please select an account",
-            trigger: "blur",
+            trigger: "change",
           },
         ],
       },
@@ -146,52 +136,47 @@ export default {
   methods: {
     ...mapActions("analysisModule", ["createComputeNode"]),
 
-    async isFormValid() {
-      const checkFormValidity = await this.$refs.computeNodeForm.validate();
-      return checkFormValidity;
-    },
-
     closeDialog() {
       this.computeNode = defaultComputeNodeFormValues();
-      this.isFormSubmitted = false; // Reset form submission state
       this.$emit("close", false);
       this.$refs.computeNodeForm.clearValidate();
     },
 
     async handleCreateComputeNode() {
-      this.isFormSubmitted = true;
-      if (this.isFormValid) {
-        const accountToSend = this.computeResourceAccounts.find(
-          (elem) => elem.accountId === this.computeNode.account
-        );
+      this.$refs.computeNodeForm.validate(async (valid) => {
+        if (valid) {
+          const accountToSend = this.computeResourceAccounts.find(
+            (elem) => elem.accountId === this.computeNode.account
+          );
 
-        const formattedComputeNode = {
-          ...this.computeNode,
-          account: accountToSend,
-        };
+          const formattedComputeNode = {
+            ...this.computeNode,
+            account: accountToSend,
+          };
 
-        try {
-          const result = await this.createComputeNode(formattedComputeNode);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg: "Your request to create a Compute Node has been initiated.",
-              duration: 8000,
-            },
-          });
-        } catch (error) {
-          console.error(error);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "error",
-              msg: "There was a problem submitting your request.",
-              duration: 6000,
-            },
-          });
-        } finally {
-          this.closeDialog();
+          try {
+            // const result = await this.createComputeNode(formattedComputeNode);
+            EventBus.$emit("toast", {
+              detail: {
+                type: "success",
+                msg: "Your request to create a Compute Node has been initiated.",
+                duration: 8000,
+              },
+            });
+          } catch (error) {
+            console.error(error);
+            EventBus.$emit("toast", {
+              detail: {
+                type: "error",
+                msg: "There was a problem submitting your request.",
+                duration: 6000,
+              },
+            });
+          } finally {
+            this.closeDialog();
+          }
         }
-      }
+      });
     },
   },
 };
