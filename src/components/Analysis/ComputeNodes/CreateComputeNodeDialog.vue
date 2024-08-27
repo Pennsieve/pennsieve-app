@@ -4,6 +4,7 @@
     @update:modelValue="dialogVisible = $event"
     class="add-integration-dialog fixed-width"
     @close="closeDialog"
+    :before-close="handleBeforeClose"
   >
     <template #header>
       <bf-dialog-header slot="title" title="Create Compute Node" />
@@ -12,12 +13,23 @@
     <dialog-body>
       <el-form
         :model="computeNode"
+        :rules="rules"
+        ref="computeNodeForm"
         label-position="top"
         @submit.native.prevent="handleCreateComputeNode"
       >
-        <el-form-item prop="name">
+        <el-form-item
+          prop="name"
+          :class="{ 'is-error': isFormSubmitted && !computeNode.name }"
+        >
           <template #label>
-            Name <span class="label-helper"> required </span>
+            <span
+              :class="{
+                'required-label': isFormSubmitted && !computeNode.name,
+              }"
+              >Name</span
+            >
+            <span class="label-helper"> required </span>
           </template>
           <el-input
             v-model="computeNode.name"
@@ -26,9 +38,18 @@
           />
         </el-form-item>
 
-        <el-form-item prop="description">
+        <el-form-item
+          prop="description"
+          :class="{ 'is-error': isFormSubmitted && !computeNode.description }"
+        >
           <template #label>
-            Description <span class="label-helper"> required </span>
+            <span
+              :class="{
+                'required-label': isFormSubmitted && !computeNode.description,
+              }"
+              >Description</span
+            >
+            <span class="label-helper"> required </span>
           </template>
           <div class="text-area-wrapper">
             <el-input
@@ -42,9 +63,19 @@
             />
           </div>
         </el-form-item>
-        <el-form-item prop="account">
+
+        <el-form-item
+          prop="account"
+          :class="{ 'is-error': isFormSubmitted && !computeNode.account }"
+        >
           <template #label>
-            Account <span class="label-helper"> required </span>
+            <span
+              :class="{
+                'required-label': isFormSubmitted && !computeNode.account,
+              }"
+              >Account</span
+            >
+            <span class="label-helper"> required </span>
           </template>
           <el-select
             ref="enum"
@@ -63,7 +94,6 @@
       </el-form>
     </dialog-body>
 
-    <!-- Overview buttons -->
     <template #footer>
       <bf-button @click="handleCreateComputeNode">
         Create Compute Node
@@ -74,16 +104,11 @@
 
 <script>
 import { mapState, mapActions } from "vuex";
-
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 
-/**
- * Returns the default values for a property
- * @returns {Object}
- */
 const defaultComputeNodeFormValues = () => ({
   name: "",
   description: "",
@@ -102,9 +127,30 @@ export default {
   props: {
     dialogVisible: Boolean,
   },
-  data: function () {
+
+  data() {
     return {
       computeNode: defaultComputeNodeFormValues(),
+      isFormSubmitted: false,
+      rules: {
+        name: [
+          { required: true, message: "Please input a name", trigger: "blur" },
+        ],
+        description: [
+          {
+            required: true,
+            message: "Please input a description",
+            trigger: "blur",
+          },
+        ],
+        account: [
+          {
+            required: true,
+            message: "Please select an account",
+            trigger: "change",
+          },
+        ],
+      },
     };
   },
 
@@ -115,45 +161,61 @@ export default {
 
   methods: {
     ...mapActions("analysisModule", ["createComputeNode"]),
-    closeDialog: function () {
-      this.computeNode = defaultComputeNodeFormValues();
-      this.$emit("close", false);
+
+    async isFormValid() {
+      const checkFormValidity = await this.$refs.computeNodeForm.validate();
+      return checkFormValidity;
     },
 
-    /**
-     * POST to API to create new application
-     */
-    handleCreateComputeNode: async function () {
-      const accountToSend = this.computeResourceAccounts.find(
-        (elem) => elem.accountId === this.computeNode.account
-      );
+    closeDialog() {
+      this.computeNode = defaultComputeNodeFormValues();
+      this.isFormSubmitted = false; // Reset form submission state
+      this.$emit("close", false);
+      this.$refs.computeNodeForm.clearValidate();
+    },
 
-      const formattedComputeNode = {
-        ...this.computeNode,
-        account: accountToSend,
-      };
-
-      try {
-        const result = await this.createComputeNode(formattedComputeNode);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "success",
-            msg: "Your Request has been Successfully Submitted and your Compute Node is currently being created. Please allow some time for the process to complete.",
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "error",
-            msg: "There was a problem submitting your request.",
-          },
-        });
-      } finally {
-        this.closeDialog();
-      }
-
+    handleBeforeClose(done) {
+      this.$refs.computeNodeForm.clearValidate();
       this.closeDialog();
+      done();
+    },
+
+    async handleCreateComputeNode() {
+      this.isFormSubmitted = true;
+      // const isFormValid = await this.$refs.computeNodeForm.validate();
+      console.log("isFormValid", await this.isFormValid());
+      if (this.isFormValid) {
+        const accountToSend = this.computeResourceAccounts.find(
+          (elem) => elem.accountId === this.computeNode.account
+        );
+
+        const formattedComputeNode = {
+          ...this.computeNode,
+          account: accountToSend,
+        };
+
+        try {
+          const result = await this.createComputeNode(formattedComputeNode);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "success",
+              msg: "Your request to create a Compute Node has been initiated.",
+              duration: 8000,
+            },
+          });
+        } catch (error) {
+          console.error(error);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: "There was a problem submitting your request.",
+              duration: 6000,
+            },
+          });
+        } finally {
+          this.closeDialog();
+        }
+      }
     },
   },
 };
@@ -172,6 +234,15 @@ export default {
       font-weight: 500;
       color: $gray_5;
     }
+    &.is-error {
+      .el-form-item__label {
+        color: red;
+      }
+    }
+  }
+
+  .required-label {
+    color: red;
   }
 
   .el-select {
