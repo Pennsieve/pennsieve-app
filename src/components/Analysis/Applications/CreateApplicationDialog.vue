@@ -359,9 +359,6 @@ export default {
           } finally {
             this.closeDialog();
           }
-        } else {
-          console.log("error submit!!");
-          return false;
         }
       });
     },

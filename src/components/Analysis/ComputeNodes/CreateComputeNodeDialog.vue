@@ -138,10 +138,6 @@ export default {
     };
   },
 
-  mounted() {
-    console.log("***", this.computeNode.account);
-  },
-
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeResourceAccounts"]),
@@ -151,7 +147,6 @@ export default {
     ...mapActions("analysisModule", ["createComputeNode"]),
 
     async isFormValid() {
-      console.log("***", this.computeNode.account);
       const checkFormValidity = await this.$refs.computeNodeForm.validate();
       return checkFormValidity;
     },
@@ -165,8 +160,6 @@ export default {
 
     async handleCreateComputeNode() {
       this.isFormSubmitted = true;
-      // const isFormValid = await this.$refs.computeNodeForm.validate();
-      console.log("isFormValid", await this.isFormValid());
       if (this.isFormValid) {
         const accountToSend = this.computeResourceAccounts.find(
           (elem) => elem.accountId === this.computeNode.account
