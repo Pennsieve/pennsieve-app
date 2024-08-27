@@ -160,7 +160,8 @@ export default {
 
     async handleCreateComputeNode() {
       this.isFormSubmitted = true;
-      if (this.isFormValid) {
+
+      if (await this.isFormValid()) {
         const accountToSend = this.computeResourceAccounts.find(
           (elem) => elem.accountId === this.computeNode.account
         );
