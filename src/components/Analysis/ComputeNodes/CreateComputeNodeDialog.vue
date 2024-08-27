@@ -22,12 +22,7 @@
           :class="{ 'is-error': isFormSubmitted && !computeNode.name }"
         >
           <template #label>
-            <span
-              :class="{
-                'required-label': isFormSubmitted && !computeNode.name,
-              }"
-              >Name</span
-            >
+            <span>Name</span>
             <span class="label-helper"> required </span>
           </template>
           <el-input
@@ -42,12 +37,7 @@
           :class="{ 'is-error': isFormSubmitted && !computeNode.description }"
         >
           <template #label>
-            <span
-              :class="{
-                'required-label': isFormSubmitted && !computeNode.description,
-              }"
-              >Description</span
-            >
+            <span>Description</span>
             <span class="label-helper"> required </span>
           </template>
           <div class="text-area-wrapper">
@@ -68,12 +58,7 @@
           :class="{ 'is-error': isFormSubmitted && !computeNode.account }"
         >
           <template #label>
-            <span
-              :class="{
-                'required-label': isFormSubmitted && !computeNode.account,
-              }"
-              >Account</span
-            >
+            <span>Account</span>
             <span class="label-helper"> required </span>
           </template>
           <el-select
