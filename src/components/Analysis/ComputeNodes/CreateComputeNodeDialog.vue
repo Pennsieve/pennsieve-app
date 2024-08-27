@@ -4,7 +4,6 @@
     @update:modelValue="dialogVisible = $event"
     class="add-integration-dialog fixed-width"
     @close="closeDialog"
-    :before-close="handleBeforeClose"
   >
     <template #header>
       <bf-dialog-header slot="title" title="Create Compute Node" />
@@ -112,7 +111,7 @@ import EventBus from "../../../utils/event-bus";
 const defaultComputeNodeFormValues = () => ({
   name: "",
   description: "",
-  account: "",
+  account: null,
 });
 
 export default {
@@ -147,11 +146,15 @@ export default {
           {
             required: true,
             message: "Please select an account",
-            trigger: "change",
+            trigger: "blur",
           },
         ],
       },
     };
+  },
+
+  mounted() {
+    console.log("***", this.computeNode.account);
   },
 
   computed: {
@@ -163,6 +166,7 @@ export default {
     ...mapActions("analysisModule", ["createComputeNode"]),
 
     async isFormValid() {
+      console.log("***", this.computeNode.account);
       const checkFormValidity = await this.$refs.computeNodeForm.validate();
       return checkFormValidity;
     },
@@ -172,12 +176,6 @@ export default {
       this.isFormSubmitted = false; // Reset form submission state
       this.$emit("close", false);
       this.$refs.computeNodeForm.clearValidate();
-    },
-
-    handleBeforeClose(done) {
-      this.$refs.computeNodeForm.clearValidate();
-      this.closeDialog();
-      done();
     },
 
     async handleCreateComputeNode() {
