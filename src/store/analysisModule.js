@@ -165,8 +165,6 @@
           },
           body: JSON.stringify(newComputeNode)
         });
-
-        console.log('response')
     
         if (!response.ok) {
           const errorDetails = await response.text(); // Extract error details from the response
@@ -177,7 +175,6 @@
         return result; // Return the result for further processing if needed
     
       } catch (err) {
-        console.log('we got here')
         console.error('Failed to create compute node:', err.message); // Log detailed error message
         throw err; // Rethrow the error to be handled by the caller
       }

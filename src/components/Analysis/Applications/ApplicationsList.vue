@@ -1,7 +1,10 @@
 <template>
   <bf-stage element-loading-background="transparent">
     <template #actions>
-      <bf-button v-if="hasAdminRights" @click="openAddApplicationDialog">
+      <bf-button
+        v-if="hasAdminRights && isFeatureFlagEnabled()"
+        @click="openCreateApplicationDialog"
+      >
         Create Application
       </bf-button>
     </template>
@@ -36,7 +39,7 @@
         </p>
       </div>
     </bf-empty-page-state>
-    <add-application-dialog
+    <create-application-dialog
       :dialog-visible="addApplicationDialogVisible"
       :application-edit.sync="applicationEdit"
       applicationType="Application"
@@ -68,7 +71,7 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
-import AddApplicationDialog from "./AddApplicationDialog.vue";
+import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 import EditApplicationDialog from "./EditApplicationDialog.vue";
 import DeleteApplicationDialog from "./DeleteApplicationDialog.vue";
 import ApplicationsListItem from "./ApplicationsListItem.vue";
@@ -78,6 +81,11 @@ import UserRoles from "../../../mixins/user-roles";
 
 import { pathOr, propOr } from "ramda";
 
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
+
 export default {
   name: "ApplicationsList",
 
@@ -86,7 +94,7 @@ export default {
     BfRafter,
     BfButton,
     ApplicationsListItem,
-    AddApplicationDialog,
+    CreateApplicationDialog,
     EditApplicationDialog,
     DeleteApplicationDialog,
   },
@@ -129,6 +137,11 @@ export default {
       "editApplication",
     ]),
 
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    },
+
     /**
      * Methods to open/close modals
      */
@@ -141,7 +154,7 @@ export default {
     onCloseEditDialog: function () {
       this.editApplicationDialogVisible = false;
     },
-    openAddApplicationDialog: function () {
+    openCreateApplicationDialog: function () {
       this.addApplicationDialogVisible = true;
     },
     openEditApplication: function () {

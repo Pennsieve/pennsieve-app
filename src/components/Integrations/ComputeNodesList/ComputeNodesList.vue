@@ -1,7 +1,10 @@
 <template>
   <bf-stage element-loading-background="transparent">
     <template #actions>
-      <bf-button v-if="hasAdminRights" @click="openCreateComputeNodeDialog">
+      <bf-button
+        v-if="hasAdminRights && isFeatureFlagEnabled()"
+        @click="openCreateComputeNodeDialog"
+      >
         Create Compute Node
       </bf-button>
     </template>
@@ -54,6 +57,10 @@ import CreateComputeNodeDialog from "../../Analysis/ComputeNodes/CreateComputeNo
 
 import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
 
 export default {
   name: "ComputeNodesList",
@@ -110,6 +117,12 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
+
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    },
+
     openCreateComputeNodeDialog: function () {
       this.createComputeNodeDialogVisible = true;
     },
