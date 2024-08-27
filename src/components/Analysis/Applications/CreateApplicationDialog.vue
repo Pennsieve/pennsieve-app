@@ -12,7 +12,9 @@
     <dialog-body>
       <el-form
         :model="application"
+        :rules="rules"
         label-position="top"
+        ref="form"
         @submit.native.prevent="handleCreateApplication"
       >
         <el-form-item prop="name">
@@ -21,7 +23,7 @@
           </template>
           <el-input
             v-model="application.name"
-            placeholder="ex: my-analysis-application"
+            placeholder="my-analysis-application"
             autofocus
           />
         </el-form-item>
@@ -42,6 +44,7 @@
             />
           </div>
         </el-form-item>
+
         <el-form-item prop="applicationType">
           <template #label>
             Application Type <span class="label-helper"> required </span>
@@ -61,26 +64,29 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item prop="resoucesCpu">
+
+        <el-form-item prop="resources.cpu">
           <template #label>
             CPU <span class="label-helper"> required </span>
           </template>
           <el-input
             v-model="application.resources.cpu"
-            placeholder="ex: 2048"
+            placeholder="2048"
             autofocus
           />
         </el-form-item>
-        <el-form-item prop="resoucesMemory">
+
+        <el-form-item prop="resources.memory">
           <template #label>
             Memory <span class="label-helper"> required </span>
           </template>
           <el-input
             v-model="application.resources.memory"
-            placeholder="ex: 4096"
+            placeholder="4096"
             autofocus
           />
         </el-form-item>
+
         <el-form-item prop="computeNode">
           <template #label>
             Compute Node <span class="label-helper"> required </span>
@@ -100,36 +106,39 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item prop="sourceType">
+        <el-form-item prop="source.type">
           <template #label>
             Source Type <span class="label-helper"> required </span>
           </template>
-          <el-input
+          <el-select
+            ref="enum"
             v-model="application.source.type"
-            placeholder="ex: github"
-            autofocus
-          />
+            class="input-property"
+            filterable
+            placeholder="Choose a Source Type"
+          >
+            <el-option
+              v-for="item in sourceItems"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item prop="sourceUrl">
+
+        <el-form-item prop="source.url">
           <template #label>
             Source Url <span class="label-helper"> required </span>
+            <span class="url-format-info">
+              (Format: github.com/owner/repo)
+            </span>
           </template>
           <el-input
             v-model="application.source.url"
-            placeholder="ex: git://github.com/MyOrg/my-repo"
+            placeholder="github.com/owner/repo"
             autofocus
           />
         </el-form-item>
-        <!-- <el-form-item prop="environment">
-          <template #label>
-            Environment <span class="label-helper"> required </span>
-          </template>
-          <el-input
-            v-model="application.environment"
-            placeholder="ex: dev or prod"
-            autofocus
-          />
-        </el-form-item> -->
       </el-form>
     </dialog-body>
 
@@ -144,7 +153,6 @@
 
 <script>
 import { mapState, mapGetters, mapActions } from "vuex";
-
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
@@ -162,11 +170,6 @@ const defaultApplicationFormValues = () => ({
     cpu: "",
     memory: "",
   },
-  account: {
-    uuid: "",
-    accountId: "",
-    accountType: "",
-  },
   computeNode: {
     value: "",
     label: "",
@@ -180,7 +183,7 @@ const defaultApplicationFormValues = () => ({
 });
 
 export default {
-  name: "AddApplicationDialog",
+  name: "CreateApplicationDialog",
 
   components: {
     BfDialogHeader,
@@ -191,7 +194,8 @@ export default {
   props: {
     dialogVisible: Boolean,
   },
-  data: function () {
+
+  data() {
     return {
       application: defaultApplicationFormValues(),
       typeItems: [
@@ -208,6 +212,72 @@ export default {
           label: "Postprocessor",
         },
       ],
+      sourceItems: [
+        {
+          value: "github",
+          label: "Github",
+        },
+      ],
+      rules: {
+        name: [
+          {
+            required: true,
+            message: "Please input the application name",
+            trigger: "blur",
+          },
+          {
+            max: 50,
+            message: "Name cannot exceed 50 characters",
+            trigger: "blur",
+          },
+        ],
+        description: [
+          {
+            required: true,
+            message: "Please input the description",
+            trigger: "blur",
+          },
+        ],
+        applicationType: [
+          {
+            required: true,
+            message: "Please select an application type",
+            trigger: "change",
+          },
+        ],
+        "resources.cpu": [
+          { required: true, message: "Please input the CPU", trigger: "blur" },
+        ],
+        "resources.memory": [
+          {
+            required: true,
+            message: "Please input the memory",
+            trigger: "blur",
+          },
+        ],
+        computeNode: [
+          { validator: this.validateComputeNode, trigger: "change" },
+        ],
+        "source.type": [
+          {
+            required: true,
+            message: "Please input the source type",
+            trigger: "change",
+          },
+        ],
+        "source.url": [
+          {
+            required: true,
+            message: "Please input the source URL",
+            trigger: "blur",
+          },
+          {
+            pattern: /^github\.com\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/,
+            message: "Source URL must be in the format github.com/owner/repo",
+            trigger: "blur",
+          },
+        ],
+      },
     };
   },
 
@@ -222,62 +292,75 @@ export default {
 
   methods: {
     ...mapActions("analysisModule", ["fetchComputeNodes", "createApplication"]),
-    /**
-     * Validation Methods
-     */
-    validUrl: function (str) {},
+    validateComputeNode(rule, value, callback) {
+      if (!value || !value.uuid) {
+        callback(new Error("Please select a compute node"));
+      } else {
+        callback();
+      }
+    },
 
-    validateName: function (rule, value, callback) {},
     /**
      * Closes the dialog
      */
-    closeDialog: function () {
+    closeDialog() {
       this.$emit("close", false);
       this.application = defaultApplicationFormValues();
+      this.$refs.form.clearValidate();
     },
 
     /**
      * POST to API to create new application
      */
-    handleCreateApplication: async function () {
-      const accountDetails = {
-        uuid: this.application.computeNode.account.uuid,
-        accountId: this.application.computeNode.account.accountId,
-        accountType: this.application.computeNode.account.accountType,
-      };
-      const computeNodeDetails = {
-        uuid: this.application.computeNode.uuid,
-        efsId: this.application.computeNode.efsId,
-      };
-      const formattedResources = {
-        cpu: Number(this.application.resources.cpu),
-        memory: Number(this.application.resources.memory),
-      };
-      const formattedNewApplication = {
-        ...this.application,
-        account: accountDetails,
-        computeNode: computeNodeDetails,
-        resources: formattedResources,
-      };
-      try {
-        await this.createApplication(formattedNewApplication);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "success",
-            msg: "Your request has been successfully submitted.",
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        EventBus.$emit("toast", {
-          detail: {
-            type: "error",
-            msg: "There was a problem submitting your request.",
-          },
-        });
-      } finally {
-        this.closeDialog();
-      }
+    async handleCreateApplication() {
+      this.$refs.form.validate(async (valid) => {
+        if (valid) {
+          const accountDetails = {
+            uuid: this.application.computeNode.account.uuid,
+            accountId: this.application.computeNode.account.accountId,
+            accountType: this.application.computeNode.account.accountType,
+          };
+          const computeNodeDetails = {
+            uuid: this.application.computeNode.uuid,
+            efsId: this.application.computeNode.efsId,
+          };
+          const formattedResources = {
+            cpu: Number(this.application.resources.cpu),
+            memory: Number(this.application.resources.memory),
+          };
+          const formattedSource = {
+            type: this.application.source.type,
+            url: this.application.source.url,
+          };
+          const formattedNewApplication = {
+            ...this.application,
+            account: accountDetails,
+            computeNode: computeNodeDetails,
+            resources: formattedResources,
+            source: formattedSource,
+          };
+
+          try {
+            await this.createApplication(formattedNewApplication);
+            EventBus.$emit("toast", {
+              detail: {
+                type: "success",
+                msg: "Your request has been successfully submitted.",
+              },
+            });
+          } catch (error) {
+            console.error(error);
+            EventBus.$emit("toast", {
+              detail: {
+                type: "error",
+                msg: "There was a problem submitting your request.",
+              },
+            });
+          } finally {
+            this.closeDialog();
+          }
+        }
+      });
     },
   },
 };
@@ -400,6 +483,22 @@ export default {
   .string-sub-type {
     display: flex;
     flex-direction: row;
+  }
+
+  .url-format-info {
+    display: block;
+    font-size: 12px;
+    color: $gray_6;
+    margin-top: 4px;
+  }
+
+  .url-format-info a {
+    color: $primary-color;
+    text-decoration: none;
+  }
+
+  .url-format-info a:hover {
+    text-decoration: underline;
   }
 }
 </style>
