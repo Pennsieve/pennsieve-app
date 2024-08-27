@@ -39,7 +39,7 @@
         </p>
       </div>
     </bf-empty-page-state>
-    <add-application-dialog
+    <create-application-dialog
       :dialog-visible="addApplicationDialogVisible"
       :application-edit.sync="applicationEdit"
       applicationType="Application"
