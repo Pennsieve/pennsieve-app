@@ -107,7 +107,7 @@ export default {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
     showEmptyState: function () {
-      return !this.computeNodesLoaded || !this.computeNodes.length;
+      return this.computeNodesLoaded && !this.computeNodes.length;
     },
   },
 
