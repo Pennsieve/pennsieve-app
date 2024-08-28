@@ -100,7 +100,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
 const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
-const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
+const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 
 /**

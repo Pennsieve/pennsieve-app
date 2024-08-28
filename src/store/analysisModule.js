@@ -1,7 +1,9 @@
 
   const initialState = () => ({
     computeNodes: [],
+    computeNodesLoaded: false,
     applications: [],
+    applicationsLoaded: false,
     preprocessors:[],
     processors: [],
     preprocessors:[],
@@ -16,9 +18,11 @@
  
     UPDATE_COMPUTE_NODES(state, computeNodes) {
       state.computeNodes = computeNodes
+      state.computeNodesLoaded = true
     },
     UPDATE_APPLICATIONS(state, applications) {
       state.applications = applications
+      state.applicationsLoaded = true
     },
     UPDATE_PREPROCESSORS(state, preprocessors) {
       state.preprocessors = preprocessors
@@ -40,8 +44,8 @@
     },
     SET_COMPUTE_RESOURCE_ACCOUNTS(state, accounts) {
       state.computeResourceAccounts = accounts
-    }
- 
+    },
+
   }
   
   export const actions = {
