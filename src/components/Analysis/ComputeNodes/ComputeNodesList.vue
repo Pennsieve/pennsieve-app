@@ -77,18 +77,22 @@ export default {
 
   data() {
     return {
-      computeNodes: [],
       createComputeNodeDialogVisible: false,
       showEmptyState: false,
     };
   },
 
-  created() {
-    this.fetchComputeNodes();
+  async mounted() {
+    try {
+      this.fetchComputeNodes();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   computed: {
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
 
     hasAdminRights: function () {
       if (this.activeOrganization) {
@@ -102,6 +106,9 @@ export default {
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
+    showEmptyState: function () {
+      return !this.computeNodesLoaded || !this.computeNodes.length;
+    },
   },
 
   beforeRouteEnter(to, from, next) {
@@ -111,18 +118,9 @@ export default {
       }
     });
   },
-  watch: {
-    computeNodesLoaded(newVal) {
-      if (newVal) {
-        this.showEmptyState(newVal);
-      }
-    },
-  },
 
   methods: {
-    ...mapActions([]),
-    ...mapState("analysisModule", ["computeNodesLoaded"]),
-
+    ...mapActions("analysisModule", ["fetchComputeNodes"]),
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
@@ -144,32 +142,6 @@ export default {
       }
 
       return "";
-    },
-    /**
-     * Fetches Compute Nodes
-     */
-    // TODO: Use the fetchComputeNodes method in the analysisModule instead
-    fetchComputeNodes: function () {
-      const url = `${this.config.api2Url}/compute-nodes`;
-
-      this.sendXhr(url, {
-        method: "GET",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-      })
-        .then((response) => {
-          this.computeNodes = response;
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue fetching your data",
-              type: "error",
-            },
-          });
-        });
     },
   },
 };
