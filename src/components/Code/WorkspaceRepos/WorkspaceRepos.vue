@@ -1,8 +1,7 @@
 <template>
   <bf-stage element-loading-background="transparent">
-
     <bf-empty-page-state class="empty">
-      <p>There are no github datasets yet</p>
+      <p>There are no Workspace Repositories yet</p>
     </bf-empty-page-state>
   </bf-stage>
 </template>
@@ -12,7 +11,7 @@ import { mapGetters } from "vuex";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
 export default {
-  name: "GitHubDatasets",
+  name: "WorkspaceRepos",
 
   components: {
     BfEmptyPageState,
@@ -35,7 +34,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-
 .empty {
   display: flex;
   flex-direction: column;
