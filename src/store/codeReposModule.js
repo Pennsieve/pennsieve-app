@@ -1,10 +1,12 @@
 import Cookies from "js-cookie";
 
 const initialState = () => ({
-  gitHubRepos: null,
-  gitHubReposCount: null,
-  externalRepos: null,
-  externalReposCount: null,
+  myRepos: [],
+  myReposCount: 0,
+  myReposLoaded: false,
+  workspaceRepos: [],
+  workspaceReposCount: 0,
+  workspaceReposLoaded: false
 })
 
 export const state = initialState()
@@ -16,23 +18,25 @@ export const mutations = {
     // need to iteratively set keys to preserve reactivity
     Object.keys(_initialState).forEach(key => state[key] = _initialState[key])
   },
-  SET_GITHUB_REPOS(state, gitHubRepos) {
-    state.gitHubRepos = gitHubRepos
+  SET_MY_REPOS(state, myRepos) {
+    state.myRepos = myRepos
+    state.myReposLoaded = true;
   },
-  SET_GITHUB_REPOS_COUNT(state, count) {
-    state.gitHubReposCount = count
+  SET_MY_REPOS_COUNT(state, count) {
+    state.myReposCount = count
   },
-  SET_EXTERNAL_REPOS(state, externalRepos) {
-    state.externalRepos = externalRepos
+  SET_WORKSPACE_REPOS(state, workspaceRepos) {
+    state.workspaecRepos = workspaceRepos
+    state.workspaceReposLoaded = true;
   },
-  SET_EXTERNAL_REPOS_COUNT(state, count) {
-    state.externalReposCount = count
+  SET_WORKSPACE_REPOS_COUNT(state, count) {
+    state.workspaceReposCount = count
   },
-  UPDATE_REPO_IN_EXTERNAL_REPOS(state, modifiedRepo) {
-    const index = state.externalRepos.findIndex(repo => repo.id === modifiedRepo.id);
+  UPDATE_REPO_IN_WORKSPACE_REPOS(state, modifiedRepo) {
+    const index = state.workspaceRepos.findIndex(repo => repo.id === modifiedRepo.id);
   
     if (index !== -1) {
-      state.externalRepos.splice(index, 1, modifiedRepo)
+      state.workspaceRepos.splice(index, 1, modifiedRepo)
     }
   }
 }
@@ -40,7 +44,7 @@ export const mutations = {
 export const actions = {
   updatePublishingInfo: ({commit}, data) => commit('UPDATE_PUBLISHING_INFO', data),
 
-  fetchGitHubRepos: async({ commit, rootState }) => {
+  fetchMyRepos: async({ commit, rootState }) => {
     try {
       const url = `${rootState.config.api2Url}/repositories/github`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -50,20 +54,20 @@ export const actions = {
       const response = await fetch(url, { headers: myHeaders })
       if (response.ok) {
         const responseJson = await response.json()
-        const gitHubRepos = responseJson.repos
-        const gitHubReposCount = responseJson.count
-        commit('SET_GITHUB_REPOS', gitHubRepos)
-        commit('SET_GITHUB_REPOS_COUNT', gitHubReposCount)
+        const myRepos = responseJson.repos
+        const myReposCount = responseJson.count
+        commit('SET_MY_REPOS', myRepos)
+        commit('SET_MY_REPOS_COUNT', myReposCount)
       } else {
-        commit('SET_GITHUB_REPOS', [])
-        commit('SET_GITHUB_REPOS_COUNT', 0)
+        commit('SET_MY_REPOS', [])
+        commit('SET_MY_REPOS_COUNT', 0)
         throw new Error(response.statusText)
       }
     }
     catch (err) {
       // add error handling - display message or alert indicating the error
-      commit('SET_GITHUB_REPOS', null)
-      commit('SET_GITHUB_REPOS_COUNT', 0)
+      commit('SET_MY_REPOS', null)
+      commit('SET_MY_REPOS_COUNT', 0)
     }
   },
 
@@ -143,11 +147,11 @@ export const actions = {
   }
 }
 
-const releasesModule = {
+const codeReposModule = {
   namespaced: true,
   state,
   mutations,
   actions,
 }
 
-export default releasesModule
+export default codeReposModule

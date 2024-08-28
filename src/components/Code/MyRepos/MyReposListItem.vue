@@ -5,7 +5,7 @@
         ><h3>{{ repo.name }}</h3></el-col
       >
       <el-col id="status" class="align-content-center" :span="8">{{
-        repoBeingTracked ? "Tracking Enabled" : "Tracking Disabled"
+        isTracked ? "Tracking Enabled" : "Tracking Disabled"
       }}</el-col>
     </el-row>
     <el-row :gutter="20">
@@ -14,7 +14,7 @@
       >
       <el-col id="actionCTA" class="align-content-center" :span="8"
         ><bf-button>{{
-          repoBeingTracked ? "Disable Tracking" : "Enable Tracking"
+          isTracked ? "Disable Tracking" : "Enable Tracking"
         }}</bf-button></el-col
       >
     </el-row>
@@ -40,8 +40,8 @@ export default {
       type: Object,
       required: true,
     },
-    // currently repoBeingTracked value is not available from the repo object, integrate it when available
-    repoBeingTracked: {
+    // currently isTracked value is not available from the repo object, integrate it when available
+    isTracked: {
       type: Boolean,
       required: true,
       default: false,

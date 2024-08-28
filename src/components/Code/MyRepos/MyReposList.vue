@@ -1,6 +1,7 @@
 <template>
   <div id="gitHubReposList">
     <MyReposListItem
+      :isTracked="false"
       v-for="repo in repos"
       :key="repo.id"
       :repo="repo"

@@ -1,12 +1,12 @@
 <template>
   <bf-stage>
-    <bf-empty-page-state class="empty" v-if="!repos || repos.length === 0">
+    <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>
-        You have not linked your github account to Pennsieve yet. Please link
+        You have not linked your Github account to Pennsieve yet. Please link
         your account to see your available repos.
       </p>
     </bf-empty-page-state>
-    <MyReposList v-else :repos="repos"></MyReposList>
+    <MyReposList v-else :repos="myRepos"></MyReposList>
   </bf-stage>
 </template>
 
@@ -19,7 +19,7 @@ export default {
   name: "MyRepos",
   beforeRouteEnter(to, from, next) {
     next((vm) => {
-      vm.$store.dispatch("releasesModule/fetchGitHubRepos");
+      vm.$store.dispatch("codeReposModule/fetchMyRepos");
     });
   },
   components: {
@@ -27,10 +27,13 @@ export default {
     BfEmptyPageState,
   },
   computed: {
-    ...mapState("releasesModule", {
-      repos: (state) => state.gitHubRepos,
-    }),
+    ...mapState("codeReposModule", ["myRepos", "myReposLoaded"]),
+
+    showEmptyState: function () {
+      return this.myReposLoaded && !this.myRepos.length;
+    },
   },
+  methods: {},
 };
 </script>
 
