@@ -88,9 +88,9 @@ const TeamsList = () => import('../components/teams/list/TeamsList.vue')
 const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
-const Releases = () => import('./Code/Releases.vue')
-const GitHubRepositories = () => import('../components/Code/github-repositories/GitHubRepositories.vue')
-const GitHubDatasets = () => import('../components/Code/github-datasets/GitHubDatasets.vue')
+const CodeRepos = () => import('./Code/CodeRepos.vue')
+const MyRepos = () => import('../components/Code/MyRepos/MyRepos.vue')
+const WorkspaceRepos = () => import('../components/Code/WorkspaceRepos/WorkspaceRepos.vue')
 
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
@@ -241,27 +241,6 @@ const router = createRouter({
         },
       ]
     },
-    // /**
-    //  * Information Panel for organization
-    //  */
-    // {
-    //   path: '/:orgId/user',
-    //   components: {
-    //     page: WelcomePage,
-    //     navigation: BfNavigation
-    //   },
-    //   props: true,
-    //   children: [
-    //
-    //     {
-    //       name: 'info',
-    //       path: '',
-    //       components: {
-    //         stage: WelcomePage
-    //       }
-    //     },
-    //   ],
-    // },
     /**
      * Welcome Org routes
      */
@@ -599,27 +578,24 @@ const router = createRouter({
       name: "code",
       path: '/:orgId/code',
       components: {
-        page: Releases,
+        page: CodeRepos,
         navigation: BfNavigation
-      },
-      redirect: {
-        name: 'github-repos'
       },
       props: true,
       children: [
         {
-          name: 'github-repos',
-          path: 'github-repositories',
+          name: 'my-repos',
+          path: 'my-repos',
           components: {
-            stage: GitHubRepositories,
+            stage: MyRepos,
           },
           props: true
         },
         {
-          name: 'github-datasets',
-          path: 'github-datasets',
+          name: 'workspace-repos',
+          path: 'workspace-repos',
           components: {
-            stage: GitHubDatasets,
+            stage: WorkspaceRepos,
           },
           props: true
         }
