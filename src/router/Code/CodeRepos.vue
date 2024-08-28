@@ -29,7 +29,7 @@ import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 
 export default {
-  name: "PennsieveReleases",
+  name: "CodeRepos",
   components: {
     RouterTabs,
     BfPage,
@@ -47,12 +47,12 @@ export default {
     return {
       tabs: [
         {
-          name: "My Repositories", //display name
-          to: "github-repos",
+          name: "My Repositories",
+          to: "my-repos",
         },
         {
-          name: "Workspace Repositories", //display name
-          to: "github-datasets",
+          name: "Workspace Repositories",
+          to: "workspace-repos",
         },
       ],
     };
