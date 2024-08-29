@@ -6,7 +6,14 @@
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
-    selectedFilesForAnalysis: {},
+    selectedFilesForAnalysis: {}, 
+    /* 
+      In the selectedFilesForAnalysis obj files are grouped by parentId 
+      where key is parentId, and value is an array of files that share a parentID.
+      For files in the root directory, they key is the string 'root'.
+      Example: { root: [{...file1}, {...file2}, {...file3}], parentId: [{}, {}] }
+      This is to support multi-level file selection. 
+    */
     fileCount: 0
   })
   
@@ -119,8 +126,6 @@
       }
     },
     setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
-      console.log('selectedFiles', selectedFiles)
-      console.log('parentId', parentId)
       commit('SET_SELECTED_FILES', { files: selectedFiles, parentId })
     },
     clearSelectedFiles: async({ commit, rootState }) => {
