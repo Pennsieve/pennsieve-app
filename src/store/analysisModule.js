@@ -62,15 +62,11 @@
         state.selectedFilesForAnalysis[parentId] = []
       }
     },
-   
-    
-    
     CLEAR_SELECTED_FILES(state) {
       state.selectedFilesForAnalysis = {}
     }
- 
   }
-  
+
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
       try {

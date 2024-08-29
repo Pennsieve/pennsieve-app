@@ -4,6 +4,7 @@
     data-cy="runAnalysisDialog"
     :show-close="true"
     @close="closeDialog"
+    v-if="processStep < lastProcessStep"
   >
     <template #header>
       <bf-dialog-header slot="title" title="Run Analysis Workflow" />
@@ -143,6 +144,7 @@ export default {
   data: function () {
     return {
       processStep: 1,
+      lastProcessStep: 4,
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
@@ -326,29 +328,36 @@ export default {
     /**
      * Manages the Multi Step Functionality
      */
-    advanceStep: function (step) {
+    advanceStep: async function (step) {
       this.processStep += step;
+
+      // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
       }
 
+      // When you click "Run Analysis"
       if (this.processStep > 3) {
-        try {
-          this.runAnalysis();
-        } catch {
-        } finally {
-          this.closeDialog();
-        }
+        await this.runAnalysis();
       }
     },
     /**
-     * Run Analaysis Workflow on Selected Files
+     * Run Analysis Workflow on Selected Files
      */
-    runAnalysis: function () {
+    runAnalysis: async function () {
       const url = `${this.config.api2Url}/workflows`;
 
-      const packageIds = this.selectedFilesForAnalysis.map((file) => {
-        return pathOr("", ["content", "id"], file);
+      let arrayOfPackageIds = [];
+      const keysInSelectedFilesForAnalysisArray = Object.keys(
+        this.selectedFilesForAnalysis
+      );
+
+      keysInSelectedFilesForAnalysisArray.forEach((key) => {
+        const ids = this.selectedFilesForAnalysis[key].map((file) => {
+          return pathOr("", ["content", "id"], file);
+        });
+
+        arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
       const formatApplication = (application) => {
@@ -364,7 +373,7 @@ export default {
 
       const body = {
         datasetId: this.datasetId,
-        packageIds: packageIds,
+        packageIds: arrayOfPackageIds,
         computeNode: {
           uuid: this.selectedComputeNode.uuid,
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
@@ -378,35 +387,31 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      this.sendXhr(url, {
-        method: "POST",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: body,
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Your workflow has been successfully initiated!",
-              type: "success",
-            },
-          });
-          this.closeDialog();
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
+
+      try {
+        await this.sendXhr(url, {
+          method: "POST",
+          header: {
+            Authorization: `Bearer ${this.userToken}`,
+          },
+          body: body,
         });
+
+        EventBus.$emit("toast", {
+          detail: {
+            msg: "Your workflow has been successfully initiated!",
+            type: "success",
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        this.closeDialog();
+      } finally {
+        this.closeDialog();
+        this.targetDirectory = "";
+        this.selectedApplication = {};
+        this.value = "";
+      }
     },
     /**
      * Determines if tab content is active
