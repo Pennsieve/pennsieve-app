@@ -4,17 +4,17 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 ## Contributing (Branching and Deployment)
 
-Always branch off of `main` when starting a new feature.
-
 - **main** branch deploys to our production environment on merge. https://app.pennsieve.io/
 
 - **dev** branch deploys to our non-prod environment on merge. Merge branches to `dev` for testing. https://app.pennsieve.net/
 
 ### Feature Branches
 
-- Always branch off on `main` when creating a new feature branch.
+- Always branch off on `main` when starting a new feature, bug or epic. `git checkout -b feature_my-cool-feature`
 
-- Never merge `dev` into your feature branch. Merge your feature branch into `dev`.
+- The exception is for epic branches, where you will branch off the epic to create your feature branch.
+
+- Please do not branch off of `dev` or merge `dev` into your feature branch. `dev` often contains features that are not ready for release, and polluting your branch with dev requires us to cherry pick out unreleased features, which may delay your release.
 
 #### Branch Naming Convention
 
@@ -31,8 +31,6 @@ Always branch off of `main` when starting a new feature.
 - Do not delete your feature branch until it is merged to production.
 
 - Keep your feature branch up to date with `main`.
-
-- Please do not merge `dev` into your feature branch. It may contain unreleased features and will complicate the prod deployment process for your feature.
 
 ### Deploy for Relase to Production Environment
 
