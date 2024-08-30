@@ -10,7 +10,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 ### Feature Branches
 
-- Always branch off on `main` when starting a new feature, bug or epic. `git checkout -b feature_my-cool-feature`
+- Always branch off of `main` when starting a new feature, bug or epic. `git checkout -b feature_my-cool-feature`
 
 - The exception is for epic branches, where you will branch off the epic to create your feature branch.
 
@@ -46,7 +46,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 - Contact an admin to reset `dev` if you need to test a feature in isolation from other in-progress features.
 
-#### Commands to Rest Non-Prod
+#### Commands to Reset Non-Prod
 
 - Navigate to `main` branch in the terminal and run `git pull origin main`
 
