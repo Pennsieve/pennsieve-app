@@ -16,6 +16,8 @@ Always branch off of `main` when starting a new feature.
 
 - Never merge `dev` into your feature branch. Merge your feature branch into `dev`.
 
+#### Branch Naming Convention
+
 - Feature branches: `feature_descriptive-name`
 - Bug fix branches: `fix_descriptive-name`
 - Epic branches: `epic_descriptive-name`
