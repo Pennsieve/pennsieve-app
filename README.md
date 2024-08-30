@@ -10,7 +10,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 ### Feature Branches
 
-- Always branch off of `main` when starting a new feature, bug or epic. `git checkout -b feature_my-cool-feature`
+- Always branch off of `main` when starting a new feature, bug fix or epic. `git checkout -b feature_my-cool-feature`
 
 - The exception is for epic branches, where you will branch off the epic to create your feature branch.
 
