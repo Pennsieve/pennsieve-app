@@ -1,48 +1,66 @@
 # Pennsieve App
 
-New and improved Pennsieve web app, now leveraging Vue3 .
+New and improved Pennsieve web app, now leveraging Vue 3!
 
-## Contributing to this Repo (Branching and Deployment)
+## Contributing (Branching and Deployment)
 
-- **main** branch reflects the version of the application that is in production.
-- **dev** branch reflects a version of the application with features that are currently in development.<br><br>
+Always branch off of `main` when starting a new feature.
 
-### Create new feature branches off of main branch
+- **main** branch deploys to our production environment on merge. https://app.pennsieve.io/
 
-- Name feature branches `feature_descriptive-name`
-- Name bug fix branches `fix_descriptive-name`
+- **dev** branch deploys to our non-prod environment on merge. Merge branches to `dev` for testing. https://app.pennsieve.net/
 
-### When you are ready to test your code in a non-prod/ development environment
+### Feature Branches
 
-- Merge branches into `dev` branch to deploy to non-prod/ development environment https://app.pennsieve.net/ - we only have one non-prod/ development environment at this time.
-- NOTE: Do not delete your feature branch until it is merged to production
-- Keep your feature branch up to date with `main.`
+- Always branch off on `main` when creating a new feature branch.
 
-### When you are ready to deploy your code to production
+- Never merge `dev` into your feature branch. Merge your feature branch into `dev`.
 
-- Make a PR from your feature branch into `main.`
-- It is a good idea to test this locally first before making your PR. Merge your code into `main` locally and test it locally.
-- You will need one approval to merge your code to `main`. Once you merge, it will automatically deploy to production https://app.pennsieve.io/
-- If you need to wait to deploy after PR approval, add a label to your PR `Do not merge` and another label describing why, such as `BE Dependency` or `Waiting for PM Approval` until you are ready to deploy, and then remove the labels. You can add a `Ready to Deploy` label to indicate it is ready to go out if you are waiting for someone else to deploy it, but feel free to merge it yourself if it is ready to go out, there is no formal process preventing any developer from deploying.
-- Merge feature branches into main branch to deploy to production environment.
-- When deploying to production, please create a corresponding Release in github (Managing Releases in A Repository). Each release PR should be titled with it's release number using the Semantic Versioning convention (v1.0.0).
+- Feature branches: `feature_descriptive-name`
+- Bug fix branches: `fix_descriptive-name`
+- Epic branches: `epic_descriptive-name`
 
-### Resetting the Development Environment to match Production
+- Once your feature branch has been merged to `main` please delete it.
 
-- If `dev` is missing features that were deployed to `main`, or for any other reason you need a development environment equivalent to production for testing, without other in-development features an admin needs to update `dev` environment by resetting it to be up to date with main. Developers with features currently merged to `dev` but not yet merged to `main` should be advised to merge their features back into `dev `if they need to continue testing them in `dev` environment.
+### Deploy for Testing to Non-Prod Environment
 
-#### To Reset the development to be equivalent to the production enviornment
+- Merge branches into `dev` branch to deploy to non-prod environment.
 
-- Navigate to `dev` branch in the terminal and run git reset --hard origin/main
-- Force push `dev branch git push origin dev --force` This will trigger a new build of the `dev `branch to be deployed to the `dev` environment.
+- Do not delete your feature branch until it is merged to production.
+
+- Keep your feature branch up to date with `main`.
+
+- Please do not merge `dev` into your feature branch. It may contain unreleased features and will complicate the prod deployment process for your feature.
+
+### Deploy for Relase to Production Environment
+
+- Make a PR from your feature branch into `main`
+
+- Merge your code into `main` locally and test it locally.
+
+- Once approved, merge feature branches into main branch to automatically deploy to production environment.
+
+- When deploying to production, please create a corresponding [Release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository). Use [Semantic Versioning](https://semver.org/) convention for tagging and titling Releases.
+
+### Reset Non-Prod
+
+- Contact an admin to reset `dev` if you need to test a feature in isolation from other in-progress features.
+
+#### Commands to Rest Non-Prod
+
+- Navigate to `main` branch in the terminal and run `git pull origin main`
+
+- Navigate to `dev` branch in the terminal and run `git reset --hard origin/main`
+
+- Force push dev branch: `git push origin dev --force`. This will trigger a new build of `dev` to be deployed to non-prod environment.
 
 ## Recommended IDE Setup
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
 
 ## Customize configuration
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+See [Vite Configuration Reference](https://vitejs.dev/config/)
 
 ## Project Setup
 
@@ -78,7 +96,7 @@ npm run lint
 ## Testing
 
 We use [Vitest](https://vitest.dev/) library for unit testing components.
-We use [msw](https://mswjs.io/) for mocking APIs in tests
+We use [msw](https://mswjs.io/) for mocking APIs in tests.
 We use [test-utils](https://test-utils.vuejs.org/) for unit testing.
 
 The mock API can be found in `/src/test/mocks`
