@@ -8,6 +8,12 @@
   top: 8px;
   width: 480px;
   padding: 8px 16px;
+
+  & a {
+    color: white;
+    text-decoration: underline;
+  }
+
   &.with-header {
     top: 58px;
   }

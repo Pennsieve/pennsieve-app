@@ -76,6 +76,15 @@
 
                 Upload
               </bf-button>
+
+              <bf-button @click="generateManifest" class="dropdown-button">
+                <template #prefix>
+                  <IconAnnotation class="mr-8" :height="20" :width="20" />
+                </template>
+
+                Generate Manifest
+              </bf-button>
+
               <bf-button @click="NavToDeleted" class="dropdown-button">
                 <template #prefix>
                   <IconTrash class="mr-8" :height="20" :width="20" />
@@ -222,11 +231,13 @@ import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
+import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 
 export default {
   name: "BfDatasetFiles",
 
   components: {
+    IconAnnotation,
     IconAnalysis,
     IconUpload,
     RenameFileDialog,
@@ -320,7 +331,7 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel"]),
+    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -399,6 +410,21 @@ export default {
   },
 
   watch: {
+
+    getManifestNotification: {
+      handler(newValue, oldValue) {
+        EventBus.$emit('toast', {
+          detail: {
+            type: "warning",
+            msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
+            duration: 0,
+            showClose: true
+          }
+        })
+      },
+      deep: true
+    },
+
     /**
      * Trigger API request when URL is changed
      */
@@ -518,6 +544,23 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+
+    ...mapActions("datasetModule",[
+      'createDatasetManifest'
+    ]),
+
+    generateManifest: function() {
+
+      this.createDatasetManifest()
+
+      EventBus.$emit('toast', {
+        detail: {
+          type: "success",
+          msg: "Dataset manifest is being prepared.",
+          duration: 1000
+        }
+      })
+    },
 
     toggleActionDropdown: function() {
       this.quickActionsVisible = !this.quickActionsVisible

@@ -102,6 +102,7 @@ export default {
 
   &.dropdown-button {
     justify-content: left;
+    text-align: left;
   }
 
   &.flex {
