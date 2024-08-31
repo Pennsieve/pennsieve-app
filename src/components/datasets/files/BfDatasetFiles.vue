@@ -16,44 +16,78 @@
           />
         </template>
         <template #right>
-          <bf-button
-            v-if="showRunAnalysisFlow"
-            @click="openRunAnalysisDialog"
-            class="mr-8 flex"
-          >
-            <template #prefix>
-              <IconAnalysis class="mr-8" :height="20" :width="20" />
-            </template>
-            Run Analysis
-          </bf-button>
-          <bf-button
-            v-if="getPermission('editor')"
-            class="flex mr-8"
-            :disabled="datasetLocked"
-            data-cy="createNewFolder"
-            @click="openPackageDialog"
-          >
-            <template #prefix>
-              <IconPlus class="mr-8" :height="20" :width="20" />
-            </template>
-            New Folder
-          </bf-button>
 
-          <bf-button @click="showUpload" class="mr-8 flex">
-            <template #prefix>
-              <IconUpload class="mr-8" :height="20" :width="20" />
+          <template v-if="quickActionsVisible">
+            <bf-button
+              v-if="showRunAnalysisFlow"
+              @click="openRunAnalysisDialog"
+              class="mr-8 flex"
+            >
+              <template #prefix>
+                <IconAnalysis class="mr-8" :height="20" :width="20" />
+              </template>
+              Run Analysis
+            </bf-button>
+
+            <bf-button
+              v-if="getPermission('editor')"
+              class="flex mr-8"
+              :disabled="datasetLocked"
+              data-cy="createNewFolder"
+              @click="openPackageDialog"
+            >
+              <template #prefix>
+                <IconPlus class="mr-8" :height="20" :width="20" />
+              </template>
+              New Folder
+            </bf-button>
+          </template>
+
+          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+            <template #buttons>
+              <bf-button
+                v-if="showRunAnalysisFlow"
+                @click="openRunAnalysisDialog"
+                class="dropdown-button "
+              >
+                <template #prefix>
+                  <IconAnalysis class="mr-8" :height="20" :width="20" />
+                </template>
+                Run Analysis
+              </bf-button>
+
+              <bf-button
+                v-if="getPermission('editor')"
+                class="dropdown-button"
+                :disabled="datasetLocked"
+                data-cy="createNewFolder"
+                @click="openPackageDialog"
+              >
+                <template #prefix>
+                  <IconPlus class="mr-8" :height="20" :width="20" />
+                </template>
+                New Folder
+              </bf-button>
+
+              <bf-button @click="showUpload" class="dropdown-button">
+                <template #prefix>
+                  <IconUpload class="mr-8" :height="20" :width="20" />
+                </template>
+
+                Upload
+              </bf-button>
+              <bf-button @click="NavToDeleted" class="dropdown-button">
+                <template #prefix>
+                  <IconTrash class="mr-8" :height="20" :width="20" />
+                </template>
+
+                Restore
+              </bf-button>
+
             </template>
 
-            Upload
-          </bf-button>
+          </ps-button-dropdown>
 
-          <bf-button @click="NavToDeleted" class="flex">
-            <template #prefix>
-              <IconTrash class="mr-8" :height="20" :width="20" />
-            </template>
-
-            Restore
-          </bf-button>
         </template>
       </stage-actions>
     </template>
@@ -187,11 +221,13 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
+import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 
 export default {
   name: "BfDatasetFiles",
 
   components: {
+    IconAnalysis,
     IconUpload,
     RenameFileDialog,
     StageActions,
@@ -213,6 +249,7 @@ export default {
     DeletedFiles,
     FileMetadataInfo,
     RunAnalysisDialog,
+    PsButtonDropdown,
   },
 
   props: {
@@ -230,6 +267,7 @@ export default {
 
   data: function () {
     return {
+      quickActionsVisible: true,
       file: {
         content: {
           name: "",
@@ -449,6 +487,7 @@ export default {
     const pusherCh = this.getPusherChannel;
     pusherCh.unbind("upload-event");
   },
+
   unmounted: function () {
     this.$el.removeEventListener("dragenter", this.onDragEnter.bind(this));
     EventBus.$off("rename-file", this.showRenameFileDialog.bind(this));
@@ -479,6 +518,10 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+
+    toggleActionDropdown: function() {
+      this.quickActionsVisible = !this.quickActionsVisible
+    },
 
     // Ignore drops to component outside the drop target and close drop-target
     onDrop: function (e) {
@@ -1158,6 +1201,10 @@ export default {
 
 .plus-icon {
   margin: -10px 0px -8px 6px;
+}
+
+.dropdown-button {
+  margin-top: 8px;
 }
 
 //.bf-stage-content {
