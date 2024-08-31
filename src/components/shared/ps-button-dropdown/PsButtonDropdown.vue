@@ -4,7 +4,7 @@
       :class="menuOpen ? `ps-button-dropdown active` : `ps-button-dropdown`"
     >
       <template v-if="menuOpen">
-        <div class = "active-actions">Actions</div>
+        <div class = "active-actions">X</div>
       </template>
       <template v-else>
         <div>...</div>
@@ -110,12 +110,8 @@ export default {
   width: 40px;
 
   &.active {
-    transition-property: width;
-    transition-duration: 0.25s;
-    width: 160px;
     background: $purple_tint;
     color: $purple_3;
-    border-bottom: 2px solid $purple_3;
   }
 }
 
