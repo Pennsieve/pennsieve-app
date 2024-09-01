@@ -584,7 +584,9 @@ export default {
       const detailMsg = pathOr('', ['detail', 'msg'], evt)
       const message = this.$sanitize(propOr(detailMsg, 'msg', evt), ['a'])
       const type = pathOr('info', ['detail', 'type'], evt).toLowerCase()
+      const showClose = pathOr(false, ['detail', 'showClose'], evt)
       const duration = pathOr(3000, ['detail', 'duration'], evt)
+
       let messageClass = pathOr('', ['detail', 'class'], evt)
 
       if (!message) {
@@ -597,7 +599,9 @@ export default {
         message: message,
         type:type,
         center: true,
-        duration: duration
+        duration: duration,
+        showClose: showClose,
+        dangerouslyUseHTMLString: true
       })
 
     },

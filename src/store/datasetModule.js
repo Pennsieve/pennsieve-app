@@ -73,7 +73,8 @@ const initialState = () => ({
   isLoadingManifestsActivity: false,
   datasetActivity: [],
   datasetManifests: [],
-  pusherChannel: {}
+  pusherChannel: {},
+  manifestNotification: {}
 })
 
 export const state = initialState()
@@ -177,6 +178,9 @@ export const mutations = {
   },
   SET_PUSHER_CHANNEL(state, channel) {
     state.pusherChannel = channel
+  },
+  ADD_MANIFEST_NOTIFICATION(state, notification) {
+    state.manifestNotification = notification
   }
 
 
@@ -323,13 +327,45 @@ export const actions = {
       commit('UPDATE_DATASET_ACTIVITY', [])
     }
   },
+
   clearDatasetActivityState: ({commit}) => {
     commit('CLEAR_DATASET_ACTIVITY_STATE')
   },
 
   setPusherChannel: async({commit}, channel) => {
     commit('SET_PUSHER_CHANNEL', channel)
-  }
+  },
+
+  createDatasetManifest: async({ commit, rootState }) => {
+    try {
+      const endpoint = `${rootState.config.api2Url}/datasets/manifest`
+      const datasetId = router.currentRoute.value.params.datasetId
+
+      const queryParams = toQueryParams({
+        dataset_id: datasetId,
+      })
+
+      const url = `${endpoint}?${queryParams}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${rootState.userToken}`
+        }
+      })
+
+      if (resp.ok) {
+        const manifestNotification = await resp.json()
+        console.log(manifestNotification)
+        commit('ADD_MANIFEST_NOTIFICATION', manifestNotification)
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
 }
 
 export const getters = {
@@ -338,7 +374,8 @@ export const getters = {
   },
   getPusherChannel: state => {
     return state.pusherChannel
-  }
+  },
+  getManifestNotification: state => state.manifestNotification
 
 }
 
