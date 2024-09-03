@@ -31,7 +31,7 @@
 <script>
 import { Link } from "@element-plus/icons-vue";
 export default {
-  name: "MyReposListItem",
+  name: "RepoListItem",
   components: {
     Link,
   },
@@ -51,7 +51,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@import "../../assets/_variables.scss";
 .list-item {
   margin-bottom: 24px;
   padding: 24px;
