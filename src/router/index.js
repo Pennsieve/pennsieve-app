@@ -581,6 +581,9 @@ const router = createRouter({
         page: CodeRepos,
         navigation: BfNavigation
       },
+      redirect: {
+        name: 'my-repos'
+      },
       props: true,
       children: [
         {

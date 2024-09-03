@@ -13,27 +13,42 @@
 <script>
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import MyReposList from "./MyReposList.vue";
-import { mapState } from "vuex";
+import { mapState, mapActions } from "vuex";
 
 export default {
   name: "MyRepos",
-  beforeRouteEnter(to, from, next) {
-    next((vm) => {
-      vm.$store.dispatch("codeReposModule/fetchMyRepos");
-    });
-  },
   components: {
     MyReposList,
     BfEmptyPageState,
   },
+
+  async mounted() {
+    try {
+      this.fetchMyRepos({
+        page: this.myReposPaginationParams.page,
+        size: this.myReposPaginationParams.size,
+        count: this.myReposCount,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  },
   computed: {
-    ...mapState("codeReposModule", ["myRepos", "myReposLoaded"]),
+    ...mapState("codeReposModule", [
+      "myRepos",
+      "myReposLoaded",
+      "myReposPaginationParams",
+      "myReposCount",
+    ]),
 
     showEmptyState: function () {
+      console.log(this.myRepos);
       return this.myReposLoaded && !this.myRepos.length;
     },
   },
-  methods: {},
+  methods: {
+    ...mapActions("codeReposModule", ["fetchMyRepos"]),
+  },
 };
 </script>
 

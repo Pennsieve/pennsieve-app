@@ -2,7 +2,11 @@ import Cookies from "js-cookie";
 
 const initialState = () => ({
   myRepos: [],
-  myReposCount: 0,
+  myReposPaginationParams: {
+    page: 1,
+    size: 5
+  },
+  myReposCount: 25,
   myReposLoaded: false,
   workspaceRepos: [],
   workspaceReposCount: 0,
@@ -31,71 +35,59 @@ export const mutations = {
   },
   SET_WORKSPACE_REPOS_COUNT(state, count) {
     state.workspaceReposCount = count
-  },
-  UPDATE_REPO_IN_WORKSPACE_REPOS(state, modifiedRepo) {
-    const index = state.workspaceRepos.findIndex(repo => repo.id === modifiedRepo.id);
-  
-    if (index !== -1) {
-      state.workspaceRepos.splice(index, 1, modifiedRepo)
-    }
   }
 }
 
 export const actions = {
   updatePublishingInfo: ({commit}, data) => commit('UPDATE_PUBLISHING_INFO', data),
 
-  fetchMyRepos: async({ commit, rootState }) => {
-    try {
-      const url = `${rootState.config.api2Url}/repositories/github`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers()
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, { headers: myHeaders })
-      if (response.ok) {
-        const responseJson = await response.json()
-        const myRepos = responseJson.repos
-        const myReposCount = responseJson.count
-        commit('SET_MY_REPOS', myRepos)
-        commit('SET_MY_REPOS_COUNT', myReposCount)
-      } else {
-        commit('SET_MY_REPOS', [])
-        commit('SET_MY_REPOS_COUNT', 0)
-        throw new Error(response.statusText)
+  fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
+    // Fetch all github repos to get the total count
+      if (count === 0) {
+        try {
+          const url =`${rootState.config.api2Url}/repositories/github`
+          const apiKey = rootState.userToken || Cookies.get('user_token')
+          const myHeaders = new Headers()
+          myHeaders.append('Authorization', 'Bearer ' + apiKey)
+          myHeaders.append('Accept', 'application/json')
+          const response = await fetch(url, { headers: myHeaders })
+          if (response.ok) {
+            const responseJson = await response.json()
+            const myReposCount = responseJson.count
+            console.log('myReposCount', myReposCount)
+            commit('SET_MY_REPOS_COUNT', myReposCount)
+          } else {
+            commit('SET_MY_REPOS_COUNT', 0)
+            throw new Error(response.statusText)
+          }
+        }
+        catch (err) {
+          commit('SET_MY_REPOS_COUNT', 0)
+        }
       }
-    }
-    catch (err) {
-      // add error handling - display message or alert indicating the error
-      commit('SET_MY_REPOS', null)
-      commit('SET_MY_REPOS_COUNT', 0)
-    }
-  },
 
-  fetchExternalRepos: async({ commit, rootState }) => {
-    try {
-      const url = `${rootState.config.api2Url}/repositories/external`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers()
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, { headers: myHeaders })
-      if (response.ok) {
-        const responseJson = await response.json()
-        const externalRepos = responseJson.repos
-        const externalReposCount = responseJson.count
-        commit('SET_EXTERNAL_REPOS', externalRepos)
-        commit('SET_EXTERNAL_REPOS_COUNT', externalReposCount)
-      } else {
-        commit('SET_EXTERNAL_REPOS', [])
-        commit('SET_EXTERNAL_REPOS_COUNT', 0)
-        throw new Error(response.statusText)
+      try {
+        const url =`${rootState.config.api2Url}/repositories/github?page=${page}&size=${size}`
+        const apiKey = rootState.userToken || Cookies.get('user_token')
+        const myHeaders = new Headers()
+        myHeaders.append('Authorization', 'Bearer ' + apiKey)
+        myHeaders.append('Accept', 'application/json')
+        const response = await fetch(url, { headers: myHeaders })
+        if (response.ok) {
+          const responseJson = await response.json()
+          const myRepos = responseJson.repos
+    
+          commit('SET_MY_REPOS', myRepos)
+        } else {
+          commit('SET_MY_REPOS', [])
+          throw new Error(response.statusText)
+        }
       }
-    }
-    catch (err) {
-      // add error handling - display message or alert indicating the error
-      commit('SET_EXTERNAL_REPOS', null)
-      commit('SET_EXTERNAL_REPOS_COUNT', 0)
-    }
+      catch (err) {
+        commit('SET_MY_REPOS', [])
+      }
+    
+
   },
 
   enableRepoTracking: async({ commit, rootState, repo }) => {
@@ -118,7 +110,7 @@ export const actions = {
       }
     }
     catch (err) {
-      // add error handling - display message or alert indicating the error
+      console.error(err)
     }
   },
 
