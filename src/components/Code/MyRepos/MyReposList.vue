@@ -9,13 +9,15 @@
         @current-change="onPaginationPageChange"
       />
     </div>
-    <RepoListItem
-      myRepos="true"
-      :isTracked="false"
-      v-for="repo in repos"
-      :key="repo.id"
-      :repo="repo"
-    ></RepoListItem>
+    <div v-loading="isLoadingRepos">
+      <RepoListItem
+        myRepos="true"
+        :isTracked="false"
+        v-for="repo in repos"
+        :key="repo.id"
+        :repo="repo"
+      ></RepoListItem>
+    </div>
   </div>
 </template>
 
@@ -34,7 +36,11 @@ export default {
       required: true,
     },
   },
-  data() {},
+  data() {
+    return {
+      isLoadingRepos: false,
+    };
+  },
   computed: {
     ...mapState("codeReposModule", ["myReposCount", "myReposPaginationParams"]),
   },
@@ -46,11 +52,13 @@ export default {
     onPaginationPageChange: async function (page) {
       console.log("onPaginationPageChange with page:", page);
       try {
+        this.isLoadingRepos = true;
         await this.fetchMyRepos({
           page,
           size: this.myReposPaginationParams.size,
           count: this.myReposCount,
         });
+        this.isLoadingRepos = false;
       } catch (err) {
         console.error(err);
       }
