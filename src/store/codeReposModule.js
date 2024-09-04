@@ -59,7 +59,7 @@ export const actions = {
     Use this data to populate the MyRepos view. 
   */
   fetchMyRepos: async({ commit, rootState }, { page, size, count, currentPage }) => {
-    // Fetch all repos to get the total count
+    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid extra call
       if (count === 0) {
         try {
           const url =`${rootState.config.api2Url}/repositories/github`

@@ -12,14 +12,22 @@
           <div class="margin">{{ repo.description }}</div>
         </div>
       </el-col>
-      <el-col :span="6" class="status-container">
-        <h2>Tracked/ Untracked</h2>
-        <div>DOI or N/A</div>
+      <el-col :span="5" class="status-container">
+        <div v-if="workspaceRepos">
+          <h2>Tracked</h2>
+          <div>DOI or N/A</div>
+        </div>
       </el-col>
-      <el-col :span="6" class="actions-container">
-        <div>Start/ Stop Tracking</div>
-        <div>Configure</div>
-        <div>Publish Latest Release</div>
+      <el-col :span="7" class="actions-container">
+        <button @click="handleTrackingClick" class="text-button">
+          Start Tracking
+        </button>
+        <button @click="handleConfigureClick" class="text-button">
+          Configure
+        </button>
+        <button @click="handlePublishLatestClick" class="text-button">
+          Publish Latest Release
+        </button>
       </el-col>
     </el-row>
   </div>
@@ -27,6 +35,8 @@
 
 <script>
 import { Link } from "@element-plus/icons-vue";
+import { mapActions, mapGetters, mapState } from "vuex";
+
 export default {
   name: "RepoListItem",
   components: {
@@ -43,6 +53,26 @@ export default {
       required: true,
       default: false,
     },
+    myRepos: {
+      type: Boolean,
+      default: false,
+    },
+    workspaceRepos: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  methods: {
+    ...mapActions("codeReposModule", ["fetchMyRepos"]),
+    handleTrackingClick: function () {
+      console.log("tracking click");
+    },
+    handleConfigureClick: function () {
+      console.log("configure click");
+    },
+    handlePublishLatestClick: function () {
+      console.log("publish latest click");
+    },
   },
 };
 </script>
@@ -53,10 +83,30 @@ export default {
   margin-left: 12px;
 }
 
+.text-button {
+  margin: 5px;
+  padding: 8px 12px; /* Add some padding for better visibility */
+  background-color: transparent;
+  border: 1px solid transparent;
+  cursor: pointer; /* Change the cursor to a pointer */
+  transition: background-color 0.3s ease, border-color 0.3s ease,
+    color 0.3s ease; /* Smooth transition */
+
+  &:hover {
+    background-color: white; /* Change background color on hover */
+    color: #011f5b; /* Change text color on hover */
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
 .actions-container {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .repo-banner-container {
@@ -81,7 +131,6 @@ export default {
   border: 1px solid #dcdcdc;
 }
 .list-item {
-  margin-bottom: 24px;
   padding: 24px;
   border-bottom: 1px solid lightgray;
   box-shadow: --el-box-shadow-lighter;

@@ -10,6 +10,7 @@
       />
     </div>
     <RepoListItem
+      myRepos="true"
       :isTracked="false"
       v-for="repo in repos"
       :key="repo.id"
@@ -45,7 +46,7 @@ export default {
     onPaginationPageChange: async function (page) {
       console.log("onPaginationPageChange with page:", page);
       try {
-        this.fetchMyRepos({
+        await this.fetchMyRepos({
           page,
           size: this.myReposPaginationParams.size,
           count: this.myReposCount,
