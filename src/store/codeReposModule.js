@@ -52,7 +52,6 @@ export const mutations = {
 }
 
 export const actions = {
-  updatePublishingInfo: ({commit}, data) => commit('UPDATE_PUBLISHING_INFO', data),
 
   /*
     This method fetches github repos that belong to the authenticated user. 
@@ -121,14 +120,13 @@ export const actions = {
         body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
       })
       if (response.ok) {
-        const updatedRepo = await response.json()
-        commit('UPDATE_REPO_IN_EXTERNAL_REPOS', updatedRepo)
+        const repo = await response.json()
       } else {
         throw new Error(response.statusText)
       }
     }
     catch (err) {
-      console.error(err)
+      console.error(err);
     }
   },
 
@@ -145,18 +143,39 @@ export const actions = {
         body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
       })
       if (response.ok) {
-        const updatedRepo = await response.json()
-        commit('UPDATE_REPO_IN_EXTERNAL_REPOS', updatedRepo)
+        const repo = await response.json()
       } else {
         throw new Error(response.statusText)
       }
     }
     catch (err) {
-      // add error handling - display message or alert indicating the error
+      console.error(err);
     }
   },
 
-  fetchWorkspaceRepos: ({ commit, rootState }, { page, size, count }) => {}
+  fetchWorkspaceRepos: async ({ commit, rootState }, { page, size, count }) => {
+    try {
+      const url = `${rootState.config.apiUrl}/datasets/paginated?publicationType=release`
+      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "GET",
+        headers: myHeaders,
+        body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
+      })
+      if (response.ok) {
+        const workspaceRepos = await response.json()
+        commit('SET_WORKSPACE_REPOS', workspaceRepos)
+      } else {
+        throw new Error(response.statusText)
+      }
+    }
+    catch (err) {
+      console.error(err);
+    }
+  }
 }
 
 const codeReposModule = {
