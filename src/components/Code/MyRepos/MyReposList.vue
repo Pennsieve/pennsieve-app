@@ -3,9 +3,9 @@
     <div class="pagination-container">
       <el-pagination
         :page-size="myReposPaginationParams.size"
-        :current-page="2"
+        :current-page="myReposPaginationParams.currentPage"
         layout="prev, pager, next"
-        :total="myReposCount"
+        :total="25"
         @current-change="onPaginationPageChange"
       />
     </div>
