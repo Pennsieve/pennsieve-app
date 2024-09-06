@@ -6,29 +6,45 @@
           <img src="../../assets/images/octocat.png" alt="Octocat" />
         </div>
         <div class="repo-info-container">
-          <h2 class="margin-left">
+          <h2>
             {{ repo.name }}
           </h2>
-          <div class="margin-left">{{ repo.description }}</div>
+          <p>
+            {{ repo.content.description }}
+          </p>
+          <p>
+            Owned by
+            <strong>{{ owner }}</strong>
+          </p>
+          <p>
+            Last updated
+            <strong>{{ updated }}</strong>
+          </p>
+          <p>
+            Accession Number
+            <strong>{{ repo.content.intId }}</strong>
+          </p>
         </div>
       </el-col>
       <el-col :span="5" class="status-container">
         <div class="more-info-container">
           <div class="tracking-status-container">
-            <!-- <tag-pill
+            <tag-pill
+              v-if="workspaceReposView"
               class="mt-8"
               :indicator-color="trackingStatus.tracked.color"
               :label="trackingStatus.tracked.label"
             >
-            </tag-pill> -->
+            </tag-pill>
             <tag-pill
+              v-if="myReposView"
               class="mt-8"
               :indicator-color="trackingStatus.untracked.color"
               :label="trackingStatus.untracked.label"
             >
             </tag-pill>
           </div>
-          <div v-if="workspaceRepos">DOI or N/A</div>
+          <!-- <div v-if="workspaceReposView">DOI or N/A</div> -->
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
@@ -50,6 +66,8 @@
 import { Link } from "@element-plus/icons-vue";
 import { mapActions, mapGetters, mapState } from "vuex";
 import TagPill from "../shared/TagPill/TagPill.vue";
+import { find, propEq, propOr } from "ramda";
+import FormatDate from "../../mixins/format-date";
 
 export default {
   name: "RepoListItem",
@@ -57,6 +75,9 @@ export default {
     Link,
     TagPill,
   },
+
+  mixins: [FormatDate],
+
   props: {
     repo: {
       type: Object,
@@ -72,11 +93,11 @@ export default {
     myRepos and workspaceRepos props are defined as booleans, so pass the prop like this <RepoListItem myRepos>
     not like this <RepoListItem myRepos="true">
     */
-    myRepos: {
+    myReposView: {
       type: Boolean,
       default: false,
     },
-    workspaceRepos: {
+    workspaceReposView: {
       type: Boolean,
       default: false,
     },
@@ -95,6 +116,41 @@ export default {
       },
     };
   },
+  computed: {
+    ...mapGetters(["hasFeature"]),
+    ...mapState([
+      "profile",
+      "activeOrganization",
+      "orgMembers",
+      "config",
+      "userToken",
+      "orgDatasetStatuses",
+    ]),
+    /**
+     * Compute owner of dataset
+     * @returns {String}
+     */
+    owner: function () {
+      const ownerId = propOr("", "owner", this.repo);
+      if (ownerId === propOr("", "id", this.profile)) {
+        return "You";
+      } else {
+        const owner = find(propEq("id", ownerId), this.orgMembers);
+        const firstName = propOr("", "firstName", owner);
+        const lastName = propOr("", "lastName", owner);
+
+        return `${firstName} ${lastName}`;
+      }
+    },
+
+    /**
+     * Compute formatted timestamp
+     * @returns {String}
+     */
+    updated: function () {
+      return this.formatDate(this.repo.content.updatedAt);
+    },
+  },
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
     handleTrackingClick: function () {
@@ -112,6 +168,7 @@ export default {
 
 <style scoped lang="scss">
 @import "../../assets/_variables.scss";
+
 .margin-left {
   margin-left: 12px;
 }
@@ -152,6 +209,8 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  align-items: flex-start;
+  margin-left: 12px;
 }
 
 .more-info-container {

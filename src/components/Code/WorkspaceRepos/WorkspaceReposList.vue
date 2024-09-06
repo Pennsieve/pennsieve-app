@@ -1,25 +1,25 @@
 <template>
-  <bf-stage>
+  <bf-stage element-loading-background="transparent">
     <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>
-        You have not linked your Github account to Pennsieve yet. Please link
-        your account to see your available repos.
+        This Workspace has no tracked repositories yet. Track a Repository to
+        create a Workspace Repository.
       </p>
     </bf-empty-page-state>
     <div class="pagination-container">
       <el-pagination
-        :page-size="myReposPaginationParams.size"
-        :current-page="myReposPaginationParams.currentPage"
+        :page-size="workspaceReposPaginationParams.limit"
+        :current-page="workspaceReposPaginationParams.currentPage"
         layout="prev, pager, next"
-        :total="myRepos"
+        :total="workspaceReposCount"
         @current-change="onPaginationPageChange"
       />
     </div>
     <div v-loading="isLoadingRepos">
       <RepoListItem
-        myReposView
+        workspaceReposView
         :isTracked="false"
-        v-for="repo in myRepos"
+        v-for="repo in workspaceRepos"
         :key="repo.id"
         :repo="repo"
       ></RepoListItem>
@@ -28,52 +28,60 @@
 </template>
 
 <script>
-import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import { mapState, mapActions } from "vuex";
 import RepoListItem from "../RepoListItem.vue";
-import { mapActions, mapState } from "vuex";
+import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
 export default {
-  name: "MyReposList",
+  name: "WorkspaceRepos",
+
   components: {
     RepoListItem,
     BfEmptyPageState,
   },
+
   data() {
     return {
       isLoadingRepos: false,
     };
   },
+
   async mounted() {
     try {
-      this.fetchMyRepos({
-        page: this.myReposPaginationParams.page,
-        size: this.myReposPaginationParams.size,
-        count: this.myReposCount,
+      this.fetchWorkspaceRepos({
+        limit: this.workspaceReposPaginationParams.limit,
+        offset: this.workspaceReposPaginationParams.offset,
       });
     } catch (err) {
       console.error(err);
     }
   },
+
   computed: {
     ...mapState("codeReposModule", [
-      "myRepos",
-      "myReposLoaded",
-      "myReposPaginationParams",
-      "myReposCount",
+      "workspaceRepos",
+      "workspaceReposLoaded",
+      "workspaceReposPaginationParams",
+      "workspaceReposCount",
     ]),
     showEmptyState: function () {
-      return this.myReposLoaded && !this.myRepos.length;
+      return this.workspaceReposLoaded && !this.workspaceRepos?.length;
     },
   },
+
   methods: {
-    ...mapActions("codeReposModule", ["fetchMyRepos"]),
+    ...mapActions("codeReposModule", [
+      "fetchWorkspaceRepos",
+      "updateWorkspaceRepoOffset",
+    ]),
     onPaginationPageChange: async function (page) {
-      console.log("onPaginationPageChange with page:", page);
+      const offset = (page - 1) * this.workspaceReposPaginationParams.limit;
+      this.updateWorkspaceRepoOffset(offset);
       try {
         this.isLoadingRepos = true;
-        await this.fetchMyRepos({
-          page,
-          size: this.myReposPaginationParams.size,
+        await this.fetchWorkspaceRepos({
+          limit: this.workspaceReposPaginationParams.limit,
+          offset: this.workspaceReposPaginationParams.offset,
           count: this.myReposCount,
         });
         this.isLoadingRepos = false;

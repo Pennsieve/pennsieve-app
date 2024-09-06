@@ -1,4 +1,3 @@
-import { curveStep } from "d3";
 import Cookies from "js-cookie";
 
 const initialState = () => ({
@@ -12,11 +11,11 @@ const initialState = () => ({
   myReposLoaded: false,
   workspaceRepos: [],
   workspaceReposPaginationParams: {
-    page: 1,
-    size: 10,
+    limit: 5,
+    offset: 0,
     currentPage: 1
   },
-  workspaceReposCount: 0,
+  workspaceReposCount: 5,
   workspaceReposLoaded: false
 })
 
@@ -40,7 +39,7 @@ export const mutations = {
     state.myReposCount = count
   },
   SET_WORKSPACE_REPOS(state, workspaceRepos) {
-    state.workspaceRepos = workspaceRepos
+    state.workspaceRepos = workspaceRepos.datasets
     state.workspaceReposLoaded = true;
   },
   SET_WORKSPACE_REPOS_COUNT(state, count) {
@@ -49,6 +48,9 @@ export const mutations = {
   SET_WORKSPACE_REPOS_CURRENT_PAGE(state, currentPage) {
     state.currentPage = currentPage;
   },
+  SET_WORKSPACE_REPOS_OFFSET(state, offset) {
+    state.workspaceReposPaginationParams.offset = offset;
+  }
 }
 
 export const actions = {
@@ -153,9 +155,14 @@ export const actions = {
     }
   },
 
-  fetchWorkspaceRepos: async ({ commit, rootState }, { page, size, count }) => {
+  updateWorkspaceRepoOffset: ({ commit, rootState }, offset) => {
+    commit('SET_WORKSPACE_REPOS_OFFSET', offset)
+  },
+
+  fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
+
     try {
-      const url = `${rootState.config.apiUrl}/datasets/paginated?publicationType=release`
+      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -163,11 +170,13 @@ export const actions = {
       const response = await fetch(url, {
         method: "GET",
         headers: myHeaders,
-        body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
       })
+      console.log('response', response)
       if (response.ok) {
         const workspaceRepos = await response.json()
+        console.log('workspaceRepos', workspaceRepos)
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
+        commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
       } else {
         throw new Error(response.statusText)
       }
