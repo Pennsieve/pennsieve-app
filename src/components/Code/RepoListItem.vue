@@ -6,16 +6,29 @@
           <img src="../../assets/images/octocat.png" alt="Octocat" />
         </div>
         <div class="repo-info-container">
-          <h2 class="margin">
+          <h2 class="margin-left">
             {{ repo.name }}
           </h2>
-          <div class="margin">{{ repo.description }}</div>
+          <div class="margin-left">{{ repo.description }}</div>
         </div>
       </el-col>
       <el-col :span="5" class="status-container">
-        <div v-if="workspaceRepos">
-          <h2>Tracked</h2>
-          <div>DOI or N/A</div>
+        <div class="more-info-container">
+          <div class="tracking-status-container">
+            <!-- <tag-pill
+              class="mt-8"
+              :indicator-color="trackingStatus.tracked.color"
+              :label="trackingStatus.tracked.label"
+            >
+            </tag-pill> -->
+            <tag-pill
+              class="mt-8"
+              :indicator-color="trackingStatus.untracked.color"
+              :label="trackingStatus.untracked.label"
+            >
+            </tag-pill>
+          </div>
+          <div v-if="workspaceRepos">DOI or N/A</div>
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
@@ -26,7 +39,7 @@
           Configure
         </button>
         <button @click="handlePublishLatestClick" class="text-button">
-          Publish Latest Release
+          Publish
         </button>
       </el-col>
     </el-row>
@@ -36,11 +49,13 @@
 <script>
 import { Link } from "@element-plus/icons-vue";
 import { mapActions, mapGetters, mapState } from "vuex";
+import TagPill from "../shared/TagPill/TagPill.vue";
 
 export default {
   name: "RepoListItem",
   components: {
     Link,
+    TagPill,
   },
   props: {
     repo: {
@@ -53,6 +68,10 @@ export default {
       required: true,
       default: false,
     },
+    /*
+    myRepos and workspaceRepos props are defined as booleans, so pass the prop like this <RepoListItem myRepos>
+    not like this <RepoListItem myRepos="true">
+    */
     myRepos: {
       type: Boolean,
       default: false,
@@ -61,6 +80,20 @@ export default {
       type: Boolean,
       default: false,
     },
+  },
+  data() {
+    return {
+      trackingStatus: {
+        tracked: {
+          color: "#17bb62",
+          label: "Tracked",
+        },
+        untracked: {
+          color: "#999999",
+          label: "Untracked",
+        },
+      },
+    };
   },
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
@@ -79,22 +112,23 @@ export default {
 
 <style scoped lang="scss">
 @import "../../assets/_variables.scss";
-.margin {
+.margin-left {
   margin-left: 12px;
 }
 
 .text-button {
   margin: 5px;
-  padding: 8px 12px; /* Add some padding for better visibility */
+  padding: 8px 12px;
   background-color: transparent;
   border: 1px solid transparent;
-  cursor: pointer; /* Change the cursor to a pointer */
+  border-radius: 5px;
+  cursor: pointer;
   transition: background-color 0.3s ease, border-color 0.3s ease,
-    color 0.3s ease; /* Smooth transition */
+    color 0.3s ease;
 
   &:hover {
-    background-color: white; /* Change background color on hover */
-    color: #011f5b; /* Change text color on hover */
+    background-color: white;
+    color: #011f5b;
   }
 
   &:focus {
@@ -118,6 +152,10 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+}
+
+.more-info-container {
+  margin: 12px;
 }
 
 .status-container {
