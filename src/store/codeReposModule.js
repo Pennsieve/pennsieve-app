@@ -94,7 +94,7 @@ export const actions = {
         if (response.ok) {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
-    
+          console.log(myRepos)
           commit('SET_MY_REPOS', myRepos);
           commit('SET_MY_REPOS_CURRENT_PAGE', currentPage);
 

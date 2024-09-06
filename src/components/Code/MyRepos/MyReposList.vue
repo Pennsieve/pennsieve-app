@@ -11,7 +11,7 @@
         :page-size="myReposPaginationParams.size"
         :current-page="myReposPaginationParams.currentPage"
         layout="prev, pager, next"
-        :total="myRepos"
+        :total="myReposCount"
         @current-change="onPaginationPageChange"
       />
     </div>

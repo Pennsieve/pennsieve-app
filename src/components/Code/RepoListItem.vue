@@ -5,7 +5,15 @@
         <div>
           <img src="../../assets/images/octocat.png" alt="Octocat" />
         </div>
-        <div class="repo-info-container">
+        <div v-if="myReposView" class="repo-info-container">
+          <h2>
+            {{ repo.name }}
+          </h2>
+          <p>
+            {{ repo.description }}
+          </p>
+        </div>
+        <div v-if="workspaceReposView" class="repo-info-container">
           <h2>
             {{ repo.name }}
           </h2>
