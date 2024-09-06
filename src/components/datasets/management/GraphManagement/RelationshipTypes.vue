@@ -407,9 +407,16 @@
         'fetchModels'
       ]),
 
-      // closeRelationshipDialog: function() {
-      //   this.createRelationshipDialogVisible = false
-      // },
+      /**
+       * Open relationship type modal
+       */
+      openRelationshipTypeModal: function() {
+        this.createRelationshipDialogVisible = true
+      },
+
+      closeRelationshipDialog: function() {
+        this.createRelationshipDialogVisible = false
+      },
       getRelationshipLinkedProperties: function() {
         if (!this.linkedPropertiesUrl) {
           return
