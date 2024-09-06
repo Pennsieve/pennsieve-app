@@ -89,8 +89,8 @@ const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 const CodeRepos = () => import('./Code/CodeRepos.vue')
-const MyRepos = () => import('../components/Code/MyRepos/MyRepos.vue')
-const WorkspaceRepos = () => import('../components/Code/WorkspaceRepos/WorkspaceRepos.vue')
+const MyRepos = () => import('../components/Code/MyRepos/MyReposList.vue')
+const WorkspaceRepos = () => import('../components/Code/WorkspaceRepos/WorkspaceReposList.vue')
 
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
