@@ -9,6 +9,7 @@ import AboutPennsieve from "./AboutPennsieve/AboutPennsieve.vue";
 import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
 import NotFound from './not-found/NotFound.vue'
+import GraphBrowse2 from "@/components/datasets/records/GraphBrowser/GraphBrowse2.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
 
@@ -516,7 +517,7 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: GraphBrowser
+                stage: GraphBrowse2
               }
             },
           ]

@@ -23,6 +23,8 @@ import request from './mixins/request'
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import 'element-plus/es/components/message/style/index';
 
+//
+//
 Amplify.configure(AWSConfig)
 
 // Enabling this will log debug messages to the console.
