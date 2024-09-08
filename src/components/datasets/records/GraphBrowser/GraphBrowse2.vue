@@ -5,6 +5,8 @@ import { Background } from '@vue-flow/background'
 import { ControlButton, Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 
+
+
 import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import * as site from '../../../../site-config/site.json';
@@ -20,6 +22,8 @@ import {useRoute} from "vue-router";
 const route = useRoute()
 
 import CustomNode from './ModelNode.vue'
+import IconUnlink from "@/components/icons/IconUnlink.vue";
+import IconSizeToFit from "@/components/icons/IconSizeToFit.vue";
 
 const store = useStore()
 
@@ -216,11 +220,16 @@ function toggleDarkMode() {
 
 
 <style lang="sass" >
+
+
 /* these are necessary styles for vue flow */
 @import '@vue-flow/core/dist/style.css'
 
 /* this contains the default theme, these are optional styles */
 @import '@vue-flow/core/dist/theme-default.css'
+@import '@vue-flow/controls/dist/style.css'
+
+
 </style>
 
 <style lang="scss" scoped>
@@ -312,24 +321,7 @@ function toggleDarkMode() {
 
         <MiniMap />
 
-<!--          <Controls position="top-left">-->
-<!--            <ControlButton title="Reset Transform" @click="resetTransform">-->
-<!--              <IconUnlink name="reset" />-->
-<!--            </ControlButton>-->
-
-<!--            <ControlButton title="Shuffle Node Positions" @click="updatePos">-->
-<!--              <IconUpload name="update" />-->
-<!--            </ControlButton>-->
-
-<!--            <ControlButton title="Toggle Dark Mode" @click="toggleDarkMode">-->
-<!--              <IconAddItem v-if="dark" name="sun" />-->
-<!--              <icon-filter-filled v-else name="moon" />-->
-<!--            </ControlButton>-->
-
-<!--            <ControlButton title="Log `toObject`" @click="logToObject">-->
-<!--              <IconLink name="log" />-->
-<!--            </ControlButton>-->
-<!--          </Controls>-->
+        <Controls position="top-left" />
       </VueFlow>
     </div>
     <div
