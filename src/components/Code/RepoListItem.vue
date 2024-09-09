@@ -15,7 +15,7 @@
         </div>
         <div v-if="workspaceReposView" class="repo-info-container">
           <h2>
-            {{ repo.name }}
+            {{ repo.content.name }}
           </h2>
           <p>
             {{ repo.content.description }}
@@ -52,12 +52,23 @@
             >
             </tag-pill>
           </div>
-          <!-- <div v-if="workspaceReposView">DOI or N/A</div> -->
+          <!-- <div class="mt-8" v-if="workspaceReposView">DOI or N/A</div> -->
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
-        <button @click="handleTrackingClick" class="text-button">
+        <button
+          v-if="myReposView || isRepoOwner"
+          @click="handleTrackingClick"
+          class="text-button"
+        >
           Start Tracking
+        </button>
+        <button
+          v-if="myReposView || isRepoOwner"
+          @click="handleTrackingClick"
+          class="text-button"
+        >
+          Stop Tracking
         </button>
         <button @click="handleConfigureClick" class="text-button">
           Configure
@@ -134,6 +145,10 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+    isRepoOwner: function () {
+      const ownerId = propOr("", "owner", this.repo);
+      return ownerId === propOr("", "id", this.profile);
+    },
     /**
      * Compute owner of dataset
      * @returns {String}
@@ -177,10 +192,6 @@ export default {
 <style scoped lang="scss">
 @import "../../assets/_variables.scss";
 
-.margin-left {
-  margin-left: 12px;
-}
-
 .text-button {
   margin: 5px;
   padding: 8px 12px;
@@ -204,7 +215,7 @@ export default {
 .actions-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
 }
 

@@ -94,7 +94,7 @@ export const actions = {
         if (response.ok) {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
-          console.log(myRepos)
+          console.log('MyRepos', myRepos)
           commit('SET_MY_REPOS', myRepos);
           commit('SET_MY_REPOS_CURRENT_PAGE', currentPage);
 
@@ -109,7 +109,7 @@ export const actions = {
       }
   },
 
-  enableRepoTracking: async({ commit, rootState, repo }) => {
+  enableRepoTracking: async({ commit, rootState }, { repo }) => {
     try {
       const url = `${rootState.config.api2Url}/repository/enable`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -171,7 +171,6 @@ export const actions = {
         method: "GET",
         headers: myHeaders,
       })
-      console.log('response', response)
       if (response.ok) {
         const workspaceRepos = await response.json()
         console.log('workspaceRepos', workspaceRepos)
