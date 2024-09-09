@@ -32,7 +32,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 - Keep your feature branch up to date with `main`.
 
-### Deploy for Relase to Production Environment
+### Deploy for Release to Production Environment
 
 - Make a PR from your feature branch into `main`
 
@@ -64,11 +64,11 @@ See [Vite Configuration Reference](https://vitejs.dev/config/)
 
 ## Project Setup
 
-Install Node.js version 20.17.0 using:
+Install Node.js version 18.17.1 using:
 
 ```sh
-nvm install 20.17.0
-nvm use 20.17.0
+nvm install 18.17.1
+nvm use 18.17.1
 ```
 
 ```sh
