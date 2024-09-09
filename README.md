@@ -32,7 +32,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 - Keep your feature branch up to date with `main`.
 
-### Deploy for Relase to Production Environment
+### Deploy for Release to Production Environment
 
 - Make a PR from your feature branch into `main`
 
