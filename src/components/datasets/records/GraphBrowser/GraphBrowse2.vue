@@ -336,6 +336,7 @@ onConnect((connection) => {
   border-top: 1px solid $gray_2;
   border-left: 1px solid $gray_2;
   border-bottom: 1px solid $gray_2;
+  border-radius: 4px 0px 0 4px;
   height: calc(100% - 94px);
   position: absolute;
   right: 0;
@@ -353,6 +354,7 @@ onConnect((connection) => {
   height: 100%;
   overflow: hidden;
   background: $gray_1;
+  border-radius: 4px 0px 0 4px;
 }
 .btn-toggle-models-list {
   align-items: center;
@@ -360,6 +362,7 @@ onConnect((connection) => {
   border-left: 1px solid $gray_2;
   border-top: 1px solid $gray_2;
   border-bottom: 1px solid $gray_2;
+  border-radius: 4px 0 0 4px;
   display: flex;
   height: 32px;
   left: -33px;
