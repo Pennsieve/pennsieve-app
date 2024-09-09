@@ -2,11 +2,8 @@
 import { nextTick, ref } from 'vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
-import { ControlButton, Controls } from '@vue-flow/controls'
+import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
-
-
-
 import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import * as site from '../../../../site-config/site.json';
@@ -19,42 +16,46 @@ import { computed } from 'vue';
 import { useStore } from 'vuex';
 import {pathOr} from "ramda";
 import {useRoute} from "vue-router";
+import ModelNode from './ModelNode.vue'
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
+import CreateConceptDialog from "@/components/datasets/management/CreateConceptDialog/CreateConceptDialog.vue";
+
+
+
 const route = useRoute()
-
-import CustomNode from './ModelNode.vue'
-import IconUnlink from "@/components/icons/IconUnlink.vue";
-import IconSizeToFit from "@/components/icons/IconSizeToFit.vue";
-
 const store = useStore()
 
-const hasModels = computed( () => store.state.concepts.length > 0)
+const { layout } = useLayout()
+
 /**
  * `useVueFlow` provides:
  * 1. a set of methods to interact with the VueFlow instance (like `fitView`, `setViewport`, `addEdges`, etc)
  * 2. a set of event-hooks to listen to VueFlow events (like `onInit`, `onNodeDragStop`, `onConnect`, etc)
  * 3. the internal state of the VueFlow instance (like `nodes`, `edges`, `viewport`, etc)
  */
-const { onInit, onNodeDragStop, onConnect, addEdges, setViewport, toObject, fitView } = useVueFlow()
+const { onInit, onNodeDragStop, onConnect, addEdges, fitView } = useVueFlow()
 
 let edges = ref()
 let nodes = ref()
 
+let createConceptDialogVisible = ref(false)
 
-const { graph, layout, previousDirection } = useLayout()
 
-// our dark mode toggle flag
-const dark = ref(false)
+/**
+ * Create a new concept
+ */
+function createModel() {
+  createConceptDialogVisible.value = true
+}
 
-const graphUrl = computed(() => {
-  const apiUrl = site.conceptsUrl
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
-  if (apiUrl && datasetId) {
-    return `${apiUrl}/datasets/${datasetId}/concepts/schema/graph`
-  }
-  return null
-})
+function closeCreateConceptDialog() {
 
-const userToken = store.state.userToken
+  let vueFlowInstance = useVueFlow()
+  getGraphData(vueFlowInstance)
+  store.dispatch('metadataModule/fetchModels')
+  createConceptDialogVisible.value = false
+}
 
 /**
  * This is a Vue Flow event-hook which can be listened to from anywhere you call the composable, instead of only on the main component
@@ -79,16 +80,42 @@ function focusNode(event) {
  */
 let modelsListVisible = ref(true)
 
-let modelsListArrowDir = ref("left")
+const minimapLocation = computed( () => {
+  if (modelsListVisible.value) {
+    return "bottom-left"
+  }
+
+  return "bottom-right"
+})
+
+const modelsListArrowDir = computed( () => {
+  if (modelsListVisible.value) {
+    return "right"
+  }
+  return "left"
+})
 
 function toggleModelsList() {
   modelsListVisible.value = !modelsListVisible.value
 }
 
+/*
+Get GraphData fetched the schema from the server and
+formats the schema into nodes and edges for display.
+ */
+const graphUrl = computed(() => {
+  const apiUrl = site.conceptsUrl
+  const datasetId = pathOr('', ['params', 'datasetId'])(route)
+  if (apiUrl && datasetId) {
+    return `${apiUrl}/datasets/${datasetId}/concepts/schema/graph`
+  }
+  return null
+})
+
 function getGraphData(vueFlowInstance) {
   useSendXhr(graphUrl.value, {
     header: {
-      'Authorization': `bearer ${userToken}`
+      'Authorization': `bearer ${store.state.userToken}`
     }
   })
     .then(response => {
@@ -114,6 +141,10 @@ function getGraphData(vueFlowInstance) {
  * @returns {Object}
  */
 function transformApiResponse(data) {
+
+  // TODO: Merge edges when multiple relationships exists between two models
+  // e.g. Person 'listens' to CD and Person 'has' CD.
+
   const nodes = []
   const edges = []
 
@@ -124,7 +155,7 @@ function transformApiResponse(data) {
 
       if (hasFromNode && hasToNode) {
 
-        const strokeColor = obj.type === "schemaRelationship" ? "blue" : "orange"
+        const strokeColor = obj.type === "schemaRelationship" ? "#011F5B" : "#F9A23A"
 
         const curObject = {
           id: obj.id,
@@ -177,132 +208,17 @@ onNodeDragStop(({ event, nodes, node }) => {
  * You can add additional properties to your new edge (like a type or label) or block the creation altogether by not calling `addEdges`
  */
 onConnect((connection) => {
+  // TODO: open create relationship modal.
+
   addEdges(connection)
 })
 
-/**
- * To update a node or multiple nodes, you can
- * 1. Mutate the node objects *if* you're using `v-model`
- * 2. Use the `updateNode` method (from `useVueFlow`) to update the node(s)
- * 3. Create a new array of nodes and pass it to the `nodes` ref
- */
-function updatePos() {
-  nodes.value = nodes.value.map((node) => {
-    return {
-      ...node,
-      position: {
-        x: Math.random() * 400,
-        y: Math.random() * 400,
-      },
-    }
-  })
-}
-
-/**
- * toObject transforms your current graph data to an easily persist-able object
- */
-function logToObject() {
-  console.log(toObject())
-}
-
-/**
- * Resets the current viewport transformation (zoom & pan)
- */
-function resetTransform() {
-  setViewport({ x: 0, y: 0, zoom: 1 })
-}
-
-function toggleDarkMode() {
-  dark.value = !dark.value
-}
 </script>
 
-
-
-<style lang="sass" >
-
-
-/* these are necessary styles for vue flow */
-@import '@vue-flow/core/dist/style.css'
-
-/* this contains the default theme, these are optional styles */
-@import '@vue-flow/core/dist/theme-default.css'
-@import '@vue-flow/controls/dist/style.css'
-
-
-</style>
-
-<style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
-
-.graph-browser {
-  height: calc(100vh - 114px);
-  overflow: hidden;
-  position: relative;
-}
-
-.vue-flow-wrapper {
-  width: 100%;
-  height:100%;
-  //left: 300px;
-  position: relative;
-
-  &.with-models {
-    width: calc(100% - 300px);
-  }
-}
-
-.models-list-wrap {
-  border-left: 1px solid $gray_2;
-  height: 100%;
-  position: absolute;
-  right: 0;
-  top: 0;
-  transform: translate3d(100%, 0, 0);
-  transition: transform .3s ease-out;
-  width: 300px;
-  will-change: transform;
-  z-index: 3;
-  &.visible {
-    transform: translate3d(0, 0, 0);
-  }
-}
-  .models-list-scroll {
-    height: 100%;
-    overflow: hidden;
-    background: $gray_1;
-    padding: 8px 8px 0 0 ;
-}
-  .btn-toggle-models-list {
-    align-items: center;
-    background: $gray_1;
-    border-left: 1px solid $gray_2;
-    border-top: 1px solid $gray_2;
-    border-bottom: 1px solid $gray_2;
-    display: flex;
-    height: 32px;
-    left: -33px;
-    justify-content: center;
-    position: absolute;
-    top: 20px;
-    width: 33px;
-    &:after {
-      background: $gray_1;
-      content: '';
-      height: 100%;
-      pointer-events: none;
-      position: absolute;
-      top: 0;
-      right: -5px;
-      width: 5px;
-  }
-}
-</style>
-
-
 <template>
+
   <div class="graph-browser">
-    <div :class="[ modelsListVisible  ? 'vue-flow-wrapper with-models' : 'vue-flow-wrapper' ]">
+    <div class="vue-flow-wrapper">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -314,16 +230,27 @@ function toggleDarkMode() {
 
       >
         <template #node-custom="props">
-          <CustomNode :data="props.data" />
+          <ModelNode :data="props.data" />
         </template>
 
         <Background pattern-color="#aaa" :gap="16" />
 
-        <MiniMap />
+        <MiniMap :position="minimapLocation" :pannable="true"/>
 
         <Controls position="top-left" />
       </VueFlow>
     </div>
+
+    <bf-button
+      @click="createModel"
+      :class="{ 'action-button': true, 'flex': true }"
+    >
+      <template #prefix>
+        <IconAddTemplate class="mr-8" :height="20" :width="20" />
+      </template>
+      Create Model
+    </bf-button>
+
     <div
       class="models-list-wrap"
       :class="{ 'visible': modelsListVisible }"
@@ -343,13 +270,114 @@ function toggleDarkMode() {
         ref="modelsList"
         class="models-list-scroll"
       >
+
         <models-list
           :show-heading="false"
           :is-link="false"
           :scrolling-list="true"
+          :models="nodes"
           @click="focusNode"
         />
       </div>
     </div>
   </div>
+
+  <create-concept-dialog
+    :dialog-visible="createConceptDialogVisible"
+    @close="closeCreateConceptDialog"
+  />
+
+<!--  </bf-stage>-->
 </template>
+
+<style lang="sass" >
+
+
+/* these are necessary styles for vue flow */
+@import '@vue-flow/core/dist/style.css'
+
+/* this contains the default theme, these are optional styles */
+@import '@vue-flow/core/dist/theme-default.css'
+@import '../../../../assets/_vueflow.css'
+
+@import '@vue-flow/minimap/dist/style.css'
+
+
+</style>
+
+<style lang="scss" scoped>
+@import '../../../../assets/_variables.scss';
+
+.modified-stage {
+  margin: 0;
+
+}
+
+.graph-browser {
+  height: calc(100vh - 114px);
+  overflow: hidden;
+  position: relative;
+}
+
+.vue-flow-wrapper {
+  width: 100%;
+  height:100%;
+  position: relative;
+
+}
+
+.action-button {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.models-list-wrap {
+  border-top: 1px solid $gray_2;
+  border-left: 1px solid $gray_2;
+  border-bottom: 1px solid $gray_2;
+  height: calc(100% - 94px);
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: translate3d(100%, 72px, 0);
+  transition: transform .3s ease-out;
+  width: 300px;
+  will-change: transform;
+  z-index: 3;
+  &.visible {
+    transform: translate3d(0, 72px, 0);
+  }
+}
+.models-list-scroll {
+  height: 100%;
+  overflow: hidden;
+  background: $gray_1;
+}
+.btn-toggle-models-list {
+  align-items: center;
+  background: $gray_1;
+  border-left: 1px solid $gray_2;
+  border-top: 1px solid $gray_2;
+  border-bottom: 1px solid $gray_2;
+  display: flex;
+  height: 32px;
+  left: -33px;
+  justify-content: center;
+  position: absolute;
+  top: 33px;
+  width: 33px;
+  &:after {
+    background: $gray_1;
+    content: '';
+    height: 100%;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    right: -5px;
+    width: 5px;
+  }
+}
+
+
+</style>

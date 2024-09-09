@@ -9,7 +9,6 @@ import AboutPennsieve from "./AboutPennsieve/AboutPennsieve.vue";
 import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
 import NotFound from './not-found/NotFound.vue'
-import GraphBrowse2 from "@/components/datasets/records/GraphBrowser/GraphBrowse2.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
 
@@ -17,6 +16,8 @@ const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue'
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
 
 const Datasets = () => import('./Datasets/Datasets.vue')
+
+
 
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
@@ -99,7 +100,7 @@ const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesL
 const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
 const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
-const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/GraphBrowser.vue')
+const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
 const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')

@@ -46,7 +46,11 @@
       datasetId: {
         type: String,
         default: ''
-      }
+      },
+      noPadding: {
+        type: Boolean,
+        default: false
+      },
     },
 
     mounted: function() {
@@ -59,7 +63,16 @@
 
     computed: {
       stageContentClass: function() {
-        return this.$slots['actions']? "bf-stage-content" : "bf-stage-content no-actions"
+        let classString = "bf-stage-content"
+        if (!this.$slots['actions']) {
+          classString = classString + " no-actions"
+        }
+        if (this.noPadding) {
+          classString = classString + " no-padding"
+        }
+
+        return classString
+        // return this.$slots['actions']? "bf-stage-content" : "bf-stage-content no-actions"
       }
     },
 
@@ -107,6 +120,10 @@
     &.no-actions {
       padding: 32px;
       min-height: 100%;
+    }
+
+    &.no-padding {
+      padding: 0;
     }
   }
   .graph-management {
