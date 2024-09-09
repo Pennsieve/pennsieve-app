@@ -17,6 +17,8 @@ const BfNavigationSecondary = () => import('../components/bf-navigation/BfNaviga
 
 const Datasets = () => import('./Datasets/Datasets.vue')
 
+
+
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
@@ -110,7 +112,7 @@ const ApplicationsList = () => import ('../components/Analysis/Applications/Appl
 const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
 const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
-const GraphBrowser = () => import('../components/datasets/records/GraphBrowser/GraphBrowser.vue')
+const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
 const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
@@ -522,7 +524,7 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: GraphBrowser
+                stage: GraphBrowse2
               }
             },
           ]
