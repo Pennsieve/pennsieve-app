@@ -316,6 +316,7 @@ export default {
      *
      *
      * @param {String} userToken
+     * @param {Boolean} fromLogin
      * @returns {Promise}
      */
     bootUp: async function (userToken, fromLogin = false) {
@@ -357,7 +358,7 @@ export default {
           // route user to login page
           this.$router.replace({
             name: "home",
-            query,
+            query: {},
           });
         });
 

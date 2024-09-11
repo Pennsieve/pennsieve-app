@@ -1,5 +1,6 @@
 <script setup>
 import { Position, Handle } from '@vue-flow/core'
+
 import {ref} from "vue";
 
 const props = defineProps(['data'])
@@ -11,7 +12,7 @@ let showInfo = ref(false)
 
 <template>
   <div class="model-node">
-    <Handle type="target" :position="Position.Top" />
+    <Handle type="source" :position="Position.Top" />
     <div class="label">{{ data.label }} </div>
     <div v-if="showInfo" class="info">
 
@@ -21,7 +22,7 @@ let showInfo = ref(false)
       </div>
 
     </div>
-    <Handle type="source" :position="Position.Bottom" />
+    <Handle type="target" :position="Position.Bottom" />
   </div>
 </template>
 
