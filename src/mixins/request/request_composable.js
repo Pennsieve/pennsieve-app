@@ -18,10 +18,10 @@ const _trimValues = (obj) => {
 /**
  * Send Xhr request
  * @param {string} url
- * @param {Object} opts  Error status
+ * @param {{method: string; header: {Authorization: string}; body: LinkedPropRequestBody[]}} opts  Error status
  * @param {string} opts.method
  * @param {Object} opts.header
- * @param {string} opts.body
+ * @param {Object} opts.body
  */
 export function useSendXhr(url, opts) {
 

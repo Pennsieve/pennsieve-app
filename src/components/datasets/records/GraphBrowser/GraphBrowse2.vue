@@ -20,6 +20,7 @@ import ModelNode from './ModelNode.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
 import CreateConceptDialog from "@/components/datasets/management/CreateConceptDialog/CreateConceptDialog.vue";
+import CreateLinkedPropDialog from "@/components/datasets/records/GraphBrowser/CreateLinkedPropDialog.vue";
 
 
 
@@ -34,12 +35,14 @@ const { layout } = useLayout()
  * 2. a set of event-hooks to listen to VueFlow events (like `onInit`, `onNodeDragStop`, `onConnect`, etc)
  * 3. the internal state of the VueFlow instance (like `nodes`, `edges`, `viewport`, etc)
  */
-const { onInit, onNodeDragStop, onConnect, addEdges, fitView } = useVueFlow()
+const { onInit, onNodeDragStop, onConnect, addEdges, fitView, findNode } = useVueFlow()
 
 let edges = ref()
 let nodes = ref()
 
 let createConceptDialogVisible = ref(false)
+let createLinkedPropDialogVisible = ref(false)
+
 
 
 /**
@@ -55,6 +58,30 @@ function closeCreateConceptDialog() {
   getGraphData(vueFlowInstance)
   store.dispatch('metadataModule/fetchModels')
   createConceptDialogVisible.value = false
+}
+
+/*
+ * @param {addedRelationship: boolean, connection: Object} data
+ */
+function closeCreateLinkedPropDialog(data) {
+  if (data.addedRelationship) {
+    const strokeColor = data.type === "schemaRelationship" ?  "#F9A23A" : "#011F5B"
+
+
+    let connection = {
+      source: data.connection.source.data.id,
+      target: data.connection.target.data.id,
+      type: 'smoothstep',
+      label: data.displayName,
+      markerEnd: MarkerType.Arrow,
+      style: { stroke: strokeColor },
+    }
+    addEdges(connection)
+  }
+
+  createLinkedPropDialogVisible.value = false
+
+
 }
 
 /**
@@ -124,7 +151,7 @@ function getGraphData(vueFlowInstance) {
       nodes.value = graphData.nodes
       edges.value = graphData.edges
 
-      nodes.value = layout(nodes.value, edges.value, 'TB')
+      nodes.value = layout(nodes.value, edges.value, 'BT')
 
       nextTick(() => {
         vueFlowInstance.fitView()
@@ -155,7 +182,7 @@ function transformApiResponse(data) {
 
       if (hasFromNode && hasToNode) {
 
-        const strokeColor = obj.type === "schemaRelationship" ? "#011F5B" : "#F9A23A"
+        const strokeColor = obj.type === "schemaRelationship" ?  "#F9A23A" : "#011F5B"
 
         const curObject = {
           id: obj.id,
@@ -163,7 +190,7 @@ function transformApiResponse(data) {
           source: obj.from,
           target: obj.to,
           label: obj.displayName,
-          markerEnd: MarkerType.ArrowClosed,
+          markerEnd: MarkerType.Arrow,
           style: { stroke: strokeColor },
         }
 
@@ -173,6 +200,7 @@ function transformApiResponse(data) {
       const curObject = {
         id: obj.id,
         type: 'custom',
+        deletable: false,
         data: {
           label: obj.displayName,
           id: obj.id
@@ -189,6 +217,9 @@ function transformApiResponse(data) {
   return { nodes, edges }
 }
 
+
+
+
 /**
  * onNodeDragStop is called when a node is done being dragged
  *
@@ -199,8 +230,12 @@ function transformApiResponse(data) {
  * 4. any intersections with other nodes
  */
 onNodeDragStop(({ event, nodes, node }) => {
+
   console.log('Node Drag Stop', { event, nodes, node })
 })
+
+
+let createRelationshipInput = ref({source:null, target: null})
 
 /**
  * onConnect is called when a new connection is created.
@@ -208,9 +243,15 @@ onNodeDragStop(({ event, nodes, node }) => {
  * You can add additional properties to your new edge (like a type or label) or block the creation altogether by not calling `addEdges`
  */
 onConnect((connection) => {
-  // TODO: open create relationship modal.
 
-  addEdges(connection)
+  console.log(connection)
+
+  // Find Node Name
+  const sourceNode = findNode(connection.source)
+  const targetNode = findNode(connection.target)
+
+  createRelationshipInput = {source: sourceNode, target: targetNode, }
+  createLinkedPropDialogVisible.value = true
 })
 
 </script>
@@ -264,6 +305,7 @@ onConnect((connection) => {
           :class="[ modelsListArrowDir === 'left' ? 'svg-flip' : '' ]"
           :height="16"
           :width="16"
+          color="#808fad"
         />
       </button>
       <div
@@ -287,7 +329,12 @@ onConnect((connection) => {
     @close="closeCreateConceptDialog"
   />
 
-<!--  </bf-stage>-->
+  <create-linked-prop-dialog
+    :dialog-visible="createLinkedPropDialogVisible"
+    :input="createRelationshipInput"
+    @close="closeCreateLinkedPropDialog"
+  />
+
 </template>
 
 <style lang="sass" >
