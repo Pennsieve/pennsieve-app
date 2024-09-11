@@ -1,5 +1,5 @@
 <template>
-  <div class="list-item">
+  <bf-stage class="list-item" element-loading-background="transparent">
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
@@ -57,15 +57,15 @@
       </el-col>
       <el-col :span="7" class="actions-container">
         <button
-          v-if="myReposView || isRepoOwner"
-          @click="handleTrackingClick"
+          v-if="!isTracked && myReposView"
+          @click="handleStartTrackingClick"
           class="text-button"
         >
           Start Tracking
         </button>
         <button
-          v-if="myReposView || isRepoOwner"
-          @click="handleTrackingClick"
+          v-if="isTracked && myReposView"
+          @click="handleStopTrackingClick"
           class="text-button"
         >
           Stop Tracking
@@ -78,7 +78,15 @@
         </button>
       </el-col>
     </el-row>
-  </div>
+
+    <change-repo-tracking-dialog
+      :dialog-visible="isChangeRepoTrackingDialogVisible"
+      :start-tracking-mode="!isTracked"
+      :stop-tracking-mode="isTracked"
+      :repo="repo"
+      @close="onChangeRepoTrackingDialogClose"
+    />
+  </bf-stage>
 </template>
 
 <script>
@@ -87,12 +95,14 @@ import { mapActions, mapGetters, mapState } from "vuex";
 import TagPill from "../shared/TagPill/TagPill.vue";
 import { find, propEq, propOr } from "ramda";
 import FormatDate from "../../mixins/format-date";
+import ChangeRepoTrackingDialog from "./ChangeRepoTrackingDialog.vue";
 
 export default {
   name: "RepoListItem",
   components: {
     Link,
     TagPill,
+    ChangeRepoTrackingDialog,
   },
 
   mixins: [FormatDate],
@@ -133,6 +143,7 @@ export default {
           label: "Untracked",
         },
       },
+      isChangeRepoTrackingDialogVisible: false,
     };
   },
   computed: {
@@ -176,14 +187,25 @@ export default {
   },
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
-    handleTrackingClick: function () {
-      console.log("tracking click");
+    handleStartTrackingClick: function () {
+      this.startTrackingMode = true;
+      this.isChangeRepoTrackingDialogVisible = true;
+    },
+    handleStopTrackingClick: function () {
+      this.stopTrackingMode = true;
+      this.isChangeRepoTrackingDialogVisible = true;
     },
     handleConfigureClick: function () {
       console.log("configure click");
     },
     handlePublishLatestClick: function () {
       console.log("publish latest click");
+    },
+    /**
+     * Methods to open/close modals
+     */
+    onChangeRepoTrackingDialogClose: function () {
+      this.isChangeRepoTrackingDialogVisible = false;
     },
   },
 };

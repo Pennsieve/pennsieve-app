@@ -9,19 +9,28 @@
       <bf-dialog-header slot="title" title="Change Tracking" />
     </template>
 
-    <dialog-body> </dialog-body>
+    <dialog-body> Hi! I am the Change Repo Tracking Dialog </dialog-body>
+    <!-- Buttons -->
+    <template #footer>
+      <bf-button v-if="enableTracking" @click="handleEnableTracking">
+        Enable Tracking
+      </bf-button>
+      <bf-button v-if="disableTracking" @click="handleDisableTracking">
+        Disable Tracking
+      </bf-button>
+    </template>
   </el-dialog>
 </template>
 
 <script>
 import { mapState, mapGetters, mapActions } from "vuex";
-import BfButton from "../../shared/bf-button/BfButton.vue";
-import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
-import DialogBody from "../../shared/dialog-body/DialogBody.vue";
-import EventBus from "../../../utils/event-bus";
+import BfButton from "../shared/bf-button/BfButton.vue";
+import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "../shared/dialog-body/DialogBody.vue";
+import EventBus from "../../utils/event-bus";
 
 export default {
-  name: "CreateApplicationDialog",
+  name: "ChangeRepoTrackingDialog",
 
   components: {
     BfDialogHeader,
@@ -40,6 +49,16 @@ export default {
       required: true,
       required: true,
     },
+    startTrackingMode: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    stopTrackingMode: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
   },
 
   data() {
@@ -51,18 +70,16 @@ export default {
     ...mapState("codeReposModule", []),
   },
 
-  mounted() {
-    this.fetchComputeNodes();
-  },
-
   methods: {
-    ...mapActions("codeReposModule", ["enableRepoTracking"]),
+    ...mapActions("codeReposModule", [
+      "enableRepoTracking",
+      "disableRepoTracking",
+    ]),
     /**
      * Closes the dialog
      */
     closeDialog() {
       this.$emit("close", false);
-      this.$refs.form.clearValidate();
     },
 
     /**
@@ -89,12 +106,36 @@ export default {
         this.closeDialog();
       }
     },
+    /**
+     * POST to API to Disable Tracking
+     */
+    async handleDisableTracking() {
+      try {
+        await this.disableRepoTracking(repo);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        this.closeDialog();
+      }
+    },
   },
 };
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@import "../../assets/_variables.scss";
 
 .text-area-wrapper {
   width: 100%;

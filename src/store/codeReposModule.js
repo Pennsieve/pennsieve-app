@@ -23,7 +23,6 @@ export const state = initialState()
 
 export const mutations = {
   CLEAR_STATE(state) {
-    //reset all state to initial state
     const _initialState = initialState()
     // need to iteratively set keys to preserve reactivity
     Object.keys(_initialState).forEach(key => state[key] = _initialState[key])
@@ -60,7 +59,7 @@ export const actions = {
     Use this data to populate the MyRepos view. 
   */
   fetchMyRepos: async({ commit, rootState }, { page, size, count, currentPage }) => {
-    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid extra call
+    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid extra call.
       if (count === 0) {
         try {
           const url =`${rootState.config.api2Url}/repositories/github`
@@ -83,7 +82,7 @@ export const actions = {
           commit('SET_MY_REPOS_COUNT', 0)
         }
       }
-      // fetch paginated repos 
+      // Fetch paginated repos for the MyRepos view.
       try {
         const url =`${rootState.config.api2Url}/repositories/github?page=${page}&size=${size}`
         const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -160,7 +159,6 @@ export const actions = {
   },
 
   fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
-
     try {
       const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
