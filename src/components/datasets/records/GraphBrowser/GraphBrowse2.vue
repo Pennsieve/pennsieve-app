@@ -151,7 +151,7 @@ function getGraphData(vueFlowInstance) {
       nodes.value = graphData.nodes
       edges.value = graphData.edges
 
-      nodes.value = layout(nodes.value, edges.value, 'LR')
+      nodes.value = layout(nodes.value, edges.value, 'BT')
 
       nextTick(() => {
         vueFlowInstance.fitView()
