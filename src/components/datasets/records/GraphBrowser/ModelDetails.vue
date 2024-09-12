@@ -7,9 +7,7 @@
         class="model-tooltip-wrap"
       >
         <h2>
-
             {{ curModel.displayName }}
-
         </h2>
         <div class="model-info">
           <div class="nr-props">
@@ -40,7 +38,26 @@
       </div>
     </div>
     <div v-else>
-      No model selected
+
+      <div class="img-container">
+        <img
+          src="/src/assets/images/illustrations/illo-empty-file-types.svg"
+          class="empty-image"
+          alt="No model selected"
+        />
+
+      </div>
+      <div class="img-container">
+      <p class="message">
+        No model selected
+      </p>
+
+
+    </div>
+
+
+
+
 
     </div>
   </div>
@@ -123,6 +140,27 @@ export default {
 <style scoped lang="scss">
 @import '../../../../assets/_variables.scss';
 
+h2 {
+  color: $purple_2;
+}
+
+.img-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  margin-top:24px
+}
+
+.message {
+  color: $purple_2;
+  margin: 8px;
+}
+
+.empty-image {
+  width:200px;
+  justify-content: center;
+}
+
 .prop-list {
   margin: 4px 0;
   .prop-wrapper {
@@ -140,10 +178,7 @@ export default {
 }
 .model-tooltip-wrap {
   padding: 8px;
-  background: $white;
-  border: 1px solid $gray_2;
   border-radius: 3px;
-  //box-shadow: 0 0 10px 0 rgba(189,189,189,0.3);
   color: $gray_6;
 }
 
