@@ -162,7 +162,7 @@ function toggleModelsList(event) {
       class="models-list-scroll"
     >
       <models-list
-        v-if="modelListSelected"
+        v-show="modelListSelected"
         :show-heading="false"
         :is-link="false"
         :scrolling-list="true"
@@ -170,8 +170,10 @@ function toggleModelsList(event) {
       />
 
 
-      <modelDetails v-if="modelInfoSelected"
-                    :model-id="modelId"/>
+      <model-details
+        v-show="modelInfoSelected"
+        :model-id="modelId"
+      />
 
 
 
@@ -191,7 +193,7 @@ function toggleModelsList(event) {
   border-top: 1px solid $gray_2;
   border-left: 1px solid $gray_2;
   border-bottom: 1px solid $gray_2;
-  border-radius: 4px 0px 0 4px;
+  border-radius: 4px 0 0 4px;
   height: calc(100% - 94px);
   position: absolute;
   right: 0;
