@@ -1,19 +1,14 @@
 <script setup>
-import { nextTick, ref } from 'vue'
-import { VueFlow, useVueFlow } from '@vue-flow/core'
-import { Background } from '@vue-flow/background'
-import { Controls } from '@vue-flow/controls'
-import { MiniMap } from '@vue-flow/minimap'
-import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
-import IconArrowRight from "@/components/icons/IconArrowRight.vue";
+import {computed, nextTick, ref} from 'vue'
+import {MarkerType, useVueFlow, VueFlow} from '@vue-flow/core'
+import {Background} from '@vue-flow/background'
+import {Controls} from '@vue-flow/controls'
+import {MiniMap} from '@vue-flow/minimap'
 import * as site from '../../../../site-config/site.json';
-import { MarkerType } from '@vue-flow/core'
-import { useLayout } from './useLayout'
+import {useLayout} from './useLayout'
 
 import {useHandleXhrError, useSendXhr} from '@/mixins/request/request_composable'
-
-import { computed } from 'vue';
-import { useStore } from 'vuex';
+import {useStore} from 'vuex';
 import {pathOr} from "ramda";
 import {useRoute} from "vue-router";
 import ModelNode from './ModelNode.vue'
@@ -22,7 +17,10 @@ import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
 import CreateConceptDialog from "@/components/datasets/management/CreateConceptDialog/CreateConceptDialog.vue";
 import CreateLinkedPropDialog from "@/components/datasets/records/GraphBrowser/CreateLinkedPropDialog.vue";
 
+import SidePanel from "@/components/datasets/records/GraphBrowser/SidePanel.vue";
 
+
+const props = defineProps(['orgId', 'datasetId','list-type'])
 
 const route = useRoute()
 const store = useStore()
@@ -35,10 +33,10 @@ const { layout } = useLayout()
  * 2. a set of event-hooks to listen to VueFlow events (like `onInit`, `onNodeDragStop`, `onConnect`, etc)
  * 3. the internal state of the VueFlow instance (like `nodes`, `edges`, `viewport`, etc)
  */
-const { onInit, onNodeDragStop, onConnect, addEdges, fitView, findNode } = useVueFlow()
+const { onInit, onNodeDragStop, onConnect, addEdges, fitView, findNode, getSelectedNodes } = useVueFlow()
 
-let edges = ref()
-let nodes = ref()
+const edges = ref([])
+const nodes = ref([])
 
 let createConceptDialogVisible = ref(false)
 let createLinkedPropDialogVisible = ref(false)
@@ -73,8 +71,8 @@ function closeCreateLinkedPropDialog(data) {
       target: data.connection.target.data.id,
       type: 'smoothstep',
       label: data.displayName,
-      markerEnd: MarkerType.Arrow,
-      style: { stroke: strokeColor },
+      markerEnd: MarkerType.ArrowClosed,
+      style: { stroke: strokeColor, color: strokeColor },
     }
     addEdges(connection)
   }
@@ -132,10 +130,25 @@ formats the schema into nodes and edges for display.
  */
 const graphUrl = computed(() => {
   const apiUrl = site.conceptsUrl
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
+  // const datasetId = pathOr('', ['params', 'datasetId'])(route)
+
   if (apiUrl && datasetId) {
-    return `${apiUrl}/datasets/${datasetId}/concepts/schema/graph`
+    return `${apiUrl}/datasets/${datasetId.value}/concepts/schema/graph`
   }
+  return null
+})
+
+const datasetId = computed( () => {
+  return pathOr('', ['params', 'datasetId'])(route)
+})
+
+const selectedModelId = computed( () => {
+
+  const s = getSelectedNodes
+  if (s.value.length > 0) {
+    return s.value[0].id
+  }
+
   return null
 })
 
@@ -150,7 +163,6 @@ function getGraphData(vueFlowInstance) {
       const graphData = transformApiResponse(response)
       nodes.value = graphData.nodes
       edges.value = graphData.edges
-
       nodes.value = layout(nodes.value, edges.value, 'BT')
 
       nextTick(() => {
@@ -169,11 +181,9 @@ function getGraphData(vueFlowInstance) {
  */
 function transformApiResponse(data) {
 
-  // TODO: Merge edges when multiple relationships exists between two models
-  // e.g. Person 'listens' to CD and Person 'has' CD.
-
   const nodes = []
   const edges = []
+  let edgeMap = new Map()
 
   data.forEach(obj => {
     if (obj.type && (obj.type === 'schemaRelationship' || obj.type === 'schemaLinkedProperty')) {
@@ -183,18 +193,52 @@ function transformApiResponse(data) {
       if (hasFromNode && hasToNode) {
 
         const strokeColor = obj.type === "schemaRelationship" ?  "#F9A23A" : "#011F5B"
+        const type = obj.type === "schemaRelationship" ? "default" : "smoothstep"
+        const sourceHandle = obj.type === "schemaLinkedProperty" ? "source-a" : "source-b"
+        const targetHandle = obj.type === "schemaLinkedProperty" ? "target-a" : "target-b"
 
         const curObject = {
           id: obj.id,
-          type: 'smoothstep',
+          type: type,
           source: obj.from,
+          sourceHandle: sourceHandle,
+          targetHandle: targetHandle,
           target: obj.to,
           label: obj.displayName,
-          markerEnd: MarkerType.Arrow,
-          style: { stroke: strokeColor },
-        }
+          markerEnd: MarkerType.ArrowClosed,
+          style: { stroke: strokeColor, color: strokeColor},
+          }
 
-        edges.push(curObject)
+        // Check if the edge already exists. If so, just update label,
+        // otherwise, add edge.
+        let curNodeEdges = edgeMap.get(obj.from)
+        if (curNodeEdges) {
+          // Check if current exist
+          let found = false;
+          for (let i in curNodeEdges) {
+
+            if (curNodeEdges[i].target === obj.to && type === curNodeEdges[i].type) {
+
+              edgeMap.set(obj.from, [...curNodeEdges, obj])
+              curNodeEdges[i].label = curNodeEdges[i].label + " / " + obj.displayName
+
+              found = true
+              break
+            }
+          }
+
+          if (!found) {
+            edgeMap.set(obj.from, [curObject])
+            edges.push(curObject)
+          }
+
+        } else {
+          edgeMap.set(obj.from, [curObject])
+          edges.push(curObject)
+        }
+      }
+      else {
+        console.log("Error: Incorrectly formatted edge")
       }
     } else {
       const curObject = {
@@ -217,7 +261,9 @@ function transformApiResponse(data) {
   return { nodes, edges }
 }
 
-
+function onTogglePanelVisibility() {
+  modelsListVisible.value = !modelsListVisible.value
+}
 
 
 /**
@@ -243,14 +289,11 @@ let createRelationshipInput = ref({source:null, target: null})
  * You can add additional properties to your new edge (like a type or label) or block the creation altogether by not calling `addEdges`
  */
 onConnect((connection) => {
-
-  console.log(connection)
-
   // Find Node Name
   const sourceNode = findNode(connection.source)
   const targetNode = findNode(connection.target)
 
-  createRelationshipInput = {source: sourceNode, target: targetNode, }
+  createRelationshipInput = {source: sourceNode, target: targetNode, sourceHandle: connection.sourceHandle }
   createLinkedPropDialogVisible.value = true
 })
 
@@ -263,7 +306,6 @@ onConnect((connection) => {
       <VueFlow
         :nodes="nodes"
         :edges="edges"
-        :class="{ dark }"
         class="basic-flow"
         :default-viewport="{ zoom: 1 }"
         :min-zoom="0.2"
@@ -292,36 +334,15 @@ onConnect((connection) => {
       Create Model
     </bf-button>
 
-    <div
-      class="models-list-wrap"
+
+    <SidePanel
       :class="{ 'visible': modelsListVisible }"
-    >
+      :panel-visible="modelsListVisible"
+      @toggle-panel-visibility="onTogglePanelVisibility"
+      @focus-node="focusNode"
+      :model-id="selectedModelId"
+    />
 
-      <button
-        class="btn-toggle-models-list"
-        @click="toggleModelsList"
-      >
-        <IconArrowRight
-          :class="[ modelsListArrowDir === 'left' ? 'svg-flip' : '' ]"
-          :height="16"
-          :width="16"
-          color="#808fad"
-        />
-      </button>
-      <div
-        ref="modelsList"
-        class="models-list-scroll"
-      >
-
-        <models-list
-          :show-heading="false"
-          :is-link="false"
-          :scrolling-list="true"
-          :models="nodes"
-          @click="focusNode"
-        />
-      </div>
-    </div>
   </div>
 
   <create-concept-dialog
@@ -344,11 +365,10 @@ onConnect((connection) => {
 @import '@vue-flow/core/dist/style.css'
 
 /* this contains the default theme, these are optional styles */
-@import '@vue-flow/core/dist/theme-default.css'
+@import '../../../../assets/_vueflow_core.scss'
 @import '../../../../assets/_vueflow.css'
 
 @import '@vue-flow/minimap/dist/style.css'
-
 
 </style>
 
@@ -395,6 +415,7 @@ onConnect((connection) => {
   z-index: 3;
   &.visible {
     transform: translate3d(0, 72px, 0);
+
   }
 }
 .models-list-scroll {
@@ -403,30 +424,53 @@ onConnect((connection) => {
   background: $gray_1;
   border-radius: 4px 0px 0 4px;
 }
-.btn-toggle-models-list {
+
+.btn-toggle-model-details {
   align-items: center;
   background: $gray_1;
   border-left: 1px solid $gray_2;
+  border-right: 1px solid $gray_2;
   border-top: 1px solid $gray_2;
   border-bottom: 1px solid $gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
-  height: 32px;
-  left: -33px;
+  height: 48px;
+  left: -35px;
+  justify-content: center;
+  position: absolute;
+  top: 88px;
+  width: 35px;
+
+}
+
+
+.btn-toggle-models-list {
+  align-items: center;
+  background: $gray_1;
+  border: 1px solid $gray_2;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  height: 48px;
+  left: -35px;
   justify-content: center;
   position: absolute;
   top: 33px;
-  width: 33px;
-  &:after {
-    background: $gray_1;
-    content: '';
-    height: 100%;
-    pointer-events: none;
-    position: absolute;
-    top: 0;
-    right: -5px;
-    width: 5px;
+  width: 35px;
+
+  &.selected {
+    &:after {
+
+      background: $gray_1;
+      content: '';
+      height: 100%;
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      right: -5px;
+      width: 5px;
+    }
   }
+
 }
 
 

@@ -13,6 +13,15 @@ import {useSendXhr, useHandleXhrError} from '../../../../mixins/request/request_
 const store = useStore()
 const route = useRoute()
 
+interface RelationshipRequestBody {
+  description: string;
+  displayName: string;
+  from: string;
+  name: string;
+  schema: Array<Object> ;
+  to: string;
+}
+
 interface LinkedPropRequestBody {
   name: string;
   displayName: string;
@@ -99,11 +108,11 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
 
     if (valid) {
-
-      postLinkedPropertyChanges()
-
-
-
+      if (createForm.multiple) {
+        postCreateRelationship()
+      } else {
+        postLinkedPropertyChanges()
+      }
 
     } else {
       console.log('error submit!', fields)
@@ -156,6 +165,36 @@ const effectiveTarget = computed( () => {
 
   return props.input.target
 })
+
+function postCreateRelationship() {
+  const userToken = store.state.userToken
+  const datasetId = pathOr('', ['params', 'datasetId'])(route)
+
+  const createRelationshipUrl = `${site.conceptsUrl}/datasets/${datasetId}/relationships`
+
+  const payload = <RelationshipRequestBody>{
+    description: "",
+    displayName: createForm.label,
+    from: effectiveSource.value.data.id,
+    name: snakeCase(createForm.label),
+    schema: [],
+    to: effectiveTarget.value.data.id
+  }
+
+  return useSendXhr(createRelationshipUrl, {
+    header: {
+      'Authorization': `bearer ${userToken}`
+    },
+    method: 'POST',
+    body: payload
+  })
+    .then(response => {
+      closeDialog(true)
+
+    })
+    .catch(useHandleXhrError)
+
+}
 
 
 function postLinkedPropertyChanges() {
