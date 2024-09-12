@@ -27,6 +27,7 @@
     "@vue-flow/controls": "^1.1.2",
     "@vue-flow/core": "^1.41.0",
     "@vue-flow/minimap": "^1.5.0",
+    "@vue-flow/node-toolbar": "^1.1.0",
     "@vueup/vue-quill": "^1.2.0",
     "@vueuse/components": "^10.6.0",
     "@vueuse/core": "^10.6.0",

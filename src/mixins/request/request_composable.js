@@ -18,7 +18,7 @@ const _trimValues = (obj) => {
 /**
  * Send Xhr request
  * @param {string} url
- * @param {{method: string; header: {Authorization: string}; body: LinkedPropRequestBody[]}} opts  Error status
+ * @param {{method: string; header: {Authorization: string}; body: []}} opts  Error status
  * @param {string} opts.method
  * @param {Object} opts.header
  * @param {Object} opts.body
@@ -34,8 +34,6 @@ export function useSendXhr(url, opts) {
     const optsHeader = propOr({}, 'header', opts)
     const headers = Object.assign({}, { 'Content-type': 'application/json' }, optsHeader)
 
-    console.log(opts)
-
     const optsBody = prop('body', opts)
     let requestOpts = { headers, method: method }
 
@@ -45,8 +43,6 @@ export function useSendXhr(url, opts) {
         }
         const body = JSON.stringify(optsBody)
         requestOpts = Object.assign({}, requestOpts, { body: body })
-    } else {
-        console.log("no opts body")
     }
 
     return fetch(url, requestOpts)
