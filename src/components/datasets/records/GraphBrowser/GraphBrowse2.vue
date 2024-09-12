@@ -399,31 +399,31 @@ onConnect((connection) => {
   top: 16px;
 }
 
-.models-list-wrap {
-  border-top: 1px solid $gray_2;
-  border-left: 1px solid $gray_2;
-  border-bottom: 1px solid $gray_2;
-  border-radius: 4px 0px 0 4px;
-  height: calc(100% - 94px);
-  position: absolute;
-  right: 0;
-  top: 0;
-  transform: translate3d(100%, 72px, 0);
-  transition: transform .3s ease-out;
-  width: 300px;
-  will-change: transform;
-  z-index: 3;
-  &.visible {
-    transform: translate3d(0, 72px, 0);
-
-  }
-}
-.models-list-scroll {
-  height: 100%;
-  overflow: hidden;
-  background: $gray_1;
-  border-radius: 4px 0px 0 4px;
-}
+//.models-list-wrap {
+//  border-top: 1px solid $gray_2;
+//  border-left: 1px solid $gray_2;
+//  border-bottom: 1px solid $gray_2;
+//  border-radius: 4px 0px 0 4px;
+//  height: calc(100% - 94px);
+//  position: absolute;
+//  right: 0;
+//  top: 0;
+//  transform: translate3d(100%, 72px, 0);
+//  transition: transform .3s ease-out;
+//  width: 300px;
+//  will-change: transform;
+//  z-index: 3;
+//  &.visible {
+//    transform: translate3d(0, 72px, 0);
+//
+//  }
+//}
+//.models-list-scroll {
+//  height: 100%;
+//  overflow: hidden;
+//  background: $gray_1;
+//  border-radius: 4px 0px 0 4px;
+//}
 
 .btn-toggle-model-details {
   align-items: center;
