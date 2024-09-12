@@ -124,7 +124,7 @@ export const mutations = {
     RESET_UPLOADER(state) {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
-        state.progress = {total: 0, loaded:0}
+        state.uploadProgress = {total: 0, loaded:0}
         state.uploadDestination = ''
         state.isUploading = false
         state.uploadComplete = false
