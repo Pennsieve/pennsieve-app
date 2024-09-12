@@ -95,7 +95,7 @@ export default {
         },
         {
           to: 'graph',
-          name: 'Graph',
+          name: 'Schema',
         },
       ]
     },

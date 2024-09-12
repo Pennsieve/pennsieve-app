@@ -87,13 +87,13 @@
               >
                 Configure
               </el-dropdown-item>
-              <el-dropdown-item
-                v-if="concept.count === 0"
-                command="archive"
-                :disabled="datasetLocked"
-              >
-                Delete
-              </el-dropdown-item>
+<!--              <el-dropdown-item-->
+<!--                v-if="concept.count === 0"-->
+<!--                command="archive"-->
+<!--                :disabled="datasetLocked"-->
+<!--              >-->
+<!--                Delete-->
+<!--              </el-dropdown-item>-->
               <el-dropdown-item
                 v-if="concept.propertyCount > 0"
                 :disabled="datasetLocked"
@@ -160,7 +160,7 @@
         const commandsList = {
           'configure': () => this.openConcept(),
           'archive': () => this.$emit('archive-concept', this.concept),
-          'newRecord': () => this.$router.push({ name: 'metadata-record', params: { conceptId: this.modelId, instanceId: 'new' }})
+          'newRecord': () => this.$router.push({ name: 'metadata-record', params: { modelId: this.modelId, instanceId: 'new' }})
         }
         const cmd = commandsList[command]
         if (typeof cmd === 'function') {

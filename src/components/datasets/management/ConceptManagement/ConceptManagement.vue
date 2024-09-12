@@ -974,6 +974,7 @@ export default {
      * @returns {Promise}
      */
     postLinkedPropertyChanges: function() {
+
       if (!this.hasNewLinkedProperties) {
         return Promise.resolve()
       }
