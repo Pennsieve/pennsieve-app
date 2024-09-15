@@ -16,7 +16,6 @@
           />
         </template>
         <template #right>
-<<<<<<< HEAD
           <bf-button
             v-if="isFeatureFlagEnabled()"
             @click="openRunAnalysisDialog"
@@ -39,8 +38,6 @@
             </template>
             New Folder
           </bf-button>
-=======
->>>>>>> main
 
           <template v-if="quickActionsVisible">
             <bf-button
@@ -68,12 +65,15 @@
             </bf-button>
           </template>
 
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
                 v-if="showRunAnalysisFlow"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button "
+                class="dropdown-button"
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -117,11 +117,8 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
@@ -561,31 +558,9 @@ export default {
       "setCurrentTargetPackage",
     ]),
 
-<<<<<<< HEAD
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
-=======
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
-
-    generateManifest: function() {
-
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
-        detail: {
-          type: "success",
-          msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
-    },
-
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
->>>>>>> main
     },
 
     // Ignore drops to component outside the drop target and close drop-target
