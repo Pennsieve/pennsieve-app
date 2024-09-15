@@ -16,9 +16,32 @@
           />
         </template>
         <template #right>
+          <bf-button
+            v-if="isFeatureFlagEnabled()"
+            @click="openRunAnalysisDialog"
+            class="mr-8 flex"
+          >
+            <template #prefix>
+              <IconAnalysis class="mr-8" :height="20" :width="20" />
+            </template>
+            Run Analysis
+          </bf-button>
+          <bf-button
+            v-if="getPermission('editor')"
+            class="flex mr-8"
+            :disabled="datasetLocked"
+            data-cy="createNewFolder"
+            @click="openPackageDialog"
+          >
+            <template #prefix>
+              <IconPlus class="mr-8" :height="20" :width="20" />
+            </template>
+            New Folder
+          </bf-button>
+
           <template v-if="quickActionsVisible">
             <bf-button
-              v-if="isFeatureFlagEnabled()"
+              v-if="showRunAnalysisFlow"
               @click="openRunAnalysisDialog"
               class="mr-8 flex"
             >
@@ -42,7 +65,10 @@
             </bf-button>
           </template>
 
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
                 v-if="isFeatureFlagEnabled()"
@@ -91,11 +117,8 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
@@ -229,12 +252,13 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
-import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
-import IconAnnotation from "@/components/icons/IconAnnotation.vue";
+
 import {
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
 } from "../../../utils/feature-flags.js";
+import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
+import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 
 export default {
   name: "BfDatasetFiles",
@@ -334,7 +358,10 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -397,19 +424,18 @@ export default {
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
     },
 
     /**
@@ -531,27 +557,6 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
-
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
-
-    generateManifest: function() {
-
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
-        detail: {
-          type: "success",
-          msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
-    },
-
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
-    },
 
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);

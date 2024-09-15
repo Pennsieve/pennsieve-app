@@ -18,7 +18,7 @@
     <div v-loading="isLoadingRepos">
       <RepoListItem
         myReposView
-        :isTracked="false"
+        :isTracked="repo.tracking"
         v-for="repo in myRepos"
         :key="repo.id"
         :repo="repo"
@@ -68,7 +68,6 @@ export default {
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
     onPaginationPageChange: async function (page) {
-      console.log("onPaginationPageChange with page:", page);
       try {
         this.isLoadingRepos = true;
         await this.fetchMyRepos({

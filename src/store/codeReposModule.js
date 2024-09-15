@@ -23,7 +23,6 @@ export const state = initialState()
 
 export const mutations = {
   CLEAR_STATE(state) {
-    //reset all state to initial state
     const _initialState = initialState()
     // need to iteratively set keys to preserve reactivity
     Object.keys(_initialState).forEach(key => state[key] = _initialState[key])
@@ -59,8 +58,8 @@ export const actions = {
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 
   */
-  fetchMyRepos: async({ commit, rootState }, { page, size, count, currentPage }) => {
-    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid extra call
+  fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
+    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid making two calls. BE does not currently support. 
       if (count === 0) {
         try {
           const url =`${rootState.config.api2Url}/repositories/github`
@@ -83,9 +82,9 @@ export const actions = {
           commit('SET_MY_REPOS_COUNT', 0)
         }
       }
-      // fetch paginated repos 
+      // Fetch paginated repos for the MyRepos view.
       try {
-        const url =`${rootState.config.api2Url}/repositories/github?page=${page}&size=${size}`
+        const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
         const apiKey = rootState.userToken || Cookies.get('user_token')
         const myHeaders = new Headers()
         myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -94,9 +93,9 @@ export const actions = {
         if (response.ok) {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
-          console.log(myRepos)
+          console.log('MyRepos', myRepos)
           commit('SET_MY_REPOS', myRepos);
-          commit('SET_MY_REPOS_CURRENT_PAGE', currentPage);
+          commit('SET_MY_REPOS_CURRENT_PAGE', page);
 
         } else {
           commit('SET_MY_REPOS', [])
@@ -109,7 +108,7 @@ export const actions = {
       }
   },
 
-  enableRepoTracking: async({ commit, rootState, repo }) => {
+  enableRepoTracking: async({ commit, rootState }, { repo }) => {
     try {
       const url = `${rootState.config.api2Url}/repository/enable`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -160,7 +159,6 @@ export const actions = {
   },
 
   fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
-
     try {
       const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -171,7 +169,6 @@ export const actions = {
         method: "GET",
         headers: myHeaders,
       })
-      console.log('response', response)
       if (response.ok) {
         const workspaceRepos = await response.json()
         console.log('workspaceRepos', workspaceRepos)
@@ -184,6 +181,9 @@ export const actions = {
     catch (err) {
       console.error(err);
     }
+  },
+  publishCodeRepo: async ({commit, rootState}, { repo }) => {
+    console.log('BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
   }
 }
 

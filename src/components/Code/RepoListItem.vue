@@ -1,5 +1,5 @@
 <template>
-  <div class="list-item">
+  <bf-stage class="list-item" element-loading-background="transparent">
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
@@ -7,7 +7,7 @@
         </div>
         <div v-if="myReposView" class="repo-info-container">
           <h2>
-            {{ repo.name }}
+            <a :href="getUrl">{{ repo.name }}</a>
           </h2>
           <p>
             {{ repo.description }}
@@ -15,7 +15,7 @@
         </div>
         <div v-if="workspaceReposView" class="repo-info-container">
           <h2>
-            {{ repo.name }}
+            {{ repo.content.name }}
           </h2>
           <p>
             {{ repo.content.description }}
@@ -47,17 +47,36 @@
             <tag-pill
               v-if="myReposView"
               class="mt-8"
-              :indicator-color="trackingStatus.untracked.color"
-              :label="trackingStatus.untracked.label"
+              :indicator-color="
+                isTracked
+                  ? trackingStatus.tracked.color
+                  : trackingStatus.untracked.color
+              "
+              :label="
+                isTracked
+                  ? trackingStatus.tracked.label
+                  : trackingStatus.untracked.label
+              "
             >
             </tag-pill>
           </div>
-          <!-- <div v-if="workspaceReposView">DOI or N/A</div> -->
+          <!-- <div class="mt-8" v-if="workspaceReposView">DOI or N/A</div> -->
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
-        <button @click="handleTrackingClick" class="text-button">
+        <button
+          v-if="!repo.tracking && myReposView"
+          @click="handleStartTrackingClick"
+          class="text-button"
+        >
           Start Tracking
+        </button>
+        <button
+          v-if="repo.tracking && myReposView"
+          @click="handleStopTrackingClick"
+          class="text-button"
+        >
+          Stop Tracking
         </button>
         <button @click="handleConfigureClick" class="text-button">
           Configure
@@ -67,7 +86,20 @@
         </button>
       </el-col>
     </el-row>
-  </div>
+
+    <change-repo-tracking-dialog
+      :dialog-visible="isChangeRepoTrackingDialogVisible"
+      :start-tracking-mode="!isTracked"
+      :stop-tracking-mode="isTracked"
+      :repo="repo"
+      @close="onChangeRepoTrackingDialogClose"
+    />
+    <publish-code-repo-dialog
+      :dialog-visible="isPublishCodeRepoDialogVisible"
+      :repo="repo"
+      @close="onPublishCodeRepoDialogVisibleClose"
+    />
+  </bf-stage>
 </template>
 
 <script>
@@ -76,12 +108,14 @@ import { mapActions, mapGetters, mapState } from "vuex";
 import TagPill from "../shared/TagPill/TagPill.vue";
 import { find, propEq, propOr } from "ramda";
 import FormatDate from "../../mixins/format-date";
+import ChangeRepoTrackingDialog from "./ChangeRepoTrackingDialog.vue";
 
 export default {
   name: "RepoListItem",
   components: {
     Link,
     TagPill,
+    ChangeRepoTrackingDialog,
   },
 
   mixins: [FormatDate],
@@ -91,7 +125,6 @@ export default {
       type: Object,
       required: true,
     },
-    // currently isTracked value is not available from the repo object, integrate it when available
     isTracked: {
       type: Boolean,
       required: true,
@@ -122,6 +155,8 @@ export default {
           label: "Untracked",
         },
       },
+      isChangeRepoTrackingDialogVisible: false,
+      isPublishCodeRepoDialogVisible: false,
     };
   },
   computed: {
@@ -134,6 +169,13 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+    getUrl: function () {
+      return this.repo.url;
+    },
+    isRepoOwner: function () {
+      const ownerId = propOr("", "owner", this.repo);
+      return ownerId === propOr("", "id", this.profile);
+    },
     /**
      * Compute owner of dataset
      * @returns {String}
@@ -161,14 +203,28 @@ export default {
   },
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
-    handleTrackingClick: function () {
-      console.log("tracking click");
+    handleStartTrackingClick: function () {
+      this.startTrackingMode = true;
+      this.isChangeRepoTrackingDialogVisible = true;
+    },
+    handleStopTrackingClick: function () {
+      this.stopTrackingMode = true;
+      this.isChangeRepoTrackingDialogVisible = true;
     },
     handleConfigureClick: function () {
       console.log("configure click");
     },
     handlePublishLatestClick: function () {
-      console.log("publish latest click");
+      this.isPublishCodeRepoDialogVisible = true;
+    },
+    /**
+     * Methods to open/close modals
+     */
+    onChangeRepoTrackingDialogClose: function () {
+      this.isChangeRepoTrackingDialogVisible = false;
+    },
+    onPublishCodeRepoDialogVisibleClose: function () {
+      this.isPublishCodeRepoDialogVisible = false;
     },
   },
 };
@@ -176,10 +232,6 @@ export default {
 
 <style scoped lang="scss">
 @import "../../assets/_variables.scss";
-
-.margin-left {
-  margin-left: 12px;
-}
 
 .text-button {
   margin: 5px;
@@ -204,7 +256,7 @@ export default {
 .actions-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
 }
 
