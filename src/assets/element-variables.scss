@@ -28,10 +28,14 @@
     'placeholder': #928D85,
     'disabled': #CAC5BF,
   ),
+  $message:(
+    'close-icon-color': white,
+  ),
   $table:(
    'header-bg-color': #F7F7F7,
    'border': 1px solid #e5e5e5
   ),
+
 );
 
 @import './variables';

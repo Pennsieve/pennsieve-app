@@ -3,12 +3,11 @@
     class="models-list"
     :class="{ 'scrolling-list': scrollingList }"
   >
-    <template v-if="hasModels || isLoadingConcepts">
+    <template v-if="hasModels">
       <h2 v-if="showHeading">
         All Models
       </h2>
       <div
-        v-loading="isLoadingConcepts"
         class="models-list-loading-wrap"
         element-loading-background="#fff"
         @keyup.enter="onEnter"
@@ -77,31 +76,31 @@
       </div>
     </template>
 
-    <dataset-owner-message
-      v-if="!isLoadingConcepts"
-      title="You don't have any records yet."
-      :display-owner-message="hasModels === false"
-      :hide-got-it="true"
-      class="empty-concepts"
-    >
-      <img
-        slot="img"
-        src="/src/assets/images/illustrations/illo-search.svg"
-        alt="Illustration of a magnifying glass"
-      >
+<!--    <dataset-owner-message-->
+<!--      title="You don't have any models yet."-->
+<!--      :display-owner-message="hasModels === false"-->
+<!--      :hide-got-it="true"-->
+<!--      class="empty-concepts"-->
+<!--    >-->
+<!--      <img-->
+<!--        slot="img"-->
+<!--        src="../../../../assets/images/illustrations/illo-search.svg"-->
+<!--        alt="Illustration of a magnifying glass"-->
+<!--      >-->
 
-      <p slot="copy">
-        Once you set up <router-link :to="{ name: 'models' }">
-          models
-        </router-link>, you'll see a list of records here.
-      </p>
-    </dataset-owner-message>
+<!--      <p slot="copy">-->
+<!--        Once you set up <router-link :to="{ name: 'models' }">-->
+<!--          models-->
+<!--        </router-link>, you'll see a list of records here.-->
+<!--      </p>-->
+<!--    </dataset-owner-message>-->
   </div>
 </template>
 
 <script>
   import {
-    mapState
+    mapState,
+    mapActions
   } from 'vuex'
 
   import {
@@ -123,7 +122,7 @@
   export default {
     name: 'ModelsList',
 
-    emits: ['click'],
+    emits: ['click', 'shouldReset'],
 
     components: {
       IconMagnifyingGlass,
@@ -163,9 +162,9 @@
     },
 
     computed: {
-      ...mapState([
-        'concepts',
-        'isLoadingConcepts'
+
+      ...mapState('metadataModule',[
+        'models'
       ]),
 
       /**
@@ -173,7 +172,7 @@
        * @returns {Boolean}
        */
       hasModels: function() {
-        return this.concepts.length > 0
+        return this.models.length > 0
       },
 
       /**
@@ -192,7 +191,7 @@
         const byFirstLetter = groupBy(function(concept) {
           return toUpper(concept.displayName.charAt(0))
         })
-        const sortedConcepts = sortBy(prop('displayName'), this.concepts)
+        const sortedConcepts = sortBy(prop('displayName'), this.models)
         const searchText = defaultTo('', this.searchText)
         const matches = concept => concept.displayName.toLowerCase().indexOf(searchText.toLowerCase()) > -1
         const filteredConcepts = filter(matches, sortedConcepts)
@@ -202,22 +201,30 @@
     },
 
     watch: {
+
+
       /**
        * Reset the component
        */
       shouldReset: function(val) {
         if (val) {
           this.searchText = ''
-          this.$emit('update:shouldReset', false)
+          this.$emit('shouldReset', false)
         }
       }
     },
 
     mounted: function() {
+      this.fetchModels()
+
       this.autoFocus()
     },
 
     methods: {
+      ...mapActions('metadataModule',[
+        'fetchModels'
+      ]),
+
       clickModel: function(ev) {
         this.$emit('click', ev)
       },
@@ -266,7 +273,7 @@
       height: 100%;
     }
     .input-wrap {
-      padding: 0px 0px 0 8px;
+      padding: 8px 8px 0 8px;
     }
     .el-input {
       margin-bottom: 0;
