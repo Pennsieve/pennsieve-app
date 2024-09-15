@@ -127,7 +127,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import './src/assets/_variables.scss';
+  @import '../../../../assets/_variables.scss';
 
   .prop-list {
     margin: 4px 0;

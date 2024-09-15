@@ -43,6 +43,7 @@ export const state = initialState()
 export const mutations = {
   SET_MODELS(state, models) {
     state.models = models
+
   },
   REMOVE_MODEL(state, id) {
     const modelIndex = state.models.findIndex(obj => obj.id === id);
@@ -150,7 +151,6 @@ export const actions = {
         // TODO: Refactor so this is returned with models or elsewhere
         for (let target in models) {
           dispatch('fetchModelProps', models[target].name)
-
         }
       } else {
         return Promise.reject(resp)

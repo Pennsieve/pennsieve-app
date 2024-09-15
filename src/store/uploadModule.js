@@ -24,6 +24,7 @@ class UploadFile {
 const initialState = () => ({
     cognitoConfig: {},
     manifestNodeId: "",
+    savedDatasetId:"",
     manifestFiles: [],
     uploadFileMap: new Map(),
     uploadDestination: '',
@@ -123,7 +124,7 @@ export const mutations = {
     RESET_UPLOADER(state) {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
-        state.progress = {total: 0, loaded:0}
+        state.uploadProgress = {total: 0, loaded:0}
         state.uploadDestination = ''
         state.isUploading = false
         state.uploadComplete = false
@@ -273,13 +274,15 @@ export const actions = {
     // Get or Request a NodeId for a manifest.
     getManifestNodeId: async ({rootState, commit}, evt) => {
 
-        if (state.manifestNodeId.length > 0) {
+        const currentRoute = router.currentRoute.value
+        const datasetId = currentRoute.params.datasetId
+
+        if (state.manifestNodeId.length > 0 && datasetId===state.savedDatasetId) {
             return state.manifestNodeId
         } else {
             const endpoint = `${rootState.config.api2Url}/manifest`
 
-            const currentRoute = router.currentRoute.value
-            const datasetId = currentRoute.params.datasetId
+            state.savedDatasetId = datasetId;
 
             const apiKey = rootState.userToken || Cookies.get('user_token')
             const queryParams = toQueryParams({

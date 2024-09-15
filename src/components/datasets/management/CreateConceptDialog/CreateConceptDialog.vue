@@ -234,9 +234,9 @@
 
         this.updateModels(sortedConcepts).then(() => {
           // Redirect user to new concept instance page
-          this.$router.replace({
-            name: 'models',
-          })
+          // this.$router.replace({
+          //   name: 'models',
+          // })
           this.closeDialog()
           this.processing = false
         })

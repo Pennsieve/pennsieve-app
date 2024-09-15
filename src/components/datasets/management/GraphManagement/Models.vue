@@ -168,11 +168,13 @@
   import IconLockFilled from "../../../icons/IconLockFilled.vue";
   import IconTrash from "../../../icons/IconTrash.vue";
   import Cookies from "js-cookie";
+  import DeleteConceptDialog from "@/components/datasets/management/DeleteConceptDialog/DeleteConceptDialog.vue";
 
   export default {
     name: 'Models',
 
     components: {
+      DeleteConceptDialog,
       IconTrash,
       IconLockFilled,
       IconArrowRight,
@@ -208,6 +210,9 @@
       if (token) {
         this.fetchModels()
       }
+    },
+    beforeDestroy() {
+
     },
 
     computed: {

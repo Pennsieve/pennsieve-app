@@ -9,6 +9,7 @@
       hasPrefixSlot ? 'hasPrefix' : '',
     ]"
   >
+
     <span v-if="hasPrefixSlot" class="prefix">
       <slot name="prefix" />
     </span>
@@ -98,6 +99,11 @@ export default {
   padding: 12px 16px;
   text-transform: none;
   min-height: 40px;
+
+  &.dropdown-button {
+    justify-content: left;
+    text-align: left;
+  }
 
   &.flex {
     min-width: 40px;
