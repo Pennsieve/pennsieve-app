@@ -117,15 +117,16 @@
       </el-col>
       <el-col :sm="4" class="list-item-col-spacer">
         <div class="bf-dataset-list-item-status">
+          <!-- No Status is coming back from the API for most datasets, but they do for SPARC at least. See SPARC prod. -->
           <tag-pill
+            v-if="!isPublished"
+            class="mt-8"
             :indicator-color="dataset.status.color"
             :label="formatDatasetStatus"
           />
-
           <tag-pill
             v-if="isPublished"
             class="mt-8"
-            :has-indicator="false"
             :indicator-color="publicationStatusColor"
             :label="publicatonStatus"
           >
@@ -223,15 +224,15 @@ export default {
      * and returns color as appropriate
      * @returns {String}
      */
-    checkDatasetStatus: function () {
-      const status = {
-        "In Review": "#FFB000",
-        "Work in Progress": "#F1F1F3",
-        "No Status": "#F1F1F3",
-        Completed: "#17BB62",
-      };
-      return status[this.formatDatasetStatus];
-    },
+    // checkDatasetStatus: function () {
+    //   const status = {
+    //     "In Review": "#FFB000",
+    //     "Work in Progress": "#F1F1F3",
+    //     "No Status": "#F1F1F3",
+    //     Completed: "#17BB62",
+    //   };
+    //   return status[this.formatDatasetStatus];
+    // },
 
     /**
      * This returns the font color of the dataset status on the list
@@ -358,6 +359,10 @@ export default {
      * @returns {String}
      */
     publicationStatusColor: function () {
+      console.log(
+        "this.dataset.publication.status",
+        this.dataset.publication.status
+      );
       const status = this.dataset.publication.status;
       if (status == PublicationStatus.REQUESTED) {
         return PublicationStatusColor.REQUESTED;

@@ -127,7 +127,6 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        v-if="getPermission('manager')"
         :link="{ name: 'metadata' }"
         label="Metadata"
         class="secondary"
