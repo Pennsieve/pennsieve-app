@@ -252,15 +252,12 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
-<<<<<<< HEAD
 import {
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
 } from "../../../utils/feature-flags.js";
-=======
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
->>>>>>> main
 
 export default {
   name: "BfDatasetFiles",
@@ -360,7 +357,10 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -423,19 +423,18 @@ export default {
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
     },
 
     /**
