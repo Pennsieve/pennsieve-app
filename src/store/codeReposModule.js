@@ -109,7 +109,6 @@ export const actions = {
   },
 
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
-    console.log('repo', repo)
     try {
       const url = `${rootState.config.api2Url}/repository/enable`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -184,7 +183,7 @@ export const actions = {
     }
   },
   publishCodeRepo: async ({commit, rootState}, { repo }) => {
-    console.log('This API does not exist yet')
+    console.log('BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
   }
 }
 
