@@ -95,15 +95,6 @@
         @update-page-size="updateDatasetSearchLimit"
       />
 
-<<<<<<< HEAD
-      <bf-empty-page-state v-if="isEmptyOrg && !isWorkspaceGuest">
-        <img
-          src="../../../assets/images/illustrations/illo-datasets.svg"
-          alt="Add datasets illustration"
-          height="80"
-          width="120"
-        >
-=======
       <el-pagination
         :page-size="datasetSearchParams.limit"
         :pager-count="5"
@@ -113,7 +104,6 @@
         @current-change="onPaginationPageChange"
       />
     </div>
->>>>>>> fix_minor-fixes
 
     <bf-create-new-dataset
       :datasets="datasets"
@@ -507,5 +497,4 @@ export default {
     flex-shrink: 0;
   }
 }
-
 </style>
