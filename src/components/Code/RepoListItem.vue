@@ -94,6 +94,11 @@
       :repo="repo"
       @close="onChangeRepoTrackingDialogClose"
     />
+    <publish-code-repo-dialog
+      :dialog-visible="isPublishCodeRepoDialogVisible"
+      :repo="repo"
+      @close="onPublishCodeRepoDialogVisibleClose"
+    />
   </bf-stage>
 </template>
 
@@ -151,6 +156,7 @@ export default {
         },
       },
       isChangeRepoTrackingDialogVisible: false,
+      isPublishCodeRepoDialogVisible: false,
     };
   },
   computed: {
@@ -209,13 +215,16 @@ export default {
       console.log("configure click");
     },
     handlePublishLatestClick: function () {
-      console.log("publish latest click");
+      this.isPublishCodeRepoDialogVisible = true;
     },
     /**
      * Methods to open/close modals
      */
     onChangeRepoTrackingDialogClose: function () {
       this.isChangeRepoTrackingDialogVisible = false;
+    },
+    onPublishCodeRepoDialogVisibleClose: function () {
+      this.isPublishCodeRepoDialogVisible = false;
     },
   },
 };

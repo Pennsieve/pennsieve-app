@@ -182,6 +182,9 @@ export const actions = {
     catch (err) {
       console.error(err);
     }
+  },
+  publishCodeRepo: async ({commit, rootState}, { repo }) => {
+    console.log('This API does not exist yet')
   }
 }
 

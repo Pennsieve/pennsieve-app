@@ -68,7 +68,6 @@ export default {
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos"]),
     onPaginationPageChange: async function (page) {
-      console.log("onPaginationPageChange with page:", page);
       try {
         this.isLoadingRepos = true;
         await this.fetchMyRepos({
