@@ -9,15 +9,18 @@
       <bf-dialog-header slot="title" title="Change Tracking" />
     </template>
 
-    <dialog-body> Hi! I am the Change Repo Tracking Dialog </dialog-body>
+    <dialog-body>
+      Please confirm if you would like to Enable Tracking on this repo.
+    </dialog-body>
     <!-- Buttons -->
     <template #footer>
-      <bf-button v-if="enableTracking" @click="handleEnableTracking">
+      <bf-button v-if="startTrackingMode" @click="handleEnableTracking">
         Enable Tracking
       </bf-button>
-      <bf-button v-if="disableTracking" @click="handleDisableTracking">
+      <bf-button v-if="stopTrackingMode" @click="handleDisableTracking">
         Disable Tracking
       </bf-button>
+      <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
     </template>
   </el-dialog>
 </template>
@@ -67,14 +70,18 @@ export default {
 
   computed: {
     ...mapState(["userToken", "config"]),
-    ...mapState("codeReposModule", []),
+    ...mapState("codeReposModule", ["myRepos"]),
   },
 
   methods: {
     ...mapActions("codeReposModule", [
       "enableRepoTracking",
       "disableRepoTracking",
+      "fetchMyRepos",
+      "myReposPaginationParams",
+      "myReposCount",
     ]),
+
     /**
      * Closes the dialog
      */
@@ -87,7 +94,7 @@ export default {
      */
     async handleEnableTracking() {
       try {
-        await this.enableRepoTracking(repo);
+        await this.enableRepoTracking({ repo: this.repo });
         EventBus.$emit("toast", {
           detail: {
             type: "success",
@@ -111,7 +118,7 @@ export default {
      */
     async handleDisableTracking() {
       try {
-        await this.disableRepoTracking(repo);
+        await this.disableRepoTracking({ repo: this.repo });
         EventBus.$emit("toast", {
           detail: {
             type: "success",

@@ -58,8 +58,8 @@ export const actions = {
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 
   */
-  fetchMyRepos: async({ commit, rootState }, { page, size, count, currentPage }) => {
-    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid extra call.
+  fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
+    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid making two calls. BE does not currently support. 
       if (count === 0) {
         try {
           const url =`${rootState.config.api2Url}/repositories/github`
@@ -84,7 +84,7 @@ export const actions = {
       }
       // Fetch paginated repos for the MyRepos view.
       try {
-        const url =`${rootState.config.api2Url}/repositories/github?page=${page}&size=${size}`
+        const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
         const apiKey = rootState.userToken || Cookies.get('user_token')
         const myHeaders = new Headers()
         myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -95,7 +95,7 @@ export const actions = {
           const myRepos = responseJson.repos
           console.log('MyRepos', myRepos)
           commit('SET_MY_REPOS', myRepos);
-          commit('SET_MY_REPOS_CURRENT_PAGE', currentPage);
+          commit('SET_MY_REPOS_CURRENT_PAGE', page);
 
         } else {
           commit('SET_MY_REPOS', [])
@@ -109,6 +109,7 @@ export const actions = {
   },
 
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
+    console.log('repo', repo)
     try {
       const url = `${rootState.config.api2Url}/repository/enable`
       const apiKey = rootState.userToken || Cookies.get('user_token')

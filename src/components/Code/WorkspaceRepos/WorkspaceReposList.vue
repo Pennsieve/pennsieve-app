@@ -18,7 +18,7 @@
     <div v-loading="isLoadingRepos">
       <RepoListItem
         workspaceReposView
-        :isTracked="false"
+        :isTracked="repo.tracking"
         v-for="repo in workspaceRepos"
         :key="repo.id"
         :repo="repo"

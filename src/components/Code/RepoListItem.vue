@@ -7,7 +7,7 @@
         </div>
         <div v-if="myReposView" class="repo-info-container">
           <h2>
-            {{ repo.name }}
+            <a :href="getUrl">{{ repo.name }}</a>
           </h2>
           <p>
             {{ repo.description }}
@@ -47,8 +47,16 @@
             <tag-pill
               v-if="myReposView"
               class="mt-8"
-              :indicator-color="trackingStatus.untracked.color"
-              :label="trackingStatus.untracked.label"
+              :indicator-color="
+                isTracked
+                  ? trackingStatus.tracked.color
+                  : trackingStatus.untracked.color
+              "
+              :label="
+                isTracked
+                  ? trackingStatus.tracked.label
+                  : trackingStatus.untracked.label
+              "
             >
             </tag-pill>
           </div>
@@ -57,14 +65,14 @@
       </el-col>
       <el-col :span="7" class="actions-container">
         <button
-          v-if="!isTracked && myReposView"
+          v-if="!repo.tracking && myReposView"
           @click="handleStartTrackingClick"
           class="text-button"
         >
           Start Tracking
         </button>
         <button
-          v-if="isTracked && myReposView"
+          v-if="repo.tracking && myReposView"
           @click="handleStopTrackingClick"
           class="text-button"
         >
@@ -112,7 +120,6 @@ export default {
       type: Object,
       required: true,
     },
-    // currently isTracked value is not available from the repo object, integrate it when available
     isTracked: {
       type: Boolean,
       required: true,
@@ -156,6 +163,9 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+    getUrl: function () {
+      return this.repo.url;
+    },
     isRepoOwner: function () {
       const ownerId = propOr("", "owner", this.repo);
       return ownerId === propOr("", "id", this.profile);
