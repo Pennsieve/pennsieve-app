@@ -7,15 +7,15 @@ const initialState = () => ({
     size: 10,
     currentPage: 1
   },
-  myReposCount: 25,
+  myReposCount: 0,
   myReposLoaded: false,
   workspaceRepos: [],
   workspaceReposPaginationParams: {
-    limit: 5,
+    limit: 10,
     offset: 0,
     currentPage: 1
   },
-  workspaceReposCount: 5,
+  workspaceReposCount: 0,
   workspaceReposLoaded: false
 })
 
