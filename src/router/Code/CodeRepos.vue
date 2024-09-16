@@ -83,7 +83,7 @@ export default {
     };
   },
   mounted() {
-    console.log("this.$route in CodeRepos", this.$route);
+    console.log("this.$route in CodeRepos.vue", this.$route);
   },
   computed: {
     configView: function () {

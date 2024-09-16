@@ -31,7 +31,7 @@ export default {
     return {};
   },
   async mounted() {
-    console.log("this.$route:", this.$route.params.repoName); // you have the repoId here passed in through route props. Access it like this.
+    console.log("this.$route.params.repoName:", this.$route.params.repoName); // you have the repoId here passed in through route props. Access it like this.
     try {
     } catch (err) {
       console.error(err);
