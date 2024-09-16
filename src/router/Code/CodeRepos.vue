@@ -1,6 +1,7 @@
 <template>
   <bf-page>
     <!-- My Repos and Workspace Repos-->
+    <div class="back-btn">(6) back button</div>
     <bf-rafter
       v-if="!configView"
       slot="heading"
@@ -96,6 +97,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
+.back-btn {
+  background-color: #f7f7f7;
+  padding: 12px;
+}
 .description {
   max-width: 600px;
 }

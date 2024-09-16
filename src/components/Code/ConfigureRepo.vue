@@ -3,10 +3,16 @@
     <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>Sorry! Something went wrong.</p>
     </bf-empty-page-state>
-    <div>
-      <!-- Configure Repo View goes here -->
-      This is the view for {{ $route.params.repoName }}
-    </div>
+    <!-- (1) Automatic Publication check box goes here -->
+    <div>(1) automatic publication check box goes here</div>
+    <!-- (2) Repo Name Greyed out input select goes here -->
+    <div>(2) repo name</div>
+    <!-- (3) Name Input Select goes Here -->
+    <div>(3) input select</div>
+    <!-- (4) Subtitle text box goes here -->
+    <div>(4) text box</div>
+    <!-- (5) Tags Input Select goes here -->
+    <div>(5) tags</div>
   </bf-stage>
 </template>
 
