@@ -80,7 +80,7 @@
         </button>
         <!-- Link to Config View in My Repos Tab -->
         <router-link
-          v-if="myeReposView"
+          v-if="myReposView"
           :to="{
             name: 'configure-repo',
             params: { repoName: repo.name },
