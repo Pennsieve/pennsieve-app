@@ -7,15 +7,15 @@ const initialState = () => ({
     size: 10,
     currentPage: 1
   },
-  myReposCount: 25,
+  myReposCount: 0,
   myReposLoaded: false,
   workspaceRepos: [],
   workspaceReposPaginationParams: {
-    limit: 5,
+    limit: 10,
     offset: 0,
     currentPage: 1
   },
-  workspaceReposCount: 5,
+  workspaceReposCount: 0,
   workspaceReposLoaded: false
 })
 
@@ -53,7 +53,6 @@ export const mutations = {
 }
 
 export const actions = {
-
   /*
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 
@@ -183,7 +182,7 @@ export const actions = {
     }
   },
   publishCodeRepo: async ({commit, rootState}, { repo }) => {
-    console.log('BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
+    console.log('TODO: BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
   }
 }
 

@@ -17,8 +17,6 @@ const BfNavigationSecondary = () => import('../components/bf-navigation/BfNaviga
 
 const Datasets = () => import('./Datasets/Datasets.vue')
 
-
-
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
@@ -48,8 +46,6 @@ const Redirect = () => import('./Redirect/Redirect.vue')
  * GitHubRedirect
  */
 const GitHubRedirect = () => import('../components/GitHub/GitHubRedirect.vue')
-
-
 
 /**
  * Publishing Components
@@ -90,10 +86,17 @@ const TeamsList = () => import('../components/teams/list/TeamsList.vue')
 const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
-const CodeRepos = () => import('./Code/CodeRepos.vue')
-const MyRepos = () => import('../components/Code/MyRepos/MyReposList.vue')
-const WorkspaceRepos = () => import('../components/Code/WorkspaceRepos/WorkspaceReposList.vue')
+/**
+ * Code Repos Components
+ */
+const CodeRepos = () => import('./Code/CodeRepos.vue') // view you see at "/code" FE route - redirects to "/code/myRepos" if you hit "/code" directly
+const MyRepos = () => import('../components/Code/MyReposList.vue') // user-specific view -- displays the user's repos to them once they link their Github account, which they can do at FE route "/:orgId/profile"
+const WorkspaceRepos = () => import('../components/Code/WorkspaceReposList.vue') // once a repo is tracked, it shows up here after it is finished processing (doesn't happen immediately)
+const ConfigureRepo = () => import('../components/Code/ConfigureRepo.vue') // a repo-specific settings view 
 
+/**
+ * Dataset Settings
+ */
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
 /**
@@ -294,7 +297,7 @@ const router = createRouter({
         navigation: true,
         navigationSecondary: true,
       },
-      meta: { hideSecondaryNav: false},
+      meta: { hideSecondaryNav: false },
       children: [
 
         {
@@ -601,6 +604,14 @@ const router = createRouter({
           path: 'workspace-repos',
           components: {
             stage: WorkspaceRepos,
+          },
+          props: true
+        },
+        {
+          name: 'configure-repo',  
+          path: 'configure-repo/:repoName',  
+          components: {
+            stage: ConfigureRepo,  
           },
           props: true
         }

@@ -83,7 +83,7 @@ export default {
         EventBus.$emit("toast", {
           detail: {
             type: "success",
-            msg: "Your request has been successfully submitted.",
+            msg: "TODO: Hit the real /repository/publish endpoint and then change this message to: Your request has been successfully submitted.",
           },
         });
       } catch (error) {
