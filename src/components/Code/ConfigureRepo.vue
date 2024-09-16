@@ -6,7 +6,7 @@
     <!-- (1) Automatic Publication check box goes here -->
     <div>(1) automatic publication check box goes here</div>
     <!-- (2) Name Input Select goes Here -->
-    <div>(2) input select</div>
+    <div>(2) subtitle</div>
     <!-- (3) Subtitle text box goes here -->
     <div>(3) text box</div>
     <!-- (4) Tags Input Select goes here -->
