@@ -1,24 +1,17 @@
 <template>
-  <div class="bf-dataset-list-item" >
-    <el-row
-      type="flex"
-      :gutter="32"
-    >
+  <div class="bf-dataset-list-item">
+    <el-row type="flex" :gutter="32">
       <el-col :sm="14">
         <div class="dataset-info">
           <img
             :src="datasetBanner"
             :alt="datasetBannerAlt"
             class="bf-dataset-list-item-banner-image mr-16"
-          >
+          />
           <div>
             <h2>
               <router-link :to="datasetLink">
-                <IconLockFilled
-                  v-if="datasetLocked"
-                  :height="16"
-                  :width="16"
-                />
+                <IconLockFilled v-if="datasetLocked" :height="16" :width="16" />
                 {{ dataset.content.name }}
               </router-link>
             </h2>
@@ -27,32 +20,27 @@
               class="publish-info mb-8"
             >
               <!-- Published to Pennsieve Discover -->
-              <template v-if="dataset.publication.type !== PublicationType.EMBARGO">
-                <IconDiscover
-                  :height="15"
-                  :width="15"
-                />
+              <template
+                v-if="dataset.publication.type !== PublicationType.EMBARGO"
+              >
+                <IconDiscover :height="15" :width="15" />
                 <p>
                   Published a copy on
                   <strong>{{ publishedDate }}</strong>
-                  <a
-                    :href="discoverLink"
-                    target="_blank"
-                  >
-                    View on Discover
-                  </a>
+                  <a :href="discoverLink" target="_blank"> View on Discover </a>
                 </p>
               </template>
 
               <!-- Embargoed dataset -->
-              <template v-if="dataset.publication.type === PublicationType.EMBARGO">
-                <IconDiscover
-                  :height="15"
-                  :width="15"
-                />
+              <template
+                v-if="dataset.publication.type === PublicationType.EMBARGO"
+              >
+                <IconDiscover :height="15" :width="15" />
                 <p>
                   Embargoed until
-                  <strong>{{ formatDate(dataset.publication.embargoReleaseDate) }}</strong>
+                  <strong>{{
+                    formatDate(dataset.publication.embargoReleaseDate)
+                  }}</strong>
                 </p>
               </template>
             </div>
@@ -61,10 +49,7 @@
               v-if="publishStatus === 'PUBLISH_FAILED'"
               class="publish-info mb-8 error"
             >
-              <IconWarningCircle
-                :height="15"
-                :width="15"
-              />
+              <IconWarningCircle :height="15" :width="15" />
               <p>
                 Dataset failed to publish
                 <router-link
@@ -72,8 +57,8 @@
                   :to="{
                     name: 'dataset-settings',
                     params: {
-                      datasetId: dataset.content.id
-                    }
+                      datasetId: dataset.content.id,
+                    },
                   }"
                   class="ml-8"
                 >
@@ -104,8 +89,8 @@
                   :to="{
                     name: 'dataset-settings',
                     params: {
-                      datasetId: dataset.content.id
-                    }
+                      datasetId: dataset.content.id,
+                    },
                   }"
                 >
                   Add a description
@@ -130,37 +115,25 @@
           </div>
         </div>
       </el-col>
-      <el-col
-        :sm="4"
-        class="list-item-col-spacer"
-      >
+      <el-col :sm="4" class="list-item-col-spacer">
         <div class="bf-dataset-list-item-status">
+          <!-- No Status is coming back from the API for most datasets, but they do for SPARC at least. See SPARC prod. -->
           <tag-pill
+            v-if="!isPublished"
+            class="mt-8"
             :indicator-color="dataset.status.color"
             :label="formatDatasetStatus"
           />
-
           <tag-pill
             v-if="isPublished"
             class="mt-8"
-            :has-indicator="false"
             :indicator-color="publicationStatusColor"
             :label="publicatonStatus"
           >
-
-<!--            <svg-icon-->
-<!--              slot="prefix"-->
-<!--              class="icon-publish-status"-->
-<!--              name="icon-public"-->
-<!--              height="12"-->
-<!--              width="12"-->
-<!--            />-->
           </tag-pill>
         </div>
       </el-col>
-      <el-col
-        :sm="6"
-      >
+      <el-col :sm="6">
         <div class="bf-dataset-list-item-storage">
           <p class="bf-dataset-list-item-stat">
             <strong class="col-label">
@@ -183,72 +156,67 @@ import {
   propEq,
   propOr,
   path,
-  pathOr
-} from 'ramda'
-import {
-  mapActions,
-  mapGetters,
-  mapState
-} from 'vuex'
+  pathOr,
+} from "ramda";
+import { mapActions, mapGetters, mapState } from "vuex";
 
-import BfIconWaiting from '../../../shared/bf-waiting-icon/bf-waiting-icon.vue'
-import TagPill from '../../../shared/TagPill/TagPill.vue'
-import BfStorageMetricsMixin from '../../../../mixins/bf-storage-metrics'
-import FormatDate from '../../../../mixins/format-date'
-import DatasetPublishedData from '../../../../mixins/dataset-published-data'
-import { PublicationType, PublicationStatus, UserFriendlyPublicationStatus, PublicationStatusColor } from '../../../../utils/constants'
+import BfIconWaiting from "../../../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import TagPill from "../../../shared/TagPill/TagPill.vue";
+import BfStorageMetricsMixin from "../../../../mixins/bf-storage-metrics";
+import FormatDate from "../../../../mixins/format-date";
+import DatasetPublishedData from "../../../../mixins/dataset-published-data";
+import {
+  PublicationType,
+  PublicationStatus,
+  UserFriendlyPublicationStatus,
+  PublicationStatusColor,
+} from "../../../../utils/constants";
 import IconLockFilled from "../../../icons/IconLockFilled.vue";
 import IconDiscover from "../../../icons/IconDiscover.vue";
 import IconWarningCircle from "../../../icons/IconWarningCircle.vue";
 
 export default {
-  name: 'BfDatasetListItem',
+  name: "BfDatasetListItem",
 
   components: {
     IconWarningCircle,
     IconDiscover,
     IconLockFilled,
     BfIconWaiting,
-    TagPill
+    TagPill,
   },
 
-  mixins: [
-    BfStorageMetricsMixin,
-    FormatDate,
-    DatasetPublishedData
-  ],
+  mixins: [BfStorageMetricsMixin, FormatDate, DatasetPublishedData],
 
   props: {
     dataset: {
       type: Object,
-      default: () => ({})
+      default: () => ({}),
     },
     showInfo: {
       type: Boolean,
-      default: true
+      default: true,
     },
   },
 
   computed: {
-    ...mapGetters([
-      'hasFeature',
-    ]),
+    ...mapGetters(["hasFeature"]),
 
     ...mapState([
-      'profile',
-      'activeOrganization',
-      'orgMembers',
-      'config',
-      'userToken',
-      'orgDatasetStatuses'
+      "profile",
+      "activeOrganization",
+      "orgMembers",
+      "config",
+      "userToken",
+      "orgDatasetStatuses",
     ]),
 
     /**
      * Returns the dataset status displayName
      * @returns {String}
      */
-    formatDatasetStatus: function() {
-      return pathOr('', ['status', 'displayName'], this.dataset)
+    formatDatasetStatus: function () {
+      return pathOr("", ["status", "displayName"], this.dataset);
     },
 
     /**
@@ -256,15 +224,15 @@ export default {
      * and returns color as appropriate
      * @returns {String}
      */
-    checkDatasetStatus: function() {
-      const status = {
-        'In Review': '#FFB000',
-        'Work in Progress': '#F1F1F3',
-        'No Status': '#F1F1F3',
-        'Completed': '#17BB62'
-      }
-      return status[this.formatDatasetStatus]
-    },
+    // checkDatasetStatus: function () {
+    //   const status = {
+    //     "In Review": "#FFB000",
+    //     "Work in Progress": "#F1F1F3",
+    //     "No Status": "#F1F1F3",
+    //     Completed: "#17BB62",
+    //   };
+    //   return status[this.formatDatasetStatus];
+    // },
 
     /**
      * This returns the font color of the dataset status on the list
@@ -272,22 +240,24 @@ export default {
      * for the rest of the statuses
      * @returns {String}
      */
-    statusFontColor: function() {
-      return this.formatDatasetStatus === 'Work in Progress' ? '#2760FF' : '#404554'
+    statusFontColor: function () {
+      return this.formatDatasetStatus === "Work in Progress"
+        ? "#2760FF"
+        : "#404554";
     },
 
     /**
      * Compute if the dataset is shared
      * @returns {Boolean}
      */
-    isShared: function() {
+    isShared: function () {
       const collaboratorCount = compose(
         sum,
         values,
-        propOr({}, 'collaboratorCounts')
-      )(this.dataset)
+        propOr({}, "collaboratorCounts")
+      )(this.dataset);
 
-      return collaboratorCount > 0
+      return collaboratorCount > 0;
     },
 
     /**
@@ -295,39 +265,39 @@ export default {
      * owner of the dataset
      * @returns {Boolean}
      */
-    isOwner: function() {
-      return this.dataset.owner === this.profile.id
+    isOwner: function () {
+      return this.dataset.owner === this.profile.id;
     },
 
     /**
      * Compute dataset storage display
      * @returns {String}
      */
-    storage: function() {
-      return this.formatMetric(this.dataset.storage)
+    storage: function () {
+      return this.formatMetric(this.dataset.storage);
     },
 
     /**
      * Compute formatted timestamp
      * @returns {String}
      */
-    updated: function() {
-      return this.formatDate(this.dataset.content.updatedAt)
+    updated: function () {
+      return this.formatDate(this.dataset.content.updatedAt);
     },
 
     /**
      * Compute owner of dataset
      * @returns {String}
      */
-    owner: function() {
-      const ownerId = propOr('', 'owner', this.dataset)
-      if (ownerId === propOr('', 'id', this.profile)) {
-        return 'You'
+    owner: function () {
+      const ownerId = propOr("", "owner", this.dataset);
+      if (ownerId === propOr("", "id", this.profile)) {
+        return "You";
       } else {
-        const owner = find(propEq('id', ownerId), this.orgMembers)
-        const firstName = propOr('', 'firstName', owner)
-        const lastName = propOr('', 'lastName', owner)
-        return `${firstName} ${lastName}`
+        const owner = find(propEq("id", ownerId), this.orgMembers);
+        const firstName = propOr("", "firstName", owner);
+        const lastName = propOr("", "lastName", owner);
+        return `${firstName} ${lastName}`;
       }
     },
 
@@ -335,12 +305,12 @@ export default {
      * Get dataset link
      * @returns {Object}
      */
-    datasetLink: function() {
-      const datasetId = path(['content', 'id'], this.dataset)
-      let routeName = 'dataset-overview'
+    datasetLink: function () {
+      const datasetId = path(["content", "id"], this.dataset);
+      let routeName = "dataset-overview";
 
-      const link = { name: routeName, params: { datasetId }}
-      return datasetId ? link : ''
+      const link = { name: routeName, params: { datasetId } };
+      return datasetId ? link : "";
     },
 
     /**
@@ -348,81 +318,84 @@ export default {
      * image or placeholder banner image
      * @returns {String}
      */
-    datasetBanner: function() {
-      return this.dataset.bannerPresignedUrl || '/images/banner-placeholder.jpg'
+    datasetBanner: function () {
+      return (
+        this.dataset.bannerPresignedUrl || "/images/banner-placeholder.jpg"
+      );
     },
 
     /**
      * Compute banner image alt text
      * @returns {String}
      */
-    datasetBannerAlt: function() {
-      const datasetName = pathOr('', ['content', 'name'], this.dataset)
-      return `Banner image for ${datasetName}`
+    datasetBannerAlt: function () {
+      const datasetName = pathOr("", ["content", "name"], this.dataset);
+      return `Banner image for ${datasetName}`;
     },
 
-    datasetLocked: function() {
-      return Boolean(this.dataset.locked)
+    datasetLocked: function () {
+      return Boolean(this.dataset.locked);
     },
 
     /**
      * Compute publication status
      * @returns {String}
      */
-    publicatonStatus: function() {
-      const status = this.dataset.publication.status
+    publicatonStatus: function () {
+      const status = this.dataset.publication.status;
       if (status == PublicationStatus.REQUESTED) {
-        return UserFriendlyPublicationStatus.REQUESTED
+        return UserFriendlyPublicationStatus.REQUESTED;
       } else if (status == PublicationStatus.COMPLETED) {
-        return UserFriendlyPublicationStatus.COMPLETED
+        return UserFriendlyPublicationStatus.COMPLETED;
       } else if (status == PublicationStatus.REJECTED) {
-        return UserFriendlyPublicationStatus.REJECTED
+        return UserFriendlyPublicationStatus.REJECTED;
       } else {
-        return ''
+        return "";
       }
     },
 
     /**
-      * Compute publication status color
-      * @returns {String}
-      */
-    publicationStatusColor: function() {
-      const status = this.dataset.publication.status
+     * Compute publication status color
+     * @returns {String}
+     */
+    publicationStatusColor: function () {
+      console.log(
+        "this.dataset.publication.status",
+        this.dataset.publication.status
+      );
+      const status = this.dataset.publication.status;
       if (status == PublicationStatus.REQUESTED) {
-        return PublicationStatusColor.REQUESTED
+        return PublicationStatusColor.REQUESTED;
       } else if (status == PublicationStatus.COMPLETED) {
-        return PublicationStatusColor.COMPLETED
+        return PublicationStatusColor.COMPLETED;
       } else if (status == PublicationStatus.REJECTED) {
-        return PublicationStatusColor.REJECTED
+        return PublicationStatusColor.REJECTED;
       } else {
-        return '' //	should we return a default color here?
+        return ""; //	should we return a default color here?
       }
     },
 
-
-    PublicationType: function() {
-      return PublicationType
-    }
+    PublicationType: function () {
+      return PublicationType;
+    },
   },
 
   methods: {
-    ...mapActions([
-      'updateDataset'
-    ]),
+    ...mapActions(["updateDataset"]),
 
     /**
      * Show intercom window
      */
-    showIntercom: function() {
+    showIntercom: function () {
       // window.Intercom('show')
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
-@import '../../../../assets/_list-item.scss';
+@import "../../../../assets/_variables.scss";
+@import "../../../../assets/_list-item.scss";
 
 .list-item-status-wrapper {
   color: $gray_4;
@@ -453,7 +426,7 @@ export default {
   margin: -2px 4px -2px -2px;
 }
 
-@media only screen and (max-width: 1200px){
+@media only screen and (max-width: 1200px) {
   .list-item-status-wrapper {
     width: 70px;
     height: fit-content;
