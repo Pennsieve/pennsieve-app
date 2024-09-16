@@ -64,6 +64,10 @@
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
+        <!-- There is no Start/ Stop Tracking button on the Workspace Repos view because 
+              we don't have access to the tracking property from the /datasets endpoint we 
+              use to fetch the data for that view 
+        -->
         <button
           v-if="!repo.tracking && myReposView"
           @click="handleStartTrackingClick"
