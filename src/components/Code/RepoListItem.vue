@@ -90,9 +90,7 @@
             params: { repoName: repo.name },
           }"
         >
-          <button @click="handleConfigureClick" class="text-button">
-            Configure
-          </button>
+          <button class="text-button">Configure</button>
         </router-link>
         <!-- Link to Config View in Workspace Repos Tab -->
         <router-link
@@ -102,9 +100,7 @@
             params: { repoName: repo.content.name },
           }"
         >
-          <button @click="handleConfigureClick" class="text-button">
-            Configure
-          </button>
+          <button class="text-button">Configure</button>
         </router-link>
         <button @click="handlePublishLatestClick" class="text-button">
           Publish
@@ -184,9 +180,7 @@ export default {
       isPublishCodeRepoDialogVisible: false,
     };
   },
-  mounted() {
-    console.log("this.repo", this.repo.name);
-  },
+  mounted() {},
   computed: {
     ...mapGetters(["hasFeature"]),
     ...mapState([
@@ -238,9 +232,6 @@ export default {
     handleStopTrackingClick: function () {
       this.stopTrackingMode = true;
       this.isChangeRepoTrackingDialogVisible = true;
-    },
-    handleConfigureClick: function () {
-      console.log("configure click");
     },
     handlePublishLatestClick: function () {
       this.isPublishCodeRepoDialogVisible = true;
