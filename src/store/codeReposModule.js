@@ -183,7 +183,7 @@ export const actions = {
     }
   },
   publishCodeRepo: async ({commit, rootState}, { repo }) => {
-    console.log('BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
+    console.log('TODO: BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
   }
 }
 
