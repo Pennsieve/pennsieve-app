@@ -1,7 +1,7 @@
 <template>
   <bf-page>
     <!-- My Repos and Workspace Repos-->
-    <div v-if="configView" class="back-btn">(6) back button</div>
+    <div v-if="configView" class="back-btn">(5) back button</div>
     <bf-rafter
       v-if="!configView"
       slot="heading"
