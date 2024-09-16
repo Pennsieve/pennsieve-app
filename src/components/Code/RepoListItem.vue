@@ -76,7 +76,7 @@
           Track Repository
         </button>
         <button
-          v-if="repo.tracking && myReposView"
+          v-if="(repo.tracking && myReposView) || workspaceReposView"
           @click="handleStopTrackingClick"
           class="text-button"
         >
@@ -94,7 +94,7 @@
         </router-link>
         <!-- Link to Config View in Workspace Repos Tab -->
         <router-link
-          v-if="workspaceReposView && repo.tracking"
+          v-if="workspaceReposView"
           :to="{
             name: 'configure-repo',
             params: { repoName: repo.content.name },
@@ -103,7 +103,7 @@
           <button class="text-button">Configure</button>
         </router-link>
         <button
-          v-if="repo.tracking"
+          v-if="repo.tracking || workspaceReposView"
           @click="handlePublishLatestClick"
           class="text-button"
         >
