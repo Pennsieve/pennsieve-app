@@ -53,7 +53,6 @@ export const mutations = {
 }
 
 export const actions = {
-
   /*
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 

@@ -29,8 +29,8 @@
 
 <script>
 import { mapState, mapActions } from "vuex";
-import RepoListItem from "../RepoListItem.vue";
-import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import RepoListItem from "./RepoListItem.vue";
+import BfEmptyPageState from "../shared/bf-empty-page-state/BfEmptyPageState.vue";
 
 export default {
   name: "WorkspaceRepos",
@@ -94,7 +94,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@import "../../assets/_variables.scss";
 
 .pagination-container {
   display: flex;

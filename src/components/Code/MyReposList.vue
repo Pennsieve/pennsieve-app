@@ -28,8 +28,8 @@
 </template>
 
 <script>
-import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
-import RepoListItem from "../RepoListItem.vue";
+import BfEmptyPageState from "../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import RepoListItem from "./RepoListItem.vue";
 import { mapActions, mapState } from "vuex";
 
 export default {
@@ -85,7 +85,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@import "../../assets/_variables.scss";
 
 .pagination-container {
   display: flex;

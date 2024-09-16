@@ -78,9 +78,16 @@
         >
           Stop Tracking
         </button>
-        <button @click="handleConfigureClick" class="text-button">
-          Configure
-        </button>
+        <router-link
+          :to="{
+            name: 'configure-repo',
+            params: { repoName: repo.name },
+          }"
+        >
+          <button @click="handleConfigureClick" class="text-button">
+            Configure
+          </button>
+        </router-link>
         <button @click="handlePublishLatestClick" class="text-button">
           Publish
         </button>
@@ -158,6 +165,9 @@ export default {
       isChangeRepoTrackingDialogVisible: false,
       isPublishCodeRepoDialogVisible: false,
     };
+  },
+  mounted() {
+    console.log("this.repo", this.repo.name);
   },
   computed: {
     ...mapGetters(["hasFeature"]),
