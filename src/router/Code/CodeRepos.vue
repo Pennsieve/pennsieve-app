@@ -1,7 +1,13 @@
 <template>
   <bf-page>
     <!-- My Repos and Workspace Repos-->
-    <div v-if="configView" class="back-btn">(5) back button</div>
+    <div v-if="configView" class="back-btn">
+      <router-link
+        :to="previousRoute"
+      >
+        <button class="text-button"> &lt- Back to list</button>
+      </router-link>
+    </div>
     <bf-rafter
       v-if="!configView"
       slot="heading"
@@ -92,6 +98,14 @@ export default {
     configRepoTitle: function () {
       return `Configure Repo: ${this.$route.params.repoName}`;
     },
+    previousRoute() {
+      const router = this.$router;
+      if (router.options.history.state.back) {
+        return router.options.history.state.back;
+      } else {
+        return { name: 'my-repos' };
+      }
+    }
   },
 };
 </script>

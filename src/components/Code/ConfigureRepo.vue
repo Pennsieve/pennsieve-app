@@ -1,60 +1,89 @@
 <template>
-  <bf-stage>
-    <bf-empty-page-state class="empty" v-if="showEmptyState">
-      <p>Sorry! Something went wrong.</p>
-    </bf-empty-page-state>
-    <!-- (1) Automatic Publication check box goes here -->
-    <div>(1) automatic publication check box goes here</div>
-    <!-- (2) Name Input Select goes Here -->
-    <div>(2) subtitle</div>
-    <!-- (3) Subtitle text box goes here -->
-    <div>(3) text box</div>
-    <!-- (4) Tags Input Select goes here -->
-    <div>(4) tags</div>
+  <bf-stage class="configure-repo-wrapper">
+    <div class="input-item">
+      <el-checkbox
+        v-model="isAutoPublished"
+        label="Automatic publication"
+        size="large"
+      >
+      </el-checkbox>
+      <p>Automatically publish a version on new releases from GitHub</p>
+    </div>
+    <div class="input-item repo-name">
+      <label for="repoName">Repository Name</label>
+      <el-input
+        v-model="repoName"
+        style="width: 320px"
+        placeholder="Repository Name (from GitHub)"
+      />
+    </div>
+    <div class="input-item given-name">
+      <label for="givenName">Name (Required)</label>
+      <el-input
+        v-model="givenName"
+        style="width: 320px"
+        placeholder="user-test"
+      />
+    </div>
+    <div class="input-item subtitle">
+      <label for="subtitle">Subtitle (required to publish)</label>
+      <el-input
+        v-model="subtitle"
+        style="width: 320px"
+        :rows="3"
+        autosize
+        type="textarea"
+        placeholder="any additional details here"
+      />
+    </div>
+    <div class="input-item tags">
+      <label for="tags">Tags</label>
+      <el-input
+              v-model="tags"
+              placeholder="Add tags"
+              style="width: 320px"
+            >
+              <template #prefix>
+                <IconTag
+                  :height="20"
+                  :width="20"
+                  />
+              </template>
+            </el-input>
+    </div>
   </bf-stage>
 </template>
 
-<script>
-import BfEmptyPageState from "../shared/bf-empty-page-state/BfEmptyPageState.vue";
-import RepoListItem from "./RepoListItem.vue";
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
+import { ref } from "vue";
 
-export default {
+defineOptions({
   name: "ConfigureRepo",
-  components: {
-    RepoListItem,
-    BfEmptyPageState,
-  },
-  data() {
-    return {};
-  },
-  async mounted() {
-    console.log("this.$route.params.repoName:", this.$route.params.repoName); // you have the repoId here passed in through route props. Access it like this.
-    try {
-    } catch (err) {
-      console.error(err);
-    }
-  },
-  computed: {
-    ...mapState("codeReposModule", []),
-    showEmptyState: function () {
-      return false; //TODO: add real condition
-    },
-  },
-  methods: {
-    ...mapActions("codeReposModule", []),
-  },
-};
+});
+
+const isAutoPublished = ref(false);
+const repoName = ref('')
+const givenName = ref('')
+const subtitle = ref('')
+const tags = ref('')
 </script>
 
-<style scoped lang="scss">
-@import "../../assets/_variables.scss";
+<style lang="scss">
+.configure-repo-wrapper {
+  .input-item {
+    margin-bottom: 24px;
+  }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  span {
+    font-weight: 700;
+  }
+
+  .repo-name, .given-name, .subtitle, .tags {
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
+  }
 }
 </style>
