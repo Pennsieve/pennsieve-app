@@ -75,7 +75,7 @@
             </template>
 
             <template #default>
-              Add properties to the selected model. Drag a connection between models in the visualizer to create a property that points to a single record of another model.
+              Add properties to the selected model. Drag a connection between models in the visualizer to create a property that points to a <b>single record</b> of another model.
             </template>
           </el-popover>
 
@@ -170,7 +170,7 @@
             </template>
 
             <template #default>
-              Relationships link models using where any number of records of model A can link to any number of records of model B. Use the visualizer to connect models that should be linked.
+              Relationships link models by enabling <b>any number</b> of records of model A to link to <b>any number</b> of records of model B. Use the visualizer to connect models that should be linked.
             </template>
           </el-popover>
 
