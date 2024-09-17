@@ -1,12 +1,11 @@
 <script setup>
-import {computed, nextTick, ref} from 'vue'
+import {computed, watch, nextTick, ref,onMounted} from 'vue'
 import {MarkerType, useVueFlow, VueFlow} from '@vue-flow/core'
 import {Background} from '@vue-flow/background'
 import {Controls} from '@vue-flow/controls'
 import {MiniMap} from '@vue-flow/minimap'
 import * as site from '../../../../site-config/site.json';
 import {useLayout} from './useLayout'
-
 import {useHandleXhrError, useSendXhr} from '@/mixins/request/request_composable'
 import {useStore} from 'vuex';
 import {pathOr} from "ramda";
@@ -16,82 +15,77 @@ import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
 import CreateConceptDialog from "@/components/datasets/management/CreateConceptDialog/CreateConceptDialog.vue";
 import CreateLinkedPropDialog from "@/components/datasets/records/GraphBrowser/CreateLinkedPropDialog.vue";
-
 import SidePanel from "@/components/datasets/records/GraphBrowser/SidePanel.vue";
-
+import AddEditModelProperty from "@/components/datasets/records/GraphBrowser/AddEditModelProperty.vue";
+import DeletePropertyDialog from "@/components/datasets/records/GraphBrowser/DeletePropertyDialog.vue";
+import DeleteLinkedPropDialog from "@/components/datasets/records/GraphBrowser/DeleteLinkedPropDialog.vue";
+import DeleteRelationshipDialog from "@/components/datasets/records/GraphBrowser/DeleteRelationshipDialog.vue";
+import DeleteModelDialog from "@/components/datasets/records/GraphBrowser/DeleteModelDialog.vue";
 
 const props = defineProps(['orgId', 'datasetId','list-type'])
-
 const route = useRoute()
 const store = useStore()
-
 const { layout } = useLayout()
-
-/**
- * `useVueFlow` provides:
- * 1. a set of methods to interact with the VueFlow instance (like `fitView`, `setViewport`, `addEdges`, etc)
- * 2. a set of event-hooks to listen to VueFlow events (like `onInit`, `onNodeDragStop`, `onConnect`, etc)
- * 3. the internal state of the VueFlow instance (like `nodes`, `edges`, `viewport`, etc)
- */
-const { onInit, onNodeDragStop, onConnect, addEdges, fitView, findNode, getSelectedNodes } = useVueFlow()
-
-const edges = ref([])
-const nodes = ref([])
-
-let createConceptDialogVisible = ref(false)
-let createLinkedPropDialogVisible = ref(false)
-
-
-
-/**
- * Create a new concept
- */
-function createModel() {
-  createConceptDialogVisible.value = true
-}
-
-function closeCreateConceptDialog() {
-
-  let vueFlowInstance = useVueFlow()
-  getGraphData(vueFlowInstance)
-  store.dispatch('metadataModule/fetchModels')
-  createConceptDialogVisible.value = false
-}
+const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } = useVueFlow()
 
 /*
- * @param {addedRelationship: boolean, connection: Object} data
+Bootup and configuration of component
  */
-function closeCreateLinkedPropDialog(data) {
-  if (data.addedRelationship) {
-    const strokeColor = data.type === "schemaRelationship" ?  "#F9A23A" : "#011F5B"
+onMounted(() => {
+  store.dispatch('metadataModule/fetchModels')
+})
+watch(route, async (newQuestion, oldQuestion) => {
+  const datasetId = pathOr('', ['params', 'datasetId'], route)
+  if (site.apiUrl && datasetId) {
+    let url = `${site.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${store.state.userToken}`
+    fetchStringSubtypes(url)
 
-
-    let connection = {
-      source: data.connection.source.data.id,
-      target: data.connection.target.data.id,
-      type: 'smoothstep',
-      label: data.displayName,
-      markerEnd: MarkerType.ArrowClosed,
-      style: { stroke: strokeColor, color: strokeColor },
-    }
-    addEdges(connection)
-  }
-
-  createLinkedPropDialogVisible.value = false
-
-
+  }})
+const datasetId = computed( () => {
+  return pathOr('', ['params', 'datasetId'])(route)
+})
+const stringSubtypes = ref(Object)
+function fetchStringSubtypes(url) {
+  useSendXhr(url,{
+    header: {
+      'Authorization': `bearer ${store.state.userToken}`
+    },
+    method: 'GET',
+  })
+    .then(subTypes => {
+      stringSubtypes.value = Object.entries(subTypes).reduce(
+        (options, [val, config]) => ([...options, { value: val, label: config.label, regex: config.regex }]),
+        []
+      )
+    })
+    .catch(response => {
+      useHandleXhrError(response)
+    })
 }
 
-/**
- * This is a Vue Flow event-hook which can be listened to from anywhere you call the composable, instead of only on the main component
- * Any event that is available as `@event-name` on the VueFlow component is also available as `onEventName` on the composable and vice versa
- *
- * onInit is called when the VueFlow viewport is initialized
+
+/*
+VueFlow Config and Create Relationships
  */
+const minimapLocation = computed( () => {
+  if (sidePanelVisible.value) {
+    return "bottom-left"
+  }
+
+  return "bottom-right"
+})
 onInit((vueFlowInstance) => {
   getGraphData(vueFlowInstance)
 })
+let createRelationshipInput = {source:null, target: null}
+onConnect((connection) => {
+  // Find Node Name
+  const sourceNode = findNode(connection.source)
+  const targetNode = findNode(connection.target)
 
+  createRelationshipInput = {source: sourceNode, target: targetNode, sourceHandle: connection.sourceHandle }
+  createLinkedPropDialogVisible.value = true
+})
 function focusNode(event) {
   fitView({
     nodes: [event.id],
@@ -100,34 +94,21 @@ function focusNode(event) {
   })
 }
 
-/**
- * Toggle models list visibility and scroll list to the top
+/*
+Side Panel Logic
  */
-let modelsListVisible = ref(true)
-
-const minimapLocation = computed( () => {
-  if (modelsListVisible.value) {
-    return "bottom-left"
-  }
-
-  return "bottom-right"
-})
-
-const modelsListArrowDir = computed( () => {
-  if (modelsListVisible.value) {
-    return "right"
-  }
-  return "left"
-})
-
-function toggleModelsList() {
-  modelsListVisible.value = !modelsListVisible.value
+const sidePanelVisible = ref(true)
+function onTogglePanelVisibility() {
+  sidePanelVisible.value = !sidePanelVisible.value
 }
 
+
 /*
-Get GraphData fetched the schema from the server and
-formats the schema into nodes and edges for display.
+Fetch schema Logic
  */
+const edges = ref([])
+const nodes = ref([])
+const allEdges = ref([])
 const graphUrl = computed(() => {
   const apiUrl = site.conceptsUrl
   // const datasetId = pathOr('', ['params', 'datasetId'])(route)
@@ -137,56 +118,18 @@ const graphUrl = computed(() => {
   }
   return null
 })
-
-const datasetId = computed( () => {
-  return pathOr('', ['params', 'datasetId'])(route)
-})
-
-const selectedModelId = computed( () => {
-
-  const s = getSelectedNodes
-  if (s.value.length > 0) {
-    return s.value[0].id
-  }
-
-  return null
-})
-
-function getGraphData(vueFlowInstance) {
-  useSendXhr(graphUrl.value, {
-    header: {
-      'Authorization': `bearer ${store.state.userToken}`
-    }
-  })
-    .then(response => {
-
-      const graphData = transformApiResponse(response)
-      nodes.value = graphData.nodes
-      edges.value = graphData.edges
-      nodes.value = layout(nodes.value, edges.value, 'BT')
-
-      nextTick(() => {
-        vueFlowInstance.fitView()
-      })
-
-
-    })
-    .catch(useHandleXhrError())
-}
-
-/**
- * Transform API GET Response
- * @param {Array} data
- * @returns {Object}
- */
 function transformApiResponse(data) {
 
   const nodes = []
   const edges = []
+  allEdges.value = []
   let edgeMap = new Map()
 
   data.forEach(obj => {
     if (obj.type && (obj.type === 'schemaRelationship' || obj.type === 'schemaLinkedProperty')) {
+
+      allEdges.value.push(obj)
+
       const hasFromNode = data.findIndex(d => d.id === obj.from) >= 0
       const hasToNode = data.findIndex(d => d.id === obj.to) >= 0
 
@@ -207,7 +150,7 @@ function transformApiResponse(data) {
           label: obj.displayName,
           markerEnd: MarkerType.ArrowClosed,
           style: { stroke: strokeColor, color: strokeColor},
-          }
+        }
 
         // Check if the edge already exists. If so, just update label,
         // otherwise, add edge.
@@ -260,42 +203,215 @@ function transformApiResponse(data) {
 
   return { nodes, edges }
 }
+function getGraphData(vueFlowInstance) {
 
-function onTogglePanelVisibility() {
-  modelsListVisible.value = !modelsListVisible.value
+  useSendXhr(graphUrl.value, {
+    header: {
+      'Authorization': `bearer ${store.state.userToken}`
+    }
+  })
+    .then(response => {
+
+      const graphData = transformApiResponse(response)
+      nodes.value = graphData.nodes
+      edges.value = graphData.edges
+      nodes.value = layout(nodes.value, edges.value, 'BT')
+
+      nextTick(() => {
+        vueFlowInstance.fitView()
+      })
+
+
+    })
+    .catch(useHandleXhrError())
+}
+
+/*
+Adding Model Logic
+ */
+const createConceptDialogVisible = ref(false)
+function createModel() {
+  createConceptDialogVisible.value = true
+}
+function closeCreateConceptDialog() {
+
+  let vueFlowInstance = useVueFlow()
+  getGraphData(vueFlowInstance)
+  store.dispatch('metadataModule/fetchModels')
+  createConceptDialogVisible.value = false
+}
+const propertiesForSelectedModel= computed(() => {
+
+  if (selectedModelId.value){
+    console.log(selectedModelId.value)
+    let m = store.getters['metadataModule/getModelById'](selectedModelId.value)
+    return m
+
+  }
+  return []
+
+})
+
+
+/*
+Adding Linked Properties Logic
+ */
+const createLinkedPropDialogVisible = ref(false)
+async function closeCreateLinkedPropDialog(data) {
+
+  createLinkedPropDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    let vueFlowInstance = useVueFlow()
+    getGraphData(vueFlowInstance)
+  });
+
+
+}
+
+/*
+Add Property Dialog Logic
+ */
+const addEditPropertyDialogVisible = ref(false)
+function onOpenPropertyDialog() {
+  addEditPropertyDialogVisible.value = true
+}
+function closeEditPropertyDialog() {
+  addEditPropertyDialogVisible.value = false
+}
+async function onAddProperty() {
+  addEditPropertyDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    store.dispatch("metadataModule/fetchModelProps", selectedModelId.value);
+  });
+}
+const selectedModelId = computed( () => {
+
+  const s = getSelectedNodes
+  if (s.value.length > 0) {
+    return s.value[0].id
+  }
+
+  return ""
+})
+const selectedModel = computed( () => {
+
+  const s = getSelectedNodes
+  if (s.value.length > 0) {
+    return store.getters["metadataModule/getModelById"](s.value[0].id)
+  }
+
+  return {}
+})
+
+/*
+Edit Property Logic
+ */
+function onOpenEditPropertyDialog(event) {
+  selectedProperty.value = event.property
+  addEditPropertyDialogVisible.value = true
+}
+async function onEditProperty() {
+  addEditPropertyDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    store.dispatch("metadataModule/fetchModelProps", selectedModelId.value);
+  });
+}
+
+/*
+Delete Property Dialog Logic
+ */
+const deletePropertyDialogVisible = ref(false)
+const selectedProperty = ref({})
+function onOpenDeletePropertyDialog(event) {
+  selectedProperty.value = event.property
+  deletePropertyDialogVisible.value = true
+
+}
+function onCloseDeletePropertyDialog() {
+  deletePropertyDialogVisible.value = false
+}
+async function onDeleteProperty() {
+  deletePropertyDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    store.dispatch("metadataModule/fetchModelProps", selectedModelId.value);
+  });
+}
+
+/*
+Delete Linked Property Dialog Logic
+ */
+const deleteLinkedPropDialogVisible = ref(false)
+const selectedLinkedProp = ref({})
+function onOpenDeleteLinkedPropDialog(event) {
+  selectedLinkedProp.value = event
+  deleteLinkedPropDialogVisible.value = true
+}
+function onCloseDeleteLinkedPropDialog() {
+  deleteLinkedPropDialogVisible.value = false
+}
+async function onDeleteLinkedProperty() {
+  deleteLinkedPropDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    let vueFlowInstance = useVueFlow()
+    getGraphData(vueFlowInstance)
+  });
+}
+
+/*
+Delete Relationship Dialog Logic
+ */
+const deleteRelationshipDialogVisible = ref(false)
+const selectedRelationship = ref({})
+function onOpenDeleteRelationshipDialog(event) {
+  selectedRelationship.value = event
+  deleteRelationshipDialogVisible.value = true
+}
+function onCloseDeleteRelationshipDialog() {
+  deleteRelationshipDialogVisible.value = false
+}
+async function onDeleteRelationship() {
+  deleteRelationshipDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    let vueFlowInstance = useVueFlow()
+    getGraphData(vueFlowInstance)
+  });
+}
+
+/*
+Delete Model Dialog Logic
+ */
+const deleteModelDialogVisible = ref(false)
+function onOpenDeleteModelDialog() {
+  deleteModelDialogVisible.value = true
+
+}
+function onCloseDeleteModelDialog() {
+  deleteModelDialogVisible.value = false
+}
+async function onDeleteModel() {
+  deleteModelDialogVisible.value = false
+
+  // Need to wait a bit to make sure the property is actually created on the backend.
+  await new Promise(r => setTimeout(r, 500)).then(() => {
+    // store.dispatch('metadataModule/fetchModels')
+    let vueFlowInstance = useVueFlow()
+    getGraphData(vueFlowInstance)
+  });
 }
 
 
-/**
- * onNodeDragStop is called when a node is done being dragged
- *
- * Node drag events provide you with:
- * 1. the event object
- * 2. the nodes array (if multiple nodes are dragged)
- * 3. the node that initiated the drag
- * 4. any intersections with other nodes
- */
-onNodeDragStop(({ event, nodes, node }) => {
-
-  console.log('Node Drag Stop', { event, nodes, node })
-})
-
-
-let createRelationshipInput = ref({source:null, target: null})
-
-/**
- * onConnect is called when a new connection is created.
- *
- * You can add additional properties to your new edge (like a type or label) or block the creation altogether by not calling `addEdges`
- */
-onConnect((connection) => {
-  // Find Node Name
-  const sourceNode = findNode(connection.source)
-  const targetNode = findNode(connection.target)
-
-  createRelationshipInput = {source: sourceNode, target: targetNode, sourceHandle: connection.sourceHandle }
-  createLinkedPropDialogVisible.value = true
-})
 
 </script>
 
@@ -334,12 +450,18 @@ onConnect((connection) => {
       Create Model
     </bf-button>
 
-
     <SidePanel
-      :class="{ 'visible': modelsListVisible }"
-      :panel-visible="modelsListVisible"
+      :class="{ 'visible': sidePanelVisible }"
+      :panel-visible="sidePanelVisible"
       @toggle-panel-visibility="onTogglePanelVisibility"
+      @open-property-dialog="onOpenPropertyDialog"
+      @open-delete-prop-dialog="onOpenDeletePropertyDialog"
+      @open-delete-linked-prop-dialog="onOpenDeleteLinkedPropDialog"
+      @open-delete-relationship-dialog="onOpenDeleteRelationshipDialog"
+      @open-delete-model-dialog="onOpenDeleteModelDialog"
+      @open-edit-property-dialog="onOpenEditPropertyDialog"
       @focus-node="focusNode"
+      :edges="allEdges"
       :model-id="selectedModelId"
     />
 
@@ -355,6 +477,50 @@ onConnect((connection) => {
     :input="createRelationshipInput"
     @close="closeCreateLinkedPropDialog"
   />
+
+  <add-edit-model-property
+    ref="addPropertyDialog"
+    :dialog-visible="addEditPropertyDialogVisible"
+    :model-id="selectedModelId"
+    :string-subtypes="stringSubtypes.value"
+    :property-edit="selectedProperty"
+    :properties="propertiesForSelectedModel"
+    @add-property="onAddProperty"
+    @edit-property="onEditProperty"
+    @close="closeEditPropertyDialog"
+  />
+
+  <delete-property-dialog
+    :model-id="selectedModelId"
+    :property="selectedProperty"
+    :dialog-visible="deletePropertyDialogVisible"
+    @delete-property="onDeleteProperty"
+    @close="onCloseDeletePropertyDialog"
+  />
+
+  <delete-linked-prop-dialog
+    :model-id="selectedModelId"
+    :link="selectedLinkedProp"
+    :dialog-visible="deleteLinkedPropDialogVisible"
+    @delete-property="onDeleteLinkedProperty"
+    @close="onCloseDeleteLinkedPropDialog"
+  />
+
+  <delete-relationship-dialog
+    :model-id="selectedModelId"
+    :link="selectedRelationship"
+    :dialog-visible="deleteRelationshipDialogVisible"
+    @delete-relationship="onDeleteRelationship"
+    @close="onCloseDeleteRelationshipDialog"
+  />
+
+  <delete-model-dialog
+    :model="selectedModel"
+    :dialog-visible="deleteModelDialogVisible"
+    @delete-model="onDeleteModel"
+    @close="onCloseDeleteModelDialog"
+  />
+
 
 </template>
 
@@ -397,33 +563,13 @@ onConnect((connection) => {
   position: absolute;
   right: 16px;
   top: 16px;
+
+  &.second {
+    right: 170px;
+  }
 }
 
-//.models-list-wrap {
-//  border-top: 1px solid $gray_2;
-//  border-left: 1px solid $gray_2;
-//  border-bottom: 1px solid $gray_2;
-//  border-radius: 4px 0px 0 4px;
-//  height: calc(100% - 94px);
-//  position: absolute;
-//  right: 0;
-//  top: 0;
-//  transform: translate3d(100%, 72px, 0);
-//  transition: transform .3s ease-out;
-//  width: 300px;
-//  will-change: transform;
-//  z-index: 3;
-//  &.visible {
-//    transform: translate3d(0, 72px, 0);
-//
-//  }
-//}
-//.models-list-scroll {
-//  height: 100%;
-//  overflow: hidden;
-//  background: $gray_1;
-//  border-radius: 4px 0px 0 4px;
-//}
+
 
 .btn-toggle-model-details {
   align-items: center;
