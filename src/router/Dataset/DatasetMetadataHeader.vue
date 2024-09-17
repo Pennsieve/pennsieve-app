@@ -9,16 +9,6 @@ let route = useRoute();
 
     <bf-rafter slot="heading" :link-back=route.meta.backLink :dataset-id="datasetId" :org-id="orgId">
 
-      <!--    <template #breadcrumb v-if="route.meta.backLinkName">-->
-      <!--      <a @click="$router.go(-1)" class="link-to-files">-->
-      <!--        <IconArrowLeft-->
-      <!--          :height="10"-->
-      <!--          :width="10"-->
-      <!--        />-->
-      <!--        Back to {{ route.meta.backLinkName }}-->
-      <!--      </a>-->
-
-      <!--    </template>-->
 
       <template #heading>
         <h1
@@ -82,21 +72,14 @@ export default {
     tabs: function() {
       return [
         {
-          to: 'records',
-          name: 'Records',
-        },
-        {
-          to: 'models',
-          name: 'Models',
-        },
-        {
-          to: 'relationships',
-          name: 'Relationships',
-        },
-        {
           to: 'graph',
           name: 'Schema',
         },
+        {
+          to: 'records',
+          name: 'Records',
+        },
+
       ]
     },
     /*
@@ -111,12 +94,6 @@ export default {
       switch (r.name) {
         case "records":
           return "Metadata Records"
-        case "models-list":
-          return "Metadata Models"
-        case "model-details":
-          return "Metadata Model"
-        case "relationships":
-          return "Metadata Relationships"
         case "graph":
           return "Metadata Graph"
         case "metadata-record":

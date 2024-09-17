@@ -16,6 +16,28 @@
           />
         </template>
         <template #right>
+          <bf-button
+            v-if="isFeatureFlagEnabled()"
+            @click="openRunAnalysisDialog"
+            class="mr-8 flex"
+          >
+            <template #prefix>
+              <IconAnalysis class="mr-8" :height="20" :width="20" />
+            </template>
+            Run Analysis
+          </bf-button>
+          <bf-button
+            v-if="getPermission('editor')"
+            class="flex mr-8"
+            :disabled="datasetLocked"
+            data-cy="createNewFolder"
+            @click="openPackageDialog"
+          >
+            <template #prefix>
+              <IconPlus class="mr-8" :height="20" :width="20" />
+            </template>
+            New Folder
+          </bf-button>
 
           <template v-if="quickActionsVisible">
             <bf-button
@@ -43,12 +65,15 @@
             </bf-button>
           </template>
 
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
-                v-if="showRunAnalysisFlow"
+                v-if="isFeatureFlagEnabled()"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button "
+                class="dropdown-button"
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -92,11 +117,8 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
@@ -230,6 +252,11 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
+
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 
@@ -331,28 +358,15 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-    /**
-     * Feature Flag for Run Analysis Flow
-     *
-     */
-    showRunAnalysisFlow: function () {
-      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
-      const isPennsieveTestDev =
-        this.organizationId ===
-        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
-      const isImmuneHealthProd =
-        this.organizationId ===
-        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
-      const isPennsieveTestProd =
-        this.organizationId ===
-        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
-      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
-    },
+
     /**
      * Compute organization's ID
      * @returns {String}
@@ -410,19 +424,18 @@ export default {
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
     },
 
     /**
@@ -545,25 +558,9 @@ export default {
       "setCurrentTargetPackage",
     ]),
 
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
-
-    generateManifest: function() {
-
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
-        detail: {
-          type: "success",
-          msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
-    },
-
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
     },
 
     // Ignore drops to component outside the drop target and close drop-target

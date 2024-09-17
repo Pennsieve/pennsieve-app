@@ -51,7 +51,13 @@ export function useSendXhr(url, opts) {
                 return Promise.reject(resp)
             }
             // if the payload cannot be converted to json, just return the original response
+
+
             return resp.json()
+            .catch(() => {
+                return resp
+            })
+
         })
 }
 

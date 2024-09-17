@@ -45,6 +45,7 @@ export const mutations = {
     state.models = models
 
   },
+
   REMOVE_MODEL(state, id) {
     const modelIndex = state.models.findIndex(obj => obj.id === id);
     state.models.splice(modelIndex, 1)
@@ -76,7 +77,16 @@ export const mutations = {
     state.filterParams = []
   },
   SET_PROPS_FOR_MODEL(state, response) {
-    const objIndex = state.models.findIndex((obj => obj.name === response.model));
+
+    // response model is either model name or UUID
+    let objIndex = null
+    var pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (pattern.test(response.model) === true) {
+       objIndex = state.models.findIndex((obj => obj.id === response.model));
+    } else {
+      objIndex = state.models.findIndex((obj => obj.name === response.model));
+    }
+
     state.models[objIndex].props = response.props
   },
   REMOVE_FILTER(state, id) {
@@ -105,6 +115,37 @@ export const mutations = {
 }
 
 export const actions = {
+
+  // fetchModelGraph: async({commit, rootState}) => {
+  //   const datasetId = router.currentRoute.value.params.datasetId
+  //
+  //   try {
+  //     const url = `${rootState.config.conceptsUrl}/datasets/${datasetId}/concepts/schema/graph`
+  //
+  //     const resp = await fetch(url, {
+  //       method: 'GET',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `bearer ${rootState.userToken}`
+  //       }
+  //     })
+  //
+  //     if (resp.ok) {
+  //       const result = await resp.json()
+  //
+  //       commit('SET_SCHEMA_EDGES', result.edges)
+  //
+  //     } else {
+  //       return Promise.reject(resp)
+  //     }
+  //   } catch (err) {
+  //     return Promise.reject(err)
+  //   }
+  //
+  //
+  //
+  // },
+
   fetchModelProps: async({commit, rootState}, model) => {
     const datasetId = router.currentRoute.value.params.datasetId
 
@@ -152,6 +193,8 @@ export const actions = {
         for (let target in models) {
           dispatch('fetchModelProps', models[target].name)
         }
+
+
       } else {
         return Promise.reject(resp)
       }
