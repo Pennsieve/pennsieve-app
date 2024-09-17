@@ -9,22 +9,23 @@
       @input="validateInput"
       @key.enter.native="addItem($event)"
     >
-      <i
-        slot="suffix"
-        class="icon-wrapper"
-      >
-        <button
-          class="icon-button"
-          @click="addItem($event)"
+      <template #suffix>
+        <i
+          class="icon-wrapper"
         >
-          <svg-icon
-            name="icon-plus"
-            height="32"
-            width="32"
-            color="#fff"
-          />
-        </button>
-      </i>
+          <button
+            class="icon-button"
+            @click="addItem($event)"
+          >
+            <IconPlus
+              :height="24"
+              :width="24"
+              color="#fff"
+            />
+          </button>
+        </i>
+      </template>
+
     </el-input>
     <!-- displays error message per input -->
     <transition name="el-zoom-in-top">
@@ -52,11 +53,13 @@
   import EnumItem from './EnumItem.vue'
   import DataType from '../../../mixins/data-type'
   import { sortBy, compose, toLower, prop, find, propEq, propOr } from 'ramda'
+  import IconPlus from "@/components/icons/IconPlus.vue";
 
   export default {
     name: 'EnumList',
 
     components: {
+      IconPlus,
       EnumItem,
     },
 
@@ -211,7 +214,7 @@
   @import '../../../assets/variables';
 
   .enum-input {
-    max-width: calc(100% - 36px);
+    max-width: calc(100% - 0px);
   }
 
   .list-items {
@@ -234,11 +237,13 @@
     border: solid 1px transparent;
     border-radius: 0 2px 2px 0;
     cursor: pointer;
-    width: 38px;
-    height: 38px;
+    width: 37px;
+    height: 37px;
     line-height: 34px;
-    text-align: center;
+    text-align: left;
     position: absolute;
+    right: 2px;
+
 
     .icon-button {
       height: 100%;

@@ -3,6 +3,10 @@
 $arrowWidth: 8px; // Multiplied by 2 because applied to left and right
 $arrowHeight: 12px;
 
+.el-popover, .el-popover__title {
+  word-break: normal !important;
+}
+
 .el-popper .popper__arrow {
   border-width: $arrowHeight $arrowWidth;
   filter: drop-shadow(0 2px 10px rgba(0,0,0,0.15));
