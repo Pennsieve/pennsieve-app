@@ -39,8 +39,7 @@
       <template #description>
         <div class="description">
           <p>
-            Configuration settings for:
-            <strong>{{ $route.params.repoName }}</strong>
+            Here, you can configure how your repository will look like when it is published.
           </p>
         </div>
       </template>
