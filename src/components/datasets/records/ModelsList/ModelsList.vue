@@ -215,16 +215,10 @@
     },
 
     mounted: function() {
-      this.fetchModels()
-
       this.autoFocus()
     },
 
     methods: {
-      ...mapActions('metadataModule',[
-        'fetchModels'
-      ]),
-
       clickModel: function(ev) {
         this.$emit('click', ev)
       },
