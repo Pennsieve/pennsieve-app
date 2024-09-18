@@ -222,33 +222,36 @@
                 label="Apply a string type to this property"
               />
             </el-form-item>
-            <p class="info">
-              Values will be checked against the displayed regular expression
-            </p>
-            <div class="string-sub-type">
-              <el-form-item
-                class="item-dropdown mr-16"
-                prop="textSubTypeValue"
-              >
-                <el-select
-                  v-model="stringSubtypeValue"
-                  placeholder="Select"
-                  placement="bottom"
-                  :disabled="editingProperty || !applyStringSubtype"
+            <div v-if="applyStringSubtype">
+              <p class="info">
+                Values will be checked against the displayed regular expression
+              </p>
+              <div class="string-sub-type" >
+                <el-form-item
+                  class="item-dropdown mr-16"
+                  prop="textSubTypeValue"
                 >
-                  <el-option
-                    v-for="item in stringSubtypes"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-input
-                disabled
-                :value="stringSubtypeRegex"
-              />
+                  <el-select
+                    v-model="stringSubtypeValue"
+                    placeholder="Select"
+                    placement="bottom"
+                    :disabled="editingProperty || !applyStringSubtype"
+                  >
+                    <el-option
+                      v-for="item in stringSubtypes"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-input
+                  disabled
+                  :value="stringSubtypeRegex"
+                />
+              </div>
             </div>
+
           </div>
           <enum-list
             v-if="property.isEnum && !invalidEnumType"
@@ -276,16 +279,11 @@
         >
           Cancel
         </bf-button>
-        <bf-button @click="createProperty">
-          {{ createText }}
-        </bf-button>
-        <button
-          class="configure-property-btn"
-          :disabled="isDataTypeModel"
-          @click="tabClicked('Configure')"
-        >
+        <bf-button @click="tabClicked('Configure')">
           {{ configureText }}
-        </button>
+
+        </bf-button>
+
       </div>
 
 
@@ -297,9 +295,9 @@
       >
         <bf-button
           class="secondary"
-          @click="closeDialog"
+          @click="tabClicked('Overview')"
         >
-          Cancel
+          Previous
         </bf-button>
         <bf-button @click="createProperty">
           Save
@@ -465,7 +463,7 @@ export default {
      * @returns {String}
      */
     configureText: function() {
-      return this.editingProperty ? 'Save and Configure' : 'Create and Configure'
+      return this.editingProperty ? 'Next' : 'Next'
     },
 
     /**
@@ -586,6 +584,7 @@ export default {
         this.isDataTypeModel = false
         delete this.rules.to
 
+        console.log(this.property)
         if (this.properties.length === 0) {
           this.property.conceptTitle = true
           this.property.required = true
