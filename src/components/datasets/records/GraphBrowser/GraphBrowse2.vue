@@ -8,7 +8,7 @@ import * as site from '../../../../site-config/site.json';
 import {useLayout} from './useLayout'
 import {useHandleXhrError, useSendXhr} from '@/mixins/request/request_composable'
 import {useStore} from 'vuex';
-import {pathOr} from "ramda";
+import {pathOr,isEmpty} from "ramda";
 import {useRoute} from "vue-router";
 import ModelNode from './ModelNode.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
@@ -31,20 +31,27 @@ const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } = use
 /*
 Bootup and configuration of component
  */
+const stringSubtypes = ref({})
 onMounted(() => {
   store.dispatch('metadataModule/fetchModels')
-})
-watch(route, async (newQuestion, oldQuestion) => {
-  const datasetId = pathOr('', ['params', 'datasetId'], route)
-  if (site.apiUrl && datasetId) {
-    let url = `${site.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${store.state.userToken}`
-    fetchStringSubtypes(url)
 
-  }})
+  if (isEmpty(stringSubtypes.value)) {
+    debugger
+    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings?api_key=${store.state.userToken}`
+    fetchStringSubtypes(url)
+  }
+})
 const datasetId = computed( () => {
   return pathOr('', ['params', 'datasetId'])(route)
 })
-const stringSubtypes = ref(Object)
+
+watch(route, async (newQuestion, oldQuestion) => {
+  if (site.apiUrl && datasetId) {
+    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings?api_key=${store.state.userToken}`
+    fetchStringSubtypes(url)
+
+  }})
+
 function fetchStringSubtypes(url) {
   useSendXhr(url,{
     header: {
@@ -241,11 +248,10 @@ function closeCreateConceptDialog() {
   createConceptDialogVisible.value = false
 }
 const propertiesForSelectedModel= computed(() => {
-
   if (selectedModelId.value){
     console.log(selectedModelId.value)
     let m = store.getters['metadataModule/getModelById'](selectedModelId.value)
-    return m
+    return m.props
 
   }
   return []
@@ -482,7 +488,7 @@ async function onDeleteModel() {
     ref="addPropertyDialog"
     :dialog-visible="addEditPropertyDialogVisible"
     :model-id="selectedModelId"
-    :string-subtypes="stringSubtypes.value"
+    :string-subtypes="stringSubtypes"
     :property-edit="selectedProperty"
     :properties="propertiesForSelectedModel"
     @add-property="onAddProperty"
