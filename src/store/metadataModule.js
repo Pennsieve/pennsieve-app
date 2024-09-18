@@ -116,36 +116,6 @@ export const mutations = {
 
 export const actions = {
 
-  // fetchModelGraph: async({commit, rootState}) => {
-  //   const datasetId = router.currentRoute.value.params.datasetId
-  //
-  //   try {
-  //     const url = `${rootState.config.conceptsUrl}/datasets/${datasetId}/concepts/schema/graph`
-  //
-  //     const resp = await fetch(url, {
-  //       method: 'GET',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `bearer ${rootState.userToken}`
-  //       }
-  //     })
-  //
-  //     if (resp.ok) {
-  //       const result = await resp.json()
-  //
-  //       commit('SET_SCHEMA_EDGES', result.edges)
-  //
-  //     } else {
-  //       return Promise.reject(resp)
-  //     }
-  //   } catch (err) {
-  //     return Promise.reject(err)
-  //   }
-  //
-  //
-  //
-  // },
-
   fetchModelProps: async({commit, rootState}, model) => {
     const datasetId = router.currentRoute.value.params.datasetId
 
