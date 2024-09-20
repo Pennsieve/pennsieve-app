@@ -1,7 +1,13 @@
 <template>
   <bf-page>
     <!-- My Repos and Workspace Repos-->
-    <div v-if="configView" class="back-btn">(5) back button</div>
+    <div v-if="configView" class="back-btn">
+      <router-link
+        :to="previousRoute"
+      >
+        <button class="text-button"> &lt- Back to list</button>
+      </router-link>
+    </div>
     <bf-rafter
       v-if="!configView"
       slot="heading"
@@ -33,8 +39,7 @@
       <template #description>
         <div class="description">
           <p>
-            Configuration settings for:
-            <strong>{{ $route.params.repoName }}</strong>
+            Here, you can configure how your repository will look like when it is published.
           </p>
         </div>
       </template>
@@ -82,9 +87,6 @@ export default {
       ],
     };
   },
-  mounted() {
-    console.log("this.$route in CodeRepos.vue", this.$route);
-  },
   computed: {
     configView: function () {
       return this.$route.name === "configure-repo";
@@ -92,6 +94,14 @@ export default {
     configRepoTitle: function () {
       return `Configure Repo: ${this.$route.params.repoName}`;
     },
+    previousRoute() {
+      const router = this.$router;
+      if (router.options.history.state.back) {
+        return router.options.history.state.back;
+      } else {
+        return { name: 'my-repos' };
+      }
+    }
   },
 };
 </script>
