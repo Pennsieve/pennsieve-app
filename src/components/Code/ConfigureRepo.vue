@@ -49,7 +49,6 @@
       <el-form-item id="inputTags">
         <template #label> Tags </template>
         <el-input
-          ref="inputTags"
           v-model="inputTag"
           placeholder="Add tags"
           @keyup.enter.native.stop="addTag"
@@ -74,25 +73,32 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from "vue";
+import { Ref, onMounted, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
-import {compose, defaultTo, toLower, trim} from 'ramda'
+import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
 
-const route = useRoute();
-const form = ref({
+interface CodeRepoConfig {
+  isAutoPublished: boolean;
+  repoName: string;
+  givenName: string;
+  description: string;
+  tags: Array<string>;
+}
+let route = useRoute();
+let inputTag = ref("");
+const form: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
   repoName: "",
   givenName: "",
   description: "",
-  tags: "",
+  tags: [],
 });
-// let inputTag = ref(''); 
 
 onMounted(() => {
   if (route.params.repoName) {
-    form.value.repoName = route.params.repoName;
+    form.value.repoName = <string>route.params.repoName;
   }
 });
 
@@ -105,35 +111,33 @@ const saveForm = debounce(function () {
     });
   }
 }, 1000);
-// Method to check if the tag exists
+
 const checkIfTagExists = (tag) => {
-  const formTags = propOr([], 'tags', form.value);
+  const formTags: Array<string> = propOr([], "tags", form.value);
   const tagExistsForm = includes(tag, formTags);
 
-  const datasetTags = pathOr([], ['dataset', 'tags'], dataset.value);
-  const tagExistsDataset = includes(tag, datasetTags);
-
-  return tagExistsForm || tagExistsDataset;
+  return tagExistsForm;
 };
 
-/**
- * Add tag to the dataset
- */
 const addTag = function () {
-  const tag = compose(trim, toLower, defaultTo(""))(this.inputTag);
+  const tag = compose(trim, toLower, defaultTo(""))(inputTag.value);
 
   if (tag) {
-    this.inputTag = "";
+    inputTag.value = "";
 
-    const tagExists = this.checkIfTagExists(tag);
+    const tagExists = checkIfTagExists(tag);
     if (tagExists === false) {
-      this.form.tags.push(tag);
-      // this.saveForm();
+      form.value.tags.push(tag);
+      saveForm();
     }
   }
 };
 
-
+const removeTag = function (tag) {
+  const tagId = form.value.tags.indexOf(tag);
+  form.value.tags.splice(tagId, 1);
+  saveForm();
+};
 </script>
 
 <style lang="scss">
@@ -147,16 +151,6 @@ const addTag = function () {
     align-items: start;
   }
 
-  .input-item {
-    margin-bottom: 24px;
-  }
-
-  .label-helper {
-    color: $gray_4;
-    font-size: 12px;
-    font-weight: 400;
-  }
-
   .auto-publish-input .el-checkbox__label {
     font-weight: 500;
   }
@@ -164,6 +158,10 @@ const addTag = function () {
   .el-input,
   .el-textarea {
     max-width: 475px;
+  }
+
+  #inputTags .el-input {
+    margin-bottom: 16px;
   }
 }
 </style>

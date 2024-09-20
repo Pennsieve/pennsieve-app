@@ -87,9 +87,6 @@ export default {
       ],
     };
   },
-  mounted() {
-    console.log("this.$route in CodeRepos.vue", this.$route);
-  },
   computed: {
     configView: function () {
       return this.$route.name === "configure-repo";
