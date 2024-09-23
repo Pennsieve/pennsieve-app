@@ -1,13 +1,14 @@
 <template>
   <bf-stage class="configure-repo-wrapper">
     <el-form
+      ref="updateCodeRepoForm"
       :model="form"
       label-width="120px"
       label-position="top"
       class="form-auto-save"
     >
       <el-form-item class="auto-publish-input">
-        <el-checkbox v-model="form.isAutoPublished" @change="saveForm"
+        <el-checkbox v-model="form.isAutoPublished" @change="submitUpdateDatasetRequest"
           >Automatic publication</el-checkbox
         >
         <p>Automatically publish a version on new releases from GitHub</p>
@@ -29,7 +30,7 @@
         <el-input
           v-model="form.givenName"
           placeholder="user-test"
-          @input="saveForm"
+          @input="submitUpdateDatasetRequest"
         />
       </el-form-item>
 
@@ -42,7 +43,7 @@
           v-model="form.description"
           :rows="3"
           placeholder="Add a description to help others understand what's in your code repo"
-          @input="saveForm"
+          @input="submitUpdateDatasetRequest"
         />
       </el-form-item>
 
@@ -73,11 +74,13 @@
 </template>
 
 <script lang="ts" setup>
-import { Ref, onMounted, ref } from "vue";
+import { Ref, onMounted, ref} from "vue";
+import { mapActions } from "vuex";
 import { ElMessage } from "element-plus";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
 import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
+import StaleUpdateDialog from "../datasets/stale-update-dialog/StaleUpdateDialog.vue";
 
 interface CodeRepoConfig {
   isAutoPublished: boolean;
@@ -96,21 +99,36 @@ const form: Ref<CodeRepoConfig> = ref({
   tags: [],
 });
 
+// mapActions(['updateDataset', 'setDatasetEtag']);
+// const mapstate = mapState(['concepts','datasetEtag','dataset','datasets']);
+
 onMounted(() => {
   if (route.params.repoName) {
     form.value.repoName = <string>route.params.repoName;
   }
 });
 
-const saveForm = debounce(function () {
-  {
-    console.log("Saving form data", form.value);
-    ElMessage({
-      message: "Form saved successfully!",
-      type: "success",
-    });
-  }
+//update the database
+const updateCodeRepoForm = ref();
+const saveRepo = mapActions('codeReposModule',['saveRepoSettings'])
+//import codeReposModule from "../../store/codeReposModule";
+const submitUpdateDatasetRequest = debounce(function () {
+  updateCodeRepoForm.value?.validate(valid => {
+    // only the name field is validated in this form.  if it is invalid, remove it from he payload.
+    const { repoName, ...rest } = form
+    const body = valid ? form : rest
+
+     saveRepo.saveRepoSettings({ repo: body });
+     //  codeReposModule.saveRepoSettings({ repo: body });
+  })
 }, 1000);
+
+
+const onUpdateDescription= function(description) {
+  this.form.description = description
+  this.submitUpdateDatasetRequest()
+}
+
 
 const checkIfTagExists = (tag) => {
   const formTags: Array<string> = propOr([], "tags", form.value);
@@ -128,7 +146,7 @@ const addTag = function () {
     const tagExists = checkIfTagExists(tag);
     if (tagExists === false) {
       form.value.tags.push(tag);
-      saveForm();
+      submitUpdateDatasetRequest();
     }
   }
 };
@@ -136,7 +154,7 @@ const addTag = function () {
 const removeTag = function (tag) {
   const tagId = form.value.tags.indexOf(tag);
   form.value.tags.splice(tagId, 1);
-  saveForm();
+  submitUpdateDatasetRequest();
 };
 </script>
 

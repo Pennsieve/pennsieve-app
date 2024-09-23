@@ -159,7 +159,7 @@ export const actions = {
 
   fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
+      const url = `${rootState.config.apiUrl}/datasets/paginated?type=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -176,6 +176,43 @@ export const actions = {
       } else {
         throw new Error(response.statusText)
       }
+    }
+    catch (err) {
+      console.error(err);
+    }
+  },
+  saveRepoSettings: async({ commit, rootState }, { repo }) => {
+    try {
+      const url = `${rootState.config.api2Url}`
+      const userToken = rootState.userToken || Cookies.get('user_token');
+      const datasetId = rootState.datasetId
+
+      if (!url || !userToken || !datasetId) {
+        throw new Error("unable to build url")
+      }
+      url = `${url}/datasets/${datasetId}?api_key=${userToken}`;
+
+      fetch(url, {
+        method:'PUT',
+        body: JSON.stringify(repo),
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Match': rootState.datasetEtag
+        }
+      }).then(response => {
+        if (response.ok) {
+          response.json().then(updatedDataset => {
+            console.log("updated")
+            rootState.setDatasetEtag(response.headers.get('etag'))
+            rootState.updateDataset({ ...state.dataset, ...updatedDataset })
+          })
+        } else if (response.status === 412) {
+          //StaleUpdateDialog.dialogVisible = true;
+        } else {
+          throw response
+        }
+      }).catch(//this.handleXhrError.bind(this)
+      )
     }
     catch (err) {
       console.error(err);
