@@ -87,7 +87,7 @@
           v-if="myReposView && repo.tracking"
           :to="{
             name: 'configure-repo',
-            params: { repoName: repo.name },
+            params: { repoName: repo.name, datasetId: test},
           }"
         >
           <button class="text-button">Configure</button>
@@ -97,7 +97,7 @@
           v-if="workspaceReposView"
           :to="{
             name: 'configure-repo',
-            params: { repoName: repo.content.name },
+            params: { repoName: repo.content.name, datasetId: repo.content.id },
           }"
         >
           <button class="text-button">Configure</button>

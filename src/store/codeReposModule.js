@@ -16,7 +16,8 @@ const initialState = () => ({
     currentPage: 1
   },
   workspaceReposCount: 0,
-  workspaceReposLoaded: false
+  workspaceReposLoaded: false,
+  datasetId: ""
 })
 
 export const state = initialState()
@@ -43,12 +44,19 @@ export const mutations = {
   },
   SET_WORKSPACE_REPOS_COUNT(state, count) {
     state.workspaceReposCount = count
-  }, 
-  SET_WORKSPACE_REPOS_CURRENT_PAGE(state, currentPage) {
-    state.currentPage = currentPage;
+  },
+  UPDATE_WORKSPACE_REPOS(state, udpatedWorkspaceRepo) {
+    state.workspaceRepos = state.workspaceRepos.map((repo) => {
+      if(repo.content.id === udpatedWorkspaceRepo.content.id) {
+        return updatedRepo
+      } else return repo
+    })
   },
   SET_WORKSPACE_REPOS_OFFSET(state, offset) {
     state.workspaceReposPaginationParams.offset = offset;
+  },
+  SET_DATASET_ID(state, datasetId) {
+    state.datasetId = datasetId
   }
 }
 
@@ -170,7 +178,6 @@ export const actions = {
       })
       if (response.ok) {
         const workspaceRepos = await response.json()
-        console.log('workspaceRepos', workspaceRepos)
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
       } else {
@@ -181,16 +188,17 @@ export const actions = {
       console.error(err);
     }
   },
-  saveRepoSettings: async({ commit, rootState }, { repo }) => {
+  
+  saveRepoSettings: async({state, commit, rootState }, { repo }) => {
     try {
-      const url = `${rootState.config.api2Url}`
+      let baseURL = `${rootState.config.api2Url}`
       const userToken = rootState.userToken || Cookies.get('user_token');
-      const datasetId = rootState.datasetId
-
-      if (!url || !userToken || !datasetId) {
+      const datasetId = state.datasetId
+      console.log('payload', repo)
+      if (!baseURL || !userToken || !datasetId) {
         throw new Error("unable to build url")
       }
-      url = `${url}/datasets/${datasetId}?api_key=${userToken}`;
+      const url = `${baseURL}/datasets/${datasetId}?api_key=${userToken}`;
 
       fetch(url, {
         method:'PUT',
@@ -201,10 +209,9 @@ export const actions = {
         }
       }).then(response => {
         if (response.ok) {
-          response.json().then(updatedDataset => {
+          response.json().then(udpatedWorkspaceRepo => {
             console.log("updated")
-            rootState.setDatasetEtag(response.headers.get('etag'))
-            rootState.updateDataset({ ...state.dataset, ...updatedDataset })
+            commit('UPDATE_WORKSPACE_REPOS', udpatedWorkspaceRepo)
           })
         } else if (response.status === 412) {
           //StaleUpdateDialog.dialogVisible = true;
@@ -218,6 +225,7 @@ export const actions = {
       console.error(err);
     }
   },
+
   publishCodeRepo: async ({commit, rootState}, { repo }) => {
     console.log('TODO: BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
   }

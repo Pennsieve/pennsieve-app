@@ -609,7 +609,7 @@ const router = createRouter({
         },
         {
           name: 'configure-repo',  
-          path: 'configure-repo/:repoName',  
+          path: 'configure-repo/:repoName/:datasetId',  
           components: {
             stage: ConfigureRepo,  
           },
