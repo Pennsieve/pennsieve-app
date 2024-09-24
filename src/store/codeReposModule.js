@@ -159,7 +159,7 @@ export const actions = {
 
   fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/paginated?type=release`
+      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
