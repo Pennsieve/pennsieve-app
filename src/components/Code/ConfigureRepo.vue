@@ -91,7 +91,7 @@ let route = useRoute();
 
 let activeRepoName = ref('')
 let inputTag = ref("");
-let workspaceRepo = ref({})
+let repo = ref({})
 
 const codeRepoForm: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
@@ -105,14 +105,14 @@ onMounted(() => {
     const activeRepoId = route.params.repoId
     store.commit('codeReposModule/SET_ACTIVE_CODE_REPO', activeRepoId)
   }
-  workspaceRepo.value = store.getters['codeReposModule/activeWorkspaceRepo']
+  repo.value = store.getters['codeReposModule/activeRepo']
 
   // update initial form values from the database
-  if (workspaceRepo.value && workspaceRepo.value.content) {
-    activeRepoName.value = workspaceRepo.value.content.name
-    codeRepoForm.value.givenName = workspaceRepo.value.content.name
-    codeRepoForm.value.description = workspaceRepo.value.content.description
-    codeRepoForm.value.tags = workspaceRepo.value.content.tags
+  if (repo.value && repo.value.content) {
+    activeRepoName.value = repo.value.content.name
+    codeRepoForm.value.givenName = repo.value.content.name
+    codeRepoForm.value.description = repo.value.content.description
+    codeRepoForm.value.tags = repo.value.content.tags
   }
 })
 

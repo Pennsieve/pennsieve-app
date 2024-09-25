@@ -233,7 +233,7 @@ export const actions = {
 }
 
 export const getters = {
-  activeWorkspaceRepo : state => state.activeRepo
+  activeRepo : state => state.activeRepo
 }
 
 const codeReposModule = {
