@@ -83,11 +83,12 @@
           Stop Tracking
         </button>
         <!-- Link to Config View in My Repos Tab -->
+        <!-- does untracked repo have id available ?  -->
         <router-link
           v-if="myReposView && repo.tracking"
           :to="{
             name: 'configure-repo',
-            params: { repoName: repo.name, datasetId: test},
+            params: { workspaceRepoId: repo.id},
           }"
         >
           <button class="text-button">Configure</button>
@@ -97,7 +98,7 @@
           v-if="workspaceReposView"
           :to="{
             name: 'configure-repo',
-            params: { repoName: repo.content.name, datasetId: repo.content.id },
+            params: { workspaceRepoId: repo.content.id },
           }"
         >
           <button class="text-button">Configure</button>

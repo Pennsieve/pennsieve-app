@@ -17,7 +17,8 @@ const initialState = () => ({
   },
   workspaceReposCount: 0,
   workspaceReposLoaded: false,
-  datasetId: ""
+  datasetId: "",
+  currentWorkspaceRepo: {}
 })
 
 export const state = initialState()
@@ -48,7 +49,7 @@ export const mutations = {
   UPDATE_WORKSPACE_REPOS(state, udpatedWorkspaceRepo) {
     state.workspaceRepos = state.workspaceRepos.map((repo) => {
       if(repo.content.id === udpatedWorkspaceRepo.content.id) {
-        return updatedRepo
+        return udpatedWorkspaceRepo
       } else return repo
     })
   },
@@ -57,6 +58,9 @@ export const mutations = {
   },
   SET_DATASET_ID(state, datasetId) {
     state.datasetId = datasetId
+  },
+  UPDATE_CURRENT_WORKSPACE_REPO(state, currentWorkspaceRepoId) {
+    state.currentWorkspaceRepo = state.workspaceRepos.find(repo => repo.content.id === currentWorkspaceRepoId)
   }
 }
 
@@ -193,7 +197,7 @@ export const actions = {
     try {
       let baseURL = `${rootState.config.api2Url}`
       const userToken = rootState.userToken || Cookies.get('user_token');
-      const datasetId = state.datasetId
+      const datasetId = state.currentWorkspaceRepo.content.id
       console.log('payload', repo)
       if (!baseURL || !userToken || !datasetId) {
         throw new Error("unable to build url")
@@ -231,11 +235,16 @@ export const actions = {
   }
 }
 
+export const getters = {
+  activeWorkspaceRepo : state => state.currentWorkspaceRepo
+}
+
 const codeReposModule = {
   namespaced: true,
   state,
   mutations,
   actions,
+  getters
 }
 
 export default codeReposModule

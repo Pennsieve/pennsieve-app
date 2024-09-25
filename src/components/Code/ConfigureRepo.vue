@@ -91,6 +91,7 @@ let route = useRoute();
 
 let currentWorkspaceRepoName = ref('')
 let inputTag = ref("");
+let workspaceRepo = ref({})
 
 const codeRepoForm: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
@@ -100,9 +101,18 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
-  if (route.params.repoName) {
-    currentWorkspaceRepoName = <string>route.params.repoName;
-    store.commit('codeReposModule/SET_DATASET_ID', route.params.datasetId)
+  if (route.params.workspaceRepoId) {
+    const currentWorkspaceRepoId = route.params.workspaceRepoId
+    store.commit('codeReposModule/UPDATE_CURRENT_WORKSPACE_REPO', currentWorkspaceRepoId)
+  }
+  workspaceRepo.value = store.getters['codeReposModule/activeWorkspaceRepo']
+
+  // update initial form values from the database
+  if (workspaceRepo.value && workspaceRepo.value.content) {
+    currentWorkspaceRepoName.value = workspaceRepo.value.content.name
+    codeRepoForm.value.givenName = workspaceRepo.value.content.name
+    codeRepoForm.value.description = workspaceRepo.value.content.description
+    codeRepoForm.value.tags = workspaceRepo.value.content.tags
   }
 })
 
