@@ -7,7 +7,7 @@
       class="form-auto-save"
     >
       <el-form-item class="auto-publish-input">
-        <el-checkbox v-model="codeRepoForm.isAutoPublished" @change="submitUpdateDatasetRequest"
+        <el-checkbox v-model="codeRepoForm.isAutoPublished" @change="saveRepoConfig"
           >Automatic publication</el-checkbox
         >
         <p>Automatically publish a version on new releases from GitHub</p>
@@ -29,7 +29,7 @@
         <el-input
           v-model="codeRepoForm.givenName"
           placeholder="user-test"
-          @blur="submitUpdateDatasetRequest"
+          @blur="saveRepoConfig"
         />
       </el-form-item>
 
@@ -42,7 +42,7 @@
           v-model="codeRepoForm.description"
           :rows="3"
           placeholder="Add a description to help others understand what's in your code repo"
-          @blur="submitUpdateDatasetRequest"
+          @blur="saveRepoConfig"
         />
       </el-form-item>
 
@@ -116,7 +116,7 @@ onMounted(() => {
   }
 })
 
-const submitUpdateDatasetRequest = debounce(function () {
+const saveRepoConfig = debounce(function () {
     store.dispatch('codeReposModule/saveRepoSettings', { repo: codeRepoForm.value})
 }, 1000)
 
@@ -136,7 +136,7 @@ const addTag = function () {
 
     if (tagExists === false) {
       codeRepoForm.value.tags.push(tag);
-      submitUpdateDatasetRequest();
+      saveRepoConfig();
     }
   }
 };
@@ -144,7 +144,7 @@ const addTag = function () {
 const removeTag = function (tag) {
   const tagId = codeRepoForm.value.tags.indexOf(tag);
   codeRepoForm.value.tags.splice(tagId, 1);
-  submitUpdateDatasetRequest();
+  saveRepoConfig();
 };
 </script>
 
