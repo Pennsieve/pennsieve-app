@@ -609,7 +609,7 @@ const router = createRouter({
         },
         {
           name: 'configure-repo',  
-          path: 'configure-repo/:workspaceRepoId',  
+          path: 'configure-repo/:repoId',  
           components: {
             stage: ConfigureRepo,  
           },

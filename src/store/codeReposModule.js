@@ -18,7 +18,7 @@ const initialState = () => ({
   workspaceReposCount: 0,
   workspaceReposLoaded: false,
   datasetId: "",
-  currentWorkspaceRepo: {}
+  activeRepo: {}
 })
 
 export const state = initialState()
@@ -56,12 +56,10 @@ export const mutations = {
   SET_WORKSPACE_REPOS_OFFSET(state, offset) {
     state.workspaceReposPaginationParams.offset = offset;
   },
-  SET_DATASET_ID(state, datasetId) {
-    state.datasetId = datasetId
-  },
-  UPDATE_CURRENT_WORKSPACE_REPO(state, currentWorkspaceRepoId) {
-    state.currentWorkspaceRepo = state.workspaceRepos.find(repo => repo.content.id === currentWorkspaceRepoId)
+  SET_ACTIVE_CODE_REPO(state, activeRepoId) {
+    state.activeRepo = state.workspaceRepos.find(repo => repo.content.id === activeRepoId)
   }
+
 }
 
 export const actions = {
@@ -165,7 +163,7 @@ export const actions = {
     }
   },
 
-  updateWorkspaceRepoOffset: ({ commit, rootState }, offset) => {
+  updateWorkspaceRepoOffset: ({ commit }, offset) => {
     commit('SET_WORKSPACE_REPOS_OFFSET', offset)
   },
 
@@ -197,8 +195,7 @@ export const actions = {
     try {
       let baseURL = `${rootState.config.api2Url}`
       const userToken = rootState.userToken || Cookies.get('user_token');
-      const datasetId = state.currentWorkspaceRepo.content.id
-      console.log('payload', repo)
+      const datasetId = state.activeRepo.content.id
       if (!baseURL || !userToken || !datasetId) {
         throw new Error("unable to build url")
       }
@@ -236,7 +233,7 @@ export const actions = {
 }
 
 export const getters = {
-  activeWorkspaceRepo : state => state.currentWorkspaceRepo
+  activeWorkspaceRepo : state => state.activeRepo
 }
 
 const codeReposModule = {

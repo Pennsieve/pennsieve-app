@@ -18,7 +18,7 @@
           Repository Name
           <span class="label-helper"> (GitHub) </span>
         </template>
-        <el-input v-model="currentWorkspaceRepoName" disabled />
+        <el-input v-model="activeRepoName" disabled />
       </el-form-item>
 
       <el-form-item>
@@ -89,7 +89,7 @@ interface CodeRepoConfig {
 const store = useStore();
 let route = useRoute();
 
-let currentWorkspaceRepoName = ref('')
+let activeRepoName = ref('')
 let inputTag = ref("");
 let workspaceRepo = ref({})
 
@@ -101,15 +101,15 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
-  if (route.params.workspaceRepoId) {
-    const currentWorkspaceRepoId = route.params.workspaceRepoId
-    store.commit('codeReposModule/UPDATE_CURRENT_WORKSPACE_REPO', currentWorkspaceRepoId)
+  if (route.params.repoId) {
+    const activeRepoId = route.params.repoId
+    store.commit('codeReposModule/SET_ACTIVE_CODE_REPO', activeRepoId)
   }
   workspaceRepo.value = store.getters['codeReposModule/activeWorkspaceRepo']
 
   // update initial form values from the database
   if (workspaceRepo.value && workspaceRepo.value.content) {
-    currentWorkspaceRepoName.value = workspaceRepo.value.content.name
+    activeRepoName.value = workspaceRepo.value.content.name
     codeRepoForm.value.givenName = workspaceRepo.value.content.name
     codeRepoForm.value.description = workspaceRepo.value.content.description
     codeRepoForm.value.tags = workspaceRepo.value.content.tags
