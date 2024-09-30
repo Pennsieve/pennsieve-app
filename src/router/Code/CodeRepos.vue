@@ -3,7 +3,7 @@
     <!-- My Repos and Workspace Repos-->
     <div v-if="configView" class="back-btn">
       <router-link :to="previousRoute">
-        <button class="text-button">&lt- Back to list</button>
+        <button class="text-button">&lt-- Back to list</button>
       </router-link>
     </div>
     <bf-rafter
@@ -16,8 +16,8 @@
       <template #description>
         <div class="description">
           <p>
-            List of Github Code Repositories associated with your linked Github
-            Account.
+            My Repositories are your personal git repos. Workspace Repositories
+            are available to everyone in your organization.
           </p>
         </div>
       </template>
@@ -36,10 +36,7 @@
     >
       <template #description>
         <div class="description">
-          <p>
-            Here, you can configure how your repository will look like when it
-            is published.
-          </p>
+          <p>Update settings and details for your repository</p>
         </div>
       </template>
     </bf-rafter>
