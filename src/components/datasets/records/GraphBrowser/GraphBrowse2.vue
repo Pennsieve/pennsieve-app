@@ -36,7 +36,6 @@ onMounted(() => {
   store.dispatch('metadataModule/fetchModels')
 
   if (isEmpty(stringSubtypes.value)) {
-    debugger
     let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings?api_key=${store.state.userToken}`
     fetchStringSubtypes(url)
   }
