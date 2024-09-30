@@ -80,7 +80,6 @@ export const actions = {
           if (response.ok) {
             const responseJson = await response.json()
             const myReposCount = responseJson.count
-            console.log('myReposCount', myReposCount)
             commit('SET_MY_REPOS_COUNT', myReposCount)
           } else {
             commit('SET_MY_REPOS_COUNT', 0)
@@ -169,7 +168,7 @@ export const actions = {
 
   fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&publicationType=release`
+      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -180,6 +179,7 @@ export const actions = {
       })
       if (response.ok) {
         const workspaceRepos = await response.json()
+        console.log('workspaceRepos:', workspaceRepos)
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
       } else {
@@ -191,40 +191,54 @@ export const actions = {
     }
   },
   
-  saveRepoSettings: async({state, commit, rootState }, { repo }) => {
-    try {
-      let baseURL = `${rootState.config.api2Url}`
-      const userToken = rootState.userToken || Cookies.get('user_token');
-      const datasetId = state.activeRepo.content.id
-      if (!baseURL || !userToken || !datasetId) {
-        throw new Error("unable to build url")
-      }
-      const url = `${baseURL}/datasets/${datasetId}?api_key=${userToken}`;
+  saveRepoSettings: async({state, commit, rootState }, { formVal, repo }) => {
+    console.log('repo:', repo.value)
+    console.log('formVal', formVal)
 
-      fetch(url, {
-        method:'PUT',
-        body: JSON.stringify(repo),
-        headers: {
-          'Content-Type': 'application/json',
-          'If-Match': rootState.datasetEtag
-        }
-      }).then(response => {
-        if (response.ok) {
-          response.json().then(udpatedWorkspaceRepo => {
-            console.log("updated")
-            commit('UPDATE_WORKSPACE_REPOS', udpatedWorkspaceRepo)
-          })
-        } else if (response.status === 412) {
-          //StaleUpdateDialog.dialogVisible = true;
-        } else {
-          throw response
-        }
-      }).catch(//this.handleXhrError.bind(this)
-      )
+    const { url } = repo.value.content.releases[0]
+    const { intId } = repo.value.content
+    const { organization } = repo.value
+
+
+    const { description, givenName, isAutoPublished, tags } = repo
+    const bodyToSend = {
+      "organization_id": organization,
+      "dataset_id": intId,
+      "url": url,
+      "name": formVal.givenName,
+      "subtitle": formVal.description,
+      "auto_publish": formVal.isAutoPublished,
+      "tags": formVal.tags,
+      // "sync": {
+      //   "banner": boolean,
+      //   "readme": boolean,
+      //   "changelog": boolean,
+      //   "license": boolean,
+      //   "contributors": boolean
+      // }
+    }
+    try {
+      const url = `${rootState.config.api2Url}/repository/external`
+      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: myHeaders,
+        body: JSON.stringify(bodyToSend)
+      })
+      if (response.ok) {
+        const repo = await response.json()
+      } else {
+        throw new Error(response.statusText)
+      }
     }
     catch (err) {
       console.error(err);
     }
+    
+   
   },
 
   publishCodeRepo: async ({commit, rootState}, { repo }) => {

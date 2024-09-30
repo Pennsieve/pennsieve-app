@@ -7,7 +7,9 @@
       class="form-auto-save"
     >
       <el-form-item class="auto-publish-input">
-        <el-checkbox v-model="codeRepoForm.isAutoPublished" @change="saveRepoConfig"
+        <el-checkbox
+          v-model="codeRepoForm.isAutoPublished"
+          @change="saveRepoConfig"
           >Automatic publication</el-checkbox
         >
         <p>Automatically publish a version on new releases from GitHub</p>
@@ -89,9 +91,9 @@ interface CodeRepoConfig {
 const store = useStore();
 let route = useRoute();
 
-let activeRepoName = ref('')
+let activeRepoName = ref("");
 let inputTag = ref("");
-let repo = ref({})
+let repo = ref({});
 
 const codeRepoForm: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
@@ -102,23 +104,26 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 
 onMounted(() => {
   if (route.params.repoId) {
-    const activeRepoId = route.params.repoId
-    store.commit('codeReposModule/SET_ACTIVE_CODE_REPO', activeRepoId)
+    const activeRepoId = route.params.repoId;
+    store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
   }
-  repo.value = store.getters['codeReposModule/activeRepo']
+  repo.value = store.getters["codeReposModule/activeRepo"];
 
   // update initial form values from the database
   if (repo.value && repo.value.content) {
-    activeRepoName.value = repo.value.content.name
-    codeRepoForm.value.givenName = repo.value.content.name
-    codeRepoForm.value.description = repo.value.content.description
-    codeRepoForm.value.tags = repo.value.content.tags
+    activeRepoName.value = repo.value.content.name;
+    codeRepoForm.value.givenName = repo.value.content.name;
+    codeRepoForm.value.description = repo.value.content.description;
+    codeRepoForm.value.tags = repo.value.content.tags;
   }
-})
+});
 
 const saveRepoConfig = debounce(function () {
-    store.dispatch('codeReposModule/saveRepoSettings', { repo: codeRepoForm.value})
-}, 1000)
+  store.dispatch("codeReposModule/saveRepoSettings", {
+    formVal: codeRepoForm.value,
+    repo,
+  });
+}, 1000);
 
 const checkIfTagExists = (tag) => {
   const formTags: Array<string> = propOr([], "tags", codeRepoForm.value);

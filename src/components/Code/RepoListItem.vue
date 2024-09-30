@@ -76,15 +76,14 @@
           Track Repository
         </button>
         <button
-          v-if="(repo.tracking && myReposView) || workspaceReposView"
+          v-if="repo.tracking && myReposView"
           @click="handleStopTrackingClick"
           class="text-button"
         >
           Stop Tracking
         </button>
         <!-- Link to Config View in My Repos Tab -->
-        <!-- does untracked repo have id available ?  -->
-        <router-link
+        <!-- <router-link
           v-if="myReposView && repo.tracking"
           :to="{
             name: 'configure-repo',
@@ -92,7 +91,7 @@
           }"
         >
           <button class="text-button">Configure</button>
-        </router-link>
+        </router-link> -->
         <!-- Link to Config View in Workspace Repos Tab -->
         <router-link
           v-if="workspaceReposView"
@@ -104,7 +103,7 @@
           <button class="text-button">Configure</button>
         </router-link>
         <button
-          v-if="repo.tracking || workspaceReposView"
+          v-if="workspaceReposView"
           @click="handlePublishLatestClick"
           class="text-button"
         >

@@ -2,10 +2,8 @@
   <bf-page>
     <!-- My Repos and Workspace Repos-->
     <div v-if="configView" class="back-btn">
-      <router-link
-        :to="previousRoute"
-      >
-        <button class="text-button"> &lt- Back to list</button>
+      <router-link :to="previousRoute">
+        <button class="text-button">&lt- Back to list</button>
       </router-link>
     </div>
     <bf-rafter
@@ -39,7 +37,8 @@
       <template #description>
         <div class="description">
           <p>
-            Here, you can configure how your repository will look like when it is published.
+            Here, you can configure how your repository will look like when it
+            is published.
           </p>
         </div>
       </template>
@@ -99,9 +98,9 @@ export default {
       if (router.options.history.state.back) {
         return router.options.history.state.back;
       } else {
-        return { name: 'my-repos' };
+        return { name: "my-repos" };
       }
-    }
+    },
   },
 };
 </script>
