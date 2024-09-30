@@ -441,7 +441,7 @@ const router = createRouter({
             stageHeader: true
           },
           redirect: {
-            name: 'records'
+            name: 'graph'
           },
           children: [
             {
