@@ -10,7 +10,7 @@
     </template>
 
     <dialog-body>
-      Please confirm if you would like to Enable Tracking on this repo.
+      Please confirm if you would like to update the tracking on this repo.
     </dialog-body>
     <!-- Buttons -->
     <template #footer>
