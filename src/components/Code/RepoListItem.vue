@@ -271,7 +271,6 @@ export default {
 }
 
 .repo-banner-container {
-  margin-top: 12px;
   display: flex;
   flex-direction: row;
 }
@@ -299,7 +298,6 @@ export default {
   border: 1px solid #dcdcdc;
 }
 .list-item {
-  padding: 24px;
   border-bottom: 1px solid lightgray;
   box-shadow: --el-box-shadow-lighter;
 }
