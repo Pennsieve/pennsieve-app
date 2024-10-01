@@ -108,8 +108,10 @@ export const actions = {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
           console.log('** MY REPOS: **', myRepos)
+          console.log('** MY REPOS COUNT **', responseJson.count)
           commit('SET_MY_REPOS', myRepos);
           commit('SET_MY_REPOS_CURRENT_PAGE', page);
+          commit('SET_MY_REPOS_COUNT', responseJson.count)
 
         } else {
           commit('SET_MY_REPOS', [])
