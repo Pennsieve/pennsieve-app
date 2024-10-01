@@ -15,9 +15,18 @@
     >
       <template #description>
         <div class="description">
-          <p>
-            My Repositories are your personal git repos. Workspace Repositories
-            are available to everyone in your organization.
+          <p v-if="myReposView">
+            <hr />
+            <strong>My Repositories </strong>are your personal git repos. Only
+            you can see this list of repos. <br /><br /> When a Repository is <strong>Tracked</strong> it becomes a Workspace Repository. 
+            <br />
+            <hr />
+          </p>
+          <p v-if="workspaceReposView">
+            <hr />
+            <strong>Workspace Repositories</strong> are tracked repositories available
+            to everyone in your Organization.
+            <hr />
           </p>
         </div>
       </template>
@@ -87,6 +96,13 @@ export default {
     configView: function () {
       return this.$route.name === "configure-repo";
     },
+    myReposView: function () {
+      return this.$route.name === "my-repos";
+    },
+    workspaceReposView: function () {
+      return this.$route.name === "workspace-repos";
+    },
+
     configRepoTitle: function () {
       return `Configure Repo: ${this.$route.params.repoName}`;
     },

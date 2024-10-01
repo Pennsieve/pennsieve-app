@@ -7,7 +7,7 @@ const initialState = () => ({
     size: 10,
     currentPage: 1
   },
-  myReposCount: 0,
+  myReposCount: 100,
   myReposLoaded: false,
   workspaceRepos: [],
   workspaceReposPaginationParams: {
@@ -73,29 +73,29 @@ export const actions = {
   fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
     // we are currently missing a total count from the API, so size is hardcoded - API limits it a 100, but I set it to 1000 in case they remove that limit
     // we derive the count from the count property on the response
-      if (count === 0) {
-        try {
-          const url =`${rootState.config.api2Url}/repositories/github?size=1000`
-          const apiKey = rootState.userToken || Cookies.get('user_token')
-          const myHeaders = new Headers()
-          myHeaders.append('Authorization', 'Bearer ' + apiKey)
-          myHeaders.append('Accept', 'application/json')
-          const response = await fetch(url, { headers: myHeaders })
-          if (response.ok) {
-            const responseJson = await response.json()
-            console.log('/repositories/github response', responseJson)
-            const myReposCount = responseJson.count
-            commit('SET_MY_REPOS_COUNT', myReposCount)
-            console.log('** MY REPOS TOTAL COUNT: **', myReposCount)
-          } else {
-            commit('SET_MY_REPOS_COUNT', 0)
-            throw new Error(response.statusText)
-          }
-        }
-        catch (err) {
-          commit('SET_MY_REPOS_COUNT', 0)
-        }
-      }
+      // if (count === 0) {
+      //   try {
+      //     const url =`${rootState.config.api2Url}/repositories/github?size=1000`
+      //     const apiKey = rootState.userToken || Cookies.get('user_token')
+      //     const myHeaders = new Headers()
+      //     myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      //     myHeaders.append('Accept', 'application/json')
+      //     const response = await fetch(url, { headers: myHeaders })
+      //     if (response.ok) {
+      //       const responseJson = await response.json()
+      //       console.log('/repositories/github response', responseJson)
+      //       const myReposCount = responseJson.count
+      //       commit('SET_MY_REPOS_COUNT', myReposCount)
+      //       console.log('** MY REPOS TOTAL COUNT: **', myReposCount)
+      //     } else {
+      //       commit('SET_MY_REPOS_COUNT', 0)
+      //       throw new Error(response.statusText)
+      //     }
+      //   }
+      //   catch (err) {
+      //     commit('SET_MY_REPOS_COUNT', 0)
+      //   }
+      // }
       // Fetch paginated repos for the MyRepos view.
       try {
         const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
