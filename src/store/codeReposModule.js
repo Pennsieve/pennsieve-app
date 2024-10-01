@@ -198,11 +198,11 @@ export const actions = {
     const { url } = repo.value.content.releases[0]
     const { intId } = repo.value.content
     const { organization } = repo.value
-
+    console.log(rootState.activeOrganization.organization.intId)
 
     const { description, givenName, isAutoPublished, tags } = repo
     const bodyToSend = {
-      "organization_id": organization,
+      "organization_id": rootState.activeOrganization.organization.intId,
       "dataset_id": intId,
       "url": url,
       "name": formVal.givenName,
