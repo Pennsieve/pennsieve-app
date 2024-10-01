@@ -74,7 +74,7 @@ export const actions = {
     // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid making two calls. BE does not currently support. 
       if (count === 0) {
         try {
-          const url =`${rootState.config.api2Url}/repositories/github`
+          const url =`${rootState.config.api2Url}/repositories/github?size=500`
           const apiKey = rootState.userToken || Cookies.get('user_token')
           const myHeaders = new Headers()
           myHeaders.append('Authorization', 'Bearer ' + apiKey)
@@ -82,6 +82,7 @@ export const actions = {
           const response = await fetch(url, { headers: myHeaders })
           if (response.ok) {
             const responseJson = await response.json()
+            console.log('/repositories/github response', responseJson)
             const myReposCount = responseJson.count
             commit('SET_MY_REPOS_COUNT', myReposCount)
             console.log('** MY REPOS TOTAL COUNT: **', myReposCount)
