@@ -192,23 +192,18 @@ export const actions = {
   },
   
   saveRepoSettings: async({state, commit, rootState }, { formVal, repo }) => {
-    console.log('repo:', repo.value)
-    console.log('formVal', formVal)
-
-    const { url } = repo.value.content.releases[0]
-    const { intId } = repo.value.content
-    const { organization } = repo.value
-    console.log(rootState.activeOrganization.organization.intId)
+    const { url } = repo.value.content.releases[0];
+    const { intId } = repo.value.content;
 
     const { description, givenName, isAutoPublished, tags } = repo
     const bodyToSend = {
-      "organization_id": rootState.activeOrganization.organization.intId,
-      "dataset_id": intId,
-      "url": url,
-      "name": formVal.givenName,
-      "subtitle": formVal.description,
-      "auto_publish": formVal.isAutoPublished,
-      "tags": formVal.tags,
+      organization_id: rootState.activeOrganization.organization.intId,
+      dataset_id: intId,
+      url: url,
+      name: formVal.givenName,
+      subtitle: formVal.description,
+      auto_publish: formVal.isAutoPublished,
+      tags: formVal.tags,
       // "sync": {
       //   "banner": boolean,
       //   "readme": boolean,
@@ -228,21 +223,52 @@ export const actions = {
         headers: myHeaders,
         body: JSON.stringify(bodyToSend)
       })
-      if (response.ok) {
-        const repo = await response.json()
-      } else {
-        throw new Error(response.statusText)
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
       }
+
+      return response;
     }
     catch (err) {
       console.error(err);
+      throw err; 
     }
     
    
   },
 
-  publishCodeRepo: async ({commit, rootState}, { repo }) => {
-    console.log('TODO: BE needs to provide the Publish Code Repo API so we can POST to it to Publish the Latest version of this Code Repo.')
+  publishCodeRepo: async ({ commit, rootState }, { repo }) => {
+    const { url } = repo.content.releases[0];
+    const { intId } = repo.content
+
+    const bodyToSend = {
+      organization_id: rootState.activeOrganization.organization.intId,
+      dataset_id: intId, 
+      url,
+      type: 'publishing'
+    }
+    try {
+      const url = `${rootState.config.api2Url}/repository/publish`
+      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "POST",
+        headers: myHeaders,
+        body: JSON.stringify(bodyToSend)
+      })
+      console.log('response', response)
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
+      }
+
+      return response;
+    }
+    catch (err) {
+      console.error(err);
+      throw err; 
+    }
   }
 }
 
