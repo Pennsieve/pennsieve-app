@@ -15,7 +15,7 @@
         </div>
         <div v-if="workspaceReposView" class="repo-info-container">
           <h2>
-            {{ repo.content.name }}
+            <a :href="getUrl">{{ repo.content.name }}</a>
           </h2>
           <p>
             {{ repo.content.description }}
@@ -64,10 +64,6 @@
         </div>
       </el-col>
       <el-col :span="7" class="actions-container">
-        <!-- There is no Start/ Stop Tracking button on the Workspace Repos view because 
-              we don't have access to the tracking property from the /datasets endpoint we 
-              use to fetch the data for that view 
-        -->
         <button
           v-if="!repo.tracking && myReposView"
           @click="handleStartTrackingClick"
@@ -82,19 +78,9 @@
         >
           Stop Tracking
         </button>
-        <!-- Link to Config View in My Repos Tab -->
-        <!-- <router-link
-          v-if="myReposView && repo.tracking"
-          :to="{
-            name: 'configure-repo',
-            params: { repoId: repo.id},
-          }"
-        >
-          <button class="text-button">Configure</button>
-        </router-link> -->
         <!-- Link to Config View in Workspace Repos Tab -->
         <router-link
-          v-if="workspaceReposView"
+          v-if="workspaceReposView && isRepoOwner"
           :to="{
             name: 'configure-repo',
             params: { repoId: repo.content.id },
@@ -103,7 +89,7 @@
           <button class="text-button">Configure</button>
         </router-link>
         <button
-          v-if="workspaceReposView"
+          v-if="workspaceReposView && isRepoOwner"
           @click="handlePublishLatestClick"
           class="text-button"
         >
@@ -196,7 +182,9 @@ export default {
       "orgDatasetStatuses",
     ]),
     getUrl: function () {
-      return this.repo.url;
+      console.log(this.repo);
+      if (this.workspaceReposView) return this.repo.content.releases[0].url;
+      if (this.myReposView) return this.repo.url;
     },
     isRepoOwner: function () {
       const ownerId = propOr("", "owner", this.repo);
