@@ -71,10 +71,11 @@ export const actions = {
     Use this data to populate the MyRepos view. 
   */
   fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
-    // Fetch all repos to get the total count, TODO: include total count in paginated response to avoid making two calls. BE does not currently support. 
+    // we are currently missing a total count from the API, so size is hardcoded - API limits it a 100, but I set it to 1000 in case they remove that limit
+    // we derive the count from the count property on the response
       if (count === 0) {
         try {
-          const url =`${rootState.config.api2Url}/repositories/github?size=500`
+          const url =`${rootState.config.api2Url}/repositories/github?size=1000`
           const apiKey = rootState.userToken || Cookies.get('user_token')
           const myHeaders = new Headers()
           myHeaders.append('Authorization', 'Bearer ' + apiKey)
