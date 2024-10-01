@@ -105,12 +105,14 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 onMounted(() => {
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
+    console.log("activeRepoId", activeRepoId);
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
   }
   repo.value = store.getters["codeReposModule/activeRepo"];
 
   // update initial form values from the database
   if (repo.value && repo.value.content) {
+    console.log("repo", repo);
     activeRepoName.value = repo.value.content.name;
     codeRepoForm.value.givenName = repo.value.content.name;
     codeRepoForm.value.description = repo.value.content.description;

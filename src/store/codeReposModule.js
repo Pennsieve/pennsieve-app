@@ -201,7 +201,7 @@ export const actions = {
   
   saveRepoSettings: async({state, commit, rootState }, { formVal, repo }) => {
     const { url } = repo.value.content.releases[0];
-    const { intId } = repo.value.content;
+    const { intId } = repo?.value?.content;
 
     const { description, givenName, isAutoPublished, tags } = repo
     const bodyToSend = {
