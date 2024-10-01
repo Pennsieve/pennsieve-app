@@ -101,6 +101,7 @@ export default {
             msg: "Your request has been successfully submitted.",
           },
         });
+        this.repo.tracking = true;
       } catch (error) {
         console.error(error);
         EventBus.$emit("toast", {
@@ -125,6 +126,7 @@ export default {
             msg: "Your request has been successfully submitted.",
           },
         });
+        this.repo.tracking = false;
       } catch (error) {
         console.error(error);
         EventBus.$emit("toast", {
