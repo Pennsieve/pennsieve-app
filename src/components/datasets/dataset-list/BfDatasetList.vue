@@ -77,7 +77,7 @@
       v-loading="isLoadingDatasets"
     >
       <bf-dataset-list-item
-        v-for="dataset in datasets"
+        v-for="dataset in filteredDatasets"
         :key="dataset.content.id"
         :dataset="dataset"
         @show-locked-dialog="dialogLockedVisible = true"
@@ -240,7 +240,11 @@ export default {
     ]),
 
     ...mapGetters("datasetModule", ["curDatasetSearchPage"]),
-
+    filteredDatasets() {
+      return this.datasets.filter(
+        (dataset) => dataset.content.datasetType !== "release"
+      );
+    },
     /**
      * Compute dataset icon sort direction
      * @returns {String}
