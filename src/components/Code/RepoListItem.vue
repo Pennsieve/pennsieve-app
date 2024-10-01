@@ -271,6 +271,7 @@ export default {
 }
 
 .repo-banner-container {
+  margin-top: 12px;
   display: flex;
   flex-direction: row;
 }
