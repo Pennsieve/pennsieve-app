@@ -56,6 +56,9 @@ export const mutations = {
   SET_WORKSPACE_REPOS_OFFSET(state, offset) {
     state.workspaceReposPaginationParams.offset = offset;
   },
+  SET_WORKSPACE_REPOS_CURRENT_PAGE(state, currentPage) {
+    state.workspaceReposPaginationParams.currentPage = currentPage;
+  },
   SET_ACTIVE_CODE_REPO(state, activeRepoId) {
     state.activeRepo = state.workspaceRepos.find(repo => repo.content.id === activeRepoId)
   }
@@ -81,6 +84,7 @@ export const actions = {
             const responseJson = await response.json()
             const myReposCount = responseJson.count
             commit('SET_MY_REPOS_COUNT', myReposCount)
+            console.log('** MY REPOS TOTAL COUNT: **', myReposCount)
           } else {
             commit('SET_MY_REPOS_COUNT', 0)
             throw new Error(response.statusText)
@@ -101,7 +105,7 @@ export const actions = {
         if (response.ok) {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
-          console.log('MyRepos', myRepos)
+          console.log('** MY REPOS: **', myRepos)
           commit('SET_MY_REPOS', myRepos);
           commit('SET_MY_REPOS_CURRENT_PAGE', page);
 
@@ -166,7 +170,7 @@ export const actions = {
     commit('SET_WORKSPACE_REPOS_OFFSET', offset)
   },
 
-  fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset }) => {
+  fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset, page }) => {
     try {
       const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -179,9 +183,11 @@ export const actions = {
       })
       if (response.ok) {
         const workspaceRepos = await response.json()
-        console.log('workspaceRepos:', workspaceRepos)
+        console.log('** WORKSPACE REPOS: **', workspaceRepos)
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
+        console.log('** WORKSPACE REPOS TOTAL COUNT: **', workspaceRepos.totalCount)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
+        commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
       } else {
         throw new Error(response.statusText)
       }
@@ -258,7 +264,6 @@ export const actions = {
         headers: myHeaders,
         body: JSON.stringify(bodyToSend)
       })
-      console.log('response', response)
       if (!response.ok) {
         throw new Error(`${response.status}`);
       }

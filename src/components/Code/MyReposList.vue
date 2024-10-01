@@ -44,7 +44,6 @@ export default {
     };
   },
   async mounted() {
-    console.log(this.myReposCount);
     try {
       this.fetchMyRepos({
         page: this.myReposPaginationParams.page,

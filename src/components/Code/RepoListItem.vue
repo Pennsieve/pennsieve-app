@@ -182,7 +182,6 @@ export default {
       "orgDatasetStatuses",
     ]),
     getUrl: function () {
-      console.log(this.repo);
       if (this.workspaceReposView) return this.repo.content.releases[0].url;
       if (this.myReposView) return this.repo.url;
     },
