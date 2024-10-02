@@ -82,8 +82,6 @@ export const actions = {
         if (response.ok) {
           const responseJson = await response.json()
           const myRepos = responseJson.repos
-          console.log('** MY REPOS: **', myRepos)
-          console.log('** MY REPOS COUNT **', responseJson.count)
           commit('SET_MY_REPOS', myRepos);
           commit('SET_MY_REPOS_CURRENT_PAGE', page);
           commit('SET_MY_REPOS_COUNT', responseJson.count)
@@ -162,9 +160,7 @@ export const actions = {
       })
       if (response.ok) {
         const workspaceRepos = await response.json()
-        console.log('** WORKSPACE REPOS: **', workspaceRepos)
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
-        console.log('** WORKSPACE REPOS TOTAL COUNT: **', workspaceRepos.totalCount)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
         commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
       } else {

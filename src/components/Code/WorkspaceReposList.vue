@@ -81,7 +81,6 @@ export default {
     ]),
     onPaginationPageChange: async function (page) {
       const offset = (page - 1) * this.workspaceReposPaginationParams.limit;
-      console.log("offset", offset);
       this.updateWorkspaceRepoOffset(offset);
       try {
         await this.fetchWorkspaceRepos({
