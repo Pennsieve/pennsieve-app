@@ -38,7 +38,6 @@
         <router-tabs :tabs="tabs" />
       </template>
     </bf-rafter>
-    <!-- Single Repo Config View -->
 
     <bf-rafter
       v-if="configView"

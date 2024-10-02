@@ -175,14 +175,14 @@ export const actions = {
   saveRepoSettings: async({state, commit, rootState }, { formVal, repo }) => {
     const { url } = repo.value.content.releases[0];
     const { intId } = repo?.value?.content;
-
+    console.log('formVal', formVal)
     const { description, givenName, isAutoPublished, tags } = repo
     const bodyToSend = {
       organization_id: rootState.activeOrganization.organization.intId,
       dataset_id: intId,
       url: url,
       name: formVal.givenName,
-      subtitle: formVal.description,
+      description: formVal.description,
       auto_publish: formVal.isAutoPublished,
       tags: formVal.tags,
       // "sync": {

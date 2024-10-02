@@ -40,10 +40,10 @@
           Subtitle
           <span class="label-helper"> required to publish </span>
         </template>
-        <character-count-input
+        <el-input
           v-model="codeRepoForm.description"
           :rows="3"
-          placeholder="Add a description to help others understand what's in your code repo"
+          placeholder="Add a description"
           @blur="saveRepoConfig"
         />
       </el-form-item>
@@ -103,26 +103,36 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
+  console.log("activeRepo", store.getters["codeReposModule/activeRepo"]);
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
+    console.log("activeRepoId", activeRepoId);
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
   }
+
   repo.value = store.getters["codeReposModule/activeRepo"];
 
   // update initial form values from the database
-  if (repo.value && repo.value.content) {
-    activeRepoName.value = repo.value.content.name;
-    codeRepoForm.value.givenName = repo.value.content.name;
-    codeRepoForm.value.description = repo.value.content.description;
-    codeRepoForm.value.tags = repo.value.content.tags;
-  }
+  activeRepoName.value =
+    store.getters["codeReposModule/activeRepo"].content.name;
+  codeRepoForm.value.givenName =
+    store.getters["codeReposModule/activeRepo"].content.name;
+  codeRepoForm.value.description =
+    store.getters["codeReposModule/activeRepo"].content.description;
+  codeRepoForm.value.tags =
+    store.getters["codeReposModule/activeRepo"].content.tags;
 });
 
 const saveRepoConfig = debounce(function () {
-  store.dispatch("codeReposModule/saveRepoSettings", {
-    formVal: codeRepoForm.value,
-    repo,
-  });
+  try {
+    store.dispatch("codeReposModule/saveRepoSettings", {
+      formVal: codeRepoForm.value,
+      repo,
+    });
+    console.log("API was called");
+  } catch (err) {
+    console.error(err);
+  }
 }, 1000);
 
 const checkIfTagExists = (tag) => {
