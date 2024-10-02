@@ -3,7 +3,11 @@
     <!-- My Repos and Workspace Repos-->
     <div v-if="configView" class="back-btn">
       <router-link :to="previousRoute">
-        <button class="text-button">&lt-- Back to list</button>
+        <button class="text-button">  <IconArrowLeft
+          name="icon-arrow-left"
+          :height="8"
+          :width="8"
+        /> Back to list</button>
       </router-link>
     </div>
     <bf-rafter
