@@ -6,23 +6,34 @@
         create a Workspace Repository.
       </p>
     </bf-empty-page-state>
-    <div class="pagination-container">
-      <el-pagination
-        :page-size="workspaceReposPaginationParams.limit"
-        :current-page="workspaceReposPaginationParams.currentPage"
-        layout="prev, pager, next"
-        :total="workspaceReposCount"
-        @current-change="onPaginationPageChange"
-      />
-    </div>
-    <div v-loading="isLoadingRepos">
-      <RepoListItem
-        workspaceReposView
-        :isTracked="repo.tracking"
-        v-for="repo in workspaceRepos"
-        :key="repo.id"
-        :repo="repo"
-      ></RepoListItem>
+    <div v-if="!showEmptyState">
+      <div class="pagination-container">
+        <el-pagination
+          :page-size="workspaceReposPaginationParams.limit"
+          :current-page="workspaceReposPaginationParams.currentPage"
+          layout="prev, pager, next"
+          :total="workspaceReposCount"
+          @current-change="onPaginationPageChange"
+        />
+      </div>
+      <div>
+        <RepoListItem
+          workspaceReposView
+          :isTracked="repo.tracking"
+          v-for="repo in workspaceRepos"
+          :key="repo.id"
+          :repo="repo"
+        ></RepoListItem>
+      </div>
+      <div class="pagination-container">
+        <el-pagination
+          :page-size="workspaceReposPaginationParams.limit"
+          :current-page="workspaceReposPaginationParams.currentPage"
+          layout="prev, pager, next"
+          :total="workspaceReposCount"
+          @current-change="onPaginationPageChange"
+        />
+      </div>
     </div>
   </bf-stage>
 </template>
@@ -38,12 +49,6 @@ export default {
   components: {
     RepoListItem,
     BfEmptyPageState,
-  },
-
-  data() {
-    return {
-      isLoadingRepos: false,
-    };
   },
 
   async mounted() {
@@ -79,13 +84,11 @@ export default {
       console.log("offset", offset);
       this.updateWorkspaceRepoOffset(offset);
       try {
-        this.isLoadingRepos = true;
         await this.fetchWorkspaceRepos({
           limit: this.workspaceReposPaginationParams.limit,
           offset: this.workspaceReposPaginationParams.offset,
           page: page,
         });
-        this.isLoadingRepos = false;
       } catch (err) {
         console.error(err);
       }

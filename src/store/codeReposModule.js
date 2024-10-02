@@ -70,7 +70,7 @@ export const actions = {
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 
   */
-  fetchMyRepos: async({ commit, rootState }, { page, size, count }) => {
+  fetchMyRepos: async({ commit, rootState }, { page, size }) => {
       // Fetch paginated repos for the MyRepos view.
       try {
         const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`

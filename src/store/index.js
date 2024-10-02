@@ -334,6 +334,7 @@ export const mutations = {
       },
 
       SET_DATASETS(state, data) {
+        console.log(data)
         state.datasets = data;
       },
 

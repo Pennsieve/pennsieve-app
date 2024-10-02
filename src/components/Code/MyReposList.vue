@@ -24,6 +24,15 @@
         :repo="repo"
       ></RepoListItem>
     </div>
+    <div class="pagination-container">
+      <el-pagination
+        :page-size="myReposPaginationParams.size"
+        :current-page="myReposPaginationParams.currentPage"
+        layout="prev, pager, next"
+        :total="myReposCount"
+        @current-change="onPaginationPageChange"
+      />
+    </div>
   </bf-stage>
 </template>
 
@@ -48,7 +57,6 @@ export default {
       this.fetchMyRepos({
         page: this.myReposPaginationParams.page,
         size: this.myReposPaginationParams.size,
-        count: this.myReposCount,
       });
     } catch (err) {
       console.error(err);
@@ -73,7 +81,6 @@ export default {
         await this.fetchMyRepos({
           page,
           size: this.myReposPaginationParams.size,
-          count: this.myReposCount,
         });
         this.isLoadingRepos = false;
       } catch (err) {

@@ -77,7 +77,7 @@
       v-loading="isLoadingDatasets"
     >
       <bf-dataset-list-item
-        v-for="dataset in filteredDatasets"
+        v-for="dataset in datasets"
         :key="dataset.content.id"
         :dataset="dataset"
         @show-locked-dialog="dialogLockedVisible = true"
