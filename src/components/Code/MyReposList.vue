@@ -1,5 +1,5 @@
 <template>
-  <bf-stage>
+  <bf-stage v-loading="isLoadingRepos" element-loading-text="Loading...">
     <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>
         You have not linked your Github account to Pennsieve yet. Please link
@@ -8,6 +8,7 @@
     </bf-empty-page-state>
     <div class="pagination-container">
       <el-pagination
+        v-if="myReposCount"
         :page-size="myReposPaginationParams.size"
         :current-page="myReposPaginationParams.currentPage"
         layout="prev, pager, next"
@@ -15,7 +16,7 @@
         @current-change="onPaginationPageChange"
       />
     </div>
-    <div v-loading="isLoadingRepos">
+    <div>
       <RepoListItem
         myReposView
         :isTracked="repo.tracking"
@@ -26,6 +27,7 @@
     </div>
     <div class="pagination-container">
       <el-pagination
+        v-if="myReposCount && myRepos.length > 5"
         :page-size="myReposPaginationParams.size"
         :current-page="myReposPaginationParams.currentPage"
         layout="prev, pager, next"
@@ -54,12 +56,15 @@ export default {
   },
   async mounted() {
     try {
-      this.fetchMyRepos({
+      this.isLoadingRepos = true;
+      await this.fetchMyRepos({
         page: this.myReposPaginationParams.page,
         size: this.myReposPaginationParams.size,
       });
     } catch (err) {
       console.error(err);
+    } finally {
+      this.isLoadingRepos = false;
     }
   },
   computed: {
