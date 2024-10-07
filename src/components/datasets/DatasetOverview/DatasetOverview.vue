@@ -36,10 +36,10 @@
               <div
                 class="dataset-description mb-24"
                 v-html="$sanitize(datasetSubtitle)"
-              />
+              ></div>
 
               <div class="dataset-heading-meta">
-                Last updated on <b>{{ lastUpdatedDate }}</b>
+                Last updated on <strong>{{ lastUpdatedDate }}</strong>
                 <template v-if="isPublished && publishedCount > 0">
                   (<a
                   :href="discoverLink"
@@ -49,7 +49,7 @@
                 </a>)
                   <div class="sharing-status">
 
-                    Last published on <b>{{ publishedDate }}</b>
+                    Last published on <strong>{{ publishedDate }}</strong>
                     <a
                       target="_blank"
                       :href="discoverLink"
@@ -63,19 +63,17 @@
                     Published dataset DOI: <a :href="doiUrl">{{datasetDoi.doi}}</a>
                   </div>
                 </template>
-
-
-
-
-
-                <!--            <div class="dataset-corresponding-contributor">-->
-                <!--              <p>Dataset owner:</p>-->
-                <!--              <contributor-item :contributor="correspondingContributor" />-->
-                <!--            </div>-->
-
-                <div>
-
-                </div>
+                <!-- <div class="dataset-corresponding-contributor">
+                  <p>Dataset owner:</p>
+                  <contributor-item :contributor="correspondingContributor" />
+                </div> -->
+              </div>
+              <div class="dataset-heading-cta">
+                <span>Dataset node id </span>
+                <span><strong>{{ datasetNodeId }}</strong></span>
+                <button @click="copyToClipboard(datasetNodeId)">
+                  <IconCopyDocument/>
+                </button>
               </div>
             </div>
           </div>
@@ -283,6 +281,9 @@
   import IconStorage from "../../icons/IconStorage.vue";
   import IconDocument from "../../icons/IconDocument.vue";
   import IconLicense from "../../icons/IconLicense.vue";
+  import IconCopyDocument from "../../icons/IconCopyDocument.vue";
+  import EventBus from '../../../utils/event-bus';
+
 
   const replaceLineBreaks = str => {
   return Object.prototype.toString.call(str) === '[object String]'
@@ -304,6 +305,7 @@ export default {
     IconDocument,
     IconStorage,
     IconFiles,
+    IconCopyDocument,
     LockedBanner,
     DatasetBanner,
     ChecklistItem,
@@ -612,7 +614,17 @@ export default {
      */
     datasetIntId: function() {
       return pathOr(0, ['content', 'intId'], this.dataset)
-    }
+    },
+    
+    /**
+     * Compute dataset node id
+     * @returns {String}
+     */
+     datasetNodeId: function() {
+      const nodeId = pathOr('', ['content', 'id'], this.dataset)
+
+      return nodeId
+    },
   },
 
   watch: {
@@ -813,6 +825,26 @@ export default {
           }
         })
       }
+    },
+
+    /**
+    * Copy text to clipboard
+    */
+    async copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        EventBus.$emit("toast", {
+            detail: {
+              msg: "Text copied to clipboard !",
+            },
+          });
+      } catch (err) {
+        EventBus.$emit("toast", {
+            detail: {
+              msg: "Failed to copy text",
+            },
+          });
+      }
     }
   }
 }
@@ -866,7 +898,7 @@ h1 {
   flex: 1;
 }
 
-.dataset-heading-meta {
+.dataset-heading-meta, .dataset-heading-cta {
   font-size: 14px;
   font-weight: normal;
   line-height: 24px;
