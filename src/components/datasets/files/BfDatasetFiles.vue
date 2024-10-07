@@ -753,7 +753,6 @@ export default {
      * @param {String} id
      */
     navigateToFile: function (id) {
-      console.log('id sent to', id)
       this.$router.push({ name: "collection-files", params: { fileId: id } });
       // this.fetchFiles();
     },
