@@ -721,7 +721,6 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
 
@@ -758,7 +757,6 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
       if (id) {
         this.navigateToFile(id);
       } else {
