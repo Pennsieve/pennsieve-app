@@ -368,21 +368,6 @@ export default {
     },
 
     /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
-
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
-
-    /**
      * Get move URL
      * @returns {String}
      */
@@ -423,13 +408,6 @@ export default {
         })
       },
       deep: true
-    },
-
-    /**
-     * Trigger API request when URL is changed
-     */
-    getFilesUrl: function () {
-      this.fetchFiles();
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -480,10 +458,16 @@ export default {
       },
       immediate: true,
     },
+
+    $route(to, from) {
+        if ((to.name !== from.name) || (to.params.fileId !== from.params.fileId)) {
+            this.fetchFiles();
+        }
+    }
   },
 
   mounted: function () {
-    if (this.getFilesUrl && !this.files.length) {
+    if (this.getFilesUrl() && !this.files.length) {
       this.fetchFiles();
     }
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
@@ -664,7 +648,7 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl)
+      this.sendXhr(this.getFilesUrl())
         .then((response) => {
           this.filesLoading = true;
           this.$store.dispatch(
@@ -702,6 +686,7 @@ export default {
           this.filesLoading = false;
         })
         .catch((response) => {
+          console.log('error caught')
           this.handleXhrError(response);
         });
     },
@@ -723,7 +708,6 @@ export default {
       this.offset = 0;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
-
       if (id === "") {
         return;
       }
@@ -769,7 +753,9 @@ export default {
      * @param {String} id
      */
     navigateToFile: function (id) {
+      console.log('id sent to', id)
       this.$router.push({ name: "collection-files", params: { fileId: id } });
+      // this.fetchFiles();
     },
 
     /**
@@ -777,6 +763,7 @@ export default {
      */
     navigateToDataset: function () {
       this.$router.push({ name: "dataset-files" });
+      // this.fetchFiles();
     },
 
     /**
@@ -1189,6 +1176,20 @@ export default {
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
+    },
+
+        /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+     getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl =
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id =
+          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
     },
   },
 };
