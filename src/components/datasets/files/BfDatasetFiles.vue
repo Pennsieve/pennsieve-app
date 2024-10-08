@@ -754,7 +754,6 @@ export default {
      */
     navigateToFile: function (id) {
       this.$router.push({ name: "collection-files", params: { fileId: id } });
-      // this.fetchFiles();
     },
 
     /**
@@ -762,7 +761,6 @@ export default {
      */
     navigateToDataset: function () {
       this.$router.push({ name: "dataset-files" });
-      // this.fetchFiles();
     },
 
     /**
