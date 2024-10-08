@@ -201,6 +201,7 @@ import {
   pathEq,
   findIndex,
   pluck,
+  includes,
 } from "ramda";
 
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
@@ -459,11 +460,7 @@ export default {
       immediate: true,
     },
 
-    $route(to, from) {
-        if ((to.name !== from.name) || (to.params.fileId !== from.params.fileId)) {
-            this.fetchFiles();
-        }
-    }
+    $route: 'handleRouteChange'
   },
 
   mounted: function () {
@@ -686,7 +683,6 @@ export default {
           this.filesLoading = false;
         })
         .catch((response) => {
-          console.log('error caught')
           this.handleXhrError(response);
         });
     },
@@ -1188,6 +1184,17 @@ export default {
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
+
+    handleRouteChange: function(to, from) {
+      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+      const routeChanged = to.name !== from.name;
+      const fileIdChanged = to.params.fileId !== from.params.fileId;
+      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+
+      if (isNavigatingWithinDatasetFiles) {
+        this.fetchFiles();
+      }
+    }
   },
 };
 </script>
