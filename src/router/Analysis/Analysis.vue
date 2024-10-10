@@ -4,16 +4,16 @@
       <template #description>
         <div class="description">
           <p>
-            The pennsieve platform allows users to register applications to
+            The pennsieve platform allows users to register integrations to
             allow users to expand the functionality of the platform through
             custom actions and webhooks.
           </p>
           <hr />
         </div>
         <div slot="description" class="description">
-          <p v-if="this.$route.name === 'applications'">
-            Applications support actions on various entities on the platform
-            such as "Files", "Records", and "Datasets". Registered applications
+          <p v-if="this.$route.name === 'integrations'">
+            Integrations support actions on various entities on the platform
+            such as "Files", "Records", and "Datasets". Registered integrations
             can be triggered from the action-menu associated with the targeted
             entities.
             <a
@@ -39,6 +39,9 @@
             Pennsieve platform. You can register compute nodes through the
             Pennsieve Agent. Each Compute Node is associated with an account,
             which can be a cloud-provider or a local cluster.
+          </p>
+          <p v-if="this.$route.name === 'applications'">
+            Applications allow users to run analytic workflows on the platform.
           </p>
         </div>
       </template>
@@ -83,8 +86,8 @@ export default {
     return {
       tabs: [
         {
-          name: "Applications",
-          to: "applications",
+          name: "Integrations",
+          to: "integrations",
         },
         {
           name: "Webhooks",
@@ -93,6 +96,10 @@ export default {
         {
           name: "Compute Nodes",
           to: "compute-nodes",
+        },
+        {
+          name: "Applications",
+          to: "applications",
         },
       ],
     };

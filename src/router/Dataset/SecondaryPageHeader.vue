@@ -66,7 +66,7 @@ export default {
         case "dataset-activity":
           return "Dataset Activity";
         case "integrations-settings":
-          return "Applications";
+          return "Integrations";
         case "collection-files":
           return "Files";
         case "viewer":
