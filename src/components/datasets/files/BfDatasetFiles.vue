@@ -201,6 +201,7 @@ import {
   pathEq,
   findIndex,
   pluck,
+  includes,
 } from "ramda";
 
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
@@ -368,21 +369,6 @@ export default {
     },
 
     /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
-
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
-
-    /**
      * Get move URL
      * @returns {String}
      */
@@ -423,13 +409,6 @@ export default {
         })
       },
       deep: true
-    },
-
-    /**
-     * Trigger API request when URL is changed
-     */
-    getFilesUrl: function () {
-      this.fetchFiles();
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -480,10 +459,12 @@ export default {
       },
       immediate: true,
     },
+
+    $route: 'handleRouteChange'
   },
 
   mounted: function () {
-    if (this.getFilesUrl && !this.files.length) {
+    if (this.getFilesUrl() && !this.files.length) {
       this.fetchFiles();
     }
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
@@ -664,7 +645,7 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl)
+      this.sendXhr(this.getFilesUrl())
         .then((response) => {
           this.filesLoading = true;
           this.$store.dispatch(
@@ -721,10 +702,8 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
-
       if (id === "") {
         return;
       }
@@ -758,7 +737,6 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
       if (id) {
         this.navigateToFile(id);
       } else {
@@ -1192,6 +1170,31 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
+
+        /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+     getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl =
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id =
+          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
+    },
+
+    handleRouteChange: function(to, from) {
+      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+      const routeChanged = to.name !== from.name;
+      const fileIdChanged = to.params.fileId !== from.params.fileId;
+      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+
+      if (isNavigatingWithinDatasetFiles) {
+        this.fetchFiles();
+      }
+    }
   },
 };
 </script>
