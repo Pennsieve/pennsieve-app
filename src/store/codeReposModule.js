@@ -172,7 +172,7 @@ export const actions = {
     }
   },
   
-  saveRepoSettings: async({state, commit, rootState }, { formVal, repo }) => {
+  saveRepoSettings: async({ state, commit, rootState }, { formVal, repo }) => {
     const { url } = repo.value.content.releases[0];
     const { intId } = repo?.value?.content;
     console.log('formVal', formVal)
