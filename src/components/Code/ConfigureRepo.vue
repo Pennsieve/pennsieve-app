@@ -103,7 +103,10 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
-  console.log("activeRepo", store.getters["codeReposModule/activeRepo"]);
+  console.log(
+    "activeRepo",
+    store.getters["codeReposModule/activeRepo"].content.repository
+  );
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     console.log("activeRepoId", activeRepoId);
@@ -115,6 +118,8 @@ onMounted(() => {
   // update initial form values from the database
   activeRepoName.value =
     store.getters["codeReposModule/activeRepo"].content.name;
+  codeRepoForm.value.isAutoPublished =
+    store.getters["codeReposModule/activeRepo"].content.repository.autoProcess;
   codeRepoForm.value.givenName =
     store.getters["codeReposModule/activeRepo"].content.name;
   codeRepoForm.value.description =
