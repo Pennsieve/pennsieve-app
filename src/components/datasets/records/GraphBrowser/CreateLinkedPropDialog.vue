@@ -62,13 +62,11 @@ import {pathOr} from "ramda";
 interface CreateForm {
   label: string,
   multiple: boolean,
-  switch: boolean
 }
 const createFormRef = ref<FormInstance>()
 const createForm = reactive<CreateForm>({
   label:"",
   multiple: false,
-  switch: false
 })
 
 const rules = reactive<FormRules<CreateForm>>({
@@ -79,13 +77,6 @@ const rules = reactive<FormRules<CreateForm>>({
     },
   ],
   multiple: [
-    {
-      type: 'boolean',
-      required: false,
-      trigger: 'change',
-    },
-  ],
-  switch: [
     {
       type: 'boolean',
       required: false,
@@ -285,7 +276,6 @@ function postLinkedPropertyChanges() {
 
       <el-form-item label="Options">
         <el-checkbox v-model="createForm.multiple" prop="multple"  label="Allow multiple links" size="large" />
-        <el-checkbox v-model="createForm.switch"   prop="switch" label="Make link required" size="large" />
       </el-form-item>
 
       <div class="info-panel">

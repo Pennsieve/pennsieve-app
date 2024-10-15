@@ -32,6 +32,7 @@ a {
   }
 }
 a, button {
+  font-family: 'Roboto', sans-serif;
   &.grey-link {
     color: $gray_4;
     &a {

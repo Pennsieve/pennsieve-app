@@ -1,6 +1,6 @@
 <script setup>
 
-import { ref} from "vue";
+import { ref,watch} from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
 import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
@@ -8,13 +8,22 @@ import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ModelDetails from "@/components/datasets/records/GraphBrowser/ModelDetails.vue";
 
-const props = defineProps(['modelId', 'panelVisible'])
+const props = defineProps(['edges', 'modelId', 'panelVisible'])
 
 const modelsListVisible = ref(false)
 const modelListSelected = ref(true)
 const modelInfoSelected = ref(false)
 
-const emit = defineEmits(['togglePanelVisibility', 'focusNode'])
+const emit = defineEmits([
+  'openDeleteLinkedPropDialog',
+  'togglePanelVisibility',
+  'focusNode',
+  'openPropertyDialog',
+  'openDeletePropDialog',
+  'openDeleteRelationshipDialog',
+  'openDeleteModelDialog',
+  'openEditPropertyDialog'
+])
 
 const mouseHoverInfo = ref(false)
 const mouseHoverList = ref(false)
@@ -64,6 +73,13 @@ function mouseOver(event) {
 
 }
 
+watch(() => props.modelId, (modelId, second) => {
+  if (modelId) {
+    modelInfoSelected.value = true
+    modelListSelected.value = false
+  }
+})
+
 function focusNode(event) {
   emit('focusNode', event)
 }
@@ -108,6 +124,27 @@ function toggleModelsList(event) {
 
 }
 
+function onOpenPropertyDialog() {
+  emit('openPropertyDialog')
+}
+
+function onOpenDeleteLinkedPropDialog(event) {
+  emit('openDeleteLinkedPropDialog', event)
+}
+function onOpenDeletePropDialog(event) {
+  emit('openDeletePropDialog', event)
+}
+function onOpenDeleteRelationshipDialog(event) {
+  emit('openDeleteRelationshipDialog', event)
+}
+
+function onOpenDeleteModelDialog(event) {
+  emit('openDeleteModelDialog', event)
+}
+
+function onOpenEditPropertyDialog(event) {
+  emit('openEditPropertyDialog', event)
+}
 
 </script>
 
@@ -118,7 +155,7 @@ function toggleModelsList(event) {
   >
     <button
       id="propPanel"
-      :class="{ 'selected': modelInfoSelected, 'btn-toggle':true, 'first':true }"
+      :class="{ 'selected': modelInfoSelected, 'btn-toggle':true, 'second':true }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
@@ -127,18 +164,16 @@ function toggleModelsList(event) {
         v-if="!mouseHoverInfo"
         :width="24"
         :height="24"
-        color="#808fad"
       />
       <IconArrowRight
         v-else
         :width="14"
         :height="14"
-        color="#808fad"
       />
     </button>
     <button
       id="infoPanel"
-      :class="{ 'selected': modelListSelected, 'btn-toggle':true, 'second':true }"
+      :class="{ 'selected': modelListSelected, 'btn-toggle':true, 'first':true }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
@@ -147,13 +182,11 @@ function toggleModelsList(event) {
         v-if="!mouseHoverList"
         :width="24"
         :height="24"
-        color="#808fad"
       />
       <IconArrowRight
         v-else
         :width="14"
         :height="14"
-        color="#808fad"
       />
 
     </button>
@@ -173,6 +206,13 @@ function toggleModelsList(event) {
       <model-details
         v-show="modelInfoSelected"
         :model-id="modelId"
+        @open-property-dialog="onOpenPropertyDialog"
+        @open-delete-property-dialog="onOpenDeletePropDialog"
+        @open-delete-linked-prop-dialog="onOpenDeleteLinkedPropDialog"
+        @open-delete-relationship-dialog="onOpenDeleteRelationshipDialog"
+        @open-delete-model-dialog="onOpenDeleteModelDialog"
+        @open-edit-property-dialog="onOpenEditPropertyDialog"
+        :edges="edges"
       />
 
 
@@ -184,6 +224,7 @@ function toggleModelsList(event) {
 
 
   </div>
+
 </template>
 
 <style lang="scss" scoped>
@@ -217,7 +258,6 @@ function toggleModelsList(event) {
 
 .btn-toggle {
   align-items: center;
-  background: $gray_1;
   border: 1px solid $gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
@@ -227,6 +267,9 @@ function toggleModelsList(event) {
   position: absolute;
   top: 8px;
   width: 35px;
+  color: $purple_1;
+  fill: $purple_1;
+  background:$gray_1;
 
   &.first {
     top: 33px;
@@ -237,8 +280,9 @@ function toggleModelsList(event) {
   }
 
   &.selected {
-    &:after {
+    background: linear-gradient(to left, $gray_1, $white);
 
+    &:after {
       background: $gray_1;
       content: '';
       height: 100%;
