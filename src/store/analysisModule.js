@@ -6,7 +6,15 @@
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
-    selectedFilesForAnalysis: []
+    selectedFilesForAnalysis: {}, 
+    /* 
+      In the selectedFilesForAnalysis obj files are grouped by parentId 
+      where key is parentId, and value is an array of files that share a parentID.
+      For files in the root directory, they key is the string 'root'.
+      Example: { root: [{...file1}, {...file2}, {...file3}], parentId: [{}, {}] }
+      This is to support multi-level file selection. 
+    */
+    fileCount: 0
   })
   
   export const state = initialState()
@@ -28,18 +36,44 @@
     UPDATE_POSTPROCESSORS(state, postprocessors) {
       state.postprocessors = postprocessors 
     },
-    SET_SELECTED_FILES(state, files) {
-      state.selectedFilesForAnalysis = files;
+    UPDATE_SELECTED_FILE_COUNT(state) {
+      let total = 0;
+      for (const parentId in state.selectedFilesForAnalysis) {
+          total = total + state.selectedFilesForAnalysis[parentId].length
+      }
+    
+      state.fileCount = total;
     },
-    SET_SELECTED_FILE(state, file) {
-      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]
+    SET_SELECTED_FILES(state, { files, parentId }) {
+      if (files.length) {
+        const updatedObj = { ...state.selectedFilesForAnalysis };
+    
+        // Get the existing files for the parentId
+        const existingFiles = updatedObj[parentId] || [];
+    
+        // Filter out duplicates
+        const nonDuplicateFiles = files.filter(
+          newFile => !existingFiles.some(existingFile => existingFile.content.id === newFile.content.id)
+        );
+    
+        // Combine existing files with non-duplicate new files
+        const updatedFiles = [...existingFiles, ...nonDuplicateFiles];
+    
+        // Remove any files in existingFiles that are not present in files
+        updatedObj[parentId] = updatedFiles.filter(
+          file => files.some(newFile => newFile.content.id === file.content.id)
+        );
+    
+        state.selectedFilesForAnalysis = updatedObj;
+      } else {
+        state.selectedFilesForAnalysis[parentId] = []
+      }
     },
     CLEAR_SELECTED_FILES(state) {
-      state.selectedFilesForAnalysis = []
+      state.selectedFilesForAnalysis = {}
     }
- 
   }
-  
+
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
       try {
@@ -91,15 +125,15 @@
           return Promise.reject(err)
       }
     },
-    setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
-      commit('SET_SELECTED_FILES', selectedFiles)
-    },
-    setSelectedFile: async({ commit, rootState}, selectedFile) => {
-      commit('SET_SELECTED_FILE', selectedFile)
+    setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
+      commit('SET_SELECTED_FILES', { files: selectedFiles, parentId })
     },
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
+    updateFileCount: async ({ commit, rootState }) => {
+      commit('UPDATE_SELECTED_FILE_COUNT')
+    }
   }
   
   export const getters = {}
