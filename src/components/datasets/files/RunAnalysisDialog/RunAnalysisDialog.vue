@@ -344,8 +344,8 @@ export default {
     /**
      * Run Analysis Workflow on Selected Files
      */
-    runAnalysis: async function () {
-      const url = `${this.config.api2Url}/workflows`;
+    runAnalysis: function () {
+      const url = `${this.config.api2Url}/workflows/instances`;
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
