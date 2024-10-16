@@ -508,6 +508,18 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
+
+    generateManifest: function () {
+      this.createDatasetManifest();
+      EventBus.$emit("toast", {
+        detail: {
+          type: "success",
+          msg: "Dataset manifest is being prepared.",
+          duration: 1000,
+        },
+      });
+    },
 
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
