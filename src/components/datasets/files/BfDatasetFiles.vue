@@ -16,55 +16,6 @@
           />
         </template>
         <template #right>
-          <bf-button
-            v-if="isFeatureFlagEnabled()"
-            @click="openRunAnalysisDialog"
-            class="mr-8 flex"
-          >
-            <template #prefix>
-              <IconAnalysis class="mr-8" :height="20" :width="20" />
-            </template>
-            Run Analysis
-          </bf-button>
-          <bf-button
-            v-if="getPermission('editor')"
-            class="flex mr-8"
-            :disabled="datasetLocked"
-            data-cy="createNewFolder"
-            @click="openPackageDialog"
-          >
-            <template #prefix>
-              <IconPlus class="mr-8" :height="20" :width="20" />
-            </template>
-            New Folder
-          </bf-button>
-
-          <template v-if="quickActionsVisible">
-            <bf-button
-              v-if="showRunAnalysisFlow"
-              @click="openRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis
-            </bf-button>
-
-            <bf-button
-              v-if="getPermission('editor')"
-              class="flex mr-8"
-              :disabled="datasetLocked"
-              data-cy="createNewFolder"
-              @click="openPackageDialog"
-            >
-              <template #prefix>
-                <IconPlus class="mr-8" :height="20" :width="20" />
-              </template>
-              New Folder
-            </bf-button>
-          </template>
-
           <ps-button-dropdown
             @click="toggleActionDropdown"
             :menu-open="!quickActionsVisible"
@@ -473,7 +424,7 @@ export default {
       immediate: true,
     },
 
-    $route: 'handleRouteChange'
+    $route: "handleRouteChange",
   },
 
   mounted: function () {
@@ -538,6 +489,18 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
+
+    generateManifest: function () {
+      this.createDatasetManifest();
+      EventBus.$emit("toast", {
+        detail: {
+          type: "success",
+          msg: "Dataset manifest is being prepared.",
+          duration: 1000,
+        },
+      });
+    },
 
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
@@ -1168,30 +1131,42 @@ export default {
       this.runAnalysisDialogVisible = true;
     },
 
-        /**
+    /**
      * Get files URL for dataset
      * @returns {String}
      */
-     getFilesUrl: function () {
+    getFilesUrl: function () {
       if (this.config.apiUrl && this.userToken) {
         const baseUrl =
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
-          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
+          this.$route.name === "dataset-files"
+            ? this.$route.params.datasetId
+            : this.$route.params.fileId;
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
 
-    handleRouteChange: function(to, from) {
-      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+    handleRouteChange: function (to, from) {
+      const DATASET_FILES_ROUTES = [
+        "dataset-files",
+        "collection-files",
+        "file-record",
+        "dataset-files-wrapper",
+      ];
       const routeChanged = to.name !== from.name;
       const fileIdChanged = to.params.fileId !== from.params.fileId;
-      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+      const isNavigatingWithinDatasetFiles =
+        DATASET_FILES_ROUTES.includes(to.name) &&
+        (routeChanged || fileIdChanged);
 
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    }
+    },
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
+    },
   },
 };
 </script>
