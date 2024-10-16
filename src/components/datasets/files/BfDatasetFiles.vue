@@ -16,55 +16,6 @@
           />
         </template>
         <template #right>
-          <bf-button
-            v-if="isFeatureFlagEnabled()"
-            @click="openRunAnalysisDialog"
-            class="mr-8 flex"
-          >
-            <template #prefix>
-              <IconAnalysis class="mr-8" :height="20" :width="20" />
-            </template>
-            Run Analysis
-          </bf-button>
-          <bf-button
-            v-if="getPermission('editor')"
-            class="flex mr-8"
-            :disabled="datasetLocked"
-            data-cy="createNewFolder"
-            @click="openPackageDialog"
-          >
-            <template #prefix>
-              <IconPlus class="mr-8" :height="20" :width="20" />
-            </template>
-            New Folder
-          </bf-button>
-
-          <template v-if="quickActionsVisible">
-            <bf-button
-              v-if="showRunAnalysisFlow"
-              @click="openRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis
-            </bf-button>
-
-            <bf-button
-              v-if="getPermission('editor')"
-              class="flex mr-8"
-              :disabled="datasetLocked"
-              data-cy="createNewFolder"
-              @click="openPackageDialog"
-            >
-              <template #prefix>
-                <IconPlus class="mr-8" :height="20" :width="20" />
-              </template>
-              New Folder
-            </bf-button>
-          </template>
-
           <ps-button-dropdown
             @click="toggleActionDropdown"
             :menu-open="!quickActionsVisible"
@@ -1188,6 +1139,9 @@ export default {
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
+    },
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
   },
 };
