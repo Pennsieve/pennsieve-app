@@ -360,7 +360,7 @@ export default {
      * Run Analaysis Workflow on Selected Files
      */
     runAnalysis: function () {
-      const url = `${this.config.api2Url}/workflows`;
+      const url = `${this.config.api2Url}/workflows/instances`;
 
       const packageIds = this.selectedFilesForAnalysis.map((file) => {
         return pathOr("", ["content", "id"], file);
