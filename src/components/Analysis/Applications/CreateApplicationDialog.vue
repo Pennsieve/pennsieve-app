@@ -129,13 +129,11 @@
         <el-form-item prop="source.url">
           <template #label>
             Source Url <span class="label-helper"> required </span>
-            <span class="url-format-info">
-              Format: git://github.com/owner/repo
-            </span>
+            <span class="url-format-info"> Format: github.com/owner/repo </span>
           </template>
           <el-input
             v-model="application.source.url"
-            placeholder="git://github.com/owner/repo"
+            placeholder="github.com/owner/repo"
             autofocus
           />
         </el-form-item>
@@ -272,9 +270,9 @@ export default {
             trigger: "blur",
           },
           {
-            pattern: "^git:\/\/github\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$",
+            pattern: "^github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$",
             message:
-              "Source URL must be in the format git://github.com/owner/repo",
+              "Source URL must be in the format github.com/owner/repo",
             trigger: "blur",
           },
         ],
@@ -331,7 +329,7 @@ export default {
           };
           const formattedSource = {
             type: this.application.source.type,
-            url: this.application.source.url,
+            url: `git://${this.application.source.url},
           };
           const formattedNewApplication = {
             ...this.application,
