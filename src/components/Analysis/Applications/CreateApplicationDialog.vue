@@ -271,8 +271,7 @@ export default {
           },
           {
             pattern: "^github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$",
-            message:
-              "Source URL must be in the format github.com/owner/repo",
+            message: "Source URL must be in the format github.com/owner/repo",
             trigger: "blur",
           },
         ],
@@ -329,7 +328,7 @@ export default {
           };
           const formattedSource = {
             type: this.application.source.type,
-            url: `git://${this.application.source.url},
+            url: `git://${this.application.source.url}`,
           };
           const formattedNewApplication = {
             ...this.application,
