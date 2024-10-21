@@ -130,12 +130,12 @@
           <template #label>
             Source Url <span class="label-helper"> required </span>
             <span class="url-format-info">
-              (Format: github.com/owner/repo)
+              Format: git://github.com/owner/repo
             </span>
           </template>
           <el-input
             v-model="application.source.url"
-            placeholder="github.com/owner/repo"
+            placeholder="git://github.com/owner/repo"
             autofocus
           />
         </el-form-item>
@@ -272,8 +272,9 @@ export default {
             trigger: "blur",
           },
           {
-            pattern: /^github\.com\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/,
-            message: "Source URL must be in the format github.com/owner/repo",
+            pattern: "^git:\/\/github\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$",
+            message:
+              "Source URL must be in the format git://github.com/owner/repo",
             trigger: "blur",
           },
         ],
