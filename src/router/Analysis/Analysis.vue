@@ -46,7 +46,13 @@
         </div>
       </template>
       <template #tabs>
-        <router-tabs :tabs="tabs" />
+        <router-tabs
+          :tabs="
+            showFeatureForImmuneHealth || showFeatureForTestOrgs
+              ? pennsieveAnalysisFeature
+              : tabs
+          "
+        />
       </template>
     </bf-rafter>
     <router-view name="stage" :integrations="integrations" />
@@ -59,6 +65,11 @@ import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
+import { pathOr, propOr } from "ramda";
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../utils/feature-flags";
 
 export default {
   name: "IntegrationView",
@@ -70,6 +81,20 @@ export default {
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
+    ...mapState(["activeOrganization"]),
+    activeOrganizationId: function () {
+      return pathOr(
+        "Organization",
+        ["organization", "id"],
+        this.activeOrganization
+      );
+    },
+    showFeatureForTestOrgs: function () {
+      return isEnabledForTestOrgs(this.activeOrganizationId);
+    },
+    showFeatureForImmuneHealth: function () {
+      return isEnabledForImmuneHealth(this.activeOrganizationId);
+    },
   },
   // From Router
   props: {
@@ -85,6 +110,16 @@ export default {
   data() {
     return {
       tabs: [
+        {
+          name: "Integrations",
+          to: "integrations",
+        },
+        {
+          name: "Webhooks",
+          to: "webhooks",
+        },
+      ],
+      pennsieveAnalysisFeature: [
         {
           name: "Integrations",
           to: "integrations",
