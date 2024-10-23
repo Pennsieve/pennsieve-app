@@ -67,21 +67,22 @@
           <IconDatasets :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
-
-      <bf-navigation-item
-        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
-        :link="{
-          name: 'code',
-          params: { orgId: activeOrganizationId },
-        }"
-        label="Code"
-        :condensed="primaryNavCondensed"
-        :styleColor="navStyleColor"
-      >
-        <template v-slot:icon>
-          <IconGitHub :width="20" :height="20" color="currentColor" />
-        </template>
-      </bf-navigation-item>
+      <div v-if="showFeatureForTestOrgs">
+        <bf-navigation-item
+          v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+          :link="{
+            name: 'code',
+            params: { orgId: activeOrganizationId },
+          }"
+          label="Code"
+          :condensed="primaryNavCondensed"
+          :styleColor="navStyleColor"
+        >
+          <template v-slot:icon>
+            <IconGitHub :width="20" :height="20" color="currentColor" />
+          </template>
+        </bf-navigation-item>
+      </div>
 
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
@@ -182,6 +183,7 @@ import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
 import CustomTheme from "../../mixins/custom-theme";
+import { isEnabledForTestOrgs } from "../../utils/feature-flags";
 
 export default {
   name: "BfNavigation",
@@ -423,6 +425,9 @@ export default {
         ["organization", "id"],
         this.activeOrganization
       );
+    },
+    showFeatureForTestOrgs: function () {
+      return isEnabledForTestOrgs(this.activeOrganizationId);
     },
   },
 
