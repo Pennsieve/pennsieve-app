@@ -597,7 +597,6 @@ export default {
       this.getApiKeys();
     },
   },
-
   mounted() {
     this.setRuleFormData(this.profile);
     this.setEmailFormData(this.profile.email);
