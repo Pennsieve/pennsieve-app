@@ -101,20 +101,8 @@
   import Cropper from 'cropperjs'
   import 'cropperjs/dist/cropper.css'
 
-  import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
-  import BfButton from '../../../shared/bf-button/BfButton.vue'
-  import DatasetBanner from '../../../datasets/DatasetBanner/DatasetBanner.vue'
-  import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
-
   export default {
     name: 'DatasetSettingsBannerImage',
-
-    components: {
-      BfButton,
-      BfDialogHeader,
-      DatasetBanner,
-      DialogBody
-    },
 
     data() {
       return {
@@ -329,7 +317,7 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
+  @import '../../../assets/_variables.scss';
 
   .add-image-wrap {
     align-items: center;

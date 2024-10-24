@@ -162,7 +162,6 @@
   import BfButton from '../../shared/bf-button/BfButton.vue'
   import CharacterCountInput from '../../shared/CharacterCountInput/CharacterCountInput.vue'
   import DeleteDataset from './window/DeleteDataset.vue'
-  import DatasetSettingsBannerImage from './DatasetSettingsBannerImage/DatasetSettingsBannerImage.vue'
   import DatasetSettingsAssociatedPublications from './DatasetSettingsAssociatedPublications/DatasetSettingsAssociatedPublications.vue'
   import DatasetSettingsCollections from './DatasetSettingsCollections/DatasetSettingsCollections.vue'
   import DatasetLicense from './DatasetLicense/DatasetLicense.vue'
@@ -190,7 +189,6 @@ export default {
     DeleteDataset,
     CharacterCountInput,
     BfEmptyPageState,
-    DatasetSettingsBannerImage,
     DatasetLicense,
     StaleUpdateDialog,
     LockedBanner,

@@ -260,7 +260,6 @@
   import Cookie from 'js-cookie'
   import {compose, defaultTo, head, last, pathOr, propOr, split, sum, values} from 'ramda'
 
-  import DatasetBanner from '../DatasetBanner/DatasetBanner.vue'
   import DataCard from '../../shared/DataCard/DataCard.vue'
   import ChecklistItem from '../../shared/ChecklistItem/ChecklistItem.vue'
   import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
@@ -307,7 +306,6 @@ export default {
     IconFiles,
     IconCopyDocument,
     LockedBanner,
-    DatasetBanner,
     ChecklistItem,
     DataCard,
     MarkdownEditor,
