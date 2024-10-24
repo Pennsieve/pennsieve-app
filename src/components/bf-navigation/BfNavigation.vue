@@ -53,49 +53,6 @@
     </div>
 
     <div class="menu-wrap">
-      <!--      <bf-navigation-item-->
-      <!--        :link="{ name: 'welcome', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="My Pennsieve"-->
-      <!--        icon="icon-organization"-->
-      <!--        :condensed="primaryNavCondensed"-->
-      <!--        :styleColor="navStyleColor"-->
-      <!--      >-->
-      <!--        <template v-slot:icon>-->
-      <!--          <IconOrganization-->
-      <!--            :width="20"-->
-      <!--            :height="20"-->
-      <!--            color="currentColor"-->
-      <!--          />-->
-      <!--        </template>-->
-      <!--      </bf-navigation-item>-->
-
-      <!--      <hr class="menu-divider">-->
-      <!--      <bf-navigation-item-->
-      <!--        :link="{ name: 'submit', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="Submit Datasets"-->
-      <!--        icon="icon-document"-->
-      <!--        :condensed="primaryNavCondensed"-->
-      <!--        :styleColor="navStyleColor"-->
-
-      <!--      >-->
-      <!--        <template v-slot:icon>-->
-      <!--          <IconDocument-->
-      <!--            :width="20"-->
-      <!--            :height="20"-->
-      <!--            color="currentColor"-->
-      <!--          />-->
-      <!--        </template>-->
-      <!--      </bf-navigation-item>-->
-
-      <!--      <bf-navigation-item-->
-      <!--        v-if="!(pageNotFound) && isWelcomeOrg"-->
-      <!--        :link="{ name: 'info', params: {orgId: activeOrganizationId} }"-->
-      <!--        label="More Information"-->
-      <!--        icon="icon-help"-->
-      <!--        :condensed="primaryNavCondensed"-->
-
-      <!--      />-->
-
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg)"
         :link="{
@@ -110,6 +67,22 @@
           <IconDatasets :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
+      <div v-if="showFeatureForTestOrgs">
+        <bf-navigation-item
+          v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+          :link="{
+            name: 'code',
+            params: { orgId: activeOrganizationId },
+          }"
+          label="Code"
+          :condensed="primaryNavCondensed"
+          :styleColor="navStyleColor"
+        >
+          <template v-slot:icon>
+            <IconGitHub :width="20" :height="20" color="currentColor" />
+          </template>
+        </bf-navigation-item>
+      </div>
 
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
@@ -210,6 +183,7 @@ import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
 import CustomTheme from "../../mixins/custom-theme";
+import { isEnabledForTestOrgs } from "../../utils/feature-flags";
 
 export default {
   name: "BfNavigation",
@@ -451,6 +425,9 @@ export default {
         ["organization", "id"],
         this.activeOrganization
       );
+    },
+    showFeatureForTestOrgs: function () {
+      return isEnabledForTestOrgs(this.activeOrganizationId);
     },
   },
 

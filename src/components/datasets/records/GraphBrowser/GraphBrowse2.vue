@@ -31,7 +31,7 @@ const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } = use
 /*
 Bootup and configuration of component
  */
-const stringSubtypes = ref({})
+const stringSubtypes = ref([])
 onMounted(() => {
   store.dispatch('metadataModule/fetchModels')
 
@@ -229,7 +229,7 @@ function getGraphData(vueFlowInstance) {
 
 
     })
-    .catch(useHandleXhrError())
+    .catch(useHandleXhrError)
 }
 
 /*
