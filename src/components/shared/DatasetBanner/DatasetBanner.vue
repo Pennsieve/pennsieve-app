@@ -4,19 +4,19 @@
     <content-loader
       v-if="isLoadingDatasetBanner"
       class="dataset-banner-loader"
-      :height="100"
-      :width="100"
+      :height="'100%'"
+      :width="'100%'"
       :speed="2"
       primary-color="#d8d8d8"
       secondary-color="#ecebeb"
     >
-      <rect
+      <rect 
         x="0"
         y="0"
         rx="0"
         ry="0"
-        width="100"
-        height="100"
+        width="100%"
+        height="100%"
       />
     </content-loader>
 
