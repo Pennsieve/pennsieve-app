@@ -1,14 +1,6 @@
 <template>
   <bf-stage element-loading-background="transparent">
-    <div v-if="computeNodes.length > 0" class="integration-list">
-      <compute-nodes-list-item
-        v-for="computeNode in computeNodes"
-        :key="computeNode.uuid"
-        :computeNode="computeNode"
-      />
-    </div>
-
-    <bf-empty-page-state v-else class="empty">
+    <bf-empty-page-state v-if="showEmptyState" class="empty">
       <img
         src="../../../assets/images/illustrations/illo-collaboration.svg"
         height="240"
@@ -31,6 +23,25 @@
         </p>
       </div>
     </bf-empty-page-state>
+    <template #actions>
+      <bf-button
+        v-if="hasAdminRights && isFeatureFlagEnabled()"
+        @click="openCreateComputeNodeDialog"
+      >
+        Create Compute Node
+      </bf-button>
+    </template>
+    <div v-if="computeNodes.length > 0" class="integration-list">
+      <compute-nodes-list-item
+        v-for="computeNode in computeNodes"
+        :key="computeNode.uuid"
+        :computeNode="computeNode"
+      />
+    </div>
+    <create-compute-node-dialog
+      :dialog-visible="createComputeNodeDialogVisible"
+      @close="onCloseCreateComputeNodeDialog"
+    />
   </bf-stage>
 </template>
 
@@ -41,9 +52,14 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import Request from "../../../mixins/request";
+import CreateComputeNodeDialog from "./CreateComputeNodeDialog.vue";
 
-import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
+import ComputeNodesListItem from "./ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+} from "../../../utils/feature-flags.js";
 
 export default {
   name: "ComputeNodesList",
@@ -61,16 +77,22 @@ export default {
 
   data() {
     return {
-      computeNodes: [],
+      createComputeNodeDialogVisible: false,
+      showEmptyState: false,
     };
   },
 
-  created() {
-    this.fetchComputeNodes();
+  async mounted() {
+    try {
+      this.fetchComputeNodes();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   computed: {
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
 
     hasAdminRights: function () {
       if (this.activeOrganization) {
@@ -84,9 +106,10 @@ export default {
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
+    showEmptyState: function () {
+      return this.computeNodesLoaded && !this.computeNodes.length;
+    },
   },
-
-  watch: {},
 
   beforeRouteEnter(to, from, next) {
     next((vm) => {
@@ -97,9 +120,18 @@ export default {
   },
 
   methods: {
-    ...mapActions([]),
-    ...mapState([]),
-    ...mapGetters(["activeOrganization", "userToken", "config"]),
+    ...mapActions("analysisModule", ["fetchComputeNodes"]),
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    },
+
+    openCreateComputeNodeDialog: function () {
+      this.createComputeNodeDialogVisible = true;
+    },
+    onCloseCreateComputeNodeDialog: function () {
+      this.createComputeNodeDialogVisible = false;
+    },
     /**
      * Model URL
      * @returns {String}
@@ -110,31 +142,6 @@ export default {
       }
 
       return "";
-    },
-    /**
-     * Fetches Compute Nodes
-     */
-    fetchComputeNodes: function () {
-      const url = `${this.config.api2Url}/compute-nodes`;
-
-      this.sendXhr(url, {
-        method: "GET",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-      })
-        .then((response) => {
-          this.computeNodes = response;
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue fetching your data",
-              type: "error",
-            },
-          });
-        });
     },
   },
 };
