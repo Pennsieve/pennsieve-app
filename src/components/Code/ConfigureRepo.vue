@@ -103,10 +103,6 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
-  console.log(
-    "activeRepo",
-    store.getters["codeReposModule/activeRepo"].content.repository
-  );
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     console.log("activeRepoId", activeRepoId);
