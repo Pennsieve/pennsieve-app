@@ -241,6 +241,7 @@ import StatBlock from '../../../shared/StatBlock/StatBlock.vue'
 import { MAX_SORTABLE_RECORD_COUNT } from '../../../../utils/constants'
 import IconLockFilled from "../../../icons/IconLockFilled.vue";
 import IconPlus from "../../../icons/IconPlus.vue";
+import StageActions from "@/components/shared/StageActions/StageActions.vue";
 
 const formatNumber = (number) => new Intl.NumberFormat('en-EN').format(number)
 
@@ -269,6 +270,7 @@ export default {
   name: 'ModelRecords',
 
   components: {
+    StageActions,
     IconPlus,
     IconLockFilled,
     BfButton,
@@ -326,7 +328,6 @@ export default {
     ]),
 
     ...mapState([
-      'concepts',
       'lastRoute',
       'dataset',
       'userToken'
@@ -370,7 +371,7 @@ export default {
      * @returns {Boolean}
      */
     hasModels: function() {
-      return this.concepts.length > 0
+      return this.modelsList.length > 0
     },
 
     /**
@@ -622,18 +623,6 @@ export default {
 
       this.tableSearchParams = Object.assign({}, searchParams)
 
-      // this.$nextTick(() => {
-      //   /*
-      //    * If there are filters, we should use the
-      //    * `/v2/organizations/${this.activeOrgIntId}/search/records` endpoint.
-      //    * Otherwise, we should use `/concepts/instances/
-      //    */
-      //   if(this.search.filters.length) {
-      //     this.$refs.searchResults.fetchRecords()
-      //   } else {
-      //     this.$refs.searchResults.fetchRecordsV1()
-      //   }
-      // })
     },
 
     /**

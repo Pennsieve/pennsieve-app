@@ -287,7 +287,7 @@ export default {
 <style scoped lang="scss">
 
 .add-proposal-img {
-  width: 100px;;
+  width: 120px;
 }
 
 .header-wrapper {
