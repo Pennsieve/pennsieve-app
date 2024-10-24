@@ -230,6 +230,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    clearSelectedValues: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   data() {
@@ -239,12 +243,59 @@ export default {
       checkAll: false,
     };
   },
+  watch: {
+    // selectedFiles: {
+    //   handler(newVal, oldVal) {
+    //     console.log(
+    //       "selectedFilesForAnalysis changed from",
+    //       oldVal,
+    //       "to",
+    //       newVal
+    //     );
+    //     // Perform any additional logic when the property changes
+    //   },
+    //   deep: true, // Set to true if you want to watch for nested changes
+    //   immediate: true, // Trigger the watcher immediately with the current value
+    // },
+    clearSelectedValues(newVal) {
+      if (newVal) {
+        this.handleCloseModal();
+      }
+    },
+    data: {
+      handler: function (newVal, oldVal) {
+        if (this.withinRunAnalysisDialog) {
+          const filesToSelect = [];
+          const dataFilesToSelect = [];
+          for (const parentId in this.selectedFilesForAnalysis) {
+            this.selectedFilesForAnalysis[parentId].forEach((file) => {
+              filesToSelect.push(file);
+            });
+          }
+          filesToSelect.forEach((elem) => {
+            this.data.forEach((dataElem) => {
+              if (elem.content.id === dataElem.content.id) {
+                dataFilesToSelect.push(dataElem);
+              }
+            });
+          });
+          dataFilesToSelect.forEach((elem) => {
+            this.onRowClick(elem, true);
+          });
+        }
+      },
+      deep: true,
+    },
+  },
 
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
     ...mapState(["dataset", "filesProxyId"]),
-
+    ...mapState("analysisModule", ["selectedFilesForAnalysis", "fileCount"]),
+    selectedFiles() {
+      return this.selectedFilesForAnalysis;
+    },
     /**
      * Compute if the checkbox is indeterminate
      * @returns {Boolean}
@@ -267,7 +318,11 @@ export default {
   },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
-    ...mapActions("analysisModule", ["clearSelectedFiles"]),
+    ...mapActions("analysisModule", ["clearSelectedFiles", "updateFileCount"]),
+
+    handleCloseModal: function () {
+      this.$refs.table.clearSelection();
+    },
 
     onOpenOffice365: function (file) {
       this.openOffice365File(file);
@@ -304,8 +359,8 @@ export default {
      */
     handleTableSelectionChange: function (selection) {
       this.selection = selection;
-
-      this.$emit("selection-change", selection);
+      const parentId = this.data[0].content.parentId || "root";
+      this.$emit("selection-change", selection, parentId);
       this.checkAll = this.data.length === selection.length;
     },
 
@@ -356,7 +411,7 @@ export default {
     onRowClick: function (row, selected) {
       setTimeout(
         function () {
-          this.$refs.table.toggleRowSelection(row, true);
+          this.$refs.table.toggleRowSelection(row, selected);
         }.bind(this),
         100
       );

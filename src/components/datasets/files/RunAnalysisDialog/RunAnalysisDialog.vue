@@ -4,6 +4,7 @@
     data-cy="runAnalysisDialog"
     :show-close="true"
     @close="closeDialog"
+    v-if="processStep < lastProcessStep"
   >
     <template #header>
       <bf-dialog-header slot="title" title="Run Analysis Workflow" />
@@ -72,7 +73,7 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
-        <div>Selected Files: {{ selectedFilesForAnalysis.length }}</div>
+        <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
             <breadcrumb-navigation
@@ -86,6 +87,7 @@
           <div class="table-container">
             <files-table
               :data="files"
+              :clear-selected-values="clearSelectedValues"
               withinRunAnalysisDialog
               :enable-download="false"
               @selection-change="onFileSelect"
@@ -142,6 +144,7 @@ export default {
   data: function () {
     return {
       processStep: 1,
+      lastProcessStep: 4,
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
@@ -166,6 +169,7 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
+      clearSelectedValues: false,
     };
   },
   computed: {
@@ -175,15 +179,10 @@ export default {
       "processors",
       "postprocessors",
       "selectedFilesForAnalysis",
+      "fileCount",
     ]),
     ...mapGetters(["userToken", "config"]),
 
-    /**
-     * Item has files
-     */
-    // hasFiles: function () {
-    //   return this.files.length > 0;
-    // },
     fileId() {
       return pathOr(
         propOr("", "node_id", this.file),
@@ -235,10 +234,13 @@ export default {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "setSelectedFile",
       "fetchComputeNodes",
       "fetchApplications",
+      "updateFileCount",
     ]),
+    handleClearSelectedValues: function () {
+      this.clearSelectedValues = !this.clearSelected;
+    },
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -300,26 +302,9 @@ export default {
         this.navigateToFile(this.fileId);
       }
     },
-    onFileSelect: function (selectedFiles) {
-      if (this.selectedFilesForAnalysis.length) {
-        selectedFiles.forEach((file) => {
-          const condition = !this.selectedFilesForAnalysis.find(
-            (globalSelectedFile) =>
-              globalSelectedFile.content.id === file.content.id
-          );
-          if (condition) {
-            this.setSelectedFile(file);
-          }
-          return;
-        });
-      } else {
-        this.setSelectedFiles(selectedFiles);
-      }
-      if (selectedFiles.length === 0) {
-        this.clearSelectedFiles();
-      }
-
-      // this.setSelectedFiles(selectedFiles);
+    onFileSelect: function (selectedFiles, parentId) {
+      this.setSelectedFiles({ selectedFiles, parentId });
+      this.updateFileCount();
     },
     /**
      * Closes the dialog
@@ -336,34 +321,43 @@ export default {
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
+      this.updateFileCount();
       this.targetDirectory = "";
+      this.handleClearSelectedValues();
     },
     /**
      * Manages the Multi Step Functionality
      */
-    advanceStep: function (step) {
+    advanceStep: async function (step) {
       this.processStep += step;
+
+      // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
       }
 
+      // When you click "Run Analysis"
       if (this.processStep > 3) {
-        try {
-          this.runAnalysis();
-        } catch {
-        } finally {
-          this.closeDialog();
-        }
+        await this.runAnalysis();
       }
     },
     /**
-     * Run Analaysis Workflow on Selected Files
+     * Run Analysis Workflow on Selected Files
      */
     runAnalysis: function () {
       const url = `${this.config.api2Url}/workflows/instances`;
 
-      const packageIds = this.selectedFilesForAnalysis.map((file) => {
-        return pathOr("", ["content", "id"], file);
+      let arrayOfPackageIds = [];
+      const keysInSelectedFilesForAnalysisArray = Object.keys(
+        this.selectedFilesForAnalysis
+      );
+
+      keysInSelectedFilesForAnalysisArray.forEach((key) => {
+        const ids = this.selectedFilesForAnalysis[key].map((file) => {
+          return pathOr("", ["content", "id"], file);
+        });
+
+        arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
       const formatApplication = (application) => {
@@ -379,7 +373,7 @@ export default {
 
       const body = {
         datasetId: this.datasetId,
-        packageIds: packageIds,
+        packageIds: arrayOfPackageIds,
         computeNode: {
           uuid: this.selectedComputeNode.uuid,
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
@@ -393,35 +387,31 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      this.sendXhr(url, {
-        method: "POST",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: body,
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Your workflow has been successfully initiated!",
-              type: "success",
-            },
-          });
-          this.closeDialog();
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
+
+      try {
+        await this.sendXhr(url, {
+          method: "POST",
+          header: {
+            Authorization: `Bearer ${this.userToken}`,
+          },
+          body: body,
         });
+
+        EventBus.$emit("toast", {
+          detail: {
+            msg: "Your workflow has been successfully initiated!",
+            type: "success",
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        this.closeDialog();
+      } finally {
+        this.closeDialog();
+        this.targetDirectory = "";
+        this.selectedApplication = {};
+        this.value = "";
+      }
     },
     /**
      * Determines if tab content is active
