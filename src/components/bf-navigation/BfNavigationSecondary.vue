@@ -155,7 +155,7 @@
 
       <bf-navigation-item
         :link="{ name: 'integrations-settings' }"
-        label="Integrations"
+        label="Applications"
         :condensed="secondaryNavCondensed"
         :secondary="true"
         :style-color="getThemeColors[0]"

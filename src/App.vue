@@ -153,8 +153,7 @@ export default {
               .then(() => this.fetchIntegrations())
               .then(() => this.fetchDatasetStatuses())
               .then(() => this.fetchComputeNodes())
-              .then(() => this.fetchApplications())
-              .then(() => this.fetchComputeResourceAccounts());
+              .then(() => this.fetchApplications());
           } catch (err) {
             console.error(err);
           }
@@ -272,11 +271,7 @@ export default {
     ...mapActions("collectionsModule", ["fetchCollections"]),
 
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
-    ...mapActions("analysisModule", [
-      "fetchComputeNodes",
-      "fetchApplications",
-      "fetchComputeResourceAccounts",
-    ]),
+    ...mapActions("analysisModule", ["fetchComputeNodes", "fetchApplications"]),
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
     callGlobalCustomEvent() {
       EventBus.$emit("redirect-detected");

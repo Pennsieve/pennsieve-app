@@ -155,8 +155,7 @@ export default {
       'setOrgContributors',
       'clearDatasetFilters',
       'updateDataUseAgreements',
-      'updateCognitoUser',
-      'updateGithubProfile'
+      'updateCognitoUser'
     ]),
 
     ...mapActions('datasetModule', [
@@ -232,23 +231,13 @@ export default {
 
       // add logic to only make organizations request if profile is defined
       let currentPath = this.$router.currentRoute.path
-      const orgPromise = this.sendXhr(this.getActiveOrgUrl(token),{})
-      const profilePromise = this.sendXhr(this.getProfileUrl(token), {})
+      const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
+      const profilePromise = this.sendXhr(this.getProfileUrl(token))
 
-      const githubPromise=  this.sendXhr(this.getGithubProfileUrl(token),{
-        header: {
-          Authorization: `Bearer ${token}`,
-        }
-      })
-
-      return Promise.all([orgPromise, profilePromise, githubPromise])
-        .then(([orgs, profile,ghProfile] ) => {
+      return Promise.all([orgPromise, profilePromise])
+        .then(([orgs, profile]) => {
           this.updateProfile(profile)
           this.updateUserToken(token)
-
-          if (ghProfile.login !== ""){
-            this.updateGithubProfile(ghProfile)
-          }
 
           const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
             this.updateOrganizations(sortedOrgs)
@@ -318,10 +307,6 @@ export default {
     getProfileUrl: function(token) {
       return `${this.config.apiUrl}/user?api_key=${token}`
     },
-    getGithubProfileUrl: function() {
-      return `${this.config.api2Url}/accounts/github/user`
-    },
-
     /**
      * Get the active org that is defined on the server side.
      * Then update the active org on the client side to match.

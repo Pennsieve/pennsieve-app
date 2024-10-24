@@ -34,7 +34,7 @@
             Learn More
           </a>
         </p>
-        <div v-if="!loadingOrcid" class="integration-success">
+        <div v-if="!loadingOrcid" class="orcid-success">
           <img src="/src/assets/images/orcid.png" />
           <el-row
             class="orcid-success-info"
@@ -166,7 +166,7 @@ export default {
 <style lang="scss" scoped>
 @import "../../../../assets/_variables.scss";
 
-.integration-success {
+.orcid-success {
   border: solid 1px #dadada;
   padding: 10px;
   display: flex;

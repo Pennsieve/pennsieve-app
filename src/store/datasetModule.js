@@ -57,8 +57,7 @@ const initialState = () => ({
     onlyMyDatasets: false,
     status: '',
     withRole: '',
-    collectionId: '',
-    type: 'research' // this is hard coded to avoid including code repos, which are type=release. 
+    collectionId: ''
   },
   datasetTotalCount: 0,
   datasetActivityParams: {

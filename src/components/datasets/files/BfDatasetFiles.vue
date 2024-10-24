@@ -16,15 +16,39 @@
           />
         </template>
         <template #right>
-          <ps-button-dropdown
-            @click="toggleActionDropdown"
-            :menu-open="!quickActionsVisible"
-          >
+
+          <template v-if="quickActionsVisible">
+            <bf-button
+              v-if="showRunAnalysisFlow"
+              @click="openRunAnalysisDialog"
+              class="mr-8 flex"
+            >
+              <template #prefix>
+                <IconAnalysis class="mr-8" :height="20" :width="20" />
+              </template>
+              Run Analysis
+            </bf-button>
+
+            <bf-button
+              v-if="getPermission('editor')"
+              class="flex mr-8"
+              :disabled="datasetLocked"
+              data-cy="createNewFolder"
+              @click="openPackageDialog"
+            >
+              <template #prefix>
+                <IconPlus class="mr-8" :height="20" :width="20" />
+              </template>
+              New Folder
+            </bf-button>
+          </template>
+
+          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
             <template #buttons>
               <bf-button
-                v-if="isFeatureFlagEnabled()"
+                v-if="showRunAnalysisFlow"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button"
+                class="dropdown-button "
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -68,8 +92,11 @@
 
                 Restore
               </bf-button>
+
             </template>
+
           </ps-button-dropdown>
+
         </template>
       </stage-actions>
     </template>
@@ -204,11 +231,6 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
-
-import {
-  isEnabledForImmuneHealth,
-  isEnabledForTestOrgs,
-} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 
@@ -310,15 +332,28 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", [
-      "getPusherChannel",
-      "getManifestNotification",
-    ]),
+    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-
+    /**
+     * Feature Flag for Run Analysis Flow
+     *
+     */
+    showRunAnalysisFlow: function () {
+      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
+      const isPennsieveTestDev =
+        this.organizationId ===
+        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
+      const isImmuneHealthProd =
+        this.organizationId ===
+        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
+      const isPennsieveTestProd =
+        this.organizationId ===
+        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
+      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
+    },
     /**
      * Compute organization's ID
      * @returns {String}
@@ -361,18 +396,19 @@ export default {
   },
 
   watch: {
+
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit("toast", {
+        EventBus.$emit('toast', {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true,
-          },
-        });
+            showClose: true
+          }
+        })
       },
-      deep: true,
+      deep: true
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -424,7 +460,7 @@ export default {
       immediate: true,
     },
 
-    $route: "handleRouteChange",
+    $route: 'handleRouteChange'
   },
 
   mounted: function () {
@@ -489,22 +525,26 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
-    ...mapActions("datasetModule", ["createDatasetManifest"]),
 
-    generateManifest: function () {
-      this.createDatasetManifest();
-      EventBus.$emit("toast", {
+    ...mapActions("datasetModule",[
+      'createDatasetManifest'
+    ]),
+
+    generateManifest: function() {
+
+      this.createDatasetManifest()
+
+      EventBus.$emit('toast', {
         detail: {
           type: "success",
           msg: "Dataset manifest is being prepared.",
-          duration: 1000,
-        },
-      });
+          duration: 1000
+        }
+      })
     },
 
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+    toggleActionDropdown: function() {
+      this.quickActionsVisible = !this.quickActionsVisible
     },
 
     // Ignore drops to component outside the drop target and close drop-target
@@ -1130,43 +1170,31 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-    toggleActionDropdown: function () {
-      this.quickActionsVisible = !this.quickActionsVisible;
-    },
 
-    /**
+        /**
      * Get files URL for dataset
      * @returns {String}
      */
-    getFilesUrl: function () {
+     getFilesUrl: function () {
       if (this.config.apiUrl && this.userToken) {
         const baseUrl =
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
-          this.$route.name === "dataset-files"
-            ? this.$route.params.datasetId
-            : this.$route.params.fileId;
+          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
 
-    handleRouteChange: function (to, from) {
-      const DATASET_FILES_ROUTES = [
-        "dataset-files",
-        "collection-files",
-        "file-record",
-        "dataset-files-wrapper",
-      ];
+    handleRouteChange: function(to, from) {
+      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
       const routeChanged = to.name !== from.name;
       const fileIdChanged = to.params.fileId !== from.params.fileId;
-      const isNavigatingWithinDatasetFiles =
-        DATASET_FILES_ROUTES.includes(to.name) &&
-        (routeChanged || fileIdChanged);
+      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
 
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    },
+    }
   },
 };
 </script>

@@ -4,6 +4,6 @@
 
 <script>
 export default {
-  name: 'Redirect'
+  name: 'Orcid'
 }
 </script>

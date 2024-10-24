@@ -17,6 +17,8 @@ const BfNavigationSecondary = () => import('../components/bf-navigation/BfNaviga
 
 const Datasets = () => import('./Datasets/Datasets.vue')
 
+
+
 const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatasetList.vue')
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
@@ -40,12 +42,7 @@ const DatasetIntegrationsSettings = () => import('../components/datasets/setting
  */
 
 const ORCIDRedirect = () => import('../components/ORCID/ORCIDRedirect.vue')
-const Redirect = () => import('./Redirect/Redirect.vue')
-
-/**
- * GitHubRedirect
- */
-const GitHubRedirect = () => import('../components/GitHub/GitHubRedirect.vue')
+const ORCID = () => import('./ORCID/ORCID.vue')
 
 /**
  * Publishing Components
@@ -86,27 +83,15 @@ const TeamsList = () => import('../components/teams/list/TeamsList.vue')
 const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
-/**
- * Code Repos Components
- */
-const CodeRepos = () => import('./Code/CodeRepos.vue') // view you see at "/code" FE route - redirects to "/code/myRepos" if you hit "/code" directly
-const MyRepos = () => import('../components/Code/MyReposList.vue') // user-specific view -- displays the user's repos to them once they link their Github account, which they can do at FE route "/:orgId/profile"
-const WorkspaceRepos = () => import('../components/Code/WorkspaceReposList.vue') // once a repo is tracked, it shows up here after it is finished processing (doesn't happen immediately)
-const ConfigureRepo = () => import('../components/Code/ConfigureRepo.vue') // a repo-specific settings view 
-
-/**
- * Dataset Settings
- */
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
 /**
  * Integrations Components
  */
-const Analysis = () => import ('./Analysis/Analysis.vue')
-const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
+const Integrations = () => import ('./Integrations/Integrations.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
-const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
-const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
+const ApplicationsList = () => import ('../components/Integrations/applicationsList/ApplicationsList.vue')
+const ComputeNodesList = () => import ('../components/Integrations/ComputeNodesList/ComputeNodesList.vue')
 
 /**
  * Metadata Components
@@ -144,24 +129,9 @@ const router = createRouter({
       }
     },
     {
-      path: '/github-redirect',
-      components: {
-        page: Redirect
-      },
-      children: [
-        {
-          name: 'github-redirect',
-          path: '',
-          components: {
-            stage: GitHubRedirect
-          }
-        },
-      ],
-    },
-    {
       path: '/orcid-redirect',
       components: {
-        page: Redirect
+        page: ORCID
       },
       children: [
         {
@@ -246,6 +216,27 @@ const router = createRouter({
         },
       ]
     },
+    // /**
+    //  * Information Panel for organization
+    //  */
+    // {
+    //   path: '/:orgId/user',
+    //   components: {
+    //     page: WelcomePage,
+    //     navigation: BfNavigation
+    //   },
+    //   props: true,
+    //   children: [
+    //
+    //     {
+    //       name: 'info',
+    //       path: '',
+    //       components: {
+    //         stage: WelcomePage
+    //       }
+    //     },
+    //   ],
+    // },
     /**
      * Welcome Org routes
      */
@@ -297,7 +288,7 @@ const router = createRouter({
         navigation: true,
         navigationSecondary: true,
       },
-      meta: { hideSecondaryNav: false },
+      meta: { hideSecondaryNav: false},
       children: [
 
         {
@@ -580,44 +571,6 @@ const router = createRouter({
       ]
     },
     {
-      name: "code",
-      path: '/:orgId/code',
-      components: {
-        page: CodeRepos,
-        navigation: BfNavigation
-      },
-      redirect: {
-        name: 'my-repos'
-      },
-      props: true,
-      children: [
-        {
-          name: 'my-repos',
-          path: 'my-repos',
-          components: {
-            stage: MyRepos,
-          },
-          props: true
-        },
-        {
-          name: 'workspace-repos',
-          path: 'workspace-repos',
-          components: {
-            stage: WorkspaceRepos,
-          },
-          props: true
-        },
-        {
-          name: 'configure-repo',  
-          path: 'configure-repo/:repoId',  
-          components: {
-            stage: ConfigureRepo,  
-          },
-          props: true
-        }
-      ]
-    },
-    {
       name: "people",
       path: '/:orgId/people',
       components: {
@@ -729,19 +682,19 @@ const router = createRouter({
       name: 'analysis',
       path: '/:orgId/analysis',
       components: {
-        page: Analysis,
+        page: Integrations,
         navigation: BfNavigation
       },
       redirect: {
-        name: 'integrations'
+        name: 'applications'
       },
       props: true,
       children: [
         {
-          name: 'integrations',
-          path: 'integrations',
+          name: 'applications',
+          path: 'applications',
           components: {
-            stage: IntegrationsList,
+            stage: ApplicationsList,
           },
           props: true
         },
@@ -749,7 +702,7 @@ const router = createRouter({
           name: 'webhooks',
           path: 'webhooks',
           components: {
-            stage: WebhooksList,
+            stage: IntegrationsList,
           },
           props: true
         },
@@ -760,13 +713,6 @@ const router = createRouter({
             stage: ComputeNodesList,
           },
           props: true
-        },
-        {
-          name: 'applications',
-          path: 'applications',
-          components: {
-            stage: ApplicationsList,
-          }
         }
       ]
     },

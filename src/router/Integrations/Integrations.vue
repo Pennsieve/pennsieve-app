@@ -4,16 +4,16 @@
       <template #description>
         <div class="description">
           <p>
-            The pennsieve platform allows users to register integrations to
+            The pennsieve platform allows users to register applications to
             allow users to expand the functionality of the platform through
             custom actions and webhooks.
           </p>
           <hr />
         </div>
         <div slot="description" class="description">
-          <p v-if="this.$route.name === 'integrations'">
-            Integrations support actions on various entities on the platform
-            such as "Files", "Records", and "Datasets". Registered integrations
+          <p v-if="this.$route.name === 'applications'">
+            Applications support actions on various entities on the platform
+            such as "Files", "Records", and "Datasets". Registered applications
             can be triggered from the action-menu associated with the targeted
             entities.
             <a
@@ -40,19 +40,10 @@
             Pennsieve Agent. Each Compute Node is associated with an account,
             which can be a cloud-provider or a local cluster.
           </p>
-          <p v-if="this.$route.name === 'applications'">
-            Applications allow users to run analytic workflows on the platform.
-          </p>
         </div>
       </template>
       <template #tabs>
-        <router-tabs
-          :tabs="
-            showFeatureForImmuneHealth || showFeatureForTestOrgs
-              ? pennsieveAnalysisFeature
-              : tabs
-          "
-        />
+        <router-tabs :tabs="tabs" />
       </template>
     </bf-rafter>
     <router-view name="stage" :integrations="integrations" />
@@ -65,11 +56,6 @@ import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
-import { pathOr, propOr } from "ramda";
-import {
-  isEnabledForImmuneHealth,
-  isEnabledForTestOrgs,
-} from "../../utils/feature-flags";
 
 export default {
   name: "IntegrationView",
@@ -81,20 +67,6 @@ export default {
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
-    ...mapState(["activeOrganization"]),
-    activeOrganizationId: function () {
-      return pathOr(
-        "Organization",
-        ["organization", "id"],
-        this.activeOrganization
-      );
-    },
-    showFeatureForTestOrgs: function () {
-      return isEnabledForTestOrgs(this.activeOrganizationId);
-    },
-    showFeatureForImmuneHealth: function () {
-      return isEnabledForImmuneHealth(this.activeOrganizationId);
-    },
   },
   // From Router
   props: {
@@ -111,18 +83,8 @@ export default {
     return {
       tabs: [
         {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
-          name: "Webhooks",
-          to: "webhooks",
-        },
-      ],
-      pennsieveAnalysisFeature: [
-        {
-          name: "Integrations",
-          to: "integrations",
+          name: "Applications",
+          to: "applications",
         },
         {
           name: "Webhooks",
@@ -131,10 +93,6 @@ export default {
         {
           name: "Compute Nodes",
           to: "compute-nodes",
-        },
-        {
-          name: "Applications",
-          to: "applications",
         },
       ],
     };

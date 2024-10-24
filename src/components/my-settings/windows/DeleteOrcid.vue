@@ -1,42 +1,33 @@
 <template>
   <el-dialog
     class="dark-header"
-    :modelValue="visible"
-    @update:modelValue="visible = $event"
+    :visible="visible"
     :show-close="false"
     @close="closeDialog"
   >
-    <template #title>
-      <bf-dialog-header title="Delete ORCID Integration?"/>
-    </template>
-
+    <bf-dialog-header
+      slot="title"
+    />
     <dialog-body>
-<!--      <h2 slot="heading">-->
-<!--        Delete ORCID?-->
-<!--      </h2>-->
-      <p style="max-width: 450px">Are you sure you want to remove your linked ORCID account from your Pennsieve user profile?</p>
-      <li>
-        You will no longer be able to submit datasets for publication.
-      </li>
-      <li>Published datasets will no longer be listed in you ORCID account</li>
-      <li>Your ORCID profile will no longer be associated with a publication if you are a contributor</li>
-
+      <h2 slot="heading">
+        Delete ORCID?
+      </h2>
+      <p>Are you sure you want to Delete this ORCID?</p>
+      <div class="dialog-simple-buttons">
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="red"
+          @click="sendRequest"
+        >
+          Confirm
+        </bf-button>
+      </div>
     </dialog-body>
-
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        class="red"
-        @click="sendRequest"
-      >
-        Confirm
-      </bf-button>
-    </template>
   </el-dialog>
 </template>
 

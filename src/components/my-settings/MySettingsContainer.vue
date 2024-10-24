@@ -188,50 +188,6 @@
         </el-row>
       </el-col>
     </el-row>
-
-    <!-- GITHUB -->
-    <el-row v-if="showFeatureForTestOrgs">
-      <el-col :span="12">
-        <h2 id="github-id">GitHub</h2>
-        <div v-if="!hasGithubProfile">
-          <p>
-            Register the Pennsieve GitHub Application in your Github account,
-            and authorize Pennsieve to get notified about events.
-            <a
-              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
-            >
-              Learn More
-            </a>
-          </p>
-          <bf-button @click="openGitHub">
-            Register your GitHub Account
-          </bf-button>
-        </div>
-        <div v-else>
-          <p class="orcid-success-text">
-            You have successfully linked your GitHub Account and installed the
-            Pennsieve Github Application.
-            <a
-              href="https://docs.pennsieve.io/docs/github-integration"
-              target="_blank"
-            >
-              Learn More
-            </a>
-          </p>
-          <div class="integration-success">
-            <IconGitHub :height="30" width="30" />
-
-            <a class="link" :href="gitHubProfile.html_url" target="_blank">
-              {{ gitHubProfile.login }}
-            </a>
-            <button class="delete" @click="isDeleteGitHubDialogVisible = true">
-              <IconRemove :height="10" :width="10" color="black" />
-            </button>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
     <div class="divider" />
     <!-- ORCID -->
     <el-row>
@@ -258,53 +214,53 @@
             Register or Connect your ORCID iD
           </button>
         </div>
-        <!--        <el-row v-else>-->
-        <div v-else>
-          <p class="orcid-success-text">
-            Below is the ORCID associated with your Pennsieve account.
-            <a
-              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
-              target="_blank"
-            >
-              Learn More
-            </a>
-          </p>
-          <div v-if="!loading" class="integration-success">
-            <img src="../../assets/images/orcid.png" alt="orcid image" />
-            <el-row
-              class="orcid-success-info"
-              align="middle"
-              alt="Logo for ORCID"
-            >
-              <el-col>
-                <a :href="getORCIDResultUrl" target="_blank">
-                  {{ getORCIDResultUrl }}
-                </a>
+        <el-row v-else>
+          <div>
+            <p class="orcid-success-text">
+              Below is the ORCID associated with your Pennsieve account.
+              <a
+                href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
+                target="_blank"
+              >
+                Learn More
+              </a>
+            </p>
+            <div v-if="!loading" class="orcid-success">
+              <img src="../../assets/images/orcid.png" />
+              <el-row
+                class="orcid-success-info"
+                align="middle"
+                alt="Logo for ORCID"
+              >
+                <el-col>
+                  <a :href="getORCIDResultUrl" target="_blank">
+                    {{ getORCIDResultUrl }}
+                  </a>
+                </el-col>
+              </el-row>
+              <el-col class="orcid-delete-button">
+                <button @click="isDeleteOrcidDialogVisible = true">
+                  <IconRemove :height="10" :width="10" color="black" />
+                </button>
               </el-col>
+            </div>
+            <div v-else class="orcid-waiting">
+              <el-row>
+                <div v-loading="loading" class="orcid-loader" />
+              </el-row>
+            </div>
+            <el-row class="mt-20" v-if="!publishToOrcid">
+              <el-tooltip
+                placement="right"
+                content="Authorize Pennsieve to update ORCID with all of your Published Datasets"
+              >
+                <bf-button @click="openORCID">
+                  Update ORCID Publish Preferences
+                </bf-button>
+              </el-tooltip>
             </el-row>
-            <el-col class="delete orcid-delete-button">
-              <button @click="isDeleteOrcidDialogVisible = true">
-                <IconRemove :height="10" :width="10" color="black" />
-              </button>
-            </el-col>
           </div>
-          <!--          <div v-else class="orcid-waiting">-->
-          <!--            <el-row>-->
-          <!--              <div v-loading="loading" class="orcid-loader" />-->
-          <!--            </el-row>-->
-          <!--          </div>-->
-          <el-row class="mt-20" v-if="!publishToOrcid">
-            <el-tooltip
-              placement="right"
-              content="Authorize Pennsieve to update ORCID with all of your Published Datasets"
-            >
-              <bf-button @click="openORCID">
-                Update ORCID Publish Preferences
-              </bf-button>
-            </el-tooltip>
-          </el-row>
-        </div>
-        <!--        </el-row>-->
+        </el-row>
       </el-col>
     </el-row>
 
@@ -331,16 +287,9 @@
 
     <delete-orcid
       ref="deleteOrcidDialog"
-      :visible="isDeleteOrcidDialogVisible"
+      :visible.sync="isDeleteOrcidDialogVisible"
       @orcid-deleted-success="updateORCID"
       @orcid-close="updateORCID2"
-    />
-
-    <delete-git-hub
-      ref="deleteGitHubDialog"
-      :visible="isDeleteGitHubDialogVisible"
-      @deleted-success="updateGitHub"
-      @close="closeGitHubDialog"
     />
   </bf-stage>
 </template>
@@ -348,9 +297,8 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
-
-import { pathOr, propOr, prop, has } from "ramda";
-import { Auth } from "@aws-amplify/auth";
+import { pathOr, propOr, prop } from "ramda";
+import {Auth} from "@aws-amplify/auth";
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
@@ -366,18 +314,11 @@ import Request from "../../mixins/request";
 import Sorter from "../../mixins/sorter";
 import IconRemove from "../icons/IconRemove.vue";
 import IconSort from "../icons/IconSort.vue";
-import IconLock from "@/components/icons/IconLock.vue";
-import IconGitHub from "@/components/icons/IconGitHub.vue";
-import DeleteGitHub from "@/components/my-settings/windows/DeleteGitHub.vue";
-import { isEnabledForTestOrgs } from "../../utils/feature-flags";
 
 export default {
   name: "MySettingsContainer",
 
   components: {
-    DeleteGitHub,
-    IconGitHub,
-    IconLock,
     IconSort,
     IconRemove,
     BfRafter,
@@ -440,7 +381,6 @@ export default {
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
-      isDeleteGitHubDialogVisible: false,
       prevEmail: "",
       apiKey: {
         name: "",
@@ -457,18 +397,9 @@ export default {
       "config",
       "onboardingEvents",
       "cognitoUser",
-      "gitHubProfile",
     ]),
 
     ...mapGetters(["hasOrcidId", "publishToOrcid"]),
-
-    hasGithubProfile: function () {
-      return has("login", this.gitHubProfile);
-    },
-
-    windowLocation: function () {
-      return window.location.origin;
-    },
 
     /**
      * Checks whether or not auth is enabled
@@ -525,18 +456,6 @@ export default {
 
       return `${url}/user/orcid?api_key=${this.userToken}`;
     },
-    /**
-     * Retrieves the API URL for adding ORCID
-     */
-    getGitHubApiUrl: function () {
-      const url = pathOr("", ["api2Url"])(this.config);
-
-      if (!url) {
-        return "";
-      }
-
-      return `${url}/accounts/github/register`;
-    },
 
     /**
      * Retrieves URL for ORCID redirect, based on environment
@@ -554,35 +473,14 @@ export default {
      * Retrieves Url to display with name once ORCID is connected to user profile
      */
     getORCIDResultUrl: function () {
-      const env = pathOr("N/A", ["environment"], this.config);
-      const orcid = pathOr("", ["orcid", "orcid"], this.profile);
-
+      const env = pathOr("", ["config", "environment"])(this);
       return env === "dev"
-        ? `https://sandbox.orcid.org/${orcid}`
-        : `https://orcid.org/${orcid}`;
-    },
-
-    getGitHubAppUrl: function () {
-      const url = pathOr("", ["config", "GitHubAppUrl"])(this);
-
-      if (!url) {
-        return "";
-      }
-      return url;
+        ? `https://sandbox.orcid.org/${this.profile.orcid.orcid}`
+        : `https://orcid.org/${this.profile.orcid.orcid}`;
     },
 
     isEmailButtonDisabled: function () {
       return this.emailButtonDisabled;
-    },
-    activeOrganizationId: function () {
-      return pathOr(
-        "Organization",
-        ["organization", "id"],
-        this.activeOrganization
-      );
-    },
-    showFeatureForTestOrgs: function () {
-      return isEnabledForTestOrgs(this.activeOrganizationId);
     },
   },
 
@@ -597,6 +495,7 @@ export default {
       this.getApiKeys();
     },
   },
+
   mounted() {
     this.setRuleFormData(this.profile);
     this.setEmailFormData(this.profile.email);
@@ -607,22 +506,10 @@ export default {
   },
 
   methods: {
-    ...mapActions([
-      "updateProfile",
-      "updateGithubProfile",
-      "updateCognitoUser",
-    ]),
+    ...mapActions(["updateProfile", "updateCognitoUser"]),
 
     changeStatus: function (val) {
       this.mfaStatus = val;
-    },
-
-    closeGitHubDialog: function () {
-      this.isDeleteGitHubDialogVisible = false;
-    },
-
-    updateGitHub: function () {
-      this.updateGithubProfile({});
     },
 
     /**
@@ -871,62 +758,6 @@ export default {
       EventBus.$emit("logout");
     },
 
-    openGitHub: function () {
-      this.oauthWindow = window.open(
-        `${this.getGitHubAppUrl}?redirect_uri=${this.windowLocation}`,
-        "_blank",
-        "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
-      );
-      const self = this;
-      window.addEventListener("message", function (event) {
-        if (
-          event.data &&
-          event.data.source &&
-          event.data.source === "github-redirect-response" &&
-          event.data.code
-        ) {
-          this.oauthCode = event.data.code;
-          if (this.oauthCode !== "") {
-            if (!self.getGitHubApiUrl) {
-              return;
-            }
-
-            self
-              .sendXhr(self.getGitHubApiUrl, {
-                method: "POST",
-                header: {
-                  Authorization: `Bearer ${self.userToken}`,
-                },
-                body: {
-                  code: this.oauthCode,
-                  installation_id: event.data.installationId,
-                },
-              })
-              .then((response) => {
-                // TODO: Handle the Authentication token
-                // response logic goes here
-                self.updateGithubProfile(response);
-
-                // self.oauthInfo = response;
-                //
-                // self.updateProfile({
-                //   ...self.profile,
-                //   orcid: self.oauthInfo,
-                // });
-
-                EventBus.$emit("toast", {
-                  detail: {
-                    type: "success",
-                    msg: "Your GitHub account has been successfully added",
-                  },
-                });
-              })
-              .catch(self.handleXhrError.bind(this));
-          }
-        }
-      });
-    },
-
     /**
      * Logic to connect to user's ORCID
      */
@@ -1099,23 +930,12 @@ p {
   float: left;
 }
 
-.integration-success {
+.orcid-success {
   border: solid 1px #dadada;
   padding: 10px;
   display: flex;
   flex-direction: row;
   background: #fff;
-  align-content: center;
-  align-items: center;
-
-  .link {
-    margin-left: 20px;
-  }
-
-  .delete {
-    flex: 1;
-    text-align: right;
-  }
 
   .orcid-waiting {
     padding-top: 30px;

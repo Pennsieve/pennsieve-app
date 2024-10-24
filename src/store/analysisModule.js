@@ -1,15 +1,12 @@
 
   const initialState = () => ({
     computeNodes: [],
-    computeNodesLoaded: false,
     applications: [],
-    applicationsLoaded: false,
     preprocessors:[],
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
-    selectedFilesForAnalysis: [],
-    computeResourceAccounts: [] 
+    selectedFilesForAnalysis: []
   })
   
   export const state = initialState()
@@ -18,11 +15,9 @@
  
     UPDATE_COMPUTE_NODES(state, computeNodes) {
       state.computeNodes = computeNodes
-      state.computeNodesLoaded = true
     },
     UPDATE_APPLICATIONS(state, applications) {
       state.applications = applications
-      state.applicationsLoaded = true
     },
     UPDATE_PREPROCESSORS(state, preprocessors) {
       state.preprocessors = preprocessors
@@ -41,11 +36,8 @@
     },
     CLEAR_SELECTED_FILES(state) {
       state.selectedFilesForAnalysis = []
-    },
-    SET_COMPUTE_RESOURCE_ACCOUNTS(state, accounts) {
-      state.computeResourceAccounts = accounts
-    },
-
+    }
+ 
   }
   
   export const actions = {
@@ -99,28 +91,6 @@
           return Promise.reject(err)
       }
     },
-    fetchComputeResourceAccounts: async({ commit, rootState }) => {
-      try {
-        const url = `${rootState.config.api2Url}/accounts`;
-  
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${rootState.userToken}`,
-          },
-        })
-  
-        if (resp.ok) {
-          const result = await resp.json()
-          commit('SET_COMPUTE_RESOURCE_ACCOUNTS', result)
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          commit('SET_COMPUTE_RESOURCE_ACCOUNTS', [])
-          return Promise.reject(err)
-      }
-    },
     setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
       commit('SET_SELECTED_FILES', selectedFiles)
     },
@@ -130,60 +100,6 @@
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
-    createApplication: async ({ commit, rootState }, newApplication) => {
-      const url = `${rootState.config.api2Url}/applications`;
-    
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${rootState.userToken}`
-          },
-          body: JSON.stringify(newApplication)
-        });
-    
-        if (!response.ok) {
-          const errorDetails = await response.text(); // Extract error details
-          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
-        }
-    
-        const result = await response.json();
-        return result; // Return the result for further processing if needed
-    
-      } catch (err) {
-        console.error('Failed to create application:', err.message); // Log error details
-        throw err; // Rethrow the error to be handled by the caller
-      }
-    },
-    
-    createComputeNode: async ({ commit, rootState }, newComputeNode) => {
-      const url = `${rootState.config.api2Url}/compute-nodes`;
-    
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${rootState.userToken}`
-          },
-          body: JSON.stringify(newComputeNode)
-        });
-    
-        if (!response.ok) {
-          const errorDetails = await response.text(); // Extract error details from the response
-          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
-        }
-    
-        const result = await response.json();
-        return result; // Return the result for further processing if needed
-    
-      } catch (err) {
-        console.error('Failed to create compute node:', err.message); // Log detailed error message
-        throw err; // Rethrow the error to be handled by the caller
-      }
-    }
-    
   }
   
   export const getters = {}

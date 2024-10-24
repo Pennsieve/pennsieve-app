@@ -13,7 +13,6 @@ import filesModule from "./filesModule";
 import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
-import codeReposModule from "./codeReposModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -119,9 +118,7 @@ const initialState = () => ({
   isLinkOrcidDialogVisible: false,
   userToken: '',
   sessionTimer: null,
-  isRefreshing: false,
-  gitHubProfile: null,
-  computeNodes: []
+  isRefreshing: false
 })
 
 export const state = initialState();
@@ -626,9 +623,6 @@ export const mutations = {
       UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE(state, isLinkOrcidDialogVisible) {
         state.isLinkOrcidDialogVisible = isLinkOrcidDialogVisible;
       },
-      UPDATE_GITHUB_PROFILE(state, githubProfile) {
-        state.gitHubProfile = githubProfile;
-      },
     }
 
 export const actions = {
@@ -641,7 +635,6 @@ export const actions = {
   updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
       commit("UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE", evt),
   updateCognitoUser: ({ commit }, evt) => commit("UPDATE_COGNITO_USER", evt),
-  updateGithubProfile: ({ commit }, evt) => commit("UPDATE_GITHUB_PROFILE", evt),
   updatePageNotFound: ({ commit }, evt) => commit("SET_PAGE_NOT_FOUND", evt),
   updateScientificUnits: ({ commit }, evt) =>
       commit("UPDATE_SCIENTIFIC_UNITS", evt),
@@ -840,13 +833,6 @@ export const actions = {
 }
 
 export const getters = {
-
-  // NOTE: Getters need to have a different name than the state property. The syntax should be `getStatePropertyName` not `statePropertyName.`
-
-  // NOTE: Getters are used for manipulating data, not just reading it. If simple reading global state, use mapState instead of mapGetters. 
-
-  // TODO: Refactor usages of these simple data-accessing getters so the state property is accessed from mapState. 
-
   sessionTimer: (state) => state.sessionTimer,
   isRefreshing: (state) => state.isRefreshing,
   isWelcomeOrg: state => {
@@ -856,7 +842,7 @@ export const getters = {
   isOrgSynced: (state) => state.activeOrgSynced,
   config: (state) => state.config,
   profile: (state) => state.profile,
-  userToken: (state) => state.userToken, 
+  userToken: (state) => state.userToken,
   getProfile: (state) => () => state.profile,
   organizations: (state) => state.organizations,
   activeOrganization: (state) => state.activeOrganization,
@@ -1008,9 +994,6 @@ export const getters = {
   hasOrcidId: (state) => {
     return R.pathOr(false, ["profile", "orcid", "orcid"], state);
   },
-  hasGitHubId: (state) => {
-    return R.pathOr(false, ["gitHubProfile"], state);
-  },
   publishToOrcid:(state)=>{
     return state.profile.orcid.scope && state.profile.orcid.scope[1] && state.profile.orcid.scope[1]==='/activities/update';
   },
@@ -1058,8 +1041,7 @@ export default createStore({
     filesModule,
     uploadModule,
     metadataModule,
-    analysisModule,
-    codeReposModule
+    analysisModule
   }
 
 });

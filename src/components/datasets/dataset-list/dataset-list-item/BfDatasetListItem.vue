@@ -359,6 +359,10 @@ export default {
      * @returns {String}
      */
     publicationStatusColor: function () {
+      console.log(
+        "this.dataset.publication.status",
+        this.dataset.publication.status
+      );
       const status = this.dataset.publication.status;
       if (status == PublicationStatus.REQUESTED) {
         return PublicationStatusColor.REQUESTED;
