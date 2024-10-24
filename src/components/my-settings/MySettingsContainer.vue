@@ -188,15 +188,15 @@
         </el-row>
       </el-col>
     </el-row>
-    <div class="divider" />
 
     <!-- GITHUB -->
-    <el-row>
+    <el-row v-if="showFeatureForTestOrgs">
       <el-col :span="12">
         <h2 id="github-id">GitHub</h2>
         <div v-if="!hasGithubProfile">
           <p>
-            Register the Pennsieve GitHub Application in your Github account, and authorize Pennsieve to get notified about events.
+            Register the Pennsieve GitHub Application in your Github account,
+            and authorize Pennsieve to get notified about events.
             <a
               href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
             >
@@ -209,7 +209,8 @@
         </div>
         <div v-else>
           <p class="orcid-success-text">
-            You have successfully linked your GitHub Account and installed the Pennsieve Github Application.
+            You have successfully linked your GitHub Account and installed the
+            Pennsieve Github Application.
             <a
               href="https://docs.pennsieve.io/docs/github-integration"
               target="_blank"
@@ -218,7 +219,7 @@
             </a>
           </p>
           <div class="integration-success">
-            <IconGitHub :height="30" width="30"/>
+            <IconGitHub :height="30" width="30" />
 
             <a class="link" :href="gitHubProfile.html_url" target="_blank">
               {{ gitHubProfile.login }}
@@ -228,7 +229,6 @@
             </button>
           </div>
         </div>
-
       </el-col>
     </el-row>
 
@@ -258,7 +258,7 @@
             Register or Connect your ORCID iD
           </button>
         </div>
-<!--        <el-row v-else>-->
+        <!--        <el-row v-else>-->
         <div v-else>
           <p class="orcid-success-text">
             Below is the ORCID associated with your Pennsieve account.
@@ -270,7 +270,7 @@
             </a>
           </p>
           <div v-if="!loading" class="integration-success">
-            <img src="../../assets/images/orcid.png"  alt="orcid image"/>
+            <img src="../../assets/images/orcid.png" alt="orcid image" />
             <el-row
               class="orcid-success-info"
               align="middle"
@@ -288,11 +288,11 @@
               </button>
             </el-col>
           </div>
-<!--          <div v-else class="orcid-waiting">-->
-<!--            <el-row>-->
-<!--              <div v-loading="loading" class="orcid-loader" />-->
-<!--            </el-row>-->
-<!--          </div>-->
+          <!--          <div v-else class="orcid-waiting">-->
+          <!--            <el-row>-->
+          <!--              <div v-loading="loading" class="orcid-loader" />-->
+          <!--            </el-row>-->
+          <!--          </div>-->
           <el-row class="mt-20" v-if="!publishToOrcid">
             <el-tooltip
               placement="right"
@@ -304,7 +304,7 @@
             </el-tooltip>
           </el-row>
         </div>
-<!--        </el-row>-->
+        <!--        </el-row>-->
       </el-col>
     </el-row>
 
@@ -341,7 +341,7 @@
       :visible="isDeleteGitHubDialogVisible"
       @deleted-success="updateGitHub"
       @close="closeGitHubDialog"
-      />
+    />
   </bf-stage>
 </template>
 
@@ -350,8 +350,7 @@ import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
 
 import { pathOr, propOr, prop, has } from "ramda";
-import {Auth} from "@aws-amplify/auth";
-
+import { Auth } from "@aws-amplify/auth";
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
@@ -370,6 +369,7 @@ import IconSort from "../icons/IconSort.vue";
 import IconLock from "@/components/icons/IconLock.vue";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import DeleteGitHub from "@/components/my-settings/windows/DeleteGitHub.vue";
+import { isEnabledForTestOrgs } from "../../utils/feature-flags";
 
 export default {
   name: "MySettingsContainer",
@@ -457,17 +457,17 @@ export default {
       "config",
       "onboardingEvents",
       "cognitoUser",
-      "gitHubProfile"
+      "gitHubProfile",
     ]),
 
     ...mapGetters(["hasOrcidId", "publishToOrcid"]),
 
     hasGithubProfile: function () {
-      return has('login', this.gitHubProfile)
+      return has("login", this.gitHubProfile);
     },
 
-    windowLocation: function() {
-      return window.location.origin
+    windowLocation: function () {
+      return window.location.origin;
     },
 
     /**
@@ -485,8 +485,6 @@ export default {
     hasApiKeys: function () {
       return this.apiKeys.length > 0;
     },
-
-
 
     getApiKeysUrl: function () {
       const url = pathOr("", ["config", "apiUrl"])(this);
@@ -533,7 +531,6 @@ export default {
     getGitHubApiUrl: function () {
       const url = pathOr("", ["api2Url"])(this.config);
 
-
       if (!url) {
         return "";
       }
@@ -558,24 +555,34 @@ export default {
      */
     getORCIDResultUrl: function () {
       const env = pathOr("N/A", ["environment"], this.config);
-      const orcid = pathOr("", ["orcid","orcid"], this.profile);
+      const orcid = pathOr("", ["orcid", "orcid"], this.profile);
 
       return env === "dev"
         ? `https://sandbox.orcid.org/${orcid}`
         : `https://orcid.org/${orcid}`;
     },
 
-    getGitHubAppUrl: function() {
+    getGitHubAppUrl: function () {
       const url = pathOr("", ["config", "GitHubAppUrl"])(this);
 
       if (!url) {
-        return ""
+        return "";
       }
-      return url
+      return url;
     },
 
     isEmailButtonDisabled: function () {
       return this.emailButtonDisabled;
+    },
+    activeOrganizationId: function () {
+      return pathOr(
+        "Organization",
+        ["organization", "id"],
+        this.activeOrganization
+      );
+    },
+    showFeatureForTestOrgs: function () {
+      return isEnabledForTestOrgs(this.activeOrganizationId);
     },
   },
 
@@ -590,7 +597,6 @@ export default {
       this.getApiKeys();
     },
   },
-
   mounted() {
     this.setRuleFormData(this.profile);
     this.setEmailFormData(this.profile.email);
@@ -601,18 +607,22 @@ export default {
   },
 
   methods: {
-    ...mapActions(["updateProfile", "updateGithubProfile", "updateCognitoUser"]),
+    ...mapActions([
+      "updateProfile",
+      "updateGithubProfile",
+      "updateCognitoUser",
+    ]),
 
     changeStatus: function (val) {
       this.mfaStatus = val;
     },
 
-    closeGitHubDialog: function() {
-      this.isDeleteGitHubDialogVisible = false
+    closeGitHubDialog: function () {
+      this.isDeleteGitHubDialogVisible = false;
     },
 
-    updateGitHub: function() {
-        this.updateGithubProfile({})
+    updateGitHub: function () {
+      this.updateGithubProfile({});
     },
 
     /**
@@ -861,9 +871,9 @@ export default {
       EventBus.$emit("logout");
     },
 
-    openGitHub: function() {
+    openGitHub: function () {
       this.oauthWindow = window.open(
-          `${this.getGitHubAppUrl}?redirect_uri=${this.windowLocation}`,
+        `${this.getGitHubAppUrl}?redirect_uri=${this.windowLocation}`,
         "_blank",
         "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
       );
@@ -875,7 +885,6 @@ export default {
           event.data.source === "github-redirect-response" &&
           event.data.code
         ) {
-
           this.oauthCode = event.data.code;
           if (this.oauthCode !== "") {
             if (!self.getGitHubApiUrl) {
@@ -886,7 +895,7 @@ export default {
               .sendXhr(self.getGitHubApiUrl, {
                 method: "POST",
                 header: {
-                  'Authorization': `Bearer ${self.userToken}`
+                  Authorization: `Bearer ${self.userToken}`,
                 },
                 body: {
                   code: this.oauthCode,
@@ -894,13 +903,9 @@ export default {
                 },
               })
               .then((response) => {
-
                 // TODO: Handle the Authentication token
                 // response logic goes here
-                self.updateGithubProfile(response)
-
-
-
+                self.updateGithubProfile(response);
 
                 // self.oauthInfo = response;
                 //

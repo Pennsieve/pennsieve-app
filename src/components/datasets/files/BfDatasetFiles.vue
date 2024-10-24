@@ -1130,6 +1130,9 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
+    },
 
     /**
      * Get files URL for dataset
@@ -1163,9 +1166,6 @@ export default {
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    },
-    toggleActionDropdown: function () {
-      this.quickActionsVisible = !this.quickActionsVisible;
     },
   },
 };
