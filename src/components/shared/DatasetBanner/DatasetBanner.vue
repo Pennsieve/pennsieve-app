@@ -23,7 +23,7 @@
     <template v-else>
       <img
         v-if="hasDatasetBanner"
-        :src="datasetBanner"
+        :src="datasetBannerURL"
         :alt="datasetBannerAlt"
       >
 
@@ -47,7 +47,6 @@
 </template>
 
 <script>
-  import { mapState } from 'vuex'
   import { pathOr } from 'ramda'
   import { ContentLoader } from 'vue-content-loader'
 
@@ -62,15 +61,22 @@
       emptyStateText: {
         type: String,
         default: 'Drag and drop to upload your image.'
+      },
+      dataset: {
+        type: Object,
+        default: {}
+      },
+      datasetBannerURL: {
+        type: String,
+        default: '',
+      },
+      isLoadingDatasetBanner: {
+        type: Boolean,
+        default: true
       }
     },
 
     computed: {
-      ...mapState([
-        'dataset',
-        'datasetBanner',
-        'isLoadingDatasetBanner'
-      ]),
 
       /**
        * Compute banner image alt text
@@ -86,7 +92,7 @@
        * @returns {Boolean}
        */
       hasDatasetBanner: function() {
-        return this.datasetBanner !== ''
+        return this.datasetBannerURL !== ''
       }
     }
   }

@@ -11,6 +11,9 @@
             <dataset-banner
               empty-state-text="Add a banner image."
               @click.native="goToBanner"
+              :dataset = "dataset"
+              :datasetBannerURL = "datasetBanner"
+              :isLoadingDatasetBanner="isLoadingDatasetBanner"
             />
 
             <div class="dataset-heading-info">

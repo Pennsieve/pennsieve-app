@@ -16,7 +16,12 @@
       @dragleave="setIsDragging(false)"
       @drop.prevent="setImage($event, true)"
     >
-      <dataset-banner class="img-banner" />
+      <dataset-banner
+      class="img-banner"
+      :dataset = "dataset"
+      :datasetBannerURL = "datasetBanner"
+      :isLoadingDatasetBanner="isLoadingDatasetBanner"
+      />
     </div>
 
     <p
@@ -136,7 +141,8 @@
         'config',
         'dataset',
         'userToken',
-        'datasetBanner'
+        'datasetBanner',
+        'isLoadingDatasetBanner'
       ]),
 
       ...mapGetters(['datasetLocked']),
