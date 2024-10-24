@@ -38,7 +38,7 @@
             alt="Upload an image"
           >
           <p class="mb-0">
-            {{ emptyStateText }}
+            Drag and drop to upload your image.
           </p>
         </div>
       </div>
@@ -58,10 +58,6 @@
     },
 
     props: {
-      emptyStateText: {
-        type: String,
-        default: 'Drag and drop to upload your image.'
-      },
       dataset: {
         type: Object,
         default: {}
