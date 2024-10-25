@@ -16,7 +16,7 @@
           registering Compute Nodes for {{ orgName }}.
         </p>
       </div>
-      <div v-if="!hasAdminRights" class="copy">
+      <div class="copy">
         <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
         <p>
           Contact your administrator to get started working with Compute Nodes
@@ -24,10 +24,7 @@
       </div>
     </bf-empty-page-state>
     <template #actions>
-      <bf-button
-        v-if="hasAdminRights && isFeatureFlagEnabled()"
-        @click="openCreateComputeNodeDialog"
-      >
+      <bf-button @click="openCreateComputeNodeDialog">
         Create Compute Node
       </bf-button>
     </template>
@@ -59,6 +56,7 @@ import { pathOr, propOr } from "ramda";
 import {
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
+  isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
 
 export default {
@@ -94,15 +92,6 @@ export default {
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
     ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
 
-    hasAdminRights: function () {
-      if (this.activeOrganization) {
-        const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
-        const isOwner = propOr(false, "isOwner", this.activeOrganization);
-        return isAdmin || isOwner;
-      } else {
-        return null;
-      }
-    },
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
@@ -123,7 +112,11 @@ export default {
     ...mapActions("analysisModule", ["fetchComputeNodes"]),
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
     },
 
     openCreateComputeNodeDialog: function () {
