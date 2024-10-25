@@ -19,3 +19,7 @@ export function isEnabledForImmuneHealth(orgId) {
     "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
    return isImmuneHealthProd;
 }
+
+export function isEnabledForAllDevOrgs(url) {
+  return url === 'https://api.pennsieve.net'
+}

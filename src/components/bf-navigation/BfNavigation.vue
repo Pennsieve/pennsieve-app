@@ -67,7 +67,7 @@
           <IconDatasets :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
-      <div v-if="showFeatureForTestOrgs">
+      <div v-if="isFeatureFlagEnabled">
         <bf-navigation-item
           v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
           :link="{
@@ -183,7 +183,11 @@ import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
 import CustomTheme from "../../mixins/custom-theme";
-import { isEnabledForTestOrgs } from "../../utils/feature-flags";
+import {
+  isEnabledForTestOrgs,
+  isEnabledForAllDevOrgs,
+  isEnabledForImmuneHealth,
+} from "../../utils/feature-flags";
 
 export default {
   name: "BfNavigation",
@@ -426,8 +430,13 @@ export default {
         this.activeOrganization
       );
     },
-    showFeatureForTestOrgs: function () {
-      return isEnabledForTestOrgs(this.activeOrganizationId);
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl) ||
+        isEnabledForImmuneHealth(orgId)
+      );
     },
   },
 

@@ -22,7 +22,7 @@
           >
             <template #buttons>
               <bf-button
-                v-if="isFeatureFlagEnabled()"
+                v-if="isFeatureFlagEnabled"
                 @click="openRunAnalysisDialog"
                 class="dropdown-button"
               >
@@ -208,6 +208,7 @@ import IconUpload from "../../icons/IconUpload.vue";
 import {
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
+  isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
@@ -358,6 +359,14 @@ export default {
     isExploreEnabled: function () {
       return this.hasFeature("concepts_feature");
     },
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
+    },
   },
 
   watch: {
@@ -500,11 +509,6 @@ export default {
           duration: 1000,
         },
       });
-    },
-
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
     },
 
     // Ignore drops to component outside the drop target and close drop-target

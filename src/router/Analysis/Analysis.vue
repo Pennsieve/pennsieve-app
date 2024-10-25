@@ -47,11 +47,7 @@
       </template>
       <template #tabs>
         <router-tabs
-          :tabs="
-            showFeatureForImmuneHealth || showFeatureForTestOrgs
-              ? pennsieveAnalysisFeature
-              : tabs
-          "
+          :tabs="isFeatureFlagEnabled ? pennsieveAnalysisFeature : tabs"
         />
       </template>
     </bf-rafter>
@@ -67,6 +63,7 @@ import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 import { pathOr, propOr } from "ramda";
 import {
+  isEnabledForAllDevOrgs,
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
 } from "../../utils/feature-flags";
@@ -81,7 +78,7 @@ export default {
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
-    ...mapState(["activeOrganization"]),
+    ...mapState(["activeOrganization", "config"]),
     activeOrganizationId: function () {
       return pathOr(
         "Organization",
@@ -89,11 +86,12 @@ export default {
         this.activeOrganization
       );
     },
-    showFeatureForTestOrgs: function () {
-      return isEnabledForTestOrgs(this.activeOrganizationId);
-    },
-    showFeatureForImmuneHealth: function () {
-      return isEnabledForImmuneHealth(this.activeOrganizationId);
+    isFeatureFlagEnabled: function () {
+      return (
+        isEnabledForTestOrgs(this.activeOrganizationId) ||
+        isEnabledForImmuneHealth(this.activeOrganizationId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
     },
   },
   // From Router
