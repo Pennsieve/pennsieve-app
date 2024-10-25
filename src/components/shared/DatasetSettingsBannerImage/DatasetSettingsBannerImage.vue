@@ -20,7 +20,7 @@
       class="img-banner"
       :dataset = "dataset"
       :datasetBannerURL = "datasetBanner"
-      :isLoadingDatasetBanner="isLoadingDatasetBanner"
+      :isLoadingBanner="isLoadingDatasetBanner"
       />
     </div>
 

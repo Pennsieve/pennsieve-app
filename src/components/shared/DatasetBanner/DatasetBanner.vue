@@ -2,7 +2,7 @@
 
   <div class="dataset-banner">
     <content-loader
-      v-if="isLoadingDatasetBanner"
+      v-if="isLoadingBanner"
       class="dataset-banner-loader"
       :height="'100%'"
       :width="'100%'"
@@ -66,7 +66,7 @@
         type: String,
         default: '',
       },
-      isLoadingDatasetBanner: {
+      isLoadingBanner: {
         type: Boolean,
         default: true
       }

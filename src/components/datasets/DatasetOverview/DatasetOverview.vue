@@ -13,7 +13,7 @@
               @click.native="goToBanner"
               :dataset = "dataset"
               :datasetBannerURL = "datasetBanner"
-              :isLoadingDatasetBanner="isLoadingDatasetBanner"
+              :isLoadingBanner="isLoadingDatasetBanner"
             />
 
             <div class="dataset-heading-info">
