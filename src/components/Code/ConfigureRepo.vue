@@ -138,7 +138,6 @@ const saveRepoConfig = debounce(function () {
       formVal: codeRepoForm.value,
       repo: codeRepo.value,
     });
-    console.log("API was called");
   } catch (err) {
     console.error(err);
   }

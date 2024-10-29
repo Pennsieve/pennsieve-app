@@ -154,7 +154,7 @@ export const actions = {
     commit('SET_WORKSPACE_REPOS_OFFSET', offset)
   },
 
-  fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset, page }) => {
+  fetchWorkspaceRepos: async ({ commit, rootState, dispatch }, { limit, offset, page }) => {
     try {
       const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -170,6 +170,7 @@ export const actions = {
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
         commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
+        dispatch('fetchWorkspaceReposBanner')
       } else {
         throw new Error(response.statusText)
       }
@@ -266,13 +267,21 @@ export const actions = {
         }).then((res) => {
           const bannerURL = propOr('', 'banner', res)
           commit('SET_CODE_REPO_BANNER_URL', bannerURL)
-          return res
+          return bannerURL
         })
       return response
     }
     catch (err) {
       console.error(err);
     }
+  },
+
+  fetchWorkspaceReposBanner: async({state, commit, dispatch}) => {
+    state.workspaceRepos.forEach(async (repo) => {
+      const url = await dispatch('fetchBanner', repo.content.id)
+      const updatedWorkspaceRepo = { ...repo, presignedBannerURL : url}
+      commit('UPDATE_WORKSPACE_REPOS', updatedWorkspaceRepo)
+    })
   }
 }
 

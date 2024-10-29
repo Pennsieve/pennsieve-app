@@ -3,7 +3,8 @@
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
-          <img src="../../assets/images/octocat.png" alt="Octocat" />
+          <img v-if="repo.presignedBannerURL" :src="repo.presignedBannerURL" alt="Octocat" width="50" height="50" />
+          <img v-else src="@/assets/images/octocat.png" alt="Octocat" width="50" height="50" />
         </div>
         <div v-if="myReposView" class="repo-info-container">
           <h2>
@@ -273,6 +274,10 @@ export default {
 .repo-banner-container {
   display: flex;
   flex-direction: row;
+  img {
+    width: 80px;
+    height: 80px;
+  }
 }
 
 .repo-info-container {
