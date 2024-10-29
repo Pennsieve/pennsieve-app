@@ -1,4 +1,8 @@
 import Cookies from "js-cookie";
+import {
+  pathOr,
+  propOr
+} from 'ramda'
 
 const initialState = () => ({
   myRepos: [],
@@ -18,7 +22,8 @@ const initialState = () => ({
   workspaceReposCount: 0,
   workspaceReposLoaded: false,
   datasetId: "",
-  activeRepo: {}
+  activeRepo: {},
+  activeRepoBannerURL: ''
 })
 
 export const state = initialState()
@@ -61,8 +66,10 @@ export const mutations = {
   },
   SET_ACTIVE_CODE_REPO(state, activeRepoId) {
     state.activeRepo = state.workspaceRepos.find(repo => repo.content.id === activeRepoId)
-  }
-
+  },
+  SET_CODE_REPO_BANNER_URL(state, URL) {
+    state.activeRepoBannerURL = URL;
+  },
 }
 
 export const actions = {
@@ -249,11 +256,39 @@ export const actions = {
       console.error(err);
       throw err; 
     }
+  },
+
+  fetchBanner: async ({commit, rootState}, datasetId) => {
+    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${rootState.userToken}`
+    try {
+      const myHeaders = new Headers();
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "GET",
+        headers: myHeaders,
+      }).then((res)=> {
+        if(!res.ok) {
+          throw new Error(`${res.status}`);
+        } else {
+          return res.json()
+        }
+        }).then((res) => {
+          const bannerURL = propOr('', 'banner', res)
+          commit('SET_CODE_REPO_BANNER_URL', bannerURL)
+          return res
+        })
+      return response
+    }
+    catch (err) {
+      console.error(err);
+    }
   }
 }
 
 export const getters = {
-  activeRepo : state => state.activeRepo
+  activeRepo : state => state.activeRepo,
+  activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
+  bannerURL : state => state.activeRepoBannerURL
 }
 
 const codeReposModule = {

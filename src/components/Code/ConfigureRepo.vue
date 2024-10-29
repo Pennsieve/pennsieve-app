@@ -48,6 +48,14 @@
         />
       </el-form-item>
 
+      <dataset-settings-banner-image
+      id="codeRepoBannerImage"
+      :dataset = "codeRepoDataset"
+      :datasetBannerURL = "codeRepoDatasetBannerURL"
+      :isLoadingBanner = "false"
+      :isCodeReposDataset = "true"
+    />
+
       <el-form-item id="inputTags">
         <template #label> Tags </template>
         <el-input
@@ -75,7 +83,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Ref, onMounted, ref } from "vue";
+import { Ref, onMounted, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
@@ -91,6 +99,8 @@ interface CodeRepoConfig {
 const store = useStore();
 let route = useRoute();
 
+const codeRepoDataset = computed(() => store.getters['codeReposModule/activeRepo'])
+const codeRepoDatasetBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
 let activeRepoName = ref("");
 let inputTag = ref("");
 let repo = ref({});
@@ -103,10 +113,12 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
+  
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     console.log("activeRepoId", activeRepoId);
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
+    store.dispatch('codeReposModule/fetchBanner', activeRepoId)
   }
 
   repo.value = store.getters["codeReposModule/activeRepo"];

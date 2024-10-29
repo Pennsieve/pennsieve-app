@@ -19,8 +19,8 @@
       <dataset-banner
       class="img-banner"
       :dataset = "dataset"
-      :datasetBannerURL = "datasetBanner"
-      :isLoadingBanner="isLoadingDatasetBanner"
+      :datasetBannerURL = "datasetBannerURL"
+      :isLoadingBanner="isLoadingBanner"
       />
     </div>
 
@@ -96,7 +96,7 @@
 <script>
   import {
     mapActions, mapGetters,
-    mapState
+    mapState, mapMutations
   } from 'vuex';
   import {
     head,
@@ -108,6 +108,25 @@
 
   export default {
     name: 'DatasetSettingsBannerImage',
+
+    props: {
+      dataset: {
+        type: Object,
+        default: {}
+      },
+      datasetBannerURL: {
+        type: String,
+        default: '',
+      },
+      isLoadingBanner: {
+        type: Boolean,
+        default: true
+      },
+      isCodeReposDataset: {
+        type: Boolean,
+        default: false
+      }
+    },
 
     data() {
       return {
@@ -139,10 +158,7 @@
     computed: {
       ...mapState([
         'config',
-        'dataset',
         'userToken',
-        'datasetBanner',
-        'isLoadingDatasetBanner'
       ]),
 
       ...mapGetters(['datasetLocked']),
@@ -152,7 +168,7 @@
        * @returns {Boolean}
        */
       hasDatasetBanner: function() {
-        return this.datasetBanner !== ''
+        return this.datasetBannerURL !== ''
       },
 
       /**
@@ -190,6 +206,10 @@
       ...mapActions([
         'setDatasetBanner'
       ]),
+      
+      ...mapMutations({
+        setCodeRepoDatasetBanner: 'codeReposModule/SET_CODE_REPO_BANNER_URL'
+      }),
 
       /**
        * Set isDragging
@@ -248,11 +268,16 @@
           })
           .then(response => {
             const banner = propOr('', 'banner', response)
-
-            this.setDatasetBanner(banner).then(() => {
+            if(this.isCodeReposDataset) {
+              this.setCodeRepoDatasetBanner(banner)
+              this.isDialogVisible = false;
+              this.isUploadingBanner = false
+            } else {
+              this.setDatasetBanner(banner).then(() => {
               this.isDialogVisible = false
               this.isUploadingBanner = false
             })
+            }
           })
           .finally(() => {
             this.isUploadingBanner = false

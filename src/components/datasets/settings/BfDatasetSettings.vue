@@ -96,6 +96,9 @@
     <dataset-settings-banner-image
       id="bannerImage"
       ref="bannerImage"
+      :dataset = "dataset"
+      :datasetBannerURL = "datasetBanner"
+      :isLoadingBanner="isLoadingDatasetBanner"
     />
 
     <hr>
@@ -245,7 +248,9 @@ export default {
       'concepts',
       'datasetEtag',
       'dataset',
-      'datasets'
+      'datasets',
+      'datasetBanner',
+      'isLoadingDatasetBanner'
     ]),
 
     ...mapGetters([
