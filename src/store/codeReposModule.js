@@ -180,10 +180,8 @@ export const actions = {
   },
   
   saveRepoSettings: async({ state, commit, rootState }, { formVal, repo }) => {
-    const { url } = repo.value.content.releases[0];
-    const { intId } = repo?.value?.content;
-    console.log('formVal', formVal)
-    const { description, givenName, isAutoPublished, tags } = repo
+    const { url } = repo.content.releases[0];
+    const { intId } = repo.content;
     const bodyToSend = {
       organization_id: rootState.activeOrganization.organization.intId,
       dataset_id: intId,
@@ -192,13 +190,6 @@ export const actions = {
       description: formVal.description,
       auto_publish: formVal.isAutoPublished,
       tags: formVal.tags,
-      // "sync": {
-      //   "banner": boolean,
-      //   "readme": boolean,
-      //   "changelog": boolean,
-      //   "license": boolean,
-      //   "contributors": boolean
-      // }
     }
     try {
       const url = `${rootState.config.api2Url}/repository/external`

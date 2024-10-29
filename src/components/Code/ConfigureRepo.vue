@@ -50,8 +50,8 @@
 
       <dataset-settings-banner-image
       id="codeRepoBannerImage"
-      :dataset = "codeRepoDataset"
-      :datasetBannerURL = "codeRepoDatasetBannerURL"
+      :dataset = "codeRepo"
+      :datasetBannerURL = "codeRepoBannerURL"
       :isLoadingBanner = "false"
       :isCodeReposDataset = "true"
     />
@@ -97,13 +97,12 @@ interface CodeRepoConfig {
 }
 
 const store = useStore();
-let route = useRoute();
+const route = useRoute();
 
-const codeRepoDataset = computed(() => store.getters['codeReposModule/activeRepo'])
-const codeRepoDatasetBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
-let activeRepoName = ref("");
-let inputTag = ref("");
-let repo = ref({});
+const codeRepo = computed(() => store.getters['codeReposModule/activeRepo'])
+const codeRepoBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
+const activeRepoName = ref("");
+const inputTag = ref("");
 
 const codeRepoForm: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
@@ -116,31 +115,28 @@ onMounted(() => {
   
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
-    console.log("activeRepoId", activeRepoId);
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
     store.dispatch('codeReposModule/fetchBanner', activeRepoId)
   }
 
-  repo.value = store.getters["codeReposModule/activeRepo"];
-
   // update initial form values from the database
   activeRepoName.value =
-    store.getters["codeReposModule/activeRepo"].content.name;
+    codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
-    store.getters["codeReposModule/activeRepo"].content.repository.autoProcess;
+    codeRepo.value.content.repository.autoProcess;
   codeRepoForm.value.givenName =
-    store.getters["codeReposModule/activeRepo"].content.name;
+    codeRepo.value.content.name;
   codeRepoForm.value.description =
-    store.getters["codeReposModule/activeRepo"].content.description;
+    codeRepo.value.content.description;
   codeRepoForm.value.tags =
-    store.getters["codeReposModule/activeRepo"].content.tags;
+    codeRepo.value.content.tags;
 });
 
 const saveRepoConfig = debounce(function () {
   try {
     store.dispatch("codeReposModule/saveRepoSettings", {
       formVal: codeRepoForm.value,
-      repo,
+      repo: codeRepo.value,
     });
     console.log("API was called");
   } catch (err) {
