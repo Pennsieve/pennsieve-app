@@ -3,8 +3,8 @@
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
-          <img v-if="repo.presignedBannerURL" :src="repo.presignedBannerURL" alt="Octocat" width="50" height="50" />
-          <img v-else src="@/assets/images/octocat.png" alt="Octocat" width="50" height="50" />
+          <img v-if="repo.presignedBannerURL" :src="repo.presignedBannerURL" alt="Code repo banner image"/>
+          <img v-else src="@/assets/images/octocat.png" alt="Octocat" />
         </div>
         <div v-if="myReposView" class="repo-info-container">
           <h2>
