@@ -52,7 +52,7 @@
       id="codeRepoBannerImage"
       :dataset = "codeRepo"
       :datasetBannerURL = "codeRepoBannerURL"
-      :isLoadingBanner = "false"
+      :isLoadingBanner = "isLoadingBanner"
       :isCodeReposDataset = "true"
     />
 
@@ -101,6 +101,7 @@ const route = useRoute();
 
 const codeRepo = computed(() => store.getters['codeReposModule/activeRepo'])
 const codeRepoBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
+const isLoadingBanner = computed(() => store.getters['codeReposModule/isLoadingCodeRepoBanner'])
 const activeRepoName = ref("");
 const inputTag = ref("");
 

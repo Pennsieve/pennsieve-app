@@ -23,7 +23,8 @@ const initialState = () => ({
   workspaceReposLoaded: false,
   datasetId: "",
   activeRepo: {},
-  activeRepoBannerURL: ''
+  activeRepoBannerURL: '',
+  isLoadingCodeRepoBanner: false,
 })
 
 export const state = initialState()
@@ -70,6 +71,9 @@ export const mutations = {
   SET_CODE_REPO_BANNER_URL(state, URL) {
     state.activeRepoBannerURL = URL;
   },
+  SET_IS_LOADING_CODE_REPO_BANNER(state, isLoadingBanner) {
+    state.isLoadingCodeRepoBanner = isLoadingBanner
+  }
 }
 
 export const actions = {
@@ -251,6 +255,7 @@ export const actions = {
   },
 
   fetchBanner: async ({commit, rootState}, datasetId) => {
+    commit('SET_IS_LOADING_CODE_REPO_BANNER', true)
     const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${rootState.userToken}`
     try {
       const myHeaders = new Headers();
@@ -267,11 +272,13 @@ export const actions = {
         }).then((res) => {
           const bannerURL = propOr('', 'banner', res)
           commit('SET_CODE_REPO_BANNER_URL', bannerURL)
+          commit('SET_IS_LOADING_CODE_REPO_BANNER', false)
           return bannerURL
         })
       return response
     }
     catch (err) {
+      commit('SET_IS_LOADING_CODE_REPO_BANNER', false)
       console.error(err);
     }
   },
@@ -288,7 +295,8 @@ export const actions = {
 export const getters = {
   activeRepo : state => state.activeRepo,
   activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
-  bannerURL : state => state.activeRepoBannerURL
+  bannerURL : state => state.activeRepoBannerURL,
+  isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner
 }
 
 const codeReposModule = {
