@@ -113,7 +113,6 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 });
 
 onMounted(() => {
-  
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);

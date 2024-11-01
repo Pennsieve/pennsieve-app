@@ -82,6 +82,7 @@ import UserRoles from "../../../mixins/user-roles";
 import { pathOr, propOr } from "ramda";
 
 import {
+  isEnabledForAllDevOrgs,
   isEnabledForImmuneHealth,
   isEnabledForTestOrgs,
 } from "../../../utils/feature-flags.js";
@@ -139,7 +140,11 @@ export default {
 
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return isEnabledForTestOrgs(orgId) || isEnabledForImmuneHealth(orgId);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
     },
 
     /**
