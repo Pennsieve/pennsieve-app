@@ -69,22 +69,52 @@
           <template #label>
             CPU <span class="label-helper"> required </span>
           </template>
-          <el-input
+          <!-- <el-input
             v-model="application.resources.cpu"
             placeholder="2048"
             autofocus
-          />
+          /> -->
+          <el-select
+            ref="enum"
+            v-model="application.resources.cpu"
+            class="input-property"
+            filterable
+            autofocus
+            placeholder="Choose CPU"
+          >
+            <el-option
+              v-for="item in cpuItems"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+            </el-select>
         </el-form-item>
 
         <el-form-item prop="resources.memory">
           <template #label>
             Memory <span class="label-helper"> required </span>
           </template>
-          <el-input
+          <!-- <el-input
             v-model="application.resources.memory"
             placeholder="4096"
             autofocus
-          />
+          /> -->
+          <el-select
+            ref="enum"
+            v-model="application.resources.memory"
+            class="input-property"
+            filterable
+            autofocus
+            placeholder="Select CPU then Memory"
+          >
+            <el-option
+              v-for="item in memoryItems"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+            </el-select>
         </el-form-item>
 
         <el-form-item prop="computeNode">
@@ -210,6 +240,48 @@ export default {
           label: "Postprocessor",
         },
       ],
+      cpuItems:[
+        {
+          value: 256,
+          label: ".25 vCPU",
+        },
+        {
+          value: 512,
+          label: ".5 vCPU",
+        },
+        {
+          value: 1024,
+          label: "1 vCPU",
+        },
+        {
+          value: 2048,
+          label: "2 vCPU",
+        },
+        {
+          value: 4096,
+          label: "4 vCPU",
+        },
+        {
+          value: 8192,
+          label: "8 vCPU",
+        },
+        {
+          value: 16384,
+          label: "16 vCPU",
+        }
+      ],
+      memoryItems:[],
+      memoryItemMap: new Map([
+        [256,{"start":1,"end":2,"i":1}],
+        [512,{"start":1,"end":4,"i":1}],
+        [1024,{"start":2,"end":8,"i":1}],
+        [1024,{"start":2,"end":8,"i":1}],
+        [2048,{"start":4,"end":16,"i":1}],
+        [4096,{"start":8,"end":30,"i":1}],
+        [8192,{"start":16,"end":60,"i":4}],
+        [16384,{"start":32,"end":120,"i":8}]
+
+      ]),
       sourceItems: [
         {
           value: "github",
@@ -281,9 +353,23 @@ export default {
 
   computed: {
     ...mapState(["userToken", "config"]),
-    ...mapState("analysisModule", ["computeNodes"]),
+    ...mapState("analysisModule", ["computeNodes"])
+    // cpuItems() {
+    //   return Array.from(this.memoryItemMap.keys()).map(key => ({
+    //     value: key,
+    //     label: key.toString() + " CPU"
+    //   }));
+    // }
   },
-
+    watch:{
+      "application.resources.cpu": {
+      handler: function(val) {
+        const vm = this;
+        createMemoryItems(val,vm);
+      },
+      immediate: true
+    }
+    },
   mounted() {
     this.fetchComputeNodes();
   },
@@ -362,6 +448,27 @@ export default {
     },
   },
 };
+
+
+function createMemoryItems(cpu, comp) {
+  if (!cpu || !comp) return;
+
+  const memVars = comp.memoryItemMap.get(cpu);
+  if (!memVars) return;
+
+  const { start, end, i } = memVars;
+  const memoryArray = [];
+
+  if (cpu === 256) {
+    memoryArray.push({ value: 512, label: "512 MiB" });
+  }
+
+  for (let value = start; value <= end; value += i) {
+    memoryArray.push({ value, label: value.toString()+" GB" });
+  }
+
+  comp.memoryItems = memoryArray;
+}
 </script>
 
 <style scoped lang="scss">
