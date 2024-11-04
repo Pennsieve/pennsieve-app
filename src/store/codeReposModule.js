@@ -1,4 +1,8 @@
 import Cookies from "js-cookie";
+import {
+  pathOr,
+  propOr
+} from 'ramda'
 
 const initialState = () => ({
   myRepos: [],
@@ -18,7 +22,9 @@ const initialState = () => ({
   workspaceReposCount: 0,
   workspaceReposLoaded: false,
   datasetId: "",
-  activeRepo: {}
+  activeRepo: {},
+  activeRepoBannerURL: '',
+  isLoadingCodeRepoBanner: false,
 })
 
 export const state = initialState()
@@ -61,8 +67,13 @@ export const mutations = {
   },
   SET_ACTIVE_CODE_REPO(state, activeRepoId) {
     state.activeRepo = state.workspaceRepos.find(repo => repo.content.id === activeRepoId)
+  },
+  SET_CODE_REPO_BANNER_URL(state, URL) {
+    state.activeRepoBannerURL = URL;
+  },
+  SET_IS_LOADING_CODE_REPO_BANNER(state, isLoadingBanner) {
+    state.isLoadingCodeRepoBanner = isLoadingBanner
   }
-
 }
 
 export const actions = {
@@ -147,7 +158,7 @@ export const actions = {
     commit('SET_WORKSPACE_REPOS_OFFSET', offset)
   },
 
-  fetchWorkspaceRepos: async ({ commit, rootState }, { limit, offset, page }) => {
+  fetchWorkspaceRepos: async ({ commit, rootState, dispatch }, { limit, offset, page }) => {
     try {
       const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
       const apiKey = rootState.userToken || Cookies.get('user_token')
@@ -163,6 +174,7 @@ export const actions = {
         commit('SET_WORKSPACE_REPOS', workspaceRepos)
         commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
         commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
+        dispatch('fetchWorkspaceReposBanner')
       } else {
         throw new Error(response.statusText)
       }
@@ -173,10 +185,8 @@ export const actions = {
   },
   
   saveRepoSettings: async({ state, commit, rootState }, { formVal, repo }) => {
-    const { url } = repo.value.content.releases[0];
-    const { intId } = repo?.value?.content;
-    console.log('formVal', formVal)
-    const { description, givenName, isAutoPublished, tags } = repo
+    const { url } = repo.content.releases[0];
+    const { intId } = repo.content;
     const bodyToSend = {
       organization_id: rootState.activeOrganization.organization.intId,
       dataset_id: intId,
@@ -185,13 +195,6 @@ export const actions = {
       description: formVal.description,
       auto_publish: formVal.isAutoPublished,
       tags: formVal.tags,
-      // "sync": {
-      //   "banner": boolean,
-      //   "readme": boolean,
-      //   "changelog": boolean,
-      //   "license": boolean,
-      //   "contributors": boolean
-      // }
     }
     try {
       const url = `${rootState.config.api2Url}/repository/external`
@@ -249,11 +252,51 @@ export const actions = {
       console.error(err);
       throw err; 
     }
+  },
+
+  fetchBanner: async ({commit, rootState}, datasetId) => {
+    commit('SET_IS_LOADING_CODE_REPO_BANNER', true)
+    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${rootState.userToken}`
+    try {
+      const myHeaders = new Headers();
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "GET",
+        headers: myHeaders,
+      }).then((res)=> {
+        if(!res.ok) {
+          throw new Error(`${res.status}`);
+        } else {
+          return res.json()
+        }
+        }).then((res) => {
+          const bannerURL = propOr('', 'banner', res)
+          commit('SET_CODE_REPO_BANNER_URL', bannerURL)
+          commit('SET_IS_LOADING_CODE_REPO_BANNER', false)
+          return bannerURL
+        })
+      return response
+    }
+    catch (err) {
+      commit('SET_IS_LOADING_CODE_REPO_BANNER', false)
+      console.error(err);
+    }
+  },
+
+  fetchWorkspaceReposBanner: async({state, commit, dispatch}) => {
+    state.workspaceRepos.forEach(async (repo) => {
+      const url = await dispatch('fetchBanner', repo.content.id)
+      const updatedWorkspaceRepo = { ...repo, presignedBannerURL : url}
+      commit('UPDATE_WORKSPACE_REPOS', updatedWorkspaceRepo)
+    })
   }
 }
 
 export const getters = {
-  activeRepo : state => state.activeRepo
+  activeRepo : state => state.activeRepo,
+  activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
+  bannerURL : state => state.activeRepoBannerURL,
+  isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner
 }
 
 const codeReposModule = {

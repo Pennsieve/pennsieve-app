@@ -2,28 +2,28 @@
 
   <div class="dataset-banner">
     <content-loader
-      v-if="isLoadingDatasetBanner"
+      v-if="isLoadingBanner"
       class="dataset-banner-loader"
-      :height="100"
-      :width="100"
+      :height="'100%'"
+      :width="'100%'"
       :speed="2"
       primary-color="#d8d8d8"
       secondary-color="#ecebeb"
     >
-      <rect
+      <rect 
         x="0"
         y="0"
         rx="0"
         ry="0"
-        width="100"
-        height="100"
+        width="100%"
+        height="100%"
       />
     </content-loader>
 
     <template v-else>
       <img
         v-if="hasDatasetBanner"
-        :src="datasetBanner"
+        :src="datasetBannerURL"
         :alt="datasetBannerAlt"
       >
 
@@ -38,7 +38,7 @@
             alt="Upload an image"
           >
           <p class="mb-0">
-            {{ emptyStateText }}
+            Drag and drop to upload your image.
           </p>
         </div>
       </div>
@@ -47,7 +47,6 @@
 </template>
 
 <script>
-  import { mapState } from 'vuex'
   import { pathOr } from 'ramda'
   import { ContentLoader } from 'vue-content-loader'
 
@@ -59,18 +58,21 @@
     },
 
     props: {
-      emptyStateText: {
+      dataset: {
+        type: Object,
+        default: {}
+      },
+      datasetBannerURL: {
         type: String,
-        default: 'Drag and drop to upload your image.'
+        default: '',
+      },
+      isLoadingBanner: {
+        type: Boolean,
+        default: true
       }
     },
 
     computed: {
-      ...mapState([
-        'dataset',
-        'datasetBanner',
-        'isLoadingDatasetBanner'
-      ]),
 
       /**
        * Compute banner image alt text
@@ -86,7 +88,7 @@
        * @returns {Boolean}
        */
       hasDatasetBanner: function() {
-        return this.datasetBanner !== ''
+        return this.datasetBannerURL !== ''
       }
     }
   }
