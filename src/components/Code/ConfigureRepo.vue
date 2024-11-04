@@ -12,7 +12,7 @@
           @change="saveRepoConfig"
           >Automatic publication</el-checkbox
         >
-        <p>Automatically publish a version on new releases from GitHub</p>
+        <p class="hint-text">Automatically publish a version on new releases from GitHub</p>
       </el-form-item>
 
       <el-form-item>
@@ -48,13 +48,15 @@
         />
       </el-form-item>
 
-      <dataset-settings-banner-image
-      id="codeRepoBannerImage"
-      :dataset = "codeRepo"
-      :datasetBannerURL = "codeRepoBannerURL"
-      :isLoadingBanner = "isLoadingBanner"
-      :isCodeReposDataset = "true"
-    />
+      <div class="el-form-item">
+        <dataset-settings-banner-image
+          id="codeRepoBannerImage"
+          :dataset = "codeRepo"
+          :datasetBannerURL = "codeRepoBannerURL"
+          :isLoadingBanner = "isLoadingBanner"
+          :isCodeReposDataset = "true"
+        />
+      </div>
 
       <el-form-item id="inputTags">
         <template #label> Tags </template>
@@ -173,7 +175,7 @@ const removeTag = function (tag) {
 
 <style lang="scss">
 .configure-repo-wrapper {
-  .form-auto-save p {
+  .form-auto-save .hint-text {
     margin-bottom: 0px;
   }
 
@@ -193,6 +195,16 @@ const removeTag = function (tag) {
 
   #inputTags .el-input {
     margin-bottom: 16px;
+  }
+
+  .dataset-settings-banner-image {
+    h4 {
+      margin-top: 0px;
+      margin-bottom: 8px;
+    }
+    p {
+      margin-bottom: 8px;
+    }
   }
 }
 </style>
