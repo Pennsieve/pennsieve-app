@@ -360,7 +360,7 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = (application) => {
+      const formatApplication = async (application) => {
         return {
           uuid: application.uuid || "",
           applicationId: application.applicationId || "",
@@ -389,7 +389,7 @@ export default {
       };
 
       try {
-        await this.sendXhr(url, {
+        this.sendXhr(url, {
           method: "POST",
           header: {
             Authorization: `Bearer ${this.userToken}`,
