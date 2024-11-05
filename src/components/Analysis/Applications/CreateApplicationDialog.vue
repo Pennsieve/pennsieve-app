@@ -69,11 +69,6 @@
           <template #label>
             CPU <span class="label-helper"> required </span>
           </template>
-          <!-- <el-input
-            v-model="application.resources.cpu"
-            placeholder="2048"
-            autofocus
-          /> -->
           <el-select
             ref="enum"
             v-model="application.resources.cpu"
@@ -95,11 +90,6 @@
           <template #label>
             Memory <span class="label-helper"> required </span>
           </template>
-          <!-- <el-input
-            v-model="application.resources.memory"
-            placeholder="4096"
-            autofocus
-          /> -->
           <el-select
             ref="enum"
             v-model="application.resources.memory"
@@ -259,6 +249,7 @@ export default {
         }
       ],
       memoryItems:[],
+      //form memory options in GB, maps to cpu value above. Keeping unsurfaced values for future options. 
       memoryItemMap: new Map([
         [256,{"start":1,"end":2,"i":1}],
         [512,{"start":1,"end":4,"i":1}],
@@ -342,12 +333,6 @@ export default {
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeNodes"])
-    // cpuItems() {
-    //   return Array.from(this.memoryItemMap.keys()).map(key => ({
-    //     value: key,
-    //     label: key.toString() + " CPU"
-    //   }));
-    // }
   },
     watch:{
       "application.resources.cpu": {
