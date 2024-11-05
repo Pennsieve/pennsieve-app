@@ -244,19 +244,6 @@ export default {
     };
   },
   watch: {
-    // selectedFiles: {
-    //   handler(newVal, oldVal) {
-    //     console.log(
-    //       "selectedFilesForAnalysis changed from",
-    //       oldVal,
-    //       "to",
-    //       newVal
-    //     );
-    //     // Perform any additional logic when the property changes
-    //   },
-    //   deep: true, // Set to true if you want to watch for nested changes
-    //   immediate: true, // Trigger the watcher immediately with the current value
-    // },
     clearSelectedValues(newVal) {
       if (newVal) {
         this.handleCloseModal();
