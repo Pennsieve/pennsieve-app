@@ -106,7 +106,7 @@
             class="input-property"
             filterable
             autofocus
-            placeholder="Select CPU then Memory"
+            placeholder="Select CPU before Memory"
           >
             <el-option
               v-for="item in memoryItems"
@@ -242,32 +242,20 @@ export default {
       ],
       cpuItems:[
         {
-          value: 256,
-          label: ".25 vCPU",
-        },
-        {
-          value: 512,
-          label: ".5 vCPU",
-        },
-        {
           value: 1024,
-          label: "1 vCPU",
+          label: "1 CPU",
         },
         {
           value: 2048,
-          label: "2 vCPU",
+          label: "2 CPU",
         },
         {
           value: 4096,
-          label: "4 vCPU",
+          label: "4 CPU",
         },
         {
           value: 8192,
-          label: "8 vCPU",
-        },
-        {
-          value: 16384,
-          label: "16 vCPU",
+          label: "8 CPU",
         }
       ],
       memoryItems:[],
