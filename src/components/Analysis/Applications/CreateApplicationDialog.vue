@@ -69,11 +69,6 @@
           <template #label>
             CPU <span class="label-helper"> required </span>
           </template>
-          <!-- <el-input
-            v-model="application.resources.cpu"
-            placeholder="2048"
-            autofocus
-          /> -->
           <el-select
             ref="enum"
             v-model="application.resources.cpu"
@@ -95,11 +90,6 @@
           <template #label>
             Memory <span class="label-helper"> required </span>
           </template>
-          <!-- <el-input
-            v-model="application.resources.memory"
-            placeholder="4096"
-            autofocus
-          /> -->
           <el-select
             ref="enum"
             v-model="application.resources.memory"
@@ -342,12 +332,6 @@ export default {
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeNodes"])
-    // cpuItems() {
-    //   return Array.from(this.memoryItemMap.keys()).map(key => ({
-    //     value: key,
-    //     label: key.toString() + " CPU"
-    //   }));
-    // }
   },
     watch:{
       "application.resources.cpu": {
