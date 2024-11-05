@@ -249,6 +249,7 @@ export default {
         }
       ],
       memoryItems:[],
+      //form memory options in GB, maps to cpu value above. Keeping unsurfaced values for future options. 
       memoryItemMap: new Map([
         [256,{"start":1,"end":2,"i":1}],
         [512,{"start":1,"end":4,"i":1}],
