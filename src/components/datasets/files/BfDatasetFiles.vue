@@ -22,7 +22,7 @@
           >
             <template #buttons>
               <bf-button
-                v-if="isFeatureFlagEnabled"
+                :disabled="!isFeatureFlagEnabled"
                 @click="openRunAnalysisDialog"
                 class="dropdown-button"
               >
