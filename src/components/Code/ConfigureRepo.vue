@@ -12,7 +12,7 @@
           @change="saveRepoConfig"
           >Automatic publication</el-checkbox
         >
-        <p>Automatically publish a version on new releases from GitHub</p>
+        <p class="hint-text">Automatically publish a version on new releases from GitHub</p>
       </el-form-item>
 
       <el-form-item>
@@ -48,6 +48,16 @@
         />
       </el-form-item>
 
+      <div class="el-form-item">
+        <dataset-settings-banner-image
+          id="codeRepoBannerImage"
+          :dataset = "codeRepo"
+          :datasetBannerURL = "codeRepoBannerURL"
+          :isLoadingBanner = "isLoadingBanner"
+          :isCodeReposDataset = "true"
+        />
+      </div>
+
       <el-form-item id="inputTags">
         <template #label> Tags </template>
         <el-input
@@ -75,7 +85,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Ref, onMounted, ref } from "vue";
+import { Ref, onMounted, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
@@ -89,11 +99,13 @@ interface CodeRepoConfig {
 }
 
 const store = useStore();
-let route = useRoute();
+const route = useRoute();
 
-let activeRepoName = ref("");
-let inputTag = ref("");
-let repo = ref({});
+const codeRepo = computed(() => store.getters['codeReposModule/activeRepo'])
+const codeRepoBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
+const isLoadingBanner = computed(() => store.getters['codeReposModule/isLoadingCodeRepoBanner'])
+const activeRepoName = ref("");
+const inputTag = ref("");
 
 const codeRepoForm: Ref<CodeRepoConfig> = ref({
   isAutoPublished: false,
@@ -105,32 +117,29 @@ const codeRepoForm: Ref<CodeRepoConfig> = ref({
 onMounted(() => {
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
-    console.log("activeRepoId", activeRepoId);
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
+    store.dispatch('codeReposModule/fetchBanner', activeRepoId)
   }
-
-  repo.value = store.getters["codeReposModule/activeRepo"];
 
   // update initial form values from the database
   activeRepoName.value =
-    store.getters["codeReposModule/activeRepo"].content.name;
+    codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
-    store.getters["codeReposModule/activeRepo"].content.repository.autoProcess;
+    codeRepo.value.content.repository.autoProcess;
   codeRepoForm.value.givenName =
-    store.getters["codeReposModule/activeRepo"].content.name;
+    codeRepo.value.content.name;
   codeRepoForm.value.description =
-    store.getters["codeReposModule/activeRepo"].content.description;
+    codeRepo.value.content.description;
   codeRepoForm.value.tags =
-    store.getters["codeReposModule/activeRepo"].content.tags;
+    codeRepo.value.content.tags;
 });
 
 const saveRepoConfig = debounce(function () {
   try {
     store.dispatch("codeReposModule/saveRepoSettings", {
       formVal: codeRepoForm.value,
-      repo,
+      repo: codeRepo.value,
     });
-    console.log("API was called");
   } catch (err) {
     console.error(err);
   }
@@ -166,7 +175,7 @@ const removeTag = function (tag) {
 
 <style lang="scss">
 .configure-repo-wrapper {
-  .form-auto-save p {
+  .form-auto-save .hint-text {
     margin-bottom: 0px;
   }
 
@@ -186,6 +195,16 @@ const removeTag = function (tag) {
 
   #inputTags .el-input {
     margin-bottom: 16px;
+  }
+
+  .dataset-settings-banner-image {
+    h4 {
+      margin-top: 0px;
+      margin-bottom: 8px;
+    }
+    p {
+      margin-bottom: 8px;
+    }
   }
 }
 </style>

@@ -24,7 +24,10 @@
       </div>
     </bf-empty-page-state>
     <template #actions>
-      <bf-button @click="openCreateComputeNodeDialog">
+      <bf-button
+        :disabled="!hasAdminRight && !isFeatureFlagEnabled"
+        @click="openCreateComputeNodeDialog"
+      >
         Create Compute Node
       </bf-button>
     </template>
@@ -97,6 +100,23 @@ export default {
     },
     showEmptyState: function () {
       return this.computeNodesLoaded && !this.computeNodes.length;
+    },
+    hasAdminRights: function () {
+      if (this.activeOrganization) {
+        const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
+        const isOwner = propOr(false, "isOwner", this.activeOrganization);
+        return isAdmin || isOwner;
+      } else {
+        return false;
+      }
+    },
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
     },
   },
 

@@ -345,7 +345,11 @@ export default {
      * Run Analysis Workflow on Selected Files
      */
     runAnalysis: function () {
-      const url = `${this.config.api2Url}/workflows/instances`;
+      console.log("this.config", this.config.environment === "dev");
+      const url =
+        this.config.environment === "dev"
+          ? `${this.config.api2Url}/workflows`
+          : `${this.config.api2Url}/workflows/instances`;
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(

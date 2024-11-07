@@ -2,7 +2,7 @@
   <bf-stage element-loading-background="transparent">
     <template #actions>
       <bf-button
-        v-if="hasAdminRights && isFeatureFlagEnabled()"
+        :disabled="!hasAdminRights && !isFeatureFlagEnabled"
         @click="openCreateApplicationDialog"
       >
         Create Application
@@ -115,13 +115,22 @@ export default {
     ...mapState(["activeOrganization", "userToken", "config"]),
     ...mapState("analysisModule", ["applications"]),
 
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
+    },
+
     hasAdminRights: function () {
       if (this.activeOrganization) {
         const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
         const isOwner = propOr(false, "isOwner", this.activeOrganization);
         return isAdmin || isOwner;
       } else {
-        return null;
+        return false;
       }
     },
 
@@ -137,15 +146,6 @@ export default {
       "deleteApplication",
       "editApplication",
     ]),
-
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
 
     /**
      * Methods to open/close modals
