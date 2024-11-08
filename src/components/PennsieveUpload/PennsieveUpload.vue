@@ -32,14 +32,6 @@ User archives manifest -> remove activeManifest from memory
         <bf-dialog-header :title="dialogTitle" />
       </template>
 
-      <p class="upload-text">
-        <b>Note:</b> Files can take up to a minute of processing after upload
-        completes. You can check import status of files in the
-        <router-link :to="{ name: 'upload-manifests' }" @click="onClose">
-          upload manifest tracker.</router-link
-        >
-      </p>
-
       <div class="clear-action-wrapper">
         <div class="clear-action" @click="clearQueue">Clear</div>
       </div>

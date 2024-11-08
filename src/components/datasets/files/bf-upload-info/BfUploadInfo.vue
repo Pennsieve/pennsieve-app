@@ -19,6 +19,15 @@
           of {{ totalStr }}
         </div>
       </div>
+      <div class="hint-info">
+        <p class="upload-text">
+        <b>Note:</b> Files can take up to a minute of processing after upload
+        completes. You can check import status of files in the
+        <router-link :to="{ name: 'upload-manifests', params : { datasetId : getUploadingDatasetId } }">
+          upload manifest tracker.</router-link
+        >
+      </p>
+      </div>
     </div>
   </transition>
 </template>
@@ -49,6 +58,7 @@ export default {
       "getIsUploading",
       "getUploadMap",
       "getUploadComplete",
+      "getUploadingDatasetId"
     ]),
 
     /**
@@ -102,7 +112,7 @@ export default {
   font-size: 13px;
   margin-left: -240px;
   left: 50%;
-  padding: 8px 16px;
+  padding: 8px;
   position: absolute;
   top: 8px;
   width: 480px;
@@ -125,5 +135,9 @@ button {
 .show-details {
   flex: 1;
   text-align: left;
+}
+
+.hint-info {
+  margin-top: 8px;
 }
 </style>

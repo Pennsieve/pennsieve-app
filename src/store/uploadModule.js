@@ -32,7 +32,8 @@ const initialState = () => ({
     isUploading: false,
     uploadComplete: false,
     uploadProgress: {total: 0, loaded:0},
-    currentTargetPackage: {}
+    currentTargetPackage: {},
+    uploadingDatasetId: ''
 })
 
 export const state = initialState()
@@ -128,6 +129,10 @@ export const mutations = {
         state.uploadDestination = ''
         state.isUploading = false
         state.uploadComplete = false
+        state.uploadingDatasetId = ''
+    },
+    SET_UPLOADING_DATASET_ID(state, datasetId) {
+      state.uploadingDatasetId = datasetId
     }
 }
 
@@ -276,6 +281,7 @@ export const actions = {
 
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
+        commit('SET_UPLOADING_DATASET_ID', datasetId)
 
         if (state.manifestNodeId.length > 0 && datasetId===state.savedDatasetId) {
             return state.manifestNodeId
@@ -502,6 +508,9 @@ export const getters = {
     },
     showUploadInfo(state) {
       return state.isUploading || state.uploadComplete
+    },
+    getUploadingDatasetId(state) {
+      return state.uploadingDatasetId
     }
 }
 
