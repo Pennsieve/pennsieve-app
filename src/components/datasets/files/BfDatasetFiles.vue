@@ -185,8 +185,6 @@
       v-model:show-drop-info="showDropInfo"
       :file="file"
     />
-
-    <bf-upload-info v-if="showUploadInfo" />
   </bf-stage>
 </template>
 
@@ -330,13 +328,8 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
     ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
-
-    showUploadInfo: function () {
-      return this.getUploadComplete() || this.getIsUploading();
-    },
     /**
      * Feature Flag for Run Analysis Flow
      *

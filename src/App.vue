@@ -42,6 +42,7 @@ let route = useRoute();
     v-model:dialogVisible="showUploadDialog"
   />
 
+  <bf-upload-info v-if="showUploadInfo" />
   <PsAnalytics />
 
   <bf-download-file ref="downloadFile" />
@@ -193,6 +194,7 @@ export default {
       "hasOrcidOnboardingEvent",
       "isOrgSynced",
     ]),
+    ...mapGetters("uploadModule", ["showUploadInfo"]),
     ...mapState("datasetModule", ["datasetSearchParams"]),
     sessionTokenMessage: function () {
       if (this.sessionTimedOut) {

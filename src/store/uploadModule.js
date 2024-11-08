@@ -499,6 +499,9 @@ export const getters = {
     },
     getUploadProgress: state => () => {
         return state.uploadProgress
+    },
+    showUploadInfo(state) {
+      return state.isUploading || state.uploadComplete
     }
 }
 

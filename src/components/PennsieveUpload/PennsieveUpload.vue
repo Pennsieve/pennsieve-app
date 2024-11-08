@@ -35,9 +35,7 @@ User archives manifest -> remove activeManifest from memory
       <p class="upload-text">
         <b>Note:</b> Files can take up to a minute of processing after upload
         completes. You can check import status of files in the
-        <!-- Can remove the native event modifier on the click event below, all native events to custom elements are now captured by default. 
-        This is deprecated since Vue3 and can be removed. -->
-        <router-link :to="{ name: 'upload-manifests' }" @click.native="onClose">
+        <router-link :to="{ name: 'upload-manifests' }" @click="onClose">
           upload manifest tracker.</router-link
         >
       </p>
