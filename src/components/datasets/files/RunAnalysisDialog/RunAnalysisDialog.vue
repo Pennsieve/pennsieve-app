@@ -366,7 +366,7 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = async (application) => {
+      const formatApplication = (application) => {
         return {
           uuid: application.uuid || "",
           applicationId: application.applicationId || "",
@@ -385,9 +385,9 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         workflow: [
-          this.selectedPreprocessor,
-          this.selectedProcessor,
-          this.selectedPostprocessor,
+          formatApplication(this.selectedPreprocessor),
+          formatApplication(this.selectedProcessor),
+          formatApplication(this.selectedPostprocessor),
         ],
         params: {
           target_path: this.targetDirectory,
