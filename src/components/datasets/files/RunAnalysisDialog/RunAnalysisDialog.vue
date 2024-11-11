@@ -345,7 +345,9 @@ export default {
      * Run Analysis Workflow on Selected Files
      */
     runAnalysis: function () {
-      console.log("this.config", this.config.environment === "dev");
+      console.log("this.selectedPreprocessor", this.selectedPreprocessor);
+      console.log("this.selectedProcessor", this.selectedProcessor);
+      console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url =
         this.config.environment === "dev"
           ? `${this.config.api2Url}/workflows`
@@ -383,9 +385,9 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         workflow: [
-          formatApplication(this.selectedPreprocessor),
-          formatApplication(this.selectedProcessor),
-          formatApplication(this.selectedPostprocessor),
+          this.selectedPreprocessor,
+          this.selectedProcessor,
+          this.selectedPostprocessor,
         ],
         params: {
           target_path: this.targetDirectory,
