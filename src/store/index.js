@@ -857,7 +857,15 @@ export const getters = {
     return R.defaultTo({}, R.find(R.propEq("id", id), state.orgMembers));
   },
   getOrgMemberByIntId: (state) => (id) => {
-    return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+    for (let i = 0; i < state.orgMembers; i++) {
+     if (state.orgMembers[i].intId === id ) {
+       return state.orgMembers[i]
+     }
+    }
+    return null
+
+
+    // return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
   },
   getOrgMembersById: (state) => (list) => {
     return state.orgMembers.filter((member) => list.includes(member.id));
@@ -923,11 +931,17 @@ export const getters = {
           R.defaultTo({}),
           R.find(R.propEq("id", datasetId))
       )(state.consortiumDatasetsImporting),
-  getOrganizationByIntId: (state) => (id) =>
-      R.compose(
-          R.defaultTo({}),
-          find(R.pathEq(["organization", "intId"], id))
-      )(state.organizations),
+  getOrganizationByIntId: (state) => (id) => {
+    console.log(state.organizations)
+    for (let i = 0; i < state.organizations; i++) {
+      console.log(id)
+      if (state.organizations[i].organization.intId === id ) {
+        return state.organizations[i]
+      }
+    }
+    return {}
+
+  },
   getRelationshipTypes: (state) => () => state.relationshipTypes,
   getRelationshipTypeByName: (state) => (name) => {
     return R.compose(

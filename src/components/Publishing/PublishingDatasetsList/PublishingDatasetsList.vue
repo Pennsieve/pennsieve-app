@@ -129,6 +129,7 @@ import toQueryParams from '../../../utils/toQueryParams.js'
 import { PublicationStatus} from '../../../utils/constants'
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'PublishingDatasetsList',
@@ -220,18 +221,19 @@ export default {
      * @return {String}
      */
     getDatasetsUrl: function() {
-      const queryParams = toQueryParams({
-        publicationStatus: this.publicationStatus,
-        publicationType: this.publicationType,
-        api_key: this.userToken,
-        includeBannerUrl: true,
-        includePublishStatus: true,
-        ...this.datasetSearchParams
-      })
+      useGetToken().then(token => {
+        const queryParams = toQueryParams({
+          publicationStatus: this.publicationStatus,
+          publicationType: this.publicationType,
+          api_key: token,
+          includeBannerUrl: true,
+          includePublishStatus: true,
+          ...this.datasetSearchParams
+        })
 
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/paginated?${queryParams}`
-        : ''
+        return `${this.config.apiUrl}/datasets/paginated?${queryParams}`
+
+      })
     },
 
     hasDatasets: function() {

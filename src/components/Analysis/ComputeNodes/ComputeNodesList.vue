@@ -97,6 +97,7 @@ export default {
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
     ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
 
+
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },

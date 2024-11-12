@@ -61,7 +61,7 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { setPageTitle, setMeta } from "./utils/meta";
 
 import globalMessageHandler from "./mixins/global-message-handler";
-import { mergeDeepLeft, pathOr, propOr } from "ramda";
+import {mergeDeepLeft, mergeDeepRight, pathOr, propOr} from "ramda";
 import EventBus from "./utils/event-bus";
 import Cookies from "js-cookie";
 import toQueryParams from "./utils/toQueryParams.js";
@@ -101,7 +101,6 @@ export default {
     };
   },
   async mounted() {
-
     setTimeout(() => {
       if (window.location.href.includes("?redirectTo=")) {
         EventBus.$emit("redirect-detected");
@@ -114,13 +113,6 @@ export default {
     );
     EventBus.$on("reload-datasets", this.fetchDatasets);
 
-    // const token = useGetToken()
-
-
-    // if (!token) {
-    //   setPageTitle(this.defaultPageTitle);
-    //   setMeta("name", "description", this.defaultPageDescription);
-    // }
   },
   watch: {
     "$route.params.orgId": {
@@ -148,45 +140,45 @@ export default {
     /**
      * Trigger API request when active organization is changed
      */
-    activeOrganization: {
-      handler: async function (val, oldVal) {
-        const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
-        const newOrgId = pathOr("NONE", ["organization", "id"], val);
-
-        // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
-        if (oldOrgId !== newOrgId && newOrgId !== "NONE") {
-          try {
-            useGetToken().then(() => {
-              this.setActiveOrgSynced()
-                .then(() => this.fetchDatasets())
-                .then(() => this.fetchDatasetPublishedData())
-                .then(() => this.fetchCollections())
-                .then(() => this.fetchIntegrations())
-                .then(() => this.fetchDatasetStatuses())
-                .then(() => this.fetchComputeNodes())
-                .then(() => this.fetchApplications());
-            })
-
-          } catch (err) {
-            console.error(err);
-          }
-        }
-      },
-      immediate: true,
-    },
-    /**
-     * Watch getDatasetsUrl and get datasets
-     * Used for dataset search
-     */
-    getDatasetsUrl: {
-      handler: async function (newVal, oldVal) {
-        if ( newVal !== oldVal && this.isOrgSynced) {
-          this.fetchDatasets();
-        }
-
-      },
-      deep: true,
-    },
+    // activeOrganization: {
+    //   handler: async function (val, oldVal) {
+    //     const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
+    //     const newOrgId = pathOr("NONE", ["organization", "id"], val);
+    //
+    //     // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
+    //     if (oldOrgId !== newOrgId && newOrgId !== "NONE") {
+    //       try {
+    //         useGetToken().then(() => {
+    //           this.setActiveOrgSynced()
+    //             .then(() => this.fetchDatasets())
+    //             .then(() => this.fetchDatasetPublishedData())
+    //             .then(() => this.fetchCollections())
+    //             .then(() => this.fetchIntegrations())
+    //             .then(() => this.fetchDatasetStatuses())
+    //             .then(() => this.fetchComputeNodes())
+    //             .then(() => this.fetchApplications());
+    //         })
+    //
+    //       } catch (err) {
+    //         console.error(err);
+    //       }
+    //     }
+    //   },
+    //   immediate: true,
+    // },
+    // /**
+    //  * Watch getDatasetsUrl and get datasets
+    //  * Used for dataset search
+    //  */
+    // getDatasetsUrl: {
+    //   handler: async function (newVal, oldVal) {
+    //     if ( newVal !== oldVal && this.isOrgSynced) {
+    //       this.fetchDatasets();
+    //     }
+    //
+    //   },
+    //   deep: true,
+    // },
   },
 
   computed: {
@@ -235,38 +227,9 @@ export default {
       );
     },
 
-    /**
-     * Compute get datasets URL
-     * @return {String}
-     */
-    getDatasetsUrl: async function () {
-
-      return useGetToken().then((t) => {
-        const params = toQueryParams(
-          mergeDeepLeft(this.datasetSearchParams, { api_key: t })
-        );
-        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-      })
-
-    },
-
-    /**
-     * Get all status options for organization url
-     * @returns {String}
-     */
-    getDatasetStatusUrl: async function () {
-
-      return useGetToken().then((token) => {
-        const orgId = pathOr(
-          "",
-          ["organization", "id"],
-          this.activeOrganization
-        )
-        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${token}`;
 
 
-      })
-    },
+
   },
 
   methods: {
@@ -295,6 +258,37 @@ export default {
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
     callGlobalCustomEvent() {
       EventBus.$emit("redirect-detected");
+    },
+
+    /**
+     * Compute get datasets URL
+     * @return {String}
+     */
+    getDatasetsUrl: async function () {
+      return useGetToken().then((t) => {
+        const params = toQueryParams(
+          mergeDeepRight(this.datasetSearchParams, { api_key: t })
+        );
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
+      })
+
+    },
+    /**
+     * Get all status options for organization url
+     * @returns {String}
+     */
+    getDatasetStatusUrl: async function () {
+
+      return useGetToken().then((token) => {
+        const orgId = pathOr(
+          "",
+          ["organization", "id"],
+          this.activeOrganization
+        )
+        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${token}`;
+
+
+      })
     },
 
     onRefreshToken: function () {
@@ -327,29 +321,29 @@ export default {
      */
     bootUp: async function (userToken, fromLogin = false) {
 
-      const { username, userId, signInDetails } = await getCurrentUser()
-
-      this.updateCognitoUser(signInDetails);
-
-
-    //   // If bootup is called from Login, only get Profile and org as login
-    //   // will re-trigger bootup when it updates the route to the correct org.
-      if (fromLogin) {
-        // Indicate that we are no longer timed out.
-        this.sessionTimedOut = false;
-
-        return this.getBfTermsOfService().then(() =>
-          this.getProfileAndOrg(userToken)
-        );
-      } else {
-        return this.getBfTermsOfService()
-          .then(() => this.getProfileAndOrg(userToken))
-          .then(() => this.getPrimaryData(userToken))
-          .then(() => {
-            this.setActiveOrgSynced();
-          })
-          .then(() => this.getOnboardingEventStates(userToken));
-      }
+    //   const { username, userId, signInDetails } = await getCurrentUser()
+    //
+    //   this.updateCognitoUser(signInDetails);
+    //
+    //
+    // //   // If bootup is called from Login, only get Profile and org as login
+    // //   // will re-trigger bootup when it updates the route to the correct org.
+    //   if (fromLogin) {
+    //     // Indicate that we are no longer timed out.
+    //     this.sessionTimedOut = false;
+    //
+    //     // return this.getBfTermsOfService().then(() =>
+    //     //   this.getProfileAndOrg(userToken)
+    //     // );
+    //   } else {
+    //     return this.getBfTermsOfService()
+    //       // .then(() => this.getProfileAndOrg(userToken))
+    //       // .then(() => this.getPrimaryData(userToken))
+    //       .then(() => {
+    //         this.setActiveOrgSynced();
+    //       })
+    //       .then(() => this.getOnboardingEventStates(userToken));
+    //   }
     },
 
     beforeUnmount: function () {

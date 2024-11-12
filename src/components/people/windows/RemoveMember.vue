@@ -43,6 +43,7 @@ import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
 import EventBus from '../../../utils/event-bus'
 import { propOr } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'RemoveMember',
@@ -114,44 +115,50 @@ export default {
     /**
      * Creates DELETE url to remove member from org
      */
-    createUrl: function() {
+    createUrl: async function() {
       const orgId = this.activeOrganization.organization.id;
-      const userToken = this.userToken;
       const apiUrl = this.config.apiUrl;
-      let endpoint = `${apiUrl}/organizations/${orgId}/members/${this.member.id}?api_key=${userToken}`;
 
-      if (this.member.validUntil) {
-        endpoint = `${apiUrl}/organizations/${orgId}/invites/${this.member.id}?api_key=${userToken}`;
-      }
-      return endpoint
+      return useGetToken().then(token => {
+        let endpoint = `${apiUrl}/organizations/${orgId}/members/${this.member.id}?api_key=${token}`;
+
+        if (this.member.validUntil) {
+          endpoint = `${apiUrl}/organizations/${orgId}/invites/${this.member.id}?api_key=${token}`;
+        }
+        return endpoint
+      })
+
     },
     /**
      * Makes XHR call to remove member from org
      */
     removeMember: function() {
-      fetch(this.createUrl(), {
-        method: 'DELETE',
-        headers: {
-          'Content-type': 'application/json'
-        }
-      })
-      .then(() => {
-        this.$emit('member-removed', this.member)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: `${this.memberDisplayName} removed from ${this.activeOrganization.organization.name}`
+      this.createUrl().then(url => {
+        fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-type': 'application/json'
           }
         })
-        this.closeDialog()
+          .then(() => {
+            this.$emit('member-removed', this.member)
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'success',
+                msg: `${this.memberDisplayName} removed from ${this.activeOrganization.organization.name}`
+              }
+            })
+            this.closeDialog()
+          })
+          .catch(() => {
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'ERROR'
+              }
+            })
+          })
       })
-      .catch(() => {
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'ERROR'
-          }
-        })
-      })
+
 
     }
   }

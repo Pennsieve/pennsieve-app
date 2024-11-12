@@ -97,7 +97,7 @@ export default {
   },
 
   computed: {
-    ...mapState(["profile", "userToken", "userDisplayName"]),
+    ...mapState(["profile", "userDisplayName"]),
 
     btnMobileSearchIcon() {
       return this.isMobileSearchOpen ? "icon-remove" : "icon-magnifying-glass";

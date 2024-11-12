@@ -6,7 +6,7 @@
     :show-close="false"
     @close="closeDialog"
   >
-    <template #title>
+    <template #header>
       <bf-dialog-header
         title="Remove relationships"
       />

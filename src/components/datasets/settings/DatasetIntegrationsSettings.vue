@@ -77,6 +77,7 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr, propOr } from "ramda";
 import IntegrationsListItem from "../../Integrations/IntegrationsListItem/IntegrationsListItem.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "DatasetIntegrationsSettings",
@@ -254,19 +255,22 @@ export default {
           // Set loading state
           this.isLoadingIntegrations = true;
 
-          this.sendXhr(url, {
-            header: {
-              Authorization: `Bearer ${this.userToken}`,
-            },
-          })
-            .then((response) => {
-              this.activeIntegrations = response;
+          useGetToken().then(token => {
+            this.sendXhr(url, {
+              header: {
+                Authorization: `Bearer ${token}`,
+              },
             })
-            .catch(this.handleXhrError.bind(this))
-            .finally(() => {
-              // Set loading state
-              this.isLoadingIntegrations = false;
-            });
+              .then((response) => {
+                this.activeIntegrations = response;
+              })
+              .catch(this.handleXhrError.bind(this))
+              .finally(() => {
+                // Set loading state
+                this.isLoadingIntegrations = false;
+              });
+          })
+
         }
       },
       deep: true,
@@ -303,23 +307,28 @@ export default {
     ...mapActions(["updateProfile"]),
 
     toggleIntegration: function (item) {
-      const url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/webhook/${item.integration.id}`;
-
       let method = "PUT";
       if (!item.isActive) {
         method = "DELETE";
       }
 
-      this.sendXhr(url, {
-        method: method,
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
+      useGetToken().then(token => {
+        const url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/webhook/${item.integration.id}`;
+        this.sendXhr(url, {
+          method: method,
+          header: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+          .catch(this.handleXhrError.bind(this))
+          .finally(() => {});
+
       })
-        // .then(response => {
-        // })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {});
+
+
+
+
+
     },
 
     /**
