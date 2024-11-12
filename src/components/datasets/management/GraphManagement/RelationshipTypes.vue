@@ -262,7 +262,6 @@
         'dataset',
         'concepts',
         'config',
-        'userToken',
         'relationshipTypes',
         'isLoadingRelationshipTypes'
       ]),
@@ -386,10 +385,8 @@
     },
 
     mounted: function() {
-      const token = Cookies.get('user_token')
-      if (token) {
-        this.fetchModels()
-      }
+      this.fetchModels()
+
 
       // this.getRelationshipTypes().then(() => {
       //   this.setupRelationshipTypes.bind(this)

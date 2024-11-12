@@ -94,7 +94,7 @@ export default {
       'shouldOpenOfficeFile',
     ]),
 
-    ...mapGetters(['userToken', 'config']),
+    ...mapGetters([ 'config']),
 
     /**
      * Computed property to generate endpoint url to retrieve

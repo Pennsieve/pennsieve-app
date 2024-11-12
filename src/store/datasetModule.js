@@ -1,10 +1,10 @@
-import Cookies from 'js-cookie'
 import moment from 'moment'
 
 import { DATASET_ACTIVITY_ALL_CATEGORIES, DATASET_ACTIVITY_ALL_CONTRIBUTORS, DATASET_ACTIVITY_DATE_RANGE_2_YEAR } from '../utils/constants'
 import toQueryParams from '../utils/toQueryParams.js'
 import EventBus from '../utils/event-bus'
 import router from '../router'
+import {useGetToken} from "@/composables/useGetToken";
 
 /**
  * Converts the days to a date range
@@ -273,7 +273,8 @@ export const actions = {
     const datasetId = router.currentRoute.value.params.datasetId
     const endpoint = `${rootState.config.api2Url}/manifest`
 
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
+
     const queryParams = getManifestQueryParams(state.datasetManifestParams, datasetId)
 
     const url = `${endpoint}?${queryParams}`
@@ -304,7 +305,8 @@ export const actions = {
     const datasetId = router.currentRoute.value.params.datasetId
     const endpoint = `${rootState.config.apiUrl}/datasets/${datasetId}/changelog/timeline`
 
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
+
     const queryParams = getQueryParams(state.datasetActivityParams, apiKey)
 
     const url = `${endpoint}?${queryParams}`
@@ -348,21 +350,22 @@ export const actions = {
 
       const url = `${endpoint}?${queryParams}`
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${rootState.userToken}`
-        }
-      })
+      useGetToken()
+        .then(token => {
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }})
+              .then(resp => {
+                resp.json()
+                    .then(json => {
+                      commit('ADD_MANIFEST_NOTIFICATION', manifestNotification)
+                    })
+              }).catch(err => console.log(err))
 
-      if (resp.ok) {
-        const manifestNotification = await resp.json()
-        console.log(manifestNotification)
-        commit('ADD_MANIFEST_NOTIFICATION', manifestNotification)
-      } else {
-        return Promise.reject(resp)
-      }
+        })
     } catch (err) {
       return Promise.reject(err)
     }

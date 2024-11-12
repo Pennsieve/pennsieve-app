@@ -218,16 +218,15 @@ export default {
     ]),
 
     ...mapState([
-      "profile",
-      "dataset",
-      "datasetRole",
-      "datasetDoi",
-      "datasetContributors",
-      "datasetDescription",
-      "isDatasetOwner",
-      "datasetBanner",
-      "config",
-      "userToken",
+      'profile',
+      'dataset',
+      'datasetRole',
+      'datasetDoi',
+      'datasetContributors',
+      'datasetDescription',
+      'isDatasetOwner',
+      'datasetBanner',
+      'config',
     ]),
 
     /**

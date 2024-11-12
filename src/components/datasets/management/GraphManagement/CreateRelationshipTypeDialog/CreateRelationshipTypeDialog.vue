@@ -224,7 +224,6 @@
 
       ...mapState([
         'concepts',
-        'userToken'
       ]),
 
       /**

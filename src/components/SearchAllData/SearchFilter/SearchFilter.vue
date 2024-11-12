@@ -273,7 +273,6 @@ export default {
     ...mapState([
       'activeOrganization',
       'config',
-      'userToken'
     ]),
     ...mapState('metadataModule',[
       'filterParams'

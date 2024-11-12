@@ -158,6 +158,8 @@
     computed: {
       ...mapState([
         'config',
+        'dataset',
+        'datasetBanner'
         'userToken',
       ]),
 
@@ -206,7 +208,7 @@
       ...mapActions([
         'setDatasetBanner'
       ]),
-      
+
       ...mapMutations({
         setCodeRepoDatasetBanner: 'codeReposModule/SET_CODE_REPO_BANNER_URL'
       }),

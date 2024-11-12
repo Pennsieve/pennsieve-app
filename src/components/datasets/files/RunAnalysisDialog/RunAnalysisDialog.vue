@@ -118,6 +118,7 @@ import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "RunAnalysisDialog",
@@ -181,7 +182,7 @@ export default {
       "selectedFilesForAnalysis",
       "fileCount",
     ]),
-    ...mapGetters(["userToken", "config"]),
+    ...mapGetters(["config"]),
 
     fileId() {
       return pathOr(
@@ -245,25 +246,31 @@ export default {
      * Get files URL for dataset
      * @returns {String}
      */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl = "datasets";
-        const id = this.datasetId;
+    getFilesUrl: async function () {
+      return useGetToken()
+        .then((token) => {
+          const baseUrl = "datasets";
+          const id = this.datasetId;
+          return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
 
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
+        })
+
     },
     /**
      * Send API request to get files for item
      */
     fetchFiles: function () {
-      this.sendXhr(this.getFilesUrl())
-        .then((response) => {
-          this.files = [...response.children];
+      this.getFilesUrl()
+        .then((url) => {
+          this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
+            })
         })
         .catch((response) => {
           this.handleXhrError(response);
         });
+
     },
     /**
      * Handler for clicking file

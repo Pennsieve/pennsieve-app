@@ -148,7 +148,6 @@ export default {
     ]),
 
     ...mapGetters([
-      'userToken',
       'config'
     ]),
 

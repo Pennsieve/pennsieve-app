@@ -73,7 +73,6 @@ export default {
       'activeOrganization',
       'config',
       'dataUseAgreements',
-      'userToken'
     ]),
 
     /**

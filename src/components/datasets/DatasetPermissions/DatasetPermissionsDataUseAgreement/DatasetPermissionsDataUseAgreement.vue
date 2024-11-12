@@ -53,7 +53,6 @@ export default {
       'config',
       'dataset',
       'dataUseAgreements',
-      'userToken'
     ])
   },
 

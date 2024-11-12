@@ -64,7 +64,6 @@ export default {
     ]),
     ...mapState([
       'dataset',
-      'userToken',
       'config'
     ])
   },

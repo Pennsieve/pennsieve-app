@@ -7,36 +7,24 @@ import striptags from 'striptags';
 import Cookies from 'js-cookie'
 import * as siteConfig from '@/site-config/site.json'
 import { VueReCaptcha } from 'vue-recaptcha-v3'
-import Amplify from '@aws-amplify/core'
 import AWSConfig from './utils/aws-exports.js'
 import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
-import request from './mixins/request'
-
-
-// This does not work correctly with Vite:
-// import Vue3Sanitize from "vue-3-sanitize";
-
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
+import { Amplify } from "aws-amplify"
 import 'element-plus/es/components/message/style/index';
+import { defaultStorage } from 'aws-amplify/utils';
+import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
+import {fetchAuthSession} from "aws-amplify/auth";
 
-//
-//
+cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
+
 Amplify.configure(AWSConfig)
 
-// Enabling this will log debug messages to the console.
-// Pusher.logToConsole = true;
 
-// const pusher = new Pusher(siteConfig.pusherConfig.appId, {
-//     cluster: siteConfig.pusherConfig.region
-// });
-
-// var channel = pusher.subscribe('dataset-d5d316ca-ae61-4633-bb0c-39a6dec18407');
-// channel.bind('upload-event', function(data) {
-// });
 
 const app = createApp(App)
 
@@ -91,9 +79,9 @@ const topLevelRoutes = [
 
 // Users should be able to access the following routes without authentication
 const allowList = [
-    'home',
     'password',
     'welcome',
+    'login',
     'setup-profile',
     'setup-profile-accept',
     'complete-profile-accept',
@@ -101,12 +89,23 @@ const allowList = [
     'welcome-to-pennsieve',
     'docs-login',
     'jupyter-login',
-    'create-account']
+    'create-account'
+]
 
-router.beforeEach((to, from, next) => {
-    // ensure user is authorized to use the app
+router.beforeEach(async (to, from, next) => {
 
-    const token = Cookies.get('user_token')
+
+    // Get token from Amplify -- don't use useGetToken as there are cases
+    // where we want to not re-direct even if no token is available
+    const session = await fetchAuthSession();
+    const token = session?.tokens?.accessToken.toString();
+
+    // If there is no token and route is not on the un-authenticated list --> redirect to discover app
+    if (!token && !(allowList.indexOf(to.name) >= 0)) {
+        window.location.replace(siteConfig.discoverAppUrl)
+    }
+
+
     const savedOrgId = Cookies.get('preferred_org_id')
 
     if (to.name === 'home' && token && savedOrgId) {
@@ -119,59 +118,17 @@ router.beforeEach((to, from, next) => {
 
         next()
     } else {
-        // Requires Authenticated Access
+        next()
 
-        const stateToken = store.state.userToken
 
-        // Store usertoken in Vuex
-        if (token && !stateToken) {
-            store.dispatch('updateUserToken', token)
-        }
-
-        if (!token) {
-            // Not authenticated --> Route to login with optional redirect after login.
-            const destination = to.fullPath
-            if (destination && destination.name !== 'page-not-found') {
-                next(`/?redirectTo=${destination}`)
-            } else {
-                next('/')
-            }
-        } else {
-            // Is Authenticated --> Route to destination, or Dataset Overview if route is login route.
-
-            // Check for session time-out and refresh token if within refresh threshold
-            const sessionT = store.state.sessionTimer
-
-            if (!store.state.isRefreshing && sessionT && sessionT < sessionRefreshThreshold) {
-                const usr = store.state.cognitoUser
-                if (usr) {
-                    const currentSession = usr.signInUserSession;
-                    if (currentSession) {
-                        store.dispatch('setIsRefreshing', true)
-
-                        usr.refreshSession(usr.signInUserSession.refreshToken, async (err, session) => {
-                            const timeOut = session.accessToken.payload.exp
-                            await store.dispatch('setSessionTimer', Math.round((timeOut * 1000 - Date.now()) / 1000))
-                            await store.dispatch('updateUserToken', session.accessToken.jwtToken)
-                                .then(() => store.dispatch('setIsRefreshing', false))
-
-                        })
-                    }
-                }
-            }
-
-            next()
-
-        }
     }
 })
 
 router.beforeResolve(async to => {
     const destination = to.fullPath
 
-    if (destination.name != 'home' &&
-        allowList.indexOf(to.name) < 0 &&
-        !store.state.activeOrgSynced && store.state.userToken) {
+    if (destination.name !== 'home' &&
+        allowList.indexOf(to.name) < 0 && !store.state.activeOrgSynced) {
         // Org is not synced yet --> Sync org and get org assets.
 
         // TODO: Need to sync Workspace and get Workspace assets here

@@ -166,7 +166,6 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config',
         'dataset'
       ]),

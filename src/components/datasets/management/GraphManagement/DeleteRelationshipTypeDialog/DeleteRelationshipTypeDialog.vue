@@ -117,9 +117,7 @@ export default {
   },
 
   computed: {
-    ...mapState([
-      'userToken'
-    ]),
+
 
     disabled: function() {
       return this.form.checkBoxes.length === 0

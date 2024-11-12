@@ -410,7 +410,6 @@ export default {
   },
 
   methods: {
-    ...mapGetters(['userToken']),
     ...mapActions(['updateProfile']),
     ...mapState([
       'profile',

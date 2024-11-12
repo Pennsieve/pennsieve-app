@@ -1,5 +1,6 @@
 import {defaultTo, propEq, find, propOr} from 'ramda'
 import Cookies from "js-cookie";
+import {useGetToken} from "@/composables/useGetToken";
 
 const sortRepositories = (repositories) => {
   return repositories.sort((a, b) => a.displayName.localeCompare(b.name, 'en', { numeric: true}))
@@ -110,7 +111,8 @@ export const actions = {
   fetchPublishingInfo: async({ commit, rootState }) => {
     try {
       let url = `${rootState.config.api2Url}/publishing/info`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const apiKey = await useGetToken()
+
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
       myHeaders.append('Accept', 'application/json')
@@ -137,7 +139,7 @@ export const actions = {
   fetchRepositories: async({ commit, rootState }) => {
     try {
       let url = `${rootState.config.api2Url}/publishing/repositories`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const apiKey = await useGetToken()
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
       myHeaders.append('Accept', 'application/json')
@@ -166,7 +168,7 @@ export const actions = {
   fetchProposals: async({ commit, rootState }) => {
     try {
       let url = `${rootState.config.api2Url}/publishing/proposal`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const apiKey = await useGetToken()
       const myHeaders = new Headers();
       myHeaders.append('Authorization', 'Bearer ' + apiKey)
       myHeaders.append('Accept', 'application/json')
@@ -190,7 +192,7 @@ export const actions = {
   storeNewProposal: async({commit, rootState, state}, proposal) => {
     // call: POST /publishing/proposal
     let url = `${rootState.config.api2Url}/publishing/proposal`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -218,7 +220,7 @@ export const actions = {
   storeChangedProposal: async({commit, rootState, state}, proposal) => {
     // call: PUT /publishing/proposal
     let url = `${rootState.config.api2Url}/publishing/proposal`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -244,7 +246,7 @@ export const actions = {
   },
   removeProposal: async({commit, rootState, state}, proposal) => {
     let url = `${rootState.config.api2Url}/publishing/proposal?proposal_node_id=${proposal.nodeId}`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -262,7 +264,7 @@ export const actions = {
   },
   submitProposal: async({commit, rootState, state}, proposal) => {
     let url = `${rootState.config.api2Url}/publishing/proposal/submit?node_id=${proposal.nodeId}`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -286,7 +288,7 @@ export const actions = {
   },
   withdrawProposal: async({commit, rootState, state}, proposal) => {
     let url = `${rootState.config.api2Url}/publishing/proposal/withdraw?node_id=${proposal.nodeId}`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -310,7 +312,7 @@ export const actions = {
   },
   acceptProposal: async({commit, rootState, state}, proposal) => {
     let url = `${rootState.config.api2Url}/publishing/submission/accept?node_id=${proposal.nodeId}`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')
@@ -334,7 +336,7 @@ export const actions = {
   },
   rejectProposal: async({commit, rootState, state}, proposal) => {
     let url = `${rootState.config.api2Url}/publishing/submission/reject?node_id=${proposal.nodeId}`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')

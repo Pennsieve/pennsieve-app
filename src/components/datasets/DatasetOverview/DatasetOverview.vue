@@ -285,6 +285,7 @@
   import IconLicense from "../../icons/IconLicense.vue";
   import IconCopyDocument from "../../icons/IconCopyDocument.vue";
   import EventBus from '../../../utils/event-bus';
+  import {useGetToken} from "@/composables/useGetToken";
 
 
   const replaceLineBreaks = str => {
@@ -363,7 +364,6 @@ export default {
       'datasetBanner',
       'isLoadingDatasetBanner',
       'isDatasetOwner',
-      'userToken',
       'config',
       'datasetDescription',
       'changelogText',
@@ -373,8 +373,7 @@ export default {
       'isLoadingDatasetDescription',
       'datasetContributors',
       'activeOrganization',
-      'changelogComponent',
-      //'isLoadingChangelog'
+      'changelogComponent'
     ]),
 
     doiUrl: function(){
@@ -591,23 +590,25 @@ export default {
      * Compute URL for readme endpoint
      * @returns {String}
      */
-    datasetReadmeUrl: function() {
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${
+    datasetReadmeUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${
             this.userToken
           }`
-        : ''
+        })
     },
 
     /*
     *compute changelog endpoint
     */
     datasetChangelogUrl: function() {
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/${this.datasetId}/changelog?api_key=${
+      return useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/changelog?api_key=${
             this.userToken
           }`
-        : ''
+        })
     },
     /**
      * Compute dataset intId
@@ -733,33 +734,39 @@ export default {
      * @params {String} markdown
      */
     onReadmeSave: function(markdown) {
-      fetch(this.datasetReadmeUrl, {
-        body: JSON.stringify({
-          readme: markdown
-        }),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'If-Match': this.datasetDescriptionEtag,
-        }
-      })
-        .then(response => {
-          if (response.ok) {
-            this.setDatasetDescriptionEtag(response.headers.get('etag'))
-            this.setDatasetDescription(markdown).finally(() => {
-              this.isSavingMarkdownDescription = false
-              this.isEditingMarkdownDescription
- = false
+      this.datasetReadmeUrl()
+        .then(url => {
+          fetch(url, {
+            body: JSON.stringify({
+              readme: markdown
+            }),
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'If-Match': this.datasetDescriptionEtag,
+            }
+          })
+            .then(response => {
+              if (response.ok) {
+                this.setDatasetDescriptionEtag(response.headers.get('etag'))
+                this.setDatasetDescription(markdown).finally(() => {
+                  this.isSavingMarkdownDescription = false
+                  this.isEditingMarkdownDescription
+                    = false
+                })
+              } else if (response.status === 412) {
+                this.isSavingMarkdownDescription = false
+                this.staleUpdateDialogVisible = true
+              } else {
+                throw response
+              }
             })
-          } else if (response.status === 412) {
-            this.isSavingMarkdownDescription = false
-            this.staleUpdateDialogVisible = true
-          } else {
-            throw response
-          }
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
     },
+
+
+
 
     /**
      * On changelog save, emitted from the MarkdownEditor
@@ -768,50 +775,60 @@ export default {
      */
 
     onChangelogSave: function(markdown) {
-      fetch(this.datasetChangelogUrl, {
-        body: JSON.stringify({
-          changelog: markdown
-        }),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-        .then(response => {
-          if (response.ok) {
-            this.setChangelogText(markdown).finally(() => {
-              this.isSavingMarkdownChangelog = false
-              this.isEditingMarkdownChangelog = false
+      this.datasetChangelogUrl()
+        .then(url => {
+          fetch(url, {
+            body: JSON.stringify({
+              changelog: markdown
+            }),
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+            .then(response => {
+              if (response.ok) {
+                this.setChangelogText(markdown).finally(() => {
+                  this.isSavingMarkdownChangelog = false
+                  this.isEditingMarkdownChangelog = false
+                })
+              } else if (response.status === 412) {
+                this.isSavingMarkdownChangelog = false
+                this.$refs.staleUpdateDialog.dialogVisible = true
+              } else {
+                throw response
+              }
             })
-          } else if (response.status === 412) {
-            this.isSavingMarkdownChangelog = false
-            this.$refs.staleUpdateDialog.dialogVisible = true
-          } else {
-            throw response
-          }
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
     },
 
 
     getChangelog: function(datasetId) {
       //this.setIsLoadingDatasetDescription(true)
-      const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${this.userToken}`
-      fetch(url)
-        .then(response => {
-          if (response.ok) {
-            response.json().then(data => {
-              const changelog = propOr('', 'changelog', data)
-              this.setChangelogText(changelog)
-            })
-          } else {
-            throw response
-          }
-        })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {
-          //this.setIsLoadingChangelog(false)
-        })
+      useGetToken().
+        then(token => {
+        const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${token}`
+        fetch(url)
+          .then(response => {
+            if (response.ok) {
+              response.json().then(data => {
+                const changelog = propOr('', 'changelog', data)
+                this.setChangelogText(changelog)
+              })
+            } else {
+              throw response
+            }
+          })
+          .catch(this.handleXhrError.bind(this))
+          .finally(() => {
+            //this.setIsLoadingChangelog(false)
+          })
+      })
+
+
+
     },
 
     /**

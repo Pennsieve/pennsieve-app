@@ -112,7 +112,6 @@ export default {
       ...mapState([
         'dataset',
         'config',
-        'userToken'
       ]),
       ...mapGetters(['datasetLocked', 'getPermission']),
 

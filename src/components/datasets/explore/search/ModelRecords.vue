@@ -242,6 +242,7 @@ import { MAX_SORTABLE_RECORD_COUNT } from '../../../../utils/constants'
 import IconLockFilled from "../../../icons/IconLockFilled.vue";
 import IconPlus from "../../../icons/IconPlus.vue";
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 const formatNumber = (number) => new Intl.NumberFormat('en-EN').format(number)
 
@@ -285,10 +286,7 @@ export default {
   mixins: [ ValidateFiltersMixin ],
 
   mounted: function() {
-    const token = Cookies.get('user_token')
-    if (token) {
       this.fetchModels()
-    }
   },
 
   props: {
@@ -330,7 +328,6 @@ export default {
     ...mapState([
       'lastRoute',
       'dataset',
-      'userToken'
     ]),
 
     ...mapGetters([

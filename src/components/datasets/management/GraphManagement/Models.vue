@@ -206,10 +206,8 @@
       }
     },
     mounted() {
-      const token = Cookies.get('user_token')
-      if (token) {
-        this.fetchModels()
-      }
+      this.fetchModels()
+
     },
     beforeDestroy() {
 
@@ -219,7 +217,6 @@
       ...mapGetters([
         'config',
         'hasFeature',
-        'userToken',
         'activeOrganization',
         'datasetLocked'
       ]),

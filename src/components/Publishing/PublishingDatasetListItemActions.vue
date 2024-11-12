@@ -272,7 +272,6 @@ export default {
   computed: {
     ...mapState(['config']),
     ...mapGetters([
-      'userToken',
       'isUserDatasetOwner'
     ]),
 

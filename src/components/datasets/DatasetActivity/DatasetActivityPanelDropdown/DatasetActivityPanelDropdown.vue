@@ -98,7 +98,7 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
 
     computed: {
       ...mapGetters(['getOrgMemberByIntId']),
-      ...mapState(['config', 'userToken']),
+      ...mapState(['config']),
 
       /**
        * Get dataset int id

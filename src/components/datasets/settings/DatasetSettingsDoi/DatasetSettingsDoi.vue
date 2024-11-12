@@ -55,7 +55,6 @@
         'config',
         'datasetDoi',
         'isLoadingDatasetDoi',
-        'userToken',
         'dataset'
       ]),
 

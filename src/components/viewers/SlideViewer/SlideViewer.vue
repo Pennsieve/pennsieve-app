@@ -214,7 +214,6 @@
 
       ...mapState([
         'config',
-        'userToken'
       ]),
 
       ...mapState('viewerModule', [

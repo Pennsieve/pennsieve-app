@@ -182,7 +182,6 @@
 
     computed: {
       ...mapState([
-        'userToken',
         'config',
         'onboardingEvents',
         'datasetTemplates',

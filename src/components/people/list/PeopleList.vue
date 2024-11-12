@@ -132,6 +132,7 @@ import Sorter from  '../../../mixins/sorter'
 import UserRoles from  '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
 import IconSort from "../../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'PeopleList',
@@ -169,7 +170,6 @@ export default {
   computed: {
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'orgMembers',
       'config',
       'hasFeature',
@@ -223,11 +223,12 @@ export default {
     /**
      * Generates invited org members GET url
      */
-    getInvitedPeopleUrl: function() {
-      if (!this.activeOrganization.organization || !this.userToken) {
+    getInvitedPeopleUrl: async function() {
+      const token = await useGetToken()
+      if (!this.activeOrganization.organization) {
         return
       }
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites?api_key=${this.userToken}`
+      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites?api_key=${token}`
     },
     /**
      * Updates org member
@@ -333,14 +334,16 @@ export default {
     /**
      * Creates XHR calls to get invited users and current organization members
      */
-    getUsers: function() {
-      const invitesUrl = this.getInvitedPeopleUrl()
-      if (!invitesUrl || this.allPeople.length > 0) {
+    getUsers: async function() {
+      const url = await this.getInvitedPeopleUrl()
+
+      // const invitesUrl = this.getInvitedPeopleUrl()
+      if (!url || this.allPeople.length > 0) {
         return
       }
       const peoplePromise = Promise.resolve(this.orgMembers)
       // only admins can request pending organization members
-      const invitesPromise = this.hasAdminRights ? this.sendXhr(invitesUrl) : Promise.resolve([])
+      const invitesPromise = this.hasAdminRights ? await this.sendXhr(url) : Promise.resolve([])
       this.getUsersRequest(invitesPromise, peoplePromise)
     },
     /**

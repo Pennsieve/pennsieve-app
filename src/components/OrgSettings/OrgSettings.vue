@@ -1,7 +1,6 @@
 <template>
     <bf-stage
       slot="stage"
-      v-loading="isLoading"
       element-loading-background="transparent"
     >
       <el-form
@@ -255,7 +254,6 @@ export default {
   computed: {
     ...mapState([
       'activeOrganization',
-      'userToken',
       'config',
       'orgMembers',
       'datasets',

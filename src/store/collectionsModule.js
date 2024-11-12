@@ -1,3 +1,5 @@
+import {useGetToken} from "@/composables/useGetToken";
+
 const sortCollections = (collections) => {
   return collections.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true}))
 }
@@ -44,7 +46,9 @@ export const actions = {
 
   fetchCollections: async({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.apiUrl}/collections?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/collections?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'GET',
@@ -67,7 +71,9 @@ export const actions = {
 
   createCollection: async ({commit, rootState, dispatch}, { datasetId, collectionName }) => {
     try {
-      const url = `${rootState.config.apiUrl}/collections?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/collections?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'POST',
@@ -91,8 +97,12 @@ export const actions = {
   },
 
   addCollection: async({ commit, rootState }, { datasetId, collectionId}) => {
+
+
     try {
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'PUT',
@@ -115,7 +125,9 @@ export const actions = {
 
   removeCollection: async({ commit, dispatch, rootState }, { datasetId, collectionId }) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections/${collectionId}?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections/${collectionId}?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'DELETE',
@@ -143,7 +155,9 @@ export const actions = {
 
   fetchDatasetCollections: async({ commit, rootState }, datasetId) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'GET',

@@ -38,7 +38,6 @@
       ...mapState([
         'config',
         'dataset',
-        'userToken',
         'datasetIgnoreFiles'
       ]),
 

@@ -86,7 +86,6 @@ export default {
   computed: {
     ...mapGetters([,
       'activeOrganization',
-      'userToken',
       'config',
       'teams'
     ]),

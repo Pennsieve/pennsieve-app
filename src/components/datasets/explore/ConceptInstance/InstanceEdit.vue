@@ -180,6 +180,7 @@ import GetConceptTitleVal from '../GetConceptTitleVal'
 import StageActions from "../../../shared/StageActions/StageActions.vue";
 import IconPencil from "../../../icons/IconPencil.vue" ;
 import FileRelationshipsTable from "../../files/FileDetails/FileRelationshipsTable.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'ConceptInstanceEdit',
@@ -309,10 +310,8 @@ export default {
   computed: {
 
     ...mapGetters([
-      'userToken',
       'config',
       'concepts',
-      'userToken',
       'editingInstance',
       'getModelById',
       'hasFeature',
@@ -650,12 +649,15 @@ export default {
      * compute the url to fetch the valid string subtypes
      * @returns {String}
      */
-    stringSubtypeUrl: function() {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      if (this.config.apiUrl && this.userToken && datasetId) {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${this.userToken}`
-      }
-      return ''
+    stringSubtypeUrl: async function() {
+      useGetToken()
+        .then((token) => {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          if (this.config.apiUrl && this.userToken && datasetId) {
+            return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`
+          }
+          return ''
+        })
     }
   },
 
@@ -719,8 +721,8 @@ export default {
     },
 
     stringSubtypeUrl: {
-      handler() {
-        if (this.stringSubtypeUrl) {
+      async handler() {
+        if (await this.stringSubtypeUrl) {
           this.fetchStringSubtypes()
         }
       },
@@ -779,16 +781,20 @@ export default {
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function() {
-      this.sendXhr(this.stringSubtypeUrl)
-        .then(subTypes => {
-          this.stringSubtypes = Object.entries(subTypes).reduce(
-            (options, [val, config]) => ([...options, {value: val, label: config.label, regex: config.regex}]),
-            []
-          )
+      this.stringSubtypeUrl
+        .then((url) => {
+          this.sendXhr(url)
+            .then(subTypes => {
+              this.stringSubtypes = Object.entries(subTypes).reduce(
+                (options, [val, config]) => ([...options, {value: val, label: config.label, regex: config.regex}]),
+                []
+              )
+            })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
         })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
     },
 
     /**

@@ -367,7 +367,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['updateUserToken', 'updateProfile']),
+    ...mapActions(['updateProfile']),
 
     onEnter(event) {
       if (event.currentTarget === this.$refs.pwdField.ref) {
@@ -532,9 +532,9 @@ export default {
      * @param {Object} profile
      */
     setLogin(token) {
-      this.$cookies.set('user_token', token)
+      // this.$cookies.set('user_token', token)
 
-      this.updateUserToken(token)
+      // this.updateUserToken(token)
       const url = `${this.userUrl}` + `?api_key=${token}`
       this.$axios.$get(url).then((response) => {
         this.updateProfile(response)
