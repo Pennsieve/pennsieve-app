@@ -372,7 +372,6 @@ export default {
           })
           this.updateDatasetSearchStatus('')
           this.updateOrgDatasetStatuses(statuses)
-          EventBus.$emit('reload-datasets')
         })
         .catch(this.handleXhrError.bind(this))
     },

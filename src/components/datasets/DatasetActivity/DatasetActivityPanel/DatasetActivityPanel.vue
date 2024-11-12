@@ -30,56 +30,56 @@
               {{ renderActivityType(event.eventType) }}
             </span>
 
-<!--            <a-->
-<!--              v-if="event.eventType === 'ACCEPT_PUBLICATION' || event.eventType === 'RELEASE_EMBARGO'"-->
-<!--              target="_blank"-->
-<!--              :href="discoverLink"-->
-<!--              :class="[!wasPublished ? 'disabled': '']"-->
-<!--            >-->
-<!--              View on Discover-->
-<!--            </a>-->
-<!--          </div>-->
+            <a
+              v-if="event.eventType === 'ACCEPT_PUBLICATION' || event.eventType === 'RELEASE_EMBARGO'"
+              target="_blank"
+              :href="discoverLink"
+              :class="[!wasPublished ? 'disabled': '']"
+            >
+              View on Discover
+            </a>
+          </div>
 
-<!--          <dataset-activity-detail-->
-<!--            v-if="totalCount === 1 && !isPublishingChange(event.eventType) && !hideMetadataDetails(event.eventType)"-->
-<!--            :parent-panel="true"-->
-<!--            :event-detail="event.event"-->
-<!--          />-->
+          <dataset-activity-detail
+            v-if="totalCount === 1 && !isPublishingChange(event.eventType) && !hideMetadataDetails(event.eventType)"
+            :parent-panel="true"
+            :event-detail="event.event"
+          />
         </div>
 
-<!--        <div class="dataset-activity-panel-item__info&#45;&#45;meta">-->
-<!--          <div class="user-wrap">-->
-<!--            <div-->
-<!--              v-for="userId in event.userIds.slice(0,3)"-->
-<!--              :key="userId"-->
-<!--              class="user-avatar-list"-->
-<!--            >-->
-<!--              <div class="user-avatar">-->
-<!--                <avatar-->
-<!--                  :user="getOrgMemberByIntId(userId)"-->
-<!--                  :tooltip="true"-->
-<!--                />-->
-<!--              </div>-->
-<!--            </div>-->
+        <div class="dataset-activity-panel-item__info--meta">
+          <div class="user-wrap">
+            <div
+              v-for="userId in event.userIds.slice(0,3)"
+              :key="userId"
+              class="user-avatar-list"
+            >
+              <div class="user-avatar">
+                <avatar
+                  :user="userId"
+                  :tooltip="true"
+                />
+              </div>
+            </div>
 
-<!--            <div-->
-<!--              v-if="event.userIds.length > 3"-->
-<!--              class="truncate-user-tooltip"-->
-<!--            >-->
-<!--              <el-tooltip-->
-<!--                ref="tooltip"-->
-<!--                placement="top-start"-->
-<!--                :content="populateUserList"-->
-<!--              >-->
-<!--                <div class="test">-->
-<!--                  + {{ (event.userIds.length - 3) }}-->
-<!--                </div>-->
-<!--              </el-tooltip>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          <p class="info-date">-->
-<!--            {{ formatDateRange(event.timeRange.start, event.timeRange.end) }}-->
-<!--          </p>-->
+            <div
+              v-if="event.userIds.length > 3"
+              class="truncate-user-tooltip"
+            >
+              <el-tooltip
+                ref="tooltip"
+                placement="top-start"
+                :content="populateUserList"
+              >
+                <div class="test">
+                  + {{ (event.userIds.length - 3) }}
+                </div>
+              </el-tooltip>
+            </div>
+          </div>
+          <p class="info-date">
+            {{ formatDateRange(event.timeRange.start, event.timeRange.end) }}
+          </p>
         </div>
       </div>
 

@@ -1,21 +1,12 @@
 <script setup>
 import { useRoute } from "vue-router";
-
-
 let route = useRoute();
-
-
 
 </script>
 
 <template>
   <div id="app-wrap">
-    <announcement-banner
-      copy="Welcome to the new Pennsieve App experience! If
-    you would like to access the previous version, it's still available"
-      linkText="here."
-      cookieName="vueMigrationBanner"
-    />
+
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -61,21 +52,16 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { setPageTitle, setMeta } from "./utils/meta";
 
 import globalMessageHandler from "./mixins/global-message-handler";
-import {mergeDeepLeft, mergeDeepRight, pathOr, propOr} from "ramda";
+import {mergeDeepRight, pathOr, propOr} from "ramda";
 import EventBus from "./utils/event-bus";
-import Cookies from "js-cookie";
 import toQueryParams from "./utils/toQueryParams.js";
 
 import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
-import Office365Dialog from "./components/datasets/files/Office365Dialog/Office365Dialog.vue";
-import AnnouncementBanner from "./components/shared/AnnouncementBanner/AnnouncementBanner.vue";
+import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
 import {useGetToken} from "@/composables/useGetToken";
-import { getCurrentUser } from 'aws-amplify/auth';
-import { fetchAuthSession } from 'aws-amplify/auth';
-
 
 
 export default {
@@ -111,74 +97,7 @@ export default {
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
-    EventBus.$on("reload-datasets", this.fetchDatasets);
 
-  },
-  watch: {
-    "$route.params.orgId": {
-      handler: async function (to, from) {
-
-        // Use amplify to get token, redirect to discover when not present
-        try {
-          await useGetToken().then( (token) => {
-            this.bootUp(token)
-          })
-        } catch (error) {
-          console.error(error);
-        } finally {
-          if (this.isOrgSynced) {
-            this.onSwitchOrganization({
-              organization: {
-                id: to,
-              },
-            });
-          }
-        }
-
-      },
-    },
-    /**
-     * Trigger API request when active organization is changed
-     */
-    // activeOrganization: {
-    //   handler: async function (val, oldVal) {
-    //     const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
-    //     const newOrgId = pathOr("NONE", ["organization", "id"], val);
-    //
-    //     // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
-    //     if (oldOrgId !== newOrgId && newOrgId !== "NONE") {
-    //       try {
-    //         useGetToken().then(() => {
-    //           this.setActiveOrgSynced()
-    //             .then(() => this.fetchDatasets())
-    //             .then(() => this.fetchDatasetPublishedData())
-    //             .then(() => this.fetchCollections())
-    //             .then(() => this.fetchIntegrations())
-    //             .then(() => this.fetchDatasetStatuses())
-    //             .then(() => this.fetchComputeNodes())
-    //             .then(() => this.fetchApplications());
-    //         })
-    //
-    //       } catch (err) {
-    //         console.error(err);
-    //       }
-    //     }
-    //   },
-    //   immediate: true,
-    // },
-    // /**
-    //  * Watch getDatasetsUrl and get datasets
-    //  * Used for dataset search
-    //  */
-    // getDatasetsUrl: {
-    //   handler: async function (newVal, oldVal) {
-    //     if ( newVal !== oldVal && this.isOrgSynced) {
-    //       this.fetchDatasets();
-    //     }
-    //
-    //   },
-    //   deep: true,
-    // },
   },
 
   computed: {
@@ -242,10 +161,10 @@ export default {
       "setIsLoadingDatasetPublishedData",
       "setIsLoadingDatasetsError",
       "setDatasetPublishedData",
-      "updateCognitoUser",
       "setSessionTimer",
     ]),
     ...mapActions("datasetModule", ["updateDatasetTotalCount"]),
+    ...mapGetters(["sessionTimer"]),
 
     ...mapActions("collectionsModule", ["fetchCollections"]),
 
@@ -308,104 +227,10 @@ export default {
 
     },
 
-    /**
-     * Request critical data required for app to run properly
-     *
-     * Method called from onLogin in Global Message Handler, and
-     * By changes to orgId in the route if a session cookie is present.
-     *
-     *
-     * @param {String} userToken
-     * @param {Boolean} fromLogin
-     * @returns {Promise}
-     */
-    bootUp: async function (userToken, fromLogin = false) {
-
-    //   const { username, userId, signInDetails } = await getCurrentUser()
-    //
-    //   this.updateCognitoUser(signInDetails);
-    //
-    //
-    // //   // If bootup is called from Login, only get Profile and org as login
-    // //   // will re-trigger bootup when it updates the route to the correct org.
-    //   if (fromLogin) {
-    //     // Indicate that we are no longer timed out.
-    //     this.sessionTimedOut = false;
-    //
-    //     // return this.getBfTermsOfService().then(() =>
-    //     //   this.getProfileAndOrg(userToken)
-    //     // );
-    //   } else {
-    //     return this.getBfTermsOfService()
-    //       // .then(() => this.getProfileAndOrg(userToken))
-    //       // .then(() => this.getPrimaryData(userToken))
-    //       .then(() => {
-    //         this.setActiveOrgSynced();
-    //       })
-    //       .then(() => this.getOnboardingEventStates(userToken));
-    //   }
-    },
-
     beforeUnmount: function () {
       clearInterval(this.interval);
     },
 
-    /**
-     * Get all dataset status options for organization
-     */
-    fetchDatasetStatuses: async function () {
-
-
-      const url = await this.getDatasetStatusUrl
-
-      this.sendXhr(url, "")
-        .then((response) => {
-          this.updateOrgDatasetStatuses(response);
-        })
-        .catch(this.handleXhrError.bind(this));
-    },
-
-    /**
-     * Get dataset publish data
-     */
-    fetchDatasetPublishedData: async function () {
-
-      return useGetToken().then((token) => {
-        this.setIsLoadingDatasetPublishedData(true);
-        return `${this.config.apiUrl}/datasets/published?api_key=${token}`;
-      }).then((url) => {
-        this.sendXhr(url)
-          .then((response) => {
-            this.setDatasetPublishedData(response).then(() => {
-              this.setIsLoadingDatasetPublishedData(false);
-            });
-          })
-          .catch(this.handleXhrError.bind(this));
-      })
-
-    },
-
-    /**
-     * Get datasets for active organization
-     */
-    fetchDatasets: function () {
-      this.setIsLoadingDatasets(true)
-        .then(async () => {
-          this.getDatasetsUrl
-            .then(url => {
-               return this.sendXhr(url, {})
-            })
-            .then((response) => {
-              this.setDatasetData(response);
-              this.setIsLoadingDatasetsError(false);
-            })
-        })
-        .catch(() => {
-          this.setDatasetData([]);
-          this.setIsLoadingDatasetsError(true);
-        })
-        .finally(() => this.setIsLoadingDatasets(false));
-    },
 
     /**
      * Set dataset data
