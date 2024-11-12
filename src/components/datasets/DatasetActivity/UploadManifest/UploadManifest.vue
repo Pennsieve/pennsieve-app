@@ -145,7 +145,6 @@ export default {
     ...mapGetters([
       'activeOrganization',
       'config',
-      'userToken',
       'profile',
       'hasFeature',
       'getOrgMemberByIntId'

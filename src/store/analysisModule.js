@@ -1,8 +1,8 @@
+import {useGetToken} from "@/composables/useGetToken";
 
-  const initialState = () => ({
+const initialState = () => ({
     computeNodes: [],
     applications: [],
-    preprocessors:[],
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
@@ -43,12 +43,14 @@
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
       try {
+        const userToken = await useGetToken()
+
         const url = `${rootState.config.api2Url}/compute-nodes`;
   
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
-            Authorization: `Bearer ${rootState.userToken}`,
+            Authorization: `Bearer ${userToken}`,
           },
         })
   
@@ -65,12 +67,14 @@
     },
     fetchApplications: async({ commit, rootState }) => {
       try {
+        const userToken = await useGetToken()
+
         const url = `${rootState.config.api2Url}/applications`;
   
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
-            Authorization: `Bearer ${rootState.userToken}`,
+            Authorization: `Bearer ${userToken}`,
           },
         })
   

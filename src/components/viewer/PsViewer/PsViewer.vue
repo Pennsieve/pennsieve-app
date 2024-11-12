@@ -195,7 +195,6 @@ export default {
     ...mapState([
       'config',
       'dataset',
-      'userToken',
       'profile',
       'activeOrganization',
       'bulkEditingChannels'

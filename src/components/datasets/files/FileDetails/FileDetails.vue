@@ -624,11 +624,9 @@ export default {
 
   computed: {
     ...mapGetters([
-      "userToken",
       "config",
       "concepts",
       "lastRoute",
-      "userToken",
       "editingInstance",
       "getModelById",
       "hasFeature",

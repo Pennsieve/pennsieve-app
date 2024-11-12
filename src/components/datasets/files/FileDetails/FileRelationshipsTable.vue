@@ -225,7 +225,6 @@ export default {
     ...mapState(['filesProxyId', 'dataset', 'relationshipTypes']),
 
     ...mapGetters([
-      'userToken',
       'getModelByName',
       'filesProxyId',
       'getRelationshipTypeDisplayName',

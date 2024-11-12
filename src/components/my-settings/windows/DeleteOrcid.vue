@@ -67,7 +67,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['profile', 'activeOrganization', 'userToken', 'config']),
+    ...mapGetters(['profile', 'activeOrganization', 'config']),
 
     apiKeyUrl: function() {
       const url = pathOr('', ['config', 'apiUrl'])(this)

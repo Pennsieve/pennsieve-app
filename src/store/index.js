@@ -116,7 +116,6 @@ const initialState = () => ({
   onboardingEvents: [],
   shouldShowLinkOrcidDialog: false,
   isLinkOrcidDialogVisible: false,
-  userToken: '',
   sessionTimer: null,
   isRefreshing: false
 })
@@ -185,14 +184,8 @@ export const mutations = {
         Cookies.set("preferred_org_id", orgId);
         state.profile = profile;
       },
-      UPDATE_USER_TOKEN(state, userToken) {
-        if (Object.prototype.toString.call(userToken) === "[object String]") {
-          state.userToken = userToken;
-        }
-      },
       CLEAR_STATE(state) {
         state.profile = {};
-        state.userToken = "";
         state.activeOrganization = {};
         state.organizations = {};
         state.orgMembers = [];
@@ -667,10 +660,7 @@ export const actions = {
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
-  updateUserToken: ({ commit }, evt) => {
-    Cookies.set('user_token', evt)
-    commit("UPDATE_USER_TOKEN", evt)
-  },
+
   clearState: ({ commit }) => {
     commit("CLEAR_STATE");
     commit("viewerModule/CLEAR_STATE");
@@ -842,7 +832,6 @@ export const getters = {
   isOrgSynced: (state) => state.activeOrgSynced,
   config: (state) => state.config,
   profile: (state) => state.profile,
-  userToken: (state) => state.userToken,
   getProfile: (state) => () => state.profile,
   organizations: (state) => state.organizations,
   activeOrganization: (state) => state.activeOrganization,
@@ -865,7 +854,6 @@ export const getters = {
   getTeam: (state) => (id) => {
     return R.defaultTo({}, R.find(R.pathEq(["team", "id"], id), state.teams));
   },
-  getUserToken: (state) => () => state.userToken,
   uploadCount: (state) => state.uploadCount,
   uploading: (state) => state.uploading,
   uploadRemaining: (state) => state.uploadRemaining,

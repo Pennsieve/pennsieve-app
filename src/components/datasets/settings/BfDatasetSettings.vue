@@ -252,7 +252,6 @@ export default {
 
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'config',
       'hasFeature',
       'getPermission',

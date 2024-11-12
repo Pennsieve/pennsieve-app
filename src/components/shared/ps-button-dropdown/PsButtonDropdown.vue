@@ -42,19 +42,6 @@ export default {
     },
 
   },
-
-  data: function () {
-  },
-
-  computed: {
-
-
-
-  },
-
-  methods: {
-
-  },
 };
 </script>
 

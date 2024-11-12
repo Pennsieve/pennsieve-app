@@ -127,7 +127,6 @@
       ...mapState([
         'config',
         'profile',
-        'userToken'
       ]),
 
       ...mapGetters([

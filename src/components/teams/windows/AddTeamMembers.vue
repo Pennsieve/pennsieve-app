@@ -157,7 +157,6 @@ export default {
     ...mapGetters([
       'activeOrganization',
       'profile',
-      'userToken',
       'config',
       'orgMembers'
     ]),

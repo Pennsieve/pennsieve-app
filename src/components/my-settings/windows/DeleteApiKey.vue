@@ -80,7 +80,6 @@ export default {
     ...mapGetters([
       'profile',
       'activeOrganization',
-      'userToken',
       'config'
     ]),
     apiKeyUrl: function() {

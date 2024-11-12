@@ -196,7 +196,6 @@ export default {
     ...mapState(['dataset', 'relationshipTypes']),
 
     ...mapGetters([
-      'userToken',
       'getModelByName',
       'filesProxyId',
       'getPermission',

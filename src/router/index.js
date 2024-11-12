@@ -122,6 +122,14 @@ const router = createRouter({
       props: true,
     },
     {
+      path: "/login",
+      name: "login",
+      components: {
+        page: () => import("./Login/LoginV2.vue"),
+      },
+      props: false,
+    },
+    {
       name: 'docs-login',
       path: '/docs-login',
       components: {

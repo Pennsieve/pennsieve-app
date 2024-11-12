@@ -3,7 +3,7 @@
     <form
       id="zipForm"
       method="POST"
-      :action="`${config.zipitUrl}/?api_key=${userToken}`"
+      :action="`${zipItUrl}`"
     >
       <input
         v-model="zipData"
@@ -61,7 +61,8 @@
               prop="storage"
               align="right"
             >
-              <template slot-scope="scope">
+
+              <template #default>
                 {{ formatMetric(scope.row.storage) }}
                 <button
                   @click="removeRow(scope.row)"
@@ -122,6 +123,7 @@
   import BfStorageMetrics from '../../mixins/bf-storage-metrics';
   import Sorter from '../../mixins/sorter';
   import IconXCircle from "../icons/IconXCircle.vue";
+  import {useGetToken} from "@/composables/useGetToken";
 
   const DEFAULT_ARCHIVE_NAME = 'pennsieve-data'
 
@@ -157,20 +159,32 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config'
       ]),
 
-      ...mapState(['config', 'userToken', 'activeOrganization']),
+      ...mapState(['config', 'activeOrganization']),
+
+      zipItUrl: async function() {
+        return useGetToken()
+          .then(token => {
+            return `${config.zipitUrl}/?api_key=${token}`
+          })
+      },
+
       /**
        * Compute the url for downloading a csv of records
        * @returns {String}
        */
-      recordCsvUrl: function() {
+      recordCsvUrl: async function() {
         const activeOrgIntId = pathOr('', ['organization', 'intId'], this.activeOrganization)
-        return `${this.config.apiUrl}/models/v2/organizations/${
-          activeOrgIntId
-        }/search/records/csv?api_key=${this.userToken}`
+        return useGetToken()
+          .then(token => {
+            return `${this.config.apiUrl}/models/v2/organizations/${
+              activeOrgIntId
+            }/search/records/csv?api_key=${token}`
+          })
+
+
       },
 
       sizeTarget: function() {

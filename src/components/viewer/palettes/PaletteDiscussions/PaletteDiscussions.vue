@@ -84,7 +84,7 @@
 
     computed: {
       ...mapState('viewerModule', ['activeViewer', 'viewerSidePanelView', 'viewerDiscussions']),
-      ...mapState(['config', 'userToken']),
+      ...mapState(['config']),
 
       /**
        * Compute URL for getting discussions

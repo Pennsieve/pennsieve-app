@@ -3,6 +3,7 @@ import {
   mapState
 } from 'vuex'
 import Request from '@/mixins/request/index'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   mixins: [
@@ -12,7 +13,6 @@ export default {
   computed: {
     ...mapState([
       'config',
-      'userToken'
     ])
   },
 
@@ -28,18 +28,21 @@ export default {
      */
     getDatasetDoi: function(datasetId) {
       this.setIsLoadingDatasetDoi(true)
-      this.setDatasetDoi('')
-      const url = `${this.config.apiUrl}/datasets/${datasetId}/doi?api_key=${this.userToken}`
-      this.sendXhr(url)
-      .then(response => {
-        return this.setDatasetDoi(response)
-      })
-      .catch(() => {
-        this.handleXhrError.bind(this)
-      })
-      .finally(() => {
-        this.setIsLoadingDatasetDoi(false)
-      })
+      useGetToken()
+          .then((token) => {
+            this.setDatasetDoi('')
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/doi?api_key=${token}`
+            this.sendXhr(url)
+                .then(response => {
+                  return this.setDatasetDoi(response)
+                })
+          })
+          .catch(() => {
+            this.handleXhrError.bind(this)
+          })
+          .finally(() => {
+            this.setIsLoadingDatasetDoi(false)
+          })
     },
   }
 }

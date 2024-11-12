@@ -160,26 +160,27 @@
 </template>
 
 <script>
-  import { mapActions, mapGetters, mapState } from 'vuex';
+import {mapActions, mapGetters, mapState} from 'vuex';
 
 import BfRafter from '../../shared/bf-rafter/BfRafter.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
-import AddTeamMembers from  '../windows/AddTeamMembers.vue'
-import RemoveTeam from  '../windows/RemoveTeam.vue'
-import CreateEditTeam from  '../windows/CreateEditTeam.vue'
+import AddTeamMembers from '../windows/AddTeamMembers.vue'
+import RemoveTeam from '../windows/RemoveTeam.vue'
+import CreateEditTeam from '../windows/CreateEditTeam.vue'
 import RemoveCollaborator from '../windows/RemoveCollaborator.vue'
 import TeamMember from './TeamMember.vue'
 import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
 
-import Sorter from  '../../../mixins/sorter'
-import UserRoles from  '../../../mixins/user-roles'
-import Request from  '../../../mixins/request'
+import Sorter from '../../../mixins/sorter'
+import UserRoles from '../../../mixins/user-roles'
+import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
-import { pathOr, propOr, findIndex, pathEq } from 'ramda'
+import {findIndex, pathEq, pathOr, propOr} from 'ramda'
 import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
-  import IconMenu from "../../icons/IconMenu.vue";
-  import IconSort from "../../icons/IconSort.vue";
-  import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import IconMenu from "../../icons/IconMenu.vue";
+import IconSort from "../../icons/IconSort.vue";
+import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'TeamMembersList',
@@ -225,7 +226,6 @@ export default {
     ]),
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'config',
       'teams',
       'publisherTeam'
@@ -342,49 +342,59 @@ export default {
      * Creates team url
      */
     getTeamUrl: function() {
-      if (!this.activeOrganization.organization || !this.userToken) {
+      if (!this.activeOrganization.organization) {
         return
       }
-      const teamId = this.$route.params.id
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}?api_key=${this.userToken}`
+
+      return useGetToken()
+        .then((token) => {
+          const teamId = this.$route.params.id
+          return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}?api_key=${token}`
+        })
+
+
     },
     /**
      * Creates teams url
      */
-    getTeamMembersUrl: function() {
-      if (!this.activeOrganization.organization || !this.userToken) {
-        return
-      }
-      const teamId = this.$route.params.id
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}/members?api_key=${this.userToken}`
+    getTeamMembersUrl: async function() {
+
+      return useGetToken()
+        .then((token) => {
+          const teamId = this.$route.params.id
+          return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}/members?api_key=${token}`
+        })
+
     },
     /**
      * Makes XHR call to get team data
      */
-    getTeam: function() {
-      const url = this.getTeamUrl()
-      if (!url) {
-        return
-      }
-      this.sendXhr(url)
-        .then(team => {
-          this.team = team
+    getTeam: async function() {
+
+      const response = await this.getTeamUrl()
+        .then(async (url) => {
+          return this.sendXhr(url)
         })
-        .catch(this.handleXhrError.bind(this))
+
+      this.team = response
+
+
+
     },
     /**
      * Makes XHR call to get teams for current organization
      */
-    getTeamMembers: function() {
-      const url = this.getTeamMembersUrl()
-      if (!url || this.allMembers.length > 0) {
-        return
-      }
-      this.sendXhr(url)
-        .then(members => {
-          return this.allMembers = this.returnSort('lastName', members)
+    getTeamMembers: async function() {
+
+      await this.getTeamMembersUrl()
+        .then(async (url) => {
+          this.sendXhr(url).then((resp) => {
+            this.allMembers = this.returnSort('lastName', resp)
+          })
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch((err) => {console.log(err)})
+
+
     },
     /**
      * Makes call to resort table by column

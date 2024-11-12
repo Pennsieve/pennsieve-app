@@ -1,6 +1,11 @@
 <script setup>
 import { useRoute } from "vue-router";
+
+
 let route = useRoute();
+
+
+
 </script>
 
 <template>
@@ -48,8 +53,7 @@ let route = useRoute();
 
   <office-365-dialog />
 
-  <!--  This is the websocket connection-->
-  <!--  <bf-notifications />-->
+
 </template>
 
 <script>
@@ -64,11 +68,15 @@ import toQueryParams from "./utils/toQueryParams.js";
 
 import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
-import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "./components/datasets/files/Office365Dialog/Office365Dialog.vue";
 import AnnouncementBanner from "./components/shared/AnnouncementBanner/AnnouncementBanner.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import { getCurrentUser } from 'aws-amplify/auth';
+import { fetchAuthSession } from 'aws-amplify/auth';
+
+
 
 export default {
   name: "app",
@@ -92,7 +100,8 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-  mounted() {
+  async mounted() {
+
     setTimeout(() => {
       if (window.location.href.includes("?redirectTo=")) {
         EventBus.$emit("redirect-detected");
@@ -105,55 +114,59 @@ export default {
     );
     EventBus.$on("reload-datasets", this.fetchDatasets);
 
-    const token = Cookies.get("user_token");
-    if (!token) {
-      setPageTitle(this.defaultPageTitle);
-      setMeta("name", "description", this.defaultPageDescription);
-    }
+    // const token = useGetToken()
+
+
+    // if (!token) {
+    //   setPageTitle(this.defaultPageTitle);
+    //   setMeta("name", "description", this.defaultPageDescription);
+    // }
   },
   watch: {
-    /**
-     * Watch to compute new dataset list
-     */
     "$route.params.orgId": {
       handler: async function (to, from) {
-        const token = Cookies.get("user_token");
-        if (token) {
-          try {
-            await this.bootUp(token);
-          } catch (error) {
-            console.error(error);
-          } finally {
-            if (this.isOrgSynced) {
-              this.onSwitchOrganization({
-                organization: {
-                  id: to,
-                },
-              });
-            }
+
+        // Use amplify to get token, redirect to discover when not present
+        try {
+          await useGetToken().then( (token) => {
+            this.bootUp(token)
+          })
+        } catch (error) {
+          console.error(error);
+        } finally {
+          if (this.isOrgSynced) {
+            this.onSwitchOrganization({
+              organization: {
+                id: to,
+              },
+            });
           }
         }
+
       },
     },
     /**
      * Trigger API request when active organization is changed
      */
     activeOrganization: {
-      handler: function (val, oldVal) {
+      handler: async function (val, oldVal) {
         const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
         const newOrgId = pathOr("NONE", ["organization", "id"], val);
 
         // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
-        if (this.userToken && oldOrgId !== newOrgId) {
+        if (oldOrgId !== newOrgId && newOrgId !== "NONE") {
           try {
-            this.setActiveOrgSynced()
-              .then(() => this.fetchDatasets())
-              .then(() => this.fetchDatasetPublishedData())
-              .then(() => this.fetchCollections())
-              .then(() => this.fetchIntegrations())
-              .then(() => this.fetchDatasetStatuses())
-              .then(() => this.fetchComputeNodes())
-              .then(() => this.fetchApplications());
+            useGetToken().then(() => {
+              this.setActiveOrgSynced()
+                .then(() => this.fetchDatasets())
+                .then(() => this.fetchDatasetPublishedData())
+                .then(() => this.fetchCollections())
+                .then(() => this.fetchIntegrations())
+                .then(() => this.fetchDatasetStatuses())
+                .then(() => this.fetchComputeNodes())
+                .then(() => this.fetchApplications());
+            })
+
           } catch (err) {
             console.error(err);
           }
@@ -166,10 +179,11 @@ export default {
      * Used for dataset search
      */
     getDatasetsUrl: {
-      handler: function (newVal, oldVal) {
-        if (this.userToken && newVal !== oldVal && this.isOrgSynced) {
+      handler: async function (newVal, oldVal) {
+        if ( newVal !== oldVal && this.isOrgSynced) {
           this.fetchDatasets();
         }
+
       },
       deep: true,
     },
@@ -188,7 +202,6 @@ export default {
       "activeOrganization",
       "getActiveOrganization",
       "config",
-      "userToken",
       "hasFeature",
       "hasOrcidOnboardingEvent",
       "isOrgSynced",
@@ -226,30 +239,33 @@ export default {
      * Compute get datasets URL
      * @return {String}
      */
-    getDatasetsUrl: function () {
-      const params = toQueryParams(
-        mergeDeepLeft(this.datasetSearchParams, { api_key: this.userToken })
-      );
-      return this.isOrgSynced
-        ? `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-        : "";
+    getDatasetsUrl: async function () {
+
+      return useGetToken().then((t) => {
+        const params = toQueryParams(
+          mergeDeepLeft(this.datasetSearchParams, { api_key: t })
+        );
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
+      })
+
     },
 
     /**
      * Get all status options for organization url
      * @returns {String}
      */
-    getDatasetStatusUrl: function () {
-      if (this.config.apiUrl && this.userToken && this.isOrgSynced) {
+    getDatasetStatusUrl: async function () {
+
+      return useGetToken().then((token) => {
         const orgId = pathOr(
           "",
           ["organization", "id"],
           this.activeOrganization
-        );
-        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${this.userToken}`;
-      } else {
-        return "Not-found";
-      }
+        )
+        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${token}`;
+
+
+      })
     },
   },
 
@@ -290,22 +306,8 @@ export default {
      * Manually refresh token.
      */
     refreshToken: async function () {
-      const usr = this.getCognitoUser();
-      const currentSession = usr.signInUserSession;
+      await fetchAuthSession({ forceRefresh: true });
 
-      this.isRefreshing = true;
-      await usr.refreshSession(
-        currentSession.refreshToken,
-        async (err, session) => {
-          const timeOut = session.accessToken.payload.exp;
-          this.setSessionTimer(
-            Math.round((timeOut * 1000 - Date.now()) / 1000)
-          );
-
-          await this.updateUserToken(session.accessToken.jwtToken);
-          this.isRefreshing = false;
-        }
-      );
     },
 
     /**
@@ -320,50 +322,14 @@ export default {
      * @returns {Promise}
      */
     bootUp: async function (userToken, fromLogin = false) {
-      // Get the current Cognito User and store in Vuex
-      await Auth.currentAuthenticatedUser()
-        .then((user) => {
-          this.updateCognitoUser(user);
 
-          // Setting recurring check for token life-cycle
-          clearInterval(this.interval);
-          this.interval = setInterval(
-            function () {
-              try {
-                const usr = this.getCognitoUser();
-                const timeOut = usr.signInUserSession.accessToken.payload.exp;
+      const { username, userId, signInDetails } = await getCurrentUser()
 
-                this.setSessionTimer(
-                  Math.round((timeOut * 1000 - Date.now()) / 1000)
-                );
-                if (this.sessionTimer() < this.sessionLogoutThreshold) {
-                  console.warn("Logging out due to expired session.");
-                  this.sessionTimedOut = true;
-                  EventBus.$emit("logout");
-                }
-              } catch (e) {
-                console.error(
-                  "Error checking for session timer -- prevent further checking"
-                );
-                clearInterval(this.interval);
-              }
-            }.bind(this),
-            1000
-          );
-        })
-        .catch((e) => {
-          // Token expired
-          Cookies.remove("user_token");
+      this.updateCognitoUser(signInDetails);
 
-          // route user to login page
-          this.$router.replace({
-            name: "home",
-            query: {},
-          });
-        });
 
-      // If bootup is called from Login, only get Profile and org as login
-      // will re-trigger bootup when it updates the route to the correct org.
+    //   // If bootup is called from Login, only get Profile and org as login
+    //   // will re-trigger bootup when it updates the route to the correct org.
       if (fromLogin) {
         // Indicate that we are no longer timed out.
         this.sessionTimedOut = false;
@@ -374,7 +340,7 @@ export default {
       } else {
         return this.getBfTermsOfService()
           .then(() => this.getProfileAndOrg(userToken))
-          .then(() => this.getPrimaryData())
+          .then(() => this.getPrimaryData(userToken))
           .then(() => {
             this.setActiveOrgSynced();
           })
@@ -389,8 +355,12 @@ export default {
     /**
      * Get all dataset status options for organization
      */
-    fetchDatasetStatuses: function () {
-      this.sendXhr(this.getDatasetStatusUrl, "")
+    fetchDatasetStatuses: async function () {
+
+
+      const url = await this.getDatasetStatusUrl
+
+      this.sendXhr(url, "")
         .then((response) => {
           this.updateOrgDatasetStatuses(response);
         })
@@ -400,17 +370,21 @@ export default {
     /**
      * Get dataset publish data
      */
-    fetchDatasetPublishedData: function () {
-      this.setIsLoadingDatasetPublishedData(true);
+    fetchDatasetPublishedData: async function () {
 
-      const url = `${this.config.apiUrl}/datasets/published?api_key=${this.userToken}`;
-      this.sendXhr(url)
-        .then((response) => {
-          this.setDatasetPublishedData(response).then(() => {
-            this.setIsLoadingDatasetPublishedData(false);
-          });
-        })
-        .catch(this.handleXhrError.bind(this));
+      return useGetToken().then((token) => {
+        this.setIsLoadingDatasetPublishedData(true);
+        return `${this.config.apiUrl}/datasets/published?api_key=${token}`;
+      }).then((url) => {
+        this.sendXhr(url)
+          .then((response) => {
+            this.setDatasetPublishedData(response).then(() => {
+              this.setIsLoadingDatasetPublishedData(false);
+            });
+          })
+          .catch(this.handleXhrError.bind(this));
+      })
+
     },
 
     /**
@@ -418,10 +392,15 @@ export default {
      */
     fetchDatasets: function () {
       this.setIsLoadingDatasets(true)
-        .then(() => this.sendXhr(this.getDatasetsUrl, {}))
-        .then((response) => {
-          this.setDatasetData(response);
-          this.setIsLoadingDatasetsError(false);
+        .then(async () => {
+          this.getDatasetsUrl
+            .then(url => {
+               return this.sendXhr(url, {})
+            })
+            .then((response) => {
+              this.setDatasetData(response);
+              this.setIsLoadingDatasetsError(false);
+            })
         })
         .catch(() => {
           this.setDatasetData([]);

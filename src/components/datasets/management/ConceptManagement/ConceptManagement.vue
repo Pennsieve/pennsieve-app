@@ -244,7 +244,6 @@ export default {
     ]),
     ...mapGetters([
       'config',
-      'userToken',
       'hasFeature',
       'datasetLocked'
     ]),
@@ -445,10 +444,8 @@ export default {
     EventBus.$on('edit-property', this.openPropertyEditDialog.bind(this))
     EventBus.$on('archive-property', this.openDeleteDialog.bind(this))
     EventBus.$on('remove-property', this.onRemoveProperty.bind(this))
-    const token = Cookies.get('user_token')
-    if (token) {
-      this.fetchModels()
-    }
+    this.fetchModels()
+
   },
 
   beforeDestroy() {

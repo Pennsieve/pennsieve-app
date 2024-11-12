@@ -178,7 +178,6 @@ export default {
     ]),
     ...mapState([
       'config',
-      'userToken',
       'activeOrganization'
     ]),
 

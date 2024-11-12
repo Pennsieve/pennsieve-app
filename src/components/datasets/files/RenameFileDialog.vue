@@ -128,7 +128,6 @@ export default {
 
   computed: {
     ...mapGetters([
-      'userToken',
       'config'
     ]),
     /**

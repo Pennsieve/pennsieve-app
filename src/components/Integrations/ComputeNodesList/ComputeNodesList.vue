@@ -44,6 +44,7 @@ import Request from "../../../mixins/request";
 
 import ComputeNodesListItem from "../ComputeNodesListItem/ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "ComputeNodesList",
@@ -70,7 +71,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
 
     hasAdminRights: function () {
       if (this.activeOrganization) {
@@ -99,7 +100,6 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
-    ...mapGetters(["activeOrganization", "userToken", "config"]),
     /**
      * Model URL
      * @returns {String}
@@ -114,13 +114,15 @@ export default {
     /**
      * Fetches Compute Nodes
      */
-    fetchComputeNodes: function () {
+    fetchComputeNodes: async function () {
+      const userToken = await useGetToken()
+
       const url = `${this.config.api2Url}/compute-nodes`;
 
       this.sendXhr(url, {
         method: "GET",
         header: {
-          Authorization: `Bearer ${this.userToken}`,
+          Authorization: `Bearer ${userToken}`,
         },
       })
         .then((response) => {

@@ -426,7 +426,6 @@ export default {
 
   computed: {
     ...mapState([
-      'userToken',
       'config',
       'concepts',
       'dataset',

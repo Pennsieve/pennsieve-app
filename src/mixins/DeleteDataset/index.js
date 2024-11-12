@@ -2,27 +2,26 @@ import { propOr, pathOr, prop } from 'ramda'
 import { mapState, mapActions } from 'vuex';
 
 import EventBus from '../../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   computed: {
     ...mapState([
       'config',
-      'userToken'
     ]),
 
     /**
      * Compute dataset endpoint URL
      * @returns {String}
      */
-    datasetUrl: function() {
+    datasetUrl: async function() {
       const url = propOr('', 'apiUrl')(this.config)
-      const userToken = prop('userToken', this)
       const datasetId = pathOr('', ['content', 'id'])(this.dataset)
 
-      if (!url || !userToken || !datasetId) {
-        return ''
-      }
-      return `${url}/datasets/${datasetId}?api_key=${userToken}`;
+      return useGetToken()
+          .then(token => {
+            return `${url}/datasets/${datasetId}?api_key=${userToken}`;
+          })
     },
   },
 
@@ -35,11 +34,15 @@ export default {
      * Makes XHR call to delete a dataset
      */
     submitDeleteDatasetRequest: function() {
-      this.sendXhr(this.datasetUrl, {
-        method: 'DELETE'
-      })
-      .then(this.handleDeleteDatasetSuccess.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      this.datasetUrl
+          .then(url => {
+            this.sendXhr(url, {
+              method: 'DELETE'
+            })
+                .then(this.handleDeleteDatasetSuccess.bind(this))
+                .catch(this.handleXhrError.bind(this))
+          })
+
     },
 
     /**

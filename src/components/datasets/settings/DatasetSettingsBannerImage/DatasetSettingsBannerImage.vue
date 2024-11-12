@@ -147,7 +147,6 @@
       ...mapState([
         'config',
         'dataset',
-        'userToken',
         'datasetBanner'
       ]),
 

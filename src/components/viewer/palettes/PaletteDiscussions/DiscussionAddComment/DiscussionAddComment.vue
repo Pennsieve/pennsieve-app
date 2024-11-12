@@ -158,7 +158,6 @@
       ...mapState([
         'orgMembers',
         'config',
-        'userToken'
       ]),
 
       /**

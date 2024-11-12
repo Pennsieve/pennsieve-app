@@ -177,7 +177,7 @@
       class="no-results"
     >
       <img
-        src="/src/assets/images/illustrations/illo-search.svg"
+        src="src/assets/images/illustrations/illo-search.svg"
         alt=""
       >
       <h3>No Results found.</h3>
@@ -290,7 +290,6 @@ export default {
       'getPermission',
       'dataset',
       'config',
-      'userToken',
       'filesProxyId',
       'hasFeature',
       'lastRoute',

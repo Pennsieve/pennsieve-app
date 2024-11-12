@@ -1,3 +1,5 @@
+import {useGetToken} from "@/composables/useGetToken";
+
 const sortIntegrations = (integrations) => {
   return integrations.sort((a, b) => a.displayName.localeCompare(b.name, 'en', { numeric: true}))
 }
@@ -42,22 +44,25 @@ export const actions = {
 
   fetchIntegrations: async({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks?api_key=${rootState.userToken}`
+      useGetToken()
+          .then(token => {
+            const url = `${rootState.config.apiUrl}/webhooks?api_key=${token}`
+            fetch(url, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+                .then(response => {
+                  response.json()
+                      .then(collections => {
+                        commit('UPDATE_INTEGRATIONS', collections)
+                      })
+                })
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (resp.ok) {
-        const collections = await resp.json()
-        commit('UPDATE_INTEGRATIONS', collections)
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
+          })
+    }
+    catch(err) {
       commit('UPDATE_INTEGRATIONS', [])
       return Promise.reject(err)
     }
@@ -65,7 +70,9 @@ export const actions = {
 
   editIntegration: async ({commit, rootState}, integrationDTO ) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks/${integrationDTO.id}?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/webhooks/${integrationDTO.id}?api_key=${userToken}`
       const resp = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -89,7 +96,9 @@ export const actions = {
 
   createIntegration: async ({commit, rootState}, integrationDTO ) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/webhooks?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'POST',
@@ -113,7 +122,9 @@ export const actions = {
   },
   removeIntegration: async({ commit, dispatch, rootState }, integrationId) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks/${integrationId}?api_key=${rootState.userToken}`
+      const userToken = await useGetToken()
+
+      const url = `${rootState.config.apiUrl}/webhooks/${integrationId}?api_key=${userToken}`
 
       const resp = await fetch(url, {
         method: 'DELETE',

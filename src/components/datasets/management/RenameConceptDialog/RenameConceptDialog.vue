@@ -109,7 +109,6 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config',
         'concepts'
       ])

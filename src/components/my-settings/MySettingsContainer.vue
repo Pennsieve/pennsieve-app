@@ -314,6 +314,7 @@ import Request from "../../mixins/request";
 import Sorter from "../../mixins/sorter";
 import IconRemove from "../icons/IconRemove.vue";
 import IconSort from "../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "MySettingsContainer",
@@ -417,14 +418,14 @@ export default {
       return this.apiKeys.length > 0;
     },
 
-    getApiKeysUrl: function () {
+    getApiKeysUrl: async function () {
       const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
 
-      if (!url || !userToken) {
-        return "";
-      }
-      return `${url}/token?api_key=${userToken}`;
+      return await useGetToken()
+        .then(token => {
+          return `${url}/token?api_key=${token}`;
+        })
+
     },
     updateProfileUrl: function () {
       const url = pathOr("", ["config", "apiUrl"])(this);
@@ -492,7 +493,7 @@ export default {
       if (!url) {
         return;
       }
-      this.getApiKeys();
+      this.getApiKreturn `${url}/token?api_key=${userToken}`;eys();
     },
   },
 
@@ -691,16 +692,18 @@ export default {
      * Fetches api keys for logged in user
      */
     getApiKeys: function () {
-      if (!this.getApiKeysUrl) {
-        return;
-      }
 
-      this.sendXhr(this.getApiKeysUrl)
-        .then((response) => {
-          this.apiKeys = this.returnSort("name", response);
-          this.isApiKeysLoading = false;
+      this.getApiKeysUrl
+        .then(url => {
+          this.sendXhr(url)
+            .then((response) => {
+              this.apiKeys = this.returnSort("name", response);
+              this.isApiKeysLoading = false;
+            })
+            .catch(this.handleXhrError.bind(this));
         })
-        .catch(this.handleXhrError.bind(this));
+
+
     },
     /**
      * Update API keys after CREATE & DELETE XHR calls

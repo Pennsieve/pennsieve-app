@@ -101,6 +101,7 @@ import FilterMenu from '../../shared/FilterMenu/FilterMenu.vue'
 
 import Request from '../../../mixins/request'
 import Sorter from '../../../mixins/sorter'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'DatasetActivityLog',
@@ -166,7 +167,6 @@ export default {
       'orgMembers',
       'dataset',
       'config',
-      'userToken'
     ]),
 
     ...mapState('datasetModule', [
@@ -199,10 +199,12 @@ export default {
      * Compute get dataset users URL
      * @returns {String}
      */
-    getDatasetUsersUrl: function() {
-      const datasetId = this.$route.params.datasetId
-      const apiKey = this.userToken || Cookies.get('user_token')
-      return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${apiKey}`
+    getDatasetUsersUrl: async function() {
+      return useGetToken()
+        .then((token) => {
+          const datasetId = this.$route.params.datasetId
+          return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${token}`
+        })
     },
 
     /**
@@ -271,13 +273,17 @@ export default {
      * Get users with permissions to this dataset
      */
     getDatasetUsers: function() {
-      this.sendXhr(this.getDatasetUsersUrl)
-        .then(datasetUsers => {
-          this.datasetUsers = datasetUsers
-        })
+      this.getDatasetUsersUrl.then( (url) => {
+        this.sendXhr(url)
+          .then((response) => {
+            this.datasetUsers = datasetUsers
+          })
+      })
         .catch(() => {
-          this.datasetUsers = []
-        })
+        this.datasetUsers = []
+      })
+
+
     }
   }
 }

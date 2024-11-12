@@ -1,5 +1,6 @@
 import {mapState, mapActions} from "vuex";
 import Request from '@/mixins/request'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   mixins: [
@@ -12,7 +13,6 @@ export default {
 
   computed: {
     ...mapState('viewerModule', [
-      'userToken',
       'activeViewer',
       'viewerChannels',
       'viewerSidePanelOpen',
@@ -71,57 +71,58 @@ export default {
       // Send ADD annotation request to server
       const timeseriesId = this.activeViewer.content.nodeId
       const url = `${this.config.apiUrl}/timeseries/${timeseriesId}/layers/${layer_id}/annotations`
-      this.sendXhr(url, {
-        method:'POST',
-        header: {
-          'Authorization': `Bearer ${this.userToken}`
-        },
-        body:XhrBody
-      } ).then((response) => {
-        const newAnn = {
-          name: '',
-          id: response.id,
-          label: response.label,
-          description: response.description,
-          start: response.start,
-          duration: response.end - response.start,
-          end: response.end,
-          cStart: null,
-          cEnd: null,
-          selected: true,
-          channelIds: response.channelIds,
-          allChannels: false,
-          layer_id: response.layerId,
-          userId: response.userId
-        };
-        if (response.linkedPackage) {
-          newAnn.linkedPackage = response.linkedPackage
-        }
 
-        // Check if all channels are selected
-        if (newAnn.channelIds.length >= this.viewerChannels.length) {
-          newAnn.allChannels = true;
-        }
+      useGetToken()
+          .then(token => {
+            this.sendXhr(url, {
+              method:'POST',
+              header: {
+                'Authorization': `Bearer ${this.userToken}`
+              },
+              body:XhrBody
+            })
+                .then(response => {
+                  const newAnn = {
+                    name: '',
+                    id: response.id,
+                    label: response.label,
+                    description: response.description,
+                    start: response.start,
+                    duration: response.end - response.start,
+                    end: response.end,
+                    cStart: null,
+                    cEnd: null,
+                    selected: true,
+                    channelIds: response.channelIds,
+                    allChannels: false,
+                    layer_id: response.layerId,
+                    userId: response.userId
+                  };
+                  if (response.linkedPackage) {
+                    newAnn.linkedPackage = response.linkedPackage
+                  }
 
-        // Find layer
-        let curLIndex = 0;
-        for (let i = 0; i < this.viewerAnnotations.length; i++) {
-          if (this.viewerAnnotations[i].id === response.layerId) {
-            curLIndex = i;
-            break;
-          }
-        }
+                  // Check if all channels are selected
+                  if (newAnn.channelIds.length >= this.viewerChannels.length) {
+                    newAnn.allChannels = true;
+                  }
 
-        this.$store.dispatch('viewerModule/createAnnotation',newAnn)
-          .then(() => {
-            this.sortAnns(this.viewerAnnotations[curLIndex].annotations);
-            this.onAnnotationCreated()
+                  // Find layer
+                  let curLIndex = 0;
+                  for (let i = 0; i < this.viewerAnnotations.length; i++) {
+                    if (this.viewerAnnotations[i].id === response.layerId) {
+                      curLIndex = i;
+                      break;
+                    }
+                  }
+
+                  this.$store.dispatch('viewerModule/createAnnotation',newAnn)
+                      .then(() => {
+                        this.sortAnns(this.viewerAnnotations[curLIndex].annotations);
+                        this.onAnnotationCreated()
+                      })
+                })
           })
-      })
-        .catch(
-        )
-
-
     },
     updateAnnotation: function() {
 

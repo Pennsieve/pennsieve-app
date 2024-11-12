@@ -71,7 +71,7 @@ export default {
 
   computed: {
     ...mapGetters(['datasetLocked']),
-    ...mapState(['config', 'userToken', 'dataset']),
+    ...mapState(['config', 'dataset']),
 
     /**
      * Computes dataset Id

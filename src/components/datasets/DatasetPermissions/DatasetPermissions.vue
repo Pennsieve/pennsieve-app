@@ -105,6 +105,7 @@
   import Request from '../../../mixins/request/index'
   import EventBus from '../../../utils/event-bus'
   import IconSort from "../../icons/IconSort.vue";
+  import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'DatasetPermissions',
@@ -144,7 +145,6 @@
     computed: {
       ...mapState([
         'config',
-        'userToken',
         'orgMembers',
         'dataset',
         'activeOrganization',
@@ -184,9 +184,10 @@
        * Compute collaborator users URL
        * @returns {String}
        */
-      getUsersUrl: function() {
+      getUsersUrl: async function() {
+        const userToken = await useGetToken()
         return this.userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/users?api_key=${this.userToken}`
+          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/users?api_key=${userToken}`
           : ''
       },
 
@@ -194,9 +195,10 @@
        * Compute collaborator teams URL
        * @returns {String}
        */
-      getTeamsUrl: function() {
-        return this.userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/teams?api_key=${this.userToken}`
+      getTeamsUrl: async function() {
+        const userToken = await useGetToken()
+        return userToken
+          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/teams?api_key=${userToken}`
           : ''
       },
 
@@ -204,9 +206,10 @@
        * Compute collaborator organizations URL
        * @returns {String}
        */
-      getOrganizationsUrl: function() {
-        return this.userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/organizations?api_key=${this.userToken}`
+      getOrganizationsUrl: async function() {
+        const userToken = await useGetToken()
+        return userToken
+          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/organizations?api_key=${userToken}`
           : ''
       },
     },
@@ -303,7 +306,7 @@
        * @param {Object} item
        * @param {Boolean} isAdding
        */
-      setPermission: function(item, isAdding = true) {
+      setPermission: async function(item, isAdding = true) {
         if (isAdding) {
           this.processingForm = true
         }
@@ -314,7 +317,9 @@
           ? 'owner'
           : entity
 
-        const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${endpointType}?api_key=${this.userToken}`
+        const userToken = await useGetToken()
+
+        const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${endpointType}?api_key=${userToken}`
 
         const itemId = pathOr('', ['item', 'id'], item)
         const label = pathOr('', ['item', 'label'], item)

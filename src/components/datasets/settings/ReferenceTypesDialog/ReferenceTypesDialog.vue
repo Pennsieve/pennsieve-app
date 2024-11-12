@@ -170,7 +170,7 @@ export default {
   },
   computed: {
     ...mapGetters(['datasetLocked']),
-    ...mapState(['userToken', 'config']),
+    ...mapState([ 'config']),
 
     /**
      * Preview citation url

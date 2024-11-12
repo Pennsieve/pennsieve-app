@@ -339,7 +339,6 @@ export default {
     ...mapGetters([
       'concepts',
       'config',
-      'userToken',
       'getModelById',
       'getModelByName',
       'getRelationshipTypeByName'

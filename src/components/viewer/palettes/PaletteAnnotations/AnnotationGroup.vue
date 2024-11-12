@@ -162,7 +162,6 @@
       ...mapState('viewerModule', ['activeViewer']),
       ...mapState([
         'config',
-        'userToken',
         'bulkEditingChannels'
       ]),
 

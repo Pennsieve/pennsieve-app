@@ -147,7 +147,6 @@ export default {
   computed: {
     ...mapState([
       'config',
-      'userToken',
       'dataset'
     ]),
 

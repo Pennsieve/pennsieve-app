@@ -231,7 +231,6 @@ export default {
       'isDatasetOwner',
       'datasetBanner',
       'config',
-      'userToken'
     ]),
 
     /**

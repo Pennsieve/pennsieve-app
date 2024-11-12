@@ -108,7 +108,6 @@ import { Methods } from '@/typescript/lib/add-linked-property-drawer/methods'
       ...mapState([
         'conceptsHash',
         'config',
-        'userToken'
       ]),
 
       /**

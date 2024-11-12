@@ -212,7 +212,7 @@ export default {
   },
 
   computed: {
-    ...mapState(['config', 'userToken', 'datasets', 'orgDatasetStatuses']),
+    ...mapState(['config', 'datasets', 'orgDatasetStatuses']),
 
     /**
      * Disables remove menu option if there is only one status left in the list

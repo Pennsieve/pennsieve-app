@@ -173,7 +173,6 @@ export default {
     ...mapState([
       'config',
       'orgMembers',
-      'userToken',
       'dataset',
       'activeOrganization',
       'datasetContributors',

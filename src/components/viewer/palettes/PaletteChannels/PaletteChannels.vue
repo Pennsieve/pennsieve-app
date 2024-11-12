@@ -175,7 +175,6 @@
       ...mapState([
         'bulkEditingChannels',
         'config',
-        'userToken'
       ]),
 
       /**

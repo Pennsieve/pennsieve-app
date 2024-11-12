@@ -54,7 +54,6 @@ export default {
       'concepts',
       'exploreFiles',
       'config',
-      'userToken',
       'filesProxyId',
     ]),
 
