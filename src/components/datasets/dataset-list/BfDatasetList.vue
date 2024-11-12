@@ -317,6 +317,8 @@ export default {
       handler: function () {
         // Clear search query keywords on org switch
         this.searchQuery = "";
+        this.fetchDatasets()
+
       },
     },
   },
