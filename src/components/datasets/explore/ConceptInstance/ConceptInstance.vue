@@ -22,7 +22,7 @@
               <router-link
                 :to="{ name: 'metadata-record-edit', params: {
                   orgId: orgId,
-                  dataset: datasetId,
+                  datasetId: datasetId,
                   instanceId: instanceId
                   } }"
               >
@@ -341,22 +341,14 @@ import {
 import validUrl from 'valid-url'
 import BfButton from '../../../shared/bf-button/BfButton.vue'
 import PillLink from '../../../shared/PillLink/PillLink.vue'
-// import BfDeleteDialog from '../../files/bf-delete-dialog/BfDeleteDialog.vue'
 import ConceptInstanceProperty from './ConceptInstanceProperty.vue'
 import ConceptInstanceStaticProperty from './ConceptInstanceStaticProperty.vue'
 import ConceptInstanceLinkedProperty from './ConceptInstanceLinkedProperty.vue'
 import AddRelationshipDrawer from './AddRelationshipDrawer.vue'
-// import AddFileRelationshipDrawer from './AddFileRelationshipDrawer.vue'
 import RelationshipsTable from './RelationshipsTable.vue'
 import RemoveRelationships from './RemoveRelationships.vue'
 import UnlinkFiles from './UnlinkFiles.vue'
-// import AddEditPropertyDialog from '../AddEditPropertyDialog/AddEditPropertyDialog.vue'
-// import ConceptDialog from '../ConceptDialog/ConceptDialog.vue'
 import LinkRecordMenu from '../../../shared/LinkRecordMenu/LinkRecordMenu.vue'
-// import BfPackageDialog from '../../files/bf-package-dialog/BfPackageDialog.vue'
-// import BfMoveDialog from '../../files/bf-move-dialog/BfMoveDialog.vue'
-// import AddLinkedPropertyDrawer from './AddLinkedPropertyDrawer.vue'
-// import RemoveLinkedPropertyDialog from './RemoveLinkedPropertyDialog.vue'
 import EventBus from '../../../../utils/event-bus'
 import Request from '../../../../mixins/request'
 import TableFunctions from '../../../../mixins/table-functions'
@@ -385,20 +377,10 @@ export default {
     ConceptInstanceStaticProperty,
     ConceptInstanceLinkedProperty,
     AddRelationshipDrawer,
-    // AddFileRelationshipDrawer,
     RemoveRelationships,
     UnlinkFiles,
     RelationshipsTable,
-    // AddEditPropertyDialog,
-    // ConceptDialog,
-    // BfDeleteDialog,
     LinkRecordMenu,
-    // BfPackageDialog,
-    // BfMoveDialog,
-    // AddLinkedPropertyDrawer,
-    // RemoveLinkedPropertyDialog,
-    // DirectoryViewer,
-    // BfPill
     InstanceEdit
   },
 
@@ -822,12 +804,12 @@ export default {
       const recordId = this.instanceId
 
       let url = `${
-        config.conceptsUrl
+        this.config.conceptsUrl
       }/datasets/${datasetId}/concepts/${modelId}/instances/${recordId}/relationCounts?includeIncomingLinkedProperties=true`
 
       if (this.isFile) {
         url = `${
-          config.conceptsUrl
+          this.config.conceptsUrl
         }/datasets/${datasetId}/proxy/package/external/${recordId}/relationCounts`
       }
 
@@ -1717,15 +1699,18 @@ export default {
 
         try {
           // Make request to create new instance
-          const record = await this.sendXhr(url, {
-            header: {
-              Authorization: `bearer ${this.userToken}`
-            },
-            method: 'POST',
-            body: {
-              values
-            }
+          await useGetToken().then(token => {
+            const record = this.sendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              method: 'POST',
+              body: {
+                values
+              }
+            })
           })
+
 
 
           const batchUrl = `${url}/${record.id}/linked/batch`
@@ -1783,15 +1768,18 @@ export default {
         }
       })
 
-      return this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        method: 'POST',
-        body: {
-          data: properties
-        }
+      return useGetToken().then(token => {
+        return this.sendXhr(url, {
+          header: {
+            Authorization: `bearer ${token}`
+          },
+          method: 'POST',
+          body: {
+            data: properties
+          }
+        })
       })
+
     },
 
     /**
@@ -1885,39 +1873,42 @@ export default {
         const url = this.recordUrl
         const values = this.formatSavedValues()
 
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          },
-          method: 'PUT',
-          body: {
-            values
-          }
+        useGetToken().then(token => {
+          this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
+            },
+            method: 'PUT',
+            body: {
+              values
+            }
+          })
+            .then(resp => {
+              this.savingChanges = false
+              this.updateEditingInstance(false)
+              this.changedProperties = []
+              this.errorProperties = []
+
+              const values = propOr([], 'values', resp)
+              this.instance.values = values
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
+                }
+              })
+
+              EventBus.$emit('track-event', {
+                name: 'Record Saved'
+              })
+            })
+            .catch(err => {
+              this.processing = false
+              this.savingChanges = false
+              this.handleXhrError(err)
+            })
         })
-          .then(resp => {
-            this.savingChanges = false
-            this.updateEditingInstance(false)
-            this.changedProperties = []
-            this.errorProperties = []
 
-            const values = propOr([], 'values', resp)
-            this.instance.values = values
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
-              }
-            })
-
-            EventBus.$emit('track-event', {
-              name: 'Record Saved'
-            })
-          })
-          .catch(err => {
-            this.processing = false
-            this.savingChanges = false
-            this.handleXhrError(err)
-          })
       }
     },
 
@@ -2024,11 +2015,14 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function() {
-      return this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
+      return useGetToken().then(token => {
+        return this.sendXhr(this.getModelSchemaUrl, {
+          header: {
+            Authorization: `bearer ${token}`
+          }
+        })
       })
+
     },
 
     /**
@@ -2099,9 +2093,6 @@ export default {
      * GET url for record relationships tables
      */
     getRecordRelationshipsUrl: function(conceptName) {
-      if (!this.userToken || !this.isOrgSynced) {
-        return
-      }
 
       let url = `${
         this.config.conceptsUrl
@@ -2122,19 +2113,23 @@ export default {
     checkForDefaultRelationship: function() {
       // check if belongs_to relationship exists in dataset
       const url = this.relationshipsUrl
+
       if (url) {
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        })
-          .then(resp => {
-            const belongsTo = find(propEq('name', 'belongs_to'), resp)
-            if (resp.length === 0 || !belongsTo) {
-              this.createDefaultRelationship()
+        useGetToken().then(token => {
+          this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
             }
           })
-          .catch(this.handleXhrError.bind(this))
+            .then(resp => {
+              const belongsTo = find(propEq('name', 'belongs_to'), resp)
+              if (resp.length === 0 || !belongsTo) {
+                this.createDefaultRelationship()
+              }
+            })
+            .catch(this.handleXhrError.bind(this))
+        })
+
       }
     },
 
@@ -2142,18 +2137,21 @@ export default {
      * Creates default relationship
      */
     createDefaultRelationship: function() {
-      this.sendXhr(this.relationshipsUrl, {
-        method: 'POST',
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).catch(this.handleXhrError.bind(this))
+      useGetToken(token => {
+        this.sendXhr(this.relationshipsUrl, {
+          method: 'POST',
+          header: {
+            Authorization: `bearer ${token}`
+          },
+          body: {
+            name: 'belongs_to',
+            displayName: 'Belongs To',
+            description: '',
+            schema: []
+          }
+        }).catch(this.handleXhrError.bind(this))
+      })
+
     },
 
     /**
@@ -2253,10 +2251,11 @@ export default {
      * Get linked properties
      */
     getLinkedProperties: function() {
-      if (this.linkedPropertiesUrl) {
+
+      useGetToken().then(token => {
         this.sendXhr(this.linkedPropertiesUrl, {
           header: {
-            Authorization: `bearer ${this.userToken}`
+            Authorization: `bearer ${token}`
           }
         })
           .then(response => {
@@ -2277,7 +2276,9 @@ export default {
           .catch(response => {
             this.handleXhrError(response)
           })
-      }
+      })
+
+
     },
 
     /**
@@ -2347,17 +2348,20 @@ export default {
         this.config.conceptsUrl
       }/datasets/${this.datasetId}/concepts/${this.modelId}/instances/${this.instanceId}`
 
-      this.sendXhr(recordUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(resp => {
-          const displayName = propOr('', 'value', head(resp.values))
-          linkedProperty.to.recordDisplayName = displayName
-          this.linkedProperties.splice(index, 1, linkedProperty)
+      useGetToken().then(token => {
+        this.sendXhr(recordUrl, {
+          header: {
+            Authorization: `bearer ${token}`
+          }
         })
-        .catch(this.handleXhrError.bind(this))
+          .then(resp => {
+            const displayName = propOr('', 'value', head(resp.values))
+            linkedProperty.to.recordDisplayName = displayName
+            this.linkedProperties.splice(index, 1, linkedProperty)
+          })
+          .catch(this.handleXhrError.bind(this))
+      })
+
     },
 
     /**

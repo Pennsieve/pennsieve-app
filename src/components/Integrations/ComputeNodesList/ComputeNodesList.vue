@@ -61,17 +61,13 @@ export default {
   mixins: [Request],
 
   data() {
-    return {
-      computeNodes: [],
-    };
-  },
 
-  created() {
-    this.fetchComputeNodes();
   },
 
   computed: {
     ...mapGetters(["activeOrganization", "config", "hasFeature"]),
+    ...mapState("analysisModule", ["computeNodes"]),
+
 
     hasAdminRights: function () {
       if (this.activeOrganization) {
@@ -100,44 +96,7 @@ export default {
   methods: {
     ...mapActions([]),
     ...mapState([]),
-    /**
-     * Model URL
-     * @returns {String}
-     */
-    getIntegrationUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`;
-      }
 
-      return "";
-    },
-    /**
-     * Fetches Compute Nodes
-     */
-    fetchComputeNodes: async function () {
-      const userToken = await useGetToken()
-
-      const url = `${this.config.api2Url}/compute-nodes`;
-
-      this.sendXhr(url, {
-        method: "GET",
-        header: {
-          Authorization: `Bearer ${userToken}`,
-        },
-      })
-        .then((response) => {
-          this.computeNodes = response;
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue fetching your data",
-              type: "error",
-            },
-          });
-        });
-    },
   },
 };
 </script>

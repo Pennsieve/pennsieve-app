@@ -146,7 +146,7 @@
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
-import { propOr } from "ramda";
+import {mergeDeepRight, propOr} from "ramda";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -165,6 +165,8 @@ import OnboardingCarousel from "../../onboarding-carousel/OnboardingCarousel.vue
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import toQueryParams from "@/utils/toQueryParams";
 
 export default {
   name: "BfDatasetList",
@@ -233,7 +235,6 @@ export default {
 
     ...mapGetters([
       "activeOrganization",
-      "userToken",
       "config",
       "teams",
       "hasFeature",
@@ -351,10 +352,14 @@ export default {
     this.filterType = filterType;
     this.sortBy = sortBy;
     this.sortDirection = sortDirection;
+
+    this.fetchDatasets()
+
   },
 
   methods: {
-    ...mapActions(["setDatasetFilters"]),
+    ...mapActions(["setDatasetFilters","setIsLoadingDatasets",
+      "setIsLoadingDatasetsError","setDatasets"]),
     ...mapActions("datasetModule", [
       "updateDatasetSearchOrderDirection",
       "updateDatasetSearchLimit",
@@ -365,7 +370,52 @@ export default {
       "updateDatasetSearchWithCollection",
       "updateDatasetSearchOrderBy",
       "updateDatasetOffset",
+      "updateDatasetTotalCount"
+
     ]),
+
+    getDatasetsUrl: async function () {
+      return useGetToken().then((t) => {
+        const params = toQueryParams(
+          mergeDeepRight(this.datasetSearchParams, { api_key: t })
+        );
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
+      })
+
+    },
+
+    fetchDatasets: async function () {
+      return this.setIsLoadingDatasets(true)
+        .then(async () => {
+          return this.getDatasetsUrl()
+            .then(url => {
+              return this.sendXhr(url, {})
+            })
+            .then((response) => {
+              this.setIsLoadingDatasetsError(false);
+              return this.setDatasetData(response);
+            })
+        })
+        .catch((err) => {
+          console.log(err)
+          this.setDatasetData([]);
+          this.setIsLoadingDatasetsError(true);
+        })
+        .finally(() => this.setIsLoadingDatasets(false));
+    },
+
+    /**
+     * Set dataset data
+     * @param {Object} response
+     */
+    setDatasetData: function (response) {
+      const datasets = propOr([], "datasets", response);
+      const datasetTotal = propOr(0, "totalCount", response);
+      return this.setDatasets(datasets).then(() => {
+        return this.updateDatasetTotalCount(datasetTotal);
+      });
+    },
+
 
     onCloseCreateDialog: function () {
       this.newDatasetDialogOpen = false;

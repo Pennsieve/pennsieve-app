@@ -9,6 +9,7 @@ import LogoutHandler from '../logout-handler'
 import Cookies from 'js-cookie'
 import { path, pathOr, propOr, find, pathEq, defaultTo, compose, prop, propEq } from 'ramda'
 import {useGetToken} from "@/composables/useGetToken";
+import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 
 export default {
   data() {
@@ -31,11 +32,11 @@ export default {
     // Vue event listeners
     // EventBus.$on('login', this.onLogin.bind(this))
     EventBus.$on('logout', this.onLogout.bind(this))
+    EventBus.$on('switch-organization', useSwitchWorkspace.bind(this))
     EventBus.$on('toast', this.onToast.bind(this))
     EventBus.$on('ajaxError', this.onToast.bind(this))
     EventBus.$on('trigger-download', this.onTriggerDownload.bind(this))
     EventBus.$on('trigger-record-csv-download', this.onTriggerRecordCsvDownload.bind(this))
-    EventBus.$on('switch-organization', this.onSwitchOrganization.bind(this))
     EventBus.$on('open-viewer', this.onOpenViewer.bind(this))
     EventBus.$on('add-to-upload-queue', this.addToUploadQueue.bind(this))
     EventBus.$on('add-input-files-to-upload-queue', this.addInputFilesToUploadQueue.bind(this))
@@ -52,11 +53,11 @@ export default {
   beforeUnmount() {
     // Vue event listeners
     EventBus.$off('logout', this.onLogout.bind(this))
+    EventBus.$on('switch-organization', useSwitchWorkspace.bind(this))
     EventBus.$off('toast', this.onToast.bind(this))
     EventBus.$off('ajaxError', this.onToast.bind(this))
     EventBus.$off('trigger-download', this.onTriggerDownload.bind(this))
     EventBus.$off('trigger-record-csv-download', this.onTriggerRecordCsvDownload.bind(this))
-    EventBus.$off('switch-organization', this.onSwitchOrganization.bind(this))
     EventBus.$off('open-viewer', this.onOpenViewer.bind(this))
     EventBus.$off('add-to-upload-queue', this.addToUploadQueue.bind(this))
     EventBus.$off('add-input-files-to-upload-queue', this.addInputFilesToUploadQueue.bind(this))
@@ -100,12 +101,9 @@ export default {
      * @returns {String}
      */
     orgMembersUrl: async function() {
-      const userToken = await useGetToken()
-
-      if (!this.activeOrgId) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/members?api_key=${userToken}`
+      return useGetToken().then(token => {
+        return `${this.config.apiUrl}/organizations/${this.activeOrgId}/members?api_key=${token}`
+      }).catch(err => console.log(err))
     },
 
     /**
@@ -226,79 +224,79 @@ export default {
 
     },
 
-    /**
-     * Gets user profile and active org data
-     * @param {String} token
-     */
-    getProfileAndOrg: function(token) {
-      // add logic to only make organizations request if profile is defined
-      let currentPath = this.$router.currentRoute.path
-      const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
-      const profilePromise = this.sendXhr(this.getProfileUrl(token))
+    // /**
+    //  * Gets user profile and active org data
+    //  * @param {String} token
+    //  */
+    // getProfileAndOrg: function(token) {
+    //   // add logic to only make organizations request if profile is defined
+    //   let currentPath = this.$router.currentRoute.path
+    //   const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
+    //   const profilePromise = this.sendXhr(this.getProfileUrl(token))
+    //
+    //   return Promise.all([orgPromise, profilePromise])
+    //     .then(([orgs, profile]) => {
+    //       this.updateProfile(profile)
+    //
+    //       const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
+    //         this.updateOrganizations(sortedOrgs)
+    //
+    //       const preferredOrgId = profile.preferredOrganization
+    //
+    //       // check route params for orgId
+    //       const activeOrgId = preferredOrgId ?
+    //         pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
+    //         path(['organizations', 0, 'organization', 'id'], orgs)
+    //       const activeOrgIndex = orgs.organizations.findIndex(org => Boolean(org.organization.id === activeOrgId))
+    //       const activeOrg = orgs.organizations[activeOrgIndex]
+    //
+    //       // handle org switch
+    //
+    //       return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
+    //
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
 
-      return Promise.all([orgPromise, profilePromise])
-        .then(([orgs, profile]) => {
-          this.updateProfile(profile)
+    // /**
+    //  * Sequence of Xhr calls to get data for org-level. These data should always be present
+    //  * in workspace.
+    //  */
+    // getPrimaryData: async function(userToken) {
+    //
+    //
+    //   const teamPromise = this.getTeams()
+    //     .then( () =>{
+    //       this.getPublishers()
+    //     })
+    //
+    //   const membersPromise = this.getOrgMembers()
+    //   const orgContributorsPromise = this.getOrgContributors()
+    //   const dataUseAgreementPromise = this.getDataUseAgreements()
+    //
+    //   return Promise.all([
+    //       teamPromise,
+    //       membersPromise,
+    //       orgContributorsPromise,
+    //       dataUseAgreementPromise,
+    //   ]).catch(this.handleXhrError.bind(this))
+    // },
 
-          const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
-            this.updateOrganizations(sortedOrgs)
-
-          const preferredOrgId = profile.preferredOrganization
-
-          // check route params for orgId
-          const activeOrgId = preferredOrgId ?
-            pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
-            path(['organizations', 0, 'organization', 'id'], orgs)
-          const activeOrgIndex = orgs.organizations.findIndex(org => Boolean(org.organization.id === activeOrgId))
-          const activeOrg = orgs.organizations[activeOrgIndex]
-
-          // handle org switch
-          
-          return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
-
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
-
-    /**
-     * Sequence of Xhr calls to get data for org-level. These data should always be present
-     * in workspace.
-     */
-    getPrimaryData: async function(userToken) {
-
-
-      const teamPromise = this.getTeams()
-        .then( () =>{
-          this.getPublishers()
-        })
-
-      const membersPromise = this.getOrgMembers()
-      const orgContributorsPromise = this.getOrgContributors()
-      const dataUseAgreementPromise = this.getDataUseAgreements()
-
-      return Promise.all([
-          teamPromise,
-          membersPromise,
-          orgContributorsPromise,
-          dataUseAgreementPromise,
-      ]).catch(this.handleXhrError.bind(this))
-    },
-
-    /**
-     * Switch orgs if active org is not preferred org
-     * @param {Object} activeOrg
-     * @param {String} activeOrgId
-     * @param {String} preferredOrgId
-     * @returns {Promise}
-     */
-    handleRedirects: function(activeOrg, activeOrgId, preferredOrgId) {
-      // handle direct links
-      if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
-        EventBus.$emit('switch-organization', activeOrg, false)
-        return Promise.resolve()
-      }
-      return this.updateActiveOrganization(activeOrg)
-    },
+    // /**
+    //  * Switch orgs if active org is not preferred org
+    //  * @param {Object} activeOrg
+    //  * @param {String} activeOrgId
+    //  * @param {String} preferredOrgId
+    //  * @returns {Promise}
+    //  */
+    // handleRedirects: function(activeOrg, activeOrgId, preferredOrgId) {
+    //   // handle direct links
+    //   if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
+    //     EventBus.$emit('switch-organization', activeOrg, false)
+    //     return Promise.resolve()
+    //   }
+    //   return this.updateActiveOrganization(activeOrg)
+    // },
     /**
      * Get active org url
      * @param {String} token
@@ -425,64 +423,64 @@ export default {
      * @param {Boolean} bool
      */
     onSwitchOrganization: async function(evt, redirect = true) {
-
-      const token = await useGetToken()
-
-      const newOrg = propOr({}, 'organization', evt)
-      const newDestNodeId = pathOr('', ['destination', 'datasetNodeId'], evt)
-      const newOrgId = propOr(1, 'id', newOrg)
-      const newOrgIntId = propOr(1, 'intId', newOrg)
-      const activeOrgId = pathOr(0, ['organization', 'id'], this.activeOrganization)
-      // Do nothing if the user is trying to switch to the organization that is already active or if no userToken found
-      if (newOrgId === activeOrgId) {
-        return
-      }
-      // switch org in vue app
-      const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${newOrgIntId}&api_key=${token}`
-      
-      this.sendXhr(switchOrgUrl, { method: 'PUT' })
-        .then(response => {
-          const updatedOrg = find(pathEq(['organization', 'id'], newOrgId), this.organizations)
-
-          // Clear filters and search query
-          this.clearDatasetFilters()
-          this.clearSearchState()
-
-          // Reset state of dataset
-          this.setDatasets([])
-          this.updateConcepts([])
-          this.updateFilesProxyId(null)
-
-          this.updateActiveOrganization(updatedOrg)
-          this.updateProfile(response)
-
-          // Reset state of menu
-          // this.togglePrimaryNav(true)
-          // this.toggleSecondaryNav(false)
-
-          // Reset state of dataset templates
-          this.setDatasetTemplates([])
-
-          // Check to see if user has accepted terms of service
-          const isSubscribed = this.checkIsSubscribed(updatedOrg)
-          if (redirect === true) {
-            if (!isSubscribed) {
-              this.$router.replace(`/${newOrgId}/welcome/terms-of-service`)
-            } else {
-              this.setDefaultRoute(newOrgId)
-            }
-          }
-          if (newDestNodeId !== '') {
-            this.$router.replace(`/${newOrgId}/datasets/${newDestNodeId}/overview`)
-          }
-          return this.getOrgMembers()
-                  .then(this.getTeams.bind(this))
-                  .then(this.getOrgContributors.bind(this))
-        })
-        .catch((error) => {
-          console.error(error)
-          this.handleXhrError.bind(this)
-        })
+      //
+      // const token = await useGetToken()
+      //
+      // const newOrg = propOr({}, 'organization', evt)
+      // const newDestNodeId = pathOr('', ['destination', 'datasetNodeId'], evt)
+      // const newOrgId = propOr(1, 'id', newOrg)
+      // const newOrgIntId = propOr(1, 'intId', newOrg)
+      // const activeOrgId = pathOr(0, ['organization', 'id'], this.activeOrganization)
+      // // Do nothing if the user is trying to switch to the organization that is already active or if no userToken found
+      // if (newOrgId === activeOrgId) {
+      //   return
+      // }
+      // // switch org in vue app
+      // const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${newOrgIntId}&api_key=${token}`
+      //
+      // this.sendXhr(switchOrgUrl, { method: 'PUT' })
+      //   .then(response => {
+      //     const updatedOrg = find(pathEq(['organization', 'id'], newOrgId), this.organizations)
+      //
+      //     // Clear filters and search query
+      //     this.clearDatasetFilters()
+      //     this.clearSearchState()
+      //
+      //     // Reset state of dataset
+      //     this.setDatasets([])
+      //     this.updateConcepts([])
+      //     this.updateFilesProxyId(null)
+      //
+      //     this.updateActiveOrganization(updatedOrg)
+      //     this.updateProfile(response)
+      //
+      //     // Reset state of menu
+      //     // this.togglePrimaryNav(true)
+      //     // this.toggleSecondaryNav(false)
+      //
+      //     // Reset state of dataset templates
+      //     this.setDatasetTemplates([])
+      //
+      //     // Check to see if user has accepted terms of service
+      //     const isSubscribed = this.checkIsSubscribed(updatedOrg)
+      //     if (redirect === true) {
+      //       if (!isSubscribed) {
+      //         this.$router.replace(`/${newOrgId}/welcome/terms-of-service`)
+      //       } else {
+      //         this.setDefaultRoute(newOrgId)
+      //       }
+      //     }
+      //     if (newDestNodeId !== '') {
+      //       this.$router.replace(`/${newOrgId}/datasets/${newDestNodeId}/overview`)
+      //     }
+      //     return this.getOrgMembers()
+      //             .then(this.getTeams.bind(this))
+      //             .then(this.getOrgContributors.bind(this))
+      //   })
+      //   .catch((error) => {
+      //     console.error(error)
+      //     this.handleXhrError.bind(this)
+      //   })
     },
     /**
      * Updates org users object with any missing fields required for sorting
@@ -507,16 +505,14 @@ export default {
      */
     getOrgMembers: async function() {
 
-      const url = await this.orgMembersUrl
-      if (!url) {
-        return
-      }
       if (this.hasFeature('sandbox_org_feature')) {
         return
       }
-      return this.sendXhr(url).then(resp => {
-        const members = this.updateMembers(resp)
-        this.updateOrgMembers(members)
+      return this.orgMembersUrl.then(url => {
+        return this.sendXhr(url).then(resp => {
+          const members = this.updateMembers(resp)
+          this.updateOrgMembers(members)
+        })
       })
     },
     /**

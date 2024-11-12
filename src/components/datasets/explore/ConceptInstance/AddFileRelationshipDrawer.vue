@@ -126,6 +126,7 @@ import FormatDate from '@/mixins/format-date'
 
 import EventBus from '@/utils/event-bus'
 import { packageDisplayName } from '@/utils/packages'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'AddFileRelationshipDrawer',
@@ -272,18 +273,20 @@ export default {
      */
     createDefaultRelationship: function(datasetId) {
       const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      return this.sendXhr(url, {
-        method: 'POST',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).then(this.createFileRelationship.bind(this))
+      return useGetToken().then(token =>{
+        this.sendXhr(url, {
+          method: 'POST',
+          header: {
+            'Authorization': `bearer ${token}`
+          },
+          body: {
+            name: 'belongs_to',
+            displayName: 'Belongs To',
+            description: '',
+            schema: []
+          }
+        }).then(this.createFileRelationship.bind(this))
+      })
     },
 
     /**

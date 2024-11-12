@@ -82,7 +82,8 @@
     mapActions,
     mapGetters,
     mapState
-} from 'vuex'
+  } from 'vuex'
+
   import {
     propEq,
     assoc,
@@ -185,10 +186,10 @@
        * @returns {String}
        */
       getUsersUrl: async function() {
-        const userToken = await useGetToken()
-        return this.userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/users?api_key=${userToken}`
-          : ''
+        return await useGetToken().then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/users?api_key=${token}`
+        })
+
       },
 
       /**
@@ -196,10 +197,9 @@
        * @returns {String}
        */
       getTeamsUrl: async function() {
-        const userToken = await useGetToken()
-        return userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/teams?api_key=${userToken}`
-          : ''
+        return await useGetToken().then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/teams?api_key=${token}`
+        })
       },
 
       /**
@@ -207,10 +207,9 @@
        * @returns {String}
        */
       getOrganizationsUrl: async function() {
-        const userToken = await useGetToken()
-        return userToken
-          ? `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/organizations?api_key=${userToken}`
-          : ''
+        return await useGetToken().then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/organizations?api_key=${token}`
+        })
       },
     },
 
@@ -263,33 +262,42 @@
        * Get users added to the dataset
        */
       getUsers: function() {
-        this.sendXhr(this.getUsersUrl).then(response => {
-          this.users = response
-          this.loadingEntities -= 1
-        }).catch(this.handleXhrError.bind(this))
+        this.getUsersUrl.then(url => {
+          this.sendXhr(url).then(response => {
+            this.users = response
+            this.loadingEntities -= 1
+          }).catch(this.handleXhrError.bind(this))
+        })
+
       },
 
       /**
        * Get teams added to the dataset
        */
       getTeams: function() {
-        this.sendXhr(this.getTeamsUrl).then(response => {
-          this.teams = response
-          this.loadingEntities -= 1
-        }).catch(this.handleXhrError.bind(this))
+        this.getTeamsUrl.then(url => {
+          this.sendXhr(url).then(response => {
+            this.teams = response
+            this.loadingEntities -= 1
+          }).catch(this.handleXhrError.bind(this))
+        })
+
       },
 
       /**
        * Get organizations added to the dataset
        */
       getOrganizations: function() {
-        this.sendXhr(this.getOrganizationsUrl).then(response => {
-          const role = prop('role', response)
-          if (role) {
-            this.organizations = [response]
-          }
-          this.loadingEntities -= 1
-        }).catch(this.handleXhrError.bind(this))
+        this.getOrganizationsUrl.then(url => {
+          this.sendXhr(url).then(response => {
+            const role = prop('role', response)
+            if (role) {
+              this.organizations = [response]
+            }
+            this.loadingEntities -= 1
+          }).catch(this.handleXhrError.bind(this))
+        })
+
       },
 
       /**
@@ -317,9 +325,7 @@
           ? 'owner'
           : entity
 
-        const userToken = await useGetToken()
 
-        const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${endpointType}?api_key=${userToken}`
 
         const itemId = pathOr('', ['item', 'id'], item)
         const label = pathOr('', ['item', 'label'], item)
@@ -337,69 +343,73 @@
           body.message = message
         }
 
-        this.sendXhr(url, {
-          method: 'PUT',
-          body
-        }).then(() => {
-          if (isAdding) {
-            // Add to the proper list based on entity
-            this[entity].push(body)
+        useGetToken().then(token => {
+          const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${endpointType}?api_key=${token}`
+          this.sendXhr(url, {
+            method: 'PUT',
+            body
+          }).then(() => {
+            if (isAdding) {
+              // Add to the proper list based on entity
+              this[entity].push(body)
 
-            // if the added entity is 'external' then a user was added to the organization
-            // as a guest, and we need to re-fetch the organization users
-            if (entity === 'external') {
-              EventBus.$emit('update-organization-members', {})
+              // if the added entity is 'external' then a user was added to the organization
+              // as a guest, and we need to re-fetch the organization users
+              if (entity === 'external') {
+                EventBus.$emit('update-organization-members', {})
+              }
+
+              // Clear form
+              this.$refs.addPermissionForm.reset()
+
+              // Reset processing
+              this.processingForm = false
+
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: 'Permission added'
+                }
+              })
+            } else {
+              // Update existing role
+              const idx = findIndex(propEq('id', itemId), this[entity])
+              this[entity].splice(idx, 1, body)
+
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: 'Permission updated'
+                }
+              })
             }
 
-            // Clear form
-            this.$refs.addPermissionForm.reset()
+            if (item.role === 'owner') {
+              this.removeOldOwner(itemId)
 
+              // Update dataset role
+              if (this.datasetRole === 'owner') {
+                this.setDatasetOwner(itemId)
+              }
+            }
+
+            const isCurrentUser = itemId === this.profile.id
+            if (isCurrentUser) {
+              this.setDatasetRole({ role: item.role })
+            }
+          }).catch(() => {
             // Reset processing
             this.processingForm = false
 
             EventBus.$emit('toast', {
               detail: {
-                type: 'success',
-                msg: 'Permission added'
+                type: 'error',
+                msg: 'Sorry, an error has occurred'
               }
             })
-          } else {
-            // Update existing role
-            const idx = findIndex(propEq('id', itemId), this[entity])
-            this[entity].splice(idx, 1, body)
-
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                msg: 'Permission updated'
-              }
-            })
-          }
-
-          if (item.role === 'owner') {
-            this.removeOldOwner(itemId)
-
-            // Update dataset role
-            if (this.datasetRole === 'owner') {
-              this.setDatasetOwner(itemId)
-            }
-          }
-
-          const isCurrentUser = itemId === this.profile.id
-          if (isCurrentUser) {
-            this.setDatasetRole({ role: item.role })
-          }
-        }).catch(() => {
-          // Reset processing
-          this.processingForm = false
-
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg: 'Sorry, an error has occurred'
-            }
           })
         })
+
       },
 
       /**
@@ -408,37 +418,41 @@
        */
       removePermission: function(item) {
         const entity = propOr('', 'entity', item)
-        const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${entity}?api_key=${this.userToken}`
-
         let id = this.getEntityId(item, entity)
 
-        this.sendXhr(url, {
-          method: 'DELETE',
-          body: {
-            id
-          }
-        }).then(() => {
-          if (entity === 'organizations') {
-            this.organizations = []
-          } else {
-            const idx = findIndex(propEq('id', id), this[entity])
-            this[entity].splice(idx, 1)
-          }
+        useGetToken().then(token => {
+          const url = `${this.config.apiUrl}/datasets/${this.datasetId}/collaborators/${entity}?api_key=${token}`
+          this.sendXhr(url, {
+            method: 'DELETE',
+            body: {
+              id
+            }
+          }).then(() => {
+            if (entity === 'organizations') {
+              this.organizations = []
+            } else {
+              const idx = findIndex(propEq('id', id), this[entity])
+              this[entity].splice(idx, 1)
+            }
 
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'success',
-              msg: 'Permission removed'
-            }
-          })
-        }).catch(() => {
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg: 'Sorry, an error has occurred'
-            }
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'success',
+                msg: 'Permission removed'
+              }
+            })
+          }).catch(() => {
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'error',
+                msg: 'Sorry, an error has occurred'
+              }
+            })
           })
         })
+
+
+
       },
 
       /**

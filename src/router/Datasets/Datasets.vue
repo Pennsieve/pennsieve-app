@@ -401,30 +401,6 @@
       },
 
       /**
-       * Gets sites for dataset
-       */
-      getSites: function() {
-        const defaultPromise = Promise.resolve([])
-        const datasetId = pathOr(0, ['content', 'id'], this.dataset)
-        if (datasetId === 0) {
-          return this.updateSites([])
-        }
-
-        this.updateIsLoadingConcepts(true)
-
-        const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/site/instances`
-        return this.sendXhr(url, {
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(response => {
-          this.updateSites(response)
-        })
-        .catch(_ => this.updateSites([]))
-      },
-
-      /**
        * Get user's role
        * @returns {Promise}
        */

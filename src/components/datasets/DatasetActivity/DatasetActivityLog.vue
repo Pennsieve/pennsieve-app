@@ -30,7 +30,7 @@
         v-loading="isLoadingDatasetActivity"
         class="dataset-activity-wrap"
       >
-        <template v-if="hasDatasetActivity">
+        <div v-if="hasDatasetActivity">
           <dataset-activity-panel
             v-for="(evt, idx) in datasetActivity"
             :key="evt.timeRange.start+evt.timeRange.end"
@@ -50,10 +50,10 @@
               Load more
             </bf-button>
           </div>
-        </template>
+        </div>
 
         <bf-empty-page-state
-          v-if="!hasDatasetActivity && !isLoadingDatasetActivity"
+          v-if="!this.hasDatasetActivity"
           class="no-results-found-wrapper"
         >
           <img
@@ -84,7 +84,6 @@
 
 <script>
 import { mapActions, mapState, mapGetters } from 'vuex'
-import Cookies from 'js-cookie'
 import { DATASET_ACTIVITY_ALL_CATEGORIES,
   DATASET_ACTIVITY_ALL_CONTRIBUTORS,
   DATASET_ACTIVITY_DATE_RANGE_30,
@@ -199,13 +198,7 @@ export default {
      * Compute get dataset users URL
      * @returns {String}
      */
-    getDatasetUsersUrl: async function() {
-      return useGetToken()
-        .then((token) => {
-          const datasetId = this.$route.params.datasetId
-          return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${token}`
-        })
-    },
+
 
     /**
      * Compute dataset contributors
@@ -234,18 +227,12 @@ export default {
     }
   },
 
-  watch: {
-    getDatasetUsersUrl: {
-      handler: function() {
-        this.getDatasetUsers()
-      },
-      immediate: true
-    }
-  },
+
 
   mounted () {
     this.clearDatasetActivityState()
     this.fetchDatasetActivity()
+    this.getDatasetUsers()
   },
 
   methods: {
@@ -257,6 +244,14 @@ export default {
       'fetchDatasetActivity',
       'clearDatasetActivityState'
     ]),
+
+    getDatasetUsersUrl: async function() {
+      return useGetToken()
+        .then((token) => {
+          const datasetId = this.$route.params.datasetId
+          return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${token}`
+        })
+    },
 
     /**
      * Set sort direction
@@ -273,17 +268,15 @@ export default {
      * Get users with permissions to this dataset
      */
     getDatasetUsers: function() {
-      this.getDatasetUsersUrl.then( (url) => {
+      this.getDatasetUsersUrl().then((url) => {
         this.sendXhr(url)
           .then((response) => {
-            this.datasetUsers = datasetUsers
+            this.datasetUsers = response
           })
       })
         .catch(() => {
         this.datasetUsers = []
       })
-
-
     }
   }
 }

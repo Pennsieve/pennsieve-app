@@ -304,24 +304,25 @@ export const actions = {
     const datasetId = router.currentRoute.value.params.datasetId
     const endpoint = `${rootState.config.apiUrl}/datasets/${datasetId}/changelog/timeline`
 
-    const apiKey = await useGetToken()
-
-    const queryParams = getQueryParams(state.datasetActivityParams, apiKey)
-
-    const url = `${endpoint}?${queryParams}`
-
     try {
-      const resp = await fetch(url)
-      if (resp.ok) {
-        const { eventGroups, cursor } = await resp.json()
-        const datasetActivity = state.datasetActivityParams.cursor ? [ ...state.datasetActivity, ...eventGroups ] : eventGroups
-        commit('UPDATE_DATASET_ACTIVITY', datasetActivity)
+      await useGetToken().then(token => {
+        const queryParams = getQueryParams(state.datasetActivityParams, token)
+        const url = `${endpoint}?${queryParams}`
+        fetch(url).then(resp =>{
+          if (resp.ok) {
+            resp.json().then(json => {
+              const datasetActivity = state.datasetActivityParams.cursor ? [ ...state.datasetActivity, ...json.eventGroups ] : json.eventGroups
+              commit('UPDATE_DATASET_ACTIVITY', datasetActivity)
 
-        commit('UPDATE_DATASET_ACTIVITY_CURSOR', cursor)
-      } else {
-        commit('UPDATE_DATASET_ACTIVITY', [])
-        throw new Error(resp.statusText)
-      }
+              commit('UPDATE_DATASET_ACTIVITY_CURSOR', json.cursor)
+            })
+          } else {
+            commit('UPDATE_DATASET_ACTIVITY', [])
+            throw new Error(resp.statusText)
+          }
+        })
+
+      })
       commit('UPDATE_IS_LOADING_DATASET_ACTIVITY', false)
     } catch (err) {
       EventBus.$emit('ajaxError', err)

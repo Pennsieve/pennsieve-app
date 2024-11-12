@@ -77,7 +77,7 @@ export default {
             this.sendXhr(url, {
               method:'POST',
               header: {
-                'Authorization': `Bearer ${this.userToken}`
+                'Authorization': `Bearer ${token}`
               },
               body:XhrBody
             })
@@ -157,17 +157,20 @@ export default {
       }
 
       const self = this
-      self.sendXhr(url, {
-        method:'PUT',
-        header: {
-          'Authorization': `Bearer ${this.userToken}`
-        },
-        body:XhrBody
-      } ).then((response) => {
-        self.$store.dispatch('viewerModule/updateAnnotation', this.activeAnnotation)
-        self.onAnnotationUpdated()
+      useGetToken().then(token => {
+        elf.sendXhr(url, {
+          method:'PUT',
+          header: {
+            'Authorization': `Bearer ${token}`
+          },
+          body:XhrBody
+        } ).then((response) => {
+          self.$store.dispatch('viewerModule/updateAnnotation', this.activeAnnotation)
+          self.onAnnotationUpdated()
+        })
+            .catch(self.handleXhrError.bind(this))
       })
-        .catch(self.handleXhrError.bind(this))
+      s
     },
     removeAnnotation: function(annotation) {
       let annLayerId = ''
@@ -182,16 +185,19 @@ export default {
       const url = `${this.config.apiUrl}/timeseries/${timeseriesId}/layers/${annLayerId}/annotations/${annotation.id}`;
 
       const self = this
-      self.sendXhr(url, {
-        method:'DELETE',
-        header: {
-          'Authorization': `Bearer ${this.userToken}`
-        },
-      } ).then((response) => {
-        self.$store.dispatch('viewerModule/deleteAnnotation', annotation)
-        self.onAnnotationDeleted()
+      useGetToken().then(token => {
+        self.sendXhr(url, {
+          method:'DELETE',
+          header: {
+            'Authorization': `Bearer ${token}`
+          },
+        } ).then((response) => {
+          self.$store.dispatch('viewerModule/deleteAnnotation', annotation)
+          self.onAnnotationDeleted()
+        })
+            .catch(self.handleXhrError.bind(this))
       })
-        .catch(self.handleXhrError.bind(this))
+
 
     },
     sortAnns: function(annArray) {
