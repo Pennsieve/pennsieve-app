@@ -41,7 +41,6 @@
               New Folder
             </bf-button>
           </template>
-          <<<<<<< HEAD ======= >>>>>>> main
           <ps-button-dropdown
             @click="toggleActionDropdown"
             :menu-open="!quickActionsVisible"
