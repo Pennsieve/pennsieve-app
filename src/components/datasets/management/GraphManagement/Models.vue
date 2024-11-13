@@ -169,6 +169,8 @@
   import IconTrash from "../../../icons/IconTrash.vue";
   import Cookies from "js-cookie";
   import DeleteConceptDialog from "@/components/datasets/management/DeleteConceptDialog/DeleteConceptDialog.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'Models',
@@ -319,11 +321,15 @@
         const promises = models.map(model => {
           const modelId = model.id
           const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}/linked`
-          return this.sendXhr(url, {
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            }
-          })
+          return useGetToken()
+            .then(token => {
+              return useSendXhr(url, {
+                header: {
+                  'Authorization': `bearer ${token}`
+                }
+              })
+            }).catch(err => useHandleXhrError(err))
+
         })
         return promises
       },
@@ -383,18 +389,22 @@
       setLockModel: function(locked) {
         const body = Object.assign({}, this.activeModel, { locked })
 
-        this.sendXhr(this.modelUrl, {
-          method: 'PUT',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body
-        })
-        .then(response => {
-          this.lockDialogVisible = false
-          this.updateModel(response)
-        })
-        .catch(this.handleXhrError.bind(this))
+        useGetToken()
+          .then(token => {
+            this.sendXhr(this.modelUrl, {
+              method: 'PUT',
+              header: {
+                'Authorization': `bearer ${token}`
+              },
+              body
+            })
+              .then(response => {
+                this.lockDialogVisible = false
+                this.updateModel(response)
+              })
+              .catch(this.handleXhrError.bind(this))
+          })
+
       },
 
       /**

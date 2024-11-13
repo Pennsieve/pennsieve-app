@@ -72,6 +72,8 @@
   import AutoFocus from '../../../../mixins/auto-focus'
   import Sorter from '../../../../mixins/sorter'
   import EventBus from '../../../../utils/event-bus'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'RenameConceptDialog',
@@ -158,34 +160,36 @@
           const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${conceptId}`
           const concept = Object.assign({}, this.updatingConcept, this.concept)
 
-          this.sendXhr(url, {
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            },
-            method: 'PUT',
-            body: concept
-          })
-          .then(response => {
-            // Update state
-            let concepts = clone(this.concepts)
-            const index = findIndex(propEq('id', response.id), concepts)
-            concepts[index] = response
+          useGetToken()
+            .then(token => {
+              return useSendXhr(url, {
+                header: {
+                  'Authorization': `bearer ${token}`
+                },
+                method: 'PUT',
+                body: concept
+              })
+                .then(response => {
+                  // Update state
+                  let concepts = clone(this.concepts)
+                  const index = findIndex(propEq('id', response.id), concepts)
+                  concepts[index] = response
 
-            const sortedConcepts = this.returnSort('displayName', concepts, 'asc')
-            this.renameModel(response)
+                  const sortedConcepts = this.returnSort('displayName', concepts, 'asc')
+                  this.renameModel(response)
 
-            this.$emit('close')
+                  this.$emit('close')
 
-            EventBus.$emit('toast', {
-              type: 'success',
-              msg: `${concept.displayName} renamed`
-            })
-          })
-          .catch(response => {
-            this.handleXhrError(response)
-          })
+                  EventBus.$emit('toast', {
+                    type: 'success',
+                    msg: `${concept.displayName} renamed`
+                  })
+                })
+                .catch(response => {
+                  this.handleXhrError(response)
+                })
+            }).finally(() => this.closeDialog())
 
-          this.closeDialog()
         })
       }
     }
