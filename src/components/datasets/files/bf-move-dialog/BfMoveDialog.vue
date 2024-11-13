@@ -122,6 +122,8 @@
   import { propOr, path, pathOr, pathEq, equals, filter, find, isNil, propEq, defaultTo } from 'ramda'
   import { mapGetters } from 'vuex'
   import IconArrowLeft from "../../../icons/IconArrowLeft.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError} from "@/mixins/request/request_composable";
 
   export default {
     name: 'BfMoveDialog',
@@ -178,15 +180,7 @@
         return Object.keys(this.moveConflict).length > 0
       },
 
-      /**
-       * Computes form URL based on type of action user is taking (rename vs creating)
-       * @returns {String}
-       */
-      moveUrl: function() {
-        if (this.config.apiUrl && this.userToken) {
-          return `${this.config.apiUrl}/data/delete?api_key=${this.userToken}`
-        }
-      },
+
 
       /**
        * Get filename if there is a file
@@ -249,6 +243,7 @@
     },
 
     methods: {
+
       /**
        * Compute if file is set as the destination
        * @returns {Boolean}
@@ -268,8 +263,12 @@
         }
         const baseUrl = pathEq(['content', 'packageType'], 'Collection', this.file) ? 'packages' : 'datasets'
         const id = pathOr('', ['content', 'id'], this.file)
-        const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true`
-        this.fetchFiles(url)
+
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true`
+            return this.fetchFiles(url)
+          }).catch(err => useHandleXhrError(err))
       },
 
       /**
@@ -318,9 +317,13 @@
        * @param {Object} file
        */
       onFileNameClick: function(file) {
-        const id = pathOr('', ['content', 'id'], file)
-        const url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}&includeAncestors=true`
-        this.fetchFiles(url)
+        useGetToken()
+          .then(token => {
+            const id = pathOr('', ['content', 'id'], file)
+            const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true`
+            return this.fetchFiles(url)
+          }).catch(err => useHandleXhrError(err))
+
       },
 
       goUp: function() {
@@ -330,12 +333,18 @@
 
         const baseUrl = pathEq(['content', 'packageType'], 'Collection', destination) ? 'packages' : 'datasets'
         const id = pathOr('', ['content', 'id'], destination)
-        const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true`
 
-        const currentFileId = pathOr('', ['content', 'id'], this.file)
-        if (id !== currentFileId) {
-          this.fetchFiles(url)
-        }
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true`
+            const currentFileId = pathOr('', ['content', 'id'], this.file)
+            if (id !== currentFileId) {
+              return this.fetchFiles(url)
+            } else {
+              return Promise.resolve()
+            }
+          }).catch(err => useHandleXhrError(err))
+
       },
 
       /**
@@ -346,7 +355,7 @@
         // Reset selected
         this.destination = {}
 
-        this.sendXhr(url)
+        return this.sendXhr(url)
         .then(response => {
           this.file = response
           this.sortedFiles = this.returnSort('content.name', this.file.children, 'asc')

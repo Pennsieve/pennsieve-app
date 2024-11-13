@@ -450,17 +450,6 @@ export default {
   },
 
   watch: {
-    /**
-     * Watch token in state, and get docs login
-     * when it is populated. This will happen
-     * when a user uses the form to log in
-     * @params {String} token
-     */
-    userToken: function(token) {
-      if (token) {
-        this.fetchModels()
-      }
-    },
     selectedModel: {
       handler: function(models) {
         this.executeSearch()

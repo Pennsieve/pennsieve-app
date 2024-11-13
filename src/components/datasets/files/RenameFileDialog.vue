@@ -74,6 +74,8 @@ import SanitizeName from '../../../mixins/sanitize-name/index'
 import { isValidPackageName } from '@/utils/namingConventions'
 import { mapGetters } from 'vuex'
 import { pathOr, pathEq, equals } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 export default {
   name: 'RenameFileDialog',
@@ -130,16 +132,7 @@ export default {
     ...mapGetters([
       'config'
     ]),
-    /**
-     * Computes form URL based on type of action user is taking (rename vs creating)
-     * @returns {String}
-     */
-    formUrl: function() {
-      if (this.config.apiUrl && this.userToken) {
-        const id = pathOr('', ['content', 'id'], this.file)
-        return `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}`
-      }
-    },
+
     /**
      * Compute dialog text
      * @returns {String}
@@ -152,6 +145,17 @@ export default {
   },
 
   methods: {
+    /**
+     * Computes form URL based on type of action user is taking (rename vs creating)
+     * @returns {String}
+     */
+    formUrl: async function() {
+      useGetToken()
+        .then(token => {
+          const id = pathOr('', ['content', 'id'], this.file)
+          return `${this.config.apiUrl}/packages/${id}?api_key=${token}`
+        }).catch(err => console.log(err))
+    },
     /**
      * On dialog open. Ensure the form field is
      */
@@ -196,27 +200,29 @@ export default {
         return
       }
 
-      if (this.formUrl) {
-        this.sendXhr(this.formUrl, {
-          method: 'PUT',
-          body: this.packageForm
-        })
-          .then(response => {
-            this.$emit('file-renamed', response)
-            this.closeDialog()
+      this.formUrl()
+        .then(url => {
+          return this.sendXhr(url, {
+            method: 'PUT',
+            body: this.packageForm
           })
-          .catch(response => {
-            if (response.status === 500) {
-              response.text()
-                .then(data => {
-                  this.isDuplicate = data.indexOf('package name is already taken') >= 0
+            .then(response => {
+              this.$emit('file-renamed', response)
+              this.closeDialog()
+            })
+            .catch(response => {
+              if (response.status === 500) {
+                response.text()
+                  .then(data => {
+                    this.isDuplicate = data.indexOf('package name is already taken') >= 0
 
-                  // Validate form again to show error
-                  this.$refs.packageForm.validate()
-                })
-            }
-          })
-      }
+                    // Validate form again to show error
+                    this.$refs.packageForm.validate()
+                  })
+              }
+            })
+        })
+
     },
 
     /**

@@ -321,6 +321,8 @@ import Request from '../../../../mixins/request'
 import GetDataType from '../../../../mixins/data-type'
 import AutoFocus from '../../../../mixins/auto-focus'
 import checkUniqueName from '../../../../mixins/check-unique-names'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 
 /**
@@ -583,7 +585,6 @@ export default {
         this.isDataTypeModel = false
         delete this.rules.to
 
-        console.log(this.property)
         if (this.properties.length === 0) {
           this.property.conceptTitle = true
           this.property.required = true
@@ -790,14 +791,18 @@ export default {
       const modelUrl = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${this.modelId}`
       const linkedPropertiesUrl = `${modelUrl}/properties`
 
-      this.sendXhr(linkedPropertiesUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'PUT',
-        body: submitProps
-      })
-      .catch(this.handleXhrError)
+      useGetToken()
+        .then(token => {
+          this.sendXhr(linkedPropertiesUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'PUT',
+            body: submitProps
+          })
+            .catch(err => useHandleXhrError(err))
+        })
+
 
 
     },

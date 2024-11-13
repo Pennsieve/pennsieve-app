@@ -59,6 +59,8 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 import Request from '../../../../mixins/request'
 import EventBus from '../../../../utils/event-bus'
 import IconGraph from "../../../icons/IconGraph.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   components: {
@@ -137,20 +139,22 @@ export default {
      * Makes XHR call to update two factor auth status
      */
     sendRequest: function() {
-      this.sendXhr(this.apiUrl, {
-        method: 'DELETE',
-        body: {
-          sourceRecordId: this.sourceRecordId,
-          proxyInstanceIds: this.data.relationships
-        },
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(this.handleXhrSuccess.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.apiUrl, {
+            method: 'DELETE',
+            body: {
+              sourceRecordId: this.sourceRecordId,
+              proxyInstanceIds: this.data.relationships
+            },
+            header: {
+              'Authorization': `bearer ${token}`
+            }
+          })
+            .then(this.handleXhrSuccess.bind(this))
+            .catch(this.handleXhrError.bind(this))
+        }).finally(() => this.closeDialog())
 
-      this.closeDialog()
     },
     /**
      * Handles successful response

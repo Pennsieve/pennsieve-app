@@ -468,6 +468,7 @@ import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
 import { viewerToolTypes } from "../../../../utils/constants";
 import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "FileDetails",
@@ -1003,13 +1004,10 @@ export default {
      * @returns {String}
      */
     modelUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const datasetId = pathOr("", ["params", "datasetId"], this.$route);
-        const modelId = pathOr("", ["params", "conceptId"], this.$route);
-        return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`;
-      }
+      const datasetId = pathOr("", ["params", "datasetId"], this.$route);
+      const modelId = pathOr("", ["params", "conceptId"], this.$route);
+      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`;
 
-      return "";
     },
 
     getRecordFileRelationshipsUrl: function () {
@@ -1024,12 +1022,6 @@ export default {
      * GET url for relationships and corresponding counts
      */
     relationshipCountsUrl: function () {
-      const { userToken, config, $route } = this;
-
-      if (!userToken || !this.isOrgSynced) {
-        return;
-      }
-
       return `${config.conceptsUrl}/datasets/${this.datasetId}/proxy/package/external/${this.fileId}/relationCounts`;
     },
 
@@ -1189,17 +1181,7 @@ export default {
     //   return this.concepts.length > 0 && !this.isRelationshipsLoading
     // },
 
-    /**
-     * get onboarding events url
-     * @returns {String}
-     */
-    onboardingEventsUrl: function () {
-      const apiUrl = propOr("", "apiUrl", this.config);
-      if (apiUrl && this.userToken) {
-        return `${apiUrl}/onboarding/events?api_key=${this.userToken}`;
-      }
-      return "";
-    },
+
 
     /**
      * Compute options to display in the link to record menu
@@ -1220,29 +1202,12 @@ export default {
       return val !== undefined ? val.toString() : val;
     },
 
-    // /**
-    //  * Schema Linked Properties URL
-    //  * @returns {String}
-    //  */
-    // schemaLinkedPropertiesUrl: function() {
-    //   if (!this.userToken) {
-    //     return
-    //   }
-    //   const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-    //   const modelId = pathOr('', ['params', 'conceptId'], this.$route)
-    //   return `${
-    //     this.config.conceptsUrl
-    //   }/datasets/${datasetId}/concepts/${modelId}/linked`
-    // },
 
     /**
      * Linked Properties URL
      * @returns {String}
      */
     linkedPropertiesUrl: function () {
-      if (!this.userToken || this.isFile) {
-        return;
-      }
 
       const datasetId = pathOr("", ["params", "datasetId"], this.$route);
       const modelId = pathOr("", ["params", "conceptId"], this.$route);
@@ -1259,12 +1224,12 @@ export default {
      * compute the url to fetch the valid string subtypes
      * @returns {String}
      */
-    stringSubtypeUrl: function () {
-      const datasetId = pathOr("", ["params", "datasetId"], this.$route);
-      if (this.config.apiUrl && this.userToken && datasetId) {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${this.userToken}`;
-      }
-      return "";
+    stringSubtypeUrl: async function () {
+      return await useGetToken().then(token => {
+        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`;
+      })
+
+
     },
   },
 
@@ -1417,12 +1382,26 @@ export default {
     ...mapActions("filesModule", ["openOffice365File"]),
 
     ...mapActions("viewerModule", ["setActiveViewer", "setActiveTool"]),
+
+    /**
+     * get onboarding events url
+     * @returns {String}
+     */
+    onboardingEventsUrl: async function () {
+      return useGetToken().then(token => {
+        const apiUrl = propOr("", "apiUrl", this.config);
+        return `${apiUrl}/onboarding/events?api_key=${token}`;
+      })
+    },
+
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function () {
-      this.sendXhr(this.stringSubtypeUrl)
-        .then((subTypes) => {
+
+      this.stringSubtypeUrl.then((url)=> {
+        useSendXhr(url)
+          .then((subTypes) => {
           this.stringSubtypes = Object.entries(subTypes).reduce(
             (options, [val, config]) => [
               ...options,
@@ -1431,9 +1410,11 @@ export default {
             []
           );
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      })
+
     },
 
     /**
@@ -1529,11 +1510,16 @@ export default {
      */
     getRelationshipTypes: function () {
       if (this.relationshipsUrl) {
-        this.sendXhr(this.relationshipsUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`,
-          },
-        }).then((response) => {
+
+        useGetToken()
+          .then(token => {
+            return useSendXhr(this.relationshipsUrl,{
+              header: {
+                Authorization: `bearer ${token}`,
+              }
+            })
+          })
+          .then((response) => {
           // get model id
           const modelId = pathOr("", ["params", "conceptId"], this.$route);
 
@@ -1639,33 +1625,37 @@ export default {
 
       this.isRelationshipsLoading = true;
 
-      this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-      })
-        .then((resp) => {
-          resp.forEach((obj) => {
-            this.activeSections.push(obj.name);
-          });
-          const filesIdx = findIndex(propEq("name", "package"), resp);
-          if (filesIdx >= 0) {
-            const filesObj = resp[filesIdx];
-            resp.splice(filesIdx, 1);
-            resp.unshift(filesObj);
-            this.relationships = resp;
-          } else {
-            this.relationships = resp;
-          }
-          if (this.relationships.count !== this.lastRelationshipCount) {
-            this.relationships.count = this.lastRelationshipCount;
-          }
+      useGetToken()
+        .then(token => {
+          useSendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+          })
+            .then((resp) => {
+              resp.forEach((obj) => {
+                this.activeSections.push(obj.name);
+              });
+              const filesIdx = findIndex(propEq("name", "package"), resp);
+              if (filesIdx >= 0) {
+                const filesObj = resp[filesIdx];
+                resp.splice(filesIdx, 1);
+                resp.unshift(filesObj);
+                this.relationships = resp;
+              } else {
+                this.relationships = resp;
+              }
+              if (this.relationships.count !== this.lastRelationshipCount) {
+                this.relationships.count = this.lastRelationshipCount;
+              }
 
-          this.isRelationshipsLoading = false;
+              this.isRelationshipsLoading = false;
+            })
+            .catch(() => {
+              this.handleXhrError.bind(this);
+            });
         })
-        .catch(() => {
-          this.handleXhrError.bind(this);
-        });
+
     },
     /**
      * Gets instance details
@@ -2005,7 +1995,7 @@ export default {
           useGetToken().then(token => {
             this.sendXhr(url, {
               header: {
-                Authorization: `bearer ${this.userToken}`,
+                Authorization: `bearer ${token}`,
               },
               method: "POST",
               body: {
@@ -2276,25 +2266,29 @@ export default {
       const name = propOr("", "value", this.conceptTitle);
 
 
-      this.sendXhr(this.packageDetailsUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-        method: "DELETE",
-      })
-        .then(() => {
-          this.$router.replace({ name: "dataset-records" });
-
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg: `${name} deleted`,
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.packageDetailsUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
             },
-          });
+            method: "DELETE",
+          })
+            .then(() => {
+              this.$router.replace({ name: "dataset-records" });
+
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "success",
+                  msg: `${name} deleted`,
+                },
+              });
+            })
+            .catch((response) => {
+              this.handleXhrError(response);
+            });
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+
     },
 
     /**
@@ -2339,24 +2333,28 @@ export default {
       properties = this.checkModelTitle(property, properties);
       properties.push(property);
 
-      this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-        method: "PUT",
-        body: properties,
-      })
-        .then(() => {
-          // Check model title for existing properties before adding new one
-          this.checkModelTitle(property, this.instance.values);
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            method: "PUT",
+            body: properties,
+          })
+            .then(() => {
+              // Check model title for existing properties before adding new one
+              this.checkModelTitle(property, this.instance.values);
 
-          this.instance.values.push(property);
+              this.instance.values.push(property);
 
-          this.addEditPropertyDialogVisible = false;
+              this.addEditPropertyDialogVisible = false;
+            })
+            .catch((response) => {
+              this.handleXhrError(response);
+            });
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+
     },
 
     /**
@@ -2377,11 +2375,15 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function () {
-      return this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-      });
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+          });
+        })
+
     },
 
     /**
@@ -2467,9 +2469,6 @@ export default {
      * GET url for record relationships tables
      */
     getRecordRelationshipsUrl: function (conceptName) {
-      if (!this.userToken || !this.isOrgSynced) {
-        return;
-      }
       const datasetId = this.datasetId;
       const fileId = this.$route.params.fileId;
 
@@ -2497,18 +2496,22 @@ export default {
       // check if belongs_to relationship exists in dataset
       const url = this.relationshipsUrl;
       if (url) {
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`,
-          },
-        })
-          .then((resp) => {
-            const belongsTo = find(propEq("name", "belongs_to"), resp);
-            if (resp.length === 0 || !belongsTo) {
-              this.createDefaultRelationship();
-            }
+        useGetToken()
+          .then(token => {
+            useSendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`,
+              },
+            })
+              .then((resp) => {
+                const belongsTo = find(propEq("name", "belongs_to"), resp);
+                if (resp.length === 0 || !belongsTo) {
+                  this.createDefaultRelationship();
+                }
+              })
+              .catch(this.handleXhrError.bind(this));
           })
-          .catch(this.handleXhrError.bind(this));
+
       }
     },
 
@@ -2516,18 +2519,22 @@ export default {
      * Creates default relationship
      */
     createDefaultRelationship: function () {
-      this.sendXhr(this.relationshipsUrl, {
-        method: "POST",
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-        body: {
-          name: "belongs_to",
-          displayName: "Belongs To",
-          description: "",
-          schema: [],
-        },
-      }).catch(this.handleXhrError.bind(this));
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.relationshipsUrl, {
+            method: "POST",
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            body: {
+              name: "belongs_to",
+              displayName: "Belongs To",
+              description: "",
+              schema: [],
+            },
+          }).catch(this.handleXhrError.bind(this));
+        })
+
     },
 
     /**
@@ -2627,12 +2634,16 @@ export default {
       );
       const baseUrl = this.proxyRecord.parent ? "packages" : "datasets";
 
-      const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${this.userToken}&includeAncestors=true`;
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${token}&includeAncestors=true`;
+          return this.sendXhr(url).then((response) => {
+            moveDialog.file = response;
+            moveDialog.visible = true;
+          });
+        }).catch(err => useHandleXhrError(err))
 
-      this.sendXhr(url).then((response) => {
-        moveDialog.file = response;
-        moveDialog.visible = true;
-      });
+
     },
 
     /**
@@ -2735,6 +2746,7 @@ export default {
      * Send Onboarding Events Request
      */
     sendOnboardingEventsRequest: function () {
+
       if (this.onboardingEventsUrl) {
         useGetToken().then(token => {
           this.sendXhr(
@@ -2759,35 +2771,6 @@ export default {
 
       }
     },
-
-    // /**
-    //  * Get schema linked properties
-    //  * @returns {Promise}
-    //  */
-    // getSchemaLinkedProperties: function() {
-    //   if (this.schemaLinkedPropertiesUrl) {
-    //     return this.sendXhr(this.schemaLinkedPropertiesUrl, {
-    //       header: {
-    //         Authorization: `bearer ${this.userToken}`
-    //       }
-    //     })
-    //       .then(response => {
-    //         const modelId = pathOr('', ['params', 'conceptId'], this.$route)
-    //         // filter out linked properties that aren't associated
-    //         const linkedProperties = response.filter(item =>
-    //           Boolean(item.link.from === modelId)
-    //         )
-    //         this.linkedProperties = this.transformLinkedProperties(
-    //           linkedProperties
-    //         )
-    //       })
-    //       .catch(response => {
-    //         this.handleXhrError(response)
-    //       })
-    //   }
-    //
-    //   return Promise.resolve()
-    // },
 
     /**
      * Transform raw linked properties data

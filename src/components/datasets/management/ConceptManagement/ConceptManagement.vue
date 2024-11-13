@@ -168,6 +168,8 @@ import Request from '../../../../mixins/request';
 import { modelUrlV2, PROPERTY_DELETION_STATES } from './utils';
 import Cookies from "js-cookie";
 import IconMenu from "../../../icons/IconMenu.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 const defaultLinkedPropertyProps = {
   dataType: 'Model',
@@ -263,14 +265,7 @@ export default {
       * @returns {String}
       */
     modelUrl: function() {
-      if (!this.userToken) {
-        return
-      }
-      // const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      // const modelId = pathOr('', ['params', 'conceptId'], this.$route)
-
       const datasetId = this.datasetId
-
       return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${this.modelId}`
     },
 
@@ -279,10 +274,6 @@ export default {
      * @returns {String}
      */
     linkedPropertiesUrl: function() {
-      if (!this.userToken) {
-        return
-      }
-
       return `${this.config.conceptsUrl}/datasets/${this.datasetId}/concepts/${this.modelId}/linked`
     },
 
@@ -406,17 +397,7 @@ export default {
       })
     },
 
-    /**
-     * compute the url to fetch the valid string subtypes
-     * @returns {String}
-     */
-    stringSubtypeUrl: function() {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      if (this.config.apiUrl && this.userToken && datasetId) {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${this.userToken}`
-      }
-      return ''
-    }
+
   },
 
   watch: {
@@ -462,6 +443,18 @@ export default {
       'fetchModels',
       'removeModel'
     ]),
+    /**
+     * compute the url to fetch the valid string subtypes
+     * @returns {String}
+     */
+    stringSubtypeUrl: async function() {
+      useGetToken()
+        .then(token => {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`
+        }).catch(err => console.log(err))
+
+    }
     closeEditPropertyDialog: function(){
       this.addEditPropertyDialogVisible = false
     },
@@ -474,19 +467,20 @@ export default {
      */
     fetchModelSchema: function() {
       if (this.getModelSchemaUrl) {
-        return this.sendXhr(this.getModelSchemaUrl, {
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(response => {
-          this.properties = response
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+        useGetToken()
+          .then(token => {
+            return this.sendXhr(this.getModelSchemaUrl, {
+              header: {
+                'Authorization': `bearer ${token}`
+              }
+            })
+              .then(response => {
+                this.properties = response
+              })
+          }).catch(response => {
+            this.handleXhrError(response)
+          })
       }
-
       return Promise.resolve()
     },
 
@@ -494,16 +488,21 @@ export default {
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function() {
-      this.sendXhr(this.stringSubtypeUrl)
-        .then(subTypes => {
-          this.stringSubtypes = Object.entries(subTypes).reduce(
-            (options, [val, config]) => ([...options, { value: val, label: config.label, regex: config.regex }]),
-            []
-          )
+      this.stringSubtypeUrl()
+        .then(url => {
+          useSendXhr(url)
+            .then(subTypes => {
+              this.stringSubtypes = Object.entries(subTypes).reduce(
+                (options, [val, config]) => ([...options, { value: val, label: config.label, regex: config.regex }]),
+                []
+              )
+            })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
         })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
+
     },
 
     /**
@@ -511,18 +510,22 @@ export default {
      */
     fetchLinkedProperties: function() {
       if (this.linkedPropertiesUrl) {
-        this.sendXhr(this.linkedPropertiesUrl, {
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
+        useGetToken()
+          .then(token => {
+            this.sendXhr(this.linkedPropertiesUrl, {
+              header: {
+                'Authorization': `bearer ${token}`
+              }
+            })
+              .then(response => {
+                const linkedProperties = this.transformLinkedProperties(response)
+                this.properties = this.sortProperties(this.conceptProperties, linkedProperties)
+              })
+              .catch(response => {
+                this.handleXhrError(response)
+              })
         })
-        .then(response => {
-          const linkedProperties = this.transformLinkedProperties(response)
-          this.properties = this.sortProperties(this.conceptProperties, linkedProperties)
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
       }
     },
 
@@ -606,36 +609,40 @@ export default {
      */
     deleteConcept: function() {
       this.savingChanges = true;
-      this.sendXhr(this.modelUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'DELETE',
-        body: [
-          this.model.id
-        ]
-      })
-      .then(() => {
-        const displayName = this.model.displayName
-        const index = findIndex(propEq('name', this.model.name), this.models)
-
-        this.removeModel(this.model.id).then(() => {
-          this.deleteDialogVisible = false
-
-          this.$router.push({
-            name: 'models'
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.modelUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'DELETE',
+            body: [
+              this.model.id
+            ]
           })
+            .then(() => {
+              const displayName = this.model.displayName
+              const index = findIndex(propEq('name', this.model.name), this.models)
 
-          EventBus.$emit('toast', {
-            type: 'success',
-            msg: `${displayName} deleted`
-          })
+              this.removeModel(this.model.id).then(() => {
+                this.deleteDialogVisible = false
+
+                this.$router.push({
+                  name: 'models'
+                })
+
+                EventBus.$emit('toast', {
+                  type: 'success',
+                  msg: `${displayName} deleted`
+                })
+              })
+            })
         })
-      })
-      .catch(response => {
-        this.handleXhrError(response)
-      })
-      .finally(() => this.savingChanges = false)
+        .catch(response => {
+          this.handleXhrError(response)
+        })
+        .finally(() => this.savingChanges = false)
+
     },
 
     /**
@@ -654,42 +661,47 @@ export default {
 
       const url = `${baseUrl}/${propertyName}${this.propertyDeletionState === PROPERTY_DELETION_STATES.CONFIRM_RECORD_MODIFICATION ? '?modifyRecords=true' : ''}`
 
-      this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'DELETE'
-      })
-      .then(() => {
-        const index = findIndex(propEq('id', propertyName), this.properties)
-        this.properties.splice(index, 1)
+      useGetToken()
+        .then(token => {
+          return useSendXhr(url, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'DELETE'
+          })
+            .then(() => {
+              const index = findIndex(propEq('id', propertyName), this.properties)
+              this.properties.splice(index, 1)
 
-        EventBus.$emit('toast', {
-          type: 'success',
-          msg: `${displayName} deleted`
+              EventBus.$emit('toast', {
+                type: 'success',
+                msg: `${displayName} deleted`
+              })
+
+              this.propertyEdit = {}
+              this.deleteDialogVisible = false
+
+              return this.putLinkedProperties()
+                .then(this.onAllComplete.bind(this))
+            })
+
         })
-
-        this.propertyEdit = {}
-        this.deleteDialogVisible = false
-
-        this.putLinkedProperties()
-        .then(this.onAllComplete.bind(this))
-      })
-      .catch(response => {
-        if (response.status === 400) {
-          this.propertyDeletionState = PROPERTY_DELETION_STATES.FAILED
-        } else if (response.status === 422) {
-          response.json()
-          .then(data => {
-            this.propertyDeletionState = PROPERTY_DELETION_STATES.CONFIRM_RECORD_MODIFICATION
-            this.propertyRecordUsageCount = data.usageCount
-          })
-          .catch(() => {
+        .catch(response => {
+          if (response.status === 400) {
             this.propertyDeletionState = PROPERTY_DELETION_STATES.FAILED
-          })
-        }
-      })
-      .finally(() => this.savingChanges = false)
+          } else if (response.status === 422) {
+            response.json()
+              .then(data => {
+                this.propertyDeletionState = PROPERTY_DELETION_STATES.CONFIRM_RECORD_MODIFICATION
+                this.propertyRecordUsageCount = data.usageCount
+              })
+              .catch(() => {
+                this.propertyDeletionState = PROPERTY_DELETION_STATES.FAILED
+              })
+          }
+        })
+        .finally(() => this.savingChanges = false)
+
     },
 
     /**
@@ -952,18 +964,23 @@ export default {
       if (!this.hasChanges) {
         return Promise.resolve()
       }
-      return this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'PUT',
-        body: this.conceptProperties
-      })
-      .then(response => {
-        this.properties = this.sortProperties(response, this.linkedProperties)
-        this.incrementPropertyCount(response.length)
-      })
-      .catch(this.handleXhrError)
+
+      return useGetToken()
+        .then(token => {
+          return useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'PUT',
+            body: this.conceptProperties
+          })
+            .then(response => {
+              this.properties = this.sortProperties(response, this.linkedProperties)
+              this.incrementPropertyCount(response.length)
+            })
+            .catch(this.handleXhrError)
+        })
+
     },
 
     /**
@@ -979,33 +996,37 @@ export default {
       const url = `${this.linkedPropertiesUrl}/bulk`
       const body = this.getLinkedPropertiesPayload(this.newLinkedProperties)
 
-      return this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'POST',
-        body
-      })
-      .then(response => {
-        let transformedResponse
-        // check if response is a list
-        if (Array.isArray(response)) {
-          transformedResponse = this.transformLinkedProperties(response)
-          const properties = [...this.properties]
-          transformedResponse.forEach(item => {
-            const idx = properties.findIndex(property => property.name === item.name)
-            properties[idx] = item
+      return useGetToken()
+        .then(token => {
+          return useSendXhr(url, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'POST',
+            body
           })
-          this.properties = properties
-          this.incrementPropertyCount(response.length)
-        } else {
-          transformedResponse = this.transformLinkedProperty(response)
-          const idx = this.properties.findIndex(property => property.name === transformedResponse.name)
-          this.properties.splice(idx, 1, transformedResponse)
-          this.incrementPropertyCount(1)
-        }
-      })
-      .catch(this.handleXhrError)
+            .then(response => {
+              let transformedResponse
+              // check if response is a list
+              if (Array.isArray(response)) {
+                transformedResponse = this.transformLinkedProperties(response)
+                const properties = [...this.properties]
+                transformedResponse.forEach(item => {
+                  const idx = properties.findIndex(property => property.name === item.name)
+                  properties[idx] = item
+                })
+                this.properties = properties
+                this.incrementPropertyCount(response.length)
+              } else {
+                transformedResponse = this.transformLinkedProperty(response)
+                const idx = this.properties.findIndex(property => property.name === transformedResponse.name)
+                this.properties.splice(idx, 1, transformedResponse)
+                this.incrementPropertyCount(1)
+              }
+            })
+            .catch(this.handleXhrError)
+        })
+
     },
 
     /**
@@ -1065,13 +1086,17 @@ export default {
      */
     createPromiseQueue: function(linkedProperty) {
       const url = `${this.linkedPropertiesUrl}/${linkedProperty.id}`
-      return this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method: 'PUT',
-        body: linkedProperty
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(url, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'PUT',
+            body: linkedProperty
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1103,13 +1128,17 @@ export default {
         body = this.linkedProperties
       }
 
-      return this.sendXhr(this.linkedPropertiesUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        method,
-        body
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(this.linkedPropertiesUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method,
+            body
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**

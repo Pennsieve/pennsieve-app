@@ -82,10 +82,6 @@ export default {
      */
     getFilesUrl: function() {
       const datasetId = this.$route.params.datasetId
-
-      if (!this.userToken) {
-        return
-      }
       return `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package`
     },
 
