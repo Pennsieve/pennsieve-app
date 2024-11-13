@@ -41,6 +41,7 @@
               New Folder
             </bf-button>
           </template>
+          <<<<<<< HEAD ======= >>>>>>> main
           <ps-button-dropdown
             @click="toggleActionDropdown"
             :menu-open="!quickActionsVisible"
@@ -360,6 +361,20 @@ export default {
     },
 
     /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+    getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl =
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id =
+          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
+    },
+
+    /**
      * Get move URL
      * @returns {String}
      */
@@ -407,6 +422,13 @@ export default {
         });
       },
       deep: true,
+    },
+
+    /**
+     * Trigger API request when URL is changed. This is required for infinite scroll functionality.
+     */
+    getFilesUrl: function () {
+      this.fetchFiles();
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -462,7 +484,7 @@ export default {
   },
 
   mounted: function () {
-    if (this.getFilesUrl() && !this.files.length) {
+    if (this.getFilesUrl && !this.files.length) {
       this.fetchFiles();
     }
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
@@ -525,8 +547,11 @@ export default {
     ]),
     ...mapActions("datasetModule", ["createDatasetManifest"]),
 
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
+
     generateManifest: function () {
       this.createDatasetManifest();
+
       EventBus.$emit("toast", {
         detail: {
           type: "success",
@@ -534,6 +559,10 @@ export default {
           duration: 1000,
         },
       });
+    },
+
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
 
     // Ignore drops to component outside the drop target and close drop-target
@@ -634,7 +663,7 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl())
+      this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
           this.$store.dispatch(
@@ -691,6 +720,7 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
+      this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
       if (id === "") {
@@ -726,6 +756,7 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
+      this.getFilesUrl; // this is here for infinite scroll
       if (id) {
         this.navigateToFile(id);
       } else {
