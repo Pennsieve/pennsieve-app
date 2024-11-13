@@ -99,6 +99,8 @@
   import BfButton from '../../../../shared/bf-button/BfButton.vue'
   import Request from '../../../../../mixins/request'
   import IconSharingIllustration from "../../../../icons/IconSharingIllustration.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   const transformComment = function(mention) {
     const values = mention.match(/"([^"]*)"/g);
@@ -168,17 +170,6 @@
         return this.value !== ''
       },
 
-      /**
-       * Compute URL for creating discussions
-       * @returns {String}
-       */
-      createDiscussionUrl: function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-
-        if (apiUrl) {
-          return `${apiUrl}/discussions?api_key=${this.userToken}`
-        }
-      }
     },
 
     watch: {
@@ -326,18 +317,22 @@
         const discussionId = propOr('', 'id', this.discussion)
         body['discussionId'] = discussionId
 
-        this.sendXhr(this.createDiscussionUrl, {
-          method: 'POST',
-          body
-        }).then(response => {
-          const comment = prop('comment', response)
-          if (comment) {
-            this.createComment(comment)
-          }
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/discussions?api_key=${token}`
+            return useSendXhr(url, {
+              method: 'POST',
+              body
+            }).then(response => {
+              const comment = prop('comment', response)
+              if (comment) {
+                this.createComment(comment)
+              }
 
-          this.reset()
-        })
-        .catch(this.handleXhrError.bind(this))
+              this.reset()
+            })
+          })
+          .catch(this.handleXhrError.bind(this))
       },
 
       /**
@@ -354,14 +349,19 @@
           body[annotationKey] = this.annotationId
         }
 
-        this.sendXhr(this.createDiscussionUrl, {
-          method: 'POST',
-          body
-        }).then(response => {
-          this.createDiscussion(response)
-          this.reset()
-        })
-        .catch(this.handleXhrError.bind(this))
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/discussions?api_key=${token}`
+            this.sendXhr(url, {
+              method: 'POST',
+              body
+            }).then(response => {
+              this.createDiscussion(response)
+              this.reset()
+            })
+
+          })
+          .catch(this.handleXhrError.bind(this))
       },
 
       /**

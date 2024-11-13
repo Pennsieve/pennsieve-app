@@ -133,7 +133,6 @@ export default {
       return useGetToken()
         .then(token => {
           const orgId = this.activeOrganization.organization.id
-          const userToken = this.userToken
           const apiUrl = this.config.apiUrl
           return `${apiUrl}/organizations/${orgId}/teams/${this.team.id}?api_key=${token}`
         }).catch(err => useHandleXhrError(err))

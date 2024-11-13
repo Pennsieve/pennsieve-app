@@ -158,22 +158,20 @@ const effectiveTarget = computed( () => {
 })
 
 function postCreateRelationship() {
-  const userToken = store.state.userToken
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
 
-  const createRelationshipUrl = `${site.conceptsUrl}/datasets/${datasetId}/relationships`
-
-  const payload = <RelationshipRequestBody>{
-    description: "",
-    displayName: createForm.label,
-    from: effectiveSource.value.data.id,
-    name: snakeCase(createForm.label),
-    schema: [],
-    to: effectiveTarget.value.data.id
-  }
-
-  return useGetToken()
+  useGetToken()
     .then(token => {
+      const datasetId = pathOr('', ['params', 'datasetId'])(route)
+      const createRelationshipUrl = `${site.conceptsUrl}/datasets/${datasetId}/relationships`
+      const payload = <RelationshipRequestBody>{
+        description: "",
+        displayName: createForm.label,
+        from: effectiveSource.value.data.id,
+        name: snakeCase(createForm.label),
+        schema: [],
+        to: effectiveTarget.value.data.id
+      }
+
       return useSendXhr(createRelationshipUrl, {
         header: {
           'Authorization': `bearer ${token}`
@@ -181,43 +179,40 @@ function postCreateRelationship() {
         method: 'POST',
         body: payload
       })
-        .then(response => {
+        .then(() => {
           closeDialog(true)
 
         })
-    }).catch(useHandleXhrError)
+
+    })
+    .catch(useHandleXhrError)
 
 }
 
 
 function postLinkedPropertyChanges() {
-
-  let userToken = store.state.userToken
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
-
-  const linkedPropertiesUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${effectiveSource.value.data.id}/linked`
-
-  const url = `${linkedPropertiesUrl}/bulk`
-
-  const payload = <LinkedPropRequestBody>{
-    name: snakeCase(createForm.label),
-    displayName: createForm.label,
-    to: effectiveTarget.value.data.id,
-    position: 1
-  }
-
-  const body = [payload]
-
-  return useSendXhr(url, {
-    header: {
-      'Authorization': `bearer ${userToken}`
-    },
-    method: 'POST',
-    body: body
-  })
-    .then(response => {
-      closeDialog(true)
-
+  useGetToken()
+    .then(async token => {
+      const datasetId = pathOr('', ['params', 'datasetId'])(route)
+      const linkedPropertiesUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${effectiveSource.value.data.id}/linked`
+      const url = `${linkedPropertiesUrl}/bulk`
+      const payload = <LinkedPropRequestBody>{
+        name: snakeCase(createForm.label),
+        displayName: createForm.label,
+        to: effectiveTarget.value.data.id,
+        position: 1
+      }
+      const body = [payload]
+      return useSendXhr(url, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'POST',
+        body: body
+      })
+        .then(response => {
+          closeDialog(true)
+        })
     })
     .catch(useHandleXhrError)
 }
