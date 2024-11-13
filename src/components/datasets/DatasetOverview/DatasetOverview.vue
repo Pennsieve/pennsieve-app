@@ -284,6 +284,7 @@
   import IconCopyDocument from "../../icons/IconCopyDocument.vue";
   import EventBus from '../../../utils/event-bus';
   import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
 
   const replaceLineBreaks = str => {
@@ -423,17 +424,7 @@ export default {
         : false
     },
 
-    /**
-     * Compute URL for total package count
-     * @returns {String}
-     */
-    getPackageTypeCountsUrl: function() {
-      return this.userToken && this.isOrgSynced
-        ? `${this.config.apiUrl}/datasets/${
-            this.datasetId
-          }/packageTypeCounts?api_key=${this.userToken}`
-        : ''
-    },
+
 
     /**
      * Compute if the dataset has a DOI
@@ -663,7 +654,19 @@ export default {
 
   methods: {
     ...mapActions(['setDatasetDescription', 'setDatasetDescriptionEtag', 'setChangelogText']),
+    /**
+     * Compute URL for total package count
+     * @returns {String}
+     */
+    getPackageTypeCountsUrl: async function() {
+      return await useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/${
+            this.datasetId
+          }/packageTypeCounts?api_key=${token}`
+        })
 
+    },
 
     staleUpdateDialogClose: function() {
       this.staleUpdateDialogVisible = false
@@ -683,15 +686,19 @@ export default {
      */
     getPackageTypeCounts: function() {
       this.packageTypeCount = 0
-      this.sendXhr(this.getPackageTypeCountsUrl)
-        .then(response => {
-          this.packageTypeCount = compose(
-            sum,
-            values,
-            defaultTo({})
-          )(response)
+      this.getPackageTypeCountsUrl()
+        .then(url => {
+          useSendXhr(url)
+            .then(response => {
+              this.packageTypeCount = compose(
+                sum,
+                values,
+                defaultTo({})
+              )(response)
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
     },
 
     /**

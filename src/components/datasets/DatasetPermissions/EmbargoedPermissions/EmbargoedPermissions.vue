@@ -59,6 +59,7 @@ import { EmbargoedRequestStatus } from '../../../../utils/constants'
 import Request from '../../../../mixins/request/index'
 import { pathOr } from 'ramda'
 import { mapState, mapGetters } from 'vuex'
+import {useGetToken} from "@/composables/useGetToken";
 export default {
   name: 'EmbargoedPermissions',
 
@@ -88,12 +89,7 @@ export default {
       'getPermission'
     ]),
 
-    /**
-     * Embargoed requests url
-     */
-    embargoedRequestsUrl: function() {
-      return `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${this.userToken}`
-    }
+
   },
 
     watch: {
@@ -108,7 +104,15 @@ export default {
     },
 
   methods: {
-
+    /**
+     * Embargoed requests url
+     */
+    embargoedRequestsUrl: async function() {
+      return await useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${token}`
+        })
+    },
     /**
      * Get list of embargoed requests
      */

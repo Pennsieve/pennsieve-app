@@ -105,6 +105,7 @@
   import BfButton from '../../../shared/bf-button/BfButton.vue'
   import DatasetBanner from '../../../datasets/DatasetBanner/DatasetBanner.vue'
   import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
+  import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'DatasetSettingsBannerImage',
@@ -242,26 +243,28 @@
           const formData = new FormData()
           formData.append('banner', blob, `dataset_banner_${datasetIntId}.jpg`)
 
-          const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${this.userToken}`
+          useGetToken()
+            .then(token => {
+              const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${token}`
+              fetch(url, {
+                method: 'PUT',
+                body: formData
+              })
+                .then(response => {
+                  return response.json()
+                })
+                .then(response => {
+                  const banner = propOr('', 'banner', response)
 
-          fetch(url, {
-            method: 'PUT',
-            body: formData
-          })
-          .then(response => {
-            return response.json()
-          })
-          .then(response => {
-            const banner = propOr('', 'banner', response)
-
-            this.setDatasetBanner(banner).then(() => {
-              this.isDialogVisible = false
-              this.isUploadingBanner = false
+                  this.setDatasetBanner(banner).then(() => {
+                    this.isDialogVisible = false
+                    this.isUploadingBanner = false
+                  })
+                })
+                .finally(() => {
+                  this.isUploadingBanner = false
+                })
             })
-          })
-          .finally(() => {
-            this.isUploadingBanner = false
-          })
         }, 'image/jpeg', 0.7)
       },
 
