@@ -283,29 +283,34 @@ export default {
       this.fileId = file.content.id;
       this.fileName = file.content.name;
 
-      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          return this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+              if (file.content.packageType === "Collection") {
+                //If we click on a folder, we want to add that folder to the ancestors list
+                if (this.fileId && this.fileName) {
+                  this.ancestorList.push({
+                    content: {
+                      id: this.fileId,
+                      name: this.fileName,
+                    },
+                  });
+                }
+                this.file = file;
+                this.navigateToFile(this.fileId);
+              }
+
+            })
         })
         .catch((response) => {
           this.handleXhrError(response);
         });
 
-      if (file.content.packageType === "Collection") {
-        //If we click on a folder, we want to add that folder to the ancestors list
-        if (this.fileId && this.fileName) {
-          this.ancestorList.push({
-            content: {
-              id: this.fileId,
-              name: this.fileName,
-            },
-          });
-        }
-        this.file = file;
-        this.navigateToFile(this.fileId);
-      }
+
     },
     onFileSelect: function (selectedFiles) {
       if (this.selectedFilesForAnalysis.length) {

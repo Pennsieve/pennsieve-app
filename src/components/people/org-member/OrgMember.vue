@@ -157,6 +157,8 @@ import { mapGetters } from 'vuex'
 import { propOr } from 'ramda'
 import moment from 'moment'
 import IconMenu from "../../icons/IconMenu.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'OrgMember',
@@ -244,18 +246,24 @@ export default {
      * @param {String} memberId
      */
     resendInvite: function(memberId) {
-      const url = `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites/${memberId}?api_key=${this.userToken}`;
-      this.sendXhr(url, {
-        method: 'PUT',
-        headers: {
-          'Content-type': 'application/json'
-        }
-      })
-        .then(() => {
-          EventBus.$emit('toast', {detail: { msg: 'Invite resent' }})
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites/${memberId}?api_key=${token}`;
+          return useSendXhr(url, {
+            method: 'PUT',
+            headers: {
+              'Content-type': 'application/json'
+            }
+          })
+            .then(() => {
+              EventBus.$emit('toast', {detail: { msg: 'Invite resent' }})
+            })
+
+
         })
-        .catch(() => {
+        .catch((e) => {
           EventBus.$emit('toast', {detail: { msg: 'Error resending invite' }})
+          useHandleXhrError(e)
         })
     },
     /**
@@ -290,12 +298,7 @@ export default {
     removeMember: function(member) {
       EventBus.$emit('remove-org-member', member)
     },
-    /**
-     * Creates PUT url
-     */
-    createPutUrl: function(memberId) {
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/members/${memberId}?api_key=${this.userToken}`
-    },
+
 
     /**
      * Promote or demote a user
@@ -304,31 +307,37 @@ export default {
      */
     setAdminStatus: function(member, status) {
       const memberId = propOr('', 'id', member)
-      const url = this.createPutUrl(memberId)
       const firstName = propOr('', 'firstName', this.item)
       const lastName = propOr('User', 'lastName', this.item)
-      this.sendXhr(url, {
-        method: 'PUT',
-        headers: {
-          'Content-type': 'application/json'
-        },
-        body: {permission: status}
-      })
-        .then(() => {
-          if (status === 'administer') {
-            EventBus.$emit('toast', {detail: { msg: `${firstName} ${lastName} has been promoted to admin` }})
-            this.$emit('promote-to-admin', member)
-          } else {
-            EventBus.$emit('toast', {detail: { msg: `${firstName} ${lastName} has been demoted to collaborator` }})
-            this.$emit('demote-from-admin', member)
-          }
+
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/members/${memberId}?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'PUT',
+            headers: {
+              'Content-type': 'application/json'
+            },
+            body: {permission: status}
+          })
+            .then(() => {
+              if (status === 'administer') {
+                EventBus.$emit('toast', {detail: { msg: `${firstName} ${lastName} has been promoted to admin` }})
+                this.$emit('promote-to-admin', member)
+              } else {
+                EventBus.$emit('toast', {detail: { msg: `${firstName} ${lastName} has been demoted to collaborator` }})
+                this.$emit('demote-from-admin', member)
+              }
+            })
+
         })
-        .catch(() => {
+        .catch((e) => {
           if (status === 'administer') {
             EventBus.$emit('toast', {detail: { msg: `Error promoting ${firstName} ${lastName} to admin` }})
           } else {
             EventBus.$emit('toast', {detail: { msg: `Error demoting ${firstName} ${lastName} to collaborator` }})
           }
+          useHandleXhrError(e)
         })
     },
     /**

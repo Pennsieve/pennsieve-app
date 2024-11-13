@@ -41,6 +41,8 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'DeleteOrcid',
@@ -69,30 +71,6 @@ export default {
   computed: {
     ...mapGetters(['profile', 'activeOrganization', 'config']),
 
-    apiKeyUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const apiKey = pathOr('', ['apiKey', 'key'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !apiKey || !userToken) {
-        return ''
-      }
-
-      return `${url}/token/${apiKey}?api_key=${userToken}`
-    },
-
-    /**
-     * Retrieves API URL to delete ORCID
-     */
-    getORCIDApiUrl: function() {
-      const url = this.config.apiUrl
-
-      if (!url) {
-        return ''
-      }
-
-      return `${url}/user/orcid?api_key=${this.userToken}`
-    }
   },
 
   methods: {
@@ -101,29 +79,27 @@ export default {
      * Makes XHR call to update two factor auth status
      */
     sendRequest: function() {
-      this.closeDialog()
-      if (!this.getORCIDApiUrl) {
-        return
-      }
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/user/orcid?api_key=${token}`
 
-      this.sendXhr(this.getORCIDApiUrl, {
-        method: 'DELETE'
-      })
-        .then(this.handleXhrSuccess.bind(this))
-        .catch(this.handleXhrError.bind(this))
-    },
-    /**
-     * Handles successful two factor xhr response
-     */
-    handleXhrSuccess: function() {
-      EventBus.$emit('toast', {
-        detail: {
-          type: 'MESSAGE',
-          msg: 'Your ORCID has been successfully removed'
-        }
-      })
+          return useSendXhr(url, {
+            method: 'DELETE'
+          })
+            .then(resp => {
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'MESSAGE',
+                  msg: 'Your ORCID has been successfully removed'
+                }
+              })
 
-      this.$emit('orcid-deleted-success', { orcid: 'orcid', type: 'DELETED' })
+              this.$emit('orcid-deleted-success', { orcid: 'orcid', type: 'DELETED' })
+            })
+
+        })
+        .finally(() => this.closeDialog())
+        .catch(useHandleXhrError.bind(this))
     },
 
     /**

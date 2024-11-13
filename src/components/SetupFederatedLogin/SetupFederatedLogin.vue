@@ -249,6 +249,8 @@ import {pathOr, propOr} from "ramda";
 import Request from '@/mixins/request'
 import { Auth } from '@aws-amplify/auth'
 import EventBus from "../../utils/event-bus";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'SetupFederatedLogin',
@@ -336,27 +338,27 @@ export default {
     ]),
 
     askingForEmail: function() {
-      return this.internalState == this.internalStates.askingForEmail
+      return this.internalState === this.internalStates.askingForEmail
     },
 
     askingForProfileInfo: function() {
-      return this.internalState == this.internalStates.askingForProfileInfo
+      return this.internalState === this.internalStates.askingForProfileInfo
     },
 
     askingForPassword: function() {
-      return this.internalState == this.internalStates.askingForPassword
+      return this.internalState === this.internalStates.askingForPassword
     },
 
     askingToConnect: function() {
-      return this.internalState == this.internalStates.askingToConnect
+      return this.internalState === this.internalStates.askingToConnect
     },
 
     askingToFinalize: function() {
-      return this.internalState == this.internalStates.askingToFinalize
+      return this.internalState === this.internalStates.askingToFinalize
     },
 
     allDone: function() {
-      return this.internalState == this.internalStates.done
+      return this.internalState === this.internalStates.done
     },
 
     apiUrl: function() {
@@ -479,16 +481,19 @@ export default {
     },
 
     lookupEmailAddress: function(email) {
-      const url = `${this.getUserByEmailRequest}${email}`
-      this.sendXhr(url, {
-        method: 'GET',
-        header: {
-          'Authorization': `bearer ${this.userToken()}`
-        }
-      })
-        .then(user => {
-          // email exists, next ask for password
-          this.toAskForPassword()
+      useGetToken()
+        .then(token => {
+          const url = `${this.getUserByEmailRequest}${email}`
+          return useSendXhr(url, {
+            method: 'GET',
+            header: {
+              'Authorization': `bearer ${token}`
+            }
+          })
+            .then(user => {
+              // email exists, next ask for password
+              this.toAskForPassword()
+            })
         })
         .catch(error => {
           if (error.status === 404) {
@@ -502,22 +507,25 @@ export default {
     },
 
     updateUserEmailAddress: function() {
-      const url = `${this.updateUserEmailUrl}`
-      this.sendXhr(url, {
-        method: 'PUT',
-        header: {
-          'Authorization': `bearer ${this.userToken()}`
-        },
-        body: {
-          email: this.emailForm.emailAddress
-        }
-      })
-        .then(user => {
-          this.updateProfile({
-            ...this.profile,
-            ...user
+      useGetToken()
+        .then(token => {
+          const url = `${this.updateUserEmailUrl}`
+          return useSendXhr(url, {
+            method: 'PUT',
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            body: {
+              email: this.emailForm.emailAddress
+            }
           })
-          this.toAskForProfileInfo()
+            .then(user => {
+              this.updateProfile({
+                ...this.profile,
+                ...user
+              })
+              this.toAskForProfileInfo()
+            })
         })
         .catch(error => {
           this.logUserError("updateUserEmailAddress()", "Error updating email address", error)
@@ -531,26 +539,29 @@ export default {
     },
 
     updateUserProfile: function(profileForm) {
-      const url = this.updateUserProfileUrl
-      this.sendXhr(url, {
-        method: 'PUT',
-        header: {
-          'Authorization': `bearer ${this.userToken()}`
-        },
-        body: {
-          organization: this.profile.preferredOrganization,
-          email: this.emailForm.email,
-          url: this.profile.url,
-          color: this.profile.color,
-          ...profileForm
-        }
-      })
-        .then(user => {
-          this.updateProfile({
-            ...this.profile,
-            ...user
+      useGetToken()
+        .then(token => {
+          const url = this.updateUserProfileUrl
+          return useSendXhr(url, {
+            method: 'PUT',
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            body: {
+              organization: this.profile.preferredOrganization,
+              email: this.emailForm.email,
+              url: this.profile.url,
+              color: this.profile.color,
+              ...profileForm
+            }
           })
-          this.toFinalizeIntegration()
+            .then(user => {
+              this.updateProfile({
+                ...this.profile,
+                ...user
+              })
+              this.toFinalizeIntegration()
+            })
         })
         .catch(error => {
           this.logUserError("updateUserProfile()", "Error updating user profile", error)

@@ -98,6 +98,8 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from '../../../mixins/request/index'
 import { PublicationStatus } from '../../../utils/constants'
 import EventBus from '../../../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 const getPublicationType = (isEmbargoed) => {
   return isEmbargoed ? 'embargo'
@@ -249,16 +251,6 @@ export default {
     },
 
     /**
-     * Compute getDatasets url
-     * @returns {String}
-     */
-    getDatasetsUrl: function() {
-      return `${this.config.apiUrl
-      }/datasets/paginated?api_key=${this.userToken
-      }&limit=10000&onlyMyDatasets=true&includePublishedDataset=true&canPublish=true`
-    },
-
-    /**
      * Get all datasets
      */
     getDatasets: function() {
@@ -271,30 +263,38 @@ export default {
        * returns from the request. If this is higher than the limit,
        * request again at the correct offset
        */
-      this.sendXhr(this.getDatasetsUrl())
-        .then(response => {
-          this.datasets = response.datasets
-          // Check if the user pre-selected a dataset
-          if (this.$route.query.request_id) {
-            // Find the dataset requested in the response and set it
-            const selectedDataset = response.datasets.find(dataset => {
-              return dataset.content.id === this.$route.query.request_id
-            })
-            this.selectedDataset = selectedDataset
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl
+          }/datasets/paginated?api_key=${token
+          }&limit=10000&onlyMyDatasets=true&includePublishedDataset=true&canPublish=true`
 
-            // Remove the query param in the URL
-            this.$router.replace({
-              query: {}
+          return useSendXhr(url)
+            .then(response => {
+              this.datasets = response.datasets
+              // Check if the user pre-selected a dataset
+              if (this.$route.query.request_id) {
+                // Find the dataset requested in the response and set it
+                const selectedDataset = response.datasets.find(dataset => {
+                  return dataset.content.id === this.$route.query.request_id
+                })
+                this.selectedDataset = selectedDataset
+
+                // Remove the query param in the URL
+                this.$router.replace({
+                  query: {}
+                })
+              } else {
+                // this is coming from the settings page
+                this.selectedDataset = this.dataset
+              }
             })
-          } else {
-            // this is coming from the settings page
-            this.selectedDataset = this.dataset
-          }
         })
         .catch(this.handleXhrError.bind(this))
         .finally(() => {
           this.isLoadingDatasets = false
         })
+
     },
 
     /**
@@ -318,34 +318,39 @@ export default {
 
       if (id) {
         this.isSubmitting = true
-        const url = `${this.config.apiUrl
-          }/datasets/${id
-          }/publication/request?api_key=${this.userToken
-          }&publicationType=${publicationType
-          }&embargoReleaseDate=${this.embargoReleaseDate}`
-        this.sendXhr(url, { method: 'POST' })
-          .then(() => {
 
-            const updatedPublicationState = {
-              ...this.dataset.publication,
-              status: PublicationStatus.REQUESTED,
-              type: publicationType
-            }
-            const updatedDataset = {
-              ...this.dataset,
-              publication: updatedPublicationState
-            }
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl
+            }/datasets/${id
+            }/publication/request?api_key=${token
+            }&publicationType=${publicationType
+            }&embargoReleaseDate=${this.embargoReleaseDate}`
 
-            this.updateDataset(updatedDataset)
+            return useSendXhr(url, { method: 'POST' })
+              .then(() => {
 
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                msg: 'Your dataset has been successfully submitted for review.'
-              }
-            })
+                const updatedPublicationState = {
+                  ...this.dataset.publication,
+                  status: PublicationStatus.REQUESTED,
+                  type: publicationType
+                }
+                const updatedDataset = {
+                  ...this.dataset,
+                  publication: updatedPublicationState
+                }
 
-            this.close()
+                this.updateDataset(updatedDataset)
+
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: 'Your dataset has been successfully submitted for review.'
+                  }
+                })
+
+                this.close()
+              })
           })
           .catch(this.handleXhrError.bind(this))
           .finally(() => {

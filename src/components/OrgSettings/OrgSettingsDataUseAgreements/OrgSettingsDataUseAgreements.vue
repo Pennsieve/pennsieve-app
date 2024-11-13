@@ -47,6 +47,8 @@ import DataUseAgreementListItem from './DataUseAgreementListItem/DataUseAgreemen
 import DataUseAgreementUpdateDialog from './DataUseAgreementUpdateDialog/DataUseAgreementUpdateDialog.vue'
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import {useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'OrgSettingsDataUseAgreements',
@@ -100,15 +102,18 @@ export default {
      * @param {Object} dataUseAgreement
      */
     deleteDataUseAgreement: function(dataUseAgreement) {
-      const { id } = dataUseAgreement
-      this.sendXhr(`${this.dataUseAgreementUrl}/${id}?api_key=${this.userToken}`, {
-        method: 'DELETE'
-      })
-        .then((e) => {
-          this.removeDataUseAgreement(id)
+      useGetToken()
+        .then(token => {
+          const { id } = dataUseAgreement
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'DELETE'
+          })
+            .then((e) => {
+              return this.removeDataUseAgreement(id)
+            })
         })
         .catch( error => {
-          error.json().then(err => {
             this.handleXhrError(err)
             EventBus.$emit('toast', {
               detail: {
@@ -116,7 +121,6 @@ export default {
                 type: 'error'
               }
             })
-          })
         })
     },
 
@@ -125,22 +129,29 @@ export default {
      * @param {Object} dataUseAgreement
      */
     addDataUseAgreement: async function(dataUseAgreement) {
-      try {
-        const agreement = await this.sendXhr(`${this.dataUseAgreementUrl}?api_key=${this.userToken}`, {
-          method: 'POST',
-          body: dataUseAgreement
+
+      useGetToken()
+        .then(async token => {
+          const url = `${this.dataUseAgreementUrl}?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'POST',
+            body: dataUseAgreement
+          })
+            .then(agreement => {
+              return this.createDataUseAgreement(agreement)
+            })
         })
-        this.createDataUseAgreement(agreement)
-        this.isDialogVisible = false
-      } catch (error) {
-        this.handleXhrError()
-        EventBus.$emit('toast', {
-          detail: {
-            msg: 'There was an error creating the agreement',
-            type: 'error'
-          }
+        .finally(this.isDialogVisible = false)
+        .catch (error => {
+          this.handleXhrError()
+          EventBus.$emit('toast', {
+            detail: {
+              msg: 'There was an error creating the agreement',
+              type: 'error'
+            }
+          })
         })
-      }
+
     },
 
     /**
@@ -157,17 +168,22 @@ export default {
      * @param {Object} dataUseAgreement
      */
     editDataUseAgreement: function(dataUseAgreement) {
-      const { id } = dataUseAgreement
 
-      this.sendXhr(`${this.dataUseAgreementUrl}/${id}?api_key=${this.userToken}`, {
-        method: 'PUT',
-        body: dataUseAgreement
-      })
-        .then(() => {
-          this.updateDataUseAgreement({ ...dataUseAgreement })
+      useGetToken()
+        .then(token => {
+          const { id } = dataUseAgreement
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'PUT',
+            body: dataUseAgreement
+          })
+            .then(() => {
+              this.updateDataUseAgreement({ ...dataUseAgreement })
+            })
         })
-        .catch(() => {
-          this.handleXhrError()
+        .finally(this.isDialogVisible = false)
+        .catch((e) => {
+          this.handleXhrError(e)
           EventBus.$emit('toast', {
             detail: {
               msg: 'There was an error updating the agreement',
@@ -176,7 +192,7 @@ export default {
           })
         })
 
-      this.isDialogVisible = false
+
     },
 
     /**
@@ -192,15 +208,20 @@ export default {
       }
       const { id } = dataUseAgreement
 
-      this.sendXhr(`${this.dataUseAgreementUrl}/${id}?api_key=${this.userToken}`, {
-        method: 'PUT',
-        body: updatedDataUseAgreement
-      })
-        .then(() => {
-          this.updateDefaultDataUseAgreement({ ...updatedDataUseAgreement })
+      useGetToken()
+        .then(token => {
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+
+          return useSendXhr(url, {
+            method: 'PUT',
+            body: updatedDataUseAgreement
+          })
+            .then(() => {
+              this.updateDefaultDataUseAgreement({ ...updatedDataUseAgreement })
+            })
         })
-        .catch(() => {
-          this.handleXhrError()
+        .catch((err) => {
+          this.handleXhrError(err)
           EventBus.$emit('toast', {
             detail: {
               msg: 'There was an error making the agreement default',

@@ -24,6 +24,8 @@
 <script>
   import debounce from 'lodash/debounce'
   import { mapGetters, mapState, mapActions } from 'vuex'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError} from "@/mixins/request/request_composable";
 
   export default {
     name: 'DatasetSettingsIgnoreFiles',
@@ -52,15 +54,6 @@
         // Account for newlines with no filename
         return this.ignoreFiles ? this.toIgnoreFilesDTO((this.ignoreFiles.split('\n').filter(fileName => fileName.length))) : []
       },
-
-      /**
-       * Compute ignore-files endpoint url
-       * @returns {String}
-       */
-      ignoreFilesUrl: function() {
-        const datasetId = this.dataset.content.id || ''
-        return `${this.config.apiUrl}/datasets/${datasetId}/ignore-files`
-      }
     },
 
     mounted: function() {
@@ -76,23 +69,31 @@
        * debounced to 1 second
        */
       submitIgnoreFilesRequest: debounce(function() {
-        fetch(this.ignoreFilesUrl, {
-          method: 'PUT',
-          body: JSON.stringify(this.ignoreFilesDTO),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(response => {
-          if (response.ok) {
-            response.json().then(resp => {
-              const ignoreFiles = (resp.ignoreFiles || []).map(file => file.fileName)
-              this.ignoreFiles = ignoreFiles.join('\n')
-              this.setDatasetIgnoreFiles(this.toIgnoreFilesDTO(ignoreFiles))
+        useGetToken()
+          .then(token => {
+            const datasetId = this.dataset.content.id || ''
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/ignore-files`
+
+            fetch(url, {
+              method: 'PUT',
+              body: JSON.stringify(this.ignoreFilesDTO),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `bearer ${token}`
+              }
             })
-          }
-        }).catch(error => {this.handleXhrError(error)})
+              .then(response => {
+                if (response.ok) {
+                  response.json().then(resp => {
+                    const ignoreFiles = (resp.ignoreFiles || []).map(file => file.fileName)
+                    this.ignoreFiles = ignoreFiles.join('\n')
+                    this.setDatasetIgnoreFiles(this.toIgnoreFilesDTO(ignoreFiles))
+                  })
+                }
+          })
+
+        })
+          .catch(useHandleXhrError)
       }, 1000),
 
       /**

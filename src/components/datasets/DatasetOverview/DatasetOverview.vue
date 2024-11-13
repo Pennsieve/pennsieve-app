@@ -284,7 +284,7 @@
   import IconCopyDocument from "../../icons/IconCopyDocument.vue";
   import EventBus from '../../../utils/event-bus';
   import {useGetToken} from "@/composables/useGetToken";
-  import {useSendXhr} from "@/mixins/request/request_composable";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 
   const replaceLineBreaks = str => {
@@ -576,19 +576,6 @@ export default {
       return pathOr('Add a license', ['content', 'license'], this.dataset)
     },
 
-    /**
-     * Compute URL for readme endpoint
-     * @returns {String}
-     */
-    datasetReadmeUrl: async function() {
-      return useGetToken()
-        .then(token => {
-          `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${
-            this.userToken
-          }`
-        })
-    },
-
     /*
     *compute changelog endpoint
     */
@@ -596,7 +583,7 @@ export default {
       return useGetToken()
         .then(token => {
           return `${this.config.apiUrl}/datasets/${this.datasetId}/changelog?api_key=${
-            this.userToken
+            token
           }`
         })
     },
@@ -740,9 +727,10 @@ export default {
      * @params {String} markdown
      */
     onReadmeSave: function(markdown) {
-      this.datasetReadmeUrl()
-        .then(url => {
-          fetch(url, {
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${token}`
+          return useSendXhr(url, {
             body: JSON.stringify({
               readme: markdown
             }),
@@ -767,8 +755,9 @@ export default {
                 throw response
               }
             })
-            .catch(this.handleXhrError.bind(this))
         })
+        .catch(useHandleXhrError)
+
     },
 
 

@@ -149,6 +149,8 @@ import IconColor from "../../icons/IconColor.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import IconTrash from "../../icons/IconTrash.vue";
 import IconReturnArrow from "../../icons/IconReturnArrow.vue";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 
 export default {
@@ -219,7 +221,7 @@ export default {
      * @returns {Boolean}
      */
     isRemoveOptionDisabled: function() {
-      return this.orgDatasetStatuses.length === 1 ? true : false
+      return this.orgDatasetStatuses.length === 1
     },
 
     /**
@@ -230,21 +232,6 @@ export default {
       return {
         '--button-color': this.status.color
       }
-    },
-    /**
-     * Create a new dataset status option url
-     * @returns {String}
-     */
-    createNewDatasetStatusUrl: function() {
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status?api_key=${this.userToken}`
-    },
-
-    /**
-     * Updates or deletes a dataset status option url
-     * @returns {String}
-     */
-    modifyDatasetStatusUrl: function() {
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status/${this.statusId}?api_key=${this.userToken}`
     },
 
     /**
@@ -361,19 +348,25 @@ export default {
      * @param {Number} id
      */
     removeStatusName: function() {
-      this.statusId = this.status.id
-      this.sendXhr(this.modifyDatasetStatusUrl, {
-        method: 'DELETE'
-      })
-        .then(() => {
-          let statuses = []
-          statuses = this.orgDatasetStatuses.filter(status => {
-            return status.id !== this.status.id
+      useGetToken()
+        .then(async token => {
+          this.statusId = this.status.id
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status/${this.statusId}?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'DELETE'
           })
-          this.updateDatasetSearchStatus('')
-          this.updateOrgDatasetStatuses(statuses)
-        })
-        .catch(this.handleXhrError.bind(this))
+            .then(() => {
+              let statuses = []
+              statuses = this.orgDatasetStatuses.filter(status => {
+                return status.id !== this.status.id
+              })
+              this.updateDatasetSearchStatus('')
+              this.updateOrgDatasetStatuses(statuses)
+            })
+        }).catch(useHandleXhrError)
+
+
+
     },
 
     /**
@@ -414,15 +407,20 @@ export default {
       this.openColorMenu = false
       this.selectedColor = color
       this.statusId = this.status.id
-      // update it using endpoint
-      this.sendXhr(this.modifyDatasetStatusUrl, {
-        method: 'PUT',
-        body: {
-          displayName: this.status.displayName,
-          color: color
-        }
-      }).then(this.updateStatusArray.bind(this))
-      .catch(this.handleXhrError.bind(this))
+
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status/${this.statusId}?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'PUT',
+            body: {
+              displayName: this.status.displayName,
+              color: color
+            }
+          })
+        })
+        .then(this.updateStatusArray.bind(this))
+        .catch(useHandleXhrError)
     },
 
     /**
@@ -510,14 +508,19 @@ export default {
      * @param {String} newStatusName
      */
     createNewStatus: function(newStatusName) {
-      this.sendXhr(this.createNewDatasetStatusUrl, {
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status?api_key=${token}`
+          return useSendXhr(url, {
             method: 'POST',
             body: {
               displayName: newStatusName,
               color: '#71747C'
             }
-          }).then(this.updateStatusArray.bind(this))
-          .catch(this.handleXhrError.bind(this))
+          })
+        })
+        .then(this.updateStatusArray.bind(this))
+        .catch(this.handleXhrError.bind(this))
     },
 
     /**
@@ -526,15 +529,20 @@ export default {
      * @param {Object} status
      */
     updateStatus: function(newStatusName, status) {
-      this.sendXhr(this.modifyDatasetStatusUrl, {
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status/${this.statusId}?api_key=${token}`
+          this.sendXhr(url, {
             method: 'PUT',
             body: {
               displayName: newStatusName,
               color:
                 this.selectedColor !== '' ? this.selectedColor : status.color
             }
-          }).then(this.updateStatusArray.bind(this))
-          .catch(this.handleXhrError.bind(this))
+          })
+        })
+        .then(this.updateStatusArray.bind(this))
+        .catch(useHandleXhrError)
     }
   }
 }

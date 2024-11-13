@@ -52,7 +52,7 @@ export default {
 
   computed: {
     ...mapState(["orgMembers", "profile"]),
-    ...mapGetters(["activeOrganization", "userToken", "config"]),
+    ...mapGetters(["activeOrganization",  "config"]),
     /**
      * Active organization name
      * @returns {String}
@@ -70,7 +70,6 @@ export default {
   methods: {
     ...mapActions(["updateDataset"]),
   },
-  methods: {},
 };
 </script>
 

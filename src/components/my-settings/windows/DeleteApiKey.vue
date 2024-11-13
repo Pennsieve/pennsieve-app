@@ -45,6 +45,7 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'DeleteApiKey',
@@ -81,18 +82,7 @@ export default {
       'profile',
       'activeOrganization',
       'config'
-    ]),
-    apiKeyUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const apiKey = pathOr('', ['apiKey', 'key'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !apiKey || !userToken) {
-        return ''
-      }
-
-      return `${url}/token/${apiKey}?api_key=${userToken}`
-    }
+    ])
   },
 
   methods: {
@@ -105,11 +95,17 @@ export default {
     sendRequest: function() {
       this.closeDialog()
 
-      this.sendXhr(this.apiKeyUrl, {
-        method: 'DELETE'
-      })
-      .then(this.handleXhrSuccess.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const apiKey = pathOr('', ['apiKey', 'key'])(this)
+          const url = `${this.config.apiUrl}/token/${apiKey}?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'DELETE'
+          })
+            .then(this.handleXhrSuccess.bind(this))
+
+        })
+        .catch(this.handleXhrError.bind(this))
     },
     /**
      * Handles successful two factor xhr response

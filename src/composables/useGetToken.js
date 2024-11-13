@@ -1,4 +1,4 @@
-import {fetchAuthSession} from "aws-amplify/auth";
+import { fetchAuthSession } from 'aws-amplify/auth';
 import * as siteConfig from '@/site-config/site.json'
 
 

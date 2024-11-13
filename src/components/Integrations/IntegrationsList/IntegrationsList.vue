@@ -117,7 +117,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization",  "config", "hasFeature"]),
 
     filteredWebhooks: function () {
       let filteredArray = this.integrations.filter(
@@ -180,17 +180,7 @@ export default {
       this.removeIntegration(integration.id);
       this.removeIntegrationDialogVisible = false;
     },
-    /**
-     * Model URL
-     * @returns {String}
-     */
-    getIntegrationUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`;
-      }
 
-      return "";
-    },
     openEditIntegrationDialog: function (integration) {
       this.integrationEdit = integration;
       this.addEditIntegrationDialogVisible = true;

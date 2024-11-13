@@ -207,6 +207,8 @@ import Request from '../../mixins/request'
 
 import EventBus from '../../utils/event-bus.js';
 import { PublicationTabsStatuses, PublicationTabs, PublicationStatus, PublicationType } from '../../utils/constants';
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 const getPublicationSuffix = (publicationStatus) => {
    return publicationStatus === PublicationStatus.REQUESTED
@@ -386,79 +388,80 @@ export default {
      * @param {Number} dataUseAgreementId
      */
     requestAccess: function(dataUseAgreementId) {
-      const id = pathOr(this.dataset.id, ['content', 'intId'], this.dataset)
-      const url = `${this.config.apiUrl}/discover/datasets/${id}/preview?api_key=${this.userToken}`
-
-      this.sendXhr(url, {
-        method: 'POST',
-        body: {
-          datasetId: id,
-          dataUseAgreementId
-        }
-      }).then(() => {
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: 'Your request was successfully sent to the dataset owner'
-          }
-        })
-        this.isDataUseAgreementSignDialogVisible = false
-        this.isSigningAgreement = false
-        this.refreshPublishingData(PublicationStatus.COMPLETED)
-      }).catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const id = pathOr(this.dataset.id, ['content', 'intId'], this.dataset)
+          const url = `${this.config.apiUrl}/discover/datasets/${id}/preview?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'POST',
+            body: {
+              datasetId: id,
+              dataUseAgreementId
+            }
+          }).then(() => {
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'success',
+                msg: 'Your request was successfully sent to the dataset owner'
+              }
+            })
+            this.isDataUseAgreementSignDialogVisible = false
+            this.isSigningAgreement = false
+            this.refreshPublishingData(PublicationStatus.COMPLETED)
+          })
+        }).catch(useHandleXhrError)
     },
 
     triggerRequest: async function(publicationStatus, publicationType, message = "") {
       const publicationSuffix = getPublicationSuffix(publicationStatus)
       let url = ''
 
-      if (this.dataset.publication.type === 'embargo') {
-         url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken
-      }&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`
+      useGetToken()
+        .then(async token => {
+          if (this.dataset.publication.type === 'embargo') {
+            url = `${this.config.apiUrl
+            }/datasets/${this.dataset.content.id
+            }/publication/${publicationSuffix
+            }?publicationType=${publicationType
+            }&api_key=${token
+            }&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`
 
-      } else {
-        url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken
-      }&comments=${encodeURI(message.replaceAll('\n','<br>'))}`
-      }
-
-      this.inFlightStatus = true;
-      try {
-        await this.sendXhr(url, { method: 'POST' })
-
-        const actionWord =
-          publicationStatus === PublicationStatus.REQUESTED
-            ? 'sent'
-            : publicationStatus
-
-        const pubTypeWord =
-          publicationType === PublicationType.REMOVAL
-            ? 'Cancel'
-            : publicationType.charAt(0).toUpperCase() + publicationType.slice(1)
-
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: `${pubTypeWord} request ${actionWord} for dataset ${this.dataset.content.name}`
+          } else {
+            url = `${this.config.apiUrl
+            }/datasets/${this.dataset.content.id
+            }/publication/${publicationSuffix
+            }?publicationType=${publicationType
+            }&api_key=${token
+            }&comments=${encodeURI(message.replaceAll('\n','<br>'))}`
           }
+
+          this.inFlightStatus = true;
+          return this.sendXhr(url, { method: 'POST' })
+            .then( () => {
+              const actionWord =
+                publicationStatus === PublicationStatus.REQUESTED
+                  ? 'sent'
+                  : publicationStatus
+
+              const pubTypeWord =
+                publicationType === PublicationType.REMOVAL
+                  ? 'Cancel'
+                  : publicationType.charAt(0).toUpperCase() + publicationType.slice(1)
+
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: `${pubTypeWord} request ${actionWord} for dataset ${this.dataset.content.name}`
+                }
+              })
+
+              this.refreshPublishingData(publicationStatus)
+            })
+        }).catch((err) => {
+          useHandleXhrError(err)
+          // set inFlight to false so we can attempt to hit the button again
+          this.inFlightStatus = false;
         })
-
-        this.refreshPublishingData(publicationStatus)
-
-        // NOTE: we explicitly DO NOT reset inFlight here because we expect further GET requests to update the parent
-        // lists and re-mount this component
-      } catch (e) {
-        this.handleXhrError(e)
-        // set inFlight to false so we can attempt to hit the button again
-        this.inFlightStatus = false;
-      }
     },
 
     /**
@@ -503,7 +506,7 @@ export default {
       this.isDataUseAgreementSignDialogVisible = true
     },
     closeDataUseAgreementSignDialog: function(){
-      isDataUseAgreementSignDialogVisible=false;
+      this.isDataUseAgreementSignDialogVisible = false;
     },
     /**
      * Download the agreement

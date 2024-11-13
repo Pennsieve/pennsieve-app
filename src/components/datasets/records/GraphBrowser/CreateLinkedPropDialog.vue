@@ -7,8 +7,8 @@ import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue"
 import * as site from '../../../../site-config/site.json';
 import snakeCase from 'lodash.snakecase'
 import {useRoute} from "vue-router";
-import {useSendXhr, useHandleXhrError} from '../../../../mixins/request/request_composable.js'
-
+import {useSendXhr, useHandleXhrError} from '@/mixins/request/request_composable'
+import {useGetToken} from '@/composables/useGetToken'
 
 const store = useStore()
 const route = useRoute()
@@ -172,18 +172,20 @@ function postCreateRelationship() {
     to: effectiveTarget.value.data.id
   }
 
-  return useSendXhr(createRelationshipUrl, {
-    header: {
-      'Authorization': `bearer ${userToken}`
-    },
-    method: 'POST',
-    body: payload
-  })
-    .then(response => {
-      closeDialog(true)
+  return useGetToken()
+    .then(token => {
+      return useSendXhr(createRelationshipUrl, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'POST',
+        body: payload
+      })
+        .then(response => {
+          closeDialog(true)
 
-    })
-    .catch(useHandleXhrError)
+        })
+    }).catch(useHandleXhrError)
 
 }
 

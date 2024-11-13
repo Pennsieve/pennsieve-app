@@ -283,17 +283,6 @@
           }).catch(err => console.log(err))
       },
 
-      /**
-       * Onboarding Events Url
-       * @returns {String}
-       */
-      onboardingEventsUrl: function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-        if (apiUrl && this.userToken) {
-          return `${apiUrl}/onboarding/events?api_key=${this.userToken}`
-        }
-        return ''
-      },
       updateIsActive: function(value) {
         this.integrations.filter(n => n.id === value.id)[0].isActive = value.isActive
         this.checkActiveIntegrations()
@@ -501,7 +490,8 @@
       sendOnboardingEventsRequest: function() {
         useGetToken()
           .then(token => {
-            this.sendXhr(this.onboardingEventsUrl, {
+            const url = `${apiUrl}/onboarding/events?api_key=${token}`
+            this.sendXhr(token, {
               method: 'POST',
               body: 'CreatedDataset',
               header: {
