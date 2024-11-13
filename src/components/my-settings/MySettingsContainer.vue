@@ -298,7 +298,7 @@
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
 import { pathOr, propOr, prop } from "ramda";
-import {Auth} from "@aws-amplify/auth";
+import {getCurrentUser} from "aws-amplify/auth";
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
@@ -487,7 +487,7 @@ export default {
      * Get current authenticated Cognito user
      */
     getCognitoUser: function () {
-      Auth.currentAuthenticatedUser()
+      getCurrentUser()
         .then((user) => {
           this.updateCognitoUser(user);
         })
