@@ -85,6 +85,8 @@ import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import AutoFocus from '../../../mixins/auto-focus'
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import {useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'CreateTwoFactor',
@@ -133,16 +135,6 @@ export default {
       'cognitoUser'
     ]),
 
-    twoFactorUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !userToken) {
-        return ''
-      }
-      return `${url}/user/twofactor?api_key=${userToken}`
-
-    }
   },
 
   methods: {
@@ -195,15 +187,19 @@ export default {
     sendTwoFactorAuthRequest: function() {
       const phoneNumber = this.ruleForm.phoneNumber.replace(/\D/g, '')
 
-      this.sendXhr(this.twoFactorUrl, {
-        method: 'POST',
-        body: {
-          countryCode: this.ruleForm.countryCode,
-          phoneNumber
-        }
-      })
-      .then(this.handleTwoFactorXhrSucces.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/user/twofactor?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'POST',
+            body: {
+              countryCode: this.ruleForm.countryCode,
+              phoneNumber
+            }
+          })
+            .then(this.handleTwoFactorXhrSucces.bind(this))
+        })
+        .catch(this.handleXhrError.bind(this))
     },
     /**
      * Handles successful two factor xhr response

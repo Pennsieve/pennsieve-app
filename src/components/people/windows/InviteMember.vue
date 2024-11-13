@@ -89,6 +89,8 @@ import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 import InviteConfirmation from './InviteConfirmation.vue'
 import { pathOr, path, find, propEq, defaultTo } from 'ramda'
+import {useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'InviteMember',
@@ -156,17 +158,6 @@ export default {
       'config'
     ]),
 
-    /**
-     * Computes the invitation url
-     * @returns {String}
-     */
-    invitationUrl: function() {
-      const activeOrgId = pathOr('', ['organization', 'id'], this.activeOrganization)
-      if (!this.userToken || !activeOrgId) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${activeOrgId}/members?api_key=${this.userToken}`
-    },
   },
 
   methods: {
@@ -244,17 +235,24 @@ export default {
         role = 'blind_reviewer'
       }
       this.emailVal = this.ruleForm.email
-      this.sendXhr(this.invitationUrl, {
-        method: 'POST',
-        body: {
-          invites: [
-            userInvite
-          ],
-          role: role
-        }
-      })
-      .then(this.handleSucessfulInvite.bind(this))
-      .catch(this.handleXhrError.bind(this))
+
+      useGetToken()
+        .then(token => {
+          const activeOrgId = pathOr('', ['organization', 'id'], this.activeOrganization)
+          const url = `${this.config.apiUrl}/organizations/${activeOrgId}/members?api_key=${token}`
+
+          return useSendXhr(url, {
+            method: 'POST',
+            body: {
+              invites: [
+                userInvite
+              ],
+              role: role
+            }
+          })
+            .then(this.handleSucessfulInvite.bind(this))
+        })
+        .catch(this.handleXhrError.bind(this))
     },
 
     /**

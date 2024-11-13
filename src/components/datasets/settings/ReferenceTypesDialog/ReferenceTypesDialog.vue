@@ -132,6 +132,8 @@ import Request from '../../../../mixins/request/index'
 import { referenceTypeOptions } from '../../../../utils/constants'
 import IconDocument from "../../../icons/IconDocument.vue";
 import IconTryAgain from "../../../icons/IconTryAgain.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 export default {
   name: 'ReferenceTypesDialog',
   components: {
@@ -242,14 +244,17 @@ export default {
       this.doi = ''
       let url = ''
       if (this.ruleForm.doi !== '') {
-        url = this.previewCitationUrl + `&api_key=${this.userToken}`
-
-        this.sendXhr(url)
-          .then(response => {
-            this.isLoading = false
-            this.doi = this.formatResponse(response)
+        useGetToken()
+          .then(async token => {
+            url = this.previewCitationUrl + `&api_key=${token}`
+            return useSendXhr(url)
+              .then(response => {
+                this.isLoading = false
+                this.doi = this.formatResponse(response)
+              })
           })
           .catch(err => {
+            console.log(err)
             if (err.status === 400) {
               this.invalidDOI = true
             } else if (err.status === 404) {

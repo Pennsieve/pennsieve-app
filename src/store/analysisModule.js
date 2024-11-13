@@ -1,4 +1,5 @@
 import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const initialState = () => ({
     computeNodes: [],
@@ -85,28 +86,28 @@ const initialState = () => ({
 
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
-      try {
-        const userToken = await useGetToken()
-
-        const url = `${rootState.config.api2Url}/compute-nodes`;
-  
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
+      return useGetToken()
+        .then(token => {
+          const url = `${rootState.config.api2Url}/compute-nodes`;
+          return fetch(url, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            }
+          })
+            .then(resp => {
+              if (resp.ok) {
+                return resp.json()
+                    .then(commit('UPDATE_COMPUTE_NODES'))
+              } else {
+                return Promise.reject(resp)
+              }
+            })
         })
-  
-        if (resp.ok) {
-          const result = await resp.json()
-          commit('UPDATE_COMPUTE_NODES', result)
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
+        .catch(err => {
           commit('UPDATE_COMPUTE_NODES', [])
-          return Promise.reject(err)
-      }
+          return Promise.reject()
+        })
     },
     fetchApplications: async({ commit, rootState }) => {
       try {

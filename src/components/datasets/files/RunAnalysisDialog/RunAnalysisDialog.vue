@@ -119,6 +119,7 @@ import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
 import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "RunAnalysisDialog",
@@ -427,6 +428,38 @@ export default {
         this.selectedApplication = {};
         this.value = "";
       }
+      useGetToken()
+        .then(token => {
+          return useSendXhr(url, {
+            method: "POST",
+            header: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: body,
+          })
+            .then((response) => {
+              EventBus.$emit("toast", {
+                detail: {
+                  msg: "Your workflow has been successfully initiated!",
+                  type: "success",
+                },
+              });
+              this.closeDialog();
+            })
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Sorry! There was an issue initiating your event",
+              type: "error",
+            },
+          });
+          this.closeDialog();
+          this.targetDirectory = "";
+          this.selectedApplication = {};
+          this.value = "";
+        });
     },
     /**
      * Determines if tab content is active
@@ -546,16 +579,22 @@ export default {
       }
     },
     fetchFilesForAnalysisDialog: function (offset, limit, id = null) {
-      let url;
-      if (this.ancestorList.length === 0) {
-        url = this.getFilesUrl();
-      } else {
-        url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+
+      useGetToken()
+        .then(async token => {
+          let url;
+          if (this.ancestorList.length === 0) {
+            url = this.getFilesUrl();
+          } else {
+            url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          }
+
+          return this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
+            })
+
         })
         .catch((response) => {
           this.handleXhrError(response);

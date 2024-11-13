@@ -59,6 +59,8 @@ import Request from '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 import { propOr, pathOr, defaultTo } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'EditMember',
@@ -160,15 +162,7 @@ export default {
       this.ruleForm.credential = member.credential
       this.memberDisplayName = this.createDisplayName(member)
     },
-    /**
-     * Creates PUT url to remove member from org
-     */
-    createUrl: function() {
-      const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      const memberId = propOr('', 'id', this.member)
-      return `${apiUrl}/organizations/${orgId}/members/${memberId}?api_key=${this.userToken}`
-    },
+
     /**
      * Validates member form
      * @param {String} formName
@@ -186,33 +180,42 @@ export default {
      * Makes XHR call to update member
      */
     updateMemberXhr: function() {
-      this.sendXhr(this.createUrl(), {
-        method: 'PUT',
-        body: {
-          firstName: this.ruleForm.firstName,
-          lastName: this.ruleForm.lastName,
-          email: this.ruleForm.email,
-          credential: this.ruleForm.credential
-        }
-      })
-      .then(updatedMember => {
-        this.$emit('member-updated', updatedMember)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: `Profile for ${this.memberDisplayName} updated`
-          }
+      useGetToken()
+        .then(token => {
+          const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
+          const apiUrl = propOr('', 'apiUrl', this.config)
+          const memberId = propOr('', 'id', this.member)
+          const url = `${apiUrl}/organizations/${orgId}/members/${memberId}?api_key=${token}`
+
+          return useSendXhr(url, {
+            method: 'PUT',
+            body: {
+              firstName: this.ruleForm.firstName,
+              lastName: this.ruleForm.lastName,
+              email: this.ruleForm.email,
+              credential: this.ruleForm.credential
+            }
+          })
+            .then(updatedMember => {
+              this.$emit('member-updated', updatedMember)
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: `Profile for ${this.memberDisplayName} updated`
+                }
+              })
+              this.closeDialog()
+            })
         })
-        this.closeDialog()
-      })
-      .catch(() => {
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'error',
-            msg: `Error updating ${this.memberDisplayName}`
-          }
+        .catch((err) => {
+          console.log(err)
+          EventBus.$emit('toast', {
+            detail: {
+              type: 'error',
+              msg: `Error updating ${this.memberDisplayName}`
+            }
+          })
         })
-      })
     }
   }
 }
