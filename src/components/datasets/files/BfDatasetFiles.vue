@@ -427,7 +427,7 @@ export default {
     },
 
     /**
-     * Trigger API request when URL is changed
+     * Trigger API request when URL is changed. This is required for infinite scroll functionality.
      */
     getFilesUrl: function () {
       this.fetchFiles();
@@ -757,7 +757,7 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
+      this.getFilesUrl; // this is here for infinite scroll
       if (id) {
         this.navigateToFile(id);
       } else {
