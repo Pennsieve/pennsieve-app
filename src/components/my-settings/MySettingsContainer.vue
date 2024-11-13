@@ -348,6 +348,8 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
+import { pathOr, propOr, prop } from "ramda";
+import {getCurrentUser} from "aws-amplify/auth";
 
 import { pathOr, propOr, prop, has } from "ramda";
 import { Auth } from "@aws-amplify/auth";
@@ -587,7 +589,7 @@ export default {
      * Get current authenticated Cognito user
      */
     getCognitoUser: function () {
-      Auth.currentAuthenticatedUser()
+      getCurrentUser()
         .then((user) => {
           this.updateCognitoUser(user);
         })
