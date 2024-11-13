@@ -16,7 +16,6 @@
           />
         </template>
         <template #right>
-
           <template v-if="quickActionsVisible">
             <bf-button
               v-if="showRunAnalysisFlow"
@@ -43,12 +42,15 @@
             </bf-button>
           </template>
 
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
                 v-if="showRunAnalysisFlow"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button "
+                class="dropdown-button"
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -92,11 +94,8 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
@@ -332,7 +331,10 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
@@ -369,6 +371,20 @@ export default {
     },
 
     /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+    getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl =
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id =
+          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
+    },
+
+    /**
      * Get move URL
      * @returns {String}
      */
@@ -396,19 +412,25 @@ export default {
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
+    },
+
+    /**
+     * Trigger API request when URL is changed
+     */
+    getFilesUrl: function () {
+      this.fetchFiles();
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -460,11 +482,11 @@ export default {
       immediate: true,
     },
 
-    $route: 'handleRouteChange'
+    $route: "handleRouteChange",
   },
 
   mounted: function () {
-    if (this.getFilesUrl() && !this.files.length) {
+    if (this.getFilesUrl && !this.files.length) {
       this.fetchFiles();
     }
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
@@ -526,25 +548,22 @@ export default {
       "setCurrentTargetPackage",
     ]),
 
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
 
-    generateManifest: function() {
+    generateManifest: function () {
+      this.createDatasetManifest();
 
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
+      EventBus.$emit("toast", {
         detail: {
           type: "success",
           msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
+          duration: 1000,
+        },
+      });
     },
 
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
 
     // Ignore drops to component outside the drop target and close drop-target
@@ -645,7 +664,7 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl())
+      this.sendXhr(this.getFilesUrl)
         .then((response) => {
           this.filesLoading = true;
           this.$store.dispatch(
@@ -702,6 +721,7 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
+      this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
       if (id === "") {
@@ -737,6 +757,7 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
+      this.getFilesUrl;
       if (id) {
         this.navigateToFile(id);
       } else {
@@ -1171,30 +1192,39 @@ export default {
       this.runAnalysisDialogVisible = true;
     },
 
-        /**
+    /**
      * Get files URL for dataset
      * @returns {String}
      */
-     getFilesUrl: function () {
+    getFilesUrl: function () {
       if (this.config.apiUrl && this.userToken) {
         const baseUrl =
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
-          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
+          this.$route.name === "dataset-files"
+            ? this.$route.params.datasetId
+            : this.$route.params.fileId;
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
 
-    handleRouteChange: function(to, from) {
-      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+    handleRouteChange: function (to, from) {
+      const DATASET_FILES_ROUTES = [
+        "dataset-files",
+        "collection-files",
+        "file-record",
+        "dataset-files-wrapper",
+      ];
       const routeChanged = to.name !== from.name;
       const fileIdChanged = to.params.fileId !== from.params.fileId;
-      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+      const isNavigatingWithinDatasetFiles =
+        DATASET_FILES_ROUTES.includes(to.name) &&
+        (routeChanged || fileIdChanged);
 
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    }
+    },
   },
 };
 </script>
