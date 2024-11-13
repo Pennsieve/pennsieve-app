@@ -76,6 +76,8 @@ import UploadManifestFile from "./UploadManifestFile.vue"
 import ManifestStatusMenu from "./ManifestFileFilterMenu.vue";
 import FileIcon from '../../../../mixins/file-icon/index'
 import IconTryAgain from "../../../icons/IconTryAgain.vue";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'UploadManifestFiles',
@@ -140,14 +142,17 @@ export default {
       if (!url) {
         return
       }
-      const opts = {
-        'header': {'Authorization': 'Bearer ' + this.userToken}
-      }
-      this.sendXhr(url, opts)
-        .then(manifestFiles => {
-          this.manifestFiles = manifestFiles
-        })
-        .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const opts = {
+            'header': {'Authorization': 'Bearer ' + token}
+          }
+          return useSendXhr(url, opts)
+            .then(manifestFiles => {
+              this.manifestFiles = manifestFiles
+            })
+        }).catch(err => useHandleXhrError(err))
+
     },
     loadMore: function() {
       let url = this.getManifestFilesUrl()
@@ -155,25 +160,23 @@ export default {
       if (!url) {
         return
       }
-      const opts = {
-        'header': {'Authorization': 'Bearer ' + this.userToken}
-      }
-      this.sendXhr(url, opts)
-        .then(manifestFiles => {
-          this.manifestFiles.files = this.manifestFiles.files.concat(manifestFiles.files)
-          this.manifestFiles.continuation_token = manifestFiles.continuation_token
-        })
-        .catch(this.handleXhrError.bind(this))
 
+      useGetToken()
+        .then(token => {
+          const opts = {
+            'header': {'Authorization': 'Bearer ' + token}
+          }
+          return useSendXhr(url, opts)
+            .then(manifestFiles => {
+              this.manifestFiles.files = this.manifestFiles.files.concat(manifestFiles.files)
+              this.manifestFiles.continuation_token = manifestFiles.continuation_token
+            })
+        }).catch(err => useHandleXhrError(err))
 
     },
     getManifestFilesUrl: function() {
       const pageLimit = 20
-      if (!this.activeOrganization.organization || !this.userToken) {
-        return
-      }
-
-      var url = `${this.config.api2Url}/manifest/files?api_key=${this.userToken}&manifest_id=${this.item.id}&limit=${pageLimit}`
+      let url = `${this.config.api2Url}/manifest/files?&manifest_id=${this.item.id}&limit=${pageLimit}`
       if (this.statusFilter != "All") {
         url = url + `&status=${this.statusFilter.replace(/\s/g, "")}`
       }

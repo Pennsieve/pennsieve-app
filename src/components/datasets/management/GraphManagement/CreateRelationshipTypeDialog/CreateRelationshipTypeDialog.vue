@@ -150,6 +150,8 @@
 
   import Request from '../../../../../mixins/request'
   import IconLockFilled from "../../../../icons/IconLockFilled.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'CreateRelationshipTypeDialog',
@@ -336,26 +338,30 @@
 
           this.isCreating = true
 
-          this.sendXhr(url, {
-            method: method,
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            },
-            body: payload
-          })
-          .then(response => {
-            if (this.editing === false) {
-              this.$emit('add-relationship-type', response)
-            } else {
-              this.$emit('update-relationship-type', response[0])
-            }
-            this.closeDialog()
-          })
-          .catch(error => {
-            // @TODO Show error state to user
-            this.isCreating = false
-            this.handleXhrError(error)
-          })
+          useGetToken()
+            .then(token => {
+              return useSendXhr(url, {
+                method: method,
+                header: {
+                  'Authorization': `bearer ${token}`
+                },
+                body: payload
+              })
+                .then(response => {
+                  if (this.editing === false) {
+                    this.$emit('add-relationship-type', response)
+                  } else {
+                    this.$emit('update-relationship-type', response[0])
+                  }
+                  this.closeDialog()
+                })
+                .catch(error => {
+                  // @TODO Show error state to user
+                  this.isCreating = false
+                  this.handleXhrError(error)
+                })
+            })
+
         })
       }
     }

@@ -74,6 +74,8 @@ import DialogBody from '../../../../shared/dialog-body/DialogBody.vue'
 
 import Request from '../../../../../mixins/request'
 import IconWarningCircle from "../../../../icons/IconWarningCircle.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'DeleteRelationshipTypeDialog',
@@ -160,16 +162,20 @@ export default {
      * Request all relationship instances of the current relationship type
      */
     getRelationshipInstances: function() {
-      this.sendXhr(this.relationshipInstancesUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-      })
-      .then(response => {
-        this.relationshipInstancesCount = response.length
-        this.isLoadingInstances = false
-      })
-      .catch(this.handleXhrError)
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.relationshipInstancesUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+          })
+            .then(response => {
+              this.relationshipInstancesCount = response.length
+              this.isLoadingInstances = false
+            })
+            .catch(this.handleXhrError)
+        })
+
     },
 
     /**
@@ -179,20 +185,24 @@ export default {
       const relationshipId = propOr('', 'id', this.relationshipTypeEdit)
       const url = `${this.url}/${relationshipId}`
 
-      this.sendXhr(url, {
-        method: 'DELETE',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-      })
-      .then(response => {
-        this.$emit('remove-relationship-type', this.relationshipTypeEdit)
-        // this.closeDialog()
-      })
-      .catch(error => {
-        this.handleXhrError(error)
-        // this.closeDialog()
-      })
+      useGetToken()
+        .then(token => {
+          useSendXhr(url, {
+            method: 'DELETE',
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+          })
+            .then(response => {
+              this.$emit('remove-relationship-type', this.relationshipTypeEdit)
+              // this.closeDialog()
+            })
+            .catch(error => {
+              this.handleXhrError(error)
+              // this.closeDialog()
+            })
+        })
+
     }
   }
 }

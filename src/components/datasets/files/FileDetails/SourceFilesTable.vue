@@ -121,6 +121,8 @@ import IconRemove from "../../../icons/IconRemove.vue";
 import BfFileLabel from '../../../datasets/files/bf-file/BfFileLabel.vue'
 import IconUpload from "../../../icons/IconUpload.vue";
 import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'SourceFilesTable',
@@ -251,27 +253,7 @@ export default {
       return find(propEq('packageType', 'Collection'), this.selection) ? true: false
     },
 
-    /**
-     * Computed API Url for Source Files table
-     * @returns {String}
-     */
-    // @TODO Modify this to handle sorting on sources table
-    sourceFilesUrl: function() {
-      if (!this.url) {
-        return ''
-      }
 
-      // ...yuck...
-      const mungedSortBy = this.sortBy === 'filename' ? 'name' : this.sortBy
-
-      const queryParams = `?order-by=${mungedSortBy
-      }&order-by-direction=${this.sortDirection
-      }&api_key=${this.userToken
-      }&limit=${this.limit
-      }&offset=${this.offset}`
-      return `${this.url}${queryParams}`
-
-    },
 
     /**
      * Compute selection count label
@@ -289,6 +271,28 @@ export default {
   },
 
   methods: {
+    /**
+     * Computed API Url for Source Files table
+     * @returns {String}
+     */
+    // @TODO Modify this to handle sorting on sources table
+    sourceFilesUrl: async function() {
+
+      return useGetToken()
+        .then(token => {
+          const mungedSortBy = this.sortBy === 'filename' ? 'name' : this.sortBy
+
+          const queryParams = `?order-by=${mungedSortBy
+          }&order-by-direction=${this.sortDirection
+          }&api_key=${token
+          }&limit=${this.limit
+          }&offset=${this.offset}`
+          return `${this.url}${queryParams}`
+        }).catch(err => console.log(err))
+
+
+
+    },
     /**
      * Updates selection from el-table
      * @param {Array} selection
@@ -310,17 +314,18 @@ export default {
      * for Source Files table
      */
     loadSourceFiles: function() {
-      if (!this.sourceFilesUrl) {
-        this.isLoading = false
-        return
-      }
 
-      this.sendXhr(this.sourceFilesUrl)
-        .then(response => {
-          this.sourceFileCount = response.totalCount
-          this.handleXhrResponse(response.results)
+      this.sourceFilesUrl
+        .then(url => {
+          useSendXhr(url)
+            .then(response => {
+              this.sourceFileCount = response.totalCount
+              this.handleXhrResponse(response.results)
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
+
     },
 
     // /**
@@ -356,37 +361,6 @@ export default {
         const isActive = includes(sectionName, this.activeSections)
         return isActive ? 'down' : 'up'
       }
-    },
-
-    /**
-     * Makes XHR call
-     * Takes optional callback to handle sort change responses
-     * @param {String} callback
-     */
-    sendXhrRequest: function(callback = null) {
-      if (!this.relationshipUrl) {
-        this.isLoading = false
-        return
-      }
-
-      this.sendXhr(this.relationshipUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(data => {
-          // if (this.isSubmissions) {
-          //   this.getLinkedFiles(data)
-          //   return
-          // }
-
-          if (typeof callback !== 'function') {
-            this.handleXhrResponse(data)
-          } else {
-            callback(data)
-          }
-        })
-        .catch(this.handleXhrError.bind(this))
     },
 
     /**

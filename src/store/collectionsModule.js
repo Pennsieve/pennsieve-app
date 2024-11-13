@@ -1,4 +1,5 @@
 import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const sortCollections = (collections) => {
   return collections.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true}))
@@ -45,136 +46,137 @@ export const actions = {
   updateCollections: ({commit}, data) => commit('UPDATE_COLLECTIONS', data),
 
   fetchCollections: async({ commit, rootState }) => {
-    try {
-      const userToken = await useGetToken()
-
-      const url = `${rootState.config.apiUrl}/collections?api_key=${userToken}`
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (resp.ok) {
-        const collections = await resp.json()
-        commit('UPDATE_COLLECTIONS', collections)
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-        commit('UPDATE_COLLECTIONS', [])
-        return Promise.reject(err)
-    }
+    useGetToken()
+        .then(token => {
+          const url = `${rootState.config.apiUrl}/collections?api_key=${token}`
+          return fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+              .then(resp => {
+                if (resp.ok) {
+                  return resp.json()
+                      .then(collections => {
+                        return commit('UPDATE_COLLECTIONS', collections)
+                      })
+                } else {
+                  return Promise.reject(resp)
+                }
+              })
+        }).catch(err => useHandleXhrError(err))
   },
 
   createCollection: async ({commit, rootState, dispatch}, { datasetId, collectionName }) => {
-    try {
-      const userToken = await useGetToken()
 
-      const url = `${rootState.config.apiUrl}/collections?api_key=${userToken}`
+    useGetToken()
+      .then(token => {
+        const url = `${rootState.config.apiUrl}/collections?api_key=${token}`
+        return fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({name: collectionName})
+        })
+          .then(resp => {
+            if (resp.ok) {
+              return resp.json()
+                  .then(collection => {
 
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({name: collectionName})
+                    const p1 = commit('CREATE_COLLECTION', collection)
+                    const p2 = dispatch('addCollection', { datasetId, collectionId: collection.id })
+
+                    return Promise.all([p1,p2])
+
+                  })
+            } else {
+              return Promise.reject(resp)
+            }
+          })
+
       })
+      .catch(err => useHandleXhrError(err))
 
-      if (resp.ok) {
-        const collection = await resp.json()
-        commit('CREATE_COLLECTION', collection)
-
-        dispatch('addCollection', { datasetId, collectionId: collection.id })
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      return Promise.reject(err)
-    }
   },
 
   addCollection: async({ commit, rootState }, { datasetId, collectionId}) => {
-
-
-    try {
-      const userToken = await useGetToken()
-
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${userToken}`
-
-      const resp = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({collectionId})
-      })
-
-      if (resp.ok) {
-        const collections = await resp.json()
-        commit('UPDATE_DATASET_COLLECTIONS', collections)
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-        return Promise.reject(err)
-    }
+    useGetToken()
+        .then(token => {
+          const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${token}`
+          return fetch(url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({collectionId})
+          })
+              .then(resp => {
+                if (resp.ok) {
+                  return resp.json()
+                      .then(collections => {
+                        return commit('UPDATE_DATASET_COLLECTIONS', collections)
+                      })
+                } else {
+                  return Promise.reject(resp)
+                }
+              })
+        })
+        .catch(err => useHandleXhrError(err))
   },
 
   removeCollection: async({ commit, dispatch, rootState }, { datasetId, collectionId }) => {
-    try {
-      const userToken = await useGetToken()
 
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections/${collectionId}?api_key=${userToken}`
+    useGetToken()
+        .then(token => {
+          const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections/${collectionId}?api_key=${token}`
+          return fetch(url, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }})
+              .then(resp => {
+                if (resp.ok) {
+                  const p1 = commit('REMOVE_COLLECTION', collectionId)
+                  /**
+                   * Need to fetch collections again in the chance that
+                   * this collection was the deleted from the organization.
+                   * This happens when a collection is removed and it wasn't
+                   * assigned to another dataset.
+                   */
+                  const p2 = dispatch('fetchCollections')
 
-      const resp = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+                  return Promise.all([p1,p2])
+                } else {
+                  return Promise.reject(resp)
+                }
+              })
+        }).catch(err => useHandleXhrError(err))
 
-      if (resp.ok) {
-        commit('REMOVE_COLLECTION', collectionId)
-        /**
-         * Need to fetch collections again in the chance that
-         * this collection was the deleted from the organization.
-         * This happens when a collection is removed and it wasn't
-         * assigned to another dataset.
-         */
-        dispatch('fetchCollections')
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-        return Promise.reject(err)
-    }
   },
 
   fetchDatasetCollections: async({ commit, rootState }, datasetId) => {
-    try {
-      const userToken = await useGetToken()
-
-      const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${userToken}`
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (resp.ok) {
-        const collections = await resp.json()
-        commit('UPDATE_DATASET_COLLECTIONS', collections)
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-        return Promise.reject(err)
-    }
+    return useGetToken()
+      .then(token => {
+        const url = `${rootState.config.apiUrl}/datasets/${datasetId}/collections?api_key=${token}`
+        return fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+            .then(resp => {
+              if (resp.ok) {
+                return resp.json()
+                    .then(collections => {
+                      return commit('UPDATE_DATASET_COLLECTIONS', collections)
+                    })
+              } else {
+                return Promise.reject(resp)
+              }
+            })
+      }).catch(err => useHandleXhrError(err))
   }
 }
 

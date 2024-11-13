@@ -181,6 +181,7 @@ import StageActions from "../../../shared/StageActions/StageActions.vue";
 import IconPencil from "../../../icons/IconPencil.vue" ;
 import FileRelationshipsTable from "../../files/FileDetails/FileRelationshipsTable.vue";
 import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'ConceptInstanceEdit',
@@ -493,27 +494,18 @@ export default {
      * GET url for relationships and corresponding counts
      */
     relationshipCountsUrl: function() {
-      const { userToken, config, $route } = this
-
-      if (!userToken || !this.isOrgSynced) {
-        return
-      }
-
-      // if (!this.datasetId || !this.modelId || !this.recordId) {
-      //   return null
-      // }
 
       const datasetId = this.datasetId
       const modelId = this.modelId
       const recordId = this.instanceId
 
       let url = `${
-        config.conceptsUrl
+        this.config.conceptsUrl
       }/datasets/${datasetId}/concepts/${modelId}/instances/${recordId}/relationCounts?includeIncomingLinkedProperties=true`
 
       if (this.isFile) {
         url = `${
-          config.conceptsUrl
+          this.config.conceptsUrl
         }/datasets/${datasetId}/proxy/package/external/${recordId}/relationCounts`
       }
 
@@ -619,9 +611,6 @@ export default {
      * @returns {String}
      */
     schemaLinkedPropertiesUrl: function() {
-      if (!this.userToken) {
-        return
-      }
       return `${
         this.config.conceptsUrl
       }/datasets/${this.datasetId}/concepts/${this.modelId}/linked`
@@ -632,10 +621,6 @@ export default {
      * @returns {String}
      */
     linkedPropertiesUrl: function() {
-      if (!this.userToken || this.isFile) {
-        return
-      }
-
       if (this.instanceId === 'new') {
         return
       }
@@ -653,7 +638,7 @@ export default {
       useGetToken()
         .then((token) => {
           const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-          if (this.config.apiUrl && this.userToken && datasetId) {
+          if (this.config.apiUrl && token && datasetId) {
             return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`
           }
           return ''
@@ -813,53 +798,57 @@ export default {
      */
     getRelationshipTypes: function() {
       if (this.relationshipsUrl) {
-        this.sendXhr(this.relationshipsUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        }).then(response => {
-          // get model id
+        useGetToken()
+          .then(token => {
+            useSendXhr(this.relationshipsUrl, {
+              header: {
+                Authorization: `bearer ${token}`
+              }
+            }).then(response => {
+              // get model id
 
-          // check to see which relationship types are related to the current record id
-          const relatedRelationshipTypes = response.filter(relType =>
-            Boolean(relType.from === this.modelId || relType.to === this.modelId)
-          )
+              // check to see which relationship types are related to the current record id
+              const relatedRelationshipTypes = response.filter(relType =>
+                Boolean(relType.from === this.modelId || relType.to === this.modelId)
+              )
 
 
-          // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
-          const relationships = relatedRelationshipTypes.map(relType => {
-            const { to, from } = relType
-            const isFrom = Boolean(from === this.modelId)
-            const relModelId = isFrom ? to : from
-            const { displayName, name, id } = this.getModelById(relModelId)
+              // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
+              const relationships = relatedRelationshipTypes.map(relType => {
+                const { to, from } = relType
+                const isFrom = Boolean(from === this.modelId)
+                const relModelId = isFrom ? to : from
+                const { displayName, name, id } = this.getModelById(relModelId)
 
-            // update relationship types state, adding modelName and modelId to DTO
+                // update relationship types state, adding modelName and modelId to DTO
 
-            this.relationshipTypes.push({
-              ...relType,
-              modelName: name,
-              modelId: id
+                this.relationshipTypes.push({
+                  ...relType,
+                  modelName: name,
+                  modelId: id
+                })
+
+
+
+                // return relationship count object
+                return { count: 0, displayName, name }
+              })
+
+              // update relationships state
+              this.relationships = uniqBy(prop('displayName'), [
+                ...this.relationships,
+                ...relationships
+              ])
+
+              // update active sections state
+              const relationshipNames = pluck('name', this.relationships)
+              this.activeSections = uniq([
+                ...this.activeSections,
+                ...relationshipNames
+              ])
             })
+          }).catch(err => useHandleXhrError(err))
 
-
-
-            // return relationship count object
-            return { count: 0, displayName, name }
-          })
-
-          // update relationships state
-          this.relationships = uniqBy(prop('displayName'), [
-            ...this.relationships,
-            ...relationships
-          ])
-
-          // update active sections state
-          const relationshipNames = pluck('name', this.relationships)
-          this.activeSections = uniq([
-            ...this.activeSections,
-            ...relationshipNames
-          ])
-        })
       }
     },
 
@@ -925,30 +914,35 @@ export default {
 
       this.isRelationshipsLoading = true
 
-      this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(resp => {
-          resp.forEach(obj => {
-            this.activeSections.push(obj.name)
+      useGetToken()
+        .then(token => {
+          this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
           })
-          const filesIdx = findIndex(propEq('name', 'package'), resp)
-          if (filesIdx >= 0) {
-            const filesObj = resp[filesIdx]
-            resp.splice(filesIdx, 1)
-            resp.unshift(filesObj)
-            this.relationships = resp
-          } else {
-            this.relationships = resp
-          }
-          if (this.relationships.count !== this.lastRelationshipCount) {
-            this.relationships.count = this.lastRelationshipCount
-          }
-          this.isRelationshipsLoading = false
-        })
-        .catch(this.handleXhrError.bind(this))
+            .then(resp => {
+              resp.forEach(obj => {
+                this.activeSections.push(obj.name)
+              })
+
+              const filesIdx = findIndex(propEq('name', 'package'), resp)
+              if (filesIdx >= 0) {
+                const filesObj = resp[filesIdx]
+                resp.splice(filesIdx, 1)
+                resp.unshift(filesObj)
+                this.relationships = resp
+              } else {
+                this.relationships = resp
+              }
+              if (this.relationships.count !== this.lastRelationshipCount) {
+                this.relationships.count = this.lastRelationshipCount
+              }
+              this.isRelationshipsLoading = false
+            })
+
+        }).catch(err => useHandleXhrError(err))
+
     },
     /**
      * Gets instance details
@@ -1250,56 +1244,60 @@ export default {
 
         const values = this.formatSavedValues()
 
-        try {
-          // Make request to create new instance
-          const record = await this.sendXhr(url, {
-            header: {
-              Authorization: `bearer ${this.userToken}`
-            },
-            method: 'POST',
-            body: {
-              values
-            }
-          })
+        useGetToken()
+          .then(token => {
+            return useSendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              method: 'POST',
+              body: {
+                values
+              }
+            }).then(record => {
+              const batchUrl = `${url}/${record.id}/linked/batch`
 
+              return this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
+                .then(resp => {
+                  // check for onboarding event state for creating a record
+                  if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
+                    // make post request
+                    this.sendOnboardingEventsRequest()
+                  }
 
-          const batchUrl = `${url}/${record.id}/linked/batch`
-          await this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
+                  // Redirect user to new concept instance page
+                  this.$router.replace({
+                    name: 'metadata-record',
+                    params: {
+                      instanceId: record.id
+                    }
+                  })
 
-          // check for onboarding event state for creating a record
-          if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
-            // make post request
-            this.sendOnboardingEventsRequest()
-          }
+                  // Update count for model
+                  const index = findIndex(
+                    propEq('name', this.model.name),
+                    this.concepts
+                  )
 
-          // Redirect user to new concept instance page
-          this.$router.replace({
-            name: 'metadata-record',
-            params: {
-              instanceId: record.id
-            }
-          })
+                  const updatedConcepts = this.concepts.slice()
+                  updatedConcepts[index].count++
 
-          // Update count for model
-          const index = findIndex(
-            propEq('name', this.model.name),
-            this.concepts
-          )
+                  return this.updateConcepts(updatedConcepts).then(() => {
+                    this.savingChanges = false
+                    this.updateEditingInstance(false)
+                    this.changedProperties = []
+                    this.errorProperties = []
+                  })
+                })
+            })
 
-          const updatedConcepts = this.concepts.slice()
-          updatedConcepts[index].count++
+          }).catch(err => {
 
-          this.updateConcepts(updatedConcepts).then(() => {
-            this.savingChanges = false
-            this.updateEditingInstance(false)
-            this.changedProperties = []
-            this.errorProperties = []
-          })
-        } catch (e) {
           this.processing = false
           this.savingChanges = false
-          this.handleXhrError(e)
-        }
+          useHandleXhrError(e)
+        })
+
       }
     },
 
@@ -1318,15 +1316,19 @@ export default {
         }
       })
 
-      return this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        method: 'POST',
-        body: {
-          data: properties
-        }
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
+            },
+            method: 'POST',
+            body: {
+              data: properties
+            }
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1420,39 +1422,43 @@ export default {
         const url = this.recordUrl
         const values = this.formatSavedValues()
 
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          },
-          method: 'PUT',
-          body: {
-            values
-          }
-        })
-          .then(resp => {
-            this.savingChanges = false
-            this.updateEditingInstance(false)
-            this.changedProperties = []
-            this.errorProperties = []
-
-            const values = propOr([], 'values', resp)
-            this.instance.values = values
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
+        useGetToken()
+          .then(token => {
+            this.sendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              method: 'PUT',
+              body: {
+                values
               }
             })
+              .then(resp => {
+                this.savingChanges = false
+                this.updateEditingInstance(false)
+                this.changedProperties = []
+                this.errorProperties = []
 
-            EventBus.$emit('track-event', {
-              name: 'Record Saved'
-            })
-          })
-          .catch(err => {
-            this.processing = false
-            this.savingChanges = false
-            this.handleXhrError(err)
-          })
+                const values = propOr([], 'values', resp)
+                this.instance.values = values
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
+                  }
+                })
+
+                EventBus.$emit('track-event', {
+                  name: 'Record Saved'
+                })
+              })
+              .catch(err => {
+                this.processing = false
+                this.savingChanges = false
+                this.handleXhrError(err)
+              })
+          }).catch(err => useHandleXhrError(err))
+
       }
     },
 
@@ -1517,24 +1523,25 @@ export default {
       properties = this.checkModelTitle(property, properties)
       properties.push(property)
 
-      this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        method: 'PUT',
-        body: properties
-      })
-        .then(() => {
-          // Check model title for existing properties before adding new one
-          this.checkModelTitle(property, this.instance.values)
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            },
+            method: 'PUT',
+            body: properties
+          })
+            .then(() => {
+              // Check model title for existing properties before adding new one
+              this.checkModelTitle(property, this.instance.values)
 
-          this.instance.values.push(property)
+              this.instance.values.push(property)
 
-          this.addEditPropertyDialogVisible = false
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+              this.addEditPropertyDialogVisible = false
+            })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1555,11 +1562,15 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function() {
-      return this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**

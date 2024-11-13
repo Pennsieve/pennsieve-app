@@ -30,7 +30,6 @@ export default {
 
   mounted() {
     // Vue event listeners
-    // EventBus.$on('login', this.onLogin.bind(this))
     EventBus.$on('logout', this.onLogout.bind(this))
     EventBus.$on('switch-organization', useSwitchWorkspace.bind(this))
     EventBus.$on('toast', this.onToast.bind(this))
@@ -416,71 +415,6 @@ export default {
       } catch (error) {
         this.handleXhrError()
       }
-    },
-    /**
-     * Handles switch-organization event
-     * @param {Object} evt
-     * @param {Boolean} bool
-     */
-    onSwitchOrganization: async function(evt, redirect = true) {
-      //
-      // const token = await useGetToken()
-      //
-      // const newOrg = propOr({}, 'organization', evt)
-      // const newDestNodeId = pathOr('', ['destination', 'datasetNodeId'], evt)
-      // const newOrgId = propOr(1, 'id', newOrg)
-      // const newOrgIntId = propOr(1, 'intId', newOrg)
-      // const activeOrgId = pathOr(0, ['organization', 'id'], this.activeOrganization)
-      // // Do nothing if the user is trying to switch to the organization that is already active or if no userToken found
-      // if (newOrgId === activeOrgId) {
-      //   return
-      // }
-      // // switch org in vue app
-      // const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${newOrgIntId}&api_key=${token}`
-      //
-      // this.sendXhr(switchOrgUrl, { method: 'PUT' })
-      //   .then(response => {
-      //     const updatedOrg = find(pathEq(['organization', 'id'], newOrgId), this.organizations)
-      //
-      //     // Clear filters and search query
-      //     this.clearDatasetFilters()
-      //     this.clearSearchState()
-      //
-      //     // Reset state of dataset
-      //     this.setDatasets([])
-      //     this.updateConcepts([])
-      //     this.updateFilesProxyId(null)
-      //
-      //     this.updateActiveOrganization(updatedOrg)
-      //     this.updateProfile(response)
-      //
-      //     // Reset state of menu
-      //     // this.togglePrimaryNav(true)
-      //     // this.toggleSecondaryNav(false)
-      //
-      //     // Reset state of dataset templates
-      //     this.setDatasetTemplates([])
-      //
-      //     // Check to see if user has accepted terms of service
-      //     const isSubscribed = this.checkIsSubscribed(updatedOrg)
-      //     if (redirect === true) {
-      //       if (!isSubscribed) {
-      //         this.$router.replace(`/${newOrgId}/welcome/terms-of-service`)
-      //       } else {
-      //         this.setDefaultRoute(newOrgId)
-      //       }
-      //     }
-      //     if (newDestNodeId !== '') {
-      //       this.$router.replace(`/${newOrgId}/datasets/${newDestNodeId}/overview`)
-      //     }
-      //     return this.getOrgMembers()
-      //             .then(this.getTeams.bind(this))
-      //             .then(this.getOrgContributors.bind(this))
-      //   })
-      //   .catch((error) => {
-      //     console.error(error)
-      //     this.handleXhrError.bind(this)
-      //   })
     },
     /**
      * Updates org users object with any missing fields required for sorting

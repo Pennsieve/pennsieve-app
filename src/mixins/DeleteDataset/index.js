@@ -20,7 +20,7 @@ export default {
 
       return useGetToken()
           .then(token => {
-            return `${url}/datasets/${datasetId}?api_key=${userToken}`;
+            return `${url}/datasets/${datasetId}?api_key=${token}`;
           })
     },
   },

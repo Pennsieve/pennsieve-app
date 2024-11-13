@@ -68,6 +68,8 @@ import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
 import {pathOr, propOr} from 'ramda'
 import IconTeam from "../../icons/IconTeam.vue";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'RemoveTeam',
@@ -127,36 +129,43 @@ export default {
     /**
      * Creates DELETE url to remove member from org
      */
-    deleteUrl: function() {
-      const orgId = this.activeOrganization.organization.id
-      const userToken = this.userToken
-      const apiUrl = this.config.apiUrl
-      return `${apiUrl}/organizations/${orgId}/teams/${this.team.id}?api_key=${userToken}`
+    deleteUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          const orgId = this.activeOrganization.organization.id
+          const userToken = this.userToken
+          const apiUrl = this.config.apiUrl
+          return `${apiUrl}/organizations/${orgId}/teams/${this.team.id}?api_key=${token}`
+        }).catch(err => useHandleXhrError(err))
+
     },
     /**
      * Makes XHR call to remove team from org
      */
     removeTeam: function() {
-      const url = this.deleteUrl()
-      this.sendXhr(url, {
-        method: 'DELETE'
-      })
-      .then(() => {
-        const teamName = propOr('Team', 'name', this.team)
-        const orgName = pathOr('organization', ['organization', 'name'], this.activeOrganization)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'MESSAGE',
-            msg: `${teamName} removed from ${orgName}`
-          }
+      this.deleteUrl()
+        .then(url => {
+          return useSendXhr(url, {
+            method: 'DELETE'
+          })
+            .then(() => {
+              const teamName = propOr('Team', 'name', this.team)
+              const orgName = pathOr('organization', ['organization', 'name'], this.activeOrganization)
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'MESSAGE',
+                  msg: `${teamName} removed from ${orgName}`
+                }
+              })
+              if (this.$route.name === 'team-members-list') {
+                return this.$router.push('../teams')
+              }
+              this.closeDialog()
+              this.$emit('team-removed', {team: this.team})
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        if (this.$route.name === 'team-members-list') {
-          return this.$router.push('../teams')
-        }
-        this.closeDialog()
-        this.$emit('team-removed', {team: this.team})
-      })
-      .catch(this.handleXhrError.bind(this))
+
 
     }
   }

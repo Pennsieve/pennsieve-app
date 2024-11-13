@@ -71,6 +71,8 @@
 
   import { mapGetters } from 'vuex'
   import IconTrash from "../../../icons/IconTrash.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'BfDeleteDialog',
@@ -115,15 +117,7 @@
         'config'
       ]),
 
-      /**
-       * Computes form URL based on type of action user is taking (rename vs creating)
-       * @returns {String}
-       */
-      deleteUrl: function() {
-        if (this.config.apiUrl && this.userToken) {
-          return `${this.config.apiUrl}/data/delete?api_key=${this.userToken}`
-        }
-      },
+
 
       /**
        * Compute total files
@@ -162,28 +156,43 @@
     },
 
     methods: {
+      /**
+       * Computes form URL based on type of action user is taking (rename vs creating)
+       * @returns {String}
+       */
+      deleteUrl: async function() {
+        useGetToken()
+          .then(token => {
+            return `${this.config.apiUrl}/data/delete?api_key=${token}`
+          })
+      },
+
       //deletes files permenantly. NOTE: should have toast message that confirms
       deletePermanently: function(){
         const fileIds = this.selectedDeletedFiles.map(item => item.content.id)
 
-        this.sendXhr(this.deleteUrl, {
-          method: 'POST',
-          body: { things: fileIds }
-        })
-        .then(response => {
-          this.$emit('file-delete', response)
-          const msg = 'File(s) permanently deleted.'
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'success',
-              msg
-            }
+        this.deleteUrl()
+          .then(url => {
+            this.sendXhr(url, {
+              method: 'POST',
+              body: { things: fileIds }
+            })
+              .then(response => {
+                this.$emit('file-delete', response)
+                const msg = 'File(s) permanently deleted.'
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg
+                  }
+                })
+                this.closeDialog()
+              })
+              .catch(response => {
+                this.handleXhrError(response)
+              })
           })
-          this.closeDialog()
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
       },
       /**
        * Closes the dialog
@@ -194,17 +203,23 @@
 
       deleteFiles: function() {
         const fileIds = this.selectedFiles.map(item => item.content.id)
-        this.sendXhr(this.deleteUrl, {
-          method: 'POST',
-          body: { things: fileIds }
-        })
-        .then(response => {
-          this.$emit('file-delete', response)
-          this.closeDialog()
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
+        this.deleteUrl()
+          .then(url => {
+            useSendXhr(url, {
+              method: 'POST',
+              body: { things: fileIds }
+            })
+              .then(response => {
+                this.$emit('file-delete', response)
+                this.closeDialog()
+              })
+              .catch(response => {
+                this.handleXhrError(response)
+              })
+          })
+
+
       }
     }
   }

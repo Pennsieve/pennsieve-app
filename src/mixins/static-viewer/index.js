@@ -3,6 +3,7 @@ import { mapState } from 'vuex'
 
 import Request from '../../mixins/request'
 import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const getPkgId = compose(
   pathOr('', ['content', 'id']),
@@ -33,21 +34,22 @@ export default {
     getViewerDataUrl: async function() {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
-      const userToken = await useGetToken()
-
-      if (apiUrl && pkgId && userToken) {
-        return `${apiUrl}/packages/${pkgId}/view?api_key=${userToken}`
-      }
+      return useGetToken()
+          .then(token => {
+            return `${apiUrl}/packages/${pkgId}/view?api_key=${token}`
+          })
+          .catch(err => console.log(err))
     },
 
     getFileUrl: async function() {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
-      const userToken = await useGetToken()
 
-      if (apiUrl && pkgId && this.viewerDataId && userToken) {
-        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${userToken}`
-      }
+      return useGetToken()
+          .then(token => {
+            return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
+          })
+
     },
   },
 
