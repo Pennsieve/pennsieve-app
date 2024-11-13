@@ -407,41 +407,6 @@
 
       },
 
-      /**
-       * Archive concept
-       * @param {object} concept
-       */
-      // openArchiveDialog: function(concept) {
-      //   this.activeModel = concept
-      //   this.archiveDialogVisible = true
-      // },
-
-      // /**
-      //  * Open Archive Dialog
-      //  */
-      // archiveConcept: function() {
-      //   this.sendXhr(this.modelUrl, {
-      //     method: 'DELETE',
-      //     header: {
-      //       'Authorization': `bearer ${this.userToken}`
-      //     }
-      //   })
-      //   .then(() => {
-      //     const displayName = this.activeModel.displayName
-      //     const index = findIndex(propEq('name', this.activeModel.name), this.models)
-      //
-      //     const updatedConcepts = this.models.slice()
-      //     updatedConcepts.splice(index, 1)
-      //
-      //     this.updateConcepts(updatedConcepts).then(() => {
-      //       this.archiveDialogVisible = false
-      //       this.combinedConcepts = clone(this.models)
-      //       this.activeModel = {}
-      //     })
-      //   })
-      //   .catch(this.handleXhrError.bind(this))
-      // },
-
       onUnlockConcept: function(model) {
         this.activeModel = model
         this.setLockModel(false)

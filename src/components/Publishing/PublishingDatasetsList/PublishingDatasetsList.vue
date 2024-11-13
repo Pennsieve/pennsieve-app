@@ -130,6 +130,7 @@ import { PublicationStatus} from '../../../utils/constants'
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
 import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'PublishingDatasetsList',
@@ -312,9 +313,13 @@ export default {
      * @param {String} id
      */
     publishDataset: function(id) {
-      this.sendXhr(`${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${this.userToken}&publicationType=publication`, {
-        method: 'POST'
-      })
+      useGetToken()
+        .then(token => {
+          return useSendXhr(`${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${token}&publicationType=publication`, {
+            method: 'POST'
+          })
+        }).catch(useHandleXhrError)
+
     },
 
     /**

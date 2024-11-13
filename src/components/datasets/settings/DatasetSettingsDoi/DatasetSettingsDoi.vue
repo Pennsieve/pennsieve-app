@@ -37,6 +37,8 @@
   import FormatDate from '../../../../mixins/format-date'
   import Request from '../../../../mixins/request'
   import BfButton from "../../../shared/bf-button/BfButton.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'DatasetSettingsDoi',
@@ -57,15 +59,6 @@
         'isLoadingDatasetDoi',
         'dataset'
       ]),
-
-      /**
-       * Compute URL for DOI endpoint
-       * @returns {String}
-       */
-      doiUrl: function() {
-        const datasetId = pathOr('', ['content', 'id'], this.dataset)
-        return `${this.config.apiUrl}/datasets/${datasetId}/doi?api_key=${this.userToken}`
-      },
 
       /**
        * Computes if the dataset has a DOI
@@ -97,13 +90,16 @@
        * Retrieve DOI for dataset
        */
       getDoi: function() {
-        if (!this.doiUrl) {
-          return
-        }
-        this.sendXhr(this.doiUrl)
-          .then(data => {
-            this.doi = data
-            this.isRequestingDoi = false
+
+        useGetToken()
+          .then(token => {
+            const datasetId = pathOr('', ['content', 'id'], this.dataset)
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/doi?api_key=${token}`
+            return useSendXhr(url)
+              .then(data => {
+                this.doi = data
+                this.isRequestingDoi = false
+              })
           })
           .catch(err => {
             this.isRequestingDoi = false
@@ -116,27 +112,31 @@
        */
       requestDraftDoi: function() {
         const title = pathOr('', ['content', 'name'], this.dataset)
-        if (!this.doiUrl || !title) {
+        if (!title) {
           return
         }
 
-        this.setIsLoadingDatasetDoi(true)
+        useGetToken()
+          .then(token => {
+            const datasetId = pathOr('', ['content', 'id'], this.dataset)
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/doi?api_key=${token}`
+            this.setIsLoadingDatasetDoi(true)
 
-        this.sendXhr(this.doiUrl, {
-          method: 'POST',
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          },
-          body: {
-            title
-          }
-        })
-          .then(response => {
-            return this.setDatasetDoi(response)
+            return useSendXhr(url, {
+              method: 'POST',
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              body: {
+                title
+              }
+            })
+              .then(response => {
+                return this.setDatasetDoi(response)
+              })
+
           })
-          .catch(err => {
-            this.handleXhrError(err)
-          })
+          .catch(useHandleXhrError)
           .finally(() => {
             this.setIsLoadingDatasetDoi(false)
           })
