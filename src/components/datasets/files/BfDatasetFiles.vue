@@ -720,7 +720,6 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
       if (id === "") {
@@ -756,7 +755,6 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl; // this is here for infinite scroll
       if (id) {
         this.navigateToFile(id);
       } else {
