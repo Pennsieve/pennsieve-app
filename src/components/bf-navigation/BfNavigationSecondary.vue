@@ -294,7 +294,13 @@ export default {
       "config",
     ]),
     getThemeColors: function () {
-      return this.getTheme(this.orgId);
+      let colorTheme = this.getTheme(this.orgId)
+
+      for (const [key, value] of Object.entries(pathOr({}, ['organization', 'colorTheme'], this.activeOrganization))) {
+          colorTheme = [key, value]
+        }
+
+      return colorTheme
     },
     secNavHeaderCollapsedStyle: function () {
       if (this.secondaryNavCondensed) {

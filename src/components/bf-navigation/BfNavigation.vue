@@ -289,7 +289,13 @@ export default {
       return true;
     },
     getThemeColors: function () {
-      return this.getTheme(this.orgId);
+      let colorTheme = this.getTheme(this.orgId)
+
+      for (const [key, value] of Object.entries(pathOr({}, ['organization', 'colorTheme'], this.activeOrganization))) {
+          colorTheme = [key, value]
+        }
+
+      return colorTheme
     },
     navStyleColor: function () {
       if (this.hasCustomTheme) {
@@ -360,7 +366,13 @@ export default {
       return true;
     },
     getThemeColors: function () {
-      return this.getTheme(this.orgId);
+      let colorTheme = this.getTheme(this.orgId)
+
+      for (const [key, value] of Object.entries(pathOr({}, ['organization', 'colorTheme'], this.activeOrganization))) {
+          colorTheme = [key, value]
+        }
+
+      return colorTheme
     },
     navStyleColor: function () {
       if (this.hasCustomTheme) {
