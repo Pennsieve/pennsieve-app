@@ -6,13 +6,43 @@
       label-position="top"
       class="form-auto-save"
     >
+      <data-card
+        class="mb-32 grey compact"
+        title="Your code repository cannot be published until the following items have been completed:"
+        :padding="false"
+      >
+        <checklist-item
+          externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
+          externalLinkText="Create a Release"
+          :is-complete="true"
+        >
+          create at least one release in your repository on GithHub
+        </checklist-item>
+        <checklist-item
+          href="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
+          cta="Add a License"
+          :is-complete="true"
+        >
+          add a license to your repository on GitHub
+        </checklist-item>
+        <checklist-item
+          href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
+          cta="Add a README"
+          :is-complete="true"
+        >
+          include a README.md file in your repo with information about your
+          repository
+        </checklist-item>
+      </data-card>
       <el-form-item class="auto-publish-input">
         <el-checkbox
           v-model="codeRepoForm.isAutoPublished"
           @change="saveRepoConfig"
           >Automatic publication</el-checkbox
         >
-        <p class="hint-text">Automatically publish a version on new releases from GitHub</p>
+        <p class="hint-text">
+          Automatically publish a version on new releases from GitHub
+        </p>
       </el-form-item>
 
       <el-form-item>
@@ -51,10 +81,10 @@
       <div class="el-form-item">
         <dataset-settings-banner-image
           id="codeRepoBannerImage"
-          :dataset = "codeRepo"
-          :datasetBannerURL = "codeRepoBannerURL"
-          :isLoadingBanner = "isLoadingBanner"
-          :isCodeReposDataset = "true"
+          :dataset="codeRepo"
+          :datasetBannerURL="codeRepoBannerURL"
+          :isLoadingBanner="isLoadingBanner"
+          :isCodeReposDataset="true"
         />
       </div>
 
@@ -90,7 +120,8 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
 import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
-
+import DataCard from "../shared/DataCard/DataCard.vue";
+import ChecklistItem from "../shared/ChecklistItem/ChecklistItem.vue";
 interface CodeRepoConfig {
   isAutoPublished: boolean;
   givenName: string;
@@ -101,9 +132,13 @@ interface CodeRepoConfig {
 const store = useStore();
 const route = useRoute();
 
-const codeRepo = computed(() => store.getters['codeReposModule/activeRepo'])
-const codeRepoBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
-const isLoadingBanner = computed(() => store.getters['codeReposModule/isLoadingCodeRepoBanner'])
+const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+const codeRepoBannerURL = computed(
+  () => store.getters["codeReposModule/bannerURL"]
+);
+const isLoadingBanner = computed(
+  () => store.getters["codeReposModule/isLoadingCodeRepoBanner"]
+);
 const activeRepoName = ref("");
 const inputTag = ref("");
 
@@ -118,20 +153,16 @@ onMounted(() => {
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
-    store.dispatch('codeReposModule/fetchBanner', activeRepoId)
+    store.dispatch("codeReposModule/fetchBanner", activeRepoId);
   }
 
   // update initial form values from the database
-  activeRepoName.value =
-    codeRepo.value.content.name;
+  activeRepoName.value = codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
     codeRepo.value.content.repository.autoProcess;
-  codeRepoForm.value.givenName =
-    codeRepo.value.content.name;
-  codeRepoForm.value.description =
-    codeRepo.value.content.description;
-  codeRepoForm.value.tags =
-    codeRepo.value.content.tags;
+  codeRepoForm.value.givenName = codeRepo.value.content.name;
+  codeRepoForm.value.description = codeRepo.value.content.description;
+  codeRepoForm.value.tags = codeRepo.value.content.tags;
 });
 
 const saveRepoConfig = debounce(function () {
