@@ -667,7 +667,6 @@ export default {
     fetchFiles: function () {
       this.filesLoading = true;
       const url = this.getFilesUrl;
-      console.log("url", url);
       if (url)
         this.sendXhr(url)
           .then((response) => {
