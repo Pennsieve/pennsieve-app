@@ -7,7 +7,7 @@
         :height="20"
         :width="20"
       />
-      <IconInfo v-else class="mr-8" :height="20" :width="20" />s
+      <IconInfo v-else class="mr-8" :height="20" :width="20" />
 
       <div class="link-wrap mr-8">
         <router-link
