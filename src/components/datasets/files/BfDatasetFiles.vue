@@ -380,7 +380,9 @@ export default {
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
           this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+        return id
+          ? `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`
+          : null;
       }
     },
 
@@ -664,46 +666,48 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl)
-        .then((response) => {
-          this.filesLoading = true;
-          this.$store.dispatch(
-            "uploadModule/setCurrentTargetPackage",
-            response
-          );
-          this.file = response;
+      const url = this.getFilesUrl;
+      if (url)
+        this.sendXhr(url)
+          .then((response) => {
+            this.filesLoading = true;
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
+            );
+            this.file = response;
 
-          const newFiles = response.children.map((file) => {
-            if (!file.storage) {
-              file.storage = 0;
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
+              }
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            if (newFiles.length < this.limit) {
+              this.lastPage = true;
             }
-            file.icon =
-              file.icon || this.getFilePropertyVal(file.properties, "icon");
-            file.subtype = this.getSubType(file);
-            return file;
-          });
-          if (newFiles.length < this.limit) {
-            this.lastPage = true;
-          }
-          this.files =
-            this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
-          this.sortedFiles = this.returnSort(
-            "content.name",
-            this.files,
-            this.sortDirection
-          );
-          this.ancestors = response.ancestors;
+            this.files =
+              this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+            this.ancestors = response.ancestors;
 
-          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-          if (pkgId) {
-            this.scrollToFile(pkgId);
-          }
-          this.allowFetch = true;
-          this.filesLoading = false;
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+            const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+            if (pkgId) {
+              this.scrollToFile(pkgId);
+            }
+            this.allowFetch = true;
+            this.filesLoading = false;
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
     },
     /**
      * Sort table by column
