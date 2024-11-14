@@ -411,7 +411,8 @@ export default {
       const orgName = pathOr('', ['organization', 'name'], org)
       this.ruleForm.orgName = orgName
 
-      const colorTheme = pathOr('', ['organization', 'colorTheme'], org)
+      const colorTheme = pathOr({}, ['organization', 'colorTheme'], org)
+      this.ruleForm.colorTheme = [null, null]
       for (const [key, value] of Object.entries(colorTheme)) {
         this.ruleForm.colorTheme = [key, value]
       }
@@ -448,8 +449,13 @@ export default {
      */
     updateOrgRequest: function() {
       const url = this.orgUrl()
-      const colorTheme = {}
-      colorTheme[this.ruleForm.colorTheme[0]] = this.ruleForm.colorTheme[1]
+      let colorTheme
+      if (this.ruleForm.colorTheme[0] == null || this.ruleForm.colorTheme[1] == null) {
+        colorTheme = null
+      } else {
+        colorTheme = {}
+        colorTheme[this.ruleForm.colorTheme[0]] = this.ruleForm.colorTheme[1]
+      }
       this.sendXhr(url, {
         method: 'PUT',
         body: {
