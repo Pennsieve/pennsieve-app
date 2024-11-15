@@ -100,7 +100,7 @@
       </stage-actions>
     </template>
 
-    <div class="file-meta-wrapper">
+    <div class="file-meta-wrapper" >
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
           :data="files"
@@ -370,6 +370,7 @@ export default {
       return this.files.length > 0;
     },
 
+
     /**
      * Get files URL for dataset
      * @returns {String}
@@ -379,10 +380,10 @@ export default {
         const baseUrl =
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
-          this.$route.name === "dataset-files" ? this.datasetId : this.fileId;
-        return id
-          ? `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`
-          : null;
+          this.$route.name === "dataset-files"
+            ? this.$route.params.datasetId
+            : this.$route.params.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       }
     },
 
@@ -428,12 +429,16 @@ export default {
       deep: true,
     },
 
-    /**
-     * Trigger API request when URL is changed. This is required for infinite scroll functionality.
-     */
-    getFilesUrl: function () {
-      this.fetchFiles();
+    offset: function() {
+      this.fetchFiles()
     },
+
+    // /**
+    //  * Trigger API request when URL is changed. This is required for infinite scroll functionality.
+    //  */
+    // getFilesUrl: function () {
+    //   this.fetchFiles();
+    // },
 
     "$store.state.uploadModule.uploadComplete": function () {
       setTimeout(() => {
@@ -595,14 +600,17 @@ export default {
       this.runAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
+      console.log('asdlksjl')
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
 
       const atBottomOfWindow = clientHeight === scrollHeight - scrollTop;
+      console.log('asdlksjl')
       if (
         atBottomOfWindow &&
         this.files.length >= this.limit &&
         this.allowFetch
       ) {
+        console.log('asdlksjl')
         this.allowFetch = false;
         this.offset = this.offset + this.limit;
         event.currentTarget.scrollTop = scrollTop - 20;
@@ -725,7 +733,7 @@ export default {
     onClickLabel: function (file) {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl;
+      // this.getFilesUrl;
       const id = pathOr("", ["content", "id"], file);
       const packageType = pathOr("", ["content", "packageType"], file);
       if (id === "") {
@@ -761,7 +769,7 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.getFilesUrl; // this is here for infinite scroll
+      // this.getFilesUrl; // this is here for infinite scroll
       if (id) {
         this.navigateToFile(id);
       } else {
@@ -1196,21 +1204,21 @@ export default {
       this.runAnalysisDialogVisible = true;
     },
 
-    /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files"
-            ? this.$route.params.datasetId
-            : this.$route.params.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
+    // /**
+    //  * Get files URL for dataset
+    //  * @returns {String}
+    //  */
+    // getFilesUrl: function () {
+    //   if (this.config.apiUrl && this.userToken) {
+    //     const baseUrl =
+    //       this.$route.name === "dataset-files" ? "datasets" : "packages";
+    //     const id =
+    //       this.$route.name === "dataset-files"
+    //         ? this.$route.params.datasetId
+    //         : this.$route.params.fileId;
+    //     return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    //   }
+    // },
 
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
