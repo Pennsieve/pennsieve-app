@@ -14,21 +14,21 @@
         <checklist-item
           externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
           externalLinkText="Create a Release"
-          :is-complete="true"
+          :is-complete="hasRelease()"
         >
           create at least one release in your repository on GithHub
         </checklist-item>
         <checklist-item
-          href="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
-          cta="Add a License"
-          :is-complete="true"
+          externalLink="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
+          externalLinkText="Add a License"
+          :is-complete="hasLicense()"
         >
           add a license to your repository on GitHub
         </checklist-item>
         <checklist-item
-          href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
-          cta="Add a README"
-          :is-complete="true"
+          externalLink="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
+          externalLinkText="Add a README"
+          :is-complete="hasReadMe()"
         >
           include a README.md file in your repo with information about your
           repository
@@ -154,8 +154,8 @@ onMounted(() => {
     const activeRepoId = route.params.repoId;
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
     store.dispatch("codeReposModule/fetchBanner", activeRepoId);
+    store.dispatch("codeReposModule/fetchReadMe", activeRepoId);
   }
-
   // update initial form values from the database
   activeRepoName.value = codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
@@ -190,11 +190,45 @@ const addTag = function () {
     inputTag.value = "";
     const tagExists = checkIfTagExists(tag);
 
-    if (tagExists === false) {
+    if (!tagExists) {
       codeRepoForm.value.tags.push(tag);
       saveRepoConfig();
     }
   }
+};
+
+/*
+  Logic for the publishing checkboxes
+*/
+const hasRelease = () => {
+  const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+  /*
+    hasRelease condition is met when the repo has the following:
+    1. The "releases" property has a value that is an array
+    2. The first element in the array (the latest release) has a releaseStatus that is not "never"
+    3. Has values in label and marker properties
+  */
+  if (codeRepo?.value) {
+    const release = codeRepo?.value?.content?.releases?.[0];
+    return (
+      release?.releaseStatus !== "never" &&
+      (release?.label?.length ?? 0) > 0 &&
+      (release?.marker?.length ?? 0) > 0
+    );
+  }
+  return false;
+};
+
+const hasLicense = () => {
+  const license = codeRepo?.value?.content?.license;
+  return license?.length;
+};
+
+const hasReadMe = () => {
+  const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+  const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
+  //the presence of a Readme can be validated by the response from the GET /datasets/{id}/readme  endpoint.
+  return Object.keys(readMe.value).length !== 0;
 };
 
 const removeTag = function (tag) {

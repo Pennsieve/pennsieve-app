@@ -3,7 +3,11 @@
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
-          <img v-if="repo.presignedBannerURL" :src="repo.presignedBannerURL" alt="Code repo banner image"/>
+          <img
+            v-if="repo.presignedBannerURL"
+            :src="repo.presignedBannerURL"
+            alt="Code repo banner image"
+          />
           <img v-else src="@/assets/images/octocat.png" alt="Octocat" />
         </div>
         <div v-if="myReposView" class="repo-info-container">
@@ -91,6 +95,7 @@
         </router-link>
         <button
           v-if="workspaceReposView && isRepoOwner"
+          :disabled="canPublish"
           @click="handlePublishLatestClick"
           class="text-button"
         >
@@ -182,6 +187,7 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+
     getUrl: function () {
       if (this.workspaceReposView) return this.repo.content.releases[0].url;
       if (this.myReposView) return this.repo.url;
@@ -213,6 +219,40 @@ export default {
      */
     updated: function () {
       return this.formatDate(this.repo.content.updatedAt);
+    },
+    hasLicense: function () {
+      const license = codeRepo?.value?.content?.license;
+      return license?.length;
+    },
+
+    hasReadMe: function () {
+      const codeRepo = computed(
+        () => store.getters["codeReposModule/activeRepo"]
+      );
+      const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
+      //the presence of a Readme can be validated by the response from the GET /datasets/{id}/readme  endpoint.
+      return Object.keys(readMe.value).length !== 0;
+    },
+
+    hasRelease: function () {
+      const codeRepo = computed(
+        () => store.getters["codeReposModule/activeRepo"]
+      );
+      /*
+      hasRelease condition is met when the repo has the following:
+      1. The "releases" property has a value that is an array
+      2. The first element in the array (the latest release) has a releaseStatus that is not "never"
+      3. Has values in label and marker properties
+      */
+      if (codeRepo?.value) {
+        const release = codeRepo?.value?.content?.releases?.[0];
+        return (
+          release?.releaseStatus !== "never" &&
+          (release?.label?.length ?? 0) > 0 &&
+          (release?.marker?.length ?? 0) > 0
+        );
+      }
+      return false;
     },
   },
   methods: {
