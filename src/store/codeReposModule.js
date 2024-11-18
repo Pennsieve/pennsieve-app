@@ -25,7 +25,7 @@ const initialState = () => ({
   activeRepo: {},
   activeRepoBannerURL: '',
   isLoadingCodeRepoBanner: false,
-  hasReadMe: false,
+  hasReadMe: {},
   canPublish: false
 })
 

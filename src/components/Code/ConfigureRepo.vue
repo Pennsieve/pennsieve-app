@@ -225,7 +225,6 @@ const hasLicense = () => {
 };
 
 const hasReadMe = () => {
-  const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
   const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
   //the presence of a Readme can be validated by the response from the GET /datasets/{id}/readme  endpoint.
   return Object.keys(readMe.value).length !== 0;

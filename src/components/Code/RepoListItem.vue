@@ -93,11 +93,20 @@
         >
           <button class="text-button">Configure</button>
         </router-link>
+        <!-- Publish Button when Publishing Criteria is Met -->
         <button
-          v-if="workspaceReposView && isRepoOwner"
-          :disabled="canPublish"
+          v-if="workspaceReposView && isRepoOwner && canPublish"
           @click="handlePublishLatestClick"
           class="text-button"
+        >
+          Publish
+        </button>
+        <!-- Publish Button when Publishing Criteria is not met -->
+        <button
+          v-if="workspaceReposView && isRepoOwner && !canPublish"
+          disabled
+          @click="handlePublishLatestClick"
+          class="text-button-disabled"
         >
           Publish
         </button>
@@ -176,7 +185,12 @@ export default {
       isPublishCodeRepoDialogVisible: false,
     };
   },
-  mounted() {},
+  mounted() {
+    if (this.repo) {
+      console.log("***", this.repo.content.id);
+      this.fetchReadMe(this.repo.content.id);
+    }
+  },
   computed: {
     ...mapGetters(["hasFeature"]),
     ...mapState([
@@ -221,42 +235,22 @@ export default {
       return this.formatDate(this.repo.content.updatedAt);
     },
     hasLicense: function () {
-      const license = codeRepo?.value?.content?.license;
-      return license?.length;
+      return true;
     },
 
     hasReadMe: function () {
-      const codeRepo = computed(
-        () => store.getters["codeReposModule/activeRepo"]
-      );
-      const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
-      //the presence of a Readme can be validated by the response from the GET /datasets/{id}/readme  endpoint.
-      return Object.keys(readMe.value).length !== 0;
+      return true;
     },
 
     hasRelease: function () {
-      const codeRepo = computed(
-        () => store.getters["codeReposModule/activeRepo"]
-      );
-      /*
-      hasRelease condition is met when the repo has the following:
-      1. The "releases" property has a value that is an array
-      2. The first element in the array (the latest release) has a releaseStatus that is not "never"
-      3. Has values in label and marker properties
-      */
-      if (codeRepo?.value) {
-        const release = codeRepo?.value?.content?.releases?.[0];
-        return (
-          release?.releaseStatus !== "never" &&
-          (release?.label?.length ?? 0) > 0 &&
-          (release?.marker?.length ?? 0) > 0
-        );
-      }
-      return false;
+      return true;
+    },
+    canPublish: function () {
+      return this.hasLicense && this.hasReadMe && this.hasRelease;
     },
   },
   methods: {
-    ...mapActions("codeReposModule", ["fetchMyRepos"]),
+    ...mapActions("codeReposModule", ["fetchMyRepos", "fetchReadMe"]),
     handleStartTrackingClick: function () {
       this.startTrackingMode = true;
       this.isChangeRepoTrackingDialogVisible = true;
@@ -302,6 +296,16 @@ export default {
   &:focus {
     outline: none;
   }
+}
+.text-button-disabled {
+  margin: 5px;
+  padding: 8px 12px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, border-color 0.3s ease,
+    color 0.3s ease;
 }
 
 .actions-container {
