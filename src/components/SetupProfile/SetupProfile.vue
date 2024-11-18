@@ -272,6 +272,7 @@ export default {
       } catch (error) {
         this.isSavingProfile = false;
         this.isUserSignInFailed = true;
+        this.hideSignInForm = true;
       }
     },
 
