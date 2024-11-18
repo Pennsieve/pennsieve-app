@@ -102,14 +102,20 @@
           Publish
         </button>
         <!-- Publish Button when Publishing Criteria is not met -->
-        <button
-          v-if="workspaceReposView && isRepoOwner && !canPublish"
-          disabled
-          @click="handlePublishLatestClick"
-          class="text-button-disabled"
+        <el-tooltip
+          ref="tooltip"
+          placement="bottom-end"
+          content="Select Configure for details"
         >
-          Publish
-        </button>
+          <button
+            v-if="workspaceReposView && isRepoOwner && !canPublish"
+            disabled
+            @click="handlePublishLatestClick"
+            class="text-button-disabled"
+          >
+            Publish
+          </button>
+        </el-tooltip>
       </el-col>
     </el-row>
 
@@ -135,6 +141,7 @@ import TagPill from "../shared/TagPill/TagPill.vue";
 import { find, propEq, propOr } from "ramda";
 import FormatDate from "../../mixins/format-date";
 import ChangeRepoTrackingDialog from "./ChangeRepoTrackingDialog.vue";
+import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
 
 export default {
   name: "RepoListItem",
@@ -187,7 +194,6 @@ export default {
   },
   mounted() {
     if (this.repo) {
-      console.log("***", this.repo.content.id);
       this.fetchReadMe(this.repo.content.id);
     }
   },
@@ -201,6 +207,7 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+    ...mapState("codeReposModule", ["hasReadMe"]),
 
     getUrl: function () {
       if (this.workspaceReposView) return this.repo.content.releases[0].url;
@@ -234,19 +241,14 @@ export default {
     updated: function () {
       return this.formatDate(this.repo.content.updatedAt);
     },
-    hasLicense: function () {
-      return true;
-    },
-
-    hasReadMe: function () {
-      return true;
-    },
-
-    hasRelease: function () {
-      return true;
-    },
     canPublish: function () {
-      return this.hasLicense && this.hasReadMe && this.hasRelease;
+      const autoPublish = this.repo.content.repository.autoProcess;
+      return (
+        !autoPublish &&
+        hasLicense(this.repo) &&
+        hasReadMe(this.hasReadMe) &&
+        hasRelease(this.repo)
+      );
     },
   },
   methods: {

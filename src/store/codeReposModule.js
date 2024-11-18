@@ -25,7 +25,7 @@ const initialState = () => ({
   activeRepo: {},
   activeRepoBannerURL: '',
   isLoadingCodeRepoBanner: false,
-  hasReadMe: {},
+  hasReadMe: false,
   canPublish: false
 })
 
@@ -76,8 +76,8 @@ export const mutations = {
   SET_IS_LOADING_CODE_REPO_BANNER(state, isLoadingBanner) {
     state.isLoadingCodeRepoBanner = isLoadingBanner
   },
-  SET_HAS_README(state, hasReadMe) {
-    state.hasReadMe = hasReadMe
+  SET_HAS_README(state, readMe) {
+    state.hasReadMe = Object.keys(readMe).length !== 0;
   }
 }
 
@@ -308,7 +308,7 @@ export const actions = {
       })
       if (response.ok) {
         const readMe = await response.json();
-        commit('SET_HAS_README', await readMe)
+        commit('SET_HAS_README', readMe)
         return readMe
       }
       if (!response.ok) {

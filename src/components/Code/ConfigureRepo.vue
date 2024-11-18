@@ -14,32 +14,40 @@
         <checklist-item
           externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
           externalLinkText="Create a Release"
-          :is-complete="hasRelease()"
+          :is-complete="hasRelease(codeRepo)"
         >
           create at least one release in your repository on GithHub
         </checklist-item>
         <checklist-item
           externalLink="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
           externalLinkText="Add a License"
-          :is-complete="hasLicense()"
+          :is-complete="hasLicense(codeRepo)"
         >
           add a license to your repository on GitHub
         </checklist-item>
         <checklist-item
           externalLink="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
           externalLinkText="Add a README"
-          :is-complete="hasReadMe()"
+          :is-complete="hasReadMe(readMe)"
         >
           include a README.md file in your repo with information about your
           repository
         </checklist-item>
       </data-card>
+
       <el-form-item class="auto-publish-input">
-        <el-checkbox
-          v-model="codeRepoForm.isAutoPublished"
-          @change="saveRepoConfig"
-          >Automatic publication</el-checkbox
+        <el-tooltip
+          ref="tooltip"
+          placement="right-end"
+          content="If automatic publication is selected, the publish latest option will be disabled."
         >
+          <el-checkbox
+            v-model="codeRepoForm.isAutoPublished"
+            @change="saveRepoConfig"
+            >Automatic publication</el-checkbox
+          >
+        </el-tooltip>
+
         <p class="hint-text">
           Automatically publish a version on new releases from GitHub
         </p>
@@ -122,6 +130,8 @@ import debounce from "lodash.debounce";
 import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
 import DataCard from "../shared/DataCard/DataCard.vue";
 import ChecklistItem from "../shared/ChecklistItem/ChecklistItem.vue";
+import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
+
 interface CodeRepoConfig {
   isAutoPublished: boolean;
   givenName: string;
@@ -133,6 +143,8 @@ const store = useStore();
 const route = useRoute();
 
 const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
+
 const codeRepoBannerURL = computed(
   () => store.getters["codeReposModule/bannerURL"]
 );
@@ -195,39 +207,6 @@ const addTag = function () {
       saveRepoConfig();
     }
   }
-};
-
-/*
-  Logic for the publishing checkboxes
-*/
-const hasRelease = () => {
-  const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
-  /*
-    hasRelease condition is met when the repo has the following:
-    1. The "releases" property has a value that is an array
-    2. The first element in the array (the latest release) has a releaseStatus that is not "never"
-    3. Has values in label and marker properties
-  */
-  if (codeRepo?.value) {
-    const release = codeRepo?.value?.content?.releases?.[0];
-    return (
-      release?.releaseStatus !== "never" &&
-      (release?.label?.length ?? 0) > 0 &&
-      (release?.marker?.length ?? 0) > 0
-    );
-  }
-  return false;
-};
-
-const hasLicense = () => {
-  const license = codeRepo?.value?.content?.license;
-  return license?.length;
-};
-
-const hasReadMe = () => {
-  const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
-  //the presence of a Readme can be validated by the response from the GET /datasets/{id}/readme  endpoint.
-  return Object.keys(readMe.value).length !== 0;
 };
 
 const removeTag = function (tag) {
