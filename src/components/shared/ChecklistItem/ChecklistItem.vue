@@ -17,9 +17,14 @@
         >
           {{ cta }}
         </router-link>
-        <strong v-else>
+        <strong v-if="!showLink">
           {{ cta }}
         </strong>
+        <a :href="externalLinkUrl" target="_blank">
+          <strong v-if="externalLinkText">
+            {{ externalLinkText }}
+          </strong>
+        </a>
 
         &nbsp; &mdash;
       </div>
@@ -59,6 +64,19 @@ export default {
     showLink: {
       type: Boolean,
       default: true,
+    },
+    externalLink: {
+      type: String,
+      default: "",
+    },
+    externalLinkText: {
+      type: String,
+      default: "",
+    },
+  },
+  computed: {
+    externalLinkUrl: function () {
+      return this.externalLink;
     },
   },
 };

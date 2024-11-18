@@ -25,6 +25,8 @@ const initialState = () => ({
   activeRepo: {},
   activeRepoBannerURL: '',
   isLoadingCodeRepoBanner: false,
+  hasReadMe: false,
+  canPublish: false
 })
 
 export const state = initialState()
@@ -73,6 +75,9 @@ export const mutations = {
   },
   SET_IS_LOADING_CODE_REPO_BANNER(state, isLoadingBanner) {
     state.isLoadingCodeRepoBanner = isLoadingBanner
+  },
+  SET_HAS_README(state, readMe) {
+    state.hasReadMe = Object.keys(readMe).length !== 0;
   }
 }
 
@@ -289,14 +294,42 @@ export const actions = {
       const updatedWorkspaceRepo = { ...repo, presignedBannerURL : url}
       commit('UPDATE_WORKSPACE_REPOS', updatedWorkspaceRepo)
     })
-  }
+  },
+  fetchReadMe: async({state, commit, rootState, dispatch}, id) => {
+    try {
+      const url = `${rootState.config.apiUrl}/datasets/${id}/readme`
+      const apiKey = rootState.userToken || Cookies.get('user_token')
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      myHeaders.append('Accept', 'application/json')
+      const response = await fetch(url, {
+        method: "GET",
+        headers: myHeaders
+      })
+      if (response.ok) {
+        const readMe = await response.json();
+        commit('SET_HAS_README', readMe)
+        return readMe
+      }
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
+      }
+    }
+    catch (err) {
+      console.error(err);
+      throw err; 
+    }
+
+  },
 }
 
 export const getters = {
   activeRepo : state => state.activeRepo,
   activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
   bannerURL : state => state.activeRepoBannerURL,
-  isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner
+  isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner,
+  hasReadMe: state => state.hasReadMe,
+  canPublish: state => state.canPublish
 }
 
 const codeReposModule = {
