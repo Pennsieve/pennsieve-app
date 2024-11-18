@@ -67,7 +67,7 @@
           <IconDatasets :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
-      <div v-if="isFeatureFlagEnabled">
+      <div>
         <bf-navigation-item
           v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
           :link="{
