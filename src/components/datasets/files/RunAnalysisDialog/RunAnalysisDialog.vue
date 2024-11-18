@@ -350,8 +350,8 @@ export default {
       console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url =
         this.config.environment === "dev"
-          ? `${this.config.api2Url}/workflows`
-          : `${this.config.api2Url}/workflows/instances`;
+          ? `${this.config.api2Url}/workflow/instances`
+          : `${this.config.api2Url}/workflows`;
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
