@@ -190,7 +190,7 @@
     </el-row>
 
     <!-- GITHUB -->
-    <el-row v-if="showFeatureForTestOrgs">
+    <el-row>
       <el-col :span="12">
         <h2 id="github-id">GitHub</h2>
         <div v-if="!hasGithubProfile">
