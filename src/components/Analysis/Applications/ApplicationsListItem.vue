@@ -10,6 +10,14 @@
         {{ application.description }}
       </p>
     </el-row>
+    <el-row>
+      <button
+          @click="deployApplication"
+          class="text-button"
+        >
+          Update
+        </button>
+    </el-row>
   </div>
 </template>
 
@@ -19,6 +27,7 @@ import { find, propEq } from "ramda";
 import FormatDate from "../../../mixins/format-date";
 import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
+import EventBus from "../../../utils/event-bus";
 
 export default {
   name: "IntegrationListItem",
@@ -50,8 +59,50 @@ export default {
     };
   },
   methods: {
-    ...mapActions(["updateDataset"]),
-  },
+    ...mapActions("analysisModule", ["updateApplication"]),
+
+    deployApplication: async function () {
+      try {
+        const accountDetails = {
+          uuid: this.application.account.uuid,
+          accountId: this.application.account.accountId,
+          accountType: this.application.account.accountType,
+        };
+        const destination = {
+          type: this.application.destination.type,
+          url: this.application.destination.url,
+        };
+        const formattedSource = {
+          type: this.application.source.type,
+          url: this.application.source.url,
+        };
+        const formattedUpdateDataset = {
+          account: accountDetails,
+          destination: destination,
+          source: formattedSource,
+        };
+
+        await this.updateApplication(formattedUpdateDataset);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "success",
+              msg: "Your request has been successfully submitted.",
+            },
+          });
+        } catch (error) {
+          console.error(error);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: "There was a problem submitting your request.",
+            },
+          });
+        } finally {
+          //handle update
+        }
+        
+        }
+    },
 };
 </script>
 
