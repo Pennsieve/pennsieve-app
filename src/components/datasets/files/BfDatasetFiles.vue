@@ -369,10 +369,12 @@ export default {
         const baseUrl =
           this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id =
+
           this.$route.name === "dataset-files"
             ? this.$route.params.datasetId
             : this.$route.params.fileId;
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+
       }
     },
 
@@ -694,6 +696,7 @@ export default {
             });
             if (newFiles.length < this.limit) {
               this.lastPage = true;
+
             }
             this.files =
               this.offset > 0 ? [...this.files, ...newFiles] : newFiles;

@@ -222,7 +222,32 @@
         throw err; // Rethrow the error to be handled by the caller
       }
     },
+    updateApplication: async ({ commit, rootState }, newApplication) => {
+      const url = `${rootState.config.api2Url}/applications/deploy`;
     
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${rootState.userToken}`
+          },
+          body: JSON.stringify(newApplication)
+        });
+    
+        if (!response.ok) {
+          const errorDetails = await response.text(); // Extract error details
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+    
+        const result = await response.json();
+        return result; // Return the result for further processing if needed
+    
+      } catch (err) {
+        console.error('Failed to create application:', err.message); // Log error details
+        throw err; // Rethrow the error to be handled by the caller
+      }
+    },
     updateFileCount: async ({ commit, rootState }) => {
       commit('UPDATE_SELECTED_FILE_COUNT')
     }
