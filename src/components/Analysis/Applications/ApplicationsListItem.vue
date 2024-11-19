@@ -10,15 +10,20 @@
         {{ application.description }}
       </p>
     </el-row>
-    <el-row>
+    <el-row class="update-app">
       <button
           @click="deployApplication"
           class="text-button"
         >
           Update
         </button>
+        <div v-if="isWaitingForResponse" 
+          class="icon-waiting mr-16">
+          <bf-waiting-icon />
+    </div>
     </el-row>
   </div>
+
 </template>
 
 <script>
@@ -28,6 +33,7 @@ import FormatDate from "../../../mixins/format-date";
 import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
+import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 
 export default {
   name: "IntegrationListItem",
@@ -50,6 +56,7 @@ export default {
   data: function () {
     return {
       isActive: false,
+      isWaitingForResponse: false,
       integrationEdit: {
         type: Object,
         default: function () {
@@ -62,6 +69,7 @@ export default {
     ...mapActions("analysisModule", ["updateApplication"]),
 
     deployApplication: async function () {
+      this.isWaitingForResponse = true;
       try {
         const accountDetails = {
           uuid: this.application.account.uuid,
@@ -99,6 +107,7 @@ export default {
             },
           });
         } finally {
+          this.isWaitingForResponse = false;
           //handle update
         }
         
@@ -139,5 +148,21 @@ export default {
 .info {
   background: $purple_tint;
   padding: 8px;
+}
+.update-app{
+  height: 100%;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column-reverse;
+  margin: 8px;
+
+}
+.icon-waiting {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
 }
 </style>
