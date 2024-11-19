@@ -3,7 +3,11 @@
     <el-row :gutter="40">
       <el-col :span="12" class="repo-banner-container">
         <div>
-          <img v-if="repo.presignedBannerURL" :src="repo.presignedBannerURL" alt="Code repo banner image"/>
+          <img
+            v-if="repo.presignedBannerURL"
+            :src="repo.presignedBannerURL"
+            alt="Code repo banner image"
+          />
           <img v-else src="@/assets/images/octocat.png" alt="Octocat" />
         </div>
         <div v-if="myReposView" class="repo-info-container">
@@ -89,13 +93,29 @@
         >
           <button class="text-button">Configure</button>
         </router-link>
+        <!-- Publish Button when Publishing Criteria is Met -->
         <button
-          v-if="workspaceReposView && isRepoOwner"
+          v-if="workspaceReposView && isRepoOwner && canPublish"
           @click="handlePublishLatestClick"
           class="text-button"
         >
           Publish
         </button>
+        <!-- Publish Button when Publishing Criteria is not met -->
+        <el-tooltip
+          ref="tooltip"
+          placement="bottom-end"
+          content="Select Configure for details"
+        >
+          <button
+            v-if="workspaceReposView && isRepoOwner && !canPublish"
+            disabled
+            @click="handlePublishLatestClick"
+            class="text-button-disabled"
+          >
+            Publish
+          </button>
+        </el-tooltip>
       </el-col>
     </el-row>
 
@@ -121,6 +141,7 @@ import TagPill from "../shared/TagPill/TagPill.vue";
 import { find, propEq, propOr } from "ramda";
 import FormatDate from "../../mixins/format-date";
 import ChangeRepoTrackingDialog from "./ChangeRepoTrackingDialog.vue";
+import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
 
 export default {
   name: "RepoListItem",
@@ -171,7 +192,11 @@ export default {
       isPublishCodeRepoDialogVisible: false,
     };
   },
-  mounted() {},
+  mounted() {
+    if (this.repo) {
+      this.fetchReadMe(this.repo.content.id);
+    }
+  },
   computed: {
     ...mapGetters(["hasFeature"]),
     ...mapState([
@@ -182,6 +207,8 @@ export default {
       "userToken",
       "orgDatasetStatuses",
     ]),
+    ...mapState("codeReposModule", ["hasReadMe"]),
+
     getUrl: function () {
       if (this.workspaceReposView) return this.repo.content.releases[0].url;
       if (this.myReposView) return this.repo.url;
@@ -214,9 +241,18 @@ export default {
     updated: function () {
       return this.formatDate(this.repo.content.updatedAt);
     },
+    canPublish: function () {
+      const autoPublish = this.repo.content.repository.autoProcess;
+      return (
+        !autoPublish &&
+        hasLicense(this.repo) &&
+        hasReadMe(this.hasReadMe) &&
+        hasRelease(this.repo)
+      );
+    },
   },
   methods: {
-    ...mapActions("codeReposModule", ["fetchMyRepos"]),
+    ...mapActions("codeReposModule", ["fetchMyRepos", "fetchReadMe"]),
     handleStartTrackingClick: function () {
       this.startTrackingMode = true;
       this.isChangeRepoTrackingDialogVisible = true;
@@ -262,6 +298,16 @@ export default {
   &:focus {
     outline: none;
   }
+}
+.text-button-disabled {
+  margin: 5px;
+  padding: 8px 12px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, border-color 0.3s ease,
+    color 0.3s ease;
 }
 
 .actions-container {

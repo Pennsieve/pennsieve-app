@@ -6,13 +6,51 @@
       label-position="top"
       class="form-auto-save"
     >
-      <el-form-item class="auto-publish-input">
-        <el-checkbox
-          v-model="codeRepoForm.isAutoPublished"
-          @change="saveRepoConfig"
-          >Automatic publication</el-checkbox
+      <data-card
+        class="mb-32 grey compact"
+        title="Your code repository cannot be published until the following items have been completed:"
+        :padding="false"
+      >
+        <checklist-item
+          externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
+          externalLinkText="Create a Release"
+          :is-complete="hasRelease(codeRepo)"
         >
-        <p class="hint-text">Automatically publish a version on new releases from GitHub</p>
+          create at least one release in your repository on GithHub
+        </checklist-item>
+        <checklist-item
+          externalLink="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
+          externalLinkText="Add a License"
+          :is-complete="hasLicense(codeRepo)"
+        >
+          add a license to your repository on GitHub
+        </checklist-item>
+        <checklist-item
+          externalLink="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
+          externalLinkText="Add a README"
+          :is-complete="hasReadMe(readMe)"
+        >
+          include a README.md file in your repo with information about your
+          repository
+        </checklist-item>
+      </data-card>
+
+      <el-form-item class="auto-publish-input">
+        <el-tooltip
+          ref="tooltip"
+          placement="right-end"
+          content="If automatic publication is selected, the publish latest option will be disabled."
+        >
+          <el-checkbox
+            v-model="codeRepoForm.isAutoPublished"
+            @change="saveRepoConfig"
+            >Automatic publication</el-checkbox
+          >
+        </el-tooltip>
+
+        <p class="hint-text">
+          Automatically publish a version on new releases from GitHub
+        </p>
       </el-form-item>
 
       <el-form-item>
@@ -51,10 +89,10 @@
       <div class="el-form-item">
         <dataset-settings-banner-image
           id="codeRepoBannerImage"
-          :dataset = "codeRepo"
-          :datasetBannerURL = "codeRepoBannerURL"
-          :isLoadingBanner = "isLoadingBanner"
-          :isCodeReposDataset = "true"
+          :dataset="codeRepo"
+          :datasetBannerURL="codeRepoBannerURL"
+          :isLoadingBanner="isLoadingBanner"
+          :isCodeReposDataset="true"
         />
       </div>
 
@@ -90,6 +128,9 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import debounce from "lodash.debounce";
 import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
+import DataCard from "../shared/DataCard/DataCard.vue";
+import ChecklistItem from "../shared/ChecklistItem/ChecklistItem.vue";
+import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
 
 interface CodeRepoConfig {
   isAutoPublished: boolean;
@@ -101,9 +142,15 @@ interface CodeRepoConfig {
 const store = useStore();
 const route = useRoute();
 
-const codeRepo = computed(() => store.getters['codeReposModule/activeRepo'])
-const codeRepoBannerURL = computed(() => store.getters['codeReposModule/bannerURL'])
-const isLoadingBanner = computed(() => store.getters['codeReposModule/isLoadingCodeRepoBanner'])
+const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
+
+const codeRepoBannerURL = computed(
+  () => store.getters["codeReposModule/bannerURL"]
+);
+const isLoadingBanner = computed(
+  () => store.getters["codeReposModule/isLoadingCodeRepoBanner"]
+);
 const activeRepoName = ref("");
 const inputTag = ref("");
 
@@ -118,20 +165,16 @@ onMounted(() => {
   if (route.params.repoId) {
     const activeRepoId = route.params.repoId;
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
-    store.dispatch('codeReposModule/fetchBanner', activeRepoId)
+    store.dispatch("codeReposModule/fetchBanner", activeRepoId);
+    store.dispatch("codeReposModule/fetchReadMe", activeRepoId);
   }
-
   // update initial form values from the database
-  activeRepoName.value =
-    codeRepo.value.content.name;
+  activeRepoName.value = codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
     codeRepo.value.content.repository.autoProcess;
-  codeRepoForm.value.givenName =
-    codeRepo.value.content.name;
-  codeRepoForm.value.description =
-    codeRepo.value.content.description;
-  codeRepoForm.value.tags =
-    codeRepo.value.content.tags;
+  codeRepoForm.value.givenName = codeRepo.value.content.name;
+  codeRepoForm.value.description = codeRepo.value.content.description;
+  codeRepoForm.value.tags = codeRepo.value.content.tags;
 });
 
 const saveRepoConfig = debounce(function () {
@@ -159,7 +202,7 @@ const addTag = function () {
     inputTag.value = "";
     const tagExists = checkIfTagExists(tag);
 
-    if (tagExists === false) {
+    if (!tagExists) {
       codeRepoForm.value.tags.push(tag);
       saveRepoConfig();
     }
