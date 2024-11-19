@@ -21,6 +21,21 @@
             :disabled="!hasAdminRights"
           />
         </el-form-item>
+        <el-form-item
+          label="Color Palette"
+          prop="colorTheme"
+        >
+          <el-input
+            v-model="ruleForm.colorTheme[0]"
+            class="org-name"
+            :disabled="!hasAdminRights"
+          />
+          <el-input
+            v-model="ruleForm.colorTheme[1]"
+            class="org-name"
+            :disabled="!hasAdminRights"
+          />
+        </el-form-item>
         <bf-button
           v-if="hasAdminRights"
           @click="updateOrg('orgSettingsForm')"
@@ -245,6 +260,14 @@ export default {
           { required: true, message: 'Please provide a name', trigger: 'false' }
         ]
       },
+      ruleForm: {
+        colorTheme: ''
+      },
+      rules: {
+        colorTheme: [
+          { required: true, message: 'Please provide a color palette', trigger: 'false' }
+        ]
+      },
       activeDatasetTemplate: {},
       // isDatasetTemplateDialogVisible: false,
       // isDeleteDatasetTemplateDialogVisible: false,
@@ -387,6 +410,12 @@ export default {
 
       const orgName = pathOr('', ['organization', 'name'], org)
       this.ruleForm.orgName = orgName
+
+      const colorTheme = pathOr({}, ['organization', 'colorTheme'], org)
+      this.ruleForm.colorTheme = [null, null]
+      for (const [key, value] of Object.entries(colorTheme)) {
+        this.ruleForm.colorTheme = [key, value]
+      }
     },
     /**
      * Handles key-pressed event
@@ -420,10 +449,18 @@ export default {
      */
     updateOrgRequest: function() {
       const url = this.orgUrl()
+      let colorTheme
+      if (this.ruleForm.colorTheme[0] == null || this.ruleForm.colorTheme[1] == null) {
+        colorTheme = null
+      } else {
+        colorTheme = {}
+        colorTheme[this.ruleForm.colorTheme[0]] = this.ruleForm.colorTheme[1]
+      }
       this.sendXhr(url, {
         method: 'PUT',
         body: {
-          name: this.ruleForm.orgName
+          name: this.ruleForm.orgName,
+          colorTheme: colorTheme
         }
       })
         .then(() => {
