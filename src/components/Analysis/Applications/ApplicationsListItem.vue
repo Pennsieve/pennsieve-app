@@ -77,6 +77,7 @@ export default {
           url: this.application.source.url,
         };
         const formattedUpdateDataset = {
+          ...this.application,
           account: accountDetails,
           destination: destination,
           source: formattedSource,
