@@ -14,32 +14,40 @@
         <checklist-item
           externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
           externalLinkText="Create a Release"
-          :is-complete="true"
+          :is-complete="hasRelease(codeRepo)"
         >
           create at least one release in your repository on GithHub
         </checklist-item>
         <checklist-item
-          href="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
-          cta="Add a License"
-          :is-complete="true"
+          externalLink="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
+          externalLinkText="Add a License"
+          :is-complete="hasLicense(codeRepo)"
         >
           add a license to your repository on GitHub
         </checklist-item>
         <checklist-item
-          href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
-          cta="Add a README"
-          :is-complete="true"
+          externalLink="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
+          externalLinkText="Add a README"
+          :is-complete="hasReadMe(readMe)"
         >
           include a README.md file in your repo with information about your
           repository
         </checklist-item>
       </data-card>
+
       <el-form-item class="auto-publish-input">
-        <el-checkbox
-          v-model="codeRepoForm.isAutoPublished"
-          @change="saveRepoConfig"
-          >Automatic publication</el-checkbox
+        <el-tooltip
+          ref="tooltip"
+          placement="right-end"
+          content="If automatic publication is selected, the publish latest option will be disabled."
         >
+          <el-checkbox
+            v-model="codeRepoForm.isAutoPublished"
+            @change="saveRepoConfig"
+            >Automatic publication</el-checkbox
+          >
+        </el-tooltip>
+
         <p class="hint-text">
           Automatically publish a version on new releases from GitHub
         </p>
@@ -122,6 +130,8 @@ import debounce from "lodash.debounce";
 import { compose, defaultTo, toLower, trim, propOr, includes } from "ramda";
 import DataCard from "../shared/DataCard/DataCard.vue";
 import ChecklistItem from "../shared/ChecklistItem/ChecklistItem.vue";
+import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
+
 interface CodeRepoConfig {
   isAutoPublished: boolean;
   givenName: string;
@@ -133,6 +143,8 @@ const store = useStore();
 const route = useRoute();
 
 const codeRepo = computed(() => store.getters["codeReposModule/activeRepo"]);
+const readMe = computed(() => store.getters["codeReposModule/hasReadMe"]);
+
 const codeRepoBannerURL = computed(
   () => store.getters["codeReposModule/bannerURL"]
 );
@@ -154,8 +166,8 @@ onMounted(() => {
     const activeRepoId = route.params.repoId;
     store.commit("codeReposModule/SET_ACTIVE_CODE_REPO", activeRepoId);
     store.dispatch("codeReposModule/fetchBanner", activeRepoId);
+    store.dispatch("codeReposModule/fetchReadMe", activeRepoId);
   }
-
   // update initial form values from the database
   activeRepoName.value = codeRepo.value.content.name;
   codeRepoForm.value.isAutoPublished =
@@ -190,7 +202,7 @@ const addTag = function () {
     inputTag.value = "";
     const tagExists = checkIfTagExists(tag);
 
-    if (tagExists === false) {
+    if (!tagExists) {
       codeRepoForm.value.tags.push(tag);
       saveRepoConfig();
     }
