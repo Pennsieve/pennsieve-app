@@ -16,7 +16,12 @@
       @dragleave="setIsDragging(false)"
       @drop.prevent="setImage($event, true)"
     >
-      <dataset-banner class="img-banner" />
+      <dataset-banner
+      class="img-banner"
+      :dataset = "dataset"
+      :datasetBannerURL = "datasetBannerURL"
+      :isLoadingBanner="isLoadingBanner"
+      />
     </div>
 
     <p
@@ -91,7 +96,7 @@
 <script>
   import {
     mapActions, mapGetters,
-    mapState
+    mapState, mapMutations
   } from 'vuex';
   import {
     head,
@@ -101,19 +106,26 @@
   import Cropper from 'cropperjs'
   import 'cropperjs/dist/cropper.css'
 
-  import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
-  import BfButton from '../../../shared/bf-button/BfButton.vue'
-  import DatasetBanner from '../../../datasets/DatasetBanner/DatasetBanner.vue'
-  import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
-
   export default {
     name: 'DatasetSettingsBannerImage',
 
-    components: {
-      BfButton,
-      BfDialogHeader,
-      DatasetBanner,
-      DialogBody
+    props: {
+      dataset: {
+        type: Object,
+        default: {}
+      },
+      datasetBannerURL: {
+        type: String,
+        default: '',
+      },
+      isLoadingBanner: {
+        type: Boolean,
+        default: true
+      },
+      isCodeReposDataset: {
+        type: Boolean,
+        default: false
+      }
     },
 
     data() {
@@ -146,9 +158,7 @@
     computed: {
       ...mapState([
         'config',
-        'dataset',
         'userToken',
-        'datasetBanner'
       ]),
 
       ...mapGetters(['datasetLocked']),
@@ -158,7 +168,7 @@
        * @returns {Boolean}
        */
       hasDatasetBanner: function() {
-        return this.datasetBanner !== ''
+        return this.datasetBannerURL !== ''
       },
 
       /**
@@ -196,6 +206,10 @@
       ...mapActions([
         'setDatasetBanner'
       ]),
+      
+      ...mapMutations({
+        setCodeRepoDatasetBanner: 'codeReposModule/SET_CODE_REPO_BANNER_URL'
+      }),
 
       /**
        * Set isDragging
@@ -254,11 +268,16 @@
           })
           .then(response => {
             const banner = propOr('', 'banner', response)
-
-            this.setDatasetBanner(banner).then(() => {
+            if(this.isCodeReposDataset) {
+              this.setCodeRepoDatasetBanner(banner)
+              this.isDialogVisible = false;
+              this.isUploadingBanner = false
+            } else {
+              this.setDatasetBanner(banner).then(() => {
               this.isDialogVisible = false
               this.isUploadingBanner = false
             })
+            }
           })
           .finally(() => {
             this.isUploadingBanner = false
@@ -329,7 +348,7 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
+  @import '../../../assets/_variables.scss';
 
   .add-image-wrap {
     align-items: center;

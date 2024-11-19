@@ -16,10 +16,9 @@
           />
         </template>
         <template #right>
-
           <template v-if="quickActionsVisible">
             <bf-button
-              v-if="showRunAnalysisFlow"
+              :disabled="!isFeatureFlagEnabled"
               @click="openRunAnalysisDialog"
               class="mr-8 flex"
             >
@@ -42,13 +41,15 @@
               New Folder
             </bf-button>
           </template>
-
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
-                v-if="showRunAnalysisFlow"
+                :disabled="!isFeatureFlagEnabled"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button "
+                class="dropdown-button"
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -92,16 +93,13 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
 
-    <div class="file-meta-wrapper">
+    <div class="file-meta-wrapper" >
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
           :data="files"
@@ -229,6 +227,12 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
+
+import {
+  isEnabledForImmuneHealth,
+  isEnabledForTestOrgs,
+  isEnabledForAllDevOrgs,
+} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 
@@ -329,24 +333,11 @@ export default {
       "datasetLocked",
     ]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
-    /**
-     * Feature Flag for Run Analysis Flow
-     *
-     */
-    showRunAnalysisFlow: function () {
-      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
-      const isPennsieveTestDev =
-        this.organizationId ===
-        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
-      const isImmuneHealthProd =
-        this.organizationId ===
-        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
-      const isPennsieveTestProd =
-        this.organizationId ===
-        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
-      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
-    },
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
+
     /**
      * Compute organization's ID
      * @returns {String}
@@ -359,6 +350,23 @@ export default {
      */
     hasFiles: function () {
       return this.files.length > 0;
+    },
+
+
+    /**
+     * Get files URL for dataset
+     * @returns {String}
+     */
+    getFilesUrl: function () {
+      if (this.config.apiUrl && this.userToken) {
+        const baseUrl =
+          this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id =
+          this.$route.name === "dataset-files"
+            ? this.$route.params.datasetId
+            : this.$route.params.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      }
     },
 
     /**
@@ -386,23 +394,41 @@ export default {
     isExploreEnabled: function () {
       return this.hasFeature("concepts_feature");
     },
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
+    },
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
     },
+
+    offset: function() {
+      this.fetchFiles()
+    },
+
+    // /**
+    //  * Trigger API request when URL is changed. This is required for infinite scroll functionality.
+    //  */
+    // getFilesUrl: function () {
+    //   this.fetchFiles();
+    // },
 
     "$store.state.uploadModule.uploadComplete": function () {
       setTimeout(() => {
@@ -453,11 +479,11 @@ export default {
       immediate: true,
     },
 
-    $route: 'handleRouteChange'
+    $route: "handleRouteChange",
   },
 
   mounted: function () {
-    if (this.getFilesUrl() && !this.files.length) {
+    if (this.getFilesUrl && !this.files.length) {
       this.fetchFiles();
     }
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
@@ -518,26 +544,24 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
 
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
+    ...mapActions("datasetModule", ["createDatasetManifest"]),
 
-    generateManifest: function() {
+    generateManifest: function () {
+      this.createDatasetManifest();
 
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
+      EventBus.$emit("toast", {
         detail: {
           type: "success",
           msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
+          duration: 1000,
+        },
+      });
     },
 
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
 
     // Ignore drops to component outside the drop target and close drop-target
@@ -567,14 +591,17 @@ export default {
       this.runAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
+      console.log('asdlksjl')
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
 
       const atBottomOfWindow = clientHeight === scrollHeight - scrollTop;
+      console.log('asdlksjl')
       if (
         atBottomOfWindow &&
         this.files.length >= this.limit &&
         this.allowFetch
       ) {
+        console.log('asdlksjl')
         this.allowFetch = false;
         this.offset = this.offset + this.limit;
         event.currentTarget.scrollTop = scrollTop - 20;
@@ -638,46 +665,48 @@ export default {
      */
     fetchFiles: function () {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl())
-        .then((response) => {
-          this.filesLoading = true;
-          this.$store.dispatch(
-            "uploadModule/setCurrentTargetPackage",
-            response
-          );
-          this.file = response;
+      const url = this.getFilesUrl;
+      if (url)
+        this.sendXhr(url)
+          .then((response) => {
+            this.filesLoading = true;
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
+            );
+            this.file = response;
 
-          const newFiles = response.children.map((file) => {
-            if (!file.storage) {
-              file.storage = 0;
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
+              }
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            if (newFiles.length < this.limit) {
+              this.lastPage = true;
             }
-            file.icon =
-              file.icon || this.getFilePropertyVal(file.properties, "icon");
-            file.subtype = this.getSubType(file);
-            return file;
-          });
-          if (newFiles.length < this.limit) {
-            this.lastPage = true;
-          }
-          this.files =
-            this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
-          this.sortedFiles = this.returnSort(
-            "content.name",
-            this.files,
-            this.sortDirection
-          );
-          this.ancestors = response.ancestors;
+            this.files =
+              this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+            this.ancestors = response.ancestors;
 
-          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-          if (pkgId) {
-            this.scrollToFile(pkgId);
-          }
-          this.allowFetch = true;
-          this.filesLoading = false;
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+            const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+            if (pkgId) {
+              this.scrollToFile(pkgId);
+            }
+            this.allowFetch = true;
+            this.filesLoading = false;
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
     },
     /**
      * Sort table by column
@@ -1163,31 +1192,43 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-
-        /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-     getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
 
-    handleRouteChange: function(to, from) {
-      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+    // /**
+    //  * Get files URL for dataset
+    //  * @returns {String}
+    //  */
+    // getFilesUrl: function () {
+    //   if (this.config.apiUrl && this.userToken) {
+    //     const baseUrl =
+    //       this.$route.name === "dataset-files" ? "datasets" : "packages";
+    //     const id =
+    //       this.$route.name === "dataset-files"
+    //         ? this.$route.params.datasetId
+    //         : this.$route.params.fileId;
+    //     return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    //   }
+    // },
+
+    handleRouteChange: function (to, from) {
+      const DATASET_FILES_ROUTES = [
+        "dataset-files",
+        "collection-files",
+        "file-record",
+        "dataset-files-wrapper",
+      ];
       const routeChanged = to.name !== from.name;
       const fileIdChanged = to.params.fileId !== from.params.fileId;
-      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+      const isNavigatingWithinDatasetFiles =
+        DATASET_FILES_ROUTES.includes(to.name) &&
+        (routeChanged || fileIdChanged);
 
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    }
+    },
   },
 };
 </script>

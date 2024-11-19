@@ -1,12 +1,24 @@
 
   const initialState = () => ({
     computeNodes: [],
+    computeNodesLoaded: false,
     applications: [],
+    applicationsLoaded: false,
     preprocessors:[],
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
-    selectedFilesForAnalysis: []
+    selectedFilesForAnalysis: [],
+    computeResourceAccounts: [] ,
+    selectedFilesForAnalysis: {}, 
+    /* 
+      In the selectedFilesForAnalysis obj files are grouped by parentId 
+      where key is parentId, and value is an array of files that share a parentID.
+      For files in the root directory, they key is the string 'root'.
+      Example: { root: [{...file1}, {...file2}, {...file3}], parentId: [{}, {}] }
+      This is to support multi-level file selection. 
+    */
+    fileCount: 0
   })
   
   export const state = initialState()
@@ -15,9 +27,11 @@
  
     UPDATE_COMPUTE_NODES(state, computeNodes) {
       state.computeNodes = computeNodes
+      state.computeNodesLoaded = true
     },
     UPDATE_APPLICATIONS(state, applications) {
       state.applications = applications
+      state.applicationsLoaded = true
     },
     UPDATE_PREPROCESSORS(state, preprocessors) {
       state.preprocessors = preprocessors
@@ -28,18 +42,48 @@
     UPDATE_POSTPROCESSORS(state, postprocessors) {
       state.postprocessors = postprocessors 
     },
-    SET_SELECTED_FILES(state, files) {
-      state.selectedFilesForAnalysis = files;
+    UPDATE_SELECTED_FILE_COUNT(state) {
+      let total = 0;
+      for (const parentId in state.selectedFilesForAnalysis) {
+          total = total + state.selectedFilesForAnalysis[parentId].length
+      }
+    
+      state.fileCount = total;
     },
-    SET_SELECTED_FILE(state, file) {
-      state.selectedFilesForAnalysis = [...state.selectedFilesForAnalysis, file]
+    SET_SELECTED_FILES(state, { files, parentId }) {
+      if (files.length) {
+        const updatedObj = { ...state.selectedFilesForAnalysis };
+    
+        // Get the existing files for the parentId
+        const existingFiles = updatedObj[parentId] || [];
+    
+        // Filter out duplicates
+        const nonDuplicateFiles = files.filter(
+          newFile => !existingFiles.some(existingFile => existingFile.content.id === newFile.content.id)
+        );
+    
+        // Combine existing files with non-duplicate new files
+        const updatedFiles = [...existingFiles, ...nonDuplicateFiles];
+    
+        // Remove any files in existingFiles that are not present in files
+        updatedObj[parentId] = updatedFiles.filter(
+          file => files.some(newFile => newFile.content.id === file.content.id)
+        );
+    
+        state.selectedFilesForAnalysis = updatedObj;
+      } else {
+        state.selectedFilesForAnalysis[parentId] = []
+      }
     },
     CLEAR_SELECTED_FILES(state) {
-      state.selectedFilesForAnalysis = []
-    }
- 
+      state.selectedFilesForAnalysis = {}
+    },
+    SET_COMPUTE_RESOURCE_ACCOUNTS(state, accounts) {
+      state.computeResourceAccounts = accounts
+    },
+
   }
-  
+
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
       try {
@@ -91,15 +135,97 @@
           return Promise.reject(err)
       }
     },
+    fetchComputeResourceAccounts: async({ commit, rootState }) => {
+      try {
+        const url = `${rootState.config.api2Url}/accounts`;
+  
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${rootState.userToken}`,
+          },
+        })
+  
+        if (resp.ok) {
+          const result = await resp.json()
+          commit('SET_COMPUTE_RESOURCE_ACCOUNTS', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_COMPUTE_RESOURCE_ACCOUNTS', [])
+          return Promise.reject(err)
+      }
+    },
     setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
       commit('SET_SELECTED_FILES', selectedFiles)
     },
     setSelectedFile: async({ commit, rootState}, selectedFile) => {
       commit('SET_SELECTED_FILE', selectedFile)
     },
+    setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
+      commit('SET_SELECTED_FILES', { files: selectedFiles, parentId })
+    },
     clearSelectedFiles: async({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
+    createApplication: async ({ commit, rootState }, newApplication) => {
+      const url = `${rootState.config.api2Url}/applications`;
+    
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${rootState.userToken}`
+          },
+          body: JSON.stringify(newApplication)
+        });
+    
+        if (!response.ok) {
+          const errorDetails = await response.text(); // Extract error details
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+    
+        const result = await response.json();
+        return result; // Return the result for further processing if needed
+    
+      } catch (err) {
+        console.error('Failed to create application:', err.message); // Log error details
+        throw err; // Rethrow the error to be handled by the caller
+      }
+    },
+    
+    createComputeNode: async ({ commit, rootState }, newComputeNode) => {
+      const url = `${rootState.config.api2Url}/compute-nodes`;
+    
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${rootState.userToken}`
+          },
+          body: JSON.stringify(newComputeNode)
+        });
+    
+        if (!response.ok) {
+          const errorDetails = await response.text(); // Extract error details from the response
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+    
+        const result = await response.json();
+        return result; // Return the result for further processing if needed
+    
+      } catch (err) {
+        console.error('Failed to create compute node:', err.message); // Log detailed error message
+        throw err; // Rethrow the error to be handled by the caller
+      }
+    },
+    
+    updateFileCount: async ({ commit, rootState }) => {
+      commit('UPDATE_SELECTED_FILE_COUNT')
+    }
   }
   
   export const getters = {}

@@ -240,7 +240,11 @@ export default {
     ]),
 
     ...mapGetters("datasetModule", ["curDatasetSearchPage"]),
-
+    filteredDatasets() {
+      return this.datasets.filter(
+        (dataset) => dataset.content.datasetType !== "release"
+      );
+    },
     /**
      * Compute dataset icon sort direction
      * @returns {String}
