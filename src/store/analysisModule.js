@@ -244,7 +244,7 @@
         return result; // Return the result for further processing if needed
     
       } catch (err) {
-        console.error('Failed to create application:', err.message); // Log error details
+        console.error('Failed to update application:', err.message); // Log error details
         throw err; // Rethrow the error to be handled by the caller
       }
     },
