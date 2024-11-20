@@ -59,6 +59,7 @@
   import Request from '../../../../mixins/request'
   import ImportHref from '../../../../mixins/import-href'
   import Sorter from '../../../../mixins/sorter'
+  import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'PaletteDiscussions',
@@ -84,35 +85,25 @@
 
     computed: {
       ...mapState('viewerModule', ['activeViewer', 'viewerSidePanelView', 'viewerDiscussions']),
-      ...mapState(['config', 'userToken']),
+      ...mapState(['config']),
 
       /**
        * Compute URL for getting discussions
        * @returns {String}
        */
-      getDiscussionsUrl: function() {
-        const packageId = pathOr('', ['content', 'id'], this.activeViewer)
-        const apiUrl = propOr('', 'apiUrl', this.config)
+      getDiscussionsUrl: async function() {
 
-        if (packageId && apiUrl && this.viewerSidePanelView === 'discussion') {
-          return `${apiUrl}/discussions/package/${packageId}?api_key=${this.userToken}`
-        }
+        return await useGetToken()
+          .then(token => {
+            const packageId = pathOr('', ['content', 'id'], this.activeViewer)
+            const apiUrl = propOr('', 'apiUrl', this.config)
 
-        return null
-      },
+            if (packageId && apiUrl && this.viewerSidePanelView === 'discussion') {
+              return `${apiUrl}/discussions/package/${packageId}?api_key=${token}`
+            }
+          })
+          .catch(e => console.log(e))
 
-      /**
-       * Compute URL for creating discussions
-       * @returns {String}
-       */
-      createDiscussionsUrl: function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-
-        if (apiUrl) {
-          return `${apiUrl}/discussions?api_key=${this.userToken}`
-        }
-
-        return null
       },
 
       /**

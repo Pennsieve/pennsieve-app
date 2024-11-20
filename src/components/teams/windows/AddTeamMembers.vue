@@ -104,6 +104,8 @@ import HighlightText from '../../../mixins/highlight-text'
 import { pathOr, propOr, find, propEq } from 'ramda'
 import IconTeam from "../../icons/IconTeam.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'AddTeamMembers',
@@ -157,7 +159,6 @@ export default {
     ...mapGetters([
       'activeOrganization',
       'profile',
-      'userToken',
       'config',
       'orgMembers'
     ]),
@@ -185,11 +186,14 @@ export default {
     /**
      * Creates the add to team
      */
-    addToTeamUrl: function() {
+    addToTeamUrl: async function() {
       const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
       const teamId = pathOr(0, ['team', 'id'], this.team)
       const apiUrl = propOr('', 'apiUrl', this.config)
-      return `${apiUrl}/organizations/${orgId}/teams/${teamId}/members?api_key=${this.userToken}`
+      return useGetToken()
+        .then(token => {
+          return `${apiUrl}/organizations/${orgId}/teams/${teamId}/members?api_key=${token}`
+        })
     },
     /**
      * Makes XHR call to add members to team
@@ -199,21 +203,24 @@ export default {
       if (ids.length === 0) {
         return
       }
-      this.sendXhr(this.addToTeamUrl(), {
-        method: 'POST',
-        body: { ids }
-      })
-        .then(members => {
-          this.closeDialog()
-          this.$emit('members-added-to-team', members)
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'info',
-              msg: `Team member(s) added for ${this.teamName}`
-            }
+      this.addToTeamUrl()
+        .then(url => {
+          return useSendXhr(url, {
+            method: 'POST',
+            body: { ids }
           })
-        })
-        .catch(this.handleXhrError.bind(this))
+            .then(members => {
+              this.closeDialog()
+              this.$emit('members-added-to-team', members)
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'info',
+                  msg: `Team member(s) added for ${this.teamName}`
+                }
+              })
+            })
+        }).catch(err => useHandleXhrError(err))
+
     },
     /**
      * Selects member to add to team

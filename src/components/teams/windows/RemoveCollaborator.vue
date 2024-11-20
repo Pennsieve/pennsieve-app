@@ -45,6 +45,7 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
 import IconPerson from "../../icons/IconPerson.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'RemoveCollaborator',
@@ -80,7 +81,6 @@ export default {
   computed: {
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'config'
     ]),
   },
@@ -101,30 +101,35 @@ export default {
     /**
      * Creates DELETE url to remove member from org
      */
-    deleteUrl: function() {
+    deleteUrl: async function() {
       const orgId = this.activeOrganization.organization.id
-      const userToken = this.userToken
       const apiUrl = this.config.apiUrl
-      return `${apiUrl}/organizations/${orgId}/teams/${this.team.team.id}/members/${this.member.id}?api_key=${userToken}`
+      return useGetToken().then(token => {
+        return `${apiUrl}/organizations/${orgId}/teams/${this.team.team.id}/members/${this.member.id}?api_key=${token}`
+
+      })
     },
     /**
      * Makes XHR call to remove collaborator from team
      */
     removeCollaborator: function() {
-      this.sendXhr(this.deleteUrl(), {
-        method: 'DELETE'
-      })
-      .then(() => {
-        this.$emit('team-member-removed', this.member)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'info',
-            msg: `${this.member.firstName} ${this.member.lastName} removed from ${this.team.team.name}`
-          }
+      this.deleteUrl().then(url => {
+        this.sendXhr(url, {
+          method: 'DELETE'
         })
-        this.closeDialog()
+          .then(() => {
+            this.$emit('team-member-removed', this.member)
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'info',
+                msg: `${this.member.firstName} ${this.member.lastName} removed from ${this.team.team.name}`
+              }
+            })
+            this.closeDialog()
+          })
+          .catch(this.handleXhrError.bind(this))
       })
-      .catch(this.handleXhrError.bind(this))
+
     }
   }
 }

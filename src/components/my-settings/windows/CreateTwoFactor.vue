@@ -75,7 +75,7 @@
 <script>
 import { mapGetters, mapActions, mapState } from 'vuex'
 import { pathOr, prop } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+// import {Auth} from 'aws-amplify'
 
 // import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
@@ -85,6 +85,8 @@ import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import AutoFocus from '../../../mixins/auto-focus'
 import Request from '../../../mixins/request'
 import EventBus from '../../../utils/event-bus'
+import {useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'CreateTwoFactor',
@@ -127,23 +129,12 @@ export default {
     ...mapGetters([
       'profile',
       'activeOrganization',
-      'userToken',
       'config'
     ]),
     ...mapState([
       'cognitoUser'
     ]),
 
-    twoFactorUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
-
-      if (!url || !userToken) {
-        return ''
-      }
-      return `${url}/user/twofactor?api_key=${userToken}`
-
-    }
   },
 
   methods: {
@@ -156,10 +147,10 @@ export default {
      */
     generateTwoFactorCode: function() {
       // retrieve current authenticated user
-       Auth.setupTOTP(this.cognitoUser).then((code) => {
-          this.totpCode = code
-        })
-      .catch(err => console.error(err));
+      //  Auth.setupTOTP(this.cognitoUser).then((code) => {
+      //     this.totpCode = code
+      //   })
+      // .catch(err => console.error(err));
     },
 
     /**
@@ -180,15 +171,15 @@ export default {
       //     }
       //     this.sendTwoFactorAuthRequest()
       //   })
-      this.totpValidation = this.totpValidation.replace(/\s/g, '')
-      Auth.verifyTotpToken(this.cognitoUser, this.totpValidation).then(() => {
-      // don't forget to set TOTP as the preferred MFA method
-      Auth.setPreferredMFA(this.cognitoUser, 'TOTP')
-      this.handleTwoFactorXhrSucces()
+      // this.totpValidation = this.totpValidation.replace(/\s/g, '')
+      // Auth.verifyTotpToken(this.cognitoUser, this.totpValidation).then(() => {
+      // // don't forget to set TOTP as the preferred MFA method
+      // Auth.setPreferredMFA(this.cognitoUser, 'TOTP')
+      // this.handleTwoFactorXhrSucces()
 
-      }).catch(() => {
-        this.error = true
-      })
+      // }).catch(() => {
+      //   this.error = true
+      // })
     },
     /**
      * Makes XHR call to update two factor auth status
@@ -196,15 +187,19 @@ export default {
     sendTwoFactorAuthRequest: function() {
       const phoneNumber = this.ruleForm.phoneNumber.replace(/\D/g, '')
 
-      this.sendXhr(this.twoFactorUrl, {
-        method: 'POST',
-        body: {
-          countryCode: this.ruleForm.countryCode,
-          phoneNumber
-        }
-      })
-      .then(this.handleTwoFactorXhrSucces.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/user/twofactor?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'POST',
+            body: {
+              countryCode: this.ruleForm.countryCode,
+              phoneNumber
+            }
+          })
+            .then(this.handleTwoFactorXhrSucces.bind(this))
+        })
+        .catch(this.handleXhrError.bind(this))
     },
     /**
      * Handles successful two factor xhr response

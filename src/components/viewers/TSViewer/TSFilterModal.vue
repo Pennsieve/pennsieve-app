@@ -126,8 +126,7 @@
         },
         computed: {
             ...mapState([
-                'config',
-                'userToken'
+                'config'
             ]),
              ...mapState('viewerModule', [
                 'activeViewer',

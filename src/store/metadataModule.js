@@ -2,6 +2,7 @@ import {v1 as uuidv1} from "uuid";
 import router from "../router";
 import { find, propEq } from 'ramda'
 import * as R from "ramda";
+import {useGetToken} from "@/composables/useGetToken";
 
 const initialState = () => ({
   // showModels: ['patient', 'visit', 'sample', 'study'],
@@ -119,66 +120,70 @@ export const actions = {
   fetchModelProps: async({commit, rootState}, model) => {
     const datasetId = router.currentRoute.value.params.datasetId
 
-    try {
-      const url = `${rootState.config.apiUrl}/models/datasets/${datasetId}/concepts/${model}/properties`
+    useGetToken()
+        .then((token) => {
+          const url = `${rootState.config.apiUrl}/models/datasets/${datasetId}/concepts/${model}/properties`
+          return fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          })
+              .then(async (resp) =>{
+                if (resp.ok) {
+                  const props = await resp.json()
+                  commit('SET_PROPS_FOR_MODEL', {'model': model, 'props': props})
+                } else {
+                  return Promise.reject(resp)
+                }
+              })
+        })
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${rootState.userToken}`
-        }
-      })
 
-      if (resp.ok) {
-        const props = await resp.json()
-        commit('SET_PROPS_FOR_MODEL', {'model': model, 'props': props})
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      return Promise.reject(err)
-    }
 
   },
   fetchModels: async({commit, rootState, dispatch}) => {
     const datasetId = router.currentRoute.value.params.datasetId
+    if(!rootState.config.apiUrl) { return []}
 
-    try {
-      const url = `${rootState.config.apiUrl}/models/datasets/${datasetId}/concepts`
+    useGetToken()
+        .then((token) => {
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${rootState.userToken}`
-        }
-      })
+          const url = `${rootState.config.apiUrl}/models/datasets/${datasetId}/concepts`
 
-      if (resp.ok) {
-        const models = await resp.json()
-        commit('SET_MODELS', models)
+          const resp = fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          })
+              .then(async (resp) => {
+                if (resp.ok) {
+                  const models = await resp.json()
+                  commit('SET_MODELS', models)
 
-        // TODO: Refactor so this is returned with models or elsewhere
-        for (let target in models) {
-          dispatch('fetchModelProps', models[target].name)
-        }
+                  // TODO: Refactor so this is returned with models or elsewhere
+                  for (let target in models) {
+                    dispatch('fetchModelProps', models[target].name)
+                  }
 
-
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      commit('SET_MODELS', [])
-      return Promise.reject(err)
-    }
+                } else {
+                  return Promise.reject(resp)
+                }
+              })
+        })
+        .catch((error) => {
+            commit('SET_MODELS', [])
+            return Promise.reject(error)
+        })
   },
   updateModels: ({ commit }, evt) => commit("SET_MODELS", evt),
   removeModel: async ({commit}, id) => {
     commit('REMOVE_MODEL', id)
   },
   fetchRecords: async({commit, rootState, state}, params) => {
-    try {
 
       if (!rootState.dataset.content) {
         return
@@ -190,7 +195,7 @@ export const actions = {
       const url = `${rootState.config.api2Url}/metadata/query?dataset_id=${datasetId}`
 
       let filters = state.filterParams.filter(value => {
-        return value.value != ''
+        return value.value !== ''
       }).map(value => {
         return {
           "model": value.target,
@@ -208,25 +213,30 @@ export const actions = {
         offset: params.offset,
       }
 
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${rootState.userToken}`
-        },
-        body: JSON.stringify(queryBody)
-      })
+      useGetToken()
+          .then((token) => {
+            fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(queryBody)
+            })
+                .then(async (resp) => {
+                  if (resp.ok) {
+                    const result = await resp.json()
+                    commit('SET_RECORDS_FOR_MODEL', {result: result})
+                  } else {
+                    return Promise.reject(resp)
+                  }
+                })
+          })
+          .catch((err) => {
+            commit('SET_RECORDS_FOR_MODEL', {model: params.modelName, values: []})
+            return Promise.reject(err)
+          })
 
-      if (resp.ok) {
-        const result = await resp.json()
-        commit('SET_RECORDS_FOR_MODEL', {result:result})
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      commit('SET_RECORDS_FOR_MODEL', {model:params.modelName, values:[]})
-      return Promise.reject(err)
-    }
   },
   clearRecords: ({commit}, modelName) => {
     commit('SET_RECORDS_FOR_MODEL', {model:modelName, values:[]})

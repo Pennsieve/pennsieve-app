@@ -73,6 +73,8 @@ import { mockData } from './mock-graph-data'
 
 // D3 Helpers
 import { positionEdge, positionNode, tickActions } from '../../../utils/d3Helpers'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 // NOTE: Defining simulation variable in global scope becuase we need to initiate d3 force simulation
 // within the context onf the renderChart function but we also need access to simulation in update chart function
@@ -148,7 +150,6 @@ export default {
     ]),
 
     ...mapGetters([
-      'userToken',
       'config'
     ]),
 
@@ -199,11 +200,6 @@ export default {
         }
       },
       immediate: true
-    },
-    userToken: function() {
-      if (this.userToken) {
-        this.getGraphData()
-      }
     },
 
     /**
@@ -321,9 +317,6 @@ export default {
      * Fetch graph data from API
      */
     getGraphData: function() {
-      if (!this.userToken) {
-        return
-      }
 
       // Short circuit if data is being passed to component
       if (this.schemaProp) {
@@ -336,15 +329,19 @@ export default {
         return
       }
 
-      this.sendXhr(this.graphUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(response => {
-        this.graphData = this.transformApiResponse(response)
-      })
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.graphUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            }
+          })
+            .then(response => {
+              this.graphData = this.transformApiResponse(response)
+            })
+            .catch(this.handleXhrError.bind(this))
+        })
+
     },
 
     /**

@@ -106,8 +106,16 @@
   import Cropper from 'cropperjs'
   import 'cropperjs/dist/cropper.css'
 
+
+  import {useGetToken} from "@/composables/useGetToken";
+  import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+  import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
+  import BfButton from "@/components/shared/bf-button/BfButton.vue";
+  import DatasetBanner from "@/components/shared/DatasetBanner/DatasetBanner.vue";
+
   export default {
     name: 'DatasetSettingsBannerImage',
+    components: {DatasetBanner, BfButton, DialogBody, BfDialogHeader},
 
     props: {
       dataset: {
@@ -158,7 +166,8 @@
     computed: {
       ...mapState([
         'config',
-        'userToken',
+        'dataset',
+        'datasetBanner'
       ]),
 
       ...mapGetters(['datasetLocked']),
@@ -206,7 +215,7 @@
       ...mapActions([
         'setDatasetBanner'
       ]),
-      
+
       ...mapMutations({
         setCodeRepoDatasetBanner: 'codeReposModule/SET_CODE_REPO_BANNER_URL'
       }),
@@ -257,31 +266,32 @@
           const formData = new FormData()
           formData.append('banner', blob, `dataset_banner_${datasetIntId}.jpg`)
 
-          const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${this.userToken}`
-
-          fetch(url, {
-            method: 'PUT',
-            body: formData
-          })
-          .then(response => {
-            return response.json()
-          })
-          .then(response => {
-            const banner = propOr('', 'banner', response)
-            if(this.isCodeReposDataset) {
-              this.setCodeRepoDatasetBanner(banner)
-              this.isDialogVisible = false;
-              this.isUploadingBanner = false
-            } else {
-              this.setDatasetBanner(banner).then(() => {
-              this.isDialogVisible = false
-              this.isUploadingBanner = false
-            })
-            }
-          })
-          .finally(() => {
-            this.isUploadingBanner = false
-          })
+          useGetToken()
+            .then(token => {
+              const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${token}`
+              fetch(url, {
+                method: 'PUT',
+                body: formData
+              })
+                .then(response => {
+                  return response.json()
+                })
+                .then(() => {
+                  if(this.isCodeReposDataset) {
+                    this.setCodeRepoDatasetBanner(banner)
+                    this.isDialogVisible = false;
+                    this.isUploadingBanner = false
+                  } else {
+                    this.setDatasetBanner(banner)
+                      .then(() => {
+                        this.isDialogVisible = false
+                        this.isUploadingBanner = false
+                      })
+                    }
+                })
+            }).finally(() => {
+                this.isUploadingBanner = false
+              })
         }, 'image/jpeg', 0.7)
       },
 

@@ -57,6 +57,7 @@ import SideDrawer from '../../../shared/side-drawer/SideDrawer.vue'
 import ModelRecordsResults from '../search/ModelRecordsResults.vue'
 import { Computed } from '@/typescript/lib/add-linked-property-drawer/computed'
 import { Methods } from '@/typescript/lib/add-linked-property-drawer/methods'
+import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'AddLinkedPropertyDrawer',
@@ -108,7 +109,6 @@ import { Methods } from '@/typescript/lib/add-linked-property-drawer/methods'
       ...mapState([
         'conceptsHash',
         'config',
-        'userToken'
       ]),
 
       /**
@@ -251,48 +251,58 @@ import { Methods } from '@/typescript/lib/add-linked-property-drawer/methods'
        * @params {Object} body
        */
       sendCreateRelationshipRequest: function(body) {
-        this.sendXhr(this.linkedPropertiesUrl, {
-          method: 'POST',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body
-        })
-        .then(response => {
-          this.$emit('update-linked-property', response)
-          this.closeSideDrawer()
-          this.isCreating = false
+        useGetToken()
+          .then(token => {
+            this.sendXhr(this.linkedPropertiesUrl, {
+              method: 'POST',
+              header: {
+                'Authorization': `bearer ${token}`
+              },
+              body
+            })
+              .then(response => {
+                this.$emit('update-linked-property', response)
+                this.closeSideDrawer()
+                this.isCreating = false
 
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'success',
-              msg: `Linked Property Saved`
-            }
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: `Linked Property Saved`
+                  }
+                })
+
+                // track adding a linked property
+                EventBus.$emit('track-event', {
+                  name: 'Linked Property Added'
+                })
+              })
+              .catch(this.handleXhrError)
           })
 
-          // track adding a linked property
-          EventBus.$emit('track-event', {
-            name: 'Linked Property Added'
-          })
-        })
-        .catch(this.handleXhrError)
       },
 
       /**
        * Makes XHR call to remove linked property
        */
-      deleteRelationship: function() {
-        if (this.linkedPropertiesUrl) {
-          const id = propOr('', 'linkedPropertyId', this.linkedProperty)
-          const url = `${this.linkedPropertiesUrl}/${id}`
+      deleteRelationship: async function() {
 
-          return this.sendXhr(url, {
-            method: 'DELETE',
-            header: {
-              'Authorization': `bearer ${this.userToken}`
+        return useGetToken()
+          .then(token => {
+            if (this.linkedPropertiesUrl) {
+              const id = propOr('', 'linkedPropertyId', this.linkedProperty)
+              const url = `${this.linkedPropertiesUrl}/${id}`
+
+              return this.sendXhr(url, {
+                method: 'DELETE',
+                header: {
+                  'Authorization': `bearer ${token}`
+                }
+              })
             }
           })
-        }
+
+
       },
 
       onRadioSelection: function(selection) {

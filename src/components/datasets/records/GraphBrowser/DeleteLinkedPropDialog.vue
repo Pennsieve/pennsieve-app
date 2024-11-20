@@ -5,6 +5,7 @@ import BfButton from "../../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue";
 import * as site from '../../../../site-config/site.json';
 import {useSendXhr, useHandleXhrError} from '../../../../mixins/request/request_composable.js'
+import {useGetToken} from '../../../../composables/useGetToken'
 import IconTrash from "../../../../components/icons/IconTrash.vue";
 import {computed} from "vue";
 
@@ -30,19 +31,23 @@ function closeDialog(isSaved:boolean) {
 }
 
 function onDeleteProperty() {
-  const datasetId = store.state.dataset.content.id
-  const deletePropUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${props.modelId}/linked/${props.link.property.id}`
 
-  return useSendXhr(deletePropUrl, {
-    header: {
-      'Authorization': `bearer ${store.state.userToken}`
-    },
-    method: 'DELETE',
-    body:[],
-  })
-    .then(response => {
-      emit('deleteProperty')
 
+  useGetToken()
+    .then(async token => {
+      const datasetId = store.state.dataset.content.id
+      const deletePropUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${props.modelId}/linked/${props.link.property.id}`
+      return useSendXhr(deletePropUrl, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'DELETE',
+        body:[],
+      })
+        .then(response => {
+          emit('deleteProperty')
+
+        })
     })
     .catch(useHandleXhrError)
 

@@ -6,7 +6,7 @@
     :show-close="false"
     @close="closeDialog"
   >
-    <template #title>
+    <template #header>
       <bf-dialog-header
         title="Remove relationships"
       />
@@ -60,6 +60,8 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 import Request from '../../../../mixins/request'
 import EventBus from '../../../../utils/event-bus'
 import IconGraph from "../../../icons/IconGraph.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   components: {
@@ -92,7 +94,6 @@ export default {
 
   computed: {
     ...mapGetters([
-      'userToken',
       'config'
     ]),
     /**
@@ -130,17 +131,18 @@ export default {
     sendRequest: function() {
       const relationshipInstanceIds = this.relationships
 
-      this.sendXhr(this.apiUrl, {
-        method: 'DELETE',
-        body: { relationshipInstanceIds },
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(this.handleXhrSuccess.bind(this))
-      .catch(this.handleXhrError.bind(this))
-
-      this.closeDialog()
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.apiUrl, {
+            method: 'DELETE',
+            body: { relationshipInstanceIds },
+            header: {
+              'Authorization': `bearer ${token}`
+            }
+          })
+            .then(this.handleXhrSuccess.bind(this))
+            .catch(this.handleXhrError.bind(this))
+        }).finally(() => this.closeDialog())
     },
     /**
      * Handles successful response

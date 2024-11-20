@@ -26,6 +26,7 @@
   import EventBus from '../../utils/event-bus'
   import GetDatasetDoi from '../../mixins/get-dataset-doi'
   import BfPage from '../../components/layout/BfPage/BfPage.vue'
+  import {useGetToken} from "@/composables/useGetToken";
 
 
   export default {
@@ -63,7 +64,6 @@
       ...mapState([
         'datasets',
         'dataset',
-        'userToken',
         'concepts',
         'scientificUnits',
         'config',
@@ -86,9 +86,14 @@
        * Get units URL
        * @returns {String}
        */
-      scientificUnitsUrl: function() {
-        const datasetId = pathOr('', ['content', 'id'], this.dataset)
-        return this.userToken && datasetId ? `${this.config.apiUrl}/models/datasets/${datasetId}/properties/units?api_key=${this.userToken}` : ''
+      scientificUnitsUrl: async function() {
+         const datasetId = pathOr('', ['content', 'id'], this.dataset)
+
+         return useGetToken()
+          .then(token => {
+            return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/units?api_key=${token}`
+          })
+
       },
 
       /**
@@ -96,10 +101,11 @@
        * @returns {String}
        */
       getDatasetUrl: function() {
+
+        // We actually get the value instead to ensure the watcher sees the change
         const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-        return this.config.apiUrl && this.userToken && datasetId && this.isOrgSynced
-          ? `${this.config.apiUrl}/datasets/${datasetId}?api_key=${this.userToken}&includePublishedDataset=true&includeCollaboratorCounts=true`
-          : ''
+        return`${this.config.apiUrl}/datasets/${datasetId}?includePublishedDataset=true&includeCollaboratorCounts=true`
+
       },
 
       /**
@@ -107,9 +113,6 @@
        * @returns {String}
        */
       getModelTemplatesUrl: function() {
-        if (!this.userToken) {
-          return
-        }
         return `${this.config.apiUrl}/model-schema/organizations/${this.orgId}/templates`
       },
     },
@@ -120,7 +123,9 @@
        */
       getDatasetUrl: {
         handler: function(val) {
-          if (val) {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          if (val && datasetId) {
+            console.log('getting dataset')
             this.getDataset()
           }
         },
@@ -185,31 +190,34 @@
 
        /**
       * Retrieves list of scientific units
-    */
-    getScientificUnits: function() {
-      if (this.userToken) {
-        this.sendXhr(this.scientificUnitsUrl).then(resp => {
-          this.updateScientificUnits([
-            ...resp,
-            {
-              dimension: 'Other',
-              units: [{
-                name: 'Other',
-                displayName: 'Other',
-                description: 'Other'
-              }]
-            }
-          ])
+      */
+      getScientificUnits: function() {
+      this.scientificUnitsUrl
+        .then(url => {
+          this.sendXhr(url).then(resp => {
+            this.updateScientificUnits([
+              ...resp,
+              {
+                dimension: 'Other',
+                units: [{
+                  name: 'Other',
+                  displayName: 'Other',
+                  description: 'Other'
+                }]
+              }
+            ])
+          })
+            .catch(this.handleXhrError.bind(this))
         })
-          .catch(this.handleXhrError.bind(this))
-      }
+
+
 
     },
 
       /**
        * Get the current dataset
        */
-      getDataset: function() {
+      getDataset: async function() {
         const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
 
         // Reset state of dataset
@@ -219,35 +227,40 @@
         this.setDatasetDescription('')
         this.setDatasetBanner('')
 
-        fetch(this.getDatasetUrl)
-          .then(response => {
-            if (response.ok) {
-              response.json()
-                .then(dataset => {
-                  this.setDatasetEtag(response.headers.get('etag'));
-                  this.setDataset(dataset)
-                  this.getScientificUnits()
-                })
-                .then(() => {
-                  return this.getUserRole()
-                })
-                .then(() => {
-                  if (this.getPermission('manager')) {
+        let url = this.getDatasetUrl
+        useGetToken()
+          .then(token => {
+            url = url + `&api_key=${token}`
+            fetch(url)
+              .then(response => {
+                this.setDatasetEtag(response.headers.get('etag'));
 
-                    this.getDatasetIgnoreFiles(datasetId)
-                  }
-                })
-                .then(() => {
-                  this.getConcepts()
-                  EventBus.$emit('get-file-proxy-id')
-                })
-            } else {
-              throw response
-            }
+                return response.json()
+              })
+              .then(dataset => {
+
+                this.setDataset(dataset)
+                this.getScientificUnits()
+              })
+              .then(() => {
+                return this.getUserRole()
+              })
+              .then(() => {
+                if (this.getPermission('manager')) {
+
+                  this.getDatasetIgnoreFiles(datasetId)
+                }
+              })
+              .then(() => {
+                this.getConcepts()
+                EventBus.$emit('get-file-proxy-id')
+              })
+              .catch(err => console.log(err))
           })
           .catch(() => {
             this.onGetDatasetError()
           })
+
         this.getDatasetBanner(datasetId)
         this.getDatasetDescription(datasetId)
         this.getDatasetDoi(datasetId)
@@ -276,18 +289,21 @@
        */
       getDatasetDescription: function(datasetId) {
         this.setIsLoadingDatasetDescription(true)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/readme?api_key=${this.userToken}`
-        fetch(url)
-          .then(response => {
-            if (response.ok) {
-              response.json().then(data => {
-                const readme = propOr('', 'readme', data)
-                this.setDatasetDescriptionEtag(response.headers.get('etag'))
-                this.setDatasetDescription(readme)
+        useGetToken()
+          .then((token) => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/readme?api_key=${token}`
+            fetch(url)
+              .then(response => {
+                if (response.ok) {
+                  response.json().then(data => {
+                    const readme = propOr('', 'readme', data)
+                    this.setDatasetDescriptionEtag(response.headers.get('etag'))
+                    this.setDatasetDescription(readme)
+                  })
+                } else {
+                  throw response
+                }
               })
-            } else {
-              throw response
-            }
           })
           .catch(this.handleXhrError.bind(this))
           .finally(() => {
@@ -296,24 +312,29 @@
       },
 
       getDatasetChangelog: function(datasetId) {
-        //this.setIsLoadingDatasetDescription(true)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${this.userToken}`
-        fetch(url)
-          .then(response => {
-            if (response.ok) {
-              response.json().then(data => {
-                const changelog = propOr('', 'changelog', data)
-                //this.setDatasetDescriptionEtag(response.headers.get('etag'))
-                this.setChangelogText(changelog)
+
+        useGetToken()
+          .then((token) => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${token}`
+            fetch(url)
+              .then(response => {
+                if (response.ok) {
+                  response.json().then(data => {
+                    const changelog = propOr('', 'changelog', data)
+                    //this.setDatasetDescriptionEtag(response.headers.get('etag'))
+                    this.setChangelogText(changelog)
+                  })
+                } else {
+                  throw response
+                }
               })
-            } else {
-              throw response
-            }
           })
           .catch(this.handleXhrError.bind(this))
           .finally(() => {
             //this.setIsLoadingDatasetDescription(false)
           })
+
+
       },
 
       /**
@@ -321,33 +342,39 @@
        * @param {String} datasetId
        */
       getDatasetBanner: function(datasetId) {
-        this.setIsLoadingDatasetBanner(true)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${this.userToken}`
-        this.sendXhr(url)
-        .then(response => {
-          const banner = propOr('', 'banner', response)
-          this.setDatasetBanner(banner).then(() => {
-            this.setIsLoadingDatasetBanner(false)
-          })
-        })
-        .catch(this.handleXhrError.bind(this))
-      },
 
+        useGetToken()
+          .then((token) => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/banner?api_key=${token}`
+            this.sendXhr(url)
+              .then(response => {
+                const banner = propOr('', 'banner', response)
+                this.setDatasetBanner(banner).then(() => {
+                  this.setIsLoadingDatasetBanner(false)
+                })
+              })
+          })
+          .catch(this.handleXhrError.bind(this))
+      },
       /**
        * Get the dataset's contributors
        * @param {String} datasetId
        */
       getDatasetContributors: function(datasetId) {
         this.setIsLoadingDatasetContributors(true)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${this.userToken}`
-        this.sendXhr(url)
-        .then(response => {
-          this.setDatasetContributors(response)
-        })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {
-          this.setIsLoadingDatasetContributors(false)
-        })
+        useGetToken()
+          .then((token) => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${token}`
+            this.sendXhr(url)
+              .then(response => {
+                this.setDatasetContributors(response)
+              })
+          })
+          .catch(this.handleXhrError.bind(this))
+          .finally(() => {
+            this.setIsLoadingDatasetContributors(false)
+          })
+
       },
 
       /**
@@ -356,40 +383,21 @@
        */
       getDatasetIgnoreFiles: function(datasetId) {
         this.setIsLoadingDatasetIgnoreFiles(true)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/ignore-files?api_key=${this.userToken}`
-        this.sendXhr(url)
-        .then(resp => {
-          const ignoreFiles = (resp.ignoreFiles || []).map(file => ({fileName: file.fileName}))
-          this.setDatasetIgnoreFiles(ignoreFiles)
-        })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {
-          this.setIsLoadingDatasetIgnoreFiles(false)
-        })
-      },
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/ignore-files?api_key=${token}`
+            this.sendXhr(url)
+              .then(resp => {
+                const ignoreFiles = (resp.ignoreFiles || []).map(file => ({fileName: file.fileName}))
+                this.setDatasetIgnoreFiles(ignoreFiles)
+              })
+              .catch(this.handleXhrError.bind(this))
+              .finally(() => {
+                this.setIsLoadingDatasetIgnoreFiles(false)
+              })
 
-      /**
-       * Gets sites for dataset
-       */
-      getSites: function() {
-        const defaultPromise = Promise.resolve([])
-        const datasetId = pathOr(0, ['content', 'id'], this.dataset)
-        if (datasetId === 0) {
-          return this.updateSites([])
-        }
+          })
 
-        this.updateIsLoadingConcepts(true)
-
-        const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/site/instances`
-        return this.sendXhr(url, {
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(response => {
-          this.updateSites(response)
-        })
-        .catch(_ => this.updateSites([]))
       },
 
       /**
@@ -398,12 +406,15 @@
        */
       getUserRole: async function() {
         const datasetId = pathOr(0, ['content', 'id'], this.dataset)
-        const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${this.userToken}`
-        try {
-          const role = await this.sendXhr(url,{})
-          return this.setDatasetRole(role)
-        } catch (error) {
-        }
+
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${token}`
+            this.sendXhr(url,{})
+              .then(role => {
+                this.setDatasetRole(role)
+              })
+          })
       },
 
       /**
@@ -419,26 +430,30 @@
         this.updateIsLoadingConcepts(true)
         this.updateIsLoadingRelationshipTypes(true)
 
-        const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts`
-        return fetch(url, {
-          headers: {
-            'Authorization': `bearer ${this.userToken}`,
-            'Content-type': 'application/json'
-          }
-        })
-          .then(response => {
-            return response.json()
-          })
-          .then(response => {
-            const sortedModels = this.returnSort('displayName', response)
-            this.updateConcepts(sortedModels)
-              .then(() => {
-                this.updateIsLoadingConcepts(false)
-                this.getRelationshipTypes()
-                this.getModelTemplates()
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts`
+            return fetch(url, {
+              headers: {
+                'Authorization': `bearer ${token}`,
+                'Content-type': 'application/json'
+              }
+            })
+              .then(response => {
+                return response.json()
               })
+              .then(response => {
+                const sortedModels = this.returnSort('displayName', response)
+                this.updateConcepts(sortedModels)
+                  .then(() => {
+                    this.updateIsLoadingConcepts(false)
+                    this.getRelationshipTypes()
+                    this.getModelTemplates()
+                  })
+              })
+              .catch(_ => this.updateConcepts([]))
           })
-          .catch(_ => this.updateConcepts([]))
+
       },
       /**
        * Determines if template is already in use
@@ -474,21 +489,26 @@
       /**
        * Get relationship types for dataset
        */
-      getRelationshipTypes: function() {
+      getRelationshipTypes: async function() {
         const datasetId = pathOr(0, ['content', 'id'], this.dataset)
         if (datasetId === 0) {
           return this.setRelationshipTypes([])
         }
         const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-        return this.sendXhr(url, {
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-          .then(response => {
-            this.setRelationshipTypes(response).then(this.updateIsLoadingRelationshipTypes(false))
+
+        await useGetToken()
+          .then(token => {
+            return this.sendXhr(url, {
+              header: {
+                'Authorization': `bearer ${token}`
+              }
+            })
+              .then(response => {
+                this.setRelationshipTypes(response).then(this.updateIsLoadingRelationshipTypes(false))
+              })
+              .catch(_ => this.setRelationshipTypes([]))
           })
-          .catch(_ => this.setRelationshipTypes([]))
+
       },
 
       findDataset: (id, list) => compose(
