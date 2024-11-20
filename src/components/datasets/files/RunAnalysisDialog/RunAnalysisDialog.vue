@@ -345,9 +345,6 @@ export default {
      * Run Analysis Workflow on Selected Files
      */
     runAnalysis: function () {
-      console.log("this.selectedPreprocessor", this.selectedPreprocessor);
-      console.log("this.selectedProcessor", this.selectedProcessor);
-      console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url = `${this.config.api2Url}/workflows/instances`;
 
       let arrayOfPackageIds = [];
