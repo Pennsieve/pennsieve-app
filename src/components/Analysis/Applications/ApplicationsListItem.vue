@@ -10,7 +10,7 @@
         {{ application.description }}
       </p>
     </el-row>
-    <el-row class="update-app">
+    <el-row v-if="hasAdminRights" class="update-app">
       <button
           @click="deployApplication"
           class="text-button"
@@ -35,6 +35,7 @@ import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 
+
 export default {
   name: "IntegrationListItem",
 
@@ -51,7 +52,18 @@ export default {
     },
   },
 
-  computed: {},
+  computed: {
+    ...mapState(["activeOrganization"]),
+    hasAdminRights: function () {
+      if (this.activeOrganization) {
+        const isAdmin = this.activeOrganization?.isAdmin ?? false;
+        const isOwner = this.activeOrganization?.isOwner ?? false;
+        return isAdmin || isOwner;
+      } else {
+        return false;
+      }
+    },
+  },
 
   data: function () {
     return {
@@ -85,7 +97,6 @@ export default {
           url: this.application.source.url,
         };
         const formattedUpdateDataset = {
-          ...this.application,
           account: accountDetails,
           destination: destination,
           source: formattedSource,
