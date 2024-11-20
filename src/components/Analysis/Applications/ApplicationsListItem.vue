@@ -10,7 +10,20 @@
         {{ application.description }}
       </p>
     </el-row>
+    <el-row v-if="hasAdminRights" class="update-app">
+      <button
+          @click="deployApplication"
+          class="text-button"
+        >
+          Update
+        </button>
+        <div v-if="isWaitingForResponse" 
+          class="icon-waiting mr-16">
+          <bf-waiting-icon />
+    </div>
+    </el-row>
   </div>
+
 </template>
 
 <script>
@@ -19,6 +32,9 @@ import { find, propEq } from "ramda";
 import FormatDate from "../../../mixins/format-date";
 import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
+import EventBus from "../../../utils/event-bus";
+import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
+
 
 export default {
   name: "IntegrationListItem",
@@ -36,11 +52,23 @@ export default {
     },
   },
 
-  computed: {},
+  computed: {
+    ...mapState(["activeOrganization"]),
+    hasAdminRights: function () {
+      if (this.activeOrganization) {
+        const isAdmin = this.activeOrganization?.isAdmin ?? false;
+        const isOwner = this.activeOrganization?.isOwner ?? false;
+        return isAdmin || isOwner;
+      } else {
+        return false;
+      }
+    },
+  },
 
   data: function () {
     return {
       isActive: false,
+      isWaitingForResponse: false,
       integrationEdit: {
         type: Object,
         default: function () {
@@ -50,8 +78,52 @@ export default {
     };
   },
   methods: {
-    ...mapActions(["updateDataset"]),
-  },
+    ...mapActions("analysisModule", ["updateApplication"]),
+
+    deployApplication: async function () {
+      this.isWaitingForResponse = true;
+      try {
+        const accountDetails = {
+          uuid: this.application.account.uuid,
+          accountId: this.application.account.accountId,
+          accountType: this.application.account.accountType,
+        };
+        const destination = {
+          type: this.application.destination.type,
+          url: this.application.destination.url,
+        };
+        const formattedSource = {
+          type: this.application.source.type,
+          url: this.application.source.url,
+        };
+        const formattedUpdateDataset = {
+          account: accountDetails,
+          destination: destination,
+          source: formattedSource,
+        };
+
+        await this.updateApplication(formattedUpdateDataset);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "success",
+              msg: "Your request has been successfully submitted.",
+            },
+          });
+        } catch (error) {
+          console.error(error);
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: "There was a problem submitting your request.",
+            },
+          });
+        } finally {
+          this.isWaitingForResponse = false;
+          //handle update
+        }
+        
+        }
+    },
 };
 </script>
 
@@ -87,5 +159,21 @@ export default {
 .info {
   background: $purple_tint;
   padding: 8px;
+}
+.update-app{
+  height: 100%;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column-reverse;
+  margin: 8px;
+
+}
+.icon-waiting {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
 }
 </style>

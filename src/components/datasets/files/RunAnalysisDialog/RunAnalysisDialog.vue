@@ -363,6 +363,7 @@ export default {
       console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url = `${this.config.api2Url}/workflows/instances`;
 
+
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
         this.selectedFilesForAnalysis

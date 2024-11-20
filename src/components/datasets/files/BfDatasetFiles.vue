@@ -358,7 +358,6 @@ export default {
       return this.files.length > 0;
     },
 
-
     // /**
     //  * Get files URL for dataset
     //  * @returns {String}
@@ -685,6 +684,7 @@ export default {
      */
     fetchFiles: function (url) {
       this.filesLoading = true;
+
       this.sendXhr(url)
         .then((response) => {
           this.filesLoading = true;
