@@ -1,4 +1,5 @@
 {
+  "app_domain": "localhost",
   "apiUrl": "https://api.pennsieve.net",
   "api2Url": "https://api2.pennsieve.net",
   "zipitUrl": "https://api.pennsieve.net/zipit",

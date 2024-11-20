@@ -16,7 +16,7 @@ import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import p
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"
 import 'element-plus/es/components/message/style/index';
-import { defaultStorage } from 'aws-amplify/utils';
+import { CookieStorage } from 'aws-amplify/utils';
 import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import {fetchAuthSession} from "aws-amplify/auth";
 import {useGetProfileAndOrg} from "@/composables/useGetProfileAndOrg";
@@ -26,8 +26,13 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 
-cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
 Amplify.configure(AWSConfig)
+
+cognitoUserPoolsTokenProvider.setKeyValueStorage(
+    new CookieStorage({
+            domain: process.env.app_domain
+        }
+    ));
 
 const app = createApp(App)
 
