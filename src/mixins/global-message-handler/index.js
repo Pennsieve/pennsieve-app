@@ -416,7 +416,7 @@ export default {
      * @param {Object} payload
      */
     onLogout: async function(payload) {
-      window.location.href = siteConfig.discoverAppUrl
+      window.location.href = siteConfig.discoverAppUrl + "/workspaces"
       // try {
       //
       //   // clearInterval(this.interval)
