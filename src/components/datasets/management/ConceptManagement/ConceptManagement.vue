@@ -454,7 +454,7 @@ export default {
           return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`
         }).catch(err => console.log(err))
 
-    }
+    },
     closeEditPropertyDialog: function(){
       this.addEditPropertyDialogVisible = false
     },

@@ -75,7 +75,7 @@
 <script>
 import { mapGetters, mapActions, mapState } from 'vuex'
 import { pathOr, prop } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+// import {Auth} from 'aws-amplify'
 
 // import A11yKeys from '../../shared/a11y-keys/A11yKeys.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
@@ -147,10 +147,10 @@ export default {
      */
     generateTwoFactorCode: function() {
       // retrieve current authenticated user
-       Auth.setupTOTP(this.cognitoUser).then((code) => {
-          this.totpCode = code
-        })
-      .catch(err => console.error(err));
+      //  Auth.setupTOTP(this.cognitoUser).then((code) => {
+      //     this.totpCode = code
+      //   })
+      // .catch(err => console.error(err));
     },
 
     /**
@@ -171,15 +171,15 @@ export default {
       //     }
       //     this.sendTwoFactorAuthRequest()
       //   })
-      this.totpValidation = this.totpValidation.replace(/\s/g, '')
-      Auth.verifyTotpToken(this.cognitoUser, this.totpValidation).then(() => {
-      // don't forget to set TOTP as the preferred MFA method
-      Auth.setPreferredMFA(this.cognitoUser, 'TOTP')
-      this.handleTwoFactorXhrSucces()
+      // this.totpValidation = this.totpValidation.replace(/\s/g, '')
+      // Auth.verifyTotpToken(this.cognitoUser, this.totpValidation).then(() => {
+      // // don't forget to set TOTP as the preferred MFA method
+      // Auth.setPreferredMFA(this.cognitoUser, 'TOTP')
+      // this.handleTwoFactorXhrSucces()
 
-      }).catch(() => {
-        this.error = true
-      })
+      // }).catch(() => {
+      //   this.error = true
+      // })
     },
     /**
      * Makes XHR call to update two factor auth status

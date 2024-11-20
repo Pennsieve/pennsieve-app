@@ -166,7 +166,7 @@
 <script>
 import { mapState } from 'vuex'
 import { pathOr, propOr } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+import { resetPassword } from 'aws-amplify/auth';
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
@@ -321,17 +321,27 @@ export default {
     /**
      * Submit the password reset request
      */
-    submitResetRequest: function() {
+    submitResetRequest: async function() {
       this.isSendingEmail = true
 
-      Auth.forgotPassword(this.emailForm.email)
-        .then(this.onEmailFormSuccess.bind(this))
-        .catch(error => {
-          this.errorMsg = error.message
-        })
-        .finally(() => {
+      const output = await resetPassword({
+        username: this.emailForm.email
+      });
+
+      const { nextStep } = output;
+      switch (nextStep.resetPasswordStep) {
+        case 'CONFIRM_RESET_PASSWORD_WITH_CODE':
+          const codeDeliveryDetails = nextStep.codeDeliveryDetails;
+          console.log(
+            `Confirmation code was sent to ${codeDeliveryDetails.deliveryMedium}`
+          );
           this.isSendingEmail = false
-        })
+          // Collect the confirmation code from the user and pass to confirmResetPassword.
+          break;
+        case 'DONE':
+          console.log('Successfully reset password.');
+          break;
+      }
     },
 
     /**

@@ -247,7 +247,7 @@ import { mapState, mapGetters, mapActions } from 'vuex'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import {pathOr, propOr} from "ramda";
 import Request from '@/mixins/request'
-import { Auth } from '@aws-amplify/auth'
+// import { Auth } from 'aws-amplify'
 import EventBus from "../../utils/event-bus";
 import {useGetToken} from "@/composables/useGetToken";
 import {useSendXhr} from "@/mixins/request/request_composable";
@@ -397,18 +397,18 @@ export default {
   mounted () {
     this.currentCognitoUser = this.cognitoUser
     this.currentProfile = this.profile
-    Auth.currentAuthenticatedUser()
-      .then(user => {
-        const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
-        const userAttributes = propOr({}, 'attributes', user)
-        this.currentAuthentication.user = user
-        this.currentAuthentication.token = token
-        this.currentAuthentication.userAttributes = userAttributes
-      })
-      .catch(error => {
-        // TODO: is there something we need to do in case of an error here???
-        this.logError("mounted()", "Auth.currentAuthenticatedUser()", error)
-      })
+    // Auth.currentAuthenticatedUser()
+    //   .then(user => {
+    //     const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
+    //     const userAttributes = propOr({}, 'attributes', user)
+    //     this.currentAuthentication.user = user
+    //     this.currentAuthentication.token = token
+    //     this.currentAuthentication.userAttributes = userAttributes
+    //   })
+    //   .catch(error => {
+    //     // TODO: is there something we need to do in case of an error here???
+    //     this.logError("mounted()", "Auth.currentAuthenticatedUser()", error)
+    //   })
   },
 
   methods: {
@@ -571,15 +571,15 @@ export default {
 
     onSubmitAuthenticate: function() {
       this.authenticatedUser.emailAddress = this.passwordForm.emailAddress
-      Auth.signIn(this.passwordForm.emailAddress, this.passwordForm.password)
-        .then(authenticatedUser => {
-          this.authenticatedUser.token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], authenticatedUser)
-          this.toAskToConnectAccounts()
-        })
-        .catch(error => {
-          this.logUserError("onSubmitAuthenticate()", "Error authenticating user", error)
-          this.toAskForPassword()
-        })
+      // Auth.signIn(this.passwordForm.emailAddress, this.passwordForm.password)
+      //   .then(authenticatedUser => {
+      //     this.authenticatedUser.token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], authenticatedUser)
+      //     this.toAskToConnectAccounts()
+      //   })
+      //   .catch(error => {
+      //     this.logUserError("onSubmitAuthenticate()", "Error authenticating user", error)
+      //     this.toAskForPassword()
+      //   })
     },
 
     onClickConnectAccounts: function() {

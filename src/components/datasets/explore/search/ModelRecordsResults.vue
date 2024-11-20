@@ -126,7 +126,7 @@
       class="no-results"
     >
       <img
-        src="/src/assets/images/illustrations/illo-search.svg"
+        src="../../../../../src/assets/images/illustrations/illo-search.svg"
         alt=""
       >
       <h3>There are no Records for {{ conceptName }}.</h3>
@@ -177,7 +177,7 @@
       class="no-results"
     >
       <img
-        src="src/assets/images/illustrations/illo-search.svg"
+        src="../../../../../src/assets/images/illustrations/illo-search.svg"
         alt=""
       >
       <h3>No Results found.</h3>
@@ -216,8 +216,6 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 
 import EventBus from '../../../../utils/event-bus.js'
 import PaginationPageMenu from "../../../shared/PaginationPageMenu/PaginationPageMenu.vue";
-import {Methods} from "../../../../typescript/lib/model-records/methods";
-import {Computed} from "../../../../typescript/lib/model-records/computed";
 import IconDirectDownload from "../../../icons/IconDirectDownload.vue";
 
 export default {

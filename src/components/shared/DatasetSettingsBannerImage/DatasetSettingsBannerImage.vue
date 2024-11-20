@@ -106,14 +106,16 @@
   import Cropper from 'cropperjs'
   import 'cropperjs/dist/cropper.css'
 
-  import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
-  import BfButton from '../../../shared/bf-button/BfButton.vue'
-  import DatasetBanner from '../../../datasets/DatasetBanner/DatasetBanner.vue'
-  import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
+
   import {useGetToken} from "@/composables/useGetToken";
+  import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+  import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
+  import BfButton from "@/components/shared/bf-button/BfButton.vue";
+  import DatasetBanner from "@/components/shared/DatasetBanner/DatasetBanner.vue";
 
   export default {
     name: 'DatasetSettingsBannerImage',
+    components: {DatasetBanner, BfButton, DialogBody, BfDialogHeader},
 
     props: {
       dataset: {
