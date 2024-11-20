@@ -1,4 +1,6 @@
 import { mapGetters, mapActions, mapState } from 'vuex'
+import * as siteConfig from '@/site-config/site.json'
+
 import { signOut } from 'aws-amplify/auth'
 import EventBus from '../../utils/event-bus'
 import Request from '../request'
@@ -10,6 +12,7 @@ import Cookies from 'js-cookie'
 import { path, pathOr, propOr, find, pathEq, defaultTo, compose, prop, propEq } from 'ramda'
 import {useGetToken} from "@/composables/useGetToken";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import router from "@/router";
 
 export default {
   data() {
@@ -413,13 +416,15 @@ export default {
      * @param {Object} payload
      */
     onLogout: async function(payload) {
-      try {
-        clearInterval(this.interval)
-        await signOut()
-        this.handleLogout(payload)
-      } catch (error) {
-        this.handleXhrError()
-      }
+      window.location.href = siteConfig.discoverAppUrl
+      // try {
+      //
+      //   // clearInterval(this.interval)
+      //   // await signOut()
+      //   // this.handleLogout(payload)
+      // } catch (error) {
+      //   this.handleXhrError()
+      // }
     },
     /**
      * Updates org users object with any missing fields required for sorting
