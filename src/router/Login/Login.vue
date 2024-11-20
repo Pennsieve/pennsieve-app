@@ -255,7 +255,6 @@ export default {
       oauthCode: "",
       showOrcidError: false,
       windowWidth: 0,
-      timeoutId: null,
     };
   },
 
