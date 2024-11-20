@@ -3,7 +3,7 @@
     <form
       id="zipForm"
       method="POST"
-      :action="`${config.zipitUrl}/?api_key=${userToken}`"
+      :action="`${zipItUrl}`"
     >
       <input
         v-model="zipData"
@@ -42,7 +42,7 @@
           v-if="showReduceSize"
           class="mb-24"
         >
-          <p>The file(s) you are trying to download exceed the limit of {{ formatMetric(config.maxDownloadSize) }}. Please reduce the number of files selected and try again.</p>
+          <p>The file(s) you are trying to download exceed the limit of {{ formatMetric(this.config.maxDownloadSize) }}. Please reduce the number of files selected and try again.</p>
           <el-table
             :show-header="false"
             :border="false"
@@ -61,7 +61,8 @@
               prop="storage"
               align="right"
             >
-              <template slot-scope="scope">
+
+              <template #default>
                 {{ formatMetric(scope.row.storage) }}
                 <button
                   @click="removeRow(scope.row)"
@@ -122,6 +123,7 @@
   import BfStorageMetrics from '../../mixins/bf-storage-metrics';
   import Sorter from '../../mixins/sorter';
   import IconXCircle from "../icons/IconXCircle.vue";
+  import {useGetToken} from "@/composables/useGetToken";
 
   const DEFAULT_ARCHIVE_NAME = 'pennsieve-data'
 
@@ -157,21 +159,14 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config'
       ]),
 
-      ...mapState(['config', 'userToken', 'activeOrganization']),
-      /**
-       * Compute the url for downloading a csv of records
-       * @returns {String}
-       */
-      recordCsvUrl: function() {
-        const activeOrgIntId = pathOr('', ['organization', 'intId'], this.activeOrganization)
-        return `${this.config.apiUrl}/models/v2/organizations/${
-          activeOrgIntId
-        }/search/records/csv?api_key=${this.userToken}`
-      },
+      ...mapState(['activeOrganization']),
+
+
+
+
 
       sizeTarget: function() {
         return this.fileDTOs || this.packageDTOs;
@@ -207,6 +202,28 @@
     },
 
     methods: {
+      /**
+       * Compute the url for downloading a csv of records
+       * @returns {String}
+       */
+      recordCsvUrl: async function() {
+        const activeOrgIntId = pathOr('', ['organization', 'intId'], this.activeOrganization)
+        return useGetToken()
+          .then(token => {
+            return `${this.config.apiUrl}/models/v2/organizations/${
+              activeOrgIntId
+            }/search/records/csv?api_key=${token}`
+          })
+
+
+      },
+
+      zipItUrl: async function() {
+        return useGetToken()
+          .then(token => {
+            return `${this.config.zipitUrl}/?api_key=${token}`
+          })
+      },
 
       /**
        * Closes the dialog and initializes state

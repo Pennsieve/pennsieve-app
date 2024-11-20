@@ -27,7 +27,7 @@
         </div>
         <img
           class="login-image"
-          src="/src/assets/images/illustrations/illo-neuron-mural.svg"
+          src="@/assets/images/illustrations/illo-neuron-mural.svg"
           alt="Neuron Mural Image"
         />
       </div>
@@ -36,7 +36,7 @@
     <div class="highlight-wrapper">
       <div class="highlight-image">
         <img
-          src="/src/assets/images/illustrations/research-platform.svg"
+          src="../../../src/assets/images/illustrations/research-platform.svg"
           class="highlight"
           alt="research platform"
         />
@@ -64,7 +64,7 @@
       </div>
       <div class="highlight-image">
         <img
-          src="/src/assets/images/illustrations/illo-dr_azumi_1.svg"
+          src="../../../src/assets/images/illustrations/illo-dr_azumi_1.svg"
           class="highlight"
           alt="azumi"
         />
@@ -144,7 +144,7 @@
 <script>
 import { mapGetters, mapActions, mapState } from "vuex";
 import { propOr, pathOr } from "ramda";
-import { Auth } from "@aws-amplify/auth";
+// import { Auth } from "aws-amplify";
 import PennsieveHeader from "../../components/shared/PennsieveHeader/PennsieveHeader.vue";
 import DatasetSearch from "../../components/DatasetSearch/DatasetSearch.vue";
 import PennsieveFooter from "../../components/shared/PennsieveFooter/PennsieveFooter.vue";
@@ -385,27 +385,27 @@ export default {
      * Makes XHR call to login
      */
     async sendTwoFactorRequest() {
-      this.isLoadingTwoFactor = true;
-      this.twoFactorForm.token = this.twoFactorForm.token.replace(/\s/g, "");
-      try {
-        const user = await Auth.confirmSignIn(
-          this.cognitoUser,
-          this.twoFactorForm.token,
-          "SOFTWARE_TOKEN_MFA"
-        );
-        const token = pathOr(
-          "",
-          ["signInUserSession", "accessToken", "jwtToken"],
-          user
-        );
-        const userAttributes = propOr({}, "attributes", user);
-        EventBus.$emit("login", { token, userAttributes, user });
-        this.twoFactorForm.token = "";
-        this.showToken = false;
-        this.isLoadingTwoFactor = false;
-      } catch (error) {
-        this.handleTwoFactorError();
-      }
+      // this.isLoadingTwoFactor = true;
+      // this.twoFactorForm.token = this.twoFactorForm.token.replace(/\s/g, "");
+      // try {
+      //   const user = await Auth.confirmSignIn(
+      //     this.cognitoUser,
+      //     this.twoFactorForm.token,
+      //     "SOFTWARE_TOKEN_MFA"
+      //   );
+      //   const token = pathOr(
+      //     "",
+      //     ["signInUserSession", "accessToken", "jwtToken"],
+      //     user
+      //   );
+      //   const userAttributes = propOr({}, "attributes", user);
+      //   EventBus.$emit("login", { token, userAttributes, user });
+      //   this.twoFactorForm.token = "";
+      //   this.showToken = false;
+      //   this.isLoadingTwoFactor = false;
+      // } catch (error) {
+      //   this.handleTwoFactorError();
+      // }
     },
 
     /**
@@ -444,17 +444,17 @@ export default {
     },
 
     async sendFederatedLoginRequest(provider) {
-      this.isLoggingIn = true;
-      try {
-        const cred = await Auth.federatedSignIn({ customProvider: provider });
-      } catch (error) {
-        this.isLoggingIn = false;
-        EventBus.$emit("toast", {
-          detail: {
-            msg: `There was an error with your federated login attempt. Please try again.`,
-          },
-        });
-      }
+      // this.isLoggingIn = true;
+      // try {
+      //   const cred = await Auth.federatedSignIn({ customProvider: provider });
+      // } catch (error) {
+      //   this.isLoggingIn = false;
+      //   EventBus.$emit("toast", {
+      //     detail: {
+      //       msg: `There was an error with your federated login attempt. Please try again.`,
+      //     },
+      //   });
+      // }
     },
 
     getFragmentParameterByName: function (name) {
@@ -469,16 +469,16 @@ export default {
     doneMounting: async function () {
       const access_token = this.getFragmentParameterByName("access_token");
 
-      if (access_token) {
-        const user = await Auth.currentAuthenticatedUser();
-        this.handleLoginSuccess(user);
-      } else {
+      // if (access_token) {
+      //   const user = await Auth.currentAuthenticatedUser();
+      //   this.handleLoginSuccess(user);
+      // } else {
         // const token = Cookies.get("user_token");
         // if (token) {
         //   const user = await Auth.currentAuthenticatedUser();
         //   this.handleLoginSuccess(user);
         // }
-      }
+      // }
 
       var error = this.getFragmentParameterByName("error_description");
       if (error.includes("Already found an entry for username orcid", 0)) {

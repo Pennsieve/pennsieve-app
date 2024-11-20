@@ -364,6 +364,8 @@ import IconMenu from "../../../icons/IconMenu.vue";
 import IconRemove from "../../../icons/IconRemove.vue";
 import PennsieveTable from "../../../shared/PennsieveTable/PennsieveTable.vue";
 import IconUpload from "../../../icons/IconUpload.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'RelationshipsTable',
@@ -464,7 +466,6 @@ export default {
     ...mapState(['filesProxyId', 'dataset', 'relationshipTypes']),
 
     ...mapGetters([
-      'userToken',
       'getModelByName',
       'filesProxyId',
       'getRelationshipTypeDisplayName',
@@ -508,16 +509,7 @@ export default {
       return this.sourceType === 'sourceFile'
     },
 
-    /**
-     * Get API Url for processing packages
-     * @returns {String}
-     */
-    processFileUrl: function() {
-      const packageId = propOr('', ['recordId'], this.activeRow)
-      return this.config.apiUrl && this.userToken ? `${this.config.apiUrl}/packages/${packageId}/process?api_key=${
-          this.userToken
-        }` : ''
-    },
+
 
     /**
      * Determine whether loading state should appear
@@ -624,28 +616,6 @@ export default {
     },
 
     /**
-     * Computed API Url for Source Files table
-     * @returns {String}
-     */
-    // @TODO Modify this to handle sorting on sources table
-    sourceFilesUrl: function() {
-      if (!this.url) {
-        return ''
-      }
-
-      // ...yuck...
-      const mungedSortBy = this.sortBy === 'filename' ? 'name' : this.sortBy
-
-      const queryParams = `?order-by=${mungedSortBy
-      }&order-by-direction=${this.sortDirection
-      }&api_key=${this.userToken
-      }&limit=${this.limit
-      }&offset=${this.offset}`
-      return `${this.url}${queryParams}`
-
-    },
-
-    /**
      * Checks if concepts list is populated
      * @returns {Boolean}
      */
@@ -663,6 +633,19 @@ export default {
   },
 
   methods: {
+    /**
+     * Get API Url for processing packages
+     * @returns {String}
+     */
+    processFileUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          const packageId = propOr('', ['recordId'], this.activeRow)
+          return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${
+            token}`
+        }).catch(err => useHandleXhrError(err))
+    },
+
     toggleCollapse: function() {
     },
 
@@ -703,33 +686,20 @@ export default {
         return
       }
 
-      this.sendXhr(this.filesPagedUrl, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-      })
-        .then(response => {
-          this.handleXhrResponse(response.results)
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.filesPagedUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+          })
+            .then(response => {
+              this.handleXhrResponse(response.results)
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
     },
-    // /**
-    //  * Used to load source files of a package
-    //  * for Source Files table
-    //  */
-    // loadSourceFiles: function() {
-    //   if (!this.sourceFilesUrl) {
-    //     this.isLoading = false
-    //     return
-    //   }
-    //
-    //   this.sendXhr(this.sourceFilesUrl)
-    //     .then(response => {
-    //       this.sourceFileCount = response.totalCount
-    //       this.handleXhrResponse(response.results)
-    //     })
-    //     .catch(this.handleXhrError.bind(this))
-    // },
 
     /**
      * Used to generate the styling for the
@@ -821,19 +791,17 @@ export default {
      * is set to 'Unprocessed'
      */
     process: function() {
-      if (this.processFileUrl === '') {
-        return
-      }
-      this.sendXhr(this.processFileUrl, {
-        method: 'PUT',
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(response => {
-         this.activeRow.status = 'Processing'
-        })
-        .catch(this.handleXhrError.bind(this))
+
+      this.processFileUrl()
+        .then(url => {
+          return this.sendXhr(url, {
+            method: 'PUT',
+          })
+            .then(response => {
+              this.activeRow.status = 'Processing'
+            })
+        }).catch(err => useHandleXhrError(err))
+
 
     },
 
@@ -954,63 +922,63 @@ export default {
       }
     },
 
-    /**
-     * Makes XHR call
-     * Takes optional callback to handle sort change responses
-     * @param {String} callback
-     */
-    sendXhrRequest: function(callback = null) {
-      if (!this.relationshipUrl) {
-        this.isLoading = false
-        return
-      }
+    // /**
+    //  * Makes XHR call
+    //  * Takes optional callback to handle sort change responses
+    //  * @param {String} callback
+    //  */
+    // sendXhrRequest: function(callback = null) {
+    //   if (!this.relationshipUrl) {
+    //     this.isLoading = false
+    //     return
+    //   }
+    //
+    //   this.sendXhr(this.relationshipUrl, {
+    //     header: {
+    //       Authorization: `bearer ${this.userToken}`
+    //     }
+    //   })
+    //     .then(data => {
+    //       // if (this.isSubmissions) {
+    //       //   this.getLinkedFiles(data)
+    //       //   return
+    //       // }
+    //
+    //       if (typeof callback !== 'function') {
+    //         this.handleXhrResponse(data)
+    //       } else {
+    //         callback(data)
+    //       }
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
 
-      this.sendXhr(this.relationshipUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(data => {
-          // if (this.isSubmissions) {
-          //   this.getLinkedFiles(data)
-          //   return
-          // }
-
-          if (typeof callback !== 'function') {
-            this.handleXhrResponse(data)
-          } else {
-            callback(data)
-          }
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
-
-    requestLinkedFiles: function(record) {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const modelName = propOr('', 'name', this.relationship)
-      const recordId = compose(
-        propOr('', 'id'),
-        find(propEq('type', 'submission'))
-      )(record)
-
-      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelName}/instances/${recordId}/files`
-
-      return this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(response => {
-          return compose(
-            defaultTo({}),
-            last,
-            defaultTo([]),
-            head,
-            defaultTo([])
-          )(response)
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
+    // requestLinkedFiles: function(record) {
+    //   const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+    //   const modelName = propOr('', 'name', this.relationship)
+    //   const recordId = compose(
+    //     propOr('', 'id'),
+    //     find(propEq('type', 'submission'))
+    //   )(record)
+    //
+    //   const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelName}/instances/${recordId}/files`
+    //
+    //   return this.sendXhr(url, {
+    //     header: {
+    //       Authorization: `bearer ${this.userToken}`
+    //     }
+    //   })
+    //     .then(response => {
+    //       return compose(
+    //         defaultTo({}),
+    //         last,
+    //         defaultTo([]),
+    //         head,
+    //         defaultTo([])
+    //       )(response)
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
 
     /**
      * Handles initial xhr request and subsequent load more requests

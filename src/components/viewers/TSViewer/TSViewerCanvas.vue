@@ -132,7 +132,6 @@
         computed: {
             ...mapState([
               'config',
-              'userToken'
             ]),
             ...mapState('viewerModule', [
               'activeViewer',

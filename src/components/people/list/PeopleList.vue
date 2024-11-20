@@ -115,7 +115,7 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import {mapActions, mapGetters} from 'vuex'
 
 import BfRafter from '../../shared/bf-rafter/BfRafter.vue'
 import BfButton from '../../shared/bf-button/BfButton.vue'
@@ -126,12 +126,12 @@ import InviteMember from '../windows/InviteMember.vue'
 import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
 
 
-
-import { propOr, findIndex, propEq, reject, union } from 'ramda'
-import Sorter from  '../../../mixins/sorter'
-import UserRoles from  '../../../mixins/user-roles'
+import {findIndex, propEq, propOr, reject, union} from 'ramda'
+import Sorter from '../../../mixins/sorter'
+import UserRoles from '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
 import IconSort from "../../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'PeopleList',
@@ -169,7 +169,6 @@ export default {
   computed: {
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'orgMembers',
       'config',
       'hasFeature',
@@ -223,11 +222,14 @@ export default {
     /**
      * Generates invited org members GET url
      */
-    getInvitedPeopleUrl: function() {
-      if (!this.activeOrganization.organization || !this.userToken) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites?api_key=${this.userToken}`
+    getInvitedPeopleUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites?api_key=${token}`
+        })
+        .catch(() => {
+          return undefined
+        })
     },
     /**
      * Updates org member
@@ -333,38 +335,30 @@ export default {
     /**
      * Creates XHR calls to get invited users and current organization members
      */
-    getUsers: function() {
-      const invitesUrl = this.getInvitedPeopleUrl()
-      if (!invitesUrl || this.allPeople.length > 0) {
-        return
-      }
-      const peoplePromise = Promise.resolve(this.orgMembers)
-      // only admins can request pending organization members
-      const invitesPromise = this.hasAdminRights ? this.sendXhr(invitesUrl) : Promise.resolve([])
-      this.getUsersRequest(invitesPromise, peoplePromise)
+    getUsers: async function() {
+
+      this.getInvitedPeopleUrl()
+        .then(url => {
+          const peoplePromise = Promise.resolve(this.orgMembers)
+          const invitesPromise = this.hasAdminRights ? this.sendXhr(url) : Promise.resolve([])
+
+          return Promise.all([invitesPromise, peoplePromise])
+            .then(values => {
+              this.isLoading = false // ensure this is reset if there are no promises executed
+              this.invitations = values[0]
+              const pendingMembers = this.updatePendingMembers(values[0])
+              const currentMembers = this.updateCurrentMembers(values[1])
+              const allUsers = union(pendingMembers, currentMembers)
+              if (this.allPeople.length !== this.orgMembers.length) {
+                this.allPeople = this.returnSort('lastName', allUsers, this.sortDirection)
+              } else {
+                this.allPeople = allUsers
+              }
+            })
+
+        }).catch(this.handleXhrError.bind(this))
     },
-    /**
-     * Makes XHR calls to get invited users and current organization members
-     * @param {Promise} invitesPromise
-     * @param {Promise} peoplePromise
-     */
-    getUsersRequest: function(invitesPromise, peoplePromise) {
-      Promise.all([invitesPromise, peoplePromise])
-        .then(values => {
-          this.isLoading = false // ensure this is reset if there are no promises executed
-          this.invitations = values[0]
-          const pendingMembers = this.updatePendingMembers(values[0])
-          const currentMembers = this.updateCurrentMembers(values[1])
-          const allUsers = union(pendingMembers, currentMembers)
-          if (this.allPeople.length !== this.orgMembers.length) {
-            const sorted = this.returnSort('lastName', allUsers, this.sortDirection)
-            this.allPeople = sorted
-          } else {
-            this.allPeople = allUsers
-          }
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
+
     /**
      * Opens the dialog
      */

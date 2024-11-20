@@ -67,6 +67,7 @@ import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 import {  path, pathOr, pathEq } from 'ramda'
 import autoFocus from "../../../mixins/auto-focus";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'CreateEditTeam',
@@ -86,7 +87,6 @@ export default {
   computed: {
     ...mapGetters([,
       'activeOrganization',
-      'userToken',
       'config',
       'teams'
     ]),
@@ -178,9 +178,12 @@ export default {
      * @param {String} method
      * @returns {String}
      */
-    createUrl: function(method) {
-      const teamId = method === 'PUT' ? `/${this.team.team.id}` : ''
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams${teamId}?api_key=${this.userToken}`
+    createUrl:async function(method) {
+      return useGetToken().then(token => {
+        const teamId = method === 'PUT' ? `/${this.team.team.id}` : ''
+        return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams${teamId}?api_key=${token}`
+
+      })
     },
     /**
      * Closes remove member dialog
@@ -210,32 +213,35 @@ export default {
     submitRequest: function() {
       const method = this.team.team ? 'PUT' : 'POST'
       const msg = method === 'PUT' ? 'updated' : 'created'
-      const url = this.createUrl(method)
       const teamId = pathOr(0, ['team', 'id'], this.team)
-      this.sendXhr(url, {
-        method,
-        body: {
-          name: this.ruleForm.name
-        }
-      })
-      .then(team => {
-        const responseId = path(['team', 'id'], team)
-        const updatedTeam = {
-          team: {
-            id: method === 'PUT' ? teamId : responseId,
+
+      this.createUrl(method).then(url => {
+        this.sendXhr(url, {
+          method,
+          body: {
             name: this.ruleForm.name
           }
-        }
-        this.$emit(`team-${msg}`, updatedTeam)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'info',
-            msg: `${this.ruleForm.name} ${msg}`
-          }
         })
-        this.closeDialog()
+          .then(team => {
+            const responseId = path(['team', 'id'], team)
+            const updatedTeam = {
+              team: {
+                id: method === 'PUT' ? teamId : responseId,
+                name: this.ruleForm.name
+              }
+            }
+            this.$emit(`team-${msg}`, updatedTeam)
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'info',
+                msg: `${this.ruleForm.name} ${msg}`
+              }
+            })
+            this.closeDialog()
+          })
+          .catch(this.handleXhrError.bind(this))
       })
-      .catch(this.handleXhrError.bind(this))
+
     },
   }
 }

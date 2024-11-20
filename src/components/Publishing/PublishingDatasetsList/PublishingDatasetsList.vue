@@ -129,6 +129,8 @@ import toQueryParams from '../../../utils/toQueryParams.js'
 import { PublicationStatus} from '../../../utils/constants'
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'PublishingDatasetsList',
@@ -178,7 +180,6 @@ export default {
     ]),
     ...mapState([
       'config',
-      'userToken',
       'activeOrganization'
     ]),
 
@@ -221,18 +222,19 @@ export default {
      * @return {String}
      */
     getDatasetsUrl: function() {
-      const queryParams = toQueryParams({
-        publicationStatus: this.publicationStatus,
-        publicationType: this.publicationType,
-        api_key: this.userToken,
-        includeBannerUrl: true,
-        includePublishStatus: true,
-        ...this.datasetSearchParams
-      })
+      useGetToken().then(token => {
+        const queryParams = toQueryParams({
+          publicationStatus: this.publicationStatus,
+          publicationType: this.publicationType,
+          api_key: token,
+          includeBannerUrl: true,
+          includePublishStatus: true,
+          ...this.datasetSearchParams
+        })
 
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/paginated?${queryParams}`
-        : ''
+        return `${this.config.apiUrl}/datasets/paginated?${queryParams}`
+
+      })
     },
 
     hasDatasets: function() {
@@ -311,9 +313,13 @@ export default {
      * @param {String} id
      */
     publishDataset: function(id) {
-      this.sendXhr(`${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${this.userToken}&publicationType=publication`, {
-        method: 'POST'
-      })
+      useGetToken()
+        .then(token => {
+          return useSendXhr(`${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${token}&publicationType=publication`, {
+            method: 'POST'
+          })
+        }).catch(useHandleXhrError)
+
     },
 
     /**

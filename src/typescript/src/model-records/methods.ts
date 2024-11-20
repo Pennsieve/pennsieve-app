@@ -1,4 +1,6 @@
 import {ModelRecordsComponentInstance, Model, ModelRecord, ModelRecordsRoute} from "./_model";
+import {useGetToken} from "../../../composables/useGetToken.js"
+import {useHandleXhrError} from "../../../mixins/request/request_composable"
 
 /**
  * execute the fetch of records from the concept instances endpoint
@@ -10,13 +12,19 @@ const fetchRecords = async (instance: ModelRecordsComponentInstance): Promise<vo
   instance.searchResults = []
 
   try {
-    instance.searchResults = await instance.sendXhr<ModelRecord[]>(instance.modelRecordsUrl, {
-      header: {
-        'Authorization': `bearer ${instance.userToken}`
-      },
-      method: 'GET',
-    })
-    instance.resultsLoading = false
+    useGetToken()
+        .then(async token => {
+          instance.searchResults = await instance.sendXhr<ModelRecord[]>(instance.modelRecordsUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'GET',
+          })
+        })
+        .catch(useHandleXhrError)
+        .finally(() => instance.resultsLoading = false)
+
+
 
   } catch (err) {
     instance.resultsLoading = false

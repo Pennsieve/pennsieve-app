@@ -60,6 +60,8 @@ import BfButton from '../../shared/bf-button/BfButton.vue'
 import Request from '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 
 
@@ -116,18 +118,9 @@ export default {
     ...mapGetters([
       'profile',
       'activeOrganization',
-      'userToken',
       'config'
     ]),
-    apiKeyUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const userToken = prop('userToken', this)
 
-      if (!url || !userToken) {
-        return ''
-      }
-      return `${url}/token?api_key=${userToken}`
-    }
   },
 
   methods: {
@@ -151,30 +144,29 @@ export default {
      * Makes XHR call to create api key
      */
     sendRequest: function() {
-      this.sendXhr(this.apiKeyUrl, {
-        method: 'POST',
-        body: {
-          name: this.ruleForm.apiKey
-        }
-      })
-      .then(this.handleXhrSucces.bind(this))
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/token?api_key=${token}`
+          this.sendXhr(url, {
+            method: 'POST',
+            body: {
+              name: this.ruleForm.apiKey
+            }
+          })
+        })
+        .then(() => {
+          this.closeDialog()
+          EventBus.$emit('toast', {
+            detail: {
+              type: 'success',
+              msg: 'API key successfully added'
+            }
+          })
+          this.$emit('api-key-created', { apiKey: response, type: 'CREATED' })
+        })
+        .catch(useHandleXhrError)
     },
-    /**
-     * Handles successful two factor xhr response
-     * @param {Object} response
-     */
-    handleXhrSucces: function(response) {
-      this.closeDialog()
 
-      EventBus.$emit('toast', {
-        detail: {
-          type: 'success',
-          msg: 'API key successfully added'
-        }
-      })
-      this.$emit('api-key-created', { apiKey: response, type: 'CREATED' })
-    },
     /**
      * Resets form fields and validations
      */

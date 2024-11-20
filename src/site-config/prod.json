@@ -1,4 +1,5 @@
 {
+  "app_domain": "pennsieve.io",
   "apiUrl": "https://api.pennsieve.io",
   "api2Url": "https://api2.pennsieve.io",
   "zipitUrl": "https://api.pennsieve.io/zipit",

@@ -69,6 +69,7 @@ import EventBus from "../../../../utils/event-bus";
 import { pathOr } from "ramda";
 
 import { mapGetters, mapState } from "vuex";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "BfDeleteDialog",
@@ -109,11 +110,9 @@ export default {
 
   computed: {
     ...mapGetters([
-      "userToken",
       "config",
       "dataset",
       "activeOrganization",
-      "userToken",
     ]),
     ...mapState("integrationsModule", ["integrations"]),
     /**
@@ -221,35 +220,39 @@ export default {
           target_path: this.targetDirectory,
         },
       };
-      this.sendXhr(url, {
-        method: "POST",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: body,
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "The selected event has been successfully initiated!",
-              type: "success",
+      useGetToken()
+        .then(token => {
+          this.sendXhr(url, {
+            method: "POST",
+            header: {
+              Authorization: `Bearer ${token}`,
             },
-          });
-          this.closeDialog();
+            body: body,
+          })
+            .then((response) => {
+              EventBus.$emit("toast", {
+                detail: {
+                  msg: "The selected event has been successfully initiated!",
+                  type: "success",
+                },
+              });
+              this.closeDialog();
+            })
+            .catch((response) => {
+              this.handleXhrError(response);
+              EventBus.$emit("toast", {
+                detail: {
+                  msg: "Sorry! There was an issue initiating your event",
+                  type: "error",
+                },
+              });
+              this.closeDialog();
+              this.targetDirectory = "";
+              this.selectedApplication = {};
+              this.value = "";
+            });
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
-        });
+
     },
   },
 };
