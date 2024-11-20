@@ -155,10 +155,11 @@ export default {
     },
   },
 
-  created() {
-    EventBus.$on("redirect-detected", () => {
+  mounted() {
+    const query = this.$route.query;
+    if ('redirectTo' in query) {
       this.isLogInModalVisible = true;
-    });
+    }
   },
   beforeMount() {
     // Setup resize event listener

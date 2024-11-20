@@ -284,16 +284,7 @@ export default {
   },
 
   mounted: function () {
-    this.timeoutId =  setTimeout(() => {
-      if (window.location.href.includes("?redirectTo=")) {
-        EventBus.$emit("redirect-detected");
-      }
-    }, "1000"); // workaround for subscribing to an event that is registed in PennsieveHeader where lifecycle events all run after App.vue lifecycle events.
     this.doneMounting();
-  },
-
-  beforeUnmount: function () {
-    clearTimeout(this.timeoutId)
   },
 
   methods: {
