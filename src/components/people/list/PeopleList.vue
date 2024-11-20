@@ -227,6 +227,9 @@ export default {
         .then(token => {
           return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/invites?api_key=${token}`
         })
+        .catch(() => {
+          return undefined
+        })
     },
     /**
      * Updates org member

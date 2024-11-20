@@ -359,22 +359,22 @@ export default {
     },
 
 
-    /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: async function () {
-      let usertoken = await useGetToken()
-      if (this.config.apiUrl) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files"
-            ? this.$route.params.datasetId
-            : this.$route.params.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${usertoken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
+    // /**
+    //  * Get files URL for dataset
+    //  * @returns {String}
+    //  */
+    // getFilesUrl: async function () {
+    //   let usertoken = await useGetToken()
+    //   if (this.config.apiUrl) {
+    //     const baseUrl =
+    //       this.$route.name === "dataset-files" ? "datasets" : "packages";
+    //     const id =
+    //       this.$route.name === "dataset-files"
+    //         ? this.$route.params.datasetId
+    //         : this.$route.params.fileId;
+    //     return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${usertoken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    //   }
+    // },
 
     /**
      * Get move URL
@@ -567,9 +567,9 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
-    ...mapActions("datasetModule", ["createDatasetManifest"]),
+    ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
-    ...mapActions("datasetModule", ["createDatasetManifest"]),
+    ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
     generateManifest: function () {
       this.createDatasetManifest();
@@ -1248,21 +1248,6 @@ export default {
 
     },
 
-    // /**
-    //  * Get files URL for dataset
-    //  * @returns {String}
-    //  */
-    // getFilesUrl: function () {
-    //   if (this.config.apiUrl && this.userToken) {
-    //     const baseUrl =
-    //       this.$route.name === "dataset-files" ? "datasets" : "packages";
-    //     const id =
-    //       this.$route.name === "dataset-files"
-    //         ? this.$route.params.datasetId
-    //         : this.$route.params.fileId;
-    //     return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-    //   }
-    // },
 
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [

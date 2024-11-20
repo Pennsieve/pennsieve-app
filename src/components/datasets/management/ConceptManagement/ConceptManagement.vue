@@ -426,7 +426,6 @@ export default {
     EventBus.$on('archive-property', this.openDeleteDialog.bind(this))
     EventBus.$on('remove-property', this.onRemoveProperty.bind(this))
     this.fetchModels()
-
   },
 
   beforeDestroy() {

@@ -257,9 +257,12 @@ export default {
 
   watch: {
     activeOrganization: {
-      handler: function() {
-        this.getTeam()
-        this.getTeamMembers()
+      handler: async function() {
+        if(await this.getTeamMembersUrl()) {
+          this.getTeam()
+          this.getTeamMembers()
+        }
+
       },
       immediate: true
     }
@@ -341,18 +344,12 @@ export default {
     /**
      * Creates team url
      */
-    getTeamUrl: function() {
-      if (!this.activeOrganization.organization) {
-        return
-      }
-
+    getTeamUrl: async function() {
       return useGetToken()
         .then((token) => {
           const teamId = this.$route.params.id
           return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}?api_key=${token}`
-        })
-
-
+        }).catch(() => {return undefined})
     },
     /**
      * Creates teams url
@@ -363,7 +360,7 @@ export default {
         .then((token) => {
           const teamId = this.$route.params.id
           return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/teams/${teamId}/members?api_key=${token}`
-        })
+        }).catch(() => {return undefined})
 
     },
     /**
@@ -374,11 +371,12 @@ export default {
       const response = await this.getTeamUrl()
         .then(async (url) => {
           return this.sendXhr(url)
+        }).catch((err) => {
+          console.log(err)
+          return ""
         })
 
       this.team = response
-
-
 
     },
     /**
@@ -392,7 +390,10 @@ export default {
             this.allMembers = this.returnSort('lastName', resp)
           })
         })
-        .catch((err) => {console.log(err)})
+        .catch((err) => {
+          console.log(err)
+          return Promise.resolve()
+        })
 
 
     },

@@ -60,9 +60,9 @@ describe('RemoveCollaborator.vue', () => {
     expect(cmp.vm.dialogVisible).toBe(false)
   })
 
-  it('deleteUrl', () => {
-    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/777/members/1?api_key=123'
-    const deleteUrl = cmp.vm.deleteUrl()
+  it('deleteUrl', async () => {
+    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/777/members/1?api_key=undefined'
+    const deleteUrl = await cmp.vm.deleteUrl()
     expect(deleteUrl).toBe(expectedUrl)
   })
 

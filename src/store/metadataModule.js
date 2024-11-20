@@ -145,10 +145,13 @@ export const actions = {
   },
   fetchModels: async({commit, rootState, dispatch}) => {
     const datasetId = router.currentRoute.value.params.datasetId
+    if(!rootState.config.apiUrl) { return []}
 
     useGetToken()
         .then((token) => {
+
           const url = `${rootState.config.apiUrl}/models/datasets/${datasetId}/concepts`
+
           const resp = fetch(url, {
             method: 'GET',
             headers: {
@@ -173,7 +176,7 @@ export const actions = {
         })
         .catch((error) => {
             commit('SET_MODELS', [])
-            return Promise.reject(err)
+            return Promise.reject(error)
         })
   },
   updateModels: ({ commit }, evt) => commit("SET_MODELS", evt),
