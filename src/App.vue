@@ -87,12 +87,6 @@ export default {
     };
   },
   async mounted() {
-    setTimeout(() => {
-      if (window.location.href.includes("?redirectTo=")) {
-        EventBus.$emit("redirect-detected");
-      }
-    }, "1000"); // workaround for subscribing to an event that is registed in PennsieveHeader where lifecycle events all run after App.vue lifecycle events.
-
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)

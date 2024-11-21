@@ -55,6 +55,10 @@
             <a target="_blank" @click="openContactUsDialog">contact support</a>
             .
           </p>
+          <p v-if="hasConflict" class="error-copy conflict">
+            This email is already associated with a Pennsieve Account. Please Sign in
+            <router-link to="/?redirectTo=">here</router-link>
+          </p>
           <p class="agreement">
             By clicking “Create Account" you are agreeing to the Pennsieve
             <a
@@ -146,6 +150,7 @@ export default {
         ],
       },
       hasError: false,
+      hasConflict: false,
     };
   },
 
@@ -182,6 +187,7 @@ export default {
     createAccount: async function () {
       this.isCreatingAccount = true;
       this.hasError = false;
+      this.hasConflict = false;
 
       try {
         const recaptchaToken = await this.$recaptcha();
@@ -197,9 +203,12 @@ export default {
         this.accountCreated = true;
         this.isCreatingAccount = false;
       } catch (error) {
-        console.error(error);
+        if(error.status === 409) {
+          this.hasConflict = true
+        } else {
+          this.hasError = true;
+        }
         this.isCreatingAccount = false;
-        this.hasError = true;
       }
     },
     /**
@@ -281,5 +290,8 @@ h2 {
 }
 .error-copy {
   color: $error-color;
+  &.conflict {
+    color: $success-color;
+  }
 }
 </style>
