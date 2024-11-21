@@ -35,6 +35,7 @@
         @current-change="onPaginationPageChange"
       />
     </div>
+
   </bf-stage>
 </template>
 
@@ -42,10 +43,13 @@
 import BfEmptyPageState from "../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import RepoListItem from "./RepoListItem.vue";
 import { mapActions, mapState } from "vuex";
+import ChangeRepoTrackingDialog from "@/components/Code/ChangeRepoTrackingDialog.vue";
+import PublishCodeRepoDialog from "@/components/Code/PublishCodeRepoDialog.vue";
 
 export default {
   name: "MyReposList",
   components: {
+    PublishCodeRepoDialog, ChangeRepoTrackingDialog,
     RepoListItem,
     BfEmptyPageState,
   },

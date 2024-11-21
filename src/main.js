@@ -30,7 +30,7 @@ Amplify.configure(AWSConfig)
 
 cognitoUserPoolsTokenProvider.setKeyValueStorage(
     new CookieStorage({
-            domain: process.env.app_domain
+            domain: siteConfig.app_domain
         }
     ));
 

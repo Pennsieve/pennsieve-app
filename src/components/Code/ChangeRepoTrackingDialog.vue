@@ -50,8 +50,7 @@ export default {
     repo: {
       type: Object,
       required: true,
-      required: true,
-    },
+   },
     startTrackingMode: {
       type: Boolean,
       required: true,

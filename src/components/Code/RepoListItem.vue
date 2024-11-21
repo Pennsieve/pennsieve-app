@@ -119,18 +119,7 @@
       </el-col>
     </el-row>
 
-    <change-repo-tracking-dialog
-      :dialog-visible="isChangeRepoTrackingDialogVisible"
-      :start-tracking-mode="!isTracked"
-      :stop-tracking-mode="isTracked"
-      :repo="repo"
-      @close="onChangeRepoTrackingDialogClose"
-    />
-    <publish-code-repo-dialog
-      :dialog-visible="isPublishCodeRepoDialogVisible"
-      :repo="repo"
-      @close="onPublishCodeRepoDialogVisibleClose"
-    />
+
   </bf-stage>
 </template>
 
@@ -142,10 +131,12 @@ import { find, propEq, propOr } from "ramda";
 import FormatDate from "../../mixins/format-date";
 import ChangeRepoTrackingDialog from "./ChangeRepoTrackingDialog.vue";
 import { hasLicense, hasReadMe, hasRelease } from "./codeReposHelpers";
+import PublishCodeRepoDialog from "@/components/Code/PublishCodeRepoDialog.vue";
 
 export default {
   name: "RepoListItem",
   components: {
+    PublishCodeRepoDialog,
     Link,
     TagPill,
     ChangeRepoTrackingDialog,
@@ -194,6 +185,7 @@ export default {
   },
   mounted() {
     if (this.repo) {
+      debugger
       this.fetchReadMe(this.repo.content.id);
     }
   },
