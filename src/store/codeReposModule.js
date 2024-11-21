@@ -122,8 +122,7 @@ export const actions = {
   },
 
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
-    try {
-      useGetToken()
+      return useGetToken()
         .then(token =>{
           const url = `${rootState.config.api2Url}/repository/enable`
           const myHeaders = new Headers();
@@ -142,15 +141,11 @@ export const actions = {
               }
             })
         })
-    }
-    catch (err) {
-      console.error(err);
-    }
+
   },
 
   disableRepoTracking: async({ commit, rootState }, { repo }) => {
-    try {
-      useGetToken()
+      return useGetToken()
           .then(token =>{
             const url = `${rootState.config.api2Url}/repository/disable`
             const myHeaders = new Headers();
@@ -170,10 +165,8 @@ export const actions = {
               })
           })
           .catch(useHandleXhrError)
-    }
-    catch (err) {
-      console.error(err);
-    }
+
+
   },
 
   updateWorkspaceRepoOffset: ({ commit }, offset) => {
@@ -370,6 +363,8 @@ export const getters = {
   activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
   bannerURL : state => state.activeRepoBannerURL,
   isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner,
+    myReposPaginationParams: state => state.myReposPaginationParams,
+    myRepos: state => state.myRepos,
   hasReadMe: state => state.hasReadMe,
   canPublish: state => state.canPublish
 }
