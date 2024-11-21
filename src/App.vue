@@ -92,7 +92,7 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-  mounted() {
+  async mounted() {
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
