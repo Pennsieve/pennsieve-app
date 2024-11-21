@@ -175,7 +175,7 @@
 <script>
 import { mapActions } from 'vuex'
 import { propOr, pathOr } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+// import {Auth} from 'aws-amplify'
 import BfButton from '../bf-button/BfButton.vue'
 import EventBus from '../../../utils/event-bus'
 import IconRemove from "../../icons/IconRemove.vue"
@@ -367,7 +367,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['updateUserToken', 'updateProfile']),
+    ...mapActions(['updateProfile']),
 
     onEnter(event) {
       if (event.currentTarget === this.$refs.pwdField.ref) {
@@ -482,48 +482,48 @@ export default {
      */
     async sendLoginRequest() {
 
-      this.isLoggingIn = true
-      try {
-        const user = await Auth.signIn(
-          this.logInForm.email,
-          this.logInForm.password
-        )
-        // this.handleLoginSuccess(user)
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'info',
-            msg: `Login successful. Loading Workspace, please wait.`,
-            duration: 5000
-          }
-        })
-        this.$emit('succesfulLogin', user)
-        this.closeLogInDialog()
-      } catch (error) {
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'error',
-            msg: `Incorrect username or password. Please try again.`
-          }
-        })
-        this.logInForm.password = ''
-      }
-      this.isLoggingIn = false
+      // this.isLoggingIn = true
+      // try {
+      //   const user = await Auth.signIn(
+      //     this.logInForm.email,
+      //     this.logInForm.password
+      //   )
+      //   // this.handleLoginSuccess(user)
+      //   EventBus.$emit('toast', {
+      //     detail: {
+      //       type: 'info',
+      //       msg: `Login successful. Loading Workspace, please wait.`,
+      //       duration: 5000
+      //     }
+      //   })
+      //   this.$emit('succesfulLogin', user)
+      //   this.closeLogInDialog()
+      // } catch (error) {
+      //   EventBus.$emit('toast', {
+      //     detail: {
+      //       type: 'error',
+      //       msg: `Incorrect username or password. Please try again.`
+      //     }
+      //   })
+      //   this.logInForm.password = ''
+      // }
+      // this.isLoggingIn = false
     },
 
     async initiateFederatedLogin(provider) {
-      this.isLoggingIn = true
-      this.closeLogInDialog()
-      try {
-        const cred = await Auth.federatedSignIn({customProvider: provider})
-      } catch (error) {
-        this.isLoggingIn = false
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'error',
-            msg: `There was an error with your federated login attempt. Please try again.`
-          }
-        })
-      }
+      // this.isLoggingIn = true
+      // this.closeLogInDialog()
+      // try {
+      //   const cred = await Auth.federatedSignIn({customProvider: provider})
+      // } catch (error) {
+      //   this.isLoggingIn = false
+      //   EventBus.$emit('toast', {
+      //     detail: {
+      //       type: 'error',
+      //       msg: `There was an error with your federated login attempt. Please try again.`
+      //     }
+      //   })
+      // }
     },
 
     /**
@@ -532,9 +532,9 @@ export default {
      * @param {Object} profile
      */
     setLogin(token) {
-      this.$cookies.set('user_token', token)
+      // this.$cookies.set('user_token', token)
 
-      this.updateUserToken(token)
+      // this.updateUserToken(token)
       const url = `${this.userUrl}` + `?api_key=${token}`
       this.$axios.$get(url).then((response) => {
         this.updateProfile(response)
@@ -546,19 +546,19 @@ export default {
      * Handle password reset request after validation
      */
     sendResetPasswordEmailRequest() {
-      this.isSendingResetEmail = true
-      Auth.forgotPassword(this.forgotPasswordForm.email)
-        .then(this.toResetPasswordState())
-        .catch(() => {
-          EventBus.$emit('toast', {
-            detail: {
-              msg: `There was an error sending a password reset request. Please try again.`
-            }
-          })
-        })
-        .finally(() => {
-          this.isSendingResetEmail = false
-        })
+      // this.isSendingResetEmail = true
+      // Auth.forgotPassword(this.forgotPasswordForm.email)
+      //   .then(this.toResetPasswordState())
+      //   .catch(() => {
+      //     EventBus.$emit('toast', {
+      //       detail: {
+      //         msg: `There was an error sending a password reset request. Please try again.`
+      //       }
+      //     })
+      //   })
+      //   .finally(() => {
+      //     this.isSendingResetEmail = false
+      //   })
     },
 
     /**

@@ -1,4 +1,5 @@
 import { mapGetters } from 'vuex'
+import {useGetToken} from "@/composables/useGetToken";
 
 const confirmMessage = 'You have unsaved changes. Are you sure you want to continue?'
 
@@ -11,9 +12,6 @@ export default {
   },
 
   computed: {
-    ...mapGetters([
-      'userToken'
-    ]),
 
     /**
      * Computed value if component has changes
@@ -42,8 +40,9 @@ export default {
   },
 
   methods: {
-    beforeRouteLeaveHandler(to, from, next) {
-      if (this.userToken) {
+    async beforeRouteLeaveHandler(to, from, next) {
+      const userToken = await useGetToken()
+      if (userToken) {
         if (this.confirmLossOfChanges()) {
           next()
           this.onConfirmLossOfChanges()

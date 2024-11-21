@@ -126,6 +126,8 @@ import FormatDate from '@/mixins/format-date'
 
 import EventBus from '@/utils/event-bus'
 import { packageDisplayName } from '@/utils/packages'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'AddFileRelationshipDrawer',
@@ -176,7 +178,6 @@ export default {
   computed: {
     ...mapGetters([
       'config',
-      'userToken',
     ]),
 
     /**
@@ -273,18 +274,20 @@ export default {
      */
     createDefaultRelationship: function(datasetId) {
       const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      return this.sendXhr(url, {
-        method: 'POST',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).then(this.createFileRelationship.bind(this))
+      return useGetToken().then(token =>{
+        this.sendXhr(url, {
+          method: 'POST',
+          header: {
+            'Authorization': `bearer ${token}`
+          },
+          body: {
+            name: 'belongs_to',
+            displayName: 'Belongs To',
+            description: '',
+            schema: []
+          }
+        }).then(this.createFileRelationship.bind(this))
+      })
     },
 
     /**
@@ -311,21 +314,25 @@ export default {
             }
           }
         }
-        return this.sendXhr(url, {
-          method: 'POST',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body: {
-            externalId: packageId,
-            targets: [{
-              direction: 'FromTarget',
-              linkTarget,
-              relationshipType: 'belongs_to',
-              relationshipData: []
-            }]
-          }
-        })
+        return useGetToken()
+          .then(token => {
+            return useSendXhr(url, {
+              method: 'POST',
+              header: {
+                'Authorization': `bearer ${token}`
+              },
+              body: {
+                externalId: packageId,
+                targets: [{
+                  direction: 'FromTarget',
+                  linkTarget,
+                  relationshipType: 'belongs_to',
+                  relationshipData: []
+                }]
+              }
+            })
+          })
+
       })
       // this maps over all the queued responses to guarantee that all responses are returned regardless of error status
       return Promise.all(queues.map(q => {
@@ -352,52 +359,56 @@ export default {
       // check if relationship exists for dataset amongst list
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(resp => {
-        const belongsTo = find(propEq('name', 'belongs_to'), resp)
-        if (resp.length === 0 || !belongsTo) {
-          // if not, create a default, then create the file relationship
-          return this.createDefaultRelationship(datasetId)
-        }
-        return this.createFileRelationship()
-      })
-      .then((resp) => {
-        // check for errors
-        const hasErrors = this.checkForRelationshipErrors(resp)
-        if (hasErrors) {
-          this.isCreating = false
-          const hasConflict = find(propEq('status', 409), resp)
-          const msg = hasConflict ? 'File relationship already exists. Please choose a different file.' : 'Error trying to add files.'
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg
+
+      useGetToken()
+        .then(token => {
+          return this.sendXhr(url, {
+            header: {
+              'Authorization': `bearer ${token}`
             }
           })
+            .then(resp => {
+              const belongsTo = find(propEq('name', 'belongs_to'), resp)
+              if (resp.length === 0 || !belongsTo) {
+                // if not, create a default, then create the file relationship
+                return this.createDefaultRelationship(datasetId)
+              }
+              return this.createFileRelationship()
+            })
+            .then((resp) => {
+              // check for errors
+              const hasErrors = this.checkForRelationshipErrors(resp)
+              if (hasErrors) {
+                this.isCreating = false
+                const hasConflict = find(propEq('status', 409), resp)
+                const msg = hasConflict ? 'File relationship already exists. Please choose a different file.' : 'Error trying to add files.'
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'error',
+                    msg
+                  }
+                })
+                return this.handleXhrError(resp)
+              }
 
-          return this.handleXhrError(resp)
-        }
+              // add relationships to file(s)
+              EventBus.$emit('refresh-table-data', {
+                name: 'package',
+                displayName: 'Files',
+                count: this.selectedItems.length,
+                type: 'Add'
+              })
 
-        // add relationships to file(s)
-        EventBus.$emit('refresh-table-data', {
-          name: 'package',
-          displayName: 'Files',
-          count: this.selectedItems.length,
-          type: 'Add'
-        })
+              EventBus.$emit('toast', {
+                detail: {
+                  msg: `A new relationship has been created`,
+                  type: 'success'
+                }
+              })
+              this.closeSideDrawer()
+              this.isCreating = false
 
-        EventBus.$emit('toast', {
-          detail: {
-            msg: `A new relationship has been created`,
-            type: 'success'
-          }
-        })
-        this.closeSideDrawer()
-        this.isCreating = false
+            })
       })
     },
 
@@ -405,14 +416,14 @@ export default {
      * Creates the GET url for files
      * @param {String} fileId
      */
-    getFilesUrl: function(fileId) {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      if (!datasetId || !this.userToken) {
-        return
-      }
-      const qString = `api_key=${this.userToken}&includeAncestors=true`
-      const url = fileId ? `packages/${fileId}` : `datasets/${datasetId}`
-      return `${this.config.apiUrl}/${url}?${qString}`
+    getFilesUrl: async function(fileId) {
+      return useGetToken()
+        .then(token => {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          const qString = `api_key=${token}&includeAncestors=true`
+          const url = fileId ? `packages/${fileId}` : `datasets/${datasetId}`
+          return `${this.config.apiUrl}/${url}?${qString}`
+        })
     },
 
     /**
@@ -443,14 +454,14 @@ export default {
      * @param {String} fileId
      */
     getFiles: function(fileId) {
-      this.fileId = fileId
-      const url = this.getFilesUrl(fileId)
-      if (!url) {
-        return
-      }
-      this.sendXhr(url)
-        .then(this.filterFiles.bind(this))
-        .catch(this.handleXhrError.bind(this))
+      return this.getFilesUrl()
+        .then((url) => {
+          this.fileId = fileId
+          this.sendXhr(url)
+            .then(this.filterFiles.bind(this))
+            .catch(this.handleXhrError.bind(this))
+        }).catch(err => console.log(err))
+
     },
 
     /**

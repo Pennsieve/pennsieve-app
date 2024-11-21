@@ -139,7 +139,7 @@
 <script>
 import { mapState } from 'vuex'
 import { propOr } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+// import {Auth} from 'aws-amplify'
 
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import PasswordValidator from '@/mixins/password-validator'
@@ -270,7 +270,7 @@ export default {
      */
     async initialLogin() {
       try {
-         this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
+         // this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
          this.verifyAccount()
         } catch (error) {
           this.isSavingProfile = false
@@ -283,14 +283,14 @@ export default {
      */
     async verifyAccount() {
       try {
-        const newUser = await Auth.completeNewPassword(
-          this.user,
-          this.profileForm.password,
-          {
-            email: this.$route.query.email
-          }
-        )
-        this.isUserPasswordUpdated = true
+        // const newUser = await Auth.completeNewPassword(
+        //   this.user,
+        //   this.profileForm.password,
+        //   {
+        //     email: this.$route.query.email
+        //   }
+        // )
+        // this.isUserPasswordUpdated = true
 
       } catch (error) {
         this.handleFailedUserCreation()
@@ -349,23 +349,23 @@ export default {
      * Submit forgot password request and take user to the forgot password page
      */
     onForgotPasswordClick: function() {
-      Auth.forgotPassword(this.$route.params.username)
-        .then(() => {
-          EventBus.$emit('toast', {
-          detail: {
-            type: 'message',
-            msg: 'Reset password email sent'
-          }
-        })
-        })
-        .catch(error => {
-          EventBus.$emit('toast', {
-          detail: {
-            type: 'error',
-            msg: error.message
-          }
-        })
-        })
+      // Auth.forgotPassword(this.$route.params.username)
+      //   .then(() => {
+      //     EventBus.$emit('toast', {
+      //     detail: {
+      //       type: 'message',
+      //       msg: 'Reset password email sent'
+      //     }
+      //   })
+      //   })
+      //   .catch(error => {
+      //     EventBus.$emit('toast', {
+      //     detail: {
+      //       type: 'error',
+      //       msg: error.message
+      //     }
+      //   })
+      //   })
     }
   }
 }

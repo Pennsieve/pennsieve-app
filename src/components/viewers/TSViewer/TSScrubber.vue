@@ -50,6 +50,8 @@
 
     import ViewerActiveTool from '@/mixins/viewer-active-tool'
     import Request from '@/mixins/request'
+    import {useGetToken} from "@/composables/useGetToken";
+    import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
     export default {
         name: 'TimeseriesScrubber',
@@ -73,7 +75,6 @@
         computed: {
             ...mapState([
                 'config',
-                'userToken'
             ]),
             ...mapState('viewerModule', [
                 'activeViewer',
@@ -259,95 +260,94 @@
             _requestSegmentSpan: function(channel, channelIdx, start, end, ix) {
                 const max_recursion = this.constants['MAXRECURSION']
 
-                const url = `${this.config.timeSeriesApi}/ts/retrieve/segments?session=${this.userToken}&channel=${channel}&start=${start}&end=${end}`;
-                this.sendXhr(url)
+              useGetToken()
+                .then(token => {
+                  const url = `${this.config.timeSeriesApi}/ts/retrieve/segments?session=${token}&channel=${channel}&start=${start}&end=${end}`;
+                  return this.sendXhr(url)
                     .then(resp => {
-                        // Parse response into vector
-                        let vector = new Array(resp.length * 2)
-                        let i = 0;
-                        for (let j = 0; j < resp.length; j++) {
-                            vector[i] = resp[j][0];
-                            vector[i+1] = resp[j][1];
-                            i = i+2;
+                      // Parse response into vector
+                      let vector = new Array(resp.length * 2)
+                      let i = 0;
+                      for (let j = 0; j < resp.length; j++) {
+                        vector[i] = resp[j][0];
+                        vector[i+1] = resp[j][1];
+                        i = i+2;
 
-                            // append to global
-                            const pxStart = Math.floor(((resp[j][0]-this.ts_start)/ (this.ts_end - this.ts_start))*5000);
-                            const pxEnd = Math.ceil(((resp[j][1]-this.ts_start) / (this.ts_end - this.ts_start))*5000);
-                            this.segments.fill(1, pxStart, pxEnd);
+                        // append to global
+                        const pxStart = Math.floor(((resp[j][0]-this.ts_start)/ (this.ts_end - this.ts_start))*5000);
+                        const pxEnd = Math.ceil(((resp[j][1]-this.ts_start) / (this.ts_end - this.ts_start))*5000);
+                        this.segments.fill(1, pxStart, pxEnd);
+                      }
+
+                      // Find Global spans
+                      let ii = 0;
+                      let inSegment = false;
+                      let startSegment = 0;
+                      this.segmentSpans = [];
+                      while (ii < (this.segments.length-1)) {
+                        if (!this.segments[ii] && !inSegment) {
+                          ii++;
+                          continue
+                        } else if (!this.segments[ii]) {
+                          // create segment
+                          this.segmentSpans = this.segmentSpans.concat([startSegment, ii]);
+                          inSegment = false;
+                        } else if (!inSegment) {
+                          startSegment = ii;
+                          inSegment = true;
                         }
+                        ii++;
+                      }
 
-                        // Find Global spans
-                        let ii = 0;
-                        let inSegment = false;
-                        let startSegment = 0;
-                        this.segmentSpans = [];
-                        while (ii < (this.segments.length-1)) {
-                            if (!this.segments[ii] && !inSegment) {
-                                ii++;
-                                continue
-                            } else if (!this.segments[ii]) {
-                                // create segment
-                                this.segmentSpans = this.segmentSpans.concat([startSegment, ii]);
-                                inSegment = false;
-                            } else if (!inSegment) {
-                                startSegment = ii;
-                                inSegment = true;
-                            }
-                            ii++;
-                        }
+                      if (inSegment) {
+                        this.segmentSpans = this.segmentSpans.concat([startSegment, ii]);
+                      }
+                      this.segmentSpans = this.segmentSpans.concat([5000]);
 
-                        if (inSegment) {
-                            this.segmentSpans = this.segmentSpans.concat([startSegment, ii]);
-                        }
-                        this.segmentSpans = this.segmentSpans.concat([5000]);
-
-                        // remove first value if there is overlap with previous request
-                        let firstValue = vector[0];
-                        let chCongig = this.viewerChannels[channelIdx];
-                        if (firstValue < chCongig.dataSegments[chCongig.dataSegments.length-1]) {
-                            vector.shift();
-                            vector.shift();
-                        }
+                      // remove first value if there is overlap with previous request
+                      let firstValue = vector[0];
+                      let chCongig = this.viewerChannels[channelIdx];
+                      if (firstValue < chCongig.dataSegments[chCongig.dataSegments.length-1]) {
+                        vector.shift();
+                        vector.shift();
+                      }
 
 
-                        chCongig.dataSegments = chCongig.dataSegments.concat(vector.sort(function(a, b) {return a - b}));
+                      chCongig.dataSegments = chCongig.dataSegments.concat(vector.sort(function(a, b) {return a - b}));
 
-                        this.$store.dispatch('viewerModule/updateChannel', chCongig)
+                      this.$store.dispatch('viewerModule/updateChannel', chCongig)
 
-                        // If we did not request all segment-spans yet, get next segment or bail when recursion limit.
-                        let span = end - start;
-                        if ((start + span) < this.ts_end && ix < max_recursion) {
-                            this._requestSegmentSpan(channel, channelIdx, end, (end+span), ix + 1);
-                        } else {
-                            this.renderSegments();
-                        }
+                      // If we did not request all segment-spans yet, get next segment or bail when recursion limit.
+                      let span = end - start;
+                      if ((start + span) < this.ts_end && ix < max_recursion) {
+                        this._requestSegmentSpan(channel, channelIdx, end, (end+span), ix + 1);
+                      } else {
+                        this.renderSegments();
+                      }
                     })
-                    .catch(err => {
-                        this.handleXhrError(err)
-                    })
+                })
+                .catch(err => {
+                  this.handleXhrError(err)
+                })
             },
             getAnnotations: function() {
-                const layerIds = map(obj => obj.id, this.viewerAnnotations);
-                const endTime = this.ts_end;
-                const params = {
-                    api_key: this.userToken,
-                    aggregation: 'count',
-                    start: this.ts_start,
-                    end: endTime,
-                    period: this.period || 1,
-                    mergePeriods: true,
-                    layerIds
-                }
-                const baseUrl = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/annotations/window`;
-                var url = baseUrl + `?api_key=${this.userToken}&aggregation=count&start=${this.ts_start}&end=${this.ts_end}&period=${this.period}&mergePeriods=true`
-                for (let i in layerIds) {
+              useGetToken()
+                .then(token => {
+                  const layerIds = map(obj => obj.id, this.viewerAnnotations);
+                  const endTime = this.ts_end;
+                  const baseUrl = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/annotations/window`;
+                  let url = baseUrl + `?api_key=${token}&aggregation=count&start=${this.ts_start}&end=${this.ts_end}&period=${this.period}&mergePeriods=true`
+                  for (let i in layerIds) {
                     url = url + `&layerIds=${layerIds[i]}`
-                }
-                this.sendXhr(url)
-                .then(resp => {
-                    this.annotations = resp;
-                    this.render();
-                })
+                  }
+                  return useSendXhr(url)
+                    .then(resp => {
+                      this.annotations = resp;
+                      this.render();
+                    })
+                }).catch(useHandleXhrError)
+
+
 
             },
             // -------

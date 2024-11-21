@@ -130,6 +130,8 @@
   import IconPencil from "../../../icons/IconPencil.vue";
   import IconFilterFilled from "../../../icons/IconFilterFilled.vue";
   import IconEyeball from "../../../icons/IconEyeball.vue";
+  import {useSendXhr} from "@/mixins/request/request_composable";
+  import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'BfChannel',
@@ -157,7 +159,6 @@
       ...mapState('viewerModule', ['activeViewer']),
       ...mapState([
         'config',
-        'userToken',
         'bulkEditingChannels'
       ]),
       hasFilter: function() {
@@ -289,31 +290,36 @@
         const channel = this.activeViewer.channels.find(item => (item.content.id === this.channel.id))
         const properties = pathOr([], [0, 'properties'], channel.properties)
         const payload = mergeRight(channel.content, { name: this.newLabel, properties })
-        const url = `${this.channelUrl}?api_key=${this.userToken}`
 
-        this.sendXhr(url, {
-          method: 'PUT',
-          body: payload
-        })
-        .then(response => {
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'success',
-              msg: 'Your changes have been saved.'
-            }
+
+        useGetToken()
+          .then(token => {
+            const url = `${this.channelUrl}?api_key=${token}`
+
+            return useSendXhr(url, {
+              method: 'PUT',
+              body: payload
+            })
+              .then(response => {
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: 'Your changes have been saved.'
+                  }
+                })
+
+                this.updateViewerChannels()
+              })
           })
+          .catch(err => {
+            this.handleXhrError(err)
 
-          this.updateViewerChannels()
-        })
-        .catch(err => {
-          this.handleXhrError(err)
-
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg: 'There was an error saving changes.'
-            }
-          })
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'error',
+                msg: 'There was an error saving changes.'
+              }
+            })
         })
       },
 

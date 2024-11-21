@@ -7,6 +7,7 @@ import * as site from '../../../../site-config/site.json';
 import {useRoute} from "vue-router";
 import {useSendXhr, useHandleXhrError} from '../../../../mixins/request/request_composable.js'
 import IconTrash from "@/components/icons/IconTrash.vue";
+import {useGetToken} from '../../../../composables/useGetToken'
 
 
 const store = useStore()
@@ -37,15 +38,19 @@ function onDeleteProperty() {
   const propName = props.property.name
   const deletePropUrl = `${site.conceptsUrl}/v2/organizations/${orgIntId}/datasets/${datasetIntId}/models/${props.modelId}/properties/${propName}`
 
-  return useSendXhr(deletePropUrl, {
-    header: {
-      'Authorization': `bearer ${store.state.userToken}`
-    },
-    method: 'DELETE',
-  })
-    .then(response => {
-      emit('deleteProperty')
+  return useGetToken()
+    .then(token => {
+      return useSendXhr(deletePropUrl, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'DELETE',
+        body:[]
+      })
+        .then(response => {
+          emit('deleteProperty')
 
+        })
     })
     .catch(useHandleXhrError)
 

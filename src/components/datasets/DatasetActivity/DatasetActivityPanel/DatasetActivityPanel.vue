@@ -56,7 +56,7 @@
             >
               <div class="user-avatar">
                 <avatar
-                  :user="getOrgMemberByIntId(userId)"
+                  :user="userId"
                   :tooltip="true"
                 />
               </div>
@@ -150,7 +150,7 @@ import { ChangelogMessage, PublicationStatus } from '../../../../utils/constants
     },
      computed: {
       ...mapGetters(['getOrgMemberByIntId']),
-      ...mapState(['config', 'userToken', 'dataset']),
+      ...mapState(['config', 'dataset']),
 
       /**
        * Checks if dataset has publication link and was successfully

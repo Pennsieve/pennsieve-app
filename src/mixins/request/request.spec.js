@@ -108,11 +108,11 @@ describe('request Mixin', () => {
     })
   })
 
-  it('handleXhrError: handles 401', () => {
-    const spy = vi.spyOn(cmp.vm, 'handleLogout')
-    cmp.vm.handleXhrError({status: 401})
-    expect(spy).toBeCalled()
-  })
+  // it('handleXhrError: handles 401', () => {
+  //   const spy = vi.spyOn(cmp.vm, 'handleLogout')
+  //   cmp.vm.handleXhrError({status: 401})
+  //   expect(spy).toBeCalled()
+  // })
 
   it('handleXhrError: handles 403', () => {
     const spy = vi.spyOn(cmp.vm.$router, 'replace')

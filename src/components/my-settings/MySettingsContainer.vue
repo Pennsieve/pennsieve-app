@@ -348,9 +348,9 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
+import {getCurrentUser} from "aws-amplify/auth";
 
 import { pathOr, propOr, prop, has } from "ramda";
-import { Auth } from "@aws-amplify/auth";
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
@@ -366,10 +366,12 @@ import Request from "../../mixins/request";
 import Sorter from "../../mixins/sorter";
 import IconRemove from "../icons/IconRemove.vue";
 import IconSort from "../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
 import IconLock from "@/components/icons/IconLock.vue";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import DeleteGitHub from "@/components/my-settings/windows/DeleteGitHub.vue";
 import { isEnabledForTestOrgs } from "../../utils/feature-flags";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "MySettingsContainer",
@@ -440,7 +442,6 @@ export default {
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
-      isDeleteGitHubDialogVisible: false,
       prevEmail: "",
       apiKey: {
         name: "",
@@ -453,7 +454,6 @@ export default {
     ...mapState([
       "profile",
       "activeOrganization",
-      "userToken",
       "config",
       "onboardingEvents",
       "cognitoUser",
@@ -486,56 +486,14 @@ export default {
       return this.apiKeys.length > 0;
     },
 
-    getApiKeysUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-
-      if (!url || !userToken) {
-        return "";
-      }
-      return `${url}/token?api_key=${userToken}`;
-    },
-    updateProfileUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-
-      if (!url || !userToken) {
-        return "";
-      }
-
-      return `${url}/user?api_key=${userToken}`;
-    },
-    updateEmailUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-      if (!url || !userToken) {
-        return "";
-      }
-      return `${url}/user/email?api_key=${userToken}`;
-    },
-    /**
-     * Retrieves the API URL for adding ORCID
-     */
-    getORCIDApiUrl: function () {
+    getApiKeysUrl: async function () {
       const url = pathOr("", ["config", "apiUrl"])(this);
 
-      if (!url) {
-        return "";
-      }
+      return await useGetToken()
+        .then(token => {
+          return `${url}/token?api_key=${token}`;
+        })
 
-      return `${url}/user/orcid?api_key=${this.userToken}`;
-    },
-    /**
-     * Retrieves the API URL for adding ORCID
-     */
-    getGitHubApiUrl: function () {
-      const url = pathOr("", ["api2Url"])(this.config);
-
-      if (!url) {
-        return "";
-      }
-
-      return `${url}/accounts/github/register`;
     },
 
     /**
@@ -629,7 +587,7 @@ export default {
      * Get current authenticated Cognito user
      */
     getCognitoUser: function () {
-      Auth.currentAuthenticatedUser()
+      getCurrentUser()
         .then((user) => {
           this.updateCognitoUser(user);
         })
@@ -726,33 +684,43 @@ export default {
      * Makes XHR call to update a user profile
      */
     submitUpdateProfileRequest: function () {
-      this.sendXhr(this.updateProfileUrl, {
-        method: "PUT",
-        body: {
-          organization: this.profile.preferredOrganization,
-          email: this.profile.email,
-          url: this.profile.url,
-          color: this.profile.color,
-          ...this.ruleForm,
-        },
-      })
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/user?api_key=${token}`
+          return this.sendXhr(url, {
+            method: "PUT",
+            body: {
+              organization: this.profile.preferredOrganization,
+              email: this.profile.email,
+              url: this.profile.url,
+              color: this.profile.color,
+              ...this.ruleForm,
+            },
+          })
+
+        })
         .then(this.handleUpdateProfileXhrSuccess.bind(this))
         .catch(this.handleXhrError.bind(this));
     },
     //XHR call to update email address
     submitUpdateEmailRequest: function () {
       this.emailButtonDisabled = true;
-      this.sendXhr(this.updateEmailUrl, {
-        method: "PUT",
-        body: {
-          organization: this.profile.preferredOrganization,
-          url: this.profile.url,
-          color: this.profile.color,
-          userRequestedChange: true,
-          ...this.emailForm,
-          ...this.ruleForm,
-        },
-      })
+
+      useGetToken()
+        .then(token => {
+          const url =`${this.config.apiUrl}/user/email?api_key=${token}`
+          return useSendXhr(url, {
+            method: "PUT",
+            body: {
+              organization: this.profile.preferredOrganization,
+              url: this.profile.url,
+              color: this.profile.color,
+              userRequestedChange: true,
+              ...this.emailForm,
+              ...this.ruleForm,
+            },
+          })
+        })
         .then(this.handleUpdateEmailXhrSuccess.bind(this))
         .catch(this.handleXhrEmailError.bind(this));
     },
@@ -804,16 +772,18 @@ export default {
      * Fetches api keys for logged in user
      */
     getApiKeys: function () {
-      if (!this.getApiKeysUrl) {
-        return;
-      }
 
-      this.sendXhr(this.getApiKeysUrl)
-        .then((response) => {
-          this.apiKeys = this.returnSort("name", response);
-          this.isApiKeysLoading = false;
+      this.getApiKeysUrl
+        .then(url => {
+          this.sendXhr(url)
+            .then((response) => {
+              this.apiKeys = this.returnSort("name", response);
+              this.isApiKeysLoading = false;
+            })
+            .catch(this.handleXhrError.bind(this));
         })
-        .catch(this.handleXhrError.bind(this));
+
+
     },
     /**
      * Update API keys after CREATE & DELETE XHR calls
@@ -946,35 +916,35 @@ export default {
         ) {
           this.oauthCode = event.data.code;
           if (this.oauthCode !== "") {
-            if (!self.getORCIDApiUrl) {
-              return;
-            }
 
-            self
-              .sendXhr(self.getORCIDApiUrl, {
-                method: "POST",
-                body: {
-                  authorizationCode: {
-                    source: "orcid-redirect-response",
-                    code: this.oauthCode,
+            useGetToken()
+              .then(token => {
+                const url = `${self.config.apiUrl}/user/orcid?api_key=${token}`;
+                return useSendXhr(url, {
+                  method: "POST",
+                  body: {
+                    authorizationCode: {
+                      source: "orcid-redirect-response",
+                      code: this.oauthCode,
+                    },
                   },
-                },
-              })
-              .then((response) => {
-                // response logic goes here
-                self.oauthInfo = response;
+                })
+                  .then((response) => {
+                    // response logic goes here
+                    self.oauthInfo = response;
 
-                self.updateProfile({
-                  ...self.profile,
-                  orcid: self.oauthInfo,
-                });
+                    self.updateProfile({
+                      ...self.profile,
+                      orcid: self.oauthInfo,
+                    });
 
-                EventBus.$emit("toast", {
-                  detail: {
-                    type: "success",
-                    msg: "Your ORCID has been successfully added",
-                  },
-                });
+                    EventBus.$emit("toast", {
+                      detail: {
+                        type: "success",
+                        msg: "Your ORCID has been successfully added",
+                      },
+                    });
+                  })
               })
               .catch(self.handleXhrError.bind(this));
           }

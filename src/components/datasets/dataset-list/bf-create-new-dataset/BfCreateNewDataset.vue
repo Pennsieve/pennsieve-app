@@ -129,6 +129,8 @@
   import AutoFocus from '../../../../mixins/auto-focus'
 
   import EventBus from '../../../../utils/event-bus'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'BfCreateNewDataset',
@@ -182,7 +184,6 @@
 
     computed: {
       ...mapState([
-        'userToken',
         'config',
         'onboardingEvents',
         'datasetTemplates',
@@ -214,28 +215,7 @@
         return this.processStep > 1 ? 'Back' : 'Cancel'
       },
 
-      /**
-       * Compute create dataset url
-       * @returns {String}
-       */
-      createDatasetsUrl: function() {
-        if (this.config.apiUrl && this.userToken) {
-          return `${this.config.apiUrl}/datasets?api_key=${this.userToken}`
-        }
-        return ''
-      },
 
-      /**
-       * Onboarding Events Url
-       * @returns {String}
-       */
-      onboardingEventsUrl: function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-        if (apiUrl && this.userToken) {
-          return `${apiUrl}/onboarding/events?api_key=${this.userToken}`
-        }
-        return ''
-      },
 
       /**
        * Compute if user has dataset templates
@@ -292,6 +272,17 @@
         'addDataset',
         'updateOnboardingEvents'
       ]),
+      /**
+       * Compute create dataset url
+       * @returns {String}
+       */
+      createDatasetsUrl: async function() {
+        return useGetToken()
+          .then(token => {
+            return `${this.config.apiUrl}/datasets?api_key=${token}`
+          }).catch(err => console.log(err))
+      },
+
       updateIsActive: function(value) {
         this.integrations.filter(n => n.id === value.id)[0].isActive = value.isActive
         this.checkActiveIntegrations()
@@ -407,20 +398,20 @@
        */
       sendRequest: function() {
         this.isCreating = true
-        const url = !this.templateSelection || this.templateSelection === 'blank' ? this.createDatasetsUrl : this.createDatsetFromTemplateUrl
 
-        this.sendXhr(url, {
-          method: 'POST',
-          header: {
-            'Authorization': `Bearer ${this.userToken}`
-          },
-          body: this.newDatasetForm
-        })
-        .then(this.handleSuccess.bind(this))
-        .catch(err => {
-          this.isCreating = false
-          this.handleError(err)
-        })
+        this.createDatasetsUrl()
+          .then(url => {
+            return useSendXhr(url, {
+              method: 'POST',
+              body: this.newDatasetForm
+            })
+              .then(this.handleSuccess.bind(this))
+              .catch(err => {
+                this.isCreating = false
+                this.handleError(err)
+              })
+          })
+
       },
       /**
        * Handles successful dataset creation ajax
@@ -497,19 +488,24 @@
        * Save onboarding event
        */
       sendOnboardingEventsRequest: function() {
-        this.sendXhr(this.onboardingEventsUrl, {
-            method: 'POST',
-            body: 'CreatedDataset',
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            }
+        useGetToken()
+          .then(token => {
+            const url = `${apiUrl}/onboarding/events?api_key=${token}`
+            this.sendXhr(token, {
+              method: 'POST',
+              body: 'CreatedDataset',
+              header: {
+                'Authorization': `bearer ${token}`
+              }
+            })
+              // eslint-disable-next-line no-unused-vars
+              .then(response => {
+                const onboardingEvents = [...this.onboardingEvents, 'CreatedDataset']
+                this.updateOnboardingEvents(onboardingEvents)
+              })
+              .catch(this.handleXhrError.bind(this))
           })
-          // eslint-disable-next-line no-unused-vars
-          .then(response => {
-            const onboardingEvents = [...this.onboardingEvents, 'CreatedDataset']
-            this.updateOnboardingEvents(onboardingEvents)
-          })
-          .catch(this.handleXhrError.bind(this))
+
       },
       /**
        * Handle dataset template selection

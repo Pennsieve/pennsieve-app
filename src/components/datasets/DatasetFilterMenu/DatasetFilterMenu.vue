@@ -409,7 +409,7 @@ export default {
 
   mounted () {
      const isOnlyMyDatasets = propOr(false, 'onlyMyDatasets', this.datasetSearchParams)
-     const doesStatusExist = this.orgDatasetStatuses.some(
+     const doesStatusExist = this.orgDatasetStatuses?.some(
         el => (el.name === status)
      )
 

@@ -32,7 +32,7 @@
 <script>
 import { mapGetters, mapState } from 'vuex'
 import { pathOr, prop } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+// import {Auth} from 'aws-amplify'
 
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
@@ -78,9 +78,9 @@ export default {
      */
     sendDisableTwoFactorRequest: function() {
       this.closeDialog()
-      Auth.setPreferredMFA(this.cognitoUser, 'NOMFA').then(resp => {
-      this.handleTwoFactorXhrSuccess()
-      })
+      // Auth.setPreferredMFA(this.cognitoUser, 'NOMFA').then(resp => {
+      // this.handleTwoFactorXhrSuccess()
+      // })
 
     },
     /**

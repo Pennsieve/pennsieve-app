@@ -128,6 +128,8 @@ import Request from '../../../../mixins/request'
 import EventBus from '../../../../utils/event-bus'
 import { displayNameAndDegree } from '../../../../utils/displayNameAndDegree'
 import IconMagnifyingGlass from "../../../icons/IconMagnifyingGlass.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 /**
  * Transform member to contributor
@@ -173,7 +175,6 @@ export default {
     ...mapState([
       'config',
       'orgMembers',
-      'userToken',
       'dataset',
       'activeOrganization',
       'datasetContributors',
@@ -217,24 +218,9 @@ export default {
       return this.filterAndSort(['email'], dedupedContributors, 'lastName')
     },
 
-    /**
-     * Compute create contributors URL
-     * @returns {String}
-     */
-    contributorsUrl: function() {
-      return `${this.config.apiUrl}/contributors?api_key=${this.userToken}`
-    },
 
-    /**
-     * Compute contributors URL
-     * @returns {String}
-     */
-    datasetContributorsUrl: function() {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${this.userToken}`
-        : ''
-    }
+
+
   },
 
   methods: {
@@ -242,6 +228,25 @@ export default {
       'addOrgContributor',
       'updateDatasetContributor'
     ]),
+
+    datasetContributorsUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          return `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${token}`
+        }).catch(err => console.log(err))
+
+    },
+
+    contributorsUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/contributors?api_key=${token}`
+        }).catch(err => {
+          console.log(err)
+          return Promise.reject()
+        })
+    },
 
     /**
      * Filter and sort a list based on another list
@@ -300,20 +305,21 @@ export default {
       }
     },
 
-    /**
-     * Create contributor for dataset
-     * @param {Object} contributor
-     */
+
     createContributor: function(contributor) {
-      this.sendXhr(this.contributorsUrl, {
-        method: 'POST',
-        body: contributor
-      })
-        .then(response => {
-          this.addContributor(response)
-          this.addOrgContributor(response)
-        })
-        .catch(this.handleXhrError.bind(this))
+      this.contributorsUrl()
+        .then(url => {
+          return this.sendXhr(url, {
+            method: 'POST',
+            body: contributor
+          })
+            .then(response => {
+              this.addContributor(response)
+              this.addOrgContributor(response)
+            })
+        }).catch(err => useHandleXhrError(err))
+
+
     },
 
     /**
@@ -321,6 +327,8 @@ export default {
      * @param {Object} contributor
      */
     addContributor: function(contributor) {
+      let s = this.datasetContributorsUrl()
+
       const contributorId = propOr(0, 'id', contributor)
 
       this.sendXhr(this.datasetContributorsUrl, {
@@ -345,15 +353,21 @@ export default {
     removeContributor: function(contributor) {
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const contributorId = propOr(0, 'id', contributor)
-      const url = `${this.config.apiUrl}/datasets/${datasetId}/contributors/${contributorId}?api_key=${this.userToken}`
 
-      this.sendXhr(url, {
-        method: 'DELETE'
-      })
-        .then(() => {
-          this.$store.dispatch('removeContributor', contributorId)
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/datasets/${datasetId}/contributors/${contributorId}?api_key=${token}`
+
+          return useSendXhr(url, {
+            method: 'DELETE'
+          })
+            .then(() => {
+              this.$store.dispatch('removeContributor', contributorId)
+            })
+
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError)
+
     },
 
     onEditContributorClick: function(contributor) {
@@ -368,25 +382,32 @@ export default {
      * @param {Object} contributor
      */
     editContributor: function(contributor) {
-      const url =  `${this.config.apiUrl}/contributors/${contributor.id}?api_key=${this.userToken}`
-
-      this.sendXhr(url, {
-        method: 'PUT',
-        body: contributor
-      })
-        .then(response => {
-          this.updateDatasetContributor(response)
-
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'success',
-              msg: `${response.firstName} ${response.lastName} has been updated.`
-            }
+      useGetToken()
+        .then(token => {
+          const url =  `${this.config.apiUrl}/contributors/${contributor.id}?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'PUT',
+            body: contributor
           })
+            .then(response => {
+              this.updateDatasetContributor(response)
 
-          this.isContributorDialogVisible = false
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'success',
+                  msg: `${response.firstName} ${response.lastName} has been updated.`
+                }
+              })
+
+              this.isContributorDialogVisible = false
+            })
+
+
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError)
+
+
+
     },
 
     /**
@@ -407,18 +428,22 @@ export default {
 
       if (otherContributor && datasetId) {
 
-        const url =  `${this.config.apiUrl}/datasets/${datasetId}/contributors/switch?api_key=${this.userToken}`
-        this.sendXhr(url, {
-          method: 'POST',
-          body: {
-            contributorId: id,
-            otherContributorId: otherContributor.id
-          }
-        })
-          .then(() => {
-            EventBus.$emit('get-dataset-contributors', datasetId)
+        useGetToken()
+          .then(token => {
+            const url =  `${this.config.apiUrl}/datasets/${datasetId}/contributors/switch?api_key=${token}`
+            return this.sendXhr(url, {
+              method: 'POST',
+              body: {
+                contributorId: id,
+                otherContributorId: otherContributor.id
+              }
+            })
+              .then(() => {
+                EventBus.$emit('get-dataset-contributors', datasetId)
+              })
           })
           .catch(this.handleXhrError.bind(this))
+
       } else {
         EventBus.$emit('toast', {
           detail: {

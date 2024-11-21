@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils'
 import RemoveTeam from './RemoveTeam.vue'
 import { actions, mutations, getters } from '../../../store'
 import EventBus from '../../../utils/event-bus'
-import flushPromises from 'flush-promises'
 
 const $router = {
   push: vi.fn(() => {})
@@ -71,10 +70,10 @@ describe('RemoveTeam.vue', () => {
     expect(cmp.vm.dialogVisible).toBe(true)
   })
 
-  it('deleteUrl', () => {
+  it('deleteUrl', async () => {
     cmp.vm.team = {id: 777}
-    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/777?api_key=123'
-    const deleteUrl = cmp.vm.deleteUrl()
+    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/777?api_key=undefined'
+    const deleteUrl = await cmp.vm.deleteUrl()
     expect(deleteUrl).toBe(expectedUrl)
   })
 

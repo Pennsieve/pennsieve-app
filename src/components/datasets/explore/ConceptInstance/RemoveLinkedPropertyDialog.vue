@@ -48,6 +48,8 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 
 import Request from '../../../../mixins/request'
 import EventBus from '../../../../utils/event-bus'
+import {useSendXhr} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'RemoveLinkedPropertyDialog',
@@ -84,7 +86,6 @@ export default {
 
   computed: {
     ...mapGetters([
-      'userToken',
       'config'
     ]),
 
@@ -93,9 +94,6 @@ export default {
      * @returns {String}
      */
     linkedPropertiesUrl: function() {
-      if (!this.userToken) {
-        return
-      }
       const conceptsUrl = pathOr('', ['config', 'conceptsUrl'])(this)
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const modelId = pathOr('', ['params', 'conceptId'], this.$route)
@@ -112,31 +110,35 @@ export default {
     sendRequest: function() {
       this.isRemoving = true
 
-      if (this.linkedPropertiesUrl) {
         const id = propOr('', 'linkedPropertyId', this.selectedLinkedProperty)
         const url = `${this.linkedPropertiesUrl}/${id}`
-        this.sendXhr(url, {
-          method: 'DELETE',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-        })
-        .then(this.handleXhrSuccess.bind(this))
-        .catch(error => {
-          this.handleXhrError(error)
 
-          this.closeDialog()
-
-          this.isRemoving = false
-
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg: 'Could not remove Linked Property'
+      useGetToken()
+        .then(token => {
+          useSendXhr(url, {
+            method: 'DELETE',
+            header: {
+              'Authorization': `bearer ${token}`
             }
           })
+            .then(this.handleXhrSuccess.bind(this))
+            .catch(error => {
+              this.handleXhrError(error)
+
+              this.closeDialog()
+
+              this.isRemoving = false
+
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'error',
+                  msg: 'Could not remove Linked Property'
+                }
+              })
+            })
         })
-      }
+
+
     },
 
     /**
