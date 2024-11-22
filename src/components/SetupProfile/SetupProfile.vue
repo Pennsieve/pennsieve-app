@@ -108,13 +108,16 @@
 <script>
 import { mapState } from "vuex";
 import { propOr } from "ramda";
-import Auth from "@aws-amplify/auth";
+
+import {AuthError, signIn, signOut, confirmSignUp } from "aws-amplify/auth";
+
 
 import BfButton from "../shared/bf-button/BfButton.vue";
 import PasswordValidator from "../../mixins/password-validator";
 
 import EventBus from "../../utils/event-bus";
 import Request from "../../mixins/request";
+import * as config from "@/site-config/site.json";
 
 export default {
   name: "SetupProfile",
@@ -264,11 +267,13 @@ export default {
      */
     async initialLogin() {
       try {
-        this.user = await Auth.signIn(
-          this.$route.params.username,
-          this.$route.params.password
-        );
-        this.setupProfile();
+        const user = await signIn({
+          username: this.$route.params.username,
+          password: this.$route.params.password,
+          authFlowType: config.awsConfig.authenticationFlowType
+        })
+
+        this.setupProfile(user);
       } catch (error) {
         this.isSavingProfile = false;
         this.isUserSignInFailed = true;
@@ -279,10 +284,11 @@ export default {
     /**
      * API Request to create a new user
      */
-    async setupProfile() {
+    async setupProfile(user) {
       try {
-        const newUser = await Auth.completeNewPassword(
-          this.user,
+
+        const newUser = await confirmSignUp(
+          user,
           this.profileForm.password,
           {
             email: this.$route.query.email,

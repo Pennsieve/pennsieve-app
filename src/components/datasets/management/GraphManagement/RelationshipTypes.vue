@@ -208,6 +208,8 @@
   import IconArrow from "../../../icons/IconArrow.vue";
   import Cookies from "js-cookie";
   import StageActions from "../../../shared/StageActions/StageActions.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'RelationshipTypes',
@@ -262,7 +264,6 @@
         'dataset',
         'concepts',
         'config',
-        'userToken',
         'relationshipTypes',
         'isLoadingRelationshipTypes'
       ]),
@@ -386,10 +387,8 @@
     },
 
     mounted: function() {
-      const token = Cookies.get('user_token')
-      if (token) {
-        this.fetchModels()
-      }
+      this.fetchModels()
+
 
       // this.getRelationshipTypes().then(() => {
       //   this.setupRelationshipTypes.bind(this)
@@ -421,15 +420,17 @@
         if (!this.linkedPropertiesUrl) {
           return
         }
-        this.sendXhr(this.linkedPropertiesUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        })
-         .then(response => {
-           this.propRelTypesResponse = response
-        })
-        .catch(this.handleXhrError.bind(this))
+        useGetToken()
+          .then(token => {
+            return useSendXhr(this.linkedPropertiesUrl, {
+              header: {
+                Authorization: `bearer ${token}`
+              }
+            })
+              .then(response => {
+                this.propRelTypesResponse = response
+              })
+          }).catch(this.handleXhrError.bind(this))
       },
 
       /**

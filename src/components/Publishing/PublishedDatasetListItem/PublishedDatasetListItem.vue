@@ -177,7 +177,6 @@ export default {
       'profile',
       'activeOrganization',
       'config',
-      'userToken',
       'orgDatasetStatuses'
     ]),
 

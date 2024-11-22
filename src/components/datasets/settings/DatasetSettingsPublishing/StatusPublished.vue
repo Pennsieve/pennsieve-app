@@ -7,11 +7,10 @@
     <p class="sharing-blurb">This requires approval by the Publishing team.</p>
     <div class="sharing-status mb-16">
       <p class="published-blurb">
-        <svg-icon
+        <IconGlobeCheck
           class="icon-status"
-          name="icon-globe-check"
-          height="24"
-          width="24"
+          :height="24"
+          :width="24"
           color="#000"
         />
         Published on {{ publishedDate }}
@@ -45,9 +44,11 @@
 import { mapState } from "vuex";
 import SubmitForPublication from "./SubmitForPublication.vue";
 import { PublicationTabs } from "../../../../utils/constants";
+import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 
 export default {
   components: {
+    IconGlobeCheck,
     SubmitForPublication,
   },
   props: {
@@ -86,7 +87,7 @@ export default {
     },
   },
   methods: {
-    ...mapState(["config", "userToken"]),
+    ...mapState(["config"]),
   },
 };
 </script>

@@ -22,7 +22,7 @@ export function useHandleLogout(payload) {
     this.clearState()
 
     // remove user token
-    Cookies.remove('user_token')
+    // Cookies.remove('user_token')
 
     // Add a redirect link
     let query = {}

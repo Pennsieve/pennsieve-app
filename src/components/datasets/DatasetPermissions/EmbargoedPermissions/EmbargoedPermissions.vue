@@ -59,6 +59,8 @@ import { EmbargoedRequestStatus } from '../../../../utils/constants'
 import Request from '../../../../mixins/request/index'
 import { pathOr } from 'ramda'
 import { mapState, mapGetters } from 'vuex'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 export default {
   name: 'EmbargoedPermissions',
 
@@ -81,7 +83,6 @@ export default {
   computed: {
     ...mapState([
       'config',
-      'userToken',
       'activeOrganization'
     ]),
 
@@ -89,24 +90,12 @@ export default {
       'getPermission'
     ]),
 
-    /**
-     * Embargoed requests url
-     */
-    embargoedRequestsUrl: function() {
-      return `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${this.userToken}`
-    }
+
   },
 
-    watch: {
-      userToken: {
-        handler: function(val) {
-          if (val) {
-            this.getEmbargoedRequests()
-          }
-        },
-        immediate: true
-      }
-    },
+  mounted() {
+    this.getEmbargoedRequests()
+  },
 
   methods: {
 
@@ -114,26 +103,28 @@ export default {
      * Get list of embargoed requests
      */
     getEmbargoedRequests: function() {
-      if (!this.embargoedRequestsUrl) {
-        return
-      }
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${token}`
+          return useSendXhr(url)
+            .then(response => {
+              this.embargoedRequests = response.map(resp => {
+                const firstName = pathOr('', ['user', 'firstName'], resp)
+                const lastName = pathOr('', ['user', 'lastName'], resp)
+                const email = pathOr('', ['user', 'email'], resp)
+                const userId = pathOr('', ['user', 'intId'], resp)
 
-      this.sendXhr(this.embargoedRequestsUrl).then(response => {
-        this.embargoedRequests = response.map(resp => {
-          const firstName = pathOr('', ['user', 'firstName'], resp)
-          const lastName = pathOr('', ['user', 'lastName'], resp)
-          const email = pathOr('', ['user', 'email'], resp)
-          const userId = pathOr('', ['user', 'intId'], resp)
+                return {
+                  userId,
+                  firstName,
+                  lastName,
+                  email,
+                  status: resp.embargoAccess
+                }
+              })
+            })
+        }).catch(useHandleXhrError)
 
-          return {
-            userId,
-            firstName,
-            lastName,
-            email,
-            status: resp.embargoAccess
-          }
-        })
-      }).catch(this.handleXhrError.bind(this))
     },
 
     /**
@@ -141,23 +132,24 @@ export default {
      * @param {String} userId
      */
     acceptRequest: function(userId) {
-      if (!this.embargoedRequestsUrl) {
-        return
-      }
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${token}`
+          return this.sendXhr(url, {
+            method: 'POST',
+            body: {
+              userId: userId
+            }
+          }).then(() => {
+            this.embargoedRequests.map(request => {
+              if (request.userId === userId) {
+                request.status = EmbargoedRequestStatus.GRANTED
+              }
+              return request
+            })
+          })
+        }).catch(useHandleXhrError)
 
-      this.sendXhr(this.embargoedRequestsUrl, {
-        method: 'POST',
-        body: {
-          userId: userId
-        }
-      }).then(() => {
-        this.embargoedRequests.map(request => {
-          if (request.userId === userId) {
-            request.status = EmbargoedRequestStatus.GRANTED
-          }
-          return request
-        })
-      }).catch(this.handleXhrError.bind(this))
     },
 
     /**
@@ -165,19 +157,18 @@ export default {
      * @param {Object} request
      */
     rejectRequest: function(request) {
-      if (!this.embargoedRequestsUrl) {
-        return
-      }
-
-      this.sendXhr(this.embargoedRequestsUrl, {
-        method: 'DELETE',
-        body: {
-          userId: request.userId
-        }
-      }).then(() => {
-        this.embargoedRequests = this.embargoedRequests.filter((req) => request.userId !== req.userId)
-      })
-
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}/publication/preview?api_key=${token}`
+          useSendXhr(url, {
+            method: 'DELETE',
+            body: {
+              userId: request.userId
+            }
+          }).then(() => {
+            this.embargoedRequests = this.embargoedRequests.filter((req) => request.userId !== req.userId)
+          })
+        }).catch(useHandleXhrError)
     }
   },
 }

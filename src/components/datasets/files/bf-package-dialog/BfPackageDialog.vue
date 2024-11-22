@@ -75,6 +75,7 @@
   import { isValidPackageName } from '@/utils/namingConventions'
   import { mapGetters } from 'vuex'
   import { pathOr, pathEq, equals } from 'ramda'
+  import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'BfPackageDialog',
@@ -127,17 +128,17 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config'
       ]),
       /**
        * Computes form URL based on type of action user is taking (rename vs creating)
        * @returns {String}
        */
-      formUrl: function() {
-        if (this.config.apiUrl && this.userToken) {
-          return `${this.config.apiUrl}/packages?api_key=${this.userToken}`
-        }
+      formUrl: async function() {
+        return useGetToken().then(token => {
+          return `${this.config.apiUrl}/packages?api_key=${token}`
+        })
+
       },
       /**
        * Compute dialog text
@@ -185,38 +186,37 @@
        * Sends XHR request to create dataset
        */
       createFolder: function() {
-        if (this.formUrl) {
 
-          const parent = pathOr('', ['content', 'id'])(this.parentFolder);
-          const datasetId = pathOr('', ['content', 'datasetId'])(this.parentFolder);
+        const parent = pathOr('', ['content', 'id'])(this.parentFolder);
+        const datasetId = pathOr('', ['content', 'datasetId'])(this.parentFolder);
+        let dataParams = {
+          parent,
+          dataset: datasetId,
+          packageType: 'Collection'
+        };
 
-          let dataParams = {
-            parent,
-            dataset: datasetId,
+        if(this.parentFolder.content.packageType === 'DataSet') {
+          dataParams = {
+            dataset: parent,
             packageType: 'Collection'
-          };
-
-          if(this.parentFolder.content.packageType === 'DataSet') {
-            dataParams = {
-              dataset: parent,
-              packageType: 'Collection'
-            }
           }
+        }
 
-          const body = Object.assign({}, this.packageForm, dataParams)
+        const body = Object.assign({}, this.packageForm, dataParams)
 
-          this.sendXhr(this.formUrl, {
+        this.formUrl.then(url => {
+          this.sendXhr(url, {
             method: 'POST',
             body
           })
-          .then(response => {
-            this.$emit('folder-created', response)
-            this.closeDialog()
-          })
-          .catch(response => {
-            this.handleXhrError(response)
-          })
-        }
+            .then(response => {
+              this.$emit('folder-created', response)
+              this.closeDialog()
+            })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
+        })
       },
 
       /**

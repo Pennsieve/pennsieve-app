@@ -96,6 +96,7 @@ import Sorter from '../../../mixins/sorter'
 import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMenu.vue";
 import UploadManifest from "./UploadManifest/UploadManifest.vue";
 import BfStage from "../../layout/BfStage/BfStage.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'DatasetManifests',
@@ -124,7 +125,6 @@ export default {
   computed: {
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'orgMembers',
       'config',
       'hasFeature',
@@ -180,10 +180,12 @@ export default {
      * Compute get dataset users URL
      * @returns {String}
      */
-    getDatasetUsersUrl: function() {
-      const datasetId = this.$route.params.datasetId
-      const apiKey = this.userToken || Cookies.get('user_token')
-      return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${apiKey}`
+    getDatasetUsersUrl: async function() {
+      useGetToken()
+        .then((token) => {
+          const datasetId = this.$route.params.datasetId
+          return  `${this.config.apiUrl}/datasets/${datasetId}/collaborators/users?api_key=${token}`
+        })
     },
 
     /**
@@ -252,13 +254,18 @@ export default {
      * Get users with permissions to this dataset
      */
     getDatasetUsers: function() {
-      this.sendXhr(this.getDatasetUsersUrl)
-        .then(datasetUsers => {
-          this.datasetUsers = datasetUsers
+      this.getDatasetUsersUrl
+        .then((url) => {
+          this.sendXhr(url)
+            .then(datasetUsers => {
+              this.datasetUsers = datasetUsers
+            })
+            .catch(() => {
+              this.datasetUsers = []
+            })
         })
-        .catch(() => {
-          this.datasetUsers = []
-        })
+
+
     }
   }
 }

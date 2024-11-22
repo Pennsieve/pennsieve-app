@@ -1,16 +1,12 @@
 <script setup>
 import { useRoute } from "vue-router";
 let route = useRoute();
+
 </script>
 
 <template>
   <div id="app-wrap">
-    <announcement-banner
-      copy="Welcome to the new Pennsieve App experience! If
-    you would like to access the previous version, it's still available"
-      linkText="here."
-      cookieName="vueMigrationBanner"
-    />
+
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -48,8 +44,7 @@ let route = useRoute();
 
   <office-365-dialog />
 
-  <!--  This is the websocket connection-->
-  <!--  <bf-notifications />-->
+
 </template>
 
 <script>
@@ -57,18 +52,17 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { setPageTitle, setMeta } from "./utils/meta";
 
 import globalMessageHandler from "./mixins/global-message-handler";
-import { mergeDeepLeft, pathOr, propOr } from "ramda";
+import {mergeDeepRight, pathOr, propOr} from "ramda";
 import EventBus from "./utils/event-bus";
-import Cookies from "js-cookie";
 import toQueryParams from "./utils/toQueryParams.js";
 
 import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
-import { Auth } from "@aws-amplify/auth";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
-import Office365Dialog from "./components/datasets/files/Office365Dialog/Office365Dialog.vue";
-import AnnouncementBanner from "./components/shared/AnnouncementBanner/AnnouncementBanner.vue";
+import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
+import {useGetToken} from "@/composables/useGetToken";
+
 
 export default {
   name: "app",
@@ -92,82 +86,12 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-  mounted() {
+  async mounted() {
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
-    EventBus.$on("reload-datasets", this.fetchDatasets);
 
-    const token = Cookies.get("user_token");
-    if (!token) {
-      setPageTitle(this.defaultPageTitle);
-      setMeta("name", "description", this.defaultPageDescription);
-    }
-  },
-  watch: {
-    /**
-     * Watch to compute new dataset list
-     */
-    "$route.params.orgId": {
-      handler: async function (to, from) {
-        const token = Cookies.get("user_token");
-        if (token) {
-          try {
-            await this.bootUp(token);
-          } catch (error) {
-            console.error(error);
-          } finally {
-            if (this.isOrgSynced) {
-              this.onSwitchOrganization({
-                organization: {
-                  id: to,
-                },
-              });
-            }
-          }
-        }
-      },
-    },
-    /**
-     * Trigger API request when active organization is changed
-     */
-    activeOrganization: {
-      handler: function (val, oldVal) {
-        const oldOrgId = pathOr("NONE", ["organization", "id"], oldVal);
-        const newOrgId = pathOr("NONE", ["organization", "id"], val);
-
-        // Only fetch Org assets if there is an actual change in organization and if the userToken is set.
-        if (this.userToken && oldOrgId !== newOrgId) {
-          try {
-            this.setActiveOrgSynced()
-              .then(() => this.fetchDatasets())
-              .then(() => this.fetchDatasetPublishedData())
-              .then(() => this.fetchCollections())
-              .then(() => this.fetchIntegrations())
-              .then(() => this.fetchDatasetStatuses())
-              .then(() => this.fetchComputeNodes())
-              .then(() => this.fetchApplications())
-              .then(() => this.fetchComputeResourceAccounts());
-          } catch (err) {
-            console.error(err);
-          }
-        }
-      },
-      immediate: true,
-    },
-    /**
-     * Watch getDatasetsUrl and get datasets
-     * Used for dataset search
-     */
-    getDatasetsUrl: {
-      handler: function (newVal, oldVal) {
-        if (this.userToken && newVal !== oldVal && this.isOrgSynced) {
-          this.fetchDatasets();
-        }
-      },
-      deep: true,
-    },
   },
 
   computed: {
@@ -183,7 +107,6 @@ export default {
       "activeOrganization",
       "getActiveOrganization",
       "config",
-      "userToken",
       "hasFeature",
       "hasOrcidOnboardingEvent",
       "isOrgSynced",
@@ -217,35 +140,9 @@ export default {
       );
     },
 
-    /**
-     * Compute get datasets URL
-     * @return {String}
-     */
-    getDatasetsUrl: function () {
-      const params = toQueryParams(
-        mergeDeepLeft(this.datasetSearchParams, { api_key: this.userToken })
-      );
-      return this.isOrgSynced
-        ? `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-        : "";
-    },
 
-    /**
-     * Get all status options for organization url
-     * @returns {String}
-     */
-    getDatasetStatusUrl: function () {
-      if (this.config.apiUrl && this.userToken && this.isOrgSynced) {
-        const orgId = pathOr(
-          "",
-          ["organization", "id"],
-          this.activeOrganization
-        );
-        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${this.userToken}`;
-      } else {
-        return "Not-found";
-      }
-    },
+
+
   },
 
   methods: {
@@ -258,10 +155,10 @@ export default {
       "setIsLoadingDatasetPublishedData",
       "setIsLoadingDatasetsError",
       "setDatasetPublishedData",
-      "updateCognitoUser",
       "setSessionTimer",
     ]),
     ...mapActions("datasetModule", ["updateDatasetTotalCount"]),
+    ...mapGetters(["sessionTimer"]),
 
     ...mapActions("collectionsModule", ["fetchCollections"]),
 
@@ -274,6 +171,37 @@ export default {
     ...mapGetters(["getCognitoUser", "sessionTimer"]),
     callGlobalCustomEvent() {
       EventBus.$emit("redirect-detected");
+    },
+
+    /**
+     * Compute get datasets URL
+     * @return {String}
+     */
+    getDatasetsUrl: async function () {
+      return useGetToken().then((t) => {
+        const params = toQueryParams(
+          mergeDeepRight(this.datasetSearchParams, { api_key: t })
+        );
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
+      })
+
+    },
+    /**
+     * Get all status options for organization url
+     * @returns {String}
+     */
+    getDatasetStatusUrl: async function () {
+
+      return useGetToken().then((token) => {
+        const orgId = pathOr(
+          "",
+          ["organization", "id"],
+          this.activeOrganization
+        )
+        return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${token}`;
+
+
+      })
     },
 
     onRefreshToken: function () {
@@ -289,145 +217,14 @@ export default {
      * Manually refresh token.
      */
     refreshToken: async function () {
-      const usr = this.getCognitoUser();
-      const currentSession = usr.signInUserSession;
+      await fetchAuthSession({ forceRefresh: true });
 
-      this.isRefreshing = true;
-      await usr.refreshSession(
-        currentSession.refreshToken,
-        async (err, session) => {
-          const timeOut = session.accessToken.payload.exp;
-          this.setSessionTimer(
-            Math.round((timeOut * 1000 - Date.now()) / 1000)
-          );
-
-          await this.updateUserToken(session.accessToken.jwtToken);
-          this.isRefreshing = false;
-        }
-      );
-    },
-
-    /**
-     * Request critical data required for app to run properly
-     *
-     * Method called from onLogin in Global Message Handler, and
-     * By changes to orgId in the route if a session cookie is present.
-     *
-     *
-     * @param {String} userToken
-     * @param {Boolean} fromLogin
-     * @returns {Promise}
-     */
-    bootUp: async function (userToken, fromLogin = false) {
-      // Get the current Cognito User and store in Vuex
-      await Auth.currentAuthenticatedUser()
-        .then((user) => {
-          this.updateCognitoUser(user);
-
-          // Setting recurring check for token life-cycle
-          clearInterval(this.interval);
-          this.interval = setInterval(
-            function () {
-              try {
-                const usr = this.getCognitoUser();
-                const timeOut = usr.signInUserSession.accessToken.payload.exp;
-
-                this.setSessionTimer(
-                  Math.round((timeOut * 1000 - Date.now()) / 1000)
-                );
-                if (this.sessionTimer() < this.sessionLogoutThreshold) {
-                  console.warn("Logging out due to expired session.");
-                  this.sessionTimedOut = true;
-                  EventBus.$emit("logout");
-                }
-              } catch (e) {
-                console.error(
-                  "Error checking for session timer -- prevent further checking"
-                );
-                clearInterval(this.interval);
-              }
-            }.bind(this),
-            1000
-          );
-        })
-        .catch((e) => {
-          // Token expired
-          Cookies.remove("user_token");
-
-          // route user to login page
-          this.$router.replace({
-            name: "home",
-            query: {},
-          });
-        });
-
-      // If bootup is called from Login, only get Profile and org as login
-      // will re-trigger bootup when it updates the route to the correct org.
-      if (fromLogin) {
-        // Indicate that we are no longer timed out.
-        this.sessionTimedOut = false;
-
-        return this.getBfTermsOfService().then(() =>
-          this.getProfileAndOrg(userToken)
-        );
-      } else {
-        return this.getBfTermsOfService()
-          .then(() => this.getProfileAndOrg(userToken))
-          .then(() => this.getPrimaryData())
-          .then(() => {
-            this.setActiveOrgSynced();
-          })
-          .then(() => this.getOnboardingEventStates(userToken));
-      }
     },
 
     beforeUnmount: function () {
       clearInterval(this.interval);
     },
 
-    /**
-     * Get all dataset status options for organization
-     */
-    fetchDatasetStatuses: function () {
-      this.sendXhr(this.getDatasetStatusUrl, "")
-        .then((response) => {
-          this.updateOrgDatasetStatuses(response);
-        })
-        .catch(this.handleXhrError.bind(this));
-    },
-
-    /**
-     * Get dataset publish data
-     */
-    fetchDatasetPublishedData: function () {
-      this.setIsLoadingDatasetPublishedData(true);
-
-      const url = `${this.config.apiUrl}/datasets/published?api_key=${this.userToken}`;
-      this.sendXhr(url)
-        .then((response) => {
-          this.setDatasetPublishedData(response).then(() => {
-            this.setIsLoadingDatasetPublishedData(false);
-          });
-        })
-        .catch(this.handleXhrError.bind(this));
-    },
-
-    /**
-     * Get datasets for active organization
-     */
-    fetchDatasets: function () {
-      this.setIsLoadingDatasets(true)
-        .then(() => this.sendXhr(this.getDatasetsUrl, {}))
-        .then((response) => {
-          this.setDatasetData(response);
-          this.setIsLoadingDatasetsError(false);
-        })
-        .catch(() => {
-          this.setDatasetData([]);
-          this.setIsLoadingDatasetsError(true);
-        })
-        .finally(() => this.setIsLoadingDatasets(false));
-    },
 
     /**
      * Set dataset data
