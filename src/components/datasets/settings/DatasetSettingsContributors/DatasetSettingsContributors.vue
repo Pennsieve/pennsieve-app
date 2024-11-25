@@ -306,8 +306,8 @@ export default {
     },
 
 
-    createContributor: function(contributor) {
-      this.contributorsUrl()
+    createContributor: async function(contributor) {
+      await this.contributorsUrl()
         .then(url => {
           return this.sendXhr(url, {
             method: 'POST',
@@ -326,12 +326,11 @@ export default {
      * Send API request to add contributor
      * @param {Object} contributor
      */
-    addContributor: function(contributor) {
-      let s = this.datasetContributorsUrl()
-
+    addContributor: async function(contributor) {
+      let s = await this.datasetContributorsUrl()
       const contributorId = propOr(0, 'id', contributor)
 
-      this.sendXhr(this.datasetContributorsUrl, {
+      this.sendXhr(s, {
         method: 'PUT',
         body: {
           contributorId
@@ -350,7 +349,7 @@ export default {
      * Remove contributor from dataset
      * @param {Object} contributor
      */
-    removeContributor: function(contributor) {
+    removeContributor: async function(contributor) {
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const contributorId = propOr(0, 'id', contributor)
 
