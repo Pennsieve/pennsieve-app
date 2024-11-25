@@ -1,12 +1,10 @@
 <script setup>
 import { useRoute } from "vue-router";
 let route = useRoute();
-
 </script>
 
 <template>
   <div id="app-wrap">
-
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -43,8 +41,6 @@ let route = useRoute();
   <bf-download-file ref="downloadFile" />
 
   <office-365-dialog />
-
-
 </template>
 
 <script>
@@ -52,7 +48,7 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { setPageTitle, setMeta } from "./utils/meta";
 
 import globalMessageHandler from "./mixins/global-message-handler";
-import {mergeDeepRight, pathOr, propOr} from "ramda";
+import { mergeDeepRight, pathOr, propOr } from "ramda";
 import EventBus from "./utils/event-bus";
 import toQueryParams from "./utils/toQueryParams.js";
 
@@ -61,8 +57,7 @@ import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
-import {useGetToken} from "@/composables/useGetToken";
-
+import { useGetToken } from "@/composables/useGetToken";
 
 export default {
   name: "app",
@@ -86,16 +81,11 @@ export default {
       loadingTimeout: 30000, // 30 seconds
     };
   },
-<<<<<<< HEAD
-  mounted() {
-=======
   async mounted() {
->>>>>>> auth2
     this.$store.watch(
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
-
   },
 
   computed: {
@@ -143,10 +133,6 @@ export default {
           this.sessionTimer() < this.showSessionTimerThreshold)
       );
     },
-
-
-
-
   },
 
   methods: {
@@ -186,26 +172,22 @@ export default {
         const params = toQueryParams(
           mergeDeepRight(this.datasetSearchParams, { api_key: t })
         );
-        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-      })
-
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
+      });
     },
     /**
      * Get all status options for organization url
      * @returns {String}
      */
     getDatasetStatusUrl: async function () {
-
       return useGetToken().then((token) => {
         const orgId = pathOr(
           "",
           ["organization", "id"],
           this.activeOrganization
-        )
+        );
         return `${this.config.apiUrl}/organizations/${orgId}/dataset-status?api_key=${token}`;
-
-
-      })
+      });
     },
 
     onRefreshToken: function () {
@@ -222,13 +204,11 @@ export default {
      */
     refreshToken: async function () {
       await fetchAuthSession({ forceRefresh: true });
-
     },
 
     beforeUnmount: function () {
       clearInterval(this.interval);
     },
-
 
     /**
      * Set dataset data
