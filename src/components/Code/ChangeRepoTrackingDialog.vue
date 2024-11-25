@@ -10,7 +10,10 @@
     </template>
 
     <dialog-body>
-      Please confirm if you would like to update the tracking on this repo.
+       <p>Please confirm if you would like to update the tracking on this repo:</p>
+       <p>
+         <strong>{{repo.name}}</strong>
+       </p>
     </dialog-body>
     <!-- Buttons -->
     <template #footer>
@@ -50,8 +53,7 @@ export default {
     repo: {
       type: Object,
       required: true,
-      required: true,
-    },
+   },
     startTrackingMode: {
       type: Boolean,
       required: true,
@@ -94,14 +96,25 @@ export default {
      */
     async handleEnableTracking() {
       try {
-        await this.enableRepoTracking({ repo: this.repo });
-        EventBus.$emit("toast", {
-          detail: {
-            type: "success",
-            msg: "Your request has been successfully submitted.",
-          },
-        });
-        this.repo.tracking = true;
+        await this.enableRepoTracking({repo: this.repo})
+          .then(response => {
+            if (response.success) {
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "success",
+                  msg: "Your request has been successfully submitted.",
+                },
+              });
+              this.repo.tracking = true;
+            } else {
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "error",
+                  msg: "Your request was not successful.",
+                },
+              });
+            }
+          })
       } catch (error) {
         console.error(error);
         EventBus.$emit("toast", {

@@ -146,7 +146,6 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['userToken']),
     ...mapGetters('filesModule', ['curPackageMetaData']),
 
     fileLocation: function() {

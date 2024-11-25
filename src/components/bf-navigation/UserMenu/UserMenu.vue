@@ -193,7 +193,7 @@
                 href="#"
                 @click.prevent="onSignOutClick"
               >
-                Sign Out
+                Exit Workspace
               </a>
             </li>
           </ul>

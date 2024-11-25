@@ -7,8 +7,8 @@ import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue"
 import * as site from '../../../../site-config/site.json';
 import snakeCase from 'lodash.snakecase'
 import {useRoute} from "vue-router";
-import {useSendXhr, useHandleXhrError} from '../../../../mixins/request/request_composable.js'
-
+import {useSendXhr, useHandleXhrError} from '@/mixins/request/request_composable'
+import {useGetToken} from '@/composables/useGetToken'
 
 const store = useStore()
 const route = useRoute()
@@ -158,29 +158,31 @@ const effectiveTarget = computed( () => {
 })
 
 function postCreateRelationship() {
-  const userToken = store.state.userToken
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
 
-  const createRelationshipUrl = `${site.conceptsUrl}/datasets/${datasetId}/relationships`
+  useGetToken()
+    .then(token => {
+      const datasetId = pathOr('', ['params', 'datasetId'])(route)
+      const createRelationshipUrl = `${site.conceptsUrl}/datasets/${datasetId}/relationships`
+      const payload = <RelationshipRequestBody>{
+        description: "",
+        displayName: createForm.label,
+        from: effectiveSource.value.data.id,
+        name: snakeCase(createForm.label),
+        schema: [],
+        to: effectiveTarget.value.data.id
+      }
 
-  const payload = <RelationshipRequestBody>{
-    description: "",
-    displayName: createForm.label,
-    from: effectiveSource.value.data.id,
-    name: snakeCase(createForm.label),
-    schema: [],
-    to: effectiveTarget.value.data.id
-  }
+      return useSendXhr(createRelationshipUrl, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'POST',
+        body: payload
+      })
+        .then(() => {
+          closeDialog(true)
 
-  return useSendXhr(createRelationshipUrl, {
-    header: {
-      'Authorization': `bearer ${userToken}`
-    },
-    method: 'POST',
-    body: payload
-  })
-    .then(response => {
-      closeDialog(true)
+        })
 
     })
     .catch(useHandleXhrError)
@@ -189,33 +191,28 @@ function postCreateRelationship() {
 
 
 function postLinkedPropertyChanges() {
-
-  let userToken = store.state.userToken
-  const datasetId = pathOr('', ['params', 'datasetId'])(route)
-
-  const linkedPropertiesUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${effectiveSource.value.data.id}/linked`
-
-  const url = `${linkedPropertiesUrl}/bulk`
-
-  const payload = <LinkedPropRequestBody>{
-    name: snakeCase(createForm.label),
-    displayName: createForm.label,
-    to: effectiveTarget.value.data.id,
-    position: 1
-  }
-
-  const body = [payload]
-
-  return useSendXhr(url, {
-    header: {
-      'Authorization': `bearer ${userToken}`
-    },
-    method: 'POST',
-    body: body
-  })
-    .then(response => {
-      closeDialog(true)
-
+  useGetToken()
+    .then(async token => {
+      const datasetId = pathOr('', ['params', 'datasetId'])(route)
+      const linkedPropertiesUrl = `${site.conceptsUrl}/datasets/${datasetId}/concepts/${effectiveSource.value.data.id}/linked`
+      const url = `${linkedPropertiesUrl}/bulk`
+      const payload = <LinkedPropRequestBody>{
+        name: snakeCase(createForm.label),
+        displayName: createForm.label,
+        to: effectiveTarget.value.data.id,
+        position: 1
+      }
+      const body = [payload]
+      return useSendXhr(url, {
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'POST',
+        body: body
+      })
+        .then(response => {
+          closeDialog(true)
+        })
     })
     .catch(useHandleXhrError)
 }

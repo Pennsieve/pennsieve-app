@@ -11,6 +11,7 @@ import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 
 import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
+import {useGetToken} from "@/composables/useGetToken";
 
 class UploadFile {
     constructor(uploadId, s3Key, targetPath, targetName) {
@@ -139,7 +140,7 @@ export const actions = {
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
         try {
             let endpoint = `${rootState.config.api2Url}/manifest/archive`
-            const apiKey = rootState.userToken || Cookies.get('user_token')
+            const token = await useGetToken()
 
             const queryParams = toQueryParams({
                 manifest_id: manifest_id,
@@ -148,7 +149,7 @@ export const actions = {
             const url = `${endpoint}?${queryParams}`
 
             const myHeaders = new Headers();
-            myHeaders.append('Authorization', 'Bearer ' + apiKey)
+            myHeaders.append('Authorization', 'Bearer ' + token)
             myHeaders.append('Accept', 'application/json')
 
             const resp = await fetch(url, {
@@ -169,7 +170,7 @@ export const actions = {
     archiveManifest: async ({commit, rootState}, {manifest_id, permanent}) => {
         try {
             let endpoint = `${rootState.config.api2Url}/manifest/archive`
-            const apiKey = rootState.userToken || Cookies.get('user_token')
+            const apiKey = await useGetToken()
 
             const queryParams = toQueryParams({
                 manifest_id: manifest_id,
@@ -284,7 +285,7 @@ export const actions = {
 
             state.savedDatasetId = datasetId;
 
-            const apiKey = rootState.userToken || Cookies.get('user_token')
+            const apiKey = await useGetToken()
             const queryParams = toQueryParams({
                 dataset_id: datasetId,
             })
@@ -392,7 +393,7 @@ export const actions = {
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
 
-        const apiKey = rootState.userToken || Cookies.get('user_token')
+        const apiKey = await useGetToken()
         const queryParams = toQueryParams({
             dataset_id: datasetId,
         })

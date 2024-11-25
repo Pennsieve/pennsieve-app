@@ -21,6 +21,7 @@ import DeletePropertyDialog from "@/components/datasets/records/GraphBrowser/Del
 import DeleteLinkedPropDialog from "@/components/datasets/records/GraphBrowser/DeleteLinkedPropDialog.vue";
 import DeleteRelationshipDialog from "@/components/datasets/records/GraphBrowser/DeleteRelationshipDialog.vue";
 import DeleteModelDialog from "@/components/datasets/records/GraphBrowser/DeleteModelDialog.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 const props = defineProps(['orgId', 'datasetId','list-type'])
 const route = useRoute()
@@ -36,7 +37,7 @@ onMounted(() => {
   store.dispatch('metadataModule/fetchModels')
 
   if (isEmpty(stringSubtypes.value)) {
-    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings?api_key=${store.state.userToken}`
+    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings`
     fetchStringSubtypes(url)
   }
 })
@@ -46,27 +47,31 @@ const datasetId = computed( () => {
 
 watch(route, async (newQuestion, oldQuestion) => {
   if (site.apiUrl && datasetId) {
-    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings?api_key=${store.state.userToken}`
+    let url = `${site.apiUrl}/models/datasets/${datasetId.value}/properties/strings`
     fetchStringSubtypes(url)
 
   }})
 
 function fetchStringSubtypes(url) {
-  useSendXhr(url,{
-    header: {
-      'Authorization': `bearer ${store.state.userToken}`
-    },
-    method: 'GET',
-  })
-    .then(subTypes => {
-      stringSubtypes.value = Object.entries(subTypes).reduce(
-        (options, [val, config]) => ([...options, { value: val, label: config.label, regex: config.regex }]),
-        []
-      )
+  useGetToken()
+    .then((token) => {
+      useSendXhr(url,{
+        header: {
+          'Authorization': `bearer ${token}`
+        },
+        method: 'GET',
+      })
+        .then(subTypes => {
+          stringSubtypes.value = Object.entries(subTypes).reduce(
+            (options, [val, config]) => ([...options, { value: val, label: config.label, regex: config.regex }]),
+            []
+          )
+        })
+        .catch(response => {
+          useHandleXhrError(response)
+        })
     })
-    .catch(response => {
-      useHandleXhrError(response)
-    })
+
 }
 
 
@@ -117,7 +122,6 @@ const nodes = ref([])
 const allEdges = ref([])
 const graphUrl = computed(() => {
   const apiUrl = site.conceptsUrl
-  // const datasetId = pathOr('', ['params', 'datasetId'])(route)
 
   if (apiUrl && datasetId) {
     return `${apiUrl}/datasets/${datasetId.value}/concepts/schema/graph`
@@ -211,25 +215,29 @@ function transformApiResponse(data) {
 }
 function getGraphData(vueFlowInstance) {
 
-  useSendXhr(graphUrl.value, {
-    header: {
-      'Authorization': `bearer ${store.state.userToken}`
-    }
-  })
-    .then(response => {
-
-      const graphData = transformApiResponse(response)
-      nodes.value = graphData.nodes
-      edges.value = graphData.edges
-      nodes.value = layout(nodes.value, edges.value, 'BT')
-
-      nextTick(() => {
-        vueFlowInstance.fitView()
+  useGetToken()
+    .then((token) => {
+      useSendXhr(graphUrl.value, {
+        header: {
+          'Authorization': `bearer ${token}`
+        }
       })
+        .then(response => {
+
+          const graphData = transformApiResponse(response)
+          nodes.value = graphData.nodes
+          edges.value = graphData.edges
+          nodes.value = layout(nodes.value, edges.value, 'BT')
+
+          nextTick(() => {
+            vueFlowInstance.fitView()
+          })
 
 
+        })
+        .catch(useHandleXhrError())
     })
-    .catch(useHandleXhrError)
+
 }
 
 /*

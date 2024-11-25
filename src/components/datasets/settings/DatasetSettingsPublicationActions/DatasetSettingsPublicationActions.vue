@@ -68,6 +68,8 @@ import EventBus from '../../../../utils/event-bus.js'
 import { PublicationStatus, PublicationType } from '../../../../utils/constants';
 import { mapGetters, mapState, mapActions } from 'vuex'
 import { pathOr, propOr } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 const getPublicationSuffix = (publicationStatus) => {
    return publicationStatus === PublicationStatus.REQUESTED
@@ -112,7 +114,6 @@ export default {
       ...mapState([
         'dataset',
         'config',
-        'userToken'
       ]),
       ...mapGetters(['datasetLocked', 'getPermission']),
 
@@ -262,58 +263,58 @@ export default {
        */
       triggerRequest: async function(publicationStatus, publicationType) {
       const publicationSuffix = getPublicationSuffix(publicationStatus)
-      let url = ''
+        useGetToken()
+          .then(token => {
+            let url = ''
+            if (this.dataset.publication.type === 'embargo') {
+              url = `${this.config.apiUrl
+              }/datasets/${this.dataset.content.id
+              }/publication/${publicationSuffix
+              }?publicationType=${publicationType
+              }&api_key=${token
+              }&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`
 
-      if (this.dataset.publication.type === 'embargo') {
-         url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken
-      }&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`
-
-      } else {
-        url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken}`
-      }
-
-      try {
-        await this.sendXhr(url, { method: 'POST' })
-        const message = publicationStatus === PublicationStatus.CANCELLED ? 'Your dataset has been successfully withdrawn from the review process.'
-        : publicationType === PublicationType.REMOVAL ? 'Your request for removal has been submitted.' : 'Your request for revision has been submitted.'
-
-
-
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: message
-          }
-        })
-
-
-        const updatedPublicationState = {
-              ...this.dataset.publication,
-              status: publicationStatus,
-              type: publicationType
-            }
-            const updatedDataset = {
-              ...this.dataset,
-              publication: updatedPublicationState
+            } else {
+              url = `${this.config.apiUrl
+              }/datasets/${this.dataset.content.id
+              }/publication/${publicationSuffix
+              }?publicationType=${publicationType
+              }&api_key=${token}`
             }
 
-            this.updateDataset(updatedDataset)
+            return useSendXhr(url, { method: 'POST' })
+              .then(resp => {
+                const message = publicationStatus === PublicationStatus.CANCELLED ? 'Your dataset has been successfully withdrawn from the review process.'
+                  : publicationType === PublicationType.REMOVAL ? 'Your request for removal has been submitted.' : 'Your request for revision has been submitted.'
 
-        this.closeAllDialogs()
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: message
+                  }
+                })
 
-      } catch (e) {
-        this.handleXhrError(e)
-        this.handleEndpointErrors(publicationStatus, publicationType)
-      }
-    },
+                const updatedPublicationState = {
+                  ...this.dataset.publication,
+                  status: publicationStatus,
+                  type: publicationType
+                }
+                const updatedDataset = {
+                  ...this.dataset,
+                  publication: updatedPublicationState
+                }
+
+                this.updateDataset(updatedDataset)
+
+                this.closeAllDialogs()
+              })
+
+          })
+          .catch(e => {
+            this.handleXhrError(e)
+            this.handleEndpointErrors(publicationStatus, publicationType)
+          })
+      },
     },
   }
 </script>

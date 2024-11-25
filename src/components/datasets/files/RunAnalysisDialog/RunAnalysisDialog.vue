@@ -118,6 +118,8 @@ import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "RunAnalysisDialog",
@@ -181,7 +183,7 @@ export default {
       "selectedFilesForAnalysis",
       "fileCount",
     ]),
-    ...mapGetters(["userToken", "config"]),
+    ...mapGetters(["config"]),
 
     fileId() {
       return pathOr(
@@ -245,25 +247,31 @@ export default {
      * Get files URL for dataset
      * @returns {String}
      */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl = "datasets";
-        const id = this.datasetId;
+    getFilesUrl: async function () {
+      return useGetToken()
+        .then((token) => {
+          const baseUrl = "datasets";
+          const id = this.datasetId;
+          return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
 
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
+        })
+
     },
     /**
      * Send API request to get files for item
      */
     fetchFiles: function () {
-      this.sendXhr(this.getFilesUrl())
-        .then((response) => {
-          this.files = [...response.children];
+      this.getFilesUrl()
+        .then((url) => {
+          this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
+            })
         })
         .catch((response) => {
           this.handleXhrError(response);
         });
+
     },
     /**
      * Handler for clicking file
@@ -278,29 +286,34 @@ export default {
       this.fileId = file.content.id;
       this.fileName = file.content.name;
 
-      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          return this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+              if (file.content.packageType === "Collection") {
+                //If we click on a folder, we want to add that folder to the ancestors list
+                if (this.fileId && this.fileName) {
+                  this.ancestorList.push({
+                    content: {
+                      id: this.fileId,
+                      name: this.fileName,
+                    },
+                  });
+                }
+                this.file = file;
+                this.navigateToFile(this.fileId);
+              }
+
+            })
         })
         .catch((response) => {
           this.handleXhrError(response);
         });
 
-      if (file.content.packageType === "Collection") {
-        //If we click on a folder, we want to add that folder to the ancestors list
-        if (this.fileId && this.fileName) {
-          this.ancestorList.push({
-            content: {
-              id: this.fileId,
-              name: this.fileName,
-            },
-          });
-        }
-        this.file = file;
-        this.navigateToFile(this.fileId);
-      }
+
     },
     onFileSelect: function (selectedFiles, parentId) {
       this.setSelectedFiles({ selectedFiles, parentId });
@@ -349,6 +362,7 @@ export default {
       console.log("this.selectedProcessor", this.selectedProcessor);
       console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url = `${this.config.api2Url}/workflows/instances`;
+
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
@@ -415,6 +429,38 @@ export default {
         this.selectedApplication = {};
         this.value = "";
       }
+      useGetToken()
+        .then(token => {
+          return useSendXhr(url, {
+            method: "POST",
+            header: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: body,
+          })
+            .then((response) => {
+              EventBus.$emit("toast", {
+                detail: {
+                  msg: "Your workflow has been successfully initiated!",
+                  type: "success",
+                },
+              });
+              this.closeDialog();
+            })
+        })
+        .catch((response) => {
+          this.handleXhrError(response);
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Sorry! There was an issue initiating your event",
+              type: "error",
+            },
+          });
+          this.closeDialog();
+          this.targetDirectory = "";
+          this.selectedApplication = {};
+          this.value = "";
+        });
     },
     /**
      * Determines if tab content is active
@@ -534,16 +580,22 @@ export default {
       }
     },
     fetchFilesForAnalysisDialog: function (offset, limit, id = null) {
-      let url;
-      if (this.ancestorList.length === 0) {
-        url = this.getFilesUrl();
-      } else {
-        url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+
+      useGetToken()
+        .then(async token => {
+          let url;
+          if (this.ancestorList.length === 0) {
+            url = this.getFilesUrl();
+          } else {
+            url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          }
+
+          return this.sendXhr(url)
+            .then((response) => {
+              this.files = [...response.children];
+            })
+
         })
         .catch((response) => {
           this.handleXhrError(response);

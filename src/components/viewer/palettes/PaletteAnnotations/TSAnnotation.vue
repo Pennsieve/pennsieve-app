@@ -77,7 +77,6 @@ export default {
     ...mapState('viewerModule', ['activeViewer', 'activeAnnotation']),
     ...mapState([
       'config',
-      'userToken',
     ]),
     isSelected: function() {
       return this.annotation.selected

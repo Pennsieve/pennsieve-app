@@ -133,7 +133,6 @@ export default {
   computed: {
     ...mapState([
       'dataset',
-      'userToken',
       'isLoadingDatasetPublishedData',
       'datasetBanner',
       'datasetContributors',
