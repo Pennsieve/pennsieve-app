@@ -8,7 +8,7 @@
             :src="repo.presignedBannerURL"
             alt="Code repo banner image"
           />
-          <img v-else src="@/assets/images/octocat.png" alt="Octocat" />
+          <img v-else src="../../../../pennsieve-discover-app2/assets/images/octocat.png" alt="Octocat" />
         </div>
         <div v-if="myReposView" class="repo-info-container">
           <h2>
