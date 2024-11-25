@@ -43,8 +43,7 @@
       @succesfulLogin="loginUser"
       @close-log-in-dialog="closeLogInModal"
     />
-    <contact-us-dialog
-    />
+    <contact-us-dialog />
   </div>
 </template>
 
@@ -66,8 +65,7 @@ import ContactUsDialog from "./contact-us-dialog/ContactUsDialog.vue";
 export default {
   name: "PennsieveHeader",
 
-  components: 
-  {
+  components: {
     PennsieveLogoContainer,
     PennsieveLogo,
     IconRemove,
@@ -78,8 +76,7 @@ export default {
     ContactUsDialog,
   },
 
-  props: 
-  {
+  props: {
     isSearchVisible: {
       type: Boolean,
       default: true,
@@ -157,7 +154,7 @@ export default {
 
   mounted() {
     const query = this.$route.query;
-    if ('redirectTo' in query) {
+    if ("redirectTo" in query) {
       this.isLogInModalVisible = true;
     }
   },
