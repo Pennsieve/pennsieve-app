@@ -352,6 +352,7 @@ export default {
               this.updateDataset({ ...this.dataset, ...updatedDataset })
             })
           } else if (response.status === 412) {
+            //staleUpdateDialog is undefined
             this.staleUpdateDialog.dialogVisible = true;
           } else {
             throw response

@@ -233,6 +233,7 @@ export default {
       return useGetToken()
         .then(token => {
           const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          console.log(datasetId)
           return `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${token}`
         }).catch(err => console.log(err))
 
@@ -331,7 +332,7 @@ export default {
 
       const contributorId = propOr(0, 'id', contributor)
 
-      this.sendXhr(this.datasetContributorsUrl, {
+      this.sendXhr(s, {
         method: 'PUT',
         body: {
           contributorId

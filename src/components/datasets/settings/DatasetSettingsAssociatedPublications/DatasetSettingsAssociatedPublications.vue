@@ -87,6 +87,7 @@ export default {
      * @returns {String}
      */
     externalPublicationsUrl: function() {
+      if(!this.datasetId){return null}
       return `${this.config.apiUrl}/datasets/${
         this.datasetId
       }/external-publications`
