@@ -256,7 +256,7 @@ function closeCreateConceptDialog() {
 }
 const propertiesForSelectedModel= computed(() => {
   if (selectedModelId.value){
-    console.log(selectedModelId.value)
+
     let m = store.getters['metadataModule/getModelById'](selectedModelId.value)
     return m.props
 

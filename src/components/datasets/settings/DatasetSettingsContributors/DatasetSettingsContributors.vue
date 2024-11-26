@@ -326,7 +326,9 @@ export default {
      * Send API request to add contributor
      * @param {Object} contributor
      */
+
     addContributor: async function(contributor) {
+
       let s = await this.datasetContributorsUrl()
 
       const contributorId = propOr(0, 'id', contributor)
