@@ -22,10 +22,10 @@
     >
       <el-form-item
         label="API Key"
-        prop="apiKey"
+        prop="apiKeyName"
       >
         <el-input
-          v-model="ruleForm.apiKey"
+          v-model="ruleForm.apiKeyName"
           autofocus
         />
       </el-form-item>
@@ -104,10 +104,10 @@ export default {
       dialogVisible: false,
       labelPosition: 'right',
       ruleForm: {
-        apiKey: ''
+        apiKeyName: ''
       },
       rules: {
-        apiKey: [
+        apiKeyName: [
           { validator: validateApiKey, trigger: 'false' },
         ]
       }
@@ -147,14 +147,14 @@ export default {
       useGetToken()
         .then(token => {
           const url = `${this.config.apiUrl}/token?api_key=${token}`
-          this.sendXhr(url, {
+          return this.sendXhr(url, {
             method: 'POST',
             body: {
-              name: this.ruleForm.apiKey
+              name: this.ruleForm.apiKeyName
             }
           })
         })
-        .then(() => {
+        .then((response) => {
           this.closeDialog()
           EventBus.$emit('toast', {
             detail: {
