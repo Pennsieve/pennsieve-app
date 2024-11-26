@@ -442,6 +442,7 @@ export default {
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
+      isDeleteGitHubDialogVisible: false,
       prevEmail: "",
       apiKey: {
         name: "",
@@ -611,7 +612,7 @@ export default {
     },
 
     /**
-     * Makes call to resort table by column
+     * Makes call to re-sort table by column
      * @param {String} key
      */
     sortColumn: function (key) {
