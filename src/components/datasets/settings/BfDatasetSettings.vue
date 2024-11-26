@@ -339,7 +339,6 @@ export default {
       this.$refs.updateDatasetForm.validate(async valid => {
         // only the name field is validated in this form.  if it is invalid, remove it from he payload.
         // eslint-disable-next-line no-unused-vars
-        console.log("hit")
         const { name, ...rest } = this.form
         const body = valid ? this.form : rest
         let datasetUrl = await this.datasetUrl;
