@@ -86,8 +86,9 @@
 
   export const actions = {
     fetchComputeNodes: async({ commit, rootState }) => {
+      console.log('fetchComputeNotes runs')
       try {
-        const url = `${rootState.config.api2Url}/compute-nodes`;
+        const url = `${rootState.config.api2Url}/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
   
         const resp = await fetch(url, {
           method: 'GET',
@@ -109,7 +110,7 @@
     },
     fetchApplications: async({ commit, rootState }) => {
       try {
-        const url = `${rootState.config.api2Url}/applications`;
+        const url = `${rootState.config.api2Url}/applications?organization_id=${rootState.activeOrganization.organization.id}`;
   
         const resp = await fetch(url, {
           method: 'GET',
