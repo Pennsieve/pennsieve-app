@@ -475,6 +475,7 @@ export default {
      * Access integrations from global state and format options for input select
      */
     formatComputeNodeOptions: function () {
+      if(!this.computeNodes){return}
       this.computeNodeOptions = this.computeNodes.map((computeNode) => {
         return {
           value: computeNode.name,

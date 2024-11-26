@@ -26,6 +26,7 @@ const initialState = () => ({
   export const mutations = {
  
     UPDATE_COMPUTE_NODES(state, computeNodes) {
+      console.log(computeNodes)
       state.computeNodes = computeNodes
       state.computeNodesLoaded = true
     },
@@ -98,7 +99,7 @@ const initialState = () => ({
             .then(resp => {
               if (resp.ok) {
                 return resp.json()
-                    .then(commit('UPDATE_COMPUTE_NODES'))
+                    .then(json => commit('UPDATE_COMPUTE_NODES', json))
               } else {
                 return Promise.reject(resp)
               }
