@@ -233,7 +233,6 @@ export default {
       return useGetToken()
         .then(token => {
           const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-          console.log(datasetId)
           return `${this.config.apiUrl}/datasets/${datasetId}/contributors?api_key=${token}`
         }).catch(err => console.log(err))
 
@@ -327,8 +326,8 @@ export default {
      * Send API request to add contributor
      * @param {Object} contributor
      */
-    addContributor: function(contributor) {
-      let s = this.datasetContributorsUrl()
+     addContributor: async function(contributor) {
+      let s = await this.datasetContributorsUrl()
 
       const contributorId = propOr(0, 'id', contributor)
 

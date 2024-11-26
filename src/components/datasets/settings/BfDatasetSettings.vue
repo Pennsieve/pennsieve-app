@@ -152,7 +152,10 @@
       @close="onCloseDeleteDialog"
     />
   </bf-stage>
-
+  <stale-update-dialog
+      :dialog-visible = "staleUpdateDialogVisible"
+      @close="staleUpdateDialogClose"
+    />
 </template>
 
 <script>
@@ -239,6 +242,7 @@ export default {
       deleteDatasetDialogVisible: false,
       dialogDescriptionVisible: false,
       dialogReleaseNewVisible: false,
+      staleUpdateDialogVisible: false,
       licenses
     }
   },
@@ -331,14 +335,15 @@ export default {
     /**
      * Makes XHR call to update a dataset
      */
-    submitUpdateDatasetRequest: debounce(function() {
-      this.$refs.updateDatasetForm.validate(valid => {
+    submitUpdateDatasetRequest:  debounce( function() {
+      this.$refs.updateDatasetForm.validate(async valid => {
         // only the name field is validated in this form.  if it is invalid, remove it from he payload.
         // eslint-disable-next-line no-unused-vars
+        console.log("hit")
         const { name, ...rest } = this.form
         const body = valid ? this.form : rest
-
-        fetch(this.datasetUrl, {
+        let datasetUrl = await this.datasetUrl;
+        fetch(datasetUrl, {
           method:'PUT',
           body: JSON.stringify(body),
           headers: {
@@ -352,8 +357,7 @@ export default {
               this.updateDataset({ ...this.dataset, ...updatedDataset })
             })
           } else if (response.status === 412) {
-            //staleUpdateDialog is undefined
-            this.staleUpdateDialog.dialogVisible = true;
+            this.staleUpdateDialogVisible = true;
           } else {
             throw response
           }
@@ -406,7 +410,13 @@ export default {
       return not(equals(formItem, datasetItem))
     },
 
-
+    /**
+     * Close StaleUpdateDialog
+     * @return {Boolean}
+     */
+    staleUpdateDialogClose: function() {
+      this.staleUpdateDialogVisible = false
+    },
 
     /**
      * Scroll to input if necessary
