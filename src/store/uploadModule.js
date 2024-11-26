@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
 import {useGetToken} from "@/composables/useGetToken";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 class UploadFile {
     constructor(uploadId, s3Key, targetPath, targetName) {
@@ -235,10 +236,10 @@ export const actions = {
             Promise.reject(new Error(errMsg)).then(resolved, rejected);
         } else {
 
-
+            let targetPackage = await state.currentTargetPackage;
 
             let uploadDestination = {
-                path: helpers.getFileLocation(state.currentTargetPackage),
+                path: helpers.getFileLocation(targetPackage),
                 file: files[0]
             }
 
@@ -323,12 +324,12 @@ export const actions = {
 
         // Get or Fetch cognito config
         const config = await dispatch('getCognitoConfig')
-
         // Create logins structure
         let logins = {}
-        const poolResource = "cognito-idp.us-east-1.amazonaws.com/" + config.userPool.id
-        logins[poolResource] = rootState.cognitoUser.signInUserSession.idToken.jwtToken
-
+    
+        const authSession = await fetchAuthSession();
+        const poolResource = authSession.tokens.accessToken.payload.iss.replace("https://","");
+        logins[poolResource] =authSession.tokens.idToken.toString();
         commit('SET_IS_UPLOADING', true)
 
         const currentRoute = router.currentRoute.value
