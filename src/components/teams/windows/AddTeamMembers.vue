@@ -105,7 +105,7 @@ import { pathOr, propOr, find, propEq } from 'ramda'
 import IconTeam from "../../icons/IconTeam.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import {useSendXhr, useHandleXhrError} from "@/mixins/request/request_composable";
 
 export default {
   name: 'AddTeamMembers',
@@ -247,7 +247,7 @@ export default {
         return !existingMember && !guestUser
       })
 
-      const searchText = this.searchText.toLowerCase()
+      const searchText = this.searchText? this.searchText.toLowerCase():"";
       const list = originalList.filter(member => {
         const selectedMember = find(propEq('id', member.id), this.selectedMembers)
         return !selectedMember

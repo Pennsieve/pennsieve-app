@@ -189,49 +189,6 @@
       </el-col>
     </el-row>
 
-    <!-- GITHUB -->
-    <el-row>
-      <el-col :span="12">
-        <h2 id="github-id">GitHub</h2>
-        <div v-if="!hasGithubProfile">
-          <p>
-            Register the Pennsieve GitHub Application in your Github account,
-            and authorize Pennsieve to get notified about events.
-            <a
-              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
-            >
-              Learn More
-            </a>
-          </p>
-          <bf-button @click="openGitHub">
-            Register your GitHub Account
-          </bf-button>
-        </div>
-        <div v-else>
-          <p class="orcid-success-text">
-            You have successfully linked your GitHub Account and installed the
-            Pennsieve Github Application.
-            <a
-              href="https://docs.pennsieve.io/docs/github-integration"
-              target="_blank"
-            >
-              Learn More
-            </a>
-          </p>
-          <div class="integration-success">
-            <IconGitHub :height="30" width="30" />
-
-            <a class="link" :href="gitHubProfile.html_url" target="_blank">
-              {{ gitHubProfile.login }}
-            </a>
-            <button class="delete" @click="isDeleteGitHubDialogVisible = true">
-              <IconRemove :height="10" :width="10" color="black" />
-            </button>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
     <div class="divider" />
     <!-- ORCID -->
     <el-row>
