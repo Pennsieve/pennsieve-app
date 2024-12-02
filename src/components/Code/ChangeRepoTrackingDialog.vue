@@ -98,7 +98,7 @@ export default {
       try {
         await this.enableRepoTracking({repo: this.repo})
           .then(response => {
-            if (response.success) {
+            if (response.status=="enabled") {
               EventBus.$emit("toast", {
                 detail: {
                   type: "success",
