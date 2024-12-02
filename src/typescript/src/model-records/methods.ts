@@ -6,14 +6,21 @@ import {useHandleXhrError} from "../../../mixins/request/request_composable"
  * execute the fetch of records from the concept instances endpoint
  */
 const fetchRecords = async (instance: ModelRecordsComponentInstance): Promise<void> => {
+
+  debugger
   if (!instance.modelRecordsUrl) return Promise.resolve()
 
   instance.resultsLoading = true
   instance.searchResults = []
 
+  console.log('FETCH')
+  
   try {
     useGetToken()
         .then(async token => {
+          console.log(token)
+
+          
           instance.searchResults = await instance.sendXhr<ModelRecord[]>(instance.modelRecordsUrl, {
             header: {
               'Authorization': `bearer ${token}`
@@ -28,7 +35,8 @@ const fetchRecords = async (instance: ModelRecordsComponentInstance): Promise<vo
 
   } catch (err) {
     instance.resultsLoading = false
-    instance.logger(['Error', err.statusText ?? err], 'error')
+    console.log(err)
+    // instance.logger(['Error', err.statusText ?? err], 'error')
   }
 
 }

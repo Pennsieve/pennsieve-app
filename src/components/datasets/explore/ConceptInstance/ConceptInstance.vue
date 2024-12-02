@@ -160,7 +160,7 @@
                 Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other objects in your graph by clicking the "Link to ..." button above.
               </p>
               <a
-                href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"
+                href="https://docs.pennsieve.io/docs/metadata-management"
                 target="_blank"
               >
                 <bf-button class="primary learn-more">
@@ -237,13 +237,13 @@
 <!--        </div>-->
       </template>
 
-    <add-relationship-drawer
-      ref="addRelationshipDrawer"
-      :relationship-types="relationshipTypes"
-      :record="instance"
-      :record-name="drawerOriginatingName"
-      :is-file="false"
-    />
+<!--    <add-relationship-drawer-->
+<!--      ref="addRelationshipDrawer"-->
+<!--      :relationship-types="relationshipTypes"-->
+<!--      :record="instance"-->
+<!--      :record-name="drawerOriginatingName"-->
+<!--      :is-file="false"-->
+<!--    />-->
 
     <remove-relationships
       ref="removeRelDialog"
@@ -262,11 +262,14 @@
 <!--      :related-files="relatedFiles"-->
 <!--    />-->
 
-<!--    <add-linked-property-drawer-->
-<!--      ref="addLinkedPropertyDrawer"-->
-<!--      :is-creating-record="isCreating"-->
-<!--      @update-linked-property="onUpdateLinkedProperty"-->
-<!--    />-->
+    <add-linked-property-drawer
+      ref="addLinkedPropertyDrawer"
+      :is-creating-record="isCreating"
+      :drawer-visible="isAddLinkedPropDrawerVisible"
+      :linked-property="editProperty"
+      @update-linked-property="onUpdateLinkedProperty"
+      @close="onCloseLinkedPropDrawer"
+    />
 
 <!--    <add-edit-property-dialog-->
 <!--      :visible.sync="addEditPropertyDialogVisible"-->
@@ -363,11 +366,13 @@ import IconPencil from "../../../icons/IconPencil.vue";
 import FileRelationshipsTable from "../../files/FileDetails/FileRelationshipsTable.vue";
 import InstanceEdit from "./InstanceEdit.vue";
 import {useGetToken} from "@/composables/useGetToken";
+import AddLinkedPropertyDrawer from "@/components/datasets/explore/ConceptInstance/AddLinkedPropertyDrawer.vue";
 
 export default {
   name: 'ConceptInstance',
 
   components: {
+    AddLinkedPropertyDrawer,
     FileRelationshipsTable,
     IconPencil,
     StageActions,
@@ -416,6 +421,8 @@ export default {
 
   data() {
     return {
+      editProperty: {},
+      isAddLinkedPropDrawerVisible: false,
       removeRelationshipsDialogVisible: false,
       addEditPropertyDialogVisible: false,
       archiveDialogVisible: false,
@@ -1212,6 +1219,11 @@ export default {
     ...mapActions('filesModule', [
        'openOffice365File'
     ]),
+    onCloseLinkedPropDrawer: function() {
+      this.isAddLinkedPropDrawerVisible = false
+      this.selectedLinkedProperty = {}
+    },
+
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
@@ -2295,7 +2307,8 @@ export default {
      * @param {Object} property
      */
     editLinkedProperty: function(property) {
-      this.$refs.addLinkedPropertyDrawer.openDrawer(property)
+      this.editProperty = property
+      this.isAddLinkedPropDrawerVisible = true
     },
 
     /**

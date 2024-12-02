@@ -261,7 +261,7 @@ import RelationshipInput from '../RelationshipInput/RelationshipInput.vue'
 import debounce from 'lodash.debounce'
 import {compose, defaultTo, dissoc, find, head, pathOr, prop, propEq, propOr, uniqBy} from 'ramda'
 import ModelRecordsResults from "../search/ModelRecordsResults.vue";
-import {Methods} from "../../../../typescript/lib/add-relationship-drawer/methods";
+import {Methods} from "../../../../typescript/src/add-relationship-drawer/methods";
 import IconGraph from "../../../icons/IconGraph.vue";
 import IconProcedure from "../../../icons/IconProcedure.vue";
 import IconArrow from "../../../icons/IconArrow.vue";

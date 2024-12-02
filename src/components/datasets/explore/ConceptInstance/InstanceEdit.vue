@@ -60,7 +60,7 @@
         :key="property.to.modelId"
         :property="property"
         :label="property.schemaLinkedProperty.displayName"
-        @edit-linked-property="editLinkedProperty"
+        @edit-linked-property="onEditLinkedProperty"
         @confirm-remove-linked-property="removeLinkedPropertyEditScreen"
       />
     </div>
@@ -762,6 +762,10 @@ export default {
     ...mapActions('filesModule', [
       'openOffice365File'
     ]),
+
+    cancelChanges: function() {
+      console.log('cancel changes')
+    },
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
@@ -1841,10 +1845,10 @@ export default {
      * Open linked property drawer
      * @param {Object} property
      */
-    editLinkedProperty: function(property) {
+    onEditLinkedProperty: function(property) {
       this.editLinkedProperty = property
       this.addLinkedPropDrawerVisible = true
-      // this.$refs.addLinkedPropertyDrawer.openDrawer(property)
+      this.$refs.addLinkedPropertyDrawer.openDrawer(property)
     },
 
     /**
