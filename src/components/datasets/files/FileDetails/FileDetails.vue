@@ -454,6 +454,7 @@ import {
 
 import BfButton from "../../../shared/bf-button/BfButton.vue";
 import AddRelationshipDrawer from "../../explore/ConceptInstance/AddRelationshipDrawer.vue";
+import ConceptInstanceStaticProperty from "../../explore/ConceptInstance/ConceptInstanceStaticProperty.vue";
 import LinkRecordMenu from "../../../shared/LinkRecordMenu/LinkRecordMenu.vue";
 import GetFileProperty from "../../../../mixins/get-file-property";
 import RelationshipsTable from "../../explore/ConceptInstance/RelationshipsTable.vue";
@@ -468,7 +469,7 @@ import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
 import { viewerToolTypes } from "../../../../utils/constants";
 import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "FileDetails",
@@ -1022,7 +1023,7 @@ export default {
      * GET url for relationships and corresponding counts
      */
     relationshipCountsUrl: function () {
-      return `${config.conceptsUrl}/datasets/${this.datasetId}/proxy/package/external/${this.fileId}/relationCounts`;
+      return `${this.config.conceptsUrl}/datasets/${this.datasetId}/proxy/package/external/${this.fileId}/relationCounts`;
     },
 
     /**
@@ -1226,7 +1227,7 @@ export default {
      */
     stringSubtypeUrl: async function () {
       return await useGetToken().then(token => {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`;
+        return `${this.config.apiUrl}/models/datasets/${this.datasetId}/properties/strings?api_key=${token}`;
       })
 
 

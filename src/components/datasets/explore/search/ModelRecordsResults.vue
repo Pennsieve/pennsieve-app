@@ -295,11 +295,11 @@ export default {
     ]),
 
     datasetId: function() {
-      return Computed.datasetId(this.$route)
+      //return Computed.datasetId(this.$route)
     },
 
     conceptId: function() {
-      return Computed.conceptId(this.concept)
+    //  return Computed.conceptId(this.concept)
     },
 
     /**
@@ -307,7 +307,7 @@ export default {
      * @returns {String}
      */
     conceptName: function() {
-      return Computed.conceptName(this.concept)
+     // return Computed.conceptName(this.concept)
     },
 
     /**
@@ -315,19 +315,19 @@ export default {
      * @returns {Number}
      */
     recordCount: function() {
-      return Computed.recordCount(this.concept)
+     // return Computed.recordCount(this.concept)
     },
 
     propertyCount: function() {
-      return Computed.propertyCount(this.concept)
+     // return Computed.propertyCount(this.concept)
     },
 
     nonSortableColumns: function() {
-      return Computed.nonSortableColumns(this.searchResults)
+      //return Computed.nonSortableColumns(this.searchResults)
     },
 
     modelRecordsUrl: function() {
-      return Computed.modelRecordsUrl(this)
+      //return Computed.modelRecordsUrl(this)
     },
   },
 
@@ -388,7 +388,7 @@ export default {
      * Executes search query by applying filters
      */
     fetchRecords: function() {
-      Methods.fetchRecords(this)
+     //Methods.fetchRecords(this)
     },
 
     /**
@@ -439,15 +439,15 @@ export default {
     },
 
     onPaginationPageChange: function(page) {
-      Methods.onPaginationPageChange(this, page)
+     // Methods.onPaginationPageChange(this, page)
     },
 
     onUpdateLimit: function(limit) {
-      Methods.onUpdateLimit(this, limit)
+     // Methods.onUpdateLimit(this, limit)
     },
 
     onUpdateSort: function(sortBy) {
-      Methods.onUpdateSort(this, sortBy)
+     // Methods.onUpdateSort(this, sortBy)
     },
 
     onSelectAll: function(items) {

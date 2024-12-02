@@ -262,6 +262,7 @@
           const datasetId = pathOr('', ['content', 'id'], this.dataset)
           const datasetIntId = pathOr('', ['content', 'intId'], this.dataset)
           const imageName = this.selectedImageFile.name
+          const path = this.selectedImageFile.webkitRelativePath;
 
           const formData = new FormData()
           formData.append('banner', blob, `dataset_banner_${datasetIntId}.jpg`)
@@ -278,11 +279,11 @@
                 })
                 .then(() => {
                   if(this.isCodeReposDataset) {
-                    this.setCodeRepoDatasetBanner(banner)
+                    this.setCodeRepoDatasetBanner(path)
                     this.isDialogVisible = false;
                     this.isUploadingBanner = false
                   } else {
-                    this.setDatasetBanner(banner)
+                    this.setDatasetBanner(path)
                       .then(() => {
                         this.isDialogVisible = false
                         this.isUploadingBanner = false
