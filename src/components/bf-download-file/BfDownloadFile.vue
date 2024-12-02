@@ -3,7 +3,7 @@
     <form
       id="zipForm"
       method="POST"
-      :action="`${zipItUrl}`"
+      :action="zipItUrl"
     >
       <input
         v-model="zipData"
@@ -14,7 +14,7 @@
     <form
       id="recordCsvForm"
       method="POST"
-      :action="`${recordCsvUrl}`"
+      :action="recordCsvUrl"
     >
       <input
         v-model="recordCsvQuery"
@@ -154,9 +154,23 @@
         archiveName: DEFAULT_ARCHIVE_NAME,
         showReduceSize: false,
         downloadConfirmed: false,
+        zipItUrl:"",
+        recordCsvUrl: ""
       }
     },
-
+    mounted() {
+      useGetToken()
+        .then(token => {
+          this.zipItUrl = `${this.config.zipitUrl}/?api_key=${token}`;
+          const activeOrgIntId = pathOr('', ['organization', 'intId'], this.activeOrganization)
+          this.recordCsvUrl = `${this.config.apiUrl}/models/v2/organizations/${
+              activeOrgIntId
+            }/search/records/csv?api_key=${token}`
+        })
+        .catch(error => {
+          console.error("Failed to fetch token:", error);
+        });
+    },
     computed: {
       ...mapGetters([
         'config'
@@ -202,29 +216,6 @@
     },
 
     methods: {
-      /**
-       * Compute the url for downloading a csv of records
-       * @returns {String}
-       */
-      recordCsvUrl: async function() {
-        const activeOrgIntId = pathOr('', ['organization', 'intId'], this.activeOrganization)
-        return useGetToken()
-          .then(token => {
-            return `${this.config.apiUrl}/models/v2/organizations/${
-              activeOrgIntId
-            }/search/records/csv?api_key=${token}`
-          })
-
-
-      },
-
-      zipItUrl: async function() {
-        return useGetToken()
-          .then(token => {
-            return `${this.config.zipitUrl}/?api_key=${token}`
-          })
-      },
-
       /**
        * Closes the dialog and initializes state
        */
@@ -297,7 +288,6 @@
         const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload }
         this.zipData = JSON.stringify(payload, undefined)
         this.$nextTick(() => {
-          // eslint-disable-next-line no-undef
           zipForm.submit()
         })
       }
