@@ -169,6 +169,8 @@
   import IconTrash from "../../../icons/IconTrash.vue";
   import Cookies from "js-cookie";
   import DeleteConceptDialog from "@/components/datasets/management/DeleteConceptDialog/DeleteConceptDialog.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'Models',
@@ -206,10 +208,8 @@
       }
     },
     mounted() {
-      const token = Cookies.get('user_token')
-      if (token) {
-        this.fetchModels()
-      }
+      this.fetchModels()
+
     },
     beforeDestroy() {
 
@@ -219,7 +219,6 @@
       ...mapGetters([
         'config',
         'hasFeature',
-        'userToken',
         'activeOrganization',
         'datasetLocked'
       ]),
@@ -322,11 +321,15 @@
         const promises = models.map(model => {
           const modelId = model.id
           const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}/linked`
-          return this.sendXhr(url, {
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            }
-          })
+          return useGetToken()
+            .then(token => {
+              return useSendXhr(url, {
+                header: {
+                  'Authorization': `bearer ${token}`
+                }
+              })
+            }).catch(err => useHandleXhrError(err))
+
         })
         return promises
       },
@@ -386,54 +389,23 @@
       setLockModel: function(locked) {
         const body = Object.assign({}, this.activeModel, { locked })
 
-        this.sendXhr(this.modelUrl, {
-          method: 'PUT',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body
-        })
-        .then(response => {
-          this.lockDialogVisible = false
-          this.updateModel(response)
-        })
-        .catch(this.handleXhrError.bind(this))
+        useGetToken()
+          .then(token => {
+            this.sendXhr(this.modelUrl, {
+              method: 'PUT',
+              header: {
+                'Authorization': `bearer ${token}`
+              },
+              body
+            })
+              .then(response => {
+                this.lockDialogVisible = false
+                this.updateModel(response)
+              })
+              .catch(this.handleXhrError.bind(this))
+          })
+
       },
-
-      /**
-       * Archive concept
-       * @param {object} concept
-       */
-      // openArchiveDialog: function(concept) {
-      //   this.activeModel = concept
-      //   this.archiveDialogVisible = true
-      // },
-
-      // /**
-      //  * Open Archive Dialog
-      //  */
-      // archiveConcept: function() {
-      //   this.sendXhr(this.modelUrl, {
-      //     method: 'DELETE',
-      //     header: {
-      //       'Authorization': `bearer ${this.userToken}`
-      //     }
-      //   })
-      //   .then(() => {
-      //     const displayName = this.activeModel.displayName
-      //     const index = findIndex(propEq('name', this.activeModel.name), this.models)
-      //
-      //     const updatedConcepts = this.models.slice()
-      //     updatedConcepts.splice(index, 1)
-      //
-      //     this.updateConcepts(updatedConcepts).then(() => {
-      //       this.archiveDialogVisible = false
-      //       this.combinedConcepts = clone(this.models)
-      //       this.activeModel = {}
-      //     })
-      //   })
-      //   .catch(this.handleXhrError.bind(this))
-      // },
 
       onUnlockConcept: function(model) {
         this.activeModel = model

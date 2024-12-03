@@ -13,6 +13,7 @@
 <script>
 import { mapState } from 'vuex'
 import Request from '../../../mixins/request'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'DatasetReference',
@@ -39,15 +40,18 @@ export default {
   computed: {
     ...mapState([
       'config',
-      'userToken'
     ]),
 
     /**
      * Compute URL for DOI endpoint
      * @returns {String}
      */
-    doiUrl: function() {
-      return `${this.config.apiUrl}/datasets/external-publications/citation?doi=${this.doi}&api_key=${this.userToken}`
+    doiUrl: async function() {
+      return await useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/external-publications/citation?doi=${this.doi}&api_key=${token}`
+        })
+
     }
   },
 

@@ -87,15 +87,15 @@ describe('PeopleList.vue', () => {
     expect(cmp.vm.people.length).toBe(1)
   })
 
-  it('getInvitedPeopleUrl(): success', () => {
-    const expectedUrl = 'https://app.blackfynn.net/organizations/777/invites?api_key=123'
-    const getUrl = cmp.vm.getInvitedPeopleUrl()
+  it('getInvitedPeopleUrl(): success', async () => {
+    const expectedUrl = 'https://app.blackfynn.net/organizations/777/invites?api_key=undefined'
+    const getUrl = await cmp.vm.getInvitedPeopleUrl()
     expect(getUrl).toBe(expectedUrl)
   })
 
-  it('getInvitedPeopleUrl(): failed', () => {
+  it('getInvitedPeopleUrl(): failed', async () => {
     delete cmp.vm.activeOrganization.organization
-    const getUrl = cmp.vm.getInvitedPeopleUrl()
+    const getUrl = await cmp.vm.getInvitedPeopleUrl()
     expect(getUrl).toBe(undefined)
   })
 

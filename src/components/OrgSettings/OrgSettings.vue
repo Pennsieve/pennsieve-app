@@ -1,7 +1,6 @@
 <template>
     <bf-stage
       slot="stage"
-      v-loading="isLoading"
       element-loading-background="transparent"
     >
       <el-form
@@ -74,131 +73,17 @@
             Storage Used
           </div>
         </div>
-<!--        <div v-if="allPeople.length > 0">-->
-<!--          <h3>Dataset Usage</h3>-->
-<!--          <div class="pagination-header mb-16">-->
-<!--            <pagination-page-menu-->
-<!--              class="mr-24"-->
-<!--              pagination-item-label="Results"-->
-<!--              :page-size="limit"-->
-<!--              @update-page-size="onUpdateLimit"-->
-<!--            />-->
-<!--            <el-pagination-->
-<!--              :page-size="limit"-->
-<!--              :pager-count="5"-->
-<!--              :current-page="offset / limit + 1"-->
-<!--              layout="prev, pager, next"-->
-<!--              :total="allPeople.length"-->
-<!--              @current-change="onPaginationPageChange"-->
-<!--            />-->
-<!--          </div>-->
-<!--&lt;!&ndash;          <div class="bf-table">&ndash;&gt;-->
-<!--&lt;!&ndash;            <div class="bf-table-header">&ndash;&gt;-->
-<!--&lt;!&ndash;              <el-row :gutter="32">&ndash;&gt;-->
-<!--&lt;!&ndash;                <el-col&ndash;&gt;-->
-<!--&lt;!&ndash;                  :sm="7"&ndash;&gt;-->
-<!--&lt;!&ndash;                  class="info"&ndash;&gt;-->
-<!--&lt;!&ndash;                >&ndash;&gt;-->
-<!--&lt;!&ndash;                  <button&ndash;&gt;-->
-<!--&lt;!&ndash;                    :class="[isSorting('lastName') ? 'sort-active' : '']"&ndash;&gt;-->
-<!--&lt;!&ndash;                    @click="sortColumn('lastName')"&ndash;&gt;-->
-<!--&lt;!&ndash;                  >&ndash;&gt;-->
-<!--&lt;!&ndash;                    Name&ndash;&gt;-->
-<!--&lt;!&ndash;                    <svg-icon&ndash;&gt;-->
-<!--&lt;!&ndash;                      class="sort-icon"&ndash;&gt;-->
-<!--&lt;!&ndash;                      :name="sortIcon('lastName')"&ndash;&gt;-->
-<!--&lt;!&ndash;                      color="currentColor"&ndash;&gt;-->
-<!--&lt;!&ndash;                    />&ndash;&gt;-->
-<!--&lt;!&ndash;                  </button>&ndash;&gt;-->
-<!--&lt;!&ndash;                </el-col>&ndash;&gt;-->
-<!--&lt;!&ndash;                <el-col&ndash;&gt;-->
-<!--&lt;!&ndash;                  :sm="4"&ndash;&gt;-->
-<!--&lt;!&ndash;                  class="align-right"&ndash;&gt;-->
-<!--&lt;!&ndash;                >&ndash;&gt;-->
-<!--&lt;!&ndash;                  <button&ndash;&gt;-->
-<!--&lt;!&ndash;                    :class="[isSorting('storage') ? 'sort-active' : '']"&ndash;&gt;-->
-<!--&lt;!&ndash;                    @click="sortColumn('storage')"&ndash;&gt;-->
-<!--&lt;!&ndash;                  >&ndash;&gt;-->
-<!--&lt;!&ndash;                    Data Usage&ndash;&gt;-->
-<!--&lt;!&ndash;                    <svg-icon&ndash;&gt;-->
-<!--&lt;!&ndash;                      class="sort-icon"&ndash;&gt;-->
-<!--&lt;!&ndash;                      :name="sortIcon('storage')"&ndash;&gt;-->
-<!--&lt;!&ndash;                      color="currentColor"&ndash;&gt;-->
-<!--&lt;!&ndash;                    />&ndash;&gt;-->
-<!--&lt;!&ndash;                  </button>&ndash;&gt;-->
-<!--&lt;!&ndash;                </el-col>&ndash;&gt;-->
-<!--&lt;!&ndash;                <el-col&ndash;&gt;-->
-<!--&lt;!&ndash;                  :sm="3"&ndash;&gt;-->
-<!--&lt;!&ndash;                  class="col-spacer"&ndash;&gt;-->
-<!--&lt;!&ndash;                >&ndash;&gt;-->
-<!--&lt;!&ndash;                  &nbsp;&ndash;&gt;-->
-<!--&lt;!&ndash;                </el-col>&ndash;&gt;-->
-<!--&lt;!&ndash;                <el-col :sm="4">&ndash;&gt;-->
-<!--&lt;!&ndash;                  <button&ndash;&gt;-->
-<!--&lt;!&ndash;                    :class="[isSorting('role') ? 'sort-active' : '']"&ndash;&gt;-->
-<!--&lt;!&ndash;                    @click="sortColumn('role')"&ndash;&gt;-->
-<!--&lt;!&ndash;                  >&ndash;&gt;-->
-<!--&lt;!&ndash;                    Role&ndash;&gt;-->
-<!--&lt;!&ndash;                    <svg-icon&ndash;&gt;-->
-<!--&lt;!&ndash;                      class="sort-icon"&ndash;&gt;-->
-<!--&lt;!&ndash;                      :name="sortIcon('role')"&ndash;&gt;-->
-<!--&lt;!&ndash;                      color="currentColor"&ndash;&gt;-->
-<!--&lt;!&ndash;                    />&ndash;&gt;-->
-<!--&lt;!&ndash;                  </button>&ndash;&gt;-->
-<!--&lt;!&ndash;                </el-col>&ndash;&gt;-->
-<!--&lt;!&ndash;                <el-col&ndash;&gt;-->
-<!--&lt;!&ndash;                  :sm="6"&ndash;&gt;-->
-<!--&lt;!&ndash;                  class="col-spacer"&ndash;&gt;-->
-<!--&lt;!&ndash;                >&ndash;&gt;-->
-<!--&lt;!&ndash;                  &nbsp;&ndash;&gt;-->
-<!--&lt;!&ndash;                </el-col>&ndash;&gt;-->
-<!--&lt;!&ndash;              </el-row>&ndash;&gt;-->
-<!--&lt;!&ndash;            </div>&ndash;&gt;-->
-<!--&lt;!&ndash;            <org-member&ndash;&gt;-->
-<!--&lt;!&ndash;              v-for="member in people"&ndash;&gt;-->
-<!--&lt;!&ndash;              :key="member.id"&ndash;&gt;-->
-<!--&lt;!&ndash;              class="bf-table-row"&ndash;&gt;-->
-<!--&lt;!&ndash;              :has-admin-rights="false"&ndash;&gt;-->
-<!--&lt;!&ndash;              :item="member"&ndash;&gt;-->
-<!--&lt;!&ndash;              :show-storage="true"&ndash;&gt;-->
-<!--&lt;!&ndash;            />&ndash;&gt;-->
-<!--&lt;!&ndash;          </div>&ndash;&gt;-->
-<!--        </div>-->
-<!--        <div-->
-<!--          v-if="hasDatasetTemplatesFeature"-->
-<!--          class="dataset-templates"-->
-<!--        >-->
-<!--          <h3>Dataset Templates</h3>-->
-<!--          <dataset-template-table-->
-<!--            @set-active-dataset-template="setActiveDatasetTemplate"-->
-<!--            @dataset-template-menu-click="onDatasetTemplateMenuClick"-->
-<!--          />-->
-<!--        </div>-->
       </div>
     </bf-stage>
 
-<!--    <create-dataset-template-dialog-->
-<!--      is-editing-->
-<!--      :visible.sync="isDatasetTemplateDialogVisible"-->
-<!--      :dataset-template="activeDatasetTemplate"-->
-<!--    />-->
-
-<!--    <delete-dataset-template-dialog-->
-<!--      :visible.sync="isDeleteDatasetTemplateDialogVisible"-->
-<!--      :dataset-template="activeDatasetTemplate"-->
-<!--    />-->
 </template>
 
 <script>
-import { mapActions, mapState, mapGetters } from 'vuex'
+import {mapActions, mapGetters, mapState} from 'vuex'
 
 import BfRafter from '../shared/bf-rafter/BfRafter.vue'
 import BfButton from '../shared/bf-button/BfButton.vue'
-// import A11yKeys from '../shared/a11y-keys/A11yKeys.vue'
-import OrgMember from '../../components/people/org-member/OrgMember.vue'
-// import CreateDatasetTemplateDialog from '../../components/datasets/management/GraphManagement/CreateDatasetTemplateDialog/CreateDatasetTemplateDialog.vue'
-// import DeleteDatasetTemplateDialog from './DeleteDatasetTemplate/DeleteDatasetTemplate.vue'
-// import DatasetTemplateTable from './DatasetTemplatesTable/DatasetTemplatesTable.vue'
+
 import DatasetStatusInput from './DatasetStatusInput/DatasetStatusInput.vue'
 import OrgSettingsDataUseAgreements from './OrgSettingsDataUseAgreements/OrgSettingsDataUseAgreements.vue'
 
@@ -209,8 +94,10 @@ import UserRoles from '../../mixins/user-roles'
 import Request from '../../mixins/request'
 import TableFunctions from '../../mixins/table-functions'
 
-import { pathOr, propOr, head, last, defaultTo } from 'ramda'
+import {defaultTo, head, last, pathOr, propOr} from 'ramda'
 import PaginationPageMenu from '../shared/PaginationPageMenu/PaginationPageMenu.vue'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'OrgSettings',
@@ -218,11 +105,7 @@ export default {
   components: {
     BfRafter,
     BfButton,
-    // A11yKeys,
-    // OrgMember,
-    // CreateDatasetTemplateDialog,
-    // DeleteDatasetTemplateDialog,
-    // DatasetTemplateTable,
+
     DatasetStatusInput,
     PaginationPageMenu,
     OrgSettingsDataUseAgreements
@@ -246,8 +129,6 @@ export default {
         ]
       },
       activeDatasetTemplate: {},
-      // isDatasetTemplateDialogVisible: false,
-      // isDeleteDatasetTemplateDialogVisible: false,
       createdNewStatus: false
     }
   },
@@ -255,7 +136,6 @@ export default {
   computed: {
     ...mapState([
       'activeOrganization',
-      'userToken',
       'config',
       'orgMembers',
       'datasets',
@@ -264,28 +144,12 @@ export default {
 
     ...mapGetters(['hasFeature']),
 
-    // /**
-    //  * the displayed subset of allPeople based on which page in the paginated list we are on
-    //  * @returns {Array}
-    //  */
-    // people: function() {
-    //   return this.allPeople.slice(this.offset, this.offset + this.limit)
-    // },
-
     /**
      * Active organization id
      * @returns {String}
      */
     activeOrgId: function() {
       return pathOr('', ['organization', 'id'], this.activeOrganization)
-    },
-
-    /**
-     * Get all status options for organization url
-     * @returns {String}
-     */
-    getDatasetStatusUrl: function() {
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status?api_key=${this.userToken}`
     },
 
 
@@ -299,41 +163,21 @@ export default {
       return ''
     },
 
-    // /**
-    //  * Compute if org has dataset templates feature
-    //  * @returns {Boolean}
-    //  */
-    // hasDatasetTemplatesFeature: function() {
-    //   return this.hasFeature('dataset_templates_feature')
-    // }
   },
 
   // needed for direct load
   watch: {
     activeOrganization: function(activeOrg) {
       this.handleGetOrg(activeOrg)
-    },
-    // orgMembers: function(orgMembers) {
-    //   this.getUsers(orgMembers)
-    // },
+      this.getAllDatasetStatuses()
 
-    /**
-     * Watches url to get all statuses for organization
-     */
-    getDatasetStatusUrl: {
-      handler: function(val) {
-        if (val && this.activeOrgId && this.userToken) {
-          this.getAllDatasetStatuses()
-        }
-      },
-      immediate: true
-    }
+    },
   },
 
   // needed for switching routes
   mounted() {
     this.handleGetOrg(this.activeOrganization)
-    // this.getUsers(this.orgMembers)
+    this.getAllDatasetStatuses()
   },
 
   beforeRouteEnter(to, from, next) {
@@ -352,10 +196,15 @@ export default {
      * Get all dataset status options for organization
      */
     getAllDatasetStatuses: function() {
-      this.sendXhr(this.getDatasetStatusUrl,{}).then(response => {
-        this.updateOrgDatasetStatuses(response)
-      })
-      .catch(this.handleXhrError.bind(this))
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrgId}/dataset-status?api_key=${token}`
+          return this.sendXhr(url,{})
+            .then(response => {
+              this.updateOrgDatasetStatuses(response)
+            })
+        })
+        .catch(useHandleXhrError)
     },
 
     /**
@@ -385,8 +234,7 @@ export default {
       this.storageNumber = defaultTo(0, head(formattedStorage))
       this.storageUnit = defaultTo('B', last(formattedStorage))
 
-      const orgName = pathOr('', ['organization', 'name'], org)
-      this.ruleForm.orgName = orgName
+      this.ruleForm.orgName = pathOr('', ['organization', 'name'], org)
     },
     /**
      * Handles key-pressed event
@@ -407,34 +255,28 @@ export default {
       })
     },
     /**
-     * Generates org data GET url
-     */
-    orgUrl: function() {
-      if (!this.activeOrganization.organization || !this.userToken) {
-        return ''
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}?api_key=${this.userToken}`
-    },
-    /**
      * Update organization request
      */
     updateOrgRequest: function() {
-      const url = this.orgUrl()
-      this.sendXhr(url, {
-        method: 'PUT',
-        body: {
-          name: this.ruleForm.orgName
-        }
-      })
-        .then(() => {
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'MESSAGE',
-              msg: `${this.ruleForm.orgName} updated`
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'PUT',
+            body: {
+              name: this.ruleForm.orgName
             }
           })
+            .then(() => {
+              EventBus.$emit('toast', {
+                detail: {
+                  type: 'MESSAGE',
+                  msg: `${this.ruleForm.orgName} updated`
+                }
+              })
+            })
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError)
     },
     /**
      * Makes call to resort table by column
@@ -444,46 +286,7 @@ export default {
       this.offset = 0
       this.allPeople = this.returnSort(key, this.allPeople)
     },
-    // /**
-    //  * Creates XHR calls to get invited users and current organization members
-    //  * @param {Array} orgMembers
-    //  */
-    // getUsers: function(orgMembers) {
-    //   const members = this.updateCurrentMembers(orgMembers)
-    //   this.allPeople = this.returnSort('lastName', members, 'asc')
-    //   this.$nextTick(() => {
-    //     this.isLoading = false
-    //   })
-    // },
-    // /**
-    //  * Updates current users object with any missing fields required for sorting
-    //  * @param {Array} users
-    //  * @returns {Array}
-    //  */
-    // updateCurrentMembers: function(users) {
-    //   return users.map(member => {
-    //     const role = this.getOrgRole(member, this.activeOrganization)
-    //     let newFields = { role }
-    //     if (!member.storage) {
-    //       newFields = {
-    //         storage: 0,
-    //         role
-    //       }
-    //     }
-    //     return Object.assign({}, newFields, member)
-    //   })
-    // },
-    // /**
-    //  * Sets the active dataset template for the menu clicked
-    //  * @param {Object} row
-    //  */
-    // setActiveDatasetTemplate: function(row) {
-    //   this.activeDatasetTemplate = row
-    // },
-    // /**
-    //  * Handler for file menu click
-    //  * @param {String} name
-    //  */
+
     onDatasetTemplateMenuClick: function(name) {
       const options = {
         update: this.onUpdateDatasetTemplate,
@@ -496,20 +299,6 @@ export default {
         handler()
       }
     },
-
-    // /**
-    //  * Update dataset template
-    //  */
-    // onUpdateDatasetTemplate: function() {
-    //   this.isDatasetTemplateDialogVisible = true
-    // },
-    //
-    // /**
-    //  * Delete dataset template
-    //  */
-    // onDeleteDatasetTemplate: function() {
-    //   this.isDeleteDatasetTemplateDialogVisible = true
-    // },
 
     /**
      * handle changing the page of results

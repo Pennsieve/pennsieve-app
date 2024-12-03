@@ -143,12 +143,11 @@
           v-model="property.value"
           class="input-property date-type"
           :disabled="property.locked"
-          format="M/d/yyyy HH:mm:ss"
-          value-format="yyyy-MM-ddTHH:mm:ss"
+          format="M/d/YYYY HH:mm:ss"
+          value-format="YYYY-MM-DDTHH:mm:ss"
           type="datetime"
           :placeholder="placeholder || 'Enter a date: MM/DD/YYYY'"
           autofocus
-          @blur="validateInput"
         />
       </template>
       <!-- displays error message per input -->
