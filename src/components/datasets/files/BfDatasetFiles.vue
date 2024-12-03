@@ -199,7 +199,6 @@ import {
   pathEq,
   findIndex,
   pluck,
-  includes,
 } from "ramda";
 
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
@@ -238,6 +237,7 @@ import {
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "BfDatasetFiles",
@@ -358,22 +358,11 @@ export default {
       return this.files.length > 0;
     },
 
-    // /**
-    //  * Get files URL for dataset
-    //  * @returns {String}
-    //  */
-    // getFilesUrl: async function () {
-    //   let usertoken = await useGetToken()
-    //   if (this.config.apiUrl) {
-    //     const baseUrl =
-    //       this.$route.name === "dataset-files" ? "datasets" : "packages";
-    //     const id =
-    //       this.$route.name === "dataset-files"
-    //         ? this.$route.params.datasetId
-    //         : this.$route.params.fileId;
-    //     return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${usertoken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-    //   }
-    // },
+    filesUrl:  function () {
+        const baseUrl = this.$route.name === "dataset-files" ? "datasets" : "packages";
+        const id = this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    },
 
     /**
      * Get move URL
@@ -430,13 +419,6 @@ export default {
       this.fetchFiles()
     },
 
-    // /**
-    //  * Trigger API request when URL is changed. This is required for infinite scroll functionality.
-    //  */
-    // getFilesUrl: function () {
-    //   this.fetchFiles();
-    // },
-
     "$store.state.uploadModule.uploadComplete": function () {
       setTimeout(() => {
         this.resetUpload();
@@ -475,10 +457,7 @@ export default {
 
               for (let x in data) {
                 if ((data[x].parent_id.Int64 = curFolderId)) {
-                  this.getFilesUrl()
-                    .then((url) => {
-                      this.fetchFiles(url);
-                    })
+                  this.fetchFiles(this.filesUrl);
                   break;
                 }
               }
@@ -493,14 +472,9 @@ export default {
   },
 
   mounted: function () {
-    if (this.getFilesUrl && !this.files.length) {
+    if (this.filesUrl && !this.files.length) {
       this.fetchFiles();
     }
-
-    this.getFilesUrl()
-      .then((url) => {
-        this.fetchFiles(url);
-      })
 
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
     EventBus.$on("add-uploaded-file", this.onAddUploadedFile.bind(this));
@@ -518,16 +492,11 @@ export default {
     });
     EventBus.$on("refreshAfterDeleteModal", (data) => {
       var temp = data;
-      this.getFilesUrl()
-        .then((url) => {
-          this.fetchFiles(url);
-        })
+      this.fetchFiles(this.filesUrl);
+
     });
     EventBus.$on("refreshAfterRestore", () => {
-      this.getFilesUrl()
-        .then((url) => {
-          this.fetchFiles(url);
-        })
+      this.fetchFiles(this.filesUrl);
     });
   },
 
@@ -685,46 +654,51 @@ export default {
     fetchFiles: function (url) {
       this.filesLoading = true;
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.filesLoading = true;
-          this.$store.dispatch(
-            "uploadModule/setCurrentTargetPackage",
-            response
-          );
-          this.file = response;
+      useGetToken()
+        .then(token => {
+          const fullUrl = `${this.filesUrl}&api_key=${token}`
+          return useSendXhr(fullUrl)
+            .then((response) => {
+              this.filesLoading = true;
+              this.$store.dispatch(
+                "uploadModule/setCurrentTargetPackage",
+                response
+              );
+              this.file = response;
 
-          const newFiles = response.children.map((file) => {
-            if (!file.storage) {
-              file.storage = 0;
-            }
-            file.icon =
-              file.icon || this.getFilePropertyVal(file.properties, "icon");
-            file.subtype = this.getSubType(file);
-            return file;
-          });
-          if (newFiles.length < this.limit) {
-            this.lastPage = true;
-          }
-          this.files =
-            this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
-          this.sortedFiles = this.returnSort(
-            "content.name",
-            this.files,
-            this.sortDirection
-          );
-          this.ancestors = response.ancestors;
+              const newFiles = response.children.map((file) => {
+                if (!file.storage) {
+                  file.storage = 0;
+                }
+                file.icon =
+                  file.icon || this.getFilePropertyVal(file.properties, "icon");
+                file.subtype = this.getSubType(file);
+                return file;
+              });
+              if (newFiles.length < this.limit) {
+                this.lastPage = true;
+              }
+              this.files =
+                this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
+              this.sortedFiles = this.returnSort(
+                "content.name",
+                this.files,
+                this.sortDirection
+              );
+              this.ancestors = response.ancestors;
 
-          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-          if (pkgId) {
-            this.scrollToFile(pkgId);
-          }
-          this.allowFetch = true;
-          this.filesLoading = false;
+              const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+              if (pkgId) {
+                this.scrollToFile(pkgId);
+              }
+              this.allowFetch = true;
+              this.filesLoading = false;
+            })
+
         })
         .catch((response) => {
           this.handleXhrError(response);
-        });
+      })
     },
     /**
      * Sort table by column
@@ -1229,24 +1203,7 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-        /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-     getFilesUrl: async function () {
-       return useGetToken()
-         .then((token) => {
-           if (this.config.apiUrl) {
-             const baseUrl =
-               this.$route.name === "dataset-files" ? "datasets" : "packages";
-             const id =
-               this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-             return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-           }
-         })
 
-
-    },
 
 
     handleRouteChange: function (to, from) {
