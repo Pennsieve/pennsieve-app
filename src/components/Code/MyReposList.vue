@@ -8,7 +8,7 @@ import { find, propEq } from "ramda";
 
 const store = useStore();
 
-const isLoadingRepos = ref(true);
+const isLoadingRepos = ref(false);
 
 const myReposCount = computed(() => {
   return store.getters["codeReposModule/myReposCount"];
@@ -67,7 +67,7 @@ function onChangeRepoTrackingDialogClose() {
 </script>
 
 <template>
-  <bf-stage :v-loading="isLoadingRepos.value" element-loading-text="Loading...">
+  <bf-stage v-loading="isLoadingRepos" element-loading-text="Loading...">
     <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>
         You have not linked your Github account to Pennsieve yet. Please link
