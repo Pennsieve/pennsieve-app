@@ -88,7 +88,7 @@
           v-if="workspaceReposView && isRepoOwner"
           :to="{
             name: 'configure-repo',
-            params: { repoId: repo.name },
+            params: { repoId: repo.content.id },
           }"
         >
           <button class="text-button">Configure</button>
@@ -119,18 +119,18 @@
       </el-col>
     </el-row>
 
-<!--    <change-repo-tracking-dialog-->
-<!--      :dialog-visible="isChangeRepoTrackingDialogVisible"-->
-<!--      :start-tracking-mode="!isTracked"-->
-<!--      :stop-tracking-mode="isTracked"-->
-<!--      :repo="repo"-->
-<!--      @close="onChangeRepoTrackingDialogClose"-->
-<!--    />-->
-<!--    <publish-code-repo-dialog-->
-<!--      :dialog-visible="isPublishCodeRepoDialogVisible"-->
-<!--      :repo="repo"-->
-<!--      @close="onPublishCodeRepoDialogVisibleClose"-->
-<!--    />-->
+    <!--    <change-repo-tracking-dialog-->
+    <!--      :dialog-visible="isChangeRepoTrackingDialogVisible"-->
+    <!--      :start-tracking-mode="!isTracked"-->
+    <!--      :stop-tracking-mode="isTracked"-->
+    <!--      :repo="repo"-->
+    <!--      @close="onChangeRepoTrackingDialogClose"-->
+    <!--    />-->
+    <!--    <publish-code-repo-dialog-->
+    <!--      :dialog-visible="isPublishCodeRepoDialogVisible"-->
+    <!--      :repo="repo"-->
+    <!--      @close="onPublishCodeRepoDialogVisibleClose"-->
+    <!--    />-->
   </bf-stage>
 </template>
 
@@ -198,6 +198,7 @@ export default {
     // if (this.repo) {
     //   this.fetchReadMe(this.repo.content.id);
     // }
+    console.log(this.repo);
   },
   computed: {
     ...mapGetters(["hasFeature"]),
@@ -253,20 +254,18 @@ export default {
       );
     },
   },
-  emits:[
-    'open-track-dialog'
-  ],
+  emits: ["open-track-dialog"],
   methods: {
     ...mapActions("codeReposModule", ["fetchMyRepos", "fetchReadMe"]),
     handleStartTrackingClick: function () {
       this.startTrackingMode = true;
       this.isChangeRepoTrackingDialogVisible = true;
-      this.$emit('open-track-dialog', this.repo.name)
+      this.$emit("open-track-dialog", this.repo.name);
     },
     handleStopTrackingClick: function () {
       this.stopTrackingMode = true;
       this.isChangeRepoTrackingDialogVisible = true;
-      this.$emit('open-track-dialog', this.repo.name)
+      this.$emit("open-track-dialog", this.repo.name);
     },
     handlePublishLatestClick: function () {
       this.isPublishCodeRepoDialogVisible = true;

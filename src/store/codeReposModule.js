@@ -289,8 +289,9 @@ export const actions = {
   },
 
   fetchBanner: async ({commit, rootState}, datasetId) => {
+    const token = await useGetToken();
     commit('SET_IS_LOADING_CODE_REPO_BANNER', true)
-    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${rootState.userToken}`
+    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${token}`
     try {
       const myHeaders = new Headers();
       myHeaders.append('Accept', 'application/json')
