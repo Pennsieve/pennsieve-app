@@ -4,12 +4,11 @@ import { useStore } from "vuex";
 import BfEmptyPageState from "../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import RepoListItem from "./RepoListItem.vue";
 import ChangeRepoTrackingDialog from "@/components/Code/ChangeRepoTrackingDialog.vue";
-import PublishCodeRepoDialog from "@/components/Code/PublishCodeRepoDialog.vue";
 import { find, propEq } from "ramda";
 
 const store = useStore();
 
-const isLoadingRepos = ref(false);
+const isLoadingRepos = ref(true);
 
 const myReposCount = computed(() => {
   return store.getters["codeReposModule/myReposCount"];
@@ -42,19 +41,19 @@ onMounted(async () => {
   }
 });
 
-async function onPaginationPageChange(page) {
+const onPaginationPageChange = async (page) => {
   try {
     isLoadingRepos.value = true;
     await store.dispatch("codeReposModule/fetchMyRepos", {
       page,
-      size: this.myReposPaginationParams.size,
+      size: myReposPaginationParams.value.size,
     });
-
-    isLoadingRepos.value = false;
   } catch (err) {
     console.error(err);
+  } finally {
+    isLoadingRepos.value = false;
   }
-}
+};
 
 const showTrackDialog = ref(false);
 const selectedRepo = ref({});
@@ -68,7 +67,7 @@ function onChangeRepoTrackingDialogClose() {
 </script>
 
 <template>
-  <bf-stage v-loading="isLoadingRepos" element-loading-text="Loading...">
+  <bf-stage :v-loading="isLoadingRepos.value" element-loading-text="Loading...">
     <bf-empty-page-state class="empty" v-if="showEmptyState">
       <p>
         You have not linked your Github account to Pennsieve yet. Please link

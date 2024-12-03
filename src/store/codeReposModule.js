@@ -367,7 +367,8 @@ export const getters = {
     myReposPaginationParams: state => state.myReposPaginationParams,
     myRepos: state => state.myRepos,
   hasReadMe: state => state.hasReadMe,
-  canPublish: state => state.canPublish
+  canPublish: state => state.canPublish,
+  myReposCount: state => state.myReposCount
 }
 
 const codeReposModule = {
