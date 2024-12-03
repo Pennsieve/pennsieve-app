@@ -91,7 +91,7 @@ export const actions = {
   fetchMyRepos: async({ commit, rootState }, { page, size }) => {
       // Fetch paginated repos for the MyRepos view.
       try {
-        useGetToken()
+        return useGetToken()
             .then(token =>{
               const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
               const myHeaders = new Headers()
@@ -118,7 +118,7 @@ export const actions = {
       catch (err) {
         console.log('Error fetching my repos')
         commit('SET_MY_REPOS', [])
-      }
+      } 
   },
 
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
