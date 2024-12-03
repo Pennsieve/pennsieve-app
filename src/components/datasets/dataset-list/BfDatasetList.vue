@@ -146,7 +146,7 @@
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
-import {mergeDeepRight, propOr} from "ramda";
+import { mergeDeepRight, propOr } from "ramda";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -164,7 +164,7 @@ import UserAccountAge from "../../../mixins/user-account-age";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
-import {useGetToken} from "@/composables/useGetToken";
+import { useGetToken } from "@/composables/useGetToken";
 import toQueryParams from "@/utils/toQueryParams";
 
 export default {
@@ -231,12 +231,7 @@ export default {
 
     ...mapState("datasetModule", ["datasetSearchParams", "datasetTotalCount"]),
 
-    ...mapGetters([
-      "activeOrganization",
-      "config",
-      "teams",
-      "hasFeature",
-    ]),
+    ...mapGetters(["activeOrganization", "config", "teams", "hasFeature"]),
 
     ...mapGetters("datasetModule", ["curDatasetSearchPage"]),
     filteredDatasets() {
@@ -319,8 +314,7 @@ export default {
       handler: function () {
         // Clear search query keywords on org switch
         this.searchQuery = "";
-        this.fetchDatasets()
-
+        this.fetchDatasets();
       },
     },
   },
@@ -357,13 +351,16 @@ export default {
     this.sortBy = sortBy;
     this.sortDirection = sortDirection;
 
-    this.fetchDatasets()
-
+    this.fetchDatasets();
   },
 
   methods: {
-    ...mapActions(["setDatasetFilters","setIsLoadingDatasets",
-      "setIsLoadingDatasetsError","setDatasets"]),
+    ...mapActions([
+      "setDatasetFilters",
+      "setIsLoadingDatasets",
+      "setIsLoadingDatasetsError",
+      "setDatasets",
+    ]),
     ...mapActions("datasetModule", [
       "updateDatasetSearchOrderDirection",
       "updateDatasetSearchLimit",
@@ -374,8 +371,7 @@ export default {
       "updateDatasetSearchWithCollection",
       "updateDatasetSearchOrderBy",
       "updateDatasetOffset",
-      "updateDatasetTotalCount"
-
+      "updateDatasetTotalCount",
     ]),
 
     getDatasetsUrl: async function () {
@@ -383,25 +379,24 @@ export default {
         const params = toQueryParams(
           mergeDeepRight(this.datasetSearchParams, { api_key: t })
         );
-        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`
-      })
-
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
+      });
     },
 
     fetchDatasets: async function () {
       return this.setIsLoadingDatasets(true)
         .then(async () => {
           return this.getDatasetsUrl()
-            .then(url => {
-              return this.sendXhr(url, {})
+            .then((url) => {
+              return this.sendXhr(url, {});
             })
             .then((response) => {
               this.setIsLoadingDatasetsError(false);
               return this.setDatasetData(response);
-            })
+            });
         })
         .catch((err) => {
-          console.log(err)
+          console.log(err);
           this.setDatasetData([]);
           this.setIsLoadingDatasetsError(true);
         })
@@ -420,7 +415,6 @@ export default {
       });
     },
 
-
     onCloseCreateDialog: function () {
       this.newDatasetDialogOpen = false;
     },
@@ -435,6 +429,7 @@ export default {
     onPaginationPageChange: function (page) {
       const offset = (page - 1) * this.datasetSearchParams.limit;
       this.updateDatasetOffset(offset);
+      this.fetchDatasets();
     },
 
     /**
