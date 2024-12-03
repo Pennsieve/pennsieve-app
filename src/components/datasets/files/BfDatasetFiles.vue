@@ -358,23 +358,6 @@ export default {
       return this.files.length > 0;
     },
 
-    /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: async function () {
-      return useGetToken()
-        .then((token) => {
-          if (this.config.apiUrl) {
-            const baseUrl =
-              this.$route.name === "dataset-files" ? "datasets" : "packages";
-            const id =
-              this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-            return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-          }
-        })
-    },
-
     filesUrl:  function () {
         const baseUrl = this.$route.name === "dataset-files" ? "datasets" : "packages";
         const id = this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
@@ -474,10 +457,7 @@ export default {
 
               for (let x in data) {
                 if ((data[x].parent_id.Int64 = curFolderId)) {
-                  this.getFilesUrl
-                    .then((url) => {
-                      this.fetchFiles(url);
-                    })
+                  this.fetchFiles(this.filesUrl);
                   break;
                 }
               }
@@ -492,14 +472,9 @@ export default {
   },
 
   mounted: function () {
-    // if (this.getFilesUrl && !this.files.length) {
-    //   this.fetchFiles();
-    // }
-
-    this.getFilesUrl
-      .then((url) => {
-        this.fetchFiles(url);
-      })
+    if (this.filesUrl && !this.files.length) {
+      this.fetchFiles();
+    }
 
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
     EventBus.$on("add-uploaded-file", this.onAddUploadedFile.bind(this));
@@ -517,16 +492,11 @@ export default {
     });
     EventBus.$on("refreshAfterDeleteModal", (data) => {
       var temp = data;
-      this.getFilesUrl
-        .then((url) => {
-          this.fetchFiles(url);
-        })
+      this.fetchFiles(this.filesUrl);
+
     });
     EventBus.$on("refreshAfterRestore", () => {
-      this.getFilesUrl
-        .then((url) => {
-          this.fetchFiles(url);
-        })
+      this.fetchFiles(this.filesUrl);
     });
   },
 
@@ -1233,24 +1203,7 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-    //     /**
-    //  * Get files URL for dataset
-    //  * @returns {String}
-    //  */
-    //  getFilesUrl: async function () {
-    //    return useGetToken()
-    //      .then((token) => {
-    //        if (this.config.apiUrl) {
-    //          const baseUrl =
-    //            this.$route.name === "dataset-files" ? "datasets" : "packages";
-    //          const id =
-    //            this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-    //          return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-    //        }
-    //      })
-    //
-    //
-    // },
+
 
 
     handleRouteChange: function (to, from) {
