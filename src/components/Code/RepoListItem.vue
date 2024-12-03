@@ -198,7 +198,6 @@ export default {
     // if (this.repo) {
     //   this.fetchReadMe(this.repo.content.id);
     // }
-    console.log(this.repo);
   },
   computed: {
     ...mapGetters(["hasFeature"]),
