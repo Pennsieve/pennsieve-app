@@ -144,6 +144,7 @@ export const actions = {
 
   },
   fetchModels: async({commit, rootState, dispatch}) => {
+
     const datasetId = router.currentRoute.value.params.datasetId
     if(!rootState.config.apiUrl) { return []}
 

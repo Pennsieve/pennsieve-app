@@ -796,6 +796,7 @@ export const actions = {
   addContributor: ({ commit }, contributor) => {
     commit("ADD_DATASET_CONTRIBUTOR", R.clone(contributor));
   },
+
   updateDatasetContributor: ({ commit }, contributor) => {
     commit("UPDATE_DATASET_CONTRIBUTOR", R.clone(contributor));
     commit("UPDATE_ORG_CONTRIBUTOR", R.clone(contributor));
@@ -866,6 +867,9 @@ export const getters = {
 
 
     // return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+  },
+  getModelByHash: (state) => (id) => {
+    return state.conceptsHash[id]
   },
   getOrgMembersById: (state) => (list) => {
     return state.orgMembers.filter((member) => list.includes(member.id));
