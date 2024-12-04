@@ -168,7 +168,7 @@ export default {
       'config',
     ]),
 
-    ...mapState('datasetModule', [
+    ...mapGetters('datasetModule', [
       'datasetActivity',
       'datasetActivityParams',
       'isLoadingDatasetActivity'

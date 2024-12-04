@@ -20,10 +20,10 @@
         </div>
         <div v-if="workspaceReposView" class="repo-info-container">
           <h2>
-            <a :href="getUrl">{{ repo.name }}</a>
+            <a :href="getUrl">{{ repo.content.name }}</a>
           </h2>
           <p>
-            {{ repo.description }}
+            {{ repo.content.description }}
           </p>
           <p>
             Owned by
@@ -35,7 +35,7 @@
           </p>
           <p>
             Accession Number
-            <strong>{{ repo.intId }}</strong>
+            <strong>{{ repo.content.intId }}</strong>
           </p>
         </div>
       </el-col>

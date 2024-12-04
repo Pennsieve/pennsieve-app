@@ -281,6 +281,11 @@ export default {
       );
     },
 
+    datasetUrl: function() {
+      const params = toQueryParams(this.datasetSearchParams);
+      return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
+    },
+
     /**
      * Computes if datasets exist
      * @returns {Boolean}
@@ -317,6 +322,11 @@ export default {
         this.fetchDatasets();
       },
     },
+    datasetUrl:{
+      handler: function () {
+        this.fetchDatasets();
+      }
+    }
   },
 
   /**

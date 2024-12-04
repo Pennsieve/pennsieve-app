@@ -150,7 +150,7 @@ export default {
      * @returns {String}
      */
     formUrl: async function() {
-      useGetToken()
+      return useGetToken()
         .then(token => {
           const id = pathOr('', ['content', 'id'], this.file)
           return `${this.config.apiUrl}/packages/${id}?api_key=${token}`
