@@ -31,33 +31,26 @@ export default {
       'config',
     ]),
 
-    getViewerDataUrl: async function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      const pkgId = pathOr('', ['content', 'id'], this.pkg)
-      return useGetToken()
-          .then(token => {
-            return `${apiUrl}/packages/${pkgId}/view?api_key=${token}`
-          })
-          .catch(err => console.log(err))
-    },
-
-    getFileUrl: async function() {
+    getViewerDataUrl: function() {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
 
-      return useGetToken()
-          .then(token => {
-            return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
-          })
-
+      return `${apiUrl}/packages/${pkgId}/view`
     },
+
+
   },
 
   watch: {
     getViewerDataUrl: {
       handler: function(url) {
         if (url) {
-          this.getViewerData()
+          useGetToken()
+              .then(token => {
+                const fullUrl = `${url}?api_key=${token}`
+                this.getViewerData(fullUrl)
+              })
+
         }
       },
       immediate: true
@@ -68,10 +61,23 @@ export default {
     /**
      * Request viewer data
      */
-    getViewerData: function() {
-      this.sendXhr(this.getViewerDataUrl)
+    getViewerData: async function(url) {
+      return this.sendXhr(url)
         .then(this.handleGetViewerData.bind(this))
         .catch(this.handleXhrError.bind(this))
+    },
+
+    getFileUrl: async function() {
+      const apiUrl = propOr('', 'apiUrl', this.config)
+      const pkgId = pathOr('', ['content', 'id'], this.pkg)
+
+      // return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/`
+      return await useGetToken()
+          .then(token => {
+            console.log(token)
+            return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
+          })
+
     },
 
     /**
