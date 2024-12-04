@@ -369,7 +369,7 @@ export default {
      * @returns {String}
      */
     moveUrl: async function () {
-      useGetToken()
+      return useGetToken()
         .then(token => {
           return `${this.config.apiUrl}/data/move?api_key=${token}`;
         })

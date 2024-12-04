@@ -728,13 +728,14 @@ export default {
      * @params {String} markdown
      */
     onReadmeSave: function(markdown) {
+      console.log('saving readme')
       useGetToken()
         .then(token => {
           const url = `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${token}`
           return useSendXhr(url, {
-            body: JSON.stringify({
+            body: {
               readme: markdown
-            }),
+            },
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -771,7 +772,7 @@ export default {
      */
 
     onChangelogSave: function(markdown) {
-      this.datasetChangelogUrl()
+      this.datasetChangelogUrl
         .then(url => {
           fetch(url, {
             body: JSON.stringify({

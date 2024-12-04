@@ -32,7 +32,7 @@ export function useSendXhr(url, opts) {
     const method = propOr('GET', 'method', opts)
 
     const optsHeader = propOr({}, 'header', opts)
-    const headers = Object.assign({}, { 'Content-type': 'application/json' }, optsHeader)
+    const headers = Object.assign({}, { 'Content-Type': 'application/json' }, optsHeader)
 
     const optsBody = prop('body', opts)
     let requestOpts = { headers, method: method }
