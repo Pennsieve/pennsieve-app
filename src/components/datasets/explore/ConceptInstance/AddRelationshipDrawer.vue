@@ -248,7 +248,7 @@
 </template>
 
 <script>
-import {mapActions, mapGetters, mapState} from 'vuex'
+import {mapActions, mapGetters} from 'vuex'
 import SideDrawer from '../../../shared/side-drawer/SideDrawer.vue'
 import BfButton from '../../../shared/bf-button/BfButton.vue'
 import TableFunctions from '../../../../mixins/table-functions'
@@ -344,9 +344,6 @@ export default {
       'getModelByName',
       'getRelationshipTypeByName'
     ]),
-    ...mapState([
-      'onboardingEvents',
-    ]),
 
     datasetId: function() {
       return this.$route ? this.$route.params.datasetId : ''
@@ -418,13 +415,6 @@ export default {
       const conceptTitle = propOr('', 'displayName', this.conceptTitle)
       return `Filter by ${conceptTitle}`
     },
-
-    onboardingEventsUrl: function(){
-      const apiUrl = propOr('', 'apiUrl', this.config)
-        if (apiUrl && this.userToken) {
-          return `${apiUrl}/onboarding/events?api_key=${this.userToken}`
-        }
-    },
   },
 
   watch: {
@@ -466,7 +456,6 @@ export default {
 
   methods: {
     ...mapActions([
-      'updateOnboardingEvents',
       'addRelationshipType'
     ]),
 
@@ -745,11 +734,6 @@ export default {
           type: 'success'
         }
       })
-      // check for onboarding event state for creating a relationship
-      if (this.onboardingEvents.indexOf('CreatedRelationshipType') === -1){
-        // make post request
-        this.sendOnboardingEventsRequest()
-      }
       this.closeSideDrawer()
       this.isCreating = false
     },
@@ -840,26 +824,7 @@ export default {
         this.relationshipVal = ''
         this.conceptTitle.value = ''
       })
-    },
-
-    sendOnboardingEventsRequest: function(){
-      if (this.onboardingEventsUrl){
-        this.sendXhr(this.onboardingEventsUrl, {
-          method: 'POST',
-          body: 'CreatedRelationshipType',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          }
-       })
-      .then(response => {
-        const onboardingEvents = [...this.onboardingEvents, 'CreatedRelationshipType']
-        this.updateOnboardingEvents(onboardingEvents)
-      })
-      .catch(this.handleXhrError.bind(this))
-      }
-
-    },
-
+    }
   }
 }
 </script>

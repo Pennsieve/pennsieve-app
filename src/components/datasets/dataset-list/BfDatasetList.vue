@@ -161,7 +161,6 @@ import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMe
 import Sorter from "../../../mixins/sorter";
 import Request from "../../../mixins/request";
 import UserAccountAge from "../../../mixins/user-account-age";
-import OnboardingCarousel from "../../onboarding-carousel/OnboardingCarousel.vue";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
@@ -182,7 +181,6 @@ export default {
     DatasetFilterMenu,
     DatasetSortMenu,
     PaginationPageMenu,
-    OnboardingCarousel,
     IconSort,
   },
 
@@ -220,7 +218,6 @@ export default {
     ...mapState([
       "isLoadingDatasets",
       "isLoadingDatasetsError",
-      "onboardingEvents",
       "datasetFilters",
       "gettingStartedOpen",
       "activeOrganization",
