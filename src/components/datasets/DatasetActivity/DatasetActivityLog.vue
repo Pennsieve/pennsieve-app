@@ -183,7 +183,6 @@ export default {
      * @returns {Boolean}
      */
     hasDatasetActivity: function() {
-      console.log('hello')
       return this.datasetActivity.length > 0
     },
 
