@@ -380,8 +380,10 @@ export const getters = {
   getPusherChannel: state => {
     return state.pusherChannel
   },
-  getManifestNotification: state => state.manifestNotification
-
+  getManifestNotification: state => state.manifestNotification,
+  datasetActivity: state => state.datasetActivity,
+  datasetActivityParams: state => state.datasetActivityParams,
+  isLoadingDatasetActivity: state => state.isLoadingDatasetActivity,
 }
 
 const datasetsModule = {

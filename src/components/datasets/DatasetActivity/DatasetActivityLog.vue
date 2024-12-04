@@ -168,7 +168,7 @@ export default {
       'config',
     ]),
 
-    ...mapState('datasetModule', [
+    ...mapGetters('datasetModule', [
       'datasetActivity',
       'datasetActivityParams',
       'isLoadingDatasetActivity'
@@ -183,6 +183,7 @@ export default {
      * @returns {Boolean}
      */
     hasDatasetActivity: function() {
+      console.log('hello')
       return this.datasetActivity.length > 0
     },
 

@@ -60,6 +60,7 @@
         <p> {{ eventDetail.detail.name }} </p>
       </div>
   </div>
+
     <div
       v-if="eventDetail.eventType === 'RENAME_PACKAGE'"
       class="dataset-activity-detail__info"
@@ -88,7 +89,7 @@
           :to="{
             name: 'file-record',
             params: {
-              instanceId: eventDetail.detail.nodeId,
+              fileId: eventDetail.detail.nodeId,
               conceptId: '00000000-0000-0000-0000-000000000000'
             }
           }"
@@ -324,7 +325,7 @@
       </div>
     </div>
 
-    <!-- Dataset meta changes -->
+<!--     Dataset meta changes-->
     <div
       v-if="eventDetail.eventType === 'UPDATE_NAME'"
       class="dataset-activity-detail__info"
