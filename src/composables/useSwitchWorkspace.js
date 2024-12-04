@@ -13,14 +13,12 @@ export async function useSwitchWorkspace(org) {
             return useSendXhr(switchOrgUrl, {method: 'PUT'})
                 .then(response => {
 
+                    const p0 = store.dispatch('clearState')
                     const p1 = store.dispatch('clearDatasetFilters')
                     const p2 = store.dispatch('datasetModule/clearSearchState')
-                    const p3 = store.dispatch('setDatasets', [])
-                    const p4 = store.dispatch('updateConcepts', [])
-                    const p5 = store.dispatch('updateFilesProxyId', null)
-                    const p6 = store.dispatch('setDatasetTemplates', [])
+                    const p3 = store.dispatch('updateFilesProxyId', null)
 
-                    return Promise.all([p1,p2,p3,p4,p5,p6])
+                    return Promise.all([p0,p1,p2,p3])
                         .then(() => {
                             if (!checkIsSubscribed) {
                                 router.replace(`/${orgId}/welcome/terms-of-service`)
