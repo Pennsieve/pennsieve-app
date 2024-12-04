@@ -139,7 +139,9 @@
 <script>
 import { mapState } from 'vuex'
 import { propOr } from 'ramda'
-// import {Auth} from 'aws-amplify'
+import {AuthError, confirmSignIn, signIn, updatePassword } from "aws-amplify/auth";
+
+import * as siteConfig from '@/site-config/site.json'
 
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import PasswordValidator from '@/mixins/password-validator'
@@ -271,7 +273,17 @@ export default {
     async initialLogin() {
       try {
          // this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
-         this.verifyAccount()
+         console.log("hre")
+        this.user = await signIn({
+        username: this.$route.params.username,
+        password: this.$route.params.password,
+        options: {
+          authFlowType: siteConfig.awsConfig.authenticationFlowType
+        }
+        }).then(()=>{
+          confirmSignIn({challengeResponse:this.profileForm.password}).then(()=>{
+            this.isUserPasswordUpdated = true})
+        }).catch(err=>{console.log(err)})
         } catch (error) {
           this.isSavingProfile = false
           this.isUserSignInFailed = true
@@ -283,14 +295,10 @@ export default {
      */
     async verifyAccount() {
       try {
-        // const newUser = await Auth.completeNewPassword(
-        //   this.user,
-        //   this.profileForm.password,
-        //   {
-        //     email: this.$route.query.email
-        //   }
-        // )
-        // this.isUserPasswordUpdated = true
+        const passwordOld = this.$route.params.password;
+        const passwordNew = this.profileForm.password ;
+        await updatePassword({oldPassword: passwordOld,newPassword:passwordNew });
+         this.isUserPasswordUpdated = true
 
       } catch (error) {
         this.handleFailedUserCreation()
