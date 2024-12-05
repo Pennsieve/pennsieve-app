@@ -61,7 +61,7 @@ import {
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
-import {useGetToken} from "@/composables/useGetToken";
+import { useGetToken } from "@/composables/useGetToken";
 
 export default {
   name: "ComputeNodesList",
@@ -95,7 +95,6 @@ export default {
     ...mapGetters(["activeOrganization", "config", "hasFeature"]),
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
     ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
-
 
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
@@ -152,11 +151,7 @@ export default {
      * @returns {String}
      */
     getIntegrationUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`;
-      }
-
-      return "";
+      return `${this.config.apiUrl}/webhooks`;
     },
   },
 };
