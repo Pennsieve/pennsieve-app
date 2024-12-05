@@ -284,6 +284,7 @@ export default {
           confirmSignIn({challengeResponse:this.profileForm.password}).then(()=>{
             this.isUserPasswordUpdated = true})
         }).catch(err=>{console.log(err)})
+
         } catch (error) {
           this.isSavingProfile = false
           this.isUserSignInFailed = true
