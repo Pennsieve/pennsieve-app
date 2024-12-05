@@ -160,18 +160,6 @@
       ]),
 
       /**
-       * Onboarding Events Url
-       * @returns {String}
-       */
-      onboardingEventsUrl: async function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-        useGetToken()
-          .then(token => {
-            return `${apiUrl}/onboarding/events?api_key=${token}`
-          })
-      },
-
-      /**
        * Closes the dialog
        */
       closeDialog: function() {
@@ -268,21 +256,6 @@
         }
         callback()
       },
-
-      sendOnboardingEventsRequest: function(){
-        this.onboardingEventsUrl()
-          .then(url => {
-            this.sendXhr(url, {
-              method: 'POST',
-              body: 'CreatedModel',
-            })
-              .then(response => {
-                const onboardingEvents = [...this.onboardingEvents, 'CreatedModel']
-                this.updateOnboardingEvents(onboardingEvents)
-              })
-              .catch(this.handleXhrError.bind(this))
-          })
-      }
     }
   }
 </script>

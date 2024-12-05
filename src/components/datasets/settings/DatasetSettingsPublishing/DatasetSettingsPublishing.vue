@@ -139,7 +139,6 @@ export default {
       'datasetDescription',
       'getPermission',
       'orgMembers',
-      'onboardingEvents'
     ]),
     ...mapGetters([
       'getPermission',

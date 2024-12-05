@@ -1382,17 +1382,6 @@ export default {
     ...mapActions("viewerModule", ["setActiveViewer", "setActiveTool"]),
 
     /**
-     * get onboarding events url
-     * @returns {String}
-     */
-    onboardingEventsUrl: async function () {
-      return useGetToken().then(token => {
-        const apiUrl = propOr("", "apiUrl", this.config);
-        return `${apiUrl}/onboarding/events?api_key=${token}`;
-      })
-    },
-
-    /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function () {
@@ -2005,12 +1994,6 @@ export default {
                 batchUrl,
                 this.linkedProperties
               );
-
-              // check for onboarding event state for creating a record
-              if (!this.onboardingEvents.some((e) => e === "CreatedRecord")) {
-                // make post request
-                this.sendOnboardingEventsRequest();
-              }
 
               // Redirect user to new concept instance page
               this.$router.replace({
