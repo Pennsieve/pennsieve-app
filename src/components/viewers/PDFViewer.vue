@@ -2,17 +2,17 @@
 <template>
   <div class="pdf-viewer">
 
-    <vue-pdf-app style="height: 100vh;" :pdf="getFileUrl"></vue-pdf-app>
+    <vue-pdf-app v-if="url" style="height: 100vh;" :pdf="url"></vue-pdf-app>
     
   </div>
 </template>
 
 <script>
 import StaticViewer from '../../mixins/static-viewer'
-// import VuePdfApp from "vue3-pdf-app";
 // import this to use default icons for buttons
 import "vue3-pdf-app/dist/icons/main.css";
 import { defineAsyncComponent } from 'vue'
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'PDFViewer',
@@ -49,11 +49,42 @@ export default {
   data() {
     return {
       documentError: undefined,
-      enableUploader: true
+      enableUploader: true,
+      url: ""
+    }
+  },
+
+  watch: {
+    getViewerDataUrl : {
+      handler: function(val) {
+        this.getFullUrl()
+      },
+      immediate: true
     }
   },
 
   methods: {
+
+    getFullUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          const fullUrl = `${this.getViewerDataUrl}?api_key=${token}`
+          return this.sendXhr(fullUrl)
+        })
+        .then(async response =>{
+          this.viewerDataId = response[0].content.id
+          return this.getFileUrl()
+            .then(url => {
+              this.url= url
+            } )
+        })
+        .catch((err) => {
+          console.log(err)
+        })
+    },
+
+
+
     /**
      * Updates current PDF url
      * @param {string} url
