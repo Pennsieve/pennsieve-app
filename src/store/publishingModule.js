@@ -276,33 +276,37 @@ export const actions = {
 
   },
 
-  getDatasetProposalCount: async ({commit, rootState}, type) => {
-
-    const apiKey = await useGetToken()
-
-    useGetToken()
-        .then(token => {
-          let url = `${rootState.config.api2Url}/publishing/submission`
-          const myHeaders = new Headers();
-          myHeaders.append('Authorization', 'Bearer ' + token)
-          myHeaders.append('Accept', 'application/json')
-
-          fetch(url, {method: "GET", headers: myHeaders})
-            .then(response => {
-              return response.json()
-            }).then(json => {
-              commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: json.totalCount })
-            }).catch(err => console.log(err))
-        })
-
-
-
+  getDatasetProposalCount: async ({ commit, rootState }, type) => {
+    const url = `${rootState.config.api2Url}/publishing/submission`;
+  
     try {
-
+      const token = await useGetToken();
+  
+      const headers = new Headers({
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      });
+  
+      const response = await fetch(url, { method: 'GET', headers });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+  
+      if (data && typeof data.totalCount === 'number') {
+        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: data.totalCount });
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (err) {
-      EventBus.$emit('ajaxError', err)
+      console.error('Error fetching dataset proposal count:', err);
+      EventBus.$emit('ajaxError', err);
     }
   },
+  
+
 
   fetchDatasetProposals: async ({state, commit, rootState}) => {
     // const publicationStatus = PublicationTabsStatuses[rootState.route.name]
