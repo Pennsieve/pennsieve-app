@@ -460,15 +460,6 @@ export default {
       'addRelationshipType'
     ]),
 
-    onboardingEventsUrl: async function () {
-      return useGetToken()
-        .then(token => {
-          const apiUrl = propOr('', 'apiUrl', this.config)
-          return `${apiUrl}/onboarding/events?api_key=${token}`
-
-        })
-    },
-
     updateSearchResults: function (searchResults) {
       this.searchResults = searchResults
     },
