@@ -221,7 +221,6 @@ export default {
       "isLoadingDatasets",
       "isLoadingDatasetsError",
       "datasetFilters",
-      "gettingStartedOpen",
       "activeOrganization",
       "datasets",
     ]),
