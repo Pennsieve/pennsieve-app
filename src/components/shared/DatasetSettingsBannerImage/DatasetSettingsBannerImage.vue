@@ -255,14 +255,13 @@
        */
       saveBanner: function() {
         this.isUploadingBanner = true
-
         this.cropper.getCroppedCanvas({
           fillColor: '#fff'
         }).toBlob((blob) => {
           const datasetId = pathOr('', ['content', 'id'], this.dataset)
           const datasetIntId = pathOr('', ['content', 'intId'], this.dataset)
           const imageName = this.selectedImageFile.name
-          const path = this.selectedImageFile.webkitRelativePath;
+          //const blob = this.selectedImageFile.webkitRelativePath;
 
           const formData = new FormData()
           formData.append('banner', blob, `dataset_banner_${datasetIntId}.jpg`)
@@ -277,13 +276,14 @@
                 .then(response => {
                   return response.json()
                 })
-                .then(() => {
+                .then((r) => {
+
                   if(this.isCodeReposDataset) {
-                    this.setCodeRepoDatasetBanner(path)
+                    this.setCodeRepoDatasetBanner(r)
                     this.isDialogVisible = false;
                     this.isUploadingBanner = false
                   } else {
-                    this.setDatasetBanner(path)
+                    this.setDatasetBanner(r.banner)
                       .then(() => {
                         this.isDialogVisible = false
                         this.isUploadingBanner = false
@@ -321,6 +321,7 @@
           : this.$refs.inputFile.files
 
         const image = head(files)
+        image.path = this.$refs.inputFile.value
         this.isValid = this.isValidImage(image)
         if (this.isValid) {
           this.isDialogVisible = true

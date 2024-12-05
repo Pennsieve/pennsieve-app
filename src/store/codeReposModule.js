@@ -368,7 +368,8 @@ export const getters = {
     myRepos: state => state.myRepos,
   hasReadMe: state => state.hasReadMe,
   canPublish: state => state.canPublish,
-  myReposCount: state => state.myReposCount
+  myReposCount: state => state.myReposCount,
+  myReposLoaded: state => state.myReposLoaded
 }
 
 const codeReposModule = {
