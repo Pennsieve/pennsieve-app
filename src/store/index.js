@@ -201,6 +201,7 @@ export const mutations = {
         state.datasetDescription = "";
         state.changelogText = "";
         state.datasetDoi = "";
+        state.datasetTemplates = [];
         state.searchModalVisible = false;
         state.shouldShowLinkOrcidDialog = false;
         state.isLinkOrcidDialogVisible = false;
@@ -1047,6 +1048,8 @@ export const getters = {
     return state.computeNodes
   }
 }
+
+
 
 
 export default createStore({

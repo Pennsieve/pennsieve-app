@@ -161,7 +161,7 @@
        * @returns {String}
        */
       deleteUrl: async function() {
-        useGetToken()
+        return useGetToken()
           .then(token => {
             return `${this.config.apiUrl}/data/delete?api_key=${token}`
           })

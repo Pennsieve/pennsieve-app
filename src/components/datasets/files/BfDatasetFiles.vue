@@ -369,7 +369,7 @@ export default {
      * @returns {String}
      */
     moveUrl: async function () {
-      useGetToken()
+      return useGetToken()
         .then(token => {
           return `${this.config.apiUrl}/data/move?api_key=${token}`;
         })
@@ -1249,7 +1249,7 @@ export default {
   overflow-y: scroll;
   display: block;
   margin-top: 1px;
-  border: 1px solid $gray_2;
+  //border: 1px solid $gray_2;
   max-height: calc(100vh - 200px);
 }
 
