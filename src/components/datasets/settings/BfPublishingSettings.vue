@@ -178,6 +178,7 @@ import { pathOr } from "ramda";
 import IconLockFilled from "../../icons/IconLockFilled.vue";
 import IconDoneCheckCircle from "../../icons/IconDoneCheckCircle.vue";
 import IconInfo from "../../icons/IconInfo.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "BfPublishingSettings",
@@ -218,16 +219,15 @@ export default {
     ]),
 
     ...mapState([
-      "profile",
-      "dataset",
-      "datasetRole",
-      "datasetDoi",
-      "datasetContributors",
-      "datasetDescription",
-      "isDatasetOwner",
-      "datasetBanner",
-      "config",
-      "userToken",
+      'profile',
+      'dataset',
+      'datasetRole',
+      'datasetDoi',
+      'datasetContributors',
+      'datasetDescription',
+      'isDatasetOwner',
+      'datasetBanner',
+      'config',
     ]),
 
     /**
@@ -252,19 +252,7 @@ export default {
       return url;
     },
 
-    /**
-     * Retrieves the API URL for adding ORCID
-     * @returns {String}
-     */
-    getORCIDApiUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
 
-      if (!url) {
-        return "";
-      }
-
-      return `${url}/user/orcid?api_key=${this.userToken}`;
-    },
 
     /**
      * Compute the license for the dataset
@@ -382,6 +370,19 @@ export default {
   methods: {
     ...mapActions(["updateProfile"]),
 
+    /**
+     * Retrieves the API URL for adding ORCID
+     * @returns {String}
+     */
+    getORCIDApiUrl: async function() {
+      return useGetToken()
+        .then(token => {
+          const url = pathOr('', ['config', 'apiUrl'])(this)
+          return `${url}/user/orcid?api_key=${token}`
+
+        }).catch(err => console.log(err))
+
+    },
     /**
      * Logic to connect to user's ORCID
      */

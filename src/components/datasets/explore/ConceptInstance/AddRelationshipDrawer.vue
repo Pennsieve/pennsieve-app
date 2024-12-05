@@ -261,12 +261,14 @@ import RelationshipInput from '../RelationshipInput/RelationshipInput.vue'
 import debounce from 'lodash.debounce'
 import {compose, defaultTo, dissoc, find, head, pathOr, prop, propEq, propOr, uniqBy} from 'ramda'
 import ModelRecordsResults from "../search/ModelRecordsResults.vue";
-import {Methods} from "../../../../typescript/lib/add-relationship-drawer/methods";
+import {Methods} from "../../../../typescript/src/add-relationship-drawer/methods";
 import IconGraph from "../../../icons/IconGraph.vue";
 import IconProcedure from "../../../icons/IconProcedure.vue";
 import IconArrow from "../../../icons/IconArrow.vue";
 import IconDocument from "../../../icons/IconDocument.vue";
 import IconCheck from "../../../icons/IconCheck.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'AddRelationshipDrawer',
@@ -300,7 +302,7 @@ export default {
     },
     relationshipTypes: {
       type: Array,
-      default: function() {
+      default: function () {
         return []
       }
     },
@@ -339,13 +341,12 @@ export default {
     ...mapGetters([
       'concepts',
       'config',
-      'userToken',
       'getModelById',
       'getModelByName',
       'getRelationshipTypeByName'
     ]),
 
-    datasetId: function() {
+    datasetId: function () {
       return this.$route ? this.$route.params.datasetId : ''
     },
 
@@ -353,7 +354,7 @@ export default {
      * Compute heading for drawer
      * @returns {String}
      */
-    drawerHeading: function() {
+    drawerHeading: function () {
       return this.isFile ? 'Attach File to Metadata Records' : 'Create Relationship'
     },
 
@@ -361,7 +362,7 @@ export default {
      * Generates url to create a relationship
      * @returns {String}
      */
-    createRelationshipUrl: function() {
+    createRelationshipUrl: function () {
       const datasetId = this.$route.params.datasetId
       return `${this.config.apiUrl}/models/v1/datasets/${datasetId}/relationships/${this.relationshipId}/instances/batch`
     },
@@ -370,7 +371,7 @@ export default {
      * Compute relationship type icon
      * @returns {String}
      */
-    relationshipTypeIcon: function() {
+    relationshipTypeIcon: function () {
       return this.relationshipVal !== '' ? 'icon-check' : null
     },
 
@@ -378,7 +379,7 @@ export default {
      * Compute destination icon
      * @returns {String}
      */
-    destinationIcon: function() {
+    destinationIcon: function () {
       return this.selectedItemIds.size > 0 ? 'icon-check' : null
     },
 
@@ -386,7 +387,7 @@ export default {
      * Compute model icon
      * @returns {String}
      */
-    modelIcon: function() {
+    modelIcon: function () {
       return defaultTo('icon-graph', prop('icon', this.concept))
     },
 
@@ -394,7 +395,7 @@ export default {
      * Computes concept name
      * @returns {String}
      */
-    conceptName: function() {
+    conceptName: function () {
       return propOr('', 'name', this.concept)
       return defaultTo(defaultName, this.selectedModel)
     },
@@ -403,7 +404,7 @@ export default {
      * Computes whether or not to disable next step
      * @returns {Boolean}
      */
-    disableButton: function() {
+    disableButton: function () {
       return this.selectedItemIds.size === 0 || this.relationshipVal === ''
     },
 
@@ -411,22 +412,22 @@ export default {
      * Returns sorted keys
      * @returns {Array}
      */
-    placeholderText: function() {
+    placeholderText: function () {
       const conceptTitle = propOr('', 'displayName', this.conceptTitle)
       return `Filter by ${conceptTitle}`
     },
   },
 
   watch: {
-    selectTypeOpen: function() {
+    selectTypeOpen: function () {
       this.resizeTable()
     },
 
-    chooseDestinationOpen: function() {
+    chooseDestinationOpen: function () {
       this.resizeTable()
     },
 
-    searchResults: function(searchResults) {
+    searchResults: function (searchResults) {
       this.resizeTable()
       const conceptTitleObj = this.getConceptTitle(searchResults) || {}
       if (!this.property.value && conceptTitleObj.name) {
@@ -436,7 +437,7 @@ export default {
     },
 
     relationshipVal: {
-      handler: function(val) {
+      handler: function (val) {
         if (val) {
           this.chooseDestinationOpen = true
           this.relationshipDisplayName = this.getRelationshipDisplayName(val, this.relationshipTypes)
@@ -446,11 +447,11 @@ export default {
     }
   },
 
-  mounted: function() {
+  mounted: function () {
     window.addEventListener('resize', this.resizeTable.bind(this))
   },
 
-  unmounted: function() {
+  unmounted: function () {
     window.removeEventListener('resize', this.resizeTable.bind(this))
   },
 
@@ -459,7 +460,16 @@ export default {
       'addRelationshipType'
     ]),
 
-    updateSearchResults: function(searchResults) {
+    onboardingEventsUrl: async function () {
+      return useGetToken()
+        .then(token => {
+          const apiUrl = propOr('', 'apiUrl', this.config)
+          return `${apiUrl}/onboarding/events?api_key=${token}`
+
+        })
+    },
+
+    updateSearchResults: function (searchResults) {
       this.searchResults = searchResults
     },
 
@@ -491,7 +501,7 @@ export default {
      * @returns {String}
      * @param direction
      */
-    relationshipTypesUrl: function(direction) {
+    relationshipTypesUrl: function (direction) {
 
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const conceptsUrl = propOr('', 'conceptsUrl', this.config)
@@ -519,18 +529,21 @@ export default {
      * @param {String} direction
      * @returns {Promise}
      */
-    getRelationships: function(direction) {
-      return this.sendXhr(this.relationshipTypesUrl(direction), {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-      })
+    getRelationships: function (direction) {
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(this.relationshipTypesUrl(direction), {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+        })
+      }).catch(err => useHandleXhrError(err))
     },
 
     /**
      * Request all relationship types (outbound and inverse directions)
      */
-    getAllRelationships: function() {
+    getAllRelationships: function () {
       const requests = [this.getRelationships('outbound'), this.getRelationships('inverse')]
 
       Promise.all(requests)
@@ -556,7 +569,7 @@ export default {
      * Callback for window resize, debounced 200ms
      */
     onWindowResize: debounce(
-      function() {
+      function () {
         this.resizeTable()
       },
       200
@@ -566,7 +579,7 @@ export default {
      * Results table
      * Compute height of the table's parent and set property to send to the table
      */
-    resizeTable: function() {
+    resizeTable: function () {
       this.$nextTick(() => {
 
         const searchResultsWrap = this.$refs.searchResultsWrap
@@ -582,17 +595,17 @@ export default {
      * @param {Array} list
      * @returns {Object}
      */
-    getConceptTitle: function(searchResults) {
+    getConceptTitle: function (searchResults) {
       return Methods.getConceptTitle(searchResults)
     },
 
     /**
      * Opens the select menu based upon node index
      */
-    openSelectMenu: function(idx) {
+    openSelectMenu: function (idx) {
       this.$refs.relationshipInput.open()
     },
-    checkBelongsToExists: function() {
+    checkBelongsToExists: function () {
       const belongsTo = this.getRelationshipTypeByName('belongs_to')
       if (Object.keys(belongsTo).length === 0) {
         // if not, create a default, then create the file relationship
@@ -601,14 +614,14 @@ export default {
       return Promise.resolve([])
     },
 
-    createRelationships: function() {
+    createRelationships: function () {
       this.isLoading = true
       if (this.isFile) {
 
         this.checkBelongsToExists()
-        .then(() => this.createFileRelationshipRequests())
-        .then(() => this.createRelationshipsSuccess())
-        .finally(() => this.isLoading === false)
+          .then(() => this.createFileRelationshipRequests())
+          .then(() => this.createRelationshipsSuccess())
+          .finally(() => this.isLoading === false)
       } else {
         this.createRecordRelationships().finally(() => this.isLoading = false)
       }
@@ -617,66 +630,69 @@ export default {
     /**
      * Creates default relationship
      */
-    createDefaultRelationship: function() {
+    createDefaultRelationship: function () {
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      return this.sendXhr(url, {
-        method: 'POST',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).then(response => {
-        this.addRelationshipType(response)
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(url, {
+            method: 'POST',
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            body: {
+              name: 'belongs_to',
+              displayName: 'Belongs To',
+              description: '',
+              schema: []
+            }
+          }).then(response => {
+            this.addRelationshipType(response)
+          })
+        }).catch(err => useHandleXhrError(err))
     },
 
     /**
      * Create file relationships
      */
-    createFileRelationship: function() {
+    createFileRelationship: function () {
       this.createFileRelationshipRequests()
-      .then((resp) => {
-        // check for errors
-        const hasErrors = this.checkForRelationshipErrors(resp)
-        if (hasErrors) {
-          this.isCreating = false
-          return this.handleXhrError()
-        }
-        const conceptName = propOr('', 'name', this.concept)
-
-        // track adding a relationship between a file and a record
-        EventBus.$emit('track-event', {
-          name: 'Add a Relationship Between a File and a Record'
-        })
-
-        // add relationships to file(s)
-        EventBus.$emit('refresh-table-data', {
-          name: conceptName,
-          count: this.selectedItemIds.size,
-          type: 'Add'
-        })
-
-        EventBus.$emit('toast', {
-          detail: {
-            msg: `A new relationship has been created`,
-            type: 'success'
+        .then((resp) => {
+          // check for errors
+          const hasErrors = this.checkForRelationshipErrors(resp)
+          if (hasErrors) {
+            this.isCreating = false
+            return this.handleXhrError()
           }
+          const conceptName = propOr('', 'name', this.concept)
+
+          // track adding a relationship between a file and a record
+          EventBus.$emit('track-event', {
+            name: 'Add a Relationship Between a File and a Record'
+          })
+
+          // add relationships to file(s)
+          EventBus.$emit('refresh-table-data', {
+            name: conceptName,
+            count: this.selectedItemIds.size,
+            type: 'Add'
+          })
+
+          EventBus.$emit('toast', {
+            detail: {
+              msg: `A new relationship has been created`,
+              type: 'success'
+            }
+          })
+          this.closeSideDrawer()
+          this.isCreating = false
         })
-        this.closeSideDrawer()
-        this.isCreating = false
-      })
     },
 
     /**
      * Creates relationships with file(s)
      */
-    createFileRelationshipRequests: function() {
+    createFileRelationshipRequests: function () {
       const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
       const url = `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package/instances`
 
@@ -689,33 +705,37 @@ export default {
           }
         }
 
-        return this.sendXhr(url, {
-          method: 'POST',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body: {
-            externalId: packageId,
-            targets: [{
-              direction: 'FromTarget',
-              linkTarget,
-              relationshipType: 'belongs_to',
-              relationshipData: []
-            }]
-          }
-        })
+        return useGetToken()
+          .then(token => {
+            return this.sendXhr(url, {
+              method: 'POST',
+              header: {
+                'Authorization': `bearer ${token}`
+              },
+              body: {
+                externalId: packageId,
+                targets: [{
+                  direction: 'FromTarget',
+                  linkTarget,
+                  relationshipType: 'belongs_to',
+                  relationshipData: []
+                }]
+              }
+            })
+          }).catch(err => useHandleXhrError(err))
+
       })
       // this maps over all the queued responses to guarantee that all responses are returned regardless of error status
       return Promise.all(queues.map(q => {
         return q.catch(err => ({status: err.status}))
-      }))
+      })).catch(err => console.log(err))
     },
 
     /**
      * Callback for create relationship success
      * Refresh table and close drawer
      */
-    createRelationshipsSuccess: function() {
+    createRelationshipsSuccess: function () {
       const conceptName = propOr('', 'name', this.concept)
       const displayName = propOr('', 'displayName', this.concept)
 
@@ -742,7 +762,7 @@ export default {
     /**
      * Create relationship
      */
-    createRecordRelationships: function() {
+    createRecordRelationships: function () {
       // execute batch request
       let body = []
       let to, from = ''
@@ -760,33 +780,38 @@ export default {
           values: []
         })
       })
-      return this.sendXhr(this.createRelationshipUrl, {
-        method: 'POST',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        body
-      })
-        .then(() => {
-          // track adding a relationship between records
-          EventBus.$emit('track-event', {
-            name: 'Add a Relationship Between Records'
-          })
 
-          this.createRelationshipsSuccess()
-        })
-        .catch(this.handleXhrError.bind(this))
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(this.createRelationshipUrl, {
+            method: 'POST',
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            body
+          })
+            .then(() => {
+              // track adding a relationship between records
+              EventBus.$emit('track-event', {
+                name: 'Add a Relationship Between Records'
+              })
+
+              this.createRelationshipsSuccess()
+            })
+
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
      * Handles table column selection change
      * @param {Array} items
      */
-    onSelectAll: function(items) {
+    onSelectAll: function (items) {
       this.selectedItemIds = Methods.onSelectAllItems(this.selectedItemIds, items, this.searchResults)
     },
 
-    onSelectIndividual: function(value, item) {
+    onSelectIndividual: function (value, item) {
       this.selectedItemIds = Methods.onSelectIndividualItem(this.selectedItemIds, value, item)
     },
 
@@ -794,7 +819,7 @@ export default {
      * Opens the side drawer and sets the drawer title
      * @param {String} conceptId
      */
-    openDrawer: function(conceptId) {
+    openDrawer: function (conceptId) {
       this.concept = (this.concepts || []).find(c => c.id === conceptId) || {}
 
       this.$nextTick(() => {
@@ -813,7 +838,7 @@ export default {
     /**
      * Handles close-side-drawer event
      */
-    closeSideDrawer: function() {
+    closeSideDrawer: function () {
       this.visible = false
 
       this.$nextTick(() => {

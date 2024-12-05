@@ -1,5 +1,7 @@
 import RecordsTable from './RecordsTable.vue'
 import { mount } from '@vue/test-utils'
+global.requestAnimationFrame = function () {}
+
 
 
 describe('RecordsTable.vue', () => {

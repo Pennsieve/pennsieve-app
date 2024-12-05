@@ -3,6 +3,8 @@ import {
   pathOr,
   propOr
 } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const initialState = () => ({
   myRepos: [],
@@ -89,74 +91,82 @@ export const actions = {
   fetchMyRepos: async({ commit, rootState }, { page, size }) => {
       // Fetch paginated repos for the MyRepos view.
       try {
-        const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
-        const apiKey = rootState.userToken || Cookies.get('user_token')
-        const myHeaders = new Headers()
-        myHeaders.append('Authorization', 'Bearer ' + apiKey)
-        myHeaders.append('Accept', 'application/json')
-        const response = await fetch(url, { headers: myHeaders })
-        if (response.ok) {
-          const responseJson = await response.json()
-          const myRepos = responseJson.repos
-          commit('SET_MY_REPOS', myRepos);
-          commit('SET_MY_REPOS_CURRENT_PAGE', page);
-          commit('SET_MY_REPOS_COUNT', responseJson.count)
-
-        } else {
-          commit('SET_MY_REPOS', [])
-          commit('SET_MY_REPOS_LOADED', false);
-          throw new Error(response.statusText)
-        }
+        return useGetToken()
+            .then(token =>{
+              const url =`${rootState.config.api2Url}/repositories?page=${page}&size=${size}`
+              const myHeaders = new Headers()
+              myHeaders.append('Authorization', 'Bearer ' + token)
+              myHeaders.append('Accept', 'application/json')
+              return fetch(url, { headers: myHeaders })
+                .then(response => {
+                  if (response.ok) {
+                    return response.json()
+                      .then(json => {
+                        const myRepos = json.repos
+                        commit('SET_MY_REPOS', myRepos);
+                        commit('SET_MY_REPOS_CURRENT_PAGE', page);
+                        commit('SET_MY_REPOS_COUNT', json.count)
+                      })
+                  } else {
+                    commit('SET_MY_REPOS', [])
+                    commit('SET_MY_REPOS_LOADED', false);
+                    throw new Error(response.statusText)
+                  }
+                })
+        })
       }
       catch (err) {
+        console.log('Error fetching my repos')
         commit('SET_MY_REPOS', [])
-      }
+      } 
   },
 
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
-    try {
-      const url = `${rootState.config.api2Url}/repository/enable`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "POST",
-        headers: myHeaders,
-        body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
-      })
-      if (response.ok) {
-        const repo = await response.json()
-      } else {
-        throw new Error(response.statusText)
-      }
-    }
-    catch (err) {
-      console.error(err);
-    }
+      return useGetToken()
+        .then(token =>{
+          const url = `${rootState.config.api2Url}/repository/enable`
+          const myHeaders = new Headers();
+          myHeaders.append('Authorization', 'Bearer ' + token)
+          myHeaders.append('Accept', 'application/json')
+          return fetch(url, {
+            method: "POST",
+            headers: myHeaders,
+            body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
+          })
+            .then(response => {
+              if (response.ok) {
+                return response.json()
+              } else {
+                throw new Error(response.statusText)
+              }
+            })
+        })
+
   },
 
   disableRepoTracking: async({ commit, rootState }, { repo }) => {
-    try {
-      const url = `${rootState.config.api2Url}/repository/disable`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "POST",
-        headers: myHeaders,
-        body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
-      })
-      if (response.ok) {
-        const repo = await response.json()
-      } else {
-        throw new Error(response.statusText)
-      }
-    }
-    catch (err) {
-      console.error(err);
-    }
+      return useGetToken()
+          .then(token =>{
+            const url = `${rootState.config.api2Url}/repository/disable`
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            return fetch(url, {
+              method: "POST",
+              headers: myHeaders,
+              body: JSON.stringify({origin: repo.origin, url: repo.url, type: repo.type})
+            })
+              .then(response => {
+                if (response.ok) {
+                  return response.json()
+                } else {
+                  throw new Error(response.statusText)
+                }
+              })
+          })
+          .catch(useHandleXhrError)
+
+
   },
 
   updateWorkspaceRepoOffset: ({ commit }, offset) => {
@@ -165,24 +175,33 @@ export const actions = {
 
   fetchWorkspaceRepos: async ({ commit, rootState, dispatch }, { limit, offset, page }) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "GET",
-        headers: myHeaders,
-      })
-      if (response.ok) {
-        const workspaceRepos = await response.json()
-        commit('SET_WORKSPACE_REPOS', workspaceRepos)
-        commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
-        commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
-        dispatch('fetchWorkspaceReposBanner')
-      } else {
-        throw new Error(response.statusText)
-      }
+      useGetToken()
+          .then(token =>{
+            const url = `${rootState.config.apiUrl}/datasets/paginated?limit=${limit}&offset=${offset}&type=release`
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            return fetch(url, {
+              method: "GET",
+              headers: myHeaders,
+            })
+                .then(response => {
+                  if (response.ok) {
+                    return response.json()
+                        .then(workspaceRepos => {
+                          commit('SET_WORKSPACE_REPOS', workspaceRepos)
+                          commit('SET_WORKSPACE_REPOS_COUNT', workspaceRepos.totalCount)
+                          commit('SET_WORKSPACE_REPOS_CURRENT_PAGE', page)
+                          dispatch('fetchWorkspaceReposBanner')
+                        })
+                  } else {
+                    throw new Error(response.statusText)
+                  }
+                })
+
+          })
+          .catch(useHandleXhrError)
+
     }
     catch (err) {
       console.error(err);
@@ -202,28 +221,30 @@ export const actions = {
       tags: formVal.tags,
     }
     try {
-      const url = `${rootState.config.api2Url}/repository/external`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: myHeaders,
-        body: JSON.stringify(bodyToSend)
-      })
-      if (!response.ok) {
-        throw new Error(`${response.status}`);
-      }
-
-      return response;
+      return useGetToken()
+          .then(token =>{
+            const url = `${rootState.config.api2Url}/repository/external`
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            return fetch(url, {
+              method: "PUT",
+              headers: myHeaders,
+              body: JSON.stringify(bodyToSend)
+            })
+                .then(response => {
+                  if (!response.ok) {
+                    throw new Error(`${response.status}`);
+                  }
+                  return Promise.resolve()
+                })
+            })
+            .catch(useHandleXhrError)
     }
     catch (err) {
       console.error(err);
       throw err; 
     }
-    
-   
   },
 
   publishCodeRepo: async ({ commit, rootState }, { repo }) => {
@@ -237,19 +258,27 @@ export const actions = {
       type: 'publishing'
     }
     try {
-      const url = `${rootState.config.api2Url}/repository/publish`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "POST",
-        headers: myHeaders,
-        body: JSON.stringify(bodyToSend)
-      })
-      if (!response.ok) {
-        throw new Error(`${response.status}`);
-      }
+      return useGetToken()
+          .then(token =>{
+            const url = `${rootState.config.api2Url}/repository/publish`
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            return fetch(url, {
+              method: "POST",
+              headers: myHeaders,
+              body: JSON.stringify(bodyToSend)
+            })
+                .then(response => {
+                  if (!response.ok) {
+                    throw new Error(`${response.status}`);
+                  }
+                  return Promise.resolve()
+                })
+          })
+          .catch(useHandleXhrError)
+
+
 
       return response;
     }
@@ -260,8 +289,9 @@ export const actions = {
   },
 
   fetchBanner: async ({commit, rootState}, datasetId) => {
+    const token = await useGetToken();
     commit('SET_IS_LOADING_CODE_REPO_BANNER', true)
-    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${rootState.userToken}`
+    const url = `${rootState.config.apiUrl}/datasets/${datasetId}/banner?api_key=${token}`
     try {
       const myHeaders = new Headers();
       myHeaders.append('Accept', 'application/json')
@@ -297,23 +327,29 @@ export const actions = {
   },
   fetchReadMe: async({state, commit, rootState, dispatch}, id) => {
     try {
-      const url = `${rootState.config.apiUrl}/datasets/${id}/readme`
-      const apiKey = rootState.userToken || Cookies.get('user_token')
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + apiKey)
-      myHeaders.append('Accept', 'application/json')
-      const response = await fetch(url, {
-        method: "GET",
-        headers: myHeaders
-      })
-      if (response.ok) {
-        const readMe = await response.json();
-        commit('SET_HAS_README', readMe)
-        return readMe
-      }
-      if (!response.ok) {
-        throw new Error(`${response.status}`);
-      }
+      return useGetToken()
+          .then(token =>{
+            const url = `${rootState.config.apiUrl}/datasets/${id}/readme`
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            return fetch(url, {
+              method: "GET",
+              headers: myHeaders
+            })
+                .then(response => {
+                  if (response.ok) {
+                    return response.json()
+                        .then(readMe => {
+                          commit('SET_HAS_README', readMe)
+                          return readMe
+                        })
+                  } else {
+                    throw new Error(`${response.status}`);
+                  }
+                })
+          })
+          .catch(useHandleXhrError)
     }
     catch (err) {
       console.error(err);
@@ -328,8 +364,11 @@ export const getters = {
   activeRepoDatasetId : state => pathOr('', ['content', 'id'], state.activeRepo),
   bannerURL : state => state.activeRepoBannerURL,
   isLoadingCodeRepoBanner : state => state.isLoadingCodeRepoBanner,
+    myReposPaginationParams: state => state.myReposPaginationParams,
+    myRepos: state => state.myRepos,
   hasReadMe: state => state.hasReadMe,
-  canPublish: state => state.canPublish
+  canPublish: state => state.canPublish,
+  myReposCount: state => state.myReposCount
 }
 
 const codeReposModule = {

@@ -61,6 +61,7 @@ import {
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: "ComputeNodesList",
@@ -79,7 +80,6 @@ export default {
   data() {
     return {
       createComputeNodeDialogVisible: false,
-      showEmptyState: false,
     };
   },
 
@@ -92,8 +92,10 @@ export default {
   },
 
   computed: {
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
     ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
+
 
     orgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);

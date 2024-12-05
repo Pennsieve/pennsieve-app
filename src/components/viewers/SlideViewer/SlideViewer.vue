@@ -70,6 +70,8 @@
   import Request from '../../../mixins/request'
   import ViewerActiveTool from '../../../mixins/viewer-active-tool'
   import EventBus from '../../../utils/event-bus'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError} from "@/mixins/request/request_composable";
 
   /**
    * Convert value to length with unit
@@ -214,7 +216,6 @@
 
       ...mapState([
         'config',
-        'userToken'
       ]),
 
       ...mapState('viewerModule', [
@@ -230,22 +231,24 @@
        * Compute get viewer data URL
        * @returns {String}
        */
-      getViewerDataUrl: function () {
-        const packageId = pathOr('', ['content', 'id'], this.activeViewer)
-        return this.userToken && packageId
-          ? `${this.config.apiUrl}/packages/${packageId}/view?api_key=${this.userToken}&includePackages=true&depth=1`
-          : ''
+      getViewerDataUrl: async function () {
+        return await useGetToken()
+          .then(token => {
+            const packageId = pathOr('', ['content', 'id'], this.activeViewer)
+            return `${this.config.apiUrl}/packages/${packageId}/view?api_key=${token}&includePackages=true&depth=1`
+          }).catch(useHandleXhrError)
       },
 
       /**
        * Compute get annotations URL
        * @returns {String}
        */
-      getAnnotationsUrl: function () {
-        const packageId = pathOr('', ['content', 'id'], this.activeViewer)
-        return this.userToken && packageId
-          ? `${this.config.apiUrl}/packages/${packageId}/annotations?api_key=${this.userToken}`
-          : ''
+      getAnnotationsUrl: async function () {
+        return await useGetToken()
+          .then(token => {
+            const packageId = pathOr('', ['content', 'id'], this.activeViewer)
+            return `${this.config.apiUrl}/packages/${packageId}/annotations?api_key=${token}`
+          }).catch(useHandleXhrError)
       },
     },
 
@@ -305,13 +308,22 @@
           head
         )(response)
         const packageId = pathOr('', ['content', 'id'], this.activeViewer)
-        this.slideViewer.open(`${this.config.apiUrl}/packages/${packageId}/files/${fileId}/presign/slide.dzi?api_key=${this.userToken}`)
 
-        this.slideViewer.tileSource = {
-          getTileUrl: function( level, x, y ) {
-            return `${this.config.apiUrl}/packages/${packageId}/files/${fileId}/presign/slide_files/${level}/${y}_${x}.jpeg?api_key=${this.userToken}`
-          }
-        }
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/packages/${packageId}/files/${fileId}/presign/slide.dzi?api_key=${token}`
+            this.slideViewer.open(url)
+
+            let self = this
+            this.slideViewer.tileSource = {
+              getTileUrl: function( level, x, y ) {
+                return `${self.config.apiUrl}/packages/${packageId}/files/${fileId}/presign/slide_files/${level}/${y}_${x}.jpeg?api_key=${token}`
+              }
+            }
+          }).catch(console.log)
+
+
+
       },
 
       /**
@@ -839,16 +851,19 @@
           properties: metadata
         }
 
-        const url = `${this.config.apiUrl}/annotations?api_key=${this.userToken}`
-
-        this.sendXhr(url, {
-          method: 'POST',
-          body
-        })
-          .then(response => {
-            this._handleCreateAnnotation(response)
+        useGetToken()
+          .then(async token => {
+            const url = `${this.config.apiUrl}/annotations?api_key=${token}`
+            return this.sendXhr(url, {
+              method: 'POST',
+              body
+            })
+              .then(response => {
+                this._handleCreateAnnotation(response)
+              })
           })
           .catch(this.handleXhrError.bind(this))
+
       },
 
       /**
@@ -908,14 +923,21 @@
         }
 
         const annotationId = propOr('', 'id', annotation)
-        const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${this.userToken}`
-        this.sendXhr(url, {
-          method: 'PUT',
-          body
-        })
-          .then(response => {
-            this._handleEditAnnotation(annotation, response)
+
+        useGetToken()
+          .then(async token => {
+            const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${token}`
+            return this.sendXhr(url, {
+              method: 'PUT',
+              body
+            })
+              .then(response => {
+                this._handleEditAnnotation(annotation, response)
+              })
           })
+          .catch(useHandleXhrError)
+
+
       },
 
       /**
@@ -990,40 +1012,44 @@
         const annotationId = pathOr(0, ['annotation', 'id'], this.annotationDelete)
         const withDiscussions = propOr(false, 'withDiscussions', this.annotationDelete)
 
-        const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${this.userToken}&withDiscussions=${withDiscussions}`
-
-        fetch(url, {
-          method: 'DELETE',
-          headers: {
-            'Content-type': 'application/json'
-          }
-        })
-          .then(response => {
-            const {status, statusText} = response
-            if (status >= 400) {
-              throw new Error(statusText)
-            }
-            return response.json()
-          })
-          .then(() => {
-            const annotation = propOr({}, 'annotation', this.annotationDelete)
-            this.$store.dispatch('viewerModule/deleteAnnotation', annotation)
-              .then(() => {
-                // Find annotation on canvas and remove it
-                try {
-                  this.overlay.removeAnnotation(annotationId)
-                  EventBus.$emit('toast', {type: 'MESSAGE', msg: 'Annotation deleted'})
-                } catch(ex) {
-                  EventBus.$emit('toast', {type: 'MESSAGE', msg: 'There was an error'})
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${token}&withDiscussions=${withDiscussions}`
+            return fetch(url, {
+              method: 'DELETE',
+              headers: {
+                'Content-type': 'application/json'
+              }
+            })
+              .then(response => {
+                const {status, statusText} = response
+                if (status >= 400) {
+                  throw new Error(statusText)
                 }
+                return response.json()
+              })
+              .then(() => {
+                const annotation = propOr({}, 'annotation', this.annotationDelete)
+                return this.$store.dispatch('viewerModule/deleteAnnotation', annotation)
+                  .then(() => {
+                    // Find annotation on canvas and remove it
+                    try {
+                      this.overlay.removeAnnotation(annotationId)
+                      EventBus.$emit('toast', {type: 'MESSAGE', msg: 'Annotation deleted'})
+                    } catch(ex) {
+                      EventBus.$emit('toast', {type: 'MESSAGE', msg: 'There was an error'})
+                    }
 
-                this.isSlideAnnotationDeleteDialogVisible = false
+                    this.isSlideAnnotationDeleteDialogVisible = false
+                  })
               })
           })
           .catch(() => {
             const payload = Object.assign({}, this.annotationDelete, { withDiscussions: true })
             this.confirmDeleteAnnotation(payload)
           })
+
+
       },
 
       /**
@@ -1134,59 +1160,69 @@
        * @param {Object} layer
        */
       createLayer: function(layer) {
-        const url = `${this.config.apiUrl}/annotations/layer?api_key=${this.userToken}`
-        const packageId = pathOr('', ['content', 'id'], this.activeViewer)
-
-        this.sendXhr(url, {
-          method: 'POST',
-          body: {
-            name: layer.name,
-            annotatedItem: packageId,
-            color: layer.color
-          }
-        })
-          .then(response => {
-            const transformedLayer = {
-              annotations: [],
-              hexColor: response.color
-            }
-
-            this.$store.dispatch('viewerModule/createLayer', Object.assign({}, response, transformedLayer))
-              .then(() => {
-                if (layer.name === 'Default') {
-                  return
+        useGetToken()
+          .then(async token => {
+            const url = `${this.config.apiUrl}/annotations/layer?api_key=${token}`
+            const packageId = pathOr('', ['content', 'id'], this.activeViewer)
+            return this.sendXhr(url, {
+              method: 'POST',
+              body: {
+                name: layer.name,
+                annotatedItem: packageId,
+                color: layer.color
+              }
+            })
+              .then(response => {
+                const transformedLayer = {
+                  annotations: [],
+                  hexColor: response.color
                 }
-                this.resetLayerData()
 
-                EventBus.$emit('toast', {
-                  type: 'MESSAGE',
-                  msg: `'${layer.name}' Layer Created`
-                })
+                return this.$store.dispatch('viewerModule/createLayer', Object.assign({}, response, transformedLayer))
+                  .then(() => {
+                    if (layer.name === 'Default') {
+                      return
+                    }
+                    this.resetLayerData()
+
+                    EventBus.$emit('toast', {
+                      type: 'MESSAGE',
+                      msg: `'${layer.name}' Layer Created`
+                    })
+                  })
               })
+
           })
+          .catch(useHandleXhrError)
+
+
+
       },
 
       editLayer: function(layer) {
-        const url = `${this.config.apiUrl}/annotations/layer/${layer.id}?api_key=${this.userToken}`
-
-        this.sendXhr(url, {
-          method: 'PUT',
-          body: {
-            name: layer.name,
-            color: layer.color
-          }
-        })
-          .then(response => {
-            const layer = Object.assign({}, response, { hexColor: response.color })
-
-            this.$store.dispatch('viewerModule/updateLayer', layer).then(() => {
-              this.updateCanvasLayers()
-              this.resetLayerData()
-
-              EventBus.$emit('toast', {
-                type: 'MESSAGE', msg: `'${layer.name}' Layer Updated`
-              })
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/annotations/layer/${layer.id}?api_key=${token}`
+            return this.sendXhr(url, {
+              method: 'PUT',
+              body: {
+                name: layer.name,
+                color: layer.color
+              }
             })
+              .then(response => {
+                const layer = Object.assign({}, response, { hexColor: response.color })
+
+                return this.$store.dispatch('viewerModule/updateLayer', layer).then(() => {
+                  this.updateCanvasLayers()
+                  this.resetLayerData()
+
+                  EventBus.$emit('toast', {
+                    type: 'MESSAGE', msg: `'${layer.name}' Layer Updated`
+                  })
+                })
+              })
+
           })
           .catch(this.handleXhrError.bind(this))
       },
@@ -1231,27 +1267,29 @@
       * @param {Object} layer
       */
       deleteLayer: function(layer) {
-        const url = `${this.config.apiUrl}/annotations/layer/${layer.id}?api_key=${this.userToken}`
 
-        this.sendXhr(url, {
-          method: 'DELETE'
-        })
-          .then(() => {
-            const layerAnnotations = layer.annotations
-            layerAnnotations.forEach(ann => {
-              const annotationId = propOr('', 'id', ann)
-              this.overlay.removeAnnotation(annotationId)
+        useGetToken()
+          .then(async token => {
+            const url = `${this.config.apiUrl}/annotations/layer/${layer.id}?api_key=${token}`
+            return this.sendXhr(url, {
+              method: 'DELETE'
             })
+              .then(() => {
+                const layerAnnotations = layer.annotations
+                layerAnnotations.forEach(ann => {
+                  const annotationId = propOr('', 'id', ann)
+                  this.overlay.removeAnnotation(annotationId)
+                })
 
-            this.$store.dispatch('viewerModule/deleteLayer', layer).then(() => {
-
-              this.resetLayerDeleteData()
-
-              EventBus.$emit('toast', {
-                type: 'MESSAGE',
-                msg: `'${layer.name}' Layer Deleted`
+                return this.$store.dispatch('viewerModule/deleteLayer', layer)
+                  .then(() => {
+                    this.resetLayerDeleteData()
+                      EventBus.$emit('toast', {
+                        type: 'MESSAGE',
+                        msg: `'${layer.name}' Layer Deleted`
+                      })
+                })
               })
-            })
           })
           .catch(this.handleXhrError.bind(this))
       }

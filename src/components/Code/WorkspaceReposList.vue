@@ -27,7 +27,7 @@
       </div>
       <div class="pagination-container">
         <el-pagination
-          v-if="myReposCount && myRepos.length > 5"
+          v-if="workspaceReposCount && workspaceRepos.length > 5"
           :page-size="workspaceReposPaginationParams.limit"
           :current-page="workspaceReposPaginationParams.currentPage"
           layout="prev, pager, next"

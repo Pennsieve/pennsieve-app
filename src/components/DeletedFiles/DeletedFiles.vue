@@ -91,6 +91,8 @@ import GetFileProperty from "../../mixins/get-file-property";
 import { mapGetters } from "vuex";
 import { pathOr, propOr, isEmpty } from "ramda";
 import IconWarningCircle from "../icons/IconWarningCircle.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 export default {
   name: "DeletedFiles",
   components: {
@@ -137,7 +139,7 @@ export default {
     //EventBus.$on('fetchDeleted', this.fetchDeletedFunc())
   },
   computed: {
-    ...mapGetters(["userToken", "config", "dataset", "filesProxyId"]),
+    ...mapGetters([ "config", "dataset", "filesProxyId"]),
     //
     curFileSearchPage: function () {
       return this.offset / this.limit + 1;
@@ -148,16 +150,6 @@ export default {
      */
     hasFiles: function () {
       return this.files.length > 0;
-    },
-
-    /**
-     * Computes form URL based on type of action user is taking (rename vs creating)
-     * @returns {String}
-     */
-    deleteUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/data/delete?api_key=${this.userToken}`;
-      } else return null;
     },
 
     /**
@@ -183,18 +175,7 @@ export default {
     },
   },
   methods: {
-    /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-    getFilesUrl: function (root_node) {
-      if (this.config.api2Url && this.userToken) {
-        return root_node
-          ? `${this.config.api2Url}/datasets/trashcan?dataset_id=${this.$route.params.datasetId}&root_node_id=${root_node}&limit=${this.limit}&offset=${this.offset}`
-          : `${this.config.api2Url}/datasets/trashcan?dataset_id=${this.$route.params.datasetId}&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
-    /**
+     /**
      * Scroll to file in list
      * @param {String} pkgId
      */
@@ -350,20 +331,25 @@ export default {
     showDelete: function () {
       const fileIds = this.selectedDeletedFiles.map((item) => item.content.id);
 
-      this.sendXhr(this.deleteUrl, {
-        method: "POST",
-        body: { things: fileIds },
-      })
-        .then((response) => {
-          this.$emit("file-delete", response);
-          const msg = "File(s) permanently deleted.";
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg,
-            },
-          });
-          this.fetchDeletedFunc(this.offset, this.limit, root_node);
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/data/delete?api_key=${token}`
+          return useSendXhr(url, {
+            method: "POST",
+            body: { things: fileIds },
+          })
+            .then((response) => {
+              this.$emit("file-delete", response);
+              const msg = "File(s) permanently deleted.";
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "success",
+                  msg,
+                },
+              });
+              this.fetchDeletedFunc(this.offset, this.limit, root_node);
+            })
+
         })
         .catch((response) => {
           this.handleXhrError(response);
@@ -375,33 +361,41 @@ export default {
      * @param {Array} items
      */
     moveBackToFiles: function () {
-      const nodeIds = this.selectedDeletedFiles.map((item) => item.node_id);
-      const options = {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: JSON.stringify({ nodeIds }),
-      };
-      fetch(
-        `${this.config.api2Url}/packages/restore?dataset_id=${this.$route.params.datasetId}`,
-        options
-      )
-        .then((response) => {
-          if (response.ok) {
-            this.onRestoreItems(response.json());
-          } else {
-            throw response;
+
+      useGetToken()
+        .then(token => {
+          const nodeIds = this.selectedDeletedFiles.map((item) => item.node_id);
+          const options = {
+            method: "POST",
+            headers: {
+              accept: "application/json",
+              "content-type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ nodeIds }),
           }
+
+          return fetch(
+            `${this.config.api2Url}/packages/restore?dataset_id=${this.$route.params.datasetId}`,
+            options
+          )
+            .then((response) => {
+              if (response.ok) {
+                return response.json()
+                  .then(json => {
+                    this.onRestoreItems(json);
+                  })
+              } else {
+                throw response;
+              }
+            })
+
         })
         .catch((err) => console.error(err));
     },
 
     //handler for restore items success
-    onRestoreItems: async function (response) {
-      const data = await response;
+    onRestoreItems: async function (data) {
       const successItems = propOr([], "success", data);
       const failureItems = propOr([], "failures", data);
       if (failureItems.length > 0) {
@@ -464,49 +458,60 @@ Need to reach into packages list instead of pulling stuff from url
 */
     fetchDeletedFunc: function (offset, limit, root_node = undefined) {
       //NOTE: we will  want to make sure that this isnt a flat map
-      const options = {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          authorization: `Bearer ${this.userToken}`,
-        },
-      };
-      var deleted_files_url = "";
-      deleted_files_url = this.getFilesUrl(root_node); //this.sendxhr
-      fetch(deleted_files_url, options)
-        .then((response) => {
-          if (response.ok) {
-            this.files = [];
-            response.json().then((data) => {
-              const packages = data.packages;
-              packages.forEach((file) => {
-                this.files.push({
-                  ...file,
-                  content: {
-                    packageType: file.type,
-                    name: file.name.replace(`__DELETED__${file.node_id}_`, ""),
-                  },
+
+      useGetToken()
+        .then(async token => {
+          const url = root_node
+            ? `${this.config.api2Url}/datasets/trashcan?dataset_id=${this.$route.params.datasetId}&root_node_id=${root_node}&limit=${this.limit}&offset=${this.offset}`
+            : `${this.config.api2Url}/datasets/trashcan?dataset_id=${this.$route.params.datasetId}&limit=${this.limit}&offset=${this.offset}`;
+
+          const options = {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              authorization: `Bearer ${token}`,
+            },
+          };
+
+          return fetch(url, options)
+            .then(async response => {
+              if (response.ok) {
+                this.files = [];
+
+                return response.json()
+                  .then((data) => {
+                    const packages = data.packages;
+                    packages.forEach((file) => {
+                      this.files.push({
+                        ...file,
+                        content: {
+                          packageType: file.type,
+                          name: file.name.replace(`__DELETED__${file.node_id}_`, ""),
+                        },
+                      });
+                    });
+
+                    this.sortedDeletedFiles = this.returnSort(
+                      "content.name",
+                      this.files,
+                      this.sortDirection
+                    );
+
+                    const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+
+                    if (pkgId) {
+                      this.scrollToFile(pkgId);
+                    }
+
                 });
-              });
-            });
-          } else {
-            throw response;
-          }
-          this.sortedDeletedFiles = this.returnSort(
-            "content.name",
-            this.files,
-            this.sortDirection
-          );
+              } else {
+                throw response;
+              }
+            })
 
-          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-
-          if (pkgId) {
-            this.scrollToFile(pkgId);
-          }
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+        .catch(useHandleXhrError)
+
     },
   },
 };

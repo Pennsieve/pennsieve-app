@@ -1,4 +1,5 @@
 {
+  "app_domain": "localhost",
   "apiUrl": "https://api.pennsieve.net",
   "api2Url": "https://api2.pennsieve.net",
   "zipitUrl": "https://api.pennsieve.net/zipit",
@@ -18,10 +19,24 @@
   "notificationUrl": "wss://api.pennsieve.net/notifications/notification/connect",
   "googleMapApi": "xxxxxxxxxxxxxx",
   "mapTiler": "xxxxx",
+  "pusherConfig": {
+    "appId": "47a81ebaf87f4c168177",
+    "region": "us2"
+  },
   "awsConfig": {
+    "authenticationFlowType": "USER_PASSWORD_AUTH",
     "region": "us-east-1",
-    "userPoolId": "us-east-1_XciE1JSvP",
-    "userPoolWebClientId": "2653f5r4vgk8eo1p17nvaftaea"
+    "userPoolId": "us-east-1_FVLhJ7CQA",
+    "userPoolWebClientId": "703lm5d8odccu21pagcfjkeaea",
+    "oauth": {
+      "domain": "pennsieve-dev-users2.auth.us-east-1.amazoncognito.com",
+      "redirectSignIn": "https://app.pennsieve.net",
+      "redirectSignOut": "https://app.pennsieve.net",
+      "responseType": "token",
+      "scope": [
+        "openid"
+      ]
+    }
   },
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG"
 }

@@ -32,6 +32,8 @@ import { mapActions, mapState } from 'vuex'
 import Request from '../../../../mixins/request'
 import EventBus from '../../../../utils/event-bus'
 import IconDocument from "../../../icons/IconDocument.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'DatasetPermissionsDataUseAgreement',
@@ -53,7 +55,6 @@ export default {
       'config',
       'dataset',
       'dataUseAgreements',
-      'userToken'
     ])
   },
 
@@ -77,24 +78,27 @@ export default {
      * Set data use agreement
      */
     setDataUseAgreement: function() {
-      this.sendXhr(`${this.config.apiUrl}/datasets/${this.$route.params.datasetId}?api_key=${this.userToken}`, {
-        method: 'PUT',
-        body: {
-          dataUseAgreementId: this.dataUseAgreementId
-        }
-      })
-        .then((response) => {
-          return this.updateDataset(response)
-        })
-        .then(() => {
-          EventBus.$emit('toast', {
-            detail: {
-              msg: 'Data use agreement successfully added',
-              type: 'success'
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/datasets/${this.$route.params.datasetId}?api_key=${token}`
+          return useSendXhr(url, {
+            method: 'PUT',
+            body: {
+              dataUseAgreementId: this.dataUseAgreementId
             }
           })
-        })
-        .catch(this.handleXhrError.bind(this))
+            .then((response) => {
+              return this.updateDataset(response)
+            })
+            .then(() => {
+              EventBus.$emit('toast', {
+                detail: {
+                  msg: 'Data use agreement successfully added',
+                  type: 'success'
+                }
+              })
+            })
+        }).catch(useHandleXhrError)
     }
   }
 }
