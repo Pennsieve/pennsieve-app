@@ -66,7 +66,7 @@ import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
 import Request from '../../../../mixins/request/index'
 import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import {useSendXhr, useHandleXhrError} from "@/mixins/request/request_composable";
 
 export default {
   name: 'Office365Dialog',
@@ -158,28 +158,28 @@ export default {
           return useSendXhr(url)
             .then(response => {
               this.awsURL = response.url
+              const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${this.awsURL}`
+              window.open(finalURL, '_blank')
             })
-            .catch(this.handleXhrError.bind(this))
+            .catch(err => useHandleXhrError(err))
         })
     },
 
     /**
      * API call to get source files data for table
      */
-    getSourceFiles: function() {
-      return this.sourceFilesUrl()
-        .then((url) => {
-          this.sendXhr(url)
+    getSourceFiles: async function() {
+      const url = await this.sourceFilesUrl();
+        await this.sendXhr(url)
             .then(response => {
               this.sourceFile = response
-            })
-        }).catch(this.handleXhrError.bind(this))
+            }).catch(this.handleXhrError.bind(this))
     },
 
     /**
      *  Accept Office 365 Agreement
      */
-    acceptAgreement: function() {
+    acceptAgreement: async function() {
       if (this.checked) {
         Cookie.set('acceptedOffice365Terms', true)
       }
@@ -195,14 +195,10 @@ export default {
        * Then with that response, request the short URL
        * Finally, open the window for the office viewer and close the dialog
        */
-      this.getSourceFiles()
-        .then(() => this.getPackageFiles())
-        .then(() => {
-          const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${this.awsURL}`
-          window.open(finalURL, '_blank')
-          this.closeDialog()
-        })
-        .catch(() => {
+      await this.getSourceFiles()
+      this.getPackageFiles().then(()=>{
+        this.closeDialog()
+      }).catch(() => {
           // Set error state
           this.hasError = true
         })
@@ -210,6 +206,19 @@ export default {
           // Reset loading state
           this.isLoading = false
         })
+      // this.getSourceFiles()
+      //   .then(() => this.getPackageFiles())
+      //   .then(() => {
+      //     this.closeDialog()
+      //   })
+      //   .catch(() => {
+      //     // Set error state
+      //     this.hasError = true
+      //   })
+      //   .finally(() => {
+      //     // Reset loading state
+      //     this.isLoading = false
+      //   })
     },
 
     /**
