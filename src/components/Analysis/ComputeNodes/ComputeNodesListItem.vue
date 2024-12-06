@@ -12,13 +12,13 @@
     </div>
     <div class="margin-10">
       <div>
-        <div class="margin-10">
+        <!-- <div v-if="false" class="margin-10">
           {{
             computeNode.environment.charAt(0).toUpperCase() +
             computeNode.environment.slice(1)
           }}
           Node
-        </div>
+        </div> -->
         <div class="margin-10">
           Created Date: {{ this.formatDateFNS(computeNode.createdAt) }}
         </div>
@@ -52,7 +52,7 @@ export default {
 
   computed: {
     ...mapState(["orgMembers", "profile"]),
-    ...mapGetters(["activeOrganization",  "config"]),
+    ...mapGetters(["activeOrganization", "config"]),
     /**
      * Active organization name
      * @returns {String}
@@ -95,9 +95,7 @@ export default {
   width: 90%;
   height: 175px;
   border: 1px solid $gray_3;
-  //margin: 0 0 16px 0;
   margin: 0 8px 16px 8px;
-  //padding:  16px 24px 8px 24px;
   background-color: white;
   display: flex;
   flex-direction: column;
