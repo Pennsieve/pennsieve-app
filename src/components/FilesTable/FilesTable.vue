@@ -345,10 +345,13 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      this.selection = selection;
-      const parentId = this.data[0].content.parentId || "root";
-      this.$emit("selection-change", selection, parentId);
-      this.checkAll = this.data.length === selection.length;
+      if(this.data[0] && this.data[0].content){
+        this.selection = selection;
+        const parentId = this.data[0].content.parentId || "root";
+        this.$emit("selection-change", selection, parentId);
+        this.checkAll = this.data.length === selection.length;
+      }
+
     },
 
     /**
