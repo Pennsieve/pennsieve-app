@@ -38,8 +38,7 @@ export default {
       default: false,
     },
     user: {
-      type: Number,
-      default: 0,
+      default: null,
     },
   },
   setup(props) {
@@ -51,9 +50,12 @@ export default {
 
     const avatarProfile = computed(() => {
       if(!props.user){return profile.value}
-      const userProfile = getOrgMemberByIntId(props.user);
+      const userProfile = Number.isInteger(props.user)
+        ? getOrgMemberByIntId(props.user)
+        : props.user;
       return Object.keys(userProfile).length ? userProfile : profile.value;
     });
+
 
     const fullName = computed(() => {
       return `${avatarProfile.value.firstName || ''} ${avatarProfile.value.lastName || ''}`;
