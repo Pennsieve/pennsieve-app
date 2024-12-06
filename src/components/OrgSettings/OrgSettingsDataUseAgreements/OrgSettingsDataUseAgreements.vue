@@ -2,9 +2,7 @@
   <div class="org-settings-data-use-agreements">
     <div class="header mb-24">
       <div class="heading">
-        <h3 class="mb-0 mt-0">
-          Data Use Agreements
-        </h3>
+        <h3 class="mb-0 mt-0">Data Use Agreements</h3>
         <a
           href="https://docs.pennsieve.io/docs/data-use-agreements"
           class="ml-8"
@@ -13,9 +11,7 @@
           What’s this?
         </a>
       </div>
-      <bf-button @click="isDialogVisible = true">
-        Add New Agreement
-      </bf-button>
+      <bf-button @click="isDialogVisible = true"> Add New Agreement </bf-button>
     </div>
 
     <div>
@@ -40,159 +36,145 @@
 </template>
 
 <script>
-import { mapActions, mapState } from 'vuex'
+import { mapActions, mapState } from "vuex";
 
-import BfButton from '../../shared/bf-button/BfButton.vue'
-import DataUseAgreementListItem from './DataUseAgreementListItem/DataUseAgreementListItem.vue'
-import DataUseAgreementUpdateDialog from './DataUseAgreementUpdateDialog/DataUseAgreementUpdateDialog.vue'
-import Request from '../../../mixins/request'
-import EventBus from '../../../utils/event-bus'
-import {useSendXhr} from "@/mixins/request/request_composable";
-import {useGetToken} from "@/composables/useGetToken";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import DataUseAgreementListItem from "./DataUseAgreementListItem/DataUseAgreementListItem.vue";
+import DataUseAgreementUpdateDialog from "./DataUseAgreementUpdateDialog/DataUseAgreementUpdateDialog.vue";
+import Request from "../../../mixins/request";
+import EventBus from "../../../utils/event-bus";
+import { useSendXhr } from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
 
 export default {
-  name: 'OrgSettingsDataUseAgreements',
+  name: "OrgSettingsDataUseAgreements",
 
   components: {
     BfButton,
     DataUseAgreementListItem,
-    DataUseAgreementUpdateDialog
+    DataUseAgreementUpdateDialog,
   },
 
-  mixins: [
-    Request
-  ],
+  mixins: [Request],
 
   data() {
     return {
       isDialogVisible: false,
-      editableDataUseAgreement: {}
-    }
+      editableDataUseAgreement: {},
+    };
   },
 
-  computed:  {
-    ...mapState([
-      'activeOrganization',
-      'config',
-      'dataUseAgreements',
-    ]),
+  computed: {
+    ...mapState(["activeOrganization", "config", "dataUseAgreements"]),
 
     /**
      * Compute data use agreement URL
      * @returns {String}
      */
-    dataUseAgreementUrl: function() {
-      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/data-use-agreements`
-    }
+    dataUseAgreementUrl: function () {
+      return `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}/data-use-agreements`;
+    },
   },
 
   methods: {
     ...mapActions([
-      'createDataUseAgreement',
-      'removeDataUseAgreement',
-      'updateDataUseAgreement',
-      'updateDefaultDataUseAgreement'
+      "createDataUseAgreement",
+      "removeDataUseAgreement",
+      "updateDataUseAgreement",
+      "updateDefaultDataUseAgreement",
     ]),
 
-    closeDataUseAgreementDialog: function() {
-      this.isDialogVisible = false
+    closeDataUseAgreementDialog: function () {
+      this.isDialogVisible = false;
     },
     /**
      * Delete data use agreement and remove it from the list
      * @param {Object} dataUseAgreement
      */
-    deleteDataUseAgreement: function(dataUseAgreement) {
+    deleteDataUseAgreement: function (dataUseAgreement) {
       useGetToken()
-        .then(token => {
-          const { id } = dataUseAgreement
-          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+        .then((token) => {
+          const { id } = dataUseAgreement;
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`;
           return useSendXhr(url, {
-            method: 'DELETE'
-          })
-            .then((e) => {
-              return this.removeDataUseAgreement(id)
-            })
+            method: "DELETE",
+          }).then((e) => {
+            return this.removeDataUseAgreement(id);
+          });
         })
-        .catch( error => {
-            this.handleXhrError(err)
-            EventBus.$emit('toast', {
-              detail: {
-                msg: 'There was an error deleting the agreement: ' + err.message,
-                type: 'error'
-              }
-            })
-        })
-    },
-
-    /**
-     * Create data use agreement and add it to the list
-     * @param {Object} dataUseAgreement
-     */
-    addDataUseAgreement: async function(dataUseAgreement) {
-
-      useGetToken()
-        .then(async token => {
-          const url = `${this.dataUseAgreementUrl}?api_key=${token}`
-          return this.sendXhr(url, {
-            method: 'POST',
-            body: dataUseAgreement
-          })
-            .then(agreement => {
-              return this.createDataUseAgreement(agreement)
-            })
-        })
-        .finally(this.isDialogVisible = false)
-        .catch (error => {
-          this.handleXhrError()
-          EventBus.$emit('toast', {
+        .catch((error) => {
+          this.handleXhrError(error);
+          EventBus.$emit("toast", {
             detail: {
-              msg: 'There was an error creating the agreement',
-              type: 'error'
-            }
-          })
-        })
-
+              msg: "There was an error deleting the agreement: " + err.message,
+              type: "error",
+            },
+          });
+        });
     },
 
     /**
      * Create data use agreement and add it to the list
      * @param {Object} dataUseAgreement
      */
-    openEditDataUseAgreement: function(dataUseAgreement) {
-      this.editableDataUseAgreement = { ...dataUseAgreement }
-      this.isDialogVisible = true
+    addDataUseAgreement: async function (dataUseAgreement) {
+      useGetToken()
+        .then(async (token) => {
+          const url = `${this.dataUseAgreementUrl}?api_key=${token}`;
+          return this.sendXhr(url, {
+            method: "POST",
+            body: dataUseAgreement,
+          }).then((agreement) => {
+            return this.createDataUseAgreement(agreement);
+          });
+        })
+        .finally((this.isDialogVisible = false))
+        .catch((error) => {
+          this.handleXhrError();
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "There was an error creating the agreement",
+              type: "error",
+            },
+          });
+        });
+    },
+
+    /**
+     * Create data use agreement and add it to the list
+     * @param {Object} dataUseAgreement
+     */
+    openEditDataUseAgreement: function (dataUseAgreement) {
+      this.editableDataUseAgreement = { ...dataUseAgreement };
+      this.isDialogVisible = true;
     },
 
     /**
      * Update data use agreement
      * @param {Object} dataUseAgreement
      */
-    editDataUseAgreement: function(dataUseAgreement) {
-
+    editDataUseAgreement: function (dataUseAgreement) {
       useGetToken()
-        .then(token => {
-          const { id } = dataUseAgreement
-          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+        .then((token) => {
+          const { id } = dataUseAgreement;
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`;
           return useSendXhr(url, {
-            method: 'PUT',
-            body: dataUseAgreement
-          })
-            .then(() => {
-              this.updateDataUseAgreement({ ...dataUseAgreement })
-            })
+            method: "PUT",
+            body: dataUseAgreement,
+          }).then(() => {
+            this.updateDataUseAgreement({ ...dataUseAgreement });
+          });
         })
-        .finally(this.isDialogVisible = false)
+        .finally((this.isDialogVisible = false))
         .catch((e) => {
-          this.handleXhrError(e)
-          EventBus.$emit('toast', {
+          this.handleXhrError(e);
+          EventBus.$emit("toast", {
             detail: {
-              msg: 'There was an error updating the agreement',
-              type: 'error'
-            }
-          })
-        })
-
-
+              msg: "There was an error updating the agreement",
+              type: "error",
+            },
+          });
+        });
     },
 
     /**
@@ -201,37 +183,36 @@ export default {
      * agreement not default
      * @param {Object} dataUseAgreement
      */
-    makeDataUseAgreementDefault: function(dataUseAgreement) {
+    makeDataUseAgreementDefault: function (dataUseAgreement) {
       const updatedDataUseAgreement = {
         ...dataUseAgreement,
-        isDefault: true
-      }
-      const { id } = dataUseAgreement
+        isDefault: true,
+      };
+      const { id } = dataUseAgreement;
 
       useGetToken()
-        .then(token => {
-          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`
+        .then((token) => {
+          const url = `${this.dataUseAgreementUrl}/${id}?api_key=${token}`;
 
           return useSendXhr(url, {
-            method: 'PUT',
-            body: updatedDataUseAgreement
-          })
-            .then(() => {
-              this.updateDefaultDataUseAgreement({ ...updatedDataUseAgreement })
-            })
+            method: "PUT",
+            body: updatedDataUseAgreement,
+          }).then(() => {
+            this.updateDefaultDataUseAgreement({ ...updatedDataUseAgreement });
+          });
         })
         .catch((err) => {
-          this.handleXhrError(err)
-          EventBus.$emit('toast', {
+          this.handleXhrError(err);
+          EventBus.$emit("toast", {
             detail: {
-              msg: 'There was an error making the agreement default',
-              type: 'error'
-            }
-          })
-        })
-    }
-  }
-}
+              msg: "There was an error making the agreement default",
+              type: "error",
+            },
+          });
+        });
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>

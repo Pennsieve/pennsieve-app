@@ -307,6 +307,9 @@ export default {
         });
     },
     onFileSelect: function (selectedFiles, parentId) {
+      console.log("selectedFiles", selectedFiles);
+      console.log("parentId", parentId);
+      console.log("here", { selectedFiles, parentId });
       this.setSelectedFiles({ selectedFiles, parentId });
       this.updateFileCount();
     },
@@ -367,6 +370,8 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
+      console.log("arrayOfPackageIds", arrayOfPackageIds);
+
       const formatApplication = (application) => {
         return {
           uuid: application.uuid || "",
@@ -421,37 +426,6 @@ export default {
         this.selectedApplication = {};
         this.value = "";
       }
-      useGetToken()
-        .then((token) => {
-          return useSendXhr(url, {
-            method: "POST",
-            header: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: body,
-          }).then((response) => {
-            EventBus.$emit("toast", {
-              detail: {
-                msg: "Your workflow has been successfully initiated!",
-                type: "success",
-              },
-            });
-            this.closeDialog();
-          });
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
-        });
     },
     /**
      * Determines if tab content is active
