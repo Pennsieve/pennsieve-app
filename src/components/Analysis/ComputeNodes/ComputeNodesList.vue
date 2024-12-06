@@ -16,7 +16,7 @@
           registering Compute Nodes for {{ orgName }}.
         </p>
       </div>
-      <div class="copy">
+      <div v-if="!hasAdminRights" class="copy">
         <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
         <p>
           Contact your administrator to get started working with Compute Nodes
