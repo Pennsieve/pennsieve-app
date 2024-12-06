@@ -7,7 +7,7 @@
   >
     <div
       :class="`avatar-circle ${classOption}`"
-      :style="`backgroundColor: ${profileColor}`"
+      :style="{ backgroundColor: profileColor }"
     >
       <img
         :src="gravatarUrl"
@@ -20,88 +20,75 @@
   </el-tooltip>
 </template>
 
-<script>
+<script setup>
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { compose, head, propOr, defaultTo } from 'ramda';
 import md5 from 'blueimp-md5';
 
-export default {
-  name: 'Avatar',
-  props: {
-    classOption: {
-      type: String,
-      default: 'icon',
-    },
-    tooltip: {
-      type: Boolean,
-      default: false,
-    },
-    user: {
-      type: Number,
-      default: 0,
-    },
+defineProps({
+  classOption: {
+    type: String,
+    default: 'icon',
   },
-  setup(props) {
-    const store = useStore();
-
-    const profile = computed(() => store.getters.profile);
-    
-    const getOrgMemberByIntId = store.getters.getOrgMemberByIntId;
-
-    const avatarProfile = computed(() => {
-      if(!props.user){return profile.value}
-      const userProfile = getOrgMemberByIntId(props.user);
-      return Object.keys(userProfile).length ? userProfile : profile.value;
-    });
-
-    const fullName = computed(() => {
-      return `${avatarProfile.value.firstName || ''} ${avatarProfile.value.lastName || ''}`;
-    });
-
-    const getInitial = (propName, data) =>
-      compose(head, defaultTo(''), propOr('', propName))(data);
-
-    const firstInitial = computed(() => {
-      return getInitial('firstName', avatarProfile.value);
-    });
-
-    const lastInitial = computed(() => {
-      return getInitial('lastName', avatarProfile.value);
-    });
-
-    const emailHash = computed(() => {
-      const email = propOr('', 'email', avatarProfile.value);
-      return md5(email);
-    });
-
-    const gravatarUrl = computed(() => {
-      return `//gravatar.com/avatar/${emailHash.value}?d=blank&r=g&s=48`;
-    });
-
-    const profileColor = computed(() => {
-      return propOr('', 'color', avatarProfile.value);
-    });
-
-    const avatarText = computed(() => {
-      const email = propOr('', 'email', avatarProfile.value);
-      return firstInitial.value || lastInitial.value
-        ? `${firstInitial.value}${lastInitial.value}`
-        : email[0];
-    });
-
-    return {
-      profile,
-      avatarProfile,
-      fullName,
-      gravatarUrl,
-      profileColor,
-      avatarText,
-      firstInitial,
-      lastInitial,
-    };
+  tooltip: {
+    type: Boolean,
+    default: false,
   },
-};
+  user: {
+    type: Number,
+    default: 0,
+  },
+});
+
+
+const store = useStore();
+const profile = computed(() => store.getters.profile);
+const getOrgMemberByIntId = store.getters.getOrgMemberByIntId;
+
+
+const avatarProfile = computed(() => {
+  if (!user) {
+    return profile.value;
+  }
+  const userProfile = getOrgMemberByIntId(user);
+  return Object.keys(userProfile).length ? userProfile : profile.value;
+});
+
+const fullName = computed(() => {
+  return `${avatarProfile.value.firstName || ''} ${avatarProfile.value.lastName || ''}`;
+});
+
+const getInitial = (propName, data) =>
+  compose(head, defaultTo(''), propOr('', propName))(data);
+
+const firstInitial = computed(() => {
+  return getInitial('firstName', avatarProfile.value);
+});
+
+const lastInitial = computed(() => {
+  return getInitial('lastName', avatarProfile.value);
+});
+
+const emailHash = computed(() => {
+  const email = propOr('', 'email', avatarProfile.value);
+  return md5(email);
+});
+
+const gravatarUrl = computed(() => {
+  return `//gravatar.com/avatar/${emailHash.value}?d=blank&r=g&s=48`;
+});
+
+const profileColor = computed(() => {
+  return propOr('', 'color', avatarProfile.value);
+});
+
+const avatarText = computed(() => {
+  const email = propOr('', 'email', avatarProfile.value);
+  return firstInitial.value || lastInitial.value
+    ? `${firstInitial.value}${lastInitial.value}`
+    : email[0];
+});
 </script>
 
 <style scoped lang="scss">
@@ -124,11 +111,13 @@ export default {
   border: 2px solid #fff;
   flex-shrink: 0;
 }
+
 .avatar-initials {
   font-weight: 500;
   line-height: 1;
   text-transform: uppercase;
 }
+
 .gravatar {
   position: absolute;
   z-index: 2;
