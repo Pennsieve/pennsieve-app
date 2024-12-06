@@ -859,7 +859,7 @@ export const getters = {
     return R.defaultTo({}, R.find(R.propEq("id", id), state.orgMembers));
   },
   getOrgMemberByIntId: (state) => (id) => {
-    for (let i = 0; i < state.orgMembers; i++) {
+    for (let i = 0; i < state.orgMembers.length; i++) {
      if (state.orgMembers[i].intId === id ) {
        return state.orgMembers[i]
      }
@@ -937,9 +937,7 @@ export const getters = {
           R.find(R.propEq("id", datasetId))
       )(state.consortiumDatasetsImporting),
   getOrganizationByIntId: (state) => (id) => {
-    console.log(state.organizations)
     for (let i = 0; i < state.organizations; i++) {
-      console.log(id)
       if (state.organizations[i].organization.intId === id ) {
         return state.organizations[i]
       }
