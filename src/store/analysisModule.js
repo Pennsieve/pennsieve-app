@@ -26,7 +26,6 @@ const initialState = () => ({
   export const mutations = {
  
     UPDATE_COMPUTE_NODES(state, computeNodes) {
-      console.log(computeNodes)
       state.computeNodes = computeNodes
       state.computeNodesLoaded = true
     },
@@ -51,15 +50,15 @@ const initialState = () => ({
 
       state.fileCount = total;
     },
-    SET_SELECTED_FILES(state, { files, parentId }) {
-      if (files.length) {
+    SET_SELECTED_FILES(state, { selectedFiles, parentId }) {
+      if (selectedFiles.length) {
         const updatedObj = { ...state.selectedFilesForAnalysis };
 
         // Get the existing files for the parentId
         const existingFiles = updatedObj[parentId] || [];
 
         // Filter out duplicates
-        const nonDuplicateFiles = files.filter(
+        const nonDuplicateFiles = selectedFiles.filter(
           newFile => !existingFiles.some(existingFile => existingFile.content.id === newFile.content.id)
         );
 
@@ -68,7 +67,7 @@ const initialState = () => ({
 
         // Remove any files in existingFiles that are not present in files
         updatedObj[parentId] = updatedFiles.filter(
-          file => files.some(newFile => newFile.content.id === file.content.id)
+          file => selectedFiles.some(newFile => newFile.content.id === file.content.id)
         );
 
         state.selectedFilesForAnalysis = updatedObj;
@@ -163,8 +162,8 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    setSelectedFiles: async({ commit, rootState}, selectedFiles) => {
-      commit('SET_SELECTED_FILES', selectedFiles)
+    setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
+      commit('SET_SELECTED_FILES', { selectedFiles, parentId } )
     },
     setSelectedFile: async({ commit, rootState}, selectedFile) => {
       commit('SET_SELECTED_FILE', selectedFile)
