@@ -6,7 +6,6 @@
       placement="right-end"
       width="260"
       transition=""
-      trigger="manual"
       :visible="menuOpen"
       :show-arrow="false"
       :disabled="pageNotFound"
@@ -14,7 +13,6 @@
       <template #reference>
         <button
           v-if="!pageNotFound"
-          v-popover:userMenu
           class="user-menu bf-navigation-item"
           :class="{ active : menuOpen }"
           @focus="onUserMenuMouseenter"
@@ -22,18 +20,19 @@
           @mouseenter="onUserMenuMouseenter"
           @mouseleave="onUserMenuMouseleave"
         >
-          <avatar />
+
+          <avatar/>
 
           <div class="info">
-        <span id="user-name">
-          {{ displayName }}
-        </span>
-            <span id="organization-name">
-          {{ organizationName }}
-        </span>
-            <span v-if="isWorkspaceGuest" id="workspace-guest">
-          (workspace guest)
-        </span>
+            <span id="user-name">
+              {{ displayName }}
+            </span>
+                <span id="organization-name">
+              {{ organizationName }}
+            </span>
+                <span v-if="isWorkspaceGuest" id="workspace-guest">
+              (workspace guest)
+            </span>
           </div>
 
           <IconArrowRight
@@ -66,126 +65,30 @@
         @mouseleave="onUserMenuMouseleave"
       >
         <div class="bf-menu">
-          <ul>
-            <li>
-              <a
-                class="bf-menu-item"
-                href="https://docs.pennsieve.io/page/pennsieve-terms-of-use"
-                target="_blank"
+          <div class="bf-menu scroll-menu">
+            <ul>
+              <li
+                v-for="org in filteredOrganizations"
+                :key="org.organization.id"
               >
-                Terms of Use
-              </a>
-            </li>
-            <li>
-              <a
-                class="bf-menu-item"
-                href="https://docs.pennsieve.io/page/privacy-policy"
-                target="_blank"
-              >
-                Privacy Policy
-              </a>
-            </li>
-          </ul>
-
-          <hr>
-
-          <ul>
-            <li>
-
-              <router-link
-                class="bf-menu-item"
-                :to="{ name: 'my-settings-container', params: {orgId: activeOrganizationId} }"
-                @click.native="closeMenus"
-              >
-                View My Profile
-              </router-link>
-
-            </li>
-            <li>
-              <el-popover
-                ref="orgMenu"
-                v-model="orgMenuOpen"
-                popper-class="no-padding user-menu-org-menu scroll"
-                placement="right-end"
-                width="300"
-                trigger="hover"
-                transition=""
-                :show-arrow="false"
-                @show="onOrgMenuShow"
-                @hide="onOrgMenuHide"
-              >
-
-                <template #reference>
-                  <a
-                    class="bf-menu-item icon-item"
-                    href="#"
-                    @click.prevent
-                    @mouseenter="onOrgMenuMouseenter"
-                    @mouseleave="onOrgMenuMouseleave"
-                  >
-                    Switch to Private Workspace
-                    <IconArrowRight
-                      :width="10"
-                      :height="10"
-                      color="black"
-                    />
-
-
-                  </a>
-
-                </template>
-
-                <div
-                  class="scroll-wrap"
-                  @mouseenter="onOrgMenuMouseenter"
-                  @mouseleave="onOrgMenuMouseleave"
+                <a
+                  href="#"
+                  class="bf-menu-item"
+                  @click.prevent="switchOrganization(org)"
                 >
-                  <div class="bf-menu scroll-menu">
-                    <ul>
-                      <li
-                        v-for="org in filteredOrganizations"
-                        :key="org.organization.id"
-                      >
-                        <a
-                          href="#"
-                          class="bf-menu-item"
-                          @click.prevent="switchOrganization(org)"
-                        >
-                          {{ org.organization.name }}
-                          <IconCheck
-                            v-if="org.organization.name === organizationName"
-                            class="icon-check"
-                            :width="20"
-                            :height="20"
-                            color="black"
-                          />
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <filter-empty-state
-                    v-if="filteredOrganizations.length === 0"
-                    class="filter-empty-state"
-                  >
-                    <h3>No results found</h3>
-                    <p>We couldn't find any organization that matched your search.</p>
-                  </filter-empty-state>
-
-                  <filter-input
-                    v-show="showOrgFilter"
-                    ref="inputFilterName"
-                    v-model="orgFilterName"
-                    placeholder="Type an organization name to filter"
+                  {{ org.organization.name }}
+                  <IconCheck
+                    v-if="org.organization.name === organizationName"
+                    class="icon-check"
+                    :width="20"
+                    :height="20"
+                    color="black"
                   />
-                </div>
-              </el-popover>
-
-            </li>
-          </ul>
-
+                </a>
+              </li>
+            </ul>
+          </div>
           <hr>
-
           <ul>
             <li>
               <a
@@ -474,15 +377,7 @@ export default {
       pointer-events: none;
     }
   }
-  //.avatar-circle {
-  //  border: 2px solid #fff;
-  //  flex-shrink: 0;
-  //  height: 32px;
-  //  width: 32px;
-  //  .condensed & {
-  //    margin-left: -12px
-  //  }
-  //}
+
   #user-name {
     font-weight: 500;
   }
