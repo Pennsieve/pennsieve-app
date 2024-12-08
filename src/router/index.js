@@ -8,7 +8,6 @@ import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
 
 import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
-const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
@@ -135,13 +134,6 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
-    },
-    {
-      name: 'docs-login',
-      path: '/docs-login',
-      components: {
-        page: DocsLogin
-      }
     },
     {
       path: '/github-redirect',
