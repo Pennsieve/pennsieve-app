@@ -2,11 +2,11 @@
   <bf-page>
     <bf-rafter
       slot="heading"
-      title="User Dashboard"
+      title="Submit Datsaet Proposals"
       class="primary"
     >
       <template #description>
-        <p> Manage your user-profile, developer tools as well as submit and track any dataset proposals.</p>
+        <p> Submit and track any dataset proposals.</p>
 
       </template>
 
@@ -24,9 +24,12 @@
 
 <script>
 import {mapActions, mapState} from "vuex";
+import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
+import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 
 export default {
   name: "WelcomePage",
+  components: {RouterTabs, BfRafter},
   props: {
     orgId: {
       type: String,
@@ -45,18 +48,16 @@ export default {
   data() {
     return {
       tabs: [
-        {
-          name: "My Profile",
-          to: "my-settings-container"
-        },
+
         {
           name: "My Dataset Submissions",
           to: "submit"
         },
-        // {
-        //   name: "My Public Datasets",
-        //   to: "submit"
-        // }
+        {
+          name: "Open Repositories",
+          to: "welcome"
+        },
+
       ]
     }
   },

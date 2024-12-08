@@ -5,12 +5,9 @@ import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
 import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
 import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
 import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
-import AboutPennsieve from "./AboutPennsieve/AboutPennsieve.vue";
-import GettingHelpStage from "../components/GettingHelp/GettingHelpStage.vue";
 
 import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
-const DocsLogin = () => import('./DocsLogin/DocsLogin.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
@@ -61,7 +58,6 @@ const Invite = () => import('./Invite/Invite.vue')
 const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/SetupFederatedLogin.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
-const PennsieveInfo = () => import('../components/welcome/Info.vue')
 
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
 const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
@@ -69,7 +65,6 @@ const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
-const DeveloperTools = () => import('../components/welcome/DeveloperTools.vue')
 
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
@@ -131,10 +126,6 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
-      components: {
-        page: () => import("./Login/Login.vue"),
-      },
-      props: true,
     },
     {
       path: "/login",
@@ -143,13 +134,6 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
-    },
-    {
-      name: 'docs-login',
-      path: '/docs-login',
-      components: {
-        page: DocsLogin
-      }
     },
     {
       path: '/github-redirect',
@@ -198,62 +182,48 @@ const router = createRouter({
       props: true,
     },
     {
-      path: "/about",
-      name: "about",
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import("./Login/Login.vue"),
-    },
-    {
       path:'/:orgId/welcome/terms-of-service',
       name:'terms-of-service',
       components: {
           page: TermsOfService
       },
     },
-    {
-      path: "/:orgId/pennsieve",
-      name: "about-pennsieve",
-      components: {
-        page: AboutPennsieve,
-        navigation: BfNavigation
-      },
-      props: true,
-      redirect: {
-        name: 'info'
-      },
-      children: [
-        {
-          name: 'welcome',
-          path: 'welcome',
-          components: {
-            stage: WelcomeInfo
-          }
-        },
-        {
-          name: 'support',
-          path: 'support',
-          components: {
-            stage: GettingHelpStage
-          }
-        },
-        {
-          name: 'info',
-          path: 'info',
-          components: {
-            stage: PennsieveInfo
-          }
-        },
-        {
-          name: 'developer-tools',
-          path: 'developer',
-          components: {
-            stage: DeveloperTools
-          }
-        },
-      ]
-    },
+    // {
+    //   path: "/:orgId/pennsieve",
+    //   name: "about-pennsieve",
+    //   components: {
+    //     page: AboutPennsieve,
+    //     navigation: BfNavigation
+    //   },
+    //   props: true,
+    //   redirect: {
+    //     name: 'info'
+    //   },
+    //   children: [
+    //
+    //     {
+    //       name: 'support',
+    //       path: 'support',
+    //       components: {
+    //         stage: GettingHelpStage
+    //       }
+    //     },
+    //     {
+    //       name: 'info',
+    //       path: 'info',
+    //       components: {
+    //         stage: PennsieveInfo
+    //       }
+    //     },
+    //     {
+    //       name: 'developer-tools',
+    //       path: 'developer',
+    //       components: {
+    //         stage: DeveloperTools
+    //       }
+    //     },
+    //   ]
+    // },
     /**
      * Welcome Org routes
      */
@@ -269,15 +239,22 @@ const router = createRouter({
         navigation: true,
       },
       redirect: {
-        name: 'my-settings-container'
+        name: 'submit'
       },
       children: [
 
+        // {
+        //   name: 'my-settings-container',
+        //   path: '/:orgId/profile',
+        //   components: {
+        //     stage: MySettingsContainer
+        //   }
+        // },
         {
-          name: 'my-settings-container',
-          path: '/:orgId/profile',
+          name: 'welcome',
+          path: 'welcome',
           components: {
-            stage: MySettingsContainer
+            stage: WelcomeInfo
           }
         },
         {
