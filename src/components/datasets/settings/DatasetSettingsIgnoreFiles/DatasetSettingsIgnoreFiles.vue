@@ -56,9 +56,13 @@
       },
     },
 
-    mounted: function() {
-      // Set current ignore files in text area
-      this.ignoreFiles = this.datasetIgnoreFiles.map(file => file.fileName).join('\n')
+    watch: {
+      datasetIgnoreFiles: {
+        handler(newVal) {
+          this.ignoreFiles = newVal.map(file => file.fileName).join('\n');
+        },
+        immediate: true,
+      }
     },
 
     methods: {
@@ -86,7 +90,6 @@
                 if (response.ok) {
                   response.json().then(resp => {
                     const ignoreFiles = (resp.ignoreFiles || []).map(file => file.fileName)
-                    this.ignoreFiles = ignoreFiles.join('\n')
                     this.setDatasetIgnoreFiles(this.toIgnoreFilesDTO(ignoreFiles))
                   })
                 }

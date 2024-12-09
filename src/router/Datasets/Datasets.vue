@@ -247,8 +247,7 @@
               })
               .then(() => {
                 if (this.getPermission('manager')) {
-
-                  this.getDatasetIgnoreFiles(datasetId)
+                  return this.getDatasetIgnoreFiles(datasetId)
                 }
               })
               .then(() => {
@@ -383,10 +382,10 @@
        */
       getDatasetIgnoreFiles: function(datasetId) {
         this.setIsLoadingDatasetIgnoreFiles(true)
-        useGetToken()
+        return useGetToken()
           .then(token => {
             const url = `${this.config.apiUrl}/datasets/${datasetId}/ignore-files?api_key=${token}`
-            this.sendXhr(url)
+            return this.sendXhr(url)
               .then(resp => {
                 const ignoreFiles = (resp.ignoreFiles || []).map(file => ({fileName: file.fileName}))
                 this.setDatasetIgnoreFiles(ignoreFiles)
@@ -407,10 +406,10 @@
       getUserRole: async function() {
         const datasetId = pathOr(0, ['content', 'id'], this.dataset)
 
-        useGetToken()
+        return useGetToken()
           .then(token => {
             const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${token}`
-            this.sendXhr(url,{})
+            return this.sendXhr(url,{})
               .then(role => {
                 this.setDatasetRole(role)
               })
