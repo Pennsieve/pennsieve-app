@@ -239,8 +239,9 @@ import IconActivity from "../icons/IconActivity.vue";
 import IconCollaborators from "../icons/IconCollaborators.vue";
 import IconGraph from "../icons/IconGraph.vue";
 import CustomTheme from "../../mixins/custom-theme";
-import {useGetToken} from "@/composables/useGetToken";
-import {useHandleXhrError} from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
+import { useHandleXhrError } from "@/mixins/request/request_composable";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "BfNavigationSecondary",
@@ -395,7 +396,7 @@ export default {
         this.datasetNameTruncated = false;
       }
       return name;
-    }
+    },
   },
 
   watch: {
@@ -464,10 +465,9 @@ export default {
         return status.displayName === command;
       });
 
-
       // API request to update the status
       useGetToken()
-        .then(token => {
+        .then((token) => {
           const datasetId = path(["content", "id"], this.dataset);
           const url = `${this.config.apiUrl}/datasets/${datasetId}?api_key=${token}`;
 
@@ -476,17 +476,16 @@ export default {
             body: {
               status: status.name,
             },
-          })
-            .then((response) => {
-              EventBus.$emit("toast", {
-                detail: {
-                  msg: "Your status has been saved",
-                },
-              });
+          }).then((response) => {
+            EventBus.$emit("toast", {
+              detail: {
+                msg: "Your status has been saved",
+              },
+            });
 
-              this.updateDataset(response);
-              this.setDataset(response);
-            })
+            this.updateDataset(response);
+            this.setDataset(response);
+          });
         })
         .catch(useHandleXhrError());
     },

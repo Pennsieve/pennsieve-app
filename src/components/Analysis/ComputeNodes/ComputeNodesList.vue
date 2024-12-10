@@ -16,7 +16,7 @@
           registering Compute Nodes for {{ orgName }}.
         </p>
       </div>
-      <div class="copy">
+      <div v-if="!hasAdminRights" class="copy">
         <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
         <p>
           Contact your administrator to get started working with Compute Nodes
@@ -89,6 +89,12 @@ export default {
     } catch (err) {
       console.error(err);
     }
+
+    try {
+      this.fetchComputeResourceAccounts();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   computed: {
@@ -130,7 +136,10 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["fetchComputeNodes"]),
+    ...mapActions("analysisModule", [
+      "fetchComputeNodes",
+      "fetchComputeResourceAccounts",
+    ]),
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
