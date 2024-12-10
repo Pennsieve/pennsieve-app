@@ -34,7 +34,7 @@ New and improved Pennsieve web app, now leveraging Vue 3!
 
 ### Deploy for Release to Production Environment
 
-- Make a PR from your feature branch into `main`
+- Make a PR from your feature branch into `main`.
 
 - Merge your code into `main` locally and test it locally.
 
