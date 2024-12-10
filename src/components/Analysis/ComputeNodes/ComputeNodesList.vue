@@ -89,6 +89,12 @@ export default {
     } catch (err) {
       console.error(err);
     }
+
+    try {
+      this.fetchComputeResourceAccounts();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   computed: {
@@ -130,7 +136,10 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["fetchComputeNodes"]),
+    ...mapActions("analysisModule", [
+      "fetchComputeNodes",
+      "fetchComputeResourceAccounts",
+    ]),
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
