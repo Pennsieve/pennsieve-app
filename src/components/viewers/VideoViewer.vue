@@ -2,7 +2,7 @@
   <div class="video-viewer">
     <video
       class="video-viewer"
-      :src="getFileUrl"
+      :src="fileUrl"
       autoplay
       controls
     />
