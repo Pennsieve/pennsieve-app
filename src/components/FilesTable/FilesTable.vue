@@ -346,7 +346,7 @@ export default {
      */
     handleTableSelectionChange: function (selection) {
       this.selection = selection;
-      const parentId = this.data[0].content.parentId || "root";
+      const parentId = this.data[0]?.content.parentId || "root";
       this.$emit("selection-change", selection, parentId);
       this.checkAll = this.data.length === selection.length;
     },
