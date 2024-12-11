@@ -4,16 +4,16 @@
       <template #description>
         <div class="description">
           <p>
-            The pennsieve platform allows users to register integrations to
+            The pennsieve platform allows users to register applications to
             allow users to expand the functionality of the platform through
             custom actions and webhooks.
           </p>
           <hr />
         </div>
         <div slot="description" class="description">
-          <p v-if="this.$route.name === 'integrations'">
-            Integrations support actions on various entities on the platform
-            such as "Files", "Records", and "Datasets". Registered integrations
+          <p v-if="this.$route.name === 'applications'">
+            Applications support actions on various entities on the platform
+            such as "Files", "Records", and "Datasets". Registered applications
             can be triggered from the action-menu associated with the targeted
             entities.
             <a
@@ -59,11 +59,13 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import {mapActions, mapState} from "vuex";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import EventBus from "@/utils/event-bus";
 import { pathOr, propOr } from "ramda";
 import {
   isEnabledForAllDevOrgs,
@@ -108,6 +110,21 @@ export default {
       default: "",
     },
   },
+
+  async mounted() {
+    const p1 = this.fetchIntegrations()
+    const p2 = this.fetchComputeNodes()
+    const p3 = this.fetchApplications()
+
+    return Promise.all([p1,p2,p3])
+  },
+
+  methods:{
+    ...mapActions("integrationsModule", ["fetchIntegrations"]),
+    ...mapActions("analysisModule", ["fetchComputeNodes", "fetchApplications"]),
+
+  },
+
   data() {
     return {
       tabs: [

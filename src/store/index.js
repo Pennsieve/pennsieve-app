@@ -117,7 +117,6 @@ const initialState = () => ({
   onboardingEvents: [],
   shouldShowLinkOrcidDialog: false,
   isLinkOrcidDialogVisible: false,
-  userToken: '',
   sessionTimer: null,
   isRefreshing: false,
   gitHubProfile: null,
@@ -188,14 +187,8 @@ export const mutations = {
         Cookies.set("preferred_org_id", orgId);
         state.profile = profile;
       },
-      UPDATE_USER_TOKEN(state, userToken) {
-        if (Object.prototype.toString.call(userToken) === "[object String]") {
-          state.userToken = userToken;
-        }
-      },
       CLEAR_STATE(state) {
         state.profile = {};
-        state.userToken = "";
         state.activeOrganization = {};
         state.organizations = {};
         state.orgMembers = [];
@@ -208,6 +201,7 @@ export const mutations = {
         state.datasetDescription = "";
         state.changelogText = "";
         state.datasetDoi = "";
+        state.datasetTemplates = [];
         state.searchModalVisible = false;
         state.shouldShowLinkOrcidDialog = false;
         state.isLinkOrcidDialogVisible = false;
@@ -674,10 +668,7 @@ export const actions = {
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
-  updateUserToken: ({ commit }, evt) => {
-    Cookies.set('user_token', evt)
-    commit("UPDATE_USER_TOKEN", evt)
-  },
+
   clearState: ({ commit }) => {
     commit("CLEAR_STATE");
     commit("viewerModule/CLEAR_STATE");
@@ -806,6 +797,7 @@ export const actions = {
   addContributor: ({ commit }, contributor) => {
     commit("ADD_DATASET_CONTRIBUTOR", R.clone(contributor));
   },
+
   updateDatasetContributor: ({ commit }, contributor) => {
     commit("UPDATE_DATASET_CONTRIBUTOR", R.clone(contributor));
     commit("UPDATE_ORG_CONTRIBUTOR", R.clone(contributor));
@@ -843,9 +835,9 @@ export const getters = {
 
   // NOTE: Getters need to have a different name than the state property. The syntax should be `getStatePropertyName` not `statePropertyName.`
 
-  // NOTE: Getters are used for manipulating data, not just reading it. If simple reading global state, use mapState instead of mapGetters. 
+  // NOTE: Getters are used for manipulating data, not just reading it. If simple reading global state, use mapState instead of mapGetters.
 
-  // TODO: Refactor usages of these simple data-accessing getters so the state property is accessed from mapState. 
+  // TODO: Refactor usages of these simple data-accessing getters so the state property is accessed from mapState.
 
   sessionTimer: (state) => state.sessionTimer,
   isRefreshing: (state) => state.isRefreshing,
@@ -856,7 +848,6 @@ export const getters = {
   isOrgSynced: (state) => state.activeOrgSynced,
   config: (state) => state.config,
   profile: (state) => state.profile,
-  userToken: (state) => state.userToken, 
   getProfile: (state) => () => state.profile,
   organizations: (state) => state.organizations,
   activeOrganization: (state) => state.activeOrganization,
@@ -868,7 +859,18 @@ export const getters = {
     return R.defaultTo({}, R.find(R.propEq("id", id), state.orgMembers));
   },
   getOrgMemberByIntId: (state) => (id) => {
-    return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+    for (let i = 0; i < state.orgMembers; i++) {
+     if (state.orgMembers[i].intId === id ) {
+       return state.orgMembers[i]
+     }
+    }
+    return null
+
+
+    // return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+  },
+  getModelByHash: (state) => (id) => {
+    return state.conceptsHash[id]
   },
   getOrgMembersById: (state) => (list) => {
     return state.orgMembers.filter((member) => list.includes(member.id));
@@ -879,7 +881,6 @@ export const getters = {
   getTeam: (state) => (id) => {
     return R.defaultTo({}, R.find(R.pathEq(["team", "id"], id), state.teams));
   },
-  getUserToken: (state) => () => state.userToken,
   uploadCount: (state) => state.uploadCount,
   uploading: (state) => state.uploading,
   uploadRemaining: (state) => state.uploadRemaining,
@@ -935,11 +936,17 @@ export const getters = {
           R.defaultTo({}),
           R.find(R.propEq("id", datasetId))
       )(state.consortiumDatasetsImporting),
-  getOrganizationByIntId: (state) => (id) =>
-      R.compose(
-          R.defaultTo({}),
-          find(R.pathEq(["organization", "intId"], id))
-      )(state.organizations),
+  getOrganizationByIntId: (state) => (id) => {
+    console.log(state.organizations)
+    for (let i = 0; i < state.organizations; i++) {
+      console.log(id)
+      if (state.organizations[i].organization.intId === id ) {
+        return state.organizations[i]
+      }
+    }
+    return {}
+
+  },
   getRelationshipTypes: (state) => () => state.relationshipTypes,
   getRelationshipTypeByName: (state) => (name) => {
     return R.compose(
@@ -1041,6 +1048,8 @@ export const getters = {
     return state.computeNodes
   }
 }
+
+
 
 
 export default createStore({

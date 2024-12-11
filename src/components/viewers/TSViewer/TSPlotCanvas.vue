@@ -35,6 +35,7 @@
     } from 'ramda'
 
     import protobuf from 'protobufjs'
+    import {useGetToken} from "@/composables/useGetToken";
 
     export default {
         name: 'TimeseriesPlotCanvas',
@@ -74,12 +75,7 @@
             },
             pHeight: function () {
                 return this.cHeight - 20
-            },
-            timeSeriesUrl: function() {
-                const url = this.$store.state.config.timeSeriesUrl
-                const token = this.$store.state.userToken
-                return url + '?session=' + token + '&package=' + this.activeViewer.content.id
-            },
+            }
         },
         data: function () {
             return {
@@ -1421,11 +1417,17 @@
                     return;
                 }
 
-                let url = this.timeSeriesUrl
-                this._websocket = new WebSocket(url);
-                this._websocket.onopen = this._onWebsocketOpen.bind(this);
-                this._websocket.onclose = this._onWebsocketClose.bind(this);
-                this._websocket.onmessage = this._onWebsocketMessage.bind(this);
+              useGetToken()
+                .then(token => {
+                  const url =  this.$store.state.config.timeSeriesUrl + '?session=' + token + '&package=' + this.activeViewer.content.id
+                  this._websocket = new WebSocket(url);
+                  this._websocket.onopen = this._onWebsocketOpen.bind(this);
+                  this._websocket.onclose = this._onWebsocketClose.bind(this);
+                  this._websocket.onmessage = this._onWebsocketMessage.bind(this);
+                })
+                .catch(console.log)
+
+
 
             },
             sendMontageMessage: function (value) {

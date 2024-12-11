@@ -17,12 +17,10 @@
         </p>
       </div>
       <div v-if="!hasAdminRights" class="copy">
-        <div class="copy">
-          <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
-          <p>
-            Contact your administrator to get started working with Compute Nodes
-          </p>
-        </div>
+        <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
+        <p>
+          Contact your administrator to get started working with Compute Nodes
+        </p>
       </div>
     </bf-empty-page-state>
     <template #actions>
@@ -63,6 +61,7 @@ import {
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
+import { useGetToken } from "@/composables/useGetToken";
 
 export default {
   name: "ComputeNodesList",
@@ -81,7 +80,6 @@ export default {
   data() {
     return {
       createComputeNodeDialogVisible: false,
-      showEmptyState: false,
     };
   },
 
@@ -91,9 +89,16 @@ export default {
     } catch (err) {
       console.error(err);
     }
+
+    try {
+      this.fetchComputeResourceAccounts();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   computed: {
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
     ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
     ...mapState("analysisModule", ["computeNodesLoaded", "computeNodes"]),
 
@@ -131,7 +136,10 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["fetchComputeNodes"]),
+    ...mapActions("analysisModule", [
+      "fetchComputeNodes",
+      "fetchComputeResourceAccounts",
+    ]),
     isFeatureFlagEnabled: function () {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
@@ -152,11 +160,7 @@ export default {
      * @returns {String}
      */
     getIntegrationUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`;
-      }
-
-      return "";
+      return `${this.config.apiUrl}/webhooks`;
     },
   },
 };

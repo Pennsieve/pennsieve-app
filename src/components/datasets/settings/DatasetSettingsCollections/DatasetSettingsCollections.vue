@@ -82,7 +82,6 @@ export default {
     ...mapState([
       'config',
       'datasetLocked',
-      'userToken'
     ]),
 
     ...mapState('collectionsModule', [

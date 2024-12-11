@@ -145,17 +145,11 @@ export default {
     ...mapGetters([
       'activeOrganization',
       'config',
-      'userToken',
       'profile',
       'hasFeature',
       'getOrgMemberByIntId'
     ]),
 
-    downloadManifestUrl: function() {
-      if (this.config.api2Url && this.userToken) {
-        return `${this.config.api2Url}/manifest/archive?manifest_id=${this.item.id}&api_key=Bearer ${this.userToken}`
-      } else return null
-    },
   },
 
   methods: {

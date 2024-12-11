@@ -65,6 +65,8 @@ import BfButton from '../../../shared/bf-button/BfButton.vue'
 import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
 import Request from '../../../../mixins/request/index'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'Office365Dialog',
@@ -94,34 +96,16 @@ export default {
       'shouldOpenOfficeFile',
     ]),
 
-    ...mapGetters(['userToken', 'config']),
+    ...mapGetters([ 'config']),
 
     /**
      * Computed property to generate endpoint url to retrieve
      * source files for package
      * @returns {String}
      */
-    sourceFilesUrl: function() {
-      const url = propOr('', 'apiUrl', this.config)
-      const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
 
-      return `${url}/packages/${packageId}/sources?api_key=${this.userToken}`
-    },
 
-    /**
-     * Computed property to generate endpoint url to retreive
-     * package file information
-     * @returns {String}
-     */
-    packageFilesUrl: function() {
-      const url = propOr('', 'apiUrl', this.config)
-      const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
-      const fileId = pathOr('', ['content', 'id'], head(this.sourceFile))
 
-      return `${url}/packages/${packageId}/files/${fileId}?api_key=${
-        this.userToken
-      }&short=true`
-    }
   },
 
   watch: {
@@ -138,25 +122,58 @@ export default {
     ]),
 
     /**
+     * Computed property to generate endpoint url to retreive
+     * package file information
+     * @returns {String}
+     */
+    packageFilesUrl: async function() {
+      const url = propOr('', 'apiUrl', this.config)
+      const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
+      const fileId = pathOr('', ['content', 'id'], head(this.sourceFile))
+
+      return useGetToken()
+        .then(token => {
+          return `${url}/packages/${packageId}/files/${fileId}?api_key=${
+            token
+          }&short=true`
+        })
+
+    },
+
+    sourceFilesUrl: async function() {
+      const url = propOr('', 'apiUrl', this.config)
+      const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
+
+      return useGetToken()
+        .then(token => {
+          return `${url}/packages/${packageId}/sources?api_key=${token}`
+        })
+    },
+    /**
      * Get package files endpoint call to get url to open in MS Office Viewer
      */
     getPackageFiles: function() {
-      return this.sendXhr(this.packageFilesUrl)
-        .then(response => {
-          this.awsURL = response.url
+      return this.packageFilesUrl()
+        .then(url => {
+          return useSendXhr(url)
+            .then(response => {
+              this.awsURL = response.url
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
     },
 
     /**
      * API call to get source files data for table
      */
     getSourceFiles: function() {
-      return this.sendXhr(this.sourceFilesUrl)
-        .then(response => {
-          this.sourceFile = response
-        })
-        .catch(this.handleXhrError.bind(this))
+      return this.sourceFilesUrl()
+        .then((url) => {
+          this.sendXhr(url)
+            .then(response => {
+              this.sourceFile = response
+            })
+        }).catch(this.handleXhrError.bind(this))
     },
 
     /**

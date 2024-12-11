@@ -56,6 +56,8 @@
   import Avatar from '../../../../shared/avatar/Avatar.vue'
 
   import Request from '../../../../../mixins/request'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   const getName = compose(replace('[', ''), head)
   const getId = compose(replace(')', ''), last)
@@ -127,7 +129,6 @@
       ...mapState([
         'config',
         'profile',
-        'userToken'
       ]),
 
       ...mapGetters([
@@ -219,14 +220,18 @@
         const commentId = propOr(0, 'id', this.comment)
 
         // build url
-        const url = `${this.config.apiUrl}/discussions/${discussionId}/comment/${commentId}?api_key=${this.userToken}`
 
-        this.sendXhr(url, {
-          method: 'DELETE'
-        }).then(() => {
-            this.removeComment(this.comment)
-        })
-        .catch(this.handleXhrError.bind(this))
+
+        useGetToken()
+          .then(token => {
+            const url = `${this.config.apiUrl}/discussions/${discussionId}/comment/${commentId}?api_key=${token}`
+            return useSendXhr(url, {
+              method: 'DELETE'
+            }).then(() => {
+              this.removeComment(this.comment)
+            })
+          })
+          .catch(this.handleXhrError.bind(this))
       }
     }
   }

@@ -46,6 +46,8 @@ import ReferenceTypesDialog from '../ReferenceTypesDialog/ReferenceTypesDialog.v
 import BfButton from '../../../shared/bf-button/BfButton.vue'
 import Request from '../../../../mixins/request/index'
 import { referenceTypeOptions } from '../../../../utils/constants'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 export default {
   name: 'DatasetAssociatedPublications',
 
@@ -71,7 +73,7 @@ export default {
 
   computed: {
     ...mapGetters(['datasetLocked']),
-    ...mapState(['config', 'userToken', 'dataset']),
+    ...mapState(['config', 'dataset']),
 
     /**
      * Computes dataset Id
@@ -85,6 +87,7 @@ export default {
      * @returns {String}
      */
     externalPublicationsUrl: function() {
+      if(!this.datasetId){return null}
       return `${this.config.apiUrl}/datasets/${
         this.datasetId
       }/external-publications`
@@ -131,17 +134,19 @@ export default {
       }
 
       this.isLoading = true
-      const url = this.externalPublicationsUrl + `?api_key=${this.userToken}`
-
-      this.sendXhr(url)
-        .then(response => {
-          this.isLoading = false
-          this.references = response
-        })
-        .catch(() => {
-          this.isLoading = false
-          this.hasError = true
-        })
+      useGetToken()
+        .then(token => {
+          const url = this.externalPublicationsUrl + `?api_key=${token}`
+          return useSendXhr(url)
+            .then(response => {
+              this.isLoading = false
+              this.references = response
+            })
+            .catch(() => {
+              this.isLoading = false
+              this.hasError = true
+            })
+        }).catch(err => useHandleXhrError(err))
     },
 
     /**
@@ -151,28 +156,32 @@ export default {
      * @param {String} refVal
      */
     addReference: function(doi, refLabel, refVal) {
-      if (!this.externalPublicationsUrl) {
-        return
-      }
 
-      this.isLoading = true
-      const url = typeof doi === 'object' && doi !== null
-        ? this.externalPublicationsUrl +
-          `?doi=${doi.doi}&api_key=${this.userToken}&relationshipType=${refVal}`
-        : this.externalPublicationsUrl +
-          `?doi=${doi}&api_key=${this.userToken}&relationshipType=${refVal}`
-      this.sendXhr(url, {
-        method: 'PUT'
-      })
-        .then(response => {
-          this.isLoading = false
-         this.checkForDuplicates(response)
-          if (!this.hasDuplicate) {
-            this.references.push(response)
-          }
+      useGetToken()
+        .then(token => {
+          this.isLoading = true
+          const url = typeof doi === 'object' && doi !== null
+            ? this.externalPublicationsUrl +
+            `?doi=${doi.doi}&api_key=${token}&relationshipType=${refVal}`
+            : this.externalPublicationsUrl +
+            `?doi=${doi}&api_key=${token}&relationshipType=${refVal}`
+
+          return useSendXhr(url, {
+            method: 'PUT'
+          })
+            .then(response => {
+              this.isLoading = false
+              this.checkForDuplicates(response)
+              if (!this.hasDuplicate) {
+                this.references.push(response)
+              }
+            })
+
+
         })
-        .catch(this.handleXhrError.bind(this))
-      this.hasDuplicate = false
+        .catch(useHandleXhrError)
+        .finally(this.hasDuplicate = false)
+
     },
 
     /**
@@ -192,20 +201,21 @@ export default {
      * @param {Object} doi
      */
     removeCitation: function(doi) {
-      if (!this.externalPublicationsUrl) {
-        return
-      }
+      useGetToken()
+        .then(token => {
+          const url =
+            this.externalPublicationsUrl +
+            `?doi=${doi.doi}&api_key=${token}&relationshipType=${
+              doi.relationshipType
+            }`
+          return useSendXhr(url, {
+            method: 'DELETE'
+          }).then(() => {
+            this.references = this.references.filter(ref => ref !== doi)
+          })
 
-      const url =
-        this.externalPublicationsUrl +
-        `?doi=${doi.doi}&api_key=${this.userToken}&relationshipType=${
-          doi.relationshipType
-        }`
-      this.sendXhr(url, {
-        method: 'DELETE'
-      }).then(() => {
-        this.references = this.references.filter(ref => ref !== doi)
-      })
+        })
+        .catch(useHandleXhrError)
     }
   }
 }

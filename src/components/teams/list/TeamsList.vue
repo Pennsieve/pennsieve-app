@@ -123,7 +123,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
     ...mapState(["teamsLoading", "teams"]),
     hasAdminRights: function () {
       if (this.activeOrganization) {

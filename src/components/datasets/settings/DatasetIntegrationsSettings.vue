@@ -77,6 +77,8 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr, propOr } from "ramda";
 import IntegrationsListItem from "../../Integrations/IntegrationsListItem/IntegrationsListItem.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "DatasetIntegrationsSettings",
@@ -116,7 +118,6 @@ export default {
       "isDatasetOwner",
       "datasetBanner",
       "config",
-      "userToken",
     ]),
 
     orgName: function () {
@@ -150,14 +151,13 @@ export default {
      * Retrieves the API URL for adding ORCID
      * @returns {String}
      */
-    getORCIDApiUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
+    getORCIDApiUrl: async function () {
+      return useGetToken()
+        .then(token => {
+          const url = pathOr("", ["config", "apiUrl"])(this);
+          return `${url}/user/orcid?api_key=${token}`;
+        }).catch(err => console.log(err))
 
-      if (!url) {
-        return "";
-      }
-
-      return `${url}/user/orcid?api_key=${this.userToken}`;
     },
 
     /**
@@ -250,23 +250,23 @@ export default {
       handler: function (dataset) {
         if (pathOr(false, ["content", "id"], dataset)) {
           const url = `${this.config.apiUrl}/datasets/${dataset.content.id}/webhook`;
-
-          // Set loading state
           this.isLoadingIntegrations = true;
 
-          this.sendXhr(url, {
-            header: {
-              Authorization: `Bearer ${this.userToken}`,
-            },
-          })
-            .then((response) => {
-              this.activeIntegrations = response;
+          useGetToken().then(token => {
+            return useSendXhr(url, {
+              header: {
+                Authorization: `Bearer ${token}`,
+              },
             })
-            .catch(this.handleXhrError.bind(this))
+              .then((response) => {
+                this.activeIntegrations = response;
+              })
+          }).catch(err => useHandleXhrError(err))
             .finally(() => {
               // Set loading state
               this.isLoadingIntegrations = false;
             });
+
         }
       },
       deep: true,
@@ -303,23 +303,28 @@ export default {
     ...mapActions(["updateProfile"]),
 
     toggleIntegration: function (item) {
-      const url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/webhook/${item.integration.id}`;
-
       let method = "PUT";
       if (!item.isActive) {
         method = "DELETE";
       }
 
-      this.sendXhr(url, {
-        method: method,
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
+      useGetToken().then(token => {
+        const url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/webhook/${item.integration.id}`;
+        this.sendXhr(url, {
+          method: method,
+          header: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+          .catch(this.handleXhrError.bind(this))
+          .finally(() => {});
+
       })
-        // .then(response => {
-        // })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {});
+
+
+
+
+
     },
 
     /**
@@ -335,27 +340,26 @@ export default {
       window.addEventListener("message", function (event) {
         this.oauthCode = event.data;
         if (this.oauthCode !== "") {
-          if (!self.getORCIDApiUrl) {
-            return;
-          }
 
-          self
-            .sendXhr(self.getORCIDApiUrl, {
-              method: "POST",
-              body: {
-                authorizationCode: this.oauthCode,
-              },
-            })
-            .then((response) => {
-              // response logic goes here
-              self.oauthInfo = response;
+          self.getORCIDApiUrl()
+            .then(url => {
+              return useSendXhr(url, {
+                  method: "POST",
+                  body: {
+                    authorizationCode: this.oauthCode,
+                  },
+                })
+                .then((response) => {
+                  // response logic goes here
+                  self.oauthInfo = response;
 
-              self.updateProfile({
-                ...self.profile,
-                orcid: self.oauthInfo,
-              });
-            })
-            .catch(self.handleXhrError.bind(this));
+                  return self.updateProfile({
+                    ...self.profile,
+                    orcid: self.oauthInfo,
+                  });
+                })
+            }).catch(self.handleXhrError.bind(this));
+
         }
       });
     },

@@ -239,6 +239,9 @@ import IconActivity from "../icons/IconActivity.vue";
 import IconCollaborators from "../icons/IconCollaborators.vue";
 import IconGraph from "../icons/IconGraph.vue";
 import CustomTheme from "../../mixins/custom-theme";
+import { useGetToken } from "@/composables/useGetToken";
+import { useHandleXhrError } from "@/mixins/request/request_composable";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "BfNavigationSecondary",
@@ -290,7 +293,6 @@ export default {
       "uploading",
       "hasFeature",
       "getPermission",
-      "userToken",
       "config",
     ]),
     getThemeColors: function () {
@@ -395,17 +397,6 @@ export default {
       }
       return name;
     },
-
-    getDatasetUpdateUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const datasetId = path(["content", "id"], this.dataset);
-
-      if (!url) {
-        return "";
-      }
-
-      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`;
-    },
   },
 
   watch: {
@@ -474,28 +465,29 @@ export default {
         return status.displayName === command;
       });
 
-      if (!this.getDatasetUpdateUrl) {
-        return;
-      }
-
       // API request to update the status
-      this.sendXhr(this.getDatasetUpdateUrl, {
-        method: "PUT",
-        body: {
-          status: status.name,
-        },
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Your status has been saved",
-            },
-          });
+      useGetToken()
+        .then((token) => {
+          const datasetId = path(["content", "id"], this.dataset);
+          const url = `${this.config.apiUrl}/datasets/${datasetId}?api_key=${token}`;
 
-          this.updateDataset(response);
-          this.setDataset(response);
+          return useSendXhr(url, {
+            method: "PUT",
+            body: {
+              status: status.name,
+            },
+          }).then((response) => {
+            EventBus.$emit("toast", {
+              detail: {
+                msg: "Your status has been saved",
+              },
+            });
+
+            this.updateDataset(response);
+            this.setDataset(response);
+          });
         })
-        .catch(this.handleXhrError.bind(this));
+        .catch(useHandleXhrError());
     },
   },
 };

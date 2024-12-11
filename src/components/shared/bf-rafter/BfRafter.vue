@@ -107,6 +107,7 @@ import IconUpload from "../../../components/icons/IconUpload.vue";
 import IconArrowUp from "../../icons/IconArrowUp.vue";
 import IconHelp from "../../icons/IconHelp.vue";
 import ReadmeDoc from "../readme-doc/ReadmeDoc.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'BfRafter',
@@ -227,7 +228,7 @@ export default {
       return this.$route.name === "file-record";
     },
 
-    ...mapGetters(['getPermission', 'userToken', 'config']),
+    ...mapGetters(['getPermission', 'config']),
     currentRouteName: function() {
       return this.$route.name
     },
@@ -257,15 +258,15 @@ export default {
       return name
     },
 
-    getDatasetUpdateUrl: function() {
-      const url = pathOr('', ['config', 'apiUrl'])(this)
-      const datasetId = path(['content', 'id'], this.dataset)
+    getDatasetUpdateUrl: async function() {
 
-      if (!url) {
-        return ''
-      }
+      return useGetToken()
+        .then((token) => {
+          const url = pathOr('', ['config', 'apiUrl'])(this)
+          const datasetId = path(['content', 'id'], this.dataset)
+          return `${url}/datasets/${datasetId}?api_key=${token}`
+        })
 
-      return `${url}/datasets/${datasetId}?api_key=${this.userToken}`
     },
     /**
      * Returns dataset filter arrow direction
@@ -350,28 +351,30 @@ export default {
         return status.displayName === command
       })
 
-      if (!this.getDatasetUpdateUrl) {
-        return
-      }
-
-      // API request to update the status
-      this.sendXhr(this.getDatasetUpdateUrl, {
-        method: 'PUT',
-        body: {
-          status: status.name
-        }
-      })
-        .then(response => {
-          EventBus.$emit('toast', {
-            detail: {
-              msg: 'Your status has been saved'
+      this.getDatasetUpdateUrl
+        .then((url) => {
+          this.sendXhr(url, {
+            method: 'PUT',
+            body: {
+              status: status.name
             }
           })
+            .then(response => {
+              EventBus.$emit('toast', {
+                detail: {
+                  msg: 'Your status has been saved'
+                }
+              })
 
-          this.updateDataset(response)
-          this.setDataset(response)
+              this.updateDataset(response)
+              this.setDataset(response)
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
+
+      // API request to update the status
+
     },
     //Navigates to dataset trash bin modal
     NavToDeleted: function() {

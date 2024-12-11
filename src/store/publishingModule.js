@@ -5,6 +5,7 @@ import { PublicationTabs, PublicationTabsStatuses, PublicationTabsTypes, StatusA
 
 import EventBus from '../utils/event-bus'
 import router from '@/router'
+import {useGetToken} from "@/composables/useGetToken";
 
 const publishingSearchParams = () => ({
   limit: 25,
@@ -15,31 +16,41 @@ const publishingSearchParams = () => ({
   totalCount: 0
 })
 
-const fetchDatasetsUrl = (state, rootState, publicationStatus, publicationType, isOnPublishedTab) => {
-  const apiKey = rootState.userToken || Cookies.get('user_token')
+const fetchDatasetsUrl = async (state, rootState, publicationStatus, publicationType, isOnPublishedTab) => {
+
+  return useGetToken()
+      .then( token => {
+        const queryParams = toQueryParams({
+          publicationStatus,
+          api_key: token,
+          includeBannerUrl: true,
+          includePublishStatus: true,
+          publicationType,
+          ...state.publishingSearchParams
+        })
+
+        const publishedQueryParams = toQueryParams({
+          api_key: token,
+          includeBannerUrl: true,
+          ...state.publishingSearchParams
+        })
+
+        return isOnPublishedTab
+            ? `${rootState.config.apiUrl}/datasets/published/paginated?${publishedQueryParams}`
+            : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
+
+  })
+
 
   /**
    * Only fetch the datasets if the user is in the publishing tab
    */
 
-  const queryParams = toQueryParams({
-    publicationStatus,
-    api_key: apiKey,
-    includeBannerUrl: true,
-    includePublishStatus: true,
-    publicationType,
-    ...state.publishingSearchParams
-  })
 
-  const publishedQueryParams = toQueryParams({
-    api_key: apiKey,
-    includeBannerUrl: true,
-    ...state.publishingSearchParams
-  })
 
-  return isOnPublishedTab
-    ? `${rootState.config.apiUrl}/datasets/published/paginated?${publishedQueryParams}`
-    : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
+
+
+
 }
 
 
@@ -189,88 +200,113 @@ export const actions = {
 
     const publicationType = PublicationTabsTypes[router.currentRoute.value.name]
 
-    const isOnPublishedTab = publicationType == PublicationTabsTypes[PublicationTabs.PUBLISHED]
+    const isOnPublishedTab = publicationType === PublicationTabsTypes[PublicationTabs.PUBLISHED]
 
-    const url = fetchDatasetsUrl(state, rootState, publicationStatus, publicationType, isOnPublishedTab)
+    const urlPromise = fetchDatasetsUrl(state, rootState, publicationStatus, publicationType, isOnPublishedTab)
 
     try {
-      const resp = await fetch(url)
-      if (resp.ok) {
-        const { datasets, totalCount } = await resp.json();
-        commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', totalCount);
-        // If on the published tab, merge the dataset and published
-        // dataset DTOs if the user has permissions for the dataset
-        const updatedDatasets = isOnPublishedTab
-        ? datasets.map(dataset => {
-          const embargoAccess = dataset.embargoAccess || ''
-          const publishedDataset = { ...dataset.publishedDataset, embargoAccess}
+      urlPromise.then(url => {
+        fetch(url).then(resp => {
+          return resp.json()
+              .then(json => {
+                commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', json.totalCount);
+                // If on the published tab, merge the dataset and published
+                // dataset DTOs if the user has permissions for the dataset
+                const updatedDatasets = isOnPublishedTab
+                    ? json.datasets.map(dataset => {
+                      const embargoAccess = dataset.embargoAccess || ''
+                      const publishedDataset = { ...dataset.publishedDataset, embargoAccess}
 
-          return dataset.dataset
-            ? {...dataset.dataset, ...publishedDataset}
-            : publishedDataset
+                      return dataset.dataset
+                          ? {...dataset.dataset, ...publishedDataset}
+                          : publishedDataset
+                    })
+                    : json.datasets;
+                commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: updatedDatasets });
+                commit('UPDATE_IS_LOADING_DATASETS', false);
+              })
         })
-        : datasets;
-        commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: updatedDatasets });
-        commit('UPDATE_IS_LOADING_DATASETS', false);
-      } else {
-        throw new Error(resp.statusText);
-      }
+      })
+
     } catch (err) {
       EventBus.$emit('ajaxError', err)
     }
   },
 
   getDatasetCount: async ({commit, rootState}, type) => {
-    const apiKey = rootState.userToken || Cookies.get('user_token')
 
     const statuses = PublicationTabsStatuses[type]
     const types = PublicationTabsTypes[type]
     const isOnPublishedTab = statuses.includes(PublicationStatus.COMPLETED)
 
-    const queryParams = toQueryParams({
-      publicationStatus: statuses,
-      publicationType: types,
-      api_key: apiKey,
-      limit: 0
-    })
+    useGetToken()
+        .then(token => {
+          const queryParams = toQueryParams({
+            publicationStatus: statuses,
+            publicationType: types,
+            api_key: token,
+            limit: 0
+          })
 
-    const url = isOnPublishedTab
-    ? `${rootState.config.apiUrl}/datasets/published/paginated?${queryParams}`
-    : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
-    try {
-      const resp = await fetch(url)
-      if (resp.ok) {
-        const { totalCount } = await resp.json()
-        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: totalCount })
-      } else {
-        throw new Error(resp.statusText)
-      }
-    } catch (err) {
-      EventBus.$emit('ajaxError', err)
-    }
+          const url = isOnPublishedTab
+              ? `${rootState.config.apiUrl}/datasets/published/paginated?${queryParams}`
+              : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
+          try {
+            fetch(url)
+                .then(resp => {
+                  if (resp.ok) {
+                    resp.json()
+                        .then(json => {
+                          commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: json.totalCount })
+                        })
+                  } else {
+                    throw new Error(resp.statusText)
+                  }
+                })
+
+          } catch (err) {
+            EventBus.$emit('ajaxError', err)
+          }
+
+        })
+
+
+
+
+
   },
 
-  getDatasetProposalCount: async ({commit, rootState}, type) => {
-    let url = `${rootState.config.api2Url}/publishing/submission`
-    const apiKey = rootState.userToken
-    const myHeaders = new Headers();
-    myHeaders.append('Authorization', 'Bearer ' + apiKey)
-    myHeaders.append('Accept', 'application/json')
+  getDatasetProposalCount: async ({ commit, rootState }, type) => {
+    const url = `${rootState.config.api2Url}/publishing/submission`;
+  
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: myHeaders,
-      })
-      if (response.ok) {
-        const { totalCount } = await response.json()
-        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: totalCount })
+      const token = await useGetToken();
+  
+      const headers = new Headers({
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      });
+  
+      const response = await fetch(url, { method: 'GET', headers });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+  
+      if (data && typeof data.totalCount === 'number') {
+        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: data.totalCount });
       } else {
-        throw new Error(response.statusText)
+        throw new Error('Invalid response format');
       }
     } catch (err) {
-      EventBus.$emit('ajaxError', err)
+      console.error('Error fetching dataset proposal count:', err);
+      EventBus.$emit('ajaxError', err);
     }
   },
+  
+
 
   fetchDatasetProposals: async ({state, commit, rootState}) => {
     // const publicationStatus = PublicationTabsStatuses[rootState.route.name]
@@ -279,7 +315,8 @@ export const actions = {
     // }
    
     let url = `${rootState.config.api2Url}/publishing/submission`
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
+
     const myHeaders = new Headers();
     myHeaders.append('Authorization', 'Bearer ' + apiKey)
     myHeaders.append('Accept', 'application/json')

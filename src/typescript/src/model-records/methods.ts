@@ -1,26 +1,42 @@
 import {ModelRecordsComponentInstance, Model, ModelRecord, ModelRecordsRoute} from "./_model";
+import {useGetToken} from "../../../composables/useGetToken.js"
+import {useHandleXhrError} from "../../../mixins/request/request_composable"
 
 /**
  * execute the fetch of records from the concept instances endpoint
  */
 const fetchRecords = async (instance: ModelRecordsComponentInstance): Promise<void> => {
+
+  debugger
   if (!instance.modelRecordsUrl) return Promise.resolve()
 
   instance.resultsLoading = true
   instance.searchResults = []
 
+  console.log('FETCH')
+  
   try {
-    instance.searchResults = await instance.sendXhr<ModelRecord[]>(instance.modelRecordsUrl, {
-      header: {
-        'Authorization': `bearer ${instance.userToken}`
-      },
-      method: 'GET',
-    })
-    instance.resultsLoading = false
+    useGetToken()
+        .then(async token => {
+          console.log(token)
+
+          
+          instance.searchResults = await instance.sendXhr<ModelRecord[]>(instance.modelRecordsUrl, {
+            header: {
+              'Authorization': `bearer ${token}`
+            },
+            method: 'GET',
+          })
+        })
+        .catch(useHandleXhrError)
+        .finally(() => instance.resultsLoading = false)
+
+
 
   } catch (err) {
     instance.resultsLoading = false
-    instance.logger(['Error', err.statusText ?? err], 'error')
+    console.log(err)
+    // instance.logger(['Error', err.statusText ?? err], 'error')
   }
 
 }

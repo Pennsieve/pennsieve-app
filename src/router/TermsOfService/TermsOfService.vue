@@ -58,6 +58,8 @@ import Request from "@/mixins/request";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 import EventBus from "@/utils/event-bus";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "TermsOfService",
@@ -84,7 +86,6 @@ export default {
       "config",
       "bfTermsOfServiceVersion",
       "activeOrganization",
-      "userToken",
       "onboardingEvents",
     ]),
 
@@ -158,15 +159,18 @@ export default {
     customTermsUrl: {
       handler: function (val) {
         if (val) {
-          const url = `${this.customTermsUrl}?api_key=${this.userToken}`;
-          fetch(url, {
-            headers: {
-              "Content-Type": "text/html",
-            },
-          })
-            .then((response) => response.text())
-            .then((response) => {
-              this.customTerms = response;
+          useGetToken()
+            .then(async token => {
+              const url = `${this.customTermsUrl}?api_key=${token}`;
+              return fetch(url, {
+                headers: {
+                  "Content-Type": "text/html",
+                },
+              })
+                .then((response) => response.text())
+                .then((response) => {
+                  this.customTerms = response;
+                })
             })
             .catch(this.handleXhrError.bind(this));
         }
@@ -186,17 +190,22 @@ export default {
      * Gets Terms of Service
      */
     getTermsOfService: function () {
-      this.sendXhr(
-        `${this.config.api2Url}/readme/docs/pennsieve-terms-of-service`,
-        {
-          method: "GET",
-          header: {
-            Authorization: `Bearer ${this.userToken}`,
-          },
-        }
-      ).then((response) => {
-        this.termsOfService = response.body_html;
-      });
+      useGetToken()
+        .then(token => {
+          useSendXhr(
+            `${this.config.api2Url}/readme/docs/pennsieve-terms-of-service`,
+            {
+              method: "GET",
+              header: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          ).then((response) => {
+            this.termsOfService = response.body_html;
+          });
+        })
+        .catch(useHandleXhrError)
+
     },
 
     /**
@@ -212,16 +221,19 @@ export default {
         );
       }
 
-      this.sendXhr(this.acceptAgreementUrl, {
-        method: "PUT",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: {
-          version,
-        },
-      })
-        .then(this.onAcceptAgreement.bind(this))
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.acceptAgreementUrl, {
+            method: "PUT",
+            header: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: {
+              version,
+            },
+          })
+            .then(this.onAcceptAgreement.bind(this))
+        })
         .catch(this.handleXhrError.bind(this));
     },
 

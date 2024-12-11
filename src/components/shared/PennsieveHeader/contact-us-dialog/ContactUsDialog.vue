@@ -83,11 +83,9 @@ export default {
   },
   computed: {
     ...mapGetters([
-      "userToken",
       "config",
       "dataset",
       "activeOrganization",
-      "userToken",
     ]),
   },
   watch: {

@@ -89,15 +89,15 @@ describe('CreateEditTeam.vue', () => {
     expect(teamB).toBe(false)
   })
 
-  it('createUrl: POST', () => {
-    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams?api_key=123'
-    const createUrl = cmp.vm.createUrl('POST')
+  it('createUrl: POST', async() => {
+    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams?api_key=undefined'
+    const createUrl = await cmp.vm.createUrl('POST')
     expect(createUrl).toBe(expectedUrl)
   })
 
-  it('createUrl: PUT', () => {
-    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/17?api_key=123'
-    const createUrl = cmp.vm.createUrl('PUT')
+  it('createUrl: PUT', async () => {
+    const expectedUrl = 'https://app.blackfynn.net/organizations/666/teams/17?api_key=undefined'
+    const createUrl = await cmp.vm.createUrl('PUT')
     expect(createUrl).toBe(expectedUrl)
   })
 

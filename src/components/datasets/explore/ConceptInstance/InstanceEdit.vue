@@ -60,7 +60,7 @@
         :key="property.to.modelId"
         :property="property"
         :label="property.schemaLinkedProperty.displayName"
-        @edit-linked-property="editLinkedProperty"
+        @edit-linked-property="onEditLinkedProperty"
         @confirm-remove-linked-property="removeLinkedPropertyEditScreen"
       />
     </div>
@@ -180,6 +180,8 @@ import GetConceptTitleVal from '../GetConceptTitleVal'
 import StageActions from "../../../shared/StageActions/StageActions.vue";
 import IconPencil from "../../../icons/IconPencil.vue" ;
 import FileRelationshipsTable from "../../files/FileDetails/FileRelationshipsTable.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: 'ConceptInstanceEdit',
@@ -309,10 +311,8 @@ export default {
   computed: {
 
     ...mapGetters([
-      'userToken',
       'config',
       'concepts',
-      'userToken',
       'editingInstance',
       'getModelById',
       'hasFeature',
@@ -327,9 +327,12 @@ export default {
      * Compute url to export file
      * @returns {String}
      */
-    exportFileUrl: function() {
+    exportFileUrl: async function() {
       const packageId = pathOr('', ['content', 'id'], this.proxyRecord)
-      return `${this.config.apiUrl}/packages/${packageId}/export?api_key=${this.userToken}`
+      return useGetToken().then(token => {
+        return `${this.config.apiUrl}/packages/${packageId}/export?api_key=${token}`
+
+      })
     },
 
     /**
@@ -392,28 +395,29 @@ export default {
      * GET url for instance details
      * @returns {String}
      */
-    recordUrl: function() {
-      if (!this.userToken || !this.isOrgSynced) {
-        return ''
+    recordUrl: async function() {
+      if (!this.isOrgSynced) {
+        return Promise.reject()
       }
+
       const datasetId = this.datasetId
       const conceptInstanceId = this.instanceId
 
-      if (conceptInstanceId !== 'new') {
-        // Conditional logic for records or proxy
-        const recordUrl = `${
-          this.config.conceptsUrl
-        }/datasets/${datasetId}/concepts/${this.modelId}/instances/${conceptInstanceId}`
-        const proxyUrl = `${
-          this.config.apiUrl
-        }/packages/${conceptInstanceId}?api_key=${
-          this.userToken
-        }&includeAncestors=true`
+      return await useGetToken().then(token => {
+        if (conceptInstanceId !== 'new') {
+          // Conditional logic for records or proxy
+          const recordUrl = `${
+            this.config.conceptsUrl
+          }/datasets/${datasetId}/concepts/${this.modelId}/instances/${conceptInstanceId}`
+          const proxyUrl = `${
+            this.config.apiUrl
+          }/packages/${conceptInstanceId}?api_key=${
+            token
+          }&includeAncestors=true`
 
-        return this.isFile ? proxyUrl : recordUrl
-      }
-
-      return ''
+          return this.isFile ? proxyUrl : recordUrl
+        }
+      })
     },
 
     /**
@@ -463,13 +467,9 @@ export default {
      * @returns {String}
      */
     modelUrl: function() {
-      if (this.config.apiUrl && this.userToken) {
-        const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-        const modelId = this.modelId
-        return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`
-      }
-
-      return ''
+      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+      const modelId = this.modelId
+      return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`
     },
 
     /**
@@ -494,27 +494,18 @@ export default {
      * GET url for relationships and corresponding counts
      */
     relationshipCountsUrl: function() {
-      const { userToken, config, $route } = this
-
-      if (!userToken || !this.isOrgSynced) {
-        return
-      }
-
-      // if (!this.datasetId || !this.modelId || !this.recordId) {
-      //   return null
-      // }
 
       const datasetId = this.datasetId
       const modelId = this.modelId
       const recordId = this.instanceId
 
       let url = `${
-        config.conceptsUrl
+        this.config.conceptsUrl
       }/datasets/${datasetId}/concepts/${modelId}/instances/${recordId}/relationCounts?includeIncomingLinkedProperties=true`
 
       if (this.isFile) {
         url = `${
-          config.conceptsUrl
+          this.config.conceptsUrl
         }/datasets/${datasetId}/proxy/package/external/${recordId}/relationCounts`
       }
 
@@ -620,9 +611,6 @@ export default {
      * @returns {String}
      */
     schemaLinkedPropertiesUrl: function() {
-      if (!this.userToken) {
-        return
-      }
       return `${
         this.config.conceptsUrl
       }/datasets/${this.datasetId}/concepts/${this.modelId}/linked`
@@ -633,10 +621,6 @@ export default {
      * @returns {String}
      */
     linkedPropertiesUrl: function() {
-      if (!this.userToken || this.isFile) {
-        return
-      }
-
       if (this.instanceId === 'new') {
         return
       }
@@ -650,12 +634,15 @@ export default {
      * compute the url to fetch the valid string subtypes
      * @returns {String}
      */
-    stringSubtypeUrl: function() {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      if (this.config.apiUrl && this.userToken && datasetId) {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${this.userToken}`
-      }
-      return ''
+    stringSubtypeUrl: async function() {
+      useGetToken()
+        .then((token) => {
+          const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
+          if (this.config.apiUrl && token && datasetId) {
+            return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/strings?api_key=${token}`
+          }
+          return ''
+        })
     }
   },
 
@@ -719,8 +706,8 @@ export default {
     },
 
     stringSubtypeUrl: {
-      handler() {
-        if (this.stringSubtypeUrl) {
+      async handler() {
+        if (await this.stringSubtypeUrl) {
           this.fetchStringSubtypes()
         }
       },
@@ -775,20 +762,28 @@ export default {
     ...mapActions('filesModule', [
       'openOffice365File'
     ]),
+
+    cancelChanges: function() {
+      console.log('cancel changes')
+    },
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function() {
-      this.sendXhr(this.stringSubtypeUrl)
-        .then(subTypes => {
-          this.stringSubtypes = Object.entries(subTypes).reduce(
-            (options, [val, config]) => ([...options, {value: val, label: config.label, regex: config.regex}]),
-            []
-          )
+      this.stringSubtypeUrl
+        .then((url) => {
+          this.sendXhr(url)
+            .then(subTypes => {
+              this.stringSubtypes = Object.entries(subTypes).reduce(
+                (options, [val, config]) => ([...options, {value: val, label: config.label, regex: config.regex}]),
+                []
+              )
+            })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
         })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+
     },
 
     /**
@@ -807,53 +802,57 @@ export default {
      */
     getRelationshipTypes: function() {
       if (this.relationshipsUrl) {
-        this.sendXhr(this.relationshipsUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        }).then(response => {
-          // get model id
+        useGetToken()
+          .then(token => {
+            useSendXhr(this.relationshipsUrl, {
+              header: {
+                Authorization: `bearer ${token}`
+              }
+            }).then(response => {
+              // get model id
 
-          // check to see which relationship types are related to the current record id
-          const relatedRelationshipTypes = response.filter(relType =>
-            Boolean(relType.from === this.modelId || relType.to === this.modelId)
-          )
+              // check to see which relationship types are related to the current record id
+              const relatedRelationshipTypes = response.filter(relType =>
+                Boolean(relType.from === this.modelId || relType.to === this.modelId)
+              )
 
 
-          // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
-          const relationships = relatedRelationshipTypes.map(relType => {
-            const { to, from } = relType
-            const isFrom = Boolean(from === this.modelId)
-            const relModelId = isFrom ? to : from
-            const { displayName, name, id } = this.getModelById(relModelId)
+              // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
+              const relationships = relatedRelationshipTypes.map(relType => {
+                const { to, from } = relType
+                const isFrom = Boolean(from === this.modelId)
+                const relModelId = isFrom ? to : from
+                const { displayName, name, id } = this.getModelById(relModelId)
 
-            // update relationship types state, adding modelName and modelId to DTO
+                // update relationship types state, adding modelName and modelId to DTO
 
-            this.relationshipTypes.push({
-              ...relType,
-              modelName: name,
-              modelId: id
+                this.relationshipTypes.push({
+                  ...relType,
+                  modelName: name,
+                  modelId: id
+                })
+
+
+
+                // return relationship count object
+                return { count: 0, displayName, name }
+              })
+
+              // update relationships state
+              this.relationships = uniqBy(prop('displayName'), [
+                ...this.relationships,
+                ...relationships
+              ])
+
+              // update active sections state
+              const relationshipNames = pluck('name', this.relationships)
+              this.activeSections = uniq([
+                ...this.activeSections,
+                ...relationshipNames
+              ])
             })
+          }).catch(err => useHandleXhrError(err))
 
-
-
-            // return relationship count object
-            return { count: 0, displayName, name }
-          })
-
-          // update relationships state
-          this.relationships = uniqBy(prop('displayName'), [
-            ...this.relationships,
-            ...relationships
-          ])
-
-          // update active sections state
-          const relationshipNames = pluck('name', this.relationships)
-          this.activeSections = uniq([
-            ...this.activeSections,
-            ...relationshipNames
-          ])
-        })
       }
     },
 
@@ -919,30 +918,35 @@ export default {
 
       this.isRelationshipsLoading = true
 
-      this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(resp => {
-          resp.forEach(obj => {
-            this.activeSections.push(obj.name)
+      useGetToken()
+        .then(token => {
+          this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
           })
-          const filesIdx = findIndex(propEq('name', 'package'), resp)
-          if (filesIdx >= 0) {
-            const filesObj = resp[filesIdx]
-            resp.splice(filesIdx, 1)
-            resp.unshift(filesObj)
-            this.relationships = resp
-          } else {
-            this.relationships = resp
-          }
-          if (this.relationships.count !== this.lastRelationshipCount) {
-            this.relationships.count = this.lastRelationshipCount
-          }
-          this.isRelationshipsLoading = false
-        })
-        .catch(this.handleXhrError.bind(this))
+            .then(resp => {
+              resp.forEach(obj => {
+                this.activeSections.push(obj.name)
+              })
+
+              const filesIdx = findIndex(propEq('name', 'package'), resp)
+              if (filesIdx >= 0) {
+                const filesObj = resp[filesIdx]
+                resp.splice(filesIdx, 1)
+                resp.unshift(filesObj)
+                this.relationships = resp
+              } else {
+                this.relationships = resp
+              }
+              if (this.relationships.count !== this.lastRelationshipCount) {
+                this.relationships.count = this.lastRelationshipCount
+              }
+              this.isRelationshipsLoading = false
+            })
+
+        }).catch(err => useHandleXhrError(err))
+
     },
     /**
      * Gets instance details
@@ -950,23 +954,22 @@ export default {
     getInstanceDetails: function() {
       const url = this.recordUrl
 
-      if (!url) {
-        return
-      }
-
-      return this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(resp => {
-          if (this.isFile) {
-            this.setProxyAsRecord(resp)
-          } else {
-            this.instance = resp
+      return useGetToken(token => {
+        return this.sendXhr(url, {
+          header: {
+            Authorization: `bearer ${token}`
           }
         })
-        .catch(this.handleXhrError.bind(this))
+          .then(resp => {
+            if (this.isFile) {
+              this.setProxyAsRecord(resp)
+            } else {
+              this.instance = resp
+            }
+          })
+          .catch(this.handleXhrError.bind(this))
+      })
+
     },
 
     /**
@@ -1245,56 +1248,60 @@ export default {
 
         const values = this.formatSavedValues()
 
-        try {
-          // Make request to create new instance
-          const record = await this.sendXhr(url, {
-            header: {
-              Authorization: `bearer ${this.userToken}`
-            },
-            method: 'POST',
-            body: {
-              values
-            }
-          })
+        useGetToken()
+          .then(token => {
+            return useSendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              method: 'POST',
+              body: {
+                values
+              }
+            }).then(record => {
+              const batchUrl = `${url}/${record.id}/linked/batch`
 
+              return this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
+                .then(resp => {
+                  // check for onboarding event state for creating a record
+                  if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
+                    // make post request
+                    this.sendOnboardingEventsRequest()
+                  }
 
-          const batchUrl = `${url}/${record.id}/linked/batch`
-          await this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
+                  // Redirect user to new concept instance page
+                  this.$router.replace({
+                    name: 'metadata-record',
+                    params: {
+                      instanceId: record.id
+                    }
+                  })
 
-          // check for onboarding event state for creating a record
-          if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
-            // make post request
-            this.sendOnboardingEventsRequest()
-          }
+                  // Update count for model
+                  const index = findIndex(
+                    propEq('name', this.model.name),
+                    this.concepts
+                  )
 
-          // Redirect user to new concept instance page
-          this.$router.replace({
-            name: 'metadata-record',
-            params: {
-              instanceId: record.id
-            }
-          })
+                  const updatedConcepts = this.concepts.slice()
+                  updatedConcepts[index].count++
 
-          // Update count for model
-          const index = findIndex(
-            propEq('name', this.model.name),
-            this.concepts
-          )
+                  return this.updateConcepts(updatedConcepts).then(() => {
+                    this.savingChanges = false
+                    this.updateEditingInstance(false)
+                    this.changedProperties = []
+                    this.errorProperties = []
+                  })
+                })
+            })
 
-          const updatedConcepts = this.concepts.slice()
-          updatedConcepts[index].count++
+          }).catch(err => {
 
-          this.updateConcepts(updatedConcepts).then(() => {
-            this.savingChanges = false
-            this.updateEditingInstance(false)
-            this.changedProperties = []
-            this.errorProperties = []
-          })
-        } catch (e) {
           this.processing = false
           this.savingChanges = false
-          this.handleXhrError(e)
-        }
+          useHandleXhrError(e)
+        })
+
       }
     },
 
@@ -1313,15 +1320,19 @@ export default {
         }
       })
 
-      return this.sendXhr(url, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        method: 'POST',
-        body: {
-          data: properties
-        }
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
+            },
+            method: 'POST',
+            body: {
+              data: properties
+            }
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1415,39 +1426,43 @@ export default {
         const url = this.recordUrl
         const values = this.formatSavedValues()
 
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          },
-          method: 'PUT',
-          body: {
-            values
-          }
-        })
-          .then(resp => {
-            this.savingChanges = false
-            this.updateEditingInstance(false)
-            this.changedProperties = []
-            this.errorProperties = []
-
-            const values = propOr([], 'values', resp)
-            this.instance.values = values
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
+        useGetToken()
+          .then(token => {
+            this.sendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`
+              },
+              method: 'PUT',
+              body: {
+                values
               }
             })
+              .then(resp => {
+                this.savingChanges = false
+                this.updateEditingInstance(false)
+                this.changedProperties = []
+                this.errorProperties = []
 
-            EventBus.$emit('track-event', {
-              name: 'Record Saved'
-            })
-          })
-          .catch(err => {
-            this.processing = false
-            this.savingChanges = false
-            this.handleXhrError(err)
-          })
+                const values = propOr([], 'values', resp)
+                this.instance.values = values
+                EventBus.$emit('toast', {
+                  detail: {
+                    type: 'success',
+                    msg: `${this.$sanitize(this.formattedConceptTitle)} updated`
+                  }
+                })
+
+                EventBus.$emit('track-event', {
+                  name: 'Record Saved'
+                })
+              })
+              .catch(err => {
+                this.processing = false
+                this.savingChanges = false
+                this.handleXhrError(err)
+              })
+          }).catch(err => useHandleXhrError(err))
+
       }
     },
 
@@ -1512,24 +1527,25 @@ export default {
       properties = this.checkModelTitle(property, properties)
       properties.push(property)
 
-      this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        method: 'PUT',
-        body: properties
-      })
-        .then(() => {
-          // Check model title for existing properties before adding new one
-          this.checkModelTitle(property, this.instance.values)
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            },
+            method: 'PUT',
+            body: properties
+          })
+            .then(() => {
+              // Check model title for existing properties before adding new one
+              this.checkModelTitle(property, this.instance.values)
 
-          this.instance.values.push(property)
+              this.instance.values.push(property)
 
-          this.addEditPropertyDialogVisible = false
-        })
-        .catch(response => {
-          this.handleXhrError(response)
-        })
+              this.addEditPropertyDialogVisible = false
+            })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1550,11 +1566,15 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function() {
-      return this.sendXhr(this.getModelSchemaUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
+      return useGetToken()
+        .then(token => {
+          return this.sendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
+          })
+        }).catch(err => useHandleXhrError(err))
+
     },
 
     /**
@@ -1625,10 +1645,6 @@ export default {
      * GET url for record relationships tables
      */
     getRecordRelationshipsUrl: function(conceptName) {
-      if (!this.userToken || !this.isOrgSynced) {
-        return
-      }
-
       let url = `${
         this.config.conceptsUrl
       }/datasets/${this.datasetId}/concepts/${this.modelId}/instances/${this.instanceId}/relations/${conceptName}`
@@ -1649,18 +1665,21 @@ export default {
       // check if belongs_to relationship exists in dataset
       const url = this.relationshipsUrl
       if (url) {
-        this.sendXhr(url, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        })
-          .then(resp => {
-            const belongsTo = find(propEq('name', 'belongs_to'), resp)
-            if (resp.length === 0 || !belongsTo) {
-              this.createDefaultRelationship()
+        useGetToken().then(token => {
+          this.sendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`
             }
           })
-          .catch(this.handleXhrError.bind(this))
+            .then(resp => {
+              const belongsTo = find(propEq('name', 'belongs_to'), resp)
+              if (resp.length === 0 || !belongsTo) {
+                this.createDefaultRelationship()
+              }
+            })
+            .catch(this.handleXhrError.bind(this))
+        })
+
       }
     },
 
@@ -1668,18 +1687,21 @@ export default {
      * Creates default relationship
      */
     createDefaultRelationship: function() {
-      this.sendXhr(this.relationshipsUrl, {
-        method: 'POST',
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).catch(this.handleXhrError.bind(this))
+      useGetToken().then(token => {
+        this.sendXhr(this.relationshipsUrl, {
+          method: 'POST',
+          header: {
+            Authorization: `bearer ${token}`
+          },
+          body: {
+            name: 'belongs_to',
+            displayName: 'Belongs To',
+            description: '',
+            schema: []
+          }
+        }).catch(this.handleXhrError.bind(this))
+      })
+
     },
 
     /**
@@ -1699,21 +1721,24 @@ export default {
      */
     sendOnboardingEventsRequest: function() {
       if (this.onboardingEventsUrl) {
-        this.sendXhr(
-          `${this.config.apiUrl}/onboarding/events?api_key=${this.userToken}`,
-          {
-            method: 'POST',
-            body: 'CreatedRecord',
-            header: {
-              Authorization: `bearer ${this.userToken}`
+        useGetToken().then(token => {
+          this.sendXhr(
+            `${this.config.apiUrl}/onboarding/events?api_key=${token}`,
+            {
+              method: 'POST',
+              body: 'CreatedRecord',
+              header: {
+                Authorization: `bearer ${token}`
+              }
             }
-          }
-        )
-          .then(() => {
-            const onboardingEvents = [...this.onboardingEvents, 'CreatedRecord']
-            this.updateOnboardingEvents(onboardingEvents)
-          })
-          .catch(this.handleXhrError.bind(this))
+          )
+            .then(() => {
+              const onboardingEvents = [...this.onboardingEvents, 'CreatedRecord']
+              this.updateOnboardingEvents(onboardingEvents)
+            })
+            .catch(this.handleXhrError.bind(this))
+        })
+
       }
     },
 
@@ -1723,23 +1748,26 @@ export default {
      */
     getSchemaLinkedProperties: function() {
       if (this.schemaLinkedPropertiesUrl) {
-        return this.sendXhr(this.schemaLinkedPropertiesUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
+        useGetToken().then(token => {
+          return this.sendXhr(this.schemaLinkedPropertiesUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
+          })
+            .then(response => {
+              // filter out linked properties that aren't associated
+              const linkedProperties = response.filter(item =>
+                Boolean(item.link.from === this.modelId)
+              )
+              this.linkedProperties = this.transformLinkedProperties(
+                linkedProperties
+              )
+            })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
         })
-          .then(response => {
-            // filter out linked properties that aren't associated
-            const linkedProperties = response.filter(item =>
-              Boolean(item.link.from === this.modelId)
-            )
-            this.linkedProperties = this.transformLinkedProperties(
-              linkedProperties
-            )
-          })
-          .catch(response => {
-            this.handleXhrError(response)
-          })
+
       }
 
       return Promise.resolve()
@@ -1775,29 +1803,32 @@ export default {
      */
     getLinkedProperties: function() {
       if (this.linkedPropertiesUrl) {
-        this.sendXhr(this.linkedPropertiesUrl, {
-          header: {
-            Authorization: `bearer ${this.userToken}`
-          }
-        })
-          .then(response => {
-            response.forEach(linkedProperty => {
-              const idx = this.linkedProperties.findIndex(item => {
-                return (
-                  item.schemaLinkedProperty.id ===
-                  linkedProperty.schemaLinkedPropertyId
-                )
-              })
-              const updatedLinkedProperty = this.linkedProperties[idx]
-              updatedLinkedProperty.linkedPropertyId = linkedProperty.id
-              updatedLinkedProperty.to.recordId = linkedProperty.to
+        useGetToken().then(token => {
+          this.sendXhr(this.linkedPropertiesUrl, {
+            header: {
+              Authorization: `bearer ${token}`
+            }
+          })
+            .then(response => {
+              response.forEach(linkedProperty => {
+                const idx = this.linkedProperties.findIndex(item => {
+                  return (
+                    item.schemaLinkedProperty.id ===
+                    linkedProperty.schemaLinkedPropertyId
+                  )
+                })
+                const updatedLinkedProperty = this.linkedProperties[idx]
+                updatedLinkedProperty.linkedPropertyId = linkedProperty.id
+                updatedLinkedProperty.to.recordId = linkedProperty.to
 
-              this.setLinkedPropertyDisplayName(updatedLinkedProperty, idx)
+                this.setLinkedPropertyDisplayName(updatedLinkedProperty, idx)
+              })
             })
-          })
-          .catch(response => {
-            this.handleXhrError(response)
-          })
+            .catch(response => {
+              this.handleXhrError(response)
+            })
+        })
+
       }
     },
 
@@ -1814,10 +1845,10 @@ export default {
      * Open linked property drawer
      * @param {Object} property
      */
-    editLinkedProperty: function(property) {
+    onEditLinkedProperty: function(property) {
       this.editLinkedProperty = property
       this.addLinkedPropDrawerVisible = true
-      // this.$refs.addLinkedPropertyDrawer.openDrawer(property)
+      this.$refs.addLinkedPropertyDrawer.openDrawer(property)
     },
 
     /**
@@ -1870,17 +1901,20 @@ export default {
         this.config.conceptsUrl
       }/datasets/${this.datasetId}/concepts/${this.modelId}/instances/${this.instanceId}`
 
-      this.sendXhr(recordUrl, {
-        header: {
-          Authorization: `bearer ${this.userToken}`
-        }
-      })
-        .then(resp => {
-          const displayName = propOr('', 'value', head(resp.values))
-          linkedProperty.to.recordDisplayName = displayName
-          this.linkedProperties.splice(index, 1, linkedProperty)
+      useGetToken().then(token => {
+        this.sendXhr(recordUrl, {
+          header: {
+            Authorization: `bearer ${token}`
+          }
         })
-        .catch(this.handleXhrError.bind(this))
+          .then(resp => {
+            const displayName = propOr('', 'value', head(resp.values))
+            linkedProperty.to.recordDisplayName = displayName
+            this.linkedProperties.splice(index, 1, linkedProperty)
+          })
+          .catch(this.handleXhrError.bind(this))
+      })
+
     },
 
     /**

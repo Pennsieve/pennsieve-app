@@ -146,7 +146,7 @@
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
-import { propOr } from "ramda";
+import { mergeDeepRight, propOr } from "ramda";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -161,10 +161,11 @@ import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMe
 import Sorter from "../../../mixins/sorter";
 import Request from "../../../mixins/request";
 import UserAccountAge from "../../../mixins/user-account-age";
-import OnboardingCarousel from "../../onboarding-carousel/OnboardingCarousel.vue";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import toQueryParams from "@/utils/toQueryParams";
 
 export default {
   name: "BfDatasetList",
@@ -182,7 +183,6 @@ export default {
     DatasetFilterMenu,
     DatasetSortMenu,
     PaginationPageMenu,
-    OnboardingCarousel,
     IconSort,
   },
 
@@ -231,13 +231,7 @@ export default {
 
     ...mapState("datasetModule", ["datasetSearchParams", "datasetTotalCount"]),
 
-    ...mapGetters([
-      "activeOrganization",
-      "userToken",
-      "config",
-      "teams",
-      "hasFeature",
-    ]),
+    ...mapGetters(["activeOrganization", "config", "teams", "hasFeature"]),
 
     ...mapGetters("datasetModule", ["curDatasetSearchPage"]),
     filteredDatasets() {
@@ -287,6 +281,11 @@ export default {
       );
     },
 
+    datasetUrl: function() {
+      const params = toQueryParams(this.datasetSearchParams);
+      return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
+    },
+
     /**
      * Computes if datasets exist
      * @returns {Boolean}
@@ -320,8 +319,14 @@ export default {
       handler: function () {
         // Clear search query keywords on org switch
         this.searchQuery = "";
+        this.fetchDatasets();
       },
     },
+    datasetUrl:{
+      handler: function () {
+        this.fetchDatasets();
+      }
+    }
   },
 
   /**
@@ -355,10 +360,17 @@ export default {
     this.filterType = filterType;
     this.sortBy = sortBy;
     this.sortDirection = sortDirection;
+
+    this.fetchDatasets();
   },
 
   methods: {
-    ...mapActions(["setDatasetFilters"]),
+    ...mapActions([
+      "setDatasetFilters",
+      "setIsLoadingDatasets",
+      "setIsLoadingDatasetsError",
+      "setDatasets",
+    ]),
     ...mapActions("datasetModule", [
       "updateDatasetSearchOrderDirection",
       "updateDatasetSearchLimit",
@@ -369,7 +381,49 @@ export default {
       "updateDatasetSearchWithCollection",
       "updateDatasetSearchOrderBy",
       "updateDatasetOffset",
+      "updateDatasetTotalCount",
     ]),
+
+    getDatasetsUrl: async function () {
+      return useGetToken().then((t) => {
+        const params = toQueryParams(
+          mergeDeepRight(this.datasetSearchParams, { api_key: t })
+        );
+        return `${this.config.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
+      });
+    },
+
+    fetchDatasets: async function () {
+      return this.setIsLoadingDatasets(true)
+        .then(async () => {
+          return this.getDatasetsUrl()
+            .then((url) => {
+              return this.sendXhr(url, {});
+            })
+            .then((response) => {
+              this.setIsLoadingDatasetsError(false);
+              return this.setDatasetData(response);
+            });
+        })
+        .catch((err) => {
+          console.log(err);
+          this.setDatasetData([]);
+          this.setIsLoadingDatasetsError(true);
+        })
+        .finally(() => this.setIsLoadingDatasets(false));
+    },
+
+    /**
+     * Set dataset data
+     * @param {Object} response
+     */
+    setDatasetData: function (response) {
+      const datasets = propOr([], "datasets", response);
+      const datasetTotal = propOr(0, "totalCount", response);
+      return this.setDatasets(datasets).then(() => {
+        return this.updateDatasetTotalCount(datasetTotal);
+      });
+    },
 
     onCloseCreateDialog: function () {
       this.newDatasetDialogOpen = false;
@@ -385,6 +439,7 @@ export default {
     onPaginationPageChange: function (page) {
       const offset = (page - 1) * this.datasetSearchParams.limit;
       this.updateDatasetOffset(offset);
+      this.fetchDatasets();
     },
 
     /**
