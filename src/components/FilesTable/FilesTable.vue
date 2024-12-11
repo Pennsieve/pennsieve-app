@@ -320,7 +320,7 @@ export default {
      * @param {Boolean} selected
      */
     selectRow: function (row, selected = null) {
-      this.$refs.table.toggleRowSelection(row, selected);
+      this.$refs.table?.toggleRowSelection(row, selected);
     },
 
     canSelectRow: (row) => {
@@ -345,10 +345,13 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      this.selection = selection;
-      const parentId = this.data[0].content.parentId || "root";
-      this.$emit("selection-change", selection, parentId);
-      this.checkAll = this.data.length === selection.length;
+      if(this.data[0] && this.data[0].content){
+        this.selection = selection;
+        const parentId = this.data[0].content.parentId || "root";
+        this.$emit("selection-change", selection, parentId);
+        this.checkAll = this.data.length === selection.length;
+      }
+
     },
 
     /**
@@ -398,7 +401,7 @@ export default {
     onRowClick: function (row, selected) {
       setTimeout(
         function () {
-          this.$refs.table.toggleRowSelection(row, selected);
+          this.$refs.table?.toggleRowSelection(row, selected);
         }.bind(this),
         100
       );
