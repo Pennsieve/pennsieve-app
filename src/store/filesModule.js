@@ -2,6 +2,7 @@ import Cookie from 'js-cookie'
 import toQueryParams from '../utils/toQueryParams.js'
 import router from '@/router'
 import {useGetToken} from "@/composables/useGetToken";
+import EventBus from "../utils/event-bus.js"
 
 
 const initialState = () => ({
