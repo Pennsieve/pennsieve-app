@@ -126,7 +126,7 @@ export default {
      * package file information
      * @returns {String}
      */
-    packageFilesUrl: async function() {
+    packageFilesUrl: function() {
       const url = propOr('', 'apiUrl', this.config)
       const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
       const fileId = pathOr('', ['content', 'id'], head(this.sourceFile))
@@ -140,7 +140,7 @@ export default {
 
     },
 
-    sourceFilesUrl: async function() {
+    sourceFilesUrl: function() {
       const url = propOr('', 'apiUrl', this.config)
       const packageId = pathOr('', ['content', 'nodeId'], this.officeFile)
 
@@ -170,7 +170,7 @@ export default {
      */
     getSourceFiles: async function() {
       const url = await this.sourceFilesUrl();
-        await this.sendXhr(url)
+      return this.sendXhr(url)
             .then(response => {
               this.sourceFile = response
             }).catch(this.handleXhrError.bind(this))
@@ -206,19 +206,6 @@ export default {
           // Reset loading state
           this.isLoading = false
         })
-      // this.getSourceFiles()
-      //   .then(() => this.getPackageFiles())
-      //   .then(() => {
-      //     this.closeDialog()
-      //   })
-      //   .catch(() => {
-      //     // Set error state
-      //     this.hasError = true
-      //   })
-      //   .finally(() => {
-      //     // Reset loading state
-      //     this.isLoading = false
-      //   })
     },
 
     /**

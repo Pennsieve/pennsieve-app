@@ -320,7 +320,7 @@ export default {
      * @param {Boolean} selected
      */
     selectRow: function (row, selected = null) {
-      this.$refs.table.toggleRowSelection(row, selected);
+      this.$refs.table?.toggleRowSelection(row, selected);
     },
 
     canSelectRow: (row) => {
@@ -401,7 +401,7 @@ export default {
     onRowClick: function (row, selected) {
       setTimeout(
         function () {
-          this.$refs.table.toggleRowSelection(row, selected);
+          this.$refs.table?.toggleRowSelection(row, selected);
         }.bind(this),
         100
       );
