@@ -311,7 +311,7 @@ export default {
         .then(token => {
           this.isPackageLoading = true
           const id = pathOr('', ['params', 'fileId'], this.$route)
-          const url = `${apiUrl}/packages/${id}?api_key=${token}`
+          const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`
 
           return useSendXhr(url)
             .then(response => {

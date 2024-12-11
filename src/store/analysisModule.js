@@ -202,11 +202,12 @@ const initialState = () => ({
       const url = `${rootState.config.api2Url}/compute-nodes`;
 
       try {
+        const userToken = await useGetToken()
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${rootState.userToken}`
+            'Authorization': `Bearer ${userToken}`
           },
           body: JSON.stringify(newComputeNode)
         });
