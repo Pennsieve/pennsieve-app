@@ -155,7 +155,7 @@ export default {
           };
 
           try {
-            // const result = await this.createComputeNode(formattedComputeNode);
+            const result = await this.createComputeNode(formattedComputeNode);
             EventBus.$emit("toast", {
               detail: {
                 type: "success",
