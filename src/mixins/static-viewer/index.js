@@ -3,7 +3,6 @@ import { mapState } from 'vuex'
 
 import Request from '../../mixins/request'
 import {useGetToken} from "@/composables/useGetToken";
-import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const getPkgId = compose(
   pathOr('', ['content', 'id']),
@@ -22,7 +21,8 @@ export default {
 
   data() {
     return {
-      viewerDataId: ''
+      viewerDataId: '',
+      fileUrl: ''
     }
   },
 
@@ -72,20 +72,23 @@ export default {
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
 
       // return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/`
-      return await useGetToken()
-          .then(token => {
-            console.log(token)
-            return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
-          })
+      const fileUrlData = await useGetToken()
+      .then(token => {
+        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
+      })
 
+      this.fileUrl = fileUrlData;
+
+      return fileUrlData
     },
 
     /**
-     * Handle get viewer data hxr response
+     * Handle get viewer data xhr response
      * @param {Object} response
      */
     handleGetViewerData: function(response) {
       this.viewerDataId = getPkgId(response)
+      this.getFileUrl()
     }
   }
 }
