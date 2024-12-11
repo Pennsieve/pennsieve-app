@@ -168,8 +168,8 @@ export default {
     /**
      * API call to get source files data for table
      */
-    getSourceFiles: function() {
-      const url = this.sourceFilesUrl();
+    getSourceFiles: async function() {
+      const url = await this.sourceFilesUrl();
       return this.sendXhr(url)
             .then(response => {
               this.sourceFile = response
