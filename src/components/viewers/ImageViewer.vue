@@ -7,7 +7,7 @@
       <el-col>
         <img
           :hidden="isLoading"
-          :src="getFileUrl"
+          :src="fileUrl"
         >
       </el-col>
     </el-row>
