@@ -43,6 +43,9 @@
           <p v-if="this.$route.name === 'applications'">
             Applications allow users to run analytic workflows on the platform.
           </p>
+          <p v-if="this.$route.name === 'activity'">
+            Monitor the activity of your analytic pipeline runs.
+          </p>
         </div>
       </template>
       <template #tabs>
@@ -136,20 +139,16 @@ export default {
       ],
       pennsieveAnalysisFeature: [
         {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
-          name: "Webhooks",
-          to: "webhooks",
-        },
-        {
-          name: "Compute Nodes",
+          name: "Configuration",
           to: "compute-nodes",
         },
         {
           name: "Applications",
           to: "applications",
+        },
+        {
+          name: "Activity",
+          to: "activity",
         },
       ],
     };

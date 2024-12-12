@@ -18,7 +18,9 @@ const initialState = () => ({
       Example: { root: [{...file1}, {...file2}, {...file3}], parentId: [{}, {}] }
       This is to support multi-level file selection.
     */
-    fileCount: 0
+    fileCount: 0,
+    workflowInstances: [],
+    workflowInstance: {}
   })
   
   export const state = initialState()
@@ -81,6 +83,15 @@ const initialState = () => ({
     SET_COMPUTE_RESOURCE_ACCOUNTS(state, accounts) {
       state.computeResourceAccounts = accounts
     },
+    SET_WORKFLOW_INSTANCES(state, instances) {
+      state.workflowInstances = instances
+    },
+    SET_WORKFLOW_INSTANCE(state, instance) {
+      state.workflowInstance = instance
+    },
+    SET_WORKFLOW_LOGS(state, logs) {
+      state.workflowLogs= logs
+    }
 
   }
 
@@ -255,10 +266,88 @@ const initialState = () => ({
 
     updateFileCount: async ({ commit, rootState }) => {
       commit('UPDATE_SELECTED_FILE_COUNT')
+    },
+
+    fetchWorkflowInstances: async({commit, rootState }) => {
+      try {
+        const url = `${rootState.config.api2Url}/workflows/instances`;
+
+        const userToken = await useGetToken()
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          commit('SET_WORKFLOW_INSTANCES', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_WORKFLOW_INSTANCES', [])
+          return Promise.reject(err)
+      }
+    },
+    fetchWorkflowInstance: async({commit, rootState }, uuid) => {
+      try {
+        const url = `${rootState.config.api2Url}/workflows/instances/${uuid}`;
+
+        const userToken = await useGetToken()
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          commit('SET_WORKFLOW_INSTANCE', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_WORKFLOW_INSTANCE', [])
+          return Promise.reject(err)
+      }
+    },
+    fetchWorkflowLogs: async({commit, rootState }, workflow) => {
+      console.log('fetchWorkflowLogs workflow:', workflow)
+      const integrationId = workflow.uuid;
+      const applicationUuid = workflow.workflow[0].applicationId
+      try {
+        const url = `${rootState.config.api2Url}/compute-node-url/logs?integrationId=${integrationId}&applicationUuid=${applicationUuid}`;
+        console.log(url)
+        const userToken = await useGetToken()
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          commit('SET_WORKFLOW_INSTANCE', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_WORKFLOW_INSTANCE', [])
+          return Promise.reject(err)
+      }
     }
   }
   
-  export const getters = {}
+  export const getters = {
+    workflowInstances: state => state.workflowInstances,
+    workflowInstance: state => state.workflowInstance,
+    workflowLogs: state => state.workflowLogs
+  }
+  
   
   const analysisModule = {
     namespaced: true,
