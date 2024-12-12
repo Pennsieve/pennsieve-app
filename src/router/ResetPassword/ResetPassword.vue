@@ -166,7 +166,7 @@
 <script>
 import { mapState } from 'vuex'
 import { pathOr, propOr } from 'ramda'
-import { resetPassword } from 'aws-amplify/auth';
+import { confirmResetPassword, resetPassword, signIn } from 'aws-amplify/auth';
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
@@ -361,7 +361,7 @@ export default {
      * Send XHR to set new password
      * @param {Object} e
      */
-    onPasswordFormSubmit: function(e) {
+    onPasswordFormSubmit: function (e) {
       this.resettingPasswordText = 'Saving'
 
       this.$refs.passwordForm.validate(valid => {
@@ -369,19 +369,27 @@ export default {
           return
         }
 
-      this.isResettingPassword = true
+        this.isResettingPassword = true
 
-      const { email, code, password } = this.passwordForm
-      // Collect confirmation code and new password, then
-      Auth.forgotPasswordSubmit(email, code, password)
-        .then(() => {
-          this.loginUser()
-          this.resettingPasswordText = 'Logging In'
+        const { email, code, password } = this.passwordForm
+        // Collect confirmation code and new password, then
+        confirmResetPassword({
+          username: email,
+          confirmationCode: code,
+          newPassword: password
         })
-        .catch(error => {
-          this.errorMsg = error.message
-          this.isResettingPassword = false
-        })
+          .then(() => {
+            this.resettingPasswordText = 'Logging In'
+            EventBus.$emit('toast', {
+              type: 'success',
+              msg: 'Password successfully reset'
+            })
+            this.$router.push({ name: 'home' })
+          })
+          .catch(error => {
+            this.errorMsg = error.message
+            this.isResettingPassword = false
+          })
       })
     },
 
@@ -392,7 +400,7 @@ export default {
     loginUser: async function() {
       try {
         const { email, password } = this.passwordForm
-        const user = await Auth.signIn(email, password)
+        const user = await signIn(email, password)
         const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
         const userAttributes = propOr({}, 'attributes', user)
         EventBus.$emit('login', { token, userAttributes })
