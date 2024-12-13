@@ -8,7 +8,7 @@
       trigger="hover"
       transition=""
       :open-delay="200"
-      :width="popoverWidth"
+      :width="260"
       :visible-arrow="false"
     >
 
@@ -118,24 +118,6 @@ export default {
     ...mapGetters([
       'hasFeature'
     ]),
-
-    /**
-     * Compute if the getting started guide should be shown
-     * @returns {Boolean}
-     */
-    showGettingStarted: function() {
-      return this.userIsLessThan30DaysOld
-    },
-
-    /**
-     * Compute popover width based on if the getting
-     * started guide is being shown
-     */
-    popoverWidth: function() {
-      return this.showGettingStarted
-        ? 340
-        : 260
-    }
   },
 
   mounted() {

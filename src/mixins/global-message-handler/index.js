@@ -85,7 +85,6 @@ export default {
     ...mapState([
       'bfTermsOfServiceVersion',
       'orgDatasetStatuses',
-      'shouldShowLinkOrcidDialog'
     ]),
 
     /**
@@ -386,9 +385,6 @@ export default {
         this.$router.push(`/${orgId}/overview`)
       } else {
           this.$router.push(`/${orgId}/datasets`)
-          if (this.shouldShowLinkOrcidDialog) {
-            this.updateIsLinkOrcidDialogVisible(true)
-          }
       }
     },
 

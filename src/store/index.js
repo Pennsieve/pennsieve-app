@@ -113,8 +113,6 @@ const initialState = () => ({
   pageNotFound: false,
   dataUseAgreements: [],
   cognitoUser: {},
-  shouldShowLinkOrcidDialog: false,
-  isLinkOrcidDialogVisible: false,
   sessionTimer: null,
   isRefreshing: false,
   gitHubProfile: null,
@@ -201,8 +199,6 @@ export const mutations = {
         state.datasetDoi = "";
         state.datasetTemplates = [];
         state.searchModalVisible = false;
-        state.shouldShowLinkOrcidDialog = false;
-        state.isLinkOrcidDialogVisible = false;
         state.cognitoUser = {};
         state.sessionTimer = null
       },
@@ -603,13 +599,6 @@ export const mutations = {
         state.dataUseAgreements = dataUseAgreements;
       },
 
-      UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG(state, shouldShowLinkOrcidDialog) {
-        state.shouldShowLinkOrcidDialog = shouldShowLinkOrcidDialog;
-      },
-
-      UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE(state, isLinkOrcidDialogVisible) {
-        state.isLinkOrcidDialogVisible = isLinkOrcidDialogVisible;
-      },
       UPDATE_GITHUB_PROFILE(state, githubProfile) {
         state.gitHubProfile = githubProfile;
       },
@@ -622,8 +611,6 @@ export const actions = {
   setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),
-  updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
-      commit("UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE", evt),
   updateCognitoUser: ({ commit }, evt) => commit("UPDATE_COGNITO_USER", evt),
   updateGithubProfile: ({ commit }, evt) => commit("UPDATE_GITHUB_PROFILE", evt),
   updatePageNotFound: ({ commit }, evt) => commit("SET_PAGE_NOT_FOUND", evt),
@@ -813,8 +800,6 @@ export const actions = {
       commit("UPDATE_DATA_USE_AGREEMENT", evt),
   updateDefaultDataUseAgreement: ({ commit }, evt) =>
       commit("UPDATE_DEFAULT_DATA_USE_AGREEMENT", evt),
-  updateShouldShowLinkOrcidDialog: ({ commit }, evt) =>
-      commit("UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG", evt),
 }
 
 export const getters = {

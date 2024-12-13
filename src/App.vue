@@ -95,7 +95,6 @@ export default {
       "secondaryNavOpen",
       "environment",
       "searchModalVisible",
-      "isLinkOrcidDialogVisible",
     ]),
     ...mapGetters([
       "activeOrganization",
