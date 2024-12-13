@@ -17,7 +17,6 @@ import router from "@/router";
 export default {
   data() {
     return {
-      minCompletedEvents: 2,
       datasetStatusList: [],
       oauthInfo: ''
     }
@@ -84,10 +83,8 @@ export default {
     ]),
 
     ...mapState([
-      'onboardingEvents',
       'bfTermsOfServiceVersion',
       'orgDatasetStatuses',
-      'shouldShowLinkOrcidDialog'
     ]),
 
     /**
@@ -150,8 +147,6 @@ export default {
       'togglePrimaryNav',
       'toggleSecondaryNav',
       'setDatasets',
-      'updateOnboardingEvents',
-      'setGettingStartedOpen',
       'setDatasetTemplates',
       'setOrgContributors',
       'clearDatasetFilters',
@@ -359,10 +354,6 @@ export default {
     //     return
     //   }
     //
-    //   const FirstTimeSignOn = pathOr(false, ['detail', 'firstTimeSignOn'], evt)
-    //   if (FirstTimeSignOn) {
-    //     this.saveFirstTimeSignOnEvent(token)
-    //   }
     //
     //   this.bootUp(token, true)
     //     .then(() => {
@@ -382,19 +373,6 @@ export default {
     //     })
     //     .catch(this.handleXhrError.bind(this))
     // },
-
-    /**
-     * Launch onboarding components
-     */
-    launchOnboarding: function() {
-      const events = defaultTo([], this.onboardingEvents)
-      if (this.userIsLessThan30DaysOld && events.length < this.minCompletedEvents) {
-        // getting started guide
-        this.setGettingStartedOpen(true)
-      } else if (this.shouldShowLinkOrcidDialog) {
-        this.updateIsLinkOrcidDialogVisible(true)
-      }
-    },
     /**
      * Set the default route for the user based off of their feature flag
      * @param {String} orgId
@@ -407,7 +385,6 @@ export default {
         this.$router.push(`/${orgId}/overview`)
       } else {
           this.$router.push(`/${orgId}/datasets`)
-          this.launchOnboarding()
       }
     },
 
@@ -621,26 +598,6 @@ export default {
           isAddingFiles: true
         }
       })
-    },
-
-    /**
-     * Check if this is a first time user
-     * @param {String} userToken
-     */
-    saveFirstTimeSignOnEvent: function(userToken) {
-      this.sendXhr(`${this.config.apiUrl}/onboarding/events?api_key=${userToken}`, {
-        method: 'POST',
-        body: 'FirstTimeSignOn',
-        header: {
-          'Authorization': `bearer ${userToken}`
-        }
-      })
-      .then(() => {
-        const list = defaultTo([], this.onboardingEvents)
-        const onboardingEvents = [...list, 'FirstTimeSignOn']
-        this.updateOnboardingEvents(onboardingEvents)
-      })
-      .catch(this.handleXhrError.bind(this))
     },
 
     /**

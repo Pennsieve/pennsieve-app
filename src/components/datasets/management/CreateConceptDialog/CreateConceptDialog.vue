@@ -131,9 +131,6 @@
         'config',
         'hasFeature',
       ]),
-      ...mapState([
-        'onboardingEvents'
-      ]),
       ...mapState('metadataModule',[
         'models'
       ]),
@@ -144,9 +141,7 @@
        */
       name: function() {
         return snakeCase(this.concept.displayName)
-      },
-
-
+      }
     },
 
     watch: {
@@ -160,24 +155,9 @@
     },
 
     methods: {
-      ...mapActions([
-        'updateOnboardingEvents'
-      ]),
       ...mapActions('metadataModule',[
         'updateModels'
       ]),
-
-      /**
-       * Onboarding Events Url
-       * @returns {String}
-       */
-      onboardingEventsUrl: async function() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-        useGetToken()
-          .then(token => {
-            return `${apiUrl}/onboarding/events?api_key=${token}`
-          })
-      },
 
       /**
        * Closes the dialog
@@ -233,13 +213,6 @@
         // Add to state
         const models = [...this.models, model]
         const sortedConcepts = this.returnSort('displayName', models, 'asc')
-
-        // check for onboarding event state for creating a model
-        if (this.onboardingEvents.indexOf('CreatedModel') === -1){
-          // make post request
-          this.sendOnboardingEventsRequest()
-        }
-
         this.updateModels(sortedConcepts).then(() => {
           // Redirect user to new concept instance page
           // this.$router.replace({
@@ -283,23 +256,6 @@
         }
         callback()
       },
-
-      sendOnboardingEventsRequest: function(){
-        this.onboardingEventsUrl()
-          .then(url => {
-            this.sendXhr(url, {
-              method: 'POST',
-              body: 'CreatedModel',
-            })
-              .then(response => {
-                const onboardingEvents = [...this.onboardingEvents, 'CreatedModel']
-                this.updateOnboardingEvents(onboardingEvents)
-              })
-              .catch(this.handleXhrError.bind(this))
-          })
-
-
-      }
     }
   }
 </script>

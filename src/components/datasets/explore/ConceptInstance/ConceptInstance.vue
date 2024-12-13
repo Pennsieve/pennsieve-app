@@ -490,7 +490,7 @@ export default {
       'isOrgSynced'
     ]),
 
-    ...mapState(['onboardingEvents', 'conceptsHash', 'dataset']),
+    ...mapState(['conceptsHash', 'dataset']),
 
     /**
      * Compute url to export file
@@ -988,20 +988,6 @@ export default {
     },
 
     /**
-     * get onboarding events url
-     * @returns {String}
-     */
-    onboardingEventsUrl: async function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-
-      return useGetToken()
-        .then(token => {
-          return `${apiUrl}/onboarding/events?api_key=${token}`
-        })
-
-    },
-
-    /**
      * Compute options to display in the link to record menu
      * @returns {Array}
      */
@@ -1213,7 +1199,6 @@ export default {
     ...mapActions([
       'updateEditingInstance',
       'updateConcepts',
-      'updateOnboardingEvents'
     ]),
 
     ...mapActions('filesModule', [
@@ -1728,12 +1713,6 @@ export default {
           const batchUrl = `${url}/${record.id}/linked/batch`
           await this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
 
-          // check for onboarding event state for creating a record
-          if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
-            // make post request
-            this.sendOnboardingEventsRequest()
-          }
-
           // Redirect user to new concept instance page
           this.$router.replace({
             name: 'metadata-record',
@@ -2176,30 +2155,6 @@ export default {
         type: 'Remove'
       }
       this.refreshTableData(payload)
-    },
-
-    /**
-     * Send Onboarding Events Request
-     */
-    sendOnboardingEventsRequest: function() {
-      this.onboardingEventsUrl()
-        .then(url => {
-          this.sendXhr(
-            `${this.config.apiUrl}/onboarding/events`,
-            {
-              method: 'POST',
-              body: 'CreatedRecord',
-              header: {
-                Authorization: `bearer ${token}`
-              }
-            }
-          )
-            .then(() => {
-              const onboardingEvents = [...this.onboardingEvents, 'CreatedRecord']
-              this.updateOnboardingEvents(onboardingEvents)
-            })
-            .catch(this.handleXhrError.bind(this))
-        })
     },
 
     /**
