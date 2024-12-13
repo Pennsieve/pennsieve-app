@@ -2,7 +2,7 @@
   <div class="video-viewer">
     <video
       class="video-viewer"
-      :src="getFileUrl"
+      :src="fileUrl"
       autoplay
       controls
     />
@@ -36,6 +36,7 @@ export default {
     handleGetViewerData: function(response) {
       const pkg = reject(pathEq(['content', 'fileType'], 'PNG'), response)
       this.viewerDataId = pathOr('', [0, 'content', 'id'])(pkg)
+      this.getFileUrl()
     }
   }
 }
