@@ -379,12 +379,11 @@ export default {
           newPassword: password
         })
           .then(() => {
-            this.resettingPasswordText = 'Logging In'
+            this.resettingPasswordText = 'Reset successful!'
             EventBus.$emit('toast', {
               type: 'success',
               msg: 'Password successfully reset'
             })
-            this.$router.push({ name: 'home' })
           })
           .catch(error => {
             this.errorMsg = error.message
@@ -397,21 +396,20 @@ export default {
      * Login the user after successfully resetting their password
      * On failure, take the user back to the login page
      */
-    loginUser: async function() {
-      try {
-        const { email, password } = this.passwordForm
-        const user = await signIn(email, password)
-        const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
-        const userAttributes = propOr({}, 'attributes', user)
-        EventBus.$emit('login', { token, userAttributes })
-      } catch (error) {
-        EventBus.$emit('toast', {
-          type: 'success',
-          msg: 'Password successfully reset'
-        })
-        this.$router.push({name: 'home'})
-      }
-    }
+    // loginUser: async function() {
+    //   try {
+    //     const { email, password } = this.passwordForm
+    //     const user = await signIn(email, password)
+    //     const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
+    //     const userAttributes = propOr({}, 'attributes', user)
+    //     EventBus.$emit('login', { token, userAttributes })
+    //   } catch (error) {
+    //     EventBus.$emit('toast', {
+    //       type: 'success',
+    //       msg: 'Password successfully reset'
+    //     })
+    //   }
+    // }
   }
 }
 </script>
