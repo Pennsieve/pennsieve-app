@@ -85,7 +85,6 @@
 import { mapGetters } from 'vuex'
 
 import EventBus from '../../../utils/event-bus'
-import UserAccountAge from '../../../mixins/user-account-age'
 import IconHelpMessage from '../../icons/IconHelpMessage.vue'
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 
@@ -103,10 +102,6 @@ export default {
     IconArrowRight,
     IconHelpMessage
   },
-
-  mixins: [
-    UserAccountAge
-  ],
 
   data() {
     return {

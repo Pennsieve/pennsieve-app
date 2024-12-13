@@ -160,7 +160,6 @@ import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMe
 
 import Sorter from "../../../mixins/sorter";
 import Request from "../../../mixins/request";
-import UserAccountAge from "../../../mixins/user-account-age";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconSort from "../../icons/IconSort.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
@@ -186,7 +185,7 @@ export default {
     IconSort,
   },
 
-  mixins: [Request, Sorter, UserAccountAge],
+  mixins: [Request, Sorter],
 
   props: {
     orgId: {
