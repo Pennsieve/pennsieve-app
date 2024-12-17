@@ -316,12 +316,33 @@ const initialState = () => ({
     },
     fetchWorkflowLogs: async({commit, rootState }, workflow) => {
       console.log('fetchWorkflowLogs workflow:', workflow)
+      const userToken = await useGetToken()
       const integrationId = workflow.uuid;
-      const applicationUuid = workflow.workflow[0].applicationId
+      let computeNodeUrl;
+      // Fetch Compute Node URL 
       try {
-        const url = `${rootState.config.api2Url}/compute-node-url/logs?integrationId=${integrationId}&applicationUuid=${applicationUuid}`;
-        console.log(url)
-        const userToken = await useGetToken()
+        const url = `${rootState.config.api2Url}/compute-nodes/${workflow.computeNode.uuid}`;
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          computeNodeUrl = result.computeNodeGatewayUrl
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          return Promise.reject(err)
+      } 
+
+      try {
+        const url = `${computeNodeUrl}logs?integrationId=${integrationId}`
+        console.log('url',url)
+
         const resp = await fetch(url, {
           method: 'GET',
           headers: {

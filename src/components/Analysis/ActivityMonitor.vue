@@ -2,6 +2,10 @@
 // Importing functions from Vue
 import { ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
+import SidePanel from "../datasets/records/GraphBrowser/SidePanel.vue";
+import ModelDetails from "../datasets/records/GraphBrowser/ModelDetails.vue";
+import ModelInfoPanel from "../datasets/records/GraphBrowser/ModelDetails.vue";
+import ModelsList from "../datasets/records/ModelsList/ModelsList.vue";
 
 // Access the Vuex store
 const store = useStore();
@@ -23,7 +27,7 @@ const workflowLogs = computed(
 const isLoading = ref(false);
 
 // Methods
-const isRunning = (workflow) => {
+const isActive = (workflow) => {
   // if the workflow does not contain a completedAt property, it is active
   return !workflow.completedAt ? "Active" : "Completed";
 };
@@ -38,35 +42,35 @@ onMounted(async () => {
     console.error(err);
   } finally {
     isLoading.value = false;
-    // console.log("workflowInstances", workflowInstances.value);
+    console.log("workflowInstances", workflowInstances.value);
   }
   // fetch one workflow instance
-  try {
-    isLoading.value = true;
-    await store.dispatch(
-      "analysisModule/fetchWorkflowInstance",
-      workflowInstances.value[0].uuid
-    );
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoading.value = false;
-    // console.log(workflowInstance.value);
-  }
+  // try {
+  //   isLoading.value = true;
+  //   await store.dispatch(
+  //     "analysisModule/fetchWorkflowInstance",
+  //     workflowInstances.value[0].uuid
+  //   );
+  // } catch (err) {
+  //   console.error(err);
+  // } finally {
+  //   isLoading.value = false;
+  //   // console.log(workflowInstance.value);
+  // }
 
   // fetch logs for one workflow instance
-  try {
-    isLoading.value = true;
-    await store.dispatch(
-      "analysisModule/fetchWorkflowLogs",
-      workflowInstances.value[3]
-    );
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoading.value = false;
-    console.log("workflowFlow Logs", workflowLogs.value);
-  }
+  // try {
+  //   isLoading.value = true;
+  //   await store.dispatch(
+  //     "analysisModule/fetchWorkflowLogs",
+  //     workflowInstances.value[3]
+  //   );
+  // } catch (err) {
+  //   console.error(err);
+  // } finally {
+  //   isLoading.value = false;
+  //   console.log("workflowFlow Logs", workflowLogs.value);
+  // }
 });
 </script>
 
@@ -79,11 +83,21 @@ onMounted(async () => {
     <ul>
       <li v-for="(workflow, index) in workflowInstances" :key="index">
         {{
-          `Workflow Uuid: ${workflow.uuid}, Workflow Running: ${isRunning(
+          `Workflow Uuid: ${workflow.uuid}, Workflow Running: ${isActive(
             workflow
           )}`
         }}
       </li>
     </ul>
+    <!-- <ModelInfoPanel />
+    <ModelDetails /> -->
+    <models-list
+      :show-heading="false"
+      :is-link="false"
+      :should-reset.sync="resetModelsList"
+      :scrolling-list="true"
+      @click="clickModel"
+    />
+    <!-- <SidePanel /> -->
   </div>
 </template>
