@@ -413,7 +413,6 @@ export default {
       "profile",
       "activeOrganization",
       "config",
-      "onboardingEvents",
       "cognitoUser",
       "gitHubProfile",
     ]),

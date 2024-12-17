@@ -321,7 +321,7 @@ export default {
       'isOrgSynced'
     ]),
 
-    ...mapState(['onboardingEvents', 'conceptsHash', 'dataset']),
+    ...mapState(['conceptsHash', 'dataset']),
 
     /**
      * Compute url to export file
@@ -756,7 +756,6 @@ export default {
     ...mapActions([
       'updateEditingInstance',
       'updateConcepts',
-      'updateOnboardingEvents'
     ]),
 
     ...mapActions('filesModule', [
@@ -1263,11 +1262,6 @@ export default {
 
               return this.createBatchLinkedProperties(batchUrl, this.linkedProperties)
                 .then(resp => {
-                  // check for onboarding event state for creating a record
-                  if (!this.onboardingEvents.some(e => e === 'CreatedRecord')) {
-                    // make post request
-                    this.sendOnboardingEventsRequest()
-                  }
 
                   // Redirect user to new concept instance page
                   this.$router.replace({
@@ -1714,32 +1708,6 @@ export default {
         type: 'Remove'
       }
       this.refreshTableData(payload)
-    },
-
-    /**
-     * Send Onboarding Events Request
-     */
-    sendOnboardingEventsRequest: function() {
-      if (this.onboardingEventsUrl) {
-        useGetToken().then(token => {
-          this.sendXhr(
-            `${this.config.apiUrl}/onboarding/events?api_key=${token}`,
-            {
-              method: 'POST',
-              body: 'CreatedRecord',
-              header: {
-                Authorization: `bearer ${token}`
-              }
-            }
-          )
-            .then(() => {
-              const onboardingEvents = [...this.onboardingEvents, 'CreatedRecord']
-              this.updateOnboardingEvents(onboardingEvents)
-            })
-            .catch(this.handleXhrError.bind(this))
-        })
-
-      }
     },
 
     /**

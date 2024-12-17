@@ -272,8 +272,6 @@ export default {
      */
     async initialLogin() {
       try {
-         // this.user = await Auth.signIn(this.$route.params.username, this.$route.params.password)
-         console.log("hre")
         this.user = await signIn({
         username: this.$route.params.username,
         password: this.$route.params.password,

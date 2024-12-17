@@ -33,7 +33,6 @@ describe('CreateConceptDialog.vue', () => {
   beforeEach(() => {
 
     store = new Vuex.Store({
-      state: Object.assign({}, state, {onboardingEvents: []}),
       mutations,
       getters,
       actions

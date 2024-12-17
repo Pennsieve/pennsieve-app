@@ -96,7 +96,6 @@ const initialState = () => ({
   consortiumId: 1,
   consortiumDatasets: [],
   consortiumDatasetsImporting: [],
-  gettingStartedOpen: false,
   modelTemplates: [],
   datasetTemplates: [],
   isLoadingDatasetTemplates: false,
@@ -114,9 +113,6 @@ const initialState = () => ({
   pageNotFound: false,
   dataUseAgreements: [],
   cognitoUser: {},
-  onboardingEvents: [],
-  shouldShowLinkOrcidDialog: false,
-  isLinkOrcidDialogVisible: false,
   sessionTimer: null,
   isRefreshing: false,
   gitHubProfile: null,
@@ -203,9 +199,6 @@ export const mutations = {
         state.datasetDoi = "";
         state.datasetTemplates = [];
         state.searchModalVisible = false;
-        state.shouldShowLinkOrcidDialog = false;
-        state.isLinkOrcidDialogVisible = false;
-        state.gettingStartedOpen = false;
         state.cognitoUser = {};
         state.sessionTimer = null
       },
@@ -444,13 +437,6 @@ export const mutations = {
       UPDATE_IS_LOADING_RELATIONSHIP_TYPES(state, data) {
         state.isLoadingRelationshipTypes = data;
       },
-      UPDATE_ONBOARDING_EVENTS(state, onboardingEvents) {
-        state.onboardingEvents = onboardingEvents;
-      },
-
-      SET_GETTING_STARTED_OPEN(state, data) {
-        state.gettingStartedOpen = data;
-      },
 
       UPDATE_MODEL_TEMPLATES(state, data) {
         state.modelTemplates = data;
@@ -613,13 +599,6 @@ export const mutations = {
         state.dataUseAgreements = dataUseAgreements;
       },
 
-      UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG(state, shouldShowLinkOrcidDialog) {
-        state.shouldShowLinkOrcidDialog = shouldShowLinkOrcidDialog;
-      },
-
-      UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE(state, isLinkOrcidDialogVisible) {
-        state.isLinkOrcidDialogVisible = isLinkOrcidDialogVisible;
-      },
       UPDATE_GITHUB_PROFILE(state, githubProfile) {
         state.gitHubProfile = githubProfile;
       },
@@ -632,8 +611,6 @@ export const actions = {
   setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),
-  updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
-      commit("UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE", evt),
   updateCognitoUser: ({ commit }, evt) => commit("UPDATE_COGNITO_USER", evt),
   updateGithubProfile: ({ commit }, evt) => commit("UPDATE_GITHUB_PROFILE", evt),
   updatePageNotFound: ({ commit }, evt) => commit("SET_PAGE_NOT_FOUND", evt),
@@ -757,10 +734,6 @@ export const actions = {
       commit("DELETE_RELATIONSHIP_TYPE", evt),
   updateIsLoadingRelationshipTypes: ({ commit }, evt) =>
       commit("UPDATE_IS_LOADING_RELATIONSHIP_TYPES", evt),
-  updateOnboardingEvents: ({ commit }, evt) =>
-      commit("UPDATE_ONBOARDING_EVENTS", evt),
-  setGettingStartedOpen: ({ commit }, evt) =>
-      commit("SET_GETTING_STARTED_OPEN", evt),
   updateModelTemplates: ({ commit }, evt) =>
       commit("UPDATE_MODEL_TEMPLATES", evt),
   setDatasetRole: ({ commit }, evt) => commit("SET_DATASET_ROLE", evt),
@@ -827,8 +800,6 @@ export const actions = {
       commit("UPDATE_DATA_USE_AGREEMENT", evt),
   updateDefaultDataUseAgreement: ({ commit }, evt) =>
       commit("UPDATE_DEFAULT_DATA_USE_AGREEMENT", evt),
-  updateShouldShowLinkOrcidDialog: ({ commit }, evt) =>
-      commit("UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG", evt),
 }
 
 export const getters = {
@@ -976,7 +947,6 @@ export const getters = {
         R.find(R.propEq("name", name))
     )(state.relationshipTypes);
   },
-  getGettingStartedOpen: (state) => () => state.gettingStartedOpen,
   modelTemplates: (state) => () => state.modelTemplates,
   getPermission:
       (state) =>
@@ -1038,9 +1008,6 @@ export const getters = {
           .find((t) => t.systemTeamType === "publishers"),
   datasetIntId: (state) => {
     return state.dataset.content ? state.dataset.content.intId : null;
-  },
-  hasOrcidOnboardingEvent: (state) => {
-    return state.onboardingEvents.includes("AddedOrcid") || false;
   },
   getComputeNodes: (state) => {
     return state.computeNodes

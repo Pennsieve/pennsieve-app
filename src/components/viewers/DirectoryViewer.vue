@@ -63,7 +63,7 @@ export default {
   },
 
   watch: {
-    getFileUrl: {
+    fileUrl: {
       handler: function(url) {
         if (url) {
           this.getData(url)
