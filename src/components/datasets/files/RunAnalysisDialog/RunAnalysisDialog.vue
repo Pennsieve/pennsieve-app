@@ -552,7 +552,7 @@ export default {
         .then(async (token) => {
           let url;
           if (this.ancestorList.length === 0) {
-            url = this.getFilesUrl();
+            url = await this.getFilesUrl();
           } else {
             url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
           }

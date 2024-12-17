@@ -86,7 +86,6 @@ export default {
       "config",
       "bfTermsOfServiceVersion",
       "activeOrganization",
-      "onboardingEvents",
     ]),
 
     /**
@@ -259,8 +258,7 @@ export default {
 
       // Send user to next route depending on if it is the org owner
       const isOwner = pathOr(false, ["isOwner"], this.activeOrganization);
-      const isFirstTimeSignOn = Boolean(this.onboardingEvents.length === 0);
-      if (isOwner && isFirstTimeSignOn) {
+      if (isOwner) {
         this.$router.push({
           name: "invite-people",
         });

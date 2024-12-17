@@ -248,7 +248,7 @@
 </template>
 
 <script>
-import {mapActions, mapGetters, mapState} from 'vuex'
+import {mapActions, mapGetters} from 'vuex'
 import SideDrawer from '../../../shared/side-drawer/SideDrawer.vue'
 import BfButton from '../../../shared/bf-button/BfButton.vue'
 import TableFunctions from '../../../../mixins/table-functions'
@@ -345,9 +345,6 @@ export default {
       'getModelByName',
       'getRelationshipTypeByName'
     ]),
-    ...mapState([
-      'onboardingEvents',
-    ]),
 
     datasetId: function () {
       return this.$route ? this.$route.params.datasetId : ''
@@ -419,8 +416,6 @@ export default {
       const conceptTitle = propOr('', 'displayName', this.conceptTitle)
       return `Filter by ${conceptTitle}`
     },
-
-
   },
 
   watch: {
@@ -462,18 +457,8 @@ export default {
 
   methods: {
     ...mapActions([
-      'updateOnboardingEvents',
       'addRelationshipType'
     ]),
-
-    onboardingEventsUrl: async function () {
-      return useGetToken()
-        .then(token => {
-          const apiUrl = propOr('', 'apiUrl', this.config)
-          return `${apiUrl}/onboarding/events?api_key=${token}`
-
-        })
-    },
 
     updateSearchResults: function (searchResults) {
       this.searchResults = searchResults
@@ -760,11 +745,6 @@ export default {
           type: 'success'
         }
       })
-      // check for onboarding event state for creating a relationship
-      if (this.onboardingEvents.indexOf('CreatedRelationshipType') === -1) {
-        // make post request
-        this.sendOnboardingEventsRequest()
-      }
       this.closeSideDrawer()
       this.isCreating = false
     },
@@ -860,21 +840,6 @@ export default {
         this.relationshipVal = ''
         this.conceptTitle.value = ''
       })
-    },
-
-    sendOnboardingEventsRequest: function () {
-      this.onboardingEventsUrl()
-        .then(url => {
-          return useSendXhr(url, {
-            method: 'POST',
-            body: 'CreatedRelationshipType',
-          })
-            .then(response => {
-              const onboardingEvents = [...this.onboardingEvents, 'CreatedRelationshipType']
-              this.updateOnboardingEvents(onboardingEvents)
-            })
-
-        }).catch(err => useHandleXhrError(err))
     }
   }
 }

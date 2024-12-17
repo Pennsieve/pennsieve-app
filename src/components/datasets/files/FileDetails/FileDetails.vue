@@ -570,7 +570,7 @@ export default {
       "isOrgSynced",
     ]),
 
-    ...mapState(["onboardingEvents", "conceptsHash", "dataset"]),
+    ...mapState(["conceptsHash", "dataset"]),
 
     /**
      * Compute the display name which will decode
@@ -1182,8 +1182,6 @@ export default {
     //   return this.concepts.length > 0 && !this.isRelationshipsLoading
     // },
 
-
-
     /**
      * Compute options to display in the link to record menu
      * @returns {Array}
@@ -1377,23 +1375,11 @@ export default {
     ...mapActions([
       "updateEditingInstance",
       "updateConcepts",
-      "updateOnboardingEvents",
     ]),
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
     ...mapActions("viewerModule", ["setActiveViewer", "setActiveTool"]),
-
-    /**
-     * get onboarding events url
-     * @returns {String}
-     */
-    onboardingEventsUrl: async function () {
-      return useGetToken().then(token => {
-        const apiUrl = propOr("", "apiUrl", this.config);
-        return `${apiUrl}/onboarding/events?api_key=${token}`;
-      })
-    },
 
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
@@ -2008,12 +1994,6 @@ export default {
                 batchUrl,
                 this.linkedProperties
               );
-
-              // check for onboarding event state for creating a record
-              if (!this.onboardingEvents.some((e) => e === "CreatedRecord")) {
-                // make post request
-                this.sendOnboardingEventsRequest();
-              }
 
               // Redirect user to new concept instance page
               this.$router.replace({
@@ -2741,36 +2721,6 @@ export default {
         });
       })
 
-    },
-
-    /**
-     * Send Onboarding Events Request
-     */
-    sendOnboardingEventsRequest: function () {
-
-      if (this.onboardingEventsUrl) {
-        useGetToken().then(token => {
-          this.sendXhr(
-            `${this.config.apiUrl}/onboarding/events?api_key=${token}`,
-            {
-              method: "POST",
-              body: "CreatedRecord",
-              header: {
-                Authorization: `bearer ${token}`,
-              },
-            }
-          )
-            .then(() => {
-              const onboardingEvents = [
-                ...this.onboardingEvents,
-                "CreatedRecord",
-              ];
-              this.updateOnboardingEvents(onboardingEvents);
-            })
-            .catch(this.handleXhrError.bind(this));
-        })
-
-      }
     },
 
     /**
