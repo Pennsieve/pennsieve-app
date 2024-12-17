@@ -59,12 +59,12 @@
 </template>
 
 <script>
-import {mapActions, mapState} from "vuex";
+import { mapActions, mapState } from "vuex";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
-import {useGetToken} from "@/composables/useGetToken";
+import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
 import { pathOr, propOr } from "ramda";
 import {
@@ -112,17 +112,16 @@ export default {
   },
 
   async mounted() {
-    const p1 = this.fetchIntegrations()
-    const p2 = this.fetchComputeNodes()
-    const p3 = this.fetchApplications()
+    const p1 = this.fetchIntegrations();
+    const p2 = this.fetchComputeNodes();
+    const p3 = this.fetchApplications();
 
-    return Promise.all([p1,p2,p3])
+    return Promise.all([p1, p2, p3]);
   },
 
-  methods:{
+  methods: {
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
     ...mapActions("analysisModule", ["fetchComputeNodes", "fetchApplications"]),
-
   },
 
   data() {
@@ -149,6 +148,10 @@ export default {
         {
           name: "Activity",
           to: "activity",
+        },
+        {
+          name: "Integrations",
+          to: "integrations",
         },
       ],
     };
