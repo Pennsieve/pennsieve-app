@@ -96,6 +96,7 @@ export default {
       profile,
       avatarProfile,
       fullName,
+      getInitial,
       gravatarUrl,
       profileColor,
       avatarText,
