@@ -95,14 +95,12 @@ export default {
       "secondaryNavOpen",
       "environment",
       "searchModalVisible",
-      "isLinkOrcidDialogVisible",
     ]),
     ...mapGetters([
       "activeOrganization",
       "getActiveOrganization",
       "config",
       "hasFeature",
-      "hasOrcidOnboardingEvent",
       "isOrgSynced",
     ]),
     ...mapState("datasetModule", ["datasetSearchParams"]),
@@ -246,30 +244,6 @@ export default {
 
       setPageTitle(pageTitle);
       setMeta("name", "description", pageDescription);
-    },
-
-    /**
-     * Request user onboarding events
-     * @param {String} userToken
-     */
-    getOnboardingEventStates: function (userToken) {
-      return this.sendXhr(
-        `${this.config.apiUrl}/onboarding/events?api_key=${userToken}`,
-        {
-          header: {
-            Authorization: `bearer ${userToken}`,
-          },
-        }
-      )
-        .then((response) => {
-          this.updateOnboardingEvents(response);
-          const hasAddedOrcid = response.includes("AddedOrcid");
-          if (!hasAddedOrcid) {
-            this.updateShouldShowLinkOrcidDialog(true);
-            // this.setLinkOrcidDialog()
-          }
-        })
-        .catch(this.handleXhrError.bind(this));
     },
 
     /**

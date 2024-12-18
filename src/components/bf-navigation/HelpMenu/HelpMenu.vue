@@ -8,7 +8,7 @@
       trigger="hover"
       transition=""
       :open-delay="200"
-      :width="popoverWidth"
+      :width="260"
       :visible-arrow="false"
     >
 
@@ -85,7 +85,6 @@
 import { mapGetters } from 'vuex'
 
 import EventBus from '../../../utils/event-bus'
-import UserAccountAge from '../../../mixins/user-account-age'
 import IconHelpMessage from '../../icons/IconHelpMessage.vue'
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 
@@ -104,10 +103,6 @@ export default {
     IconHelpMessage
   },
 
-  mixins: [
-    UserAccountAge
-  ],
-
   data() {
     return {
       menuOpen: false
@@ -118,24 +113,6 @@ export default {
     ...mapGetters([
       'hasFeature'
     ]),
-
-    /**
-     * Compute if the getting started guide should be shown
-     * @returns {Boolean}
-     */
-    showGettingStarted: function() {
-      return this.userIsLessThan30DaysOld
-    },
-
-    /**
-     * Compute popover width based on if the getting
-     * started guide is being shown
-     */
-    popoverWidth: function() {
-      return this.showGettingStarted
-        ? 340
-        : 260
-    }
   },
 
   mounted() {

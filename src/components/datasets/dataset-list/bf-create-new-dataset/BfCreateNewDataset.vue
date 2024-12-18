@@ -185,7 +185,6 @@
     computed: {
       ...mapState([
         'config',
-        'onboardingEvents',
         'datasetTemplates',
         'activeOrganization'
       ]),
@@ -214,7 +213,6 @@
       stepBackText: function() {
         return this.processStep > 1 ? 'Back' : 'Cancel'
       },
-
 
 
       /**
@@ -270,7 +268,6 @@
     methods: {
       ...mapActions([
         'addDataset',
-        'updateOnboardingEvents'
       ]),
       /**
        * Compute create dataset url
@@ -421,12 +418,6 @@
         this.addDataset(response).then(() => {
           this.closeDialog()
 
-          // check for onboarding event state for creating a dataset
-          if (this.onboardingEvents.indexOf('CreatedDataset') === -1){
-            // make post request
-            this.sendOnboardingEventsRequest()
-          }
-
           EventBus.$emit('track-event', {
             name: 'Dataset Created'
           })
@@ -483,29 +474,6 @@
         } else {
           callback()
         }
-      },
-      /**
-       * Save onboarding event
-       */
-      sendOnboardingEventsRequest: function() {
-        useGetToken()
-          .then(token => {
-            const url = `${apiUrl}/onboarding/events?api_key=${token}`
-            this.sendXhr(token, {
-              method: 'POST',
-              body: 'CreatedDataset',
-              header: {
-                'Authorization': `bearer ${token}`
-              }
-            })
-              // eslint-disable-next-line no-unused-vars
-              .then(response => {
-                const onboardingEvents = [...this.onboardingEvents, 'CreatedDataset']
-                this.updateOnboardingEvents(onboardingEvents)
-              })
-              .catch(this.handleXhrError.bind(this))
-          })
-
       },
       /**
        * Handle dataset template selection

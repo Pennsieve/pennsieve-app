@@ -215,13 +215,9 @@ export default {
     computeNodes: function () {
       this.formatComputeNodeOptions();
     },
-    processors: function () {
+    selectedComputeNode: function () {
       this.formatProcessorOptions();
-    },
-    preprocessors: function () {
       this.formatPreprocessorOptions();
-    },
-    postprocessors: function () {
       this.formatPostprocessorOptions();
     },
   },
@@ -307,9 +303,6 @@ export default {
         });
     },
     onFileSelect: function (selectedFiles, parentId) {
-      console.log("selectedFiles", selectedFiles);
-      console.log("parentId", parentId);
-      console.log("here", { selectedFiles, parentId });
       this.setSelectedFiles({ selectedFiles, parentId });
       this.updateFileCount();
     },
@@ -352,9 +345,6 @@ export default {
      * Run Analysis Workflow on Selected Files
      */
     runAnalysis: async function () {
-      console.log("this.selectedPreprocessor", this.selectedPreprocessor);
-      console.log("this.selectedProcessor", this.selectedProcessor);
-      console.log("this.selectedPostprocessor", this.selectedPostprocessor);
       const url = `${this.config.api2Url}/workflows/instances`;
 
       let arrayOfPackageIds = [];
@@ -369,8 +359,6 @@ export default {
 
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
-
-      console.log("arrayOfPackageIds", arrayOfPackageIds);
 
       const formatApplication = (application) => {
         return {
@@ -454,7 +442,11 @@ export default {
      * Access processors from global state and format options for input select
      */
     formatProcessorOptions: function () {
-      this.processorOptions = this.processors.map((processor) => {
+      const filteredProcessors = this.processors.filter(
+        (processor) =>
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
+      );
+      this.processorOptions = filteredProcessors.map((processor) => {
         return {
           value: processor.name,
           label: processor.name,
@@ -465,7 +457,11 @@ export default {
      * Access preprocessors from global state and format options for input select
      */
     formatPreprocessorOptions: function () {
-      this.preprocessorOptions = this.preprocessors.map((preprocessor) => {
+      const filteredPreprocessors = this.preprocessors.filter(
+        (preprocessor) =>
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
+      );
+      this.preprocessorOptions = filteredPreprocessors.map((preprocessor) => {
         return {
           value: preprocessor.name,
           label: preprocessor.name,
@@ -476,12 +472,18 @@ export default {
      * Access postprocessors from global state and format options for input select
      */
     formatPostprocessorOptions: function () {
-      this.postprocessorOptions = this.postprocessors.map((postprocessor) => {
-        return {
-          value: postprocessor.name,
-          label: postprocessor.name,
-        };
-      });
+      const filteredPostprocessors = this.postprocessors.filter(
+        (postprocessor) =>
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+      );
+      this.postprocessorOptions = filteredPostprocessors.map(
+        (postprocessor) => {
+          return {
+            value: postprocessor.name,
+            label: postprocessor.name,
+          };
+        }
+      );
     },
     /**
      * Set Selected Compute Node
@@ -552,7 +554,7 @@ export default {
         .then(async (token) => {
           let url;
           if (this.ancestorList.length === 0) {
-            url = this.getFilesUrl();
+            url = await this.getFilesUrl();
           } else {
             url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
           }
