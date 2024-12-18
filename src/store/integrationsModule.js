@@ -120,6 +120,7 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  
   removeIntegration: async({ commit, dispatch, rootState }, integrationId) => {
     try {
       useGetToken().then(token => {
