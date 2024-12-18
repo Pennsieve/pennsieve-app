@@ -1,5 +1,5 @@
 import Vuex from 'vuex'
-import { mount } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import DatasetActivityPanel from './DatasetActivityPanel.vue'
 import { state, actions, mutations, getters } from '../../../../store'
 
@@ -40,7 +40,7 @@ const marchEvent = {
 }
 
 describe('DatasetActivityPanel.vue', () => {
-  const cmp = mount(DatasetActivityPanel, {
+  const cmp = shallowMount(DatasetActivityPanel, {
     props: {
       event: februaryEvent
     },

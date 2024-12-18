@@ -95,6 +95,7 @@ export const actions = {
   createIntegration: async ({ commit, rootState }, integrationDTO) => {
     try {
       const token = await useGetToken();
+      console.log('token', token);
       
       const url = `${rootState.config.apiUrl}/webhooks?api_key=${token}`;
       const response = await fetch(url, {
