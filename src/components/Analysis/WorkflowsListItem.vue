@@ -1,6 +1,6 @@
 <template>
   <div v-if="isActive" class="box green-circle">
-    <div class="icon">●</div>
+    <IconWaitingCircle class="icon" />
     <div class="text">
       <div class="workflow-name">
         Workflow UUID: <br />
@@ -13,7 +13,7 @@
   </div>
 
   <div v-if="!isActive" class="box red-x">
-    <div class="icon">✖</div>
+    <IconRemove class="icon" />
     <div class="text">
       <div class="workflow-name">
         Workflow UUID: <br />
@@ -27,6 +27,10 @@
 </template>
 
 <script>
+import IconRemove from "../icons/IconRemove.vue";
+import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
+import CircleIcon from "../shared/CircleIcon/CircleIcon.vue";
+
 export default {
   name: "WorkflowsListItem",
 
@@ -79,31 +83,35 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
-  width: 20px;
-  height: 20px;
+  margin-right: 15px;
+  width: 30px; /* Increase size */
+  height: 30px; /* Increase size */
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 26px; /* Adjust font size */
 }
 
 /* Green circle box styles */
 .box.green-circle {
-  border-color: #0f0; /* Green border */
+  border-color: #14a758; /* Green border */
 }
 
 .box.green-circle .icon {
-  background-color: #0f0; /* Green circle background */
-  color: #fff; /* White icon color */
+  background-color: #fff; /* Green circle background */
+  color: #14a758; /* White icon color */
+  box-sizing: border-box; /* Include border in size calculation */
+  font-weight: bold; /* Make the 'X' stand out */
 }
 
 /* Red X box styles */
 .box.red-x {
-  border-color: #f00; /* Red border */
+  border-color: #c14d49; /* Red border */
 }
 
 .box.red-x .icon {
-  background-color: #f00; /* Red circle background */
-  color: #fff; /* White icon color */
+  background-color: #fff;
+  color: #c14d49; /* Red icon color */
+  font-weight: bold; /* Make the 'X' stand out */
+  border: none; /* No border for the 'X' */
 }
 
 /* Text styles (Optional, if further customization is needed) */
