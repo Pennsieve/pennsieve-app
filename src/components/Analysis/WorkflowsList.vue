@@ -1,0 +1,209 @@
+<template>
+  <div class="models-list scrolling-list">
+    <h2 class="heading">Active Workflows</h2>
+    <template v-if="workflowInstances.length > 0">
+      <div class="models-list-loading-wrap" element-loading-background="#fff">
+        <div class="models-list-wrap-scroll">
+          <div class="models-list-wrap">
+            <!-- Display API data -->
+            <div>
+              <WorkflowsListItem
+                v-for="(workflow, index) in workflowInstances"
+                :key="index"
+                :workflow="workflow"
+                :is-active="isActive(workflow)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template v-if="!workflowInstances.length && !isLoading">
+      <div class="no-workflows">
+        There are no Active Workflows at this time.
+      </div>
+    </template>
+  </div>
+</template>
+
+<script>
+import { mapState, mapActions } from "vuex";
+
+import AutoFocus from "../../mixins/auto-focus/index";
+import WorkflowsListItem from "./WorkflowsListItem.vue";
+
+export default {
+  name: "ModelsList",
+
+  emits: ["click", "shouldReset"],
+
+  components: {},
+
+  mixins: [AutoFocus],
+
+  props: {
+    shouldReset: {
+      type: Boolean,
+      default: false,
+    },
+    scrollingList: {
+      type: Boolean,
+      default: false,
+    },
+  },
+
+  data() {
+    return {
+      isLoading: false,
+    };
+  },
+
+  computed: {
+    ...mapState("metadataModule", ["models"]),
+    ...mapState("analysisModule", ["workflowInstances"]),
+
+    /**
+     * Group concepts by letter
+     * @returns {Array}
+     */
+    groupedConcepts: function () {
+      const byFirstLetter = groupBy(function (concept) {
+        return toUpper(concept.displayName.charAt(0));
+      });
+      const sortedConcepts = sortBy(prop("displayName"), this.models);
+      const searchText = defaultTo("", this.searchText);
+      const matches = (concept) =>
+        concept.displayName.toLowerCase().indexOf(searchText.toLowerCase()) >
+        -1;
+      const filteredConcepts = filter(matches, sortedConcepts);
+
+      return byFirstLetter(filteredConcepts);
+    },
+  },
+
+  watch: {
+    /**
+     * Reset the component
+     */
+    shouldReset: function (val) {
+      if (val) {
+        this.searchText = "";
+        this.$emit("shouldReset", false);
+      }
+    },
+  },
+
+  mounted: function () {
+    this.autoFocus();
+    this.isLoading = true;
+  },
+
+  methods: {
+    clickModel: function (ev) {
+      this.$emit("click", ev);
+    },
+    /**
+     * Allow user to press enter key to navigate to the first item in the list
+     */
+    onEnter: function () {
+      if (this.isInputFocused) {
+        const modelLink = this.$el.querySelector(".concepts-list-item a");
+        if (modelLink && this.searchText !== "") {
+          modelLink.click();
+        }
+      }
+    },
+    isActive: function (workflow) {
+      // if the workflow does not contain a completedAt property, it is active
+      return !workflow.completedAt;
+    },
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+@import "../../assets/_variables.scss";
+
+:deep(.models-list.scrolling-list.input-wrap) {
+  padding: 0 0 0 16px;
+}
+
+.el-input__inner {
+  background: $gray_1;
+  border: none;
+  border-bottom: 1px solid $gray_3;
+  border-radius: 0;
+  padding-left: 32px;
+}
+
+.models-list.scrolling-list {
+  box-sizing: border-box;
+  height: 100%; // Ensure the parent container takes the full height
+  display: flex;
+  flex-direction: column; // Stack children vertically
+
+  .models-list-wrap-scroll {
+    box-sizing: border-box;
+    flex: 1; // Take up available space
+    overflow-y: auto; // Enable vertical scrolling
+    padding: 0 0 16px 8px;
+  }
+
+  .models-list-loading-wrap {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .input-wrap {
+    padding: 8px 8px 0 8px;
+  }
+
+  .el-input {
+    margin-bottom: 0;
+  }
+}
+
+.models-list-wrap {
+  background: $gray_1;
+  padding: 16px;
+}
+.model-group {
+  display: flex;
+  &:first-child {
+    margin-top: 0;
+  }
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+.model-group-col {
+  flex: 1;
+  overflow: hidden;
+}
+.group-key {
+  line-height: 1;
+  margin: 0;
+  min-width: 20px;
+}
+.icon-search {
+  color: $app-primary-color;
+}
+.empty-concepts {
+  img {
+    height: 78px;
+    width: 99px;
+  }
+}
+
+.heading {
+  margin: 15px;
+  color: $purple_3;
+}
+
+.no-workflows {
+  padding: 16px;
+  color: $gray_3;
+  text-align: center;
+}
+</style>
