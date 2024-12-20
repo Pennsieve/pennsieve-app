@@ -80,7 +80,6 @@ export default {
       'config',
       'profile',
       'hasFeature',
-      'getOrgMemberByIntId'
     ]),
 
     fileIconStr: function() {

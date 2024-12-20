@@ -98,7 +98,6 @@ import {useGetToken} from "@/composables/useGetToken";
     },
 
     computed: {
-      ...mapGetters(['getOrgMemberByIntId']),
       ...mapState(['config']),
 
       /**

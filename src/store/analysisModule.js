@@ -185,12 +185,14 @@ const initialState = () => ({
     createApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications`;
 
+      const userToken = await useGetToken()
+
       try {
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${rootState.userToken}`
+            'Authorization': `Bearer ${userToken}`
           },
           body: JSON.stringify(newApplication)
         });
@@ -239,13 +241,14 @@ const initialState = () => ({
 
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
-    
+      const userToken = await useGetToken()
+
       try {
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${rootState.userToken}`
+            'Authorization': `Bearer ${userToken}`
           },
           body: JSON.stringify(newApplication)
         });

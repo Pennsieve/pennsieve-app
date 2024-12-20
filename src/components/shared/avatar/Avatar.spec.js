@@ -27,7 +27,10 @@ describe('Avatar.vue', () => {
   })
 
   it('calculates initial', () => {
-    const initial = cmp.vm.getInitial('firstName', cmp.vm.$store.state.profile)
-    expect(initial).toBe('J')
+    const getInitial = cmp.vm.getInitial;
+    const profile = cmp.vm.profile;
+
+    const initial = getInitial('firstName', profile);
+    expect(initial).toBe('J');
   })
 })
