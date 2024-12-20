@@ -77,8 +77,11 @@ import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr, propOr } from "ramda";
 import IntegrationsListItem from "../../Integrations/IntegrationsListItem/IntegrationsListItem.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
-import {useGetToken} from "@/composables/useGetToken";
-import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
+import {
+  useHandleXhrError,
+  useSendXhr,
+} from "@/mixins/request/request_composable";
 
 export default {
   name: "DatasetIntegrationsSettings",
@@ -95,6 +98,14 @@ export default {
       activeIntegrations: [],
       isLoadingIntegrations: false,
     };
+  },
+
+  async mounted() {
+    try {
+      await this.fetchIntegrations();
+    } catch (err) {
+      console.error(err);
+    }
   },
 
   props: {},
@@ -153,11 +164,11 @@ export default {
      */
     getORCIDApiUrl: async function () {
       return useGetToken()
-        .then(token => {
+        .then((token) => {
           const url = pathOr("", ["config", "apiUrl"])(this);
           return `${url}/user/orcid?api_key=${token}`;
-        }).catch(err => console.log(err))
-
+        })
+        .catch((err) => console.log(err));
     },
 
     /**
@@ -252,21 +263,21 @@ export default {
           const url = `${this.config.apiUrl}/datasets/${dataset.content.id}/webhook`;
           this.isLoadingIntegrations = true;
 
-          useGetToken().then(token => {
-            return useSendXhr(url, {
-              header: {
-                Authorization: `Bearer ${token}`,
-              },
-            })
-              .then((response) => {
+          useGetToken()
+            .then((token) => {
+              return useSendXhr(url, {
+                header: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }).then((response) => {
                 this.activeIntegrations = response;
-              })
-          }).catch(err => useHandleXhrError(err))
+              });
+            })
+            .catch((err) => useHandleXhrError(err))
             .finally(() => {
               // Set loading state
               this.isLoadingIntegrations = false;
             });
-
         }
       },
       deep: true,
@@ -301,6 +312,7 @@ export default {
 
   methods: {
     ...mapActions(["updateProfile"]),
+    ...mapActions("integrationsModule", ["fetchIntegrations"]),
 
     toggleIntegration: function (item) {
       let method = "PUT";
@@ -308,7 +320,7 @@ export default {
         method = "DELETE";
       }
 
-      useGetToken().then(token => {
+      useGetToken().then((token) => {
         const url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/webhook/${item.integration.id}`;
         this.sendXhr(url, {
           method: method,
@@ -318,13 +330,7 @@ export default {
         })
           .catch(this.handleXhrError.bind(this))
           .finally(() => {});
-
-      })
-
-
-
-
-
+      });
     },
 
     /**
@@ -340,26 +346,25 @@ export default {
       window.addEventListener("message", function (event) {
         this.oauthCode = event.data;
         if (this.oauthCode !== "") {
-
-          self.getORCIDApiUrl()
-            .then(url => {
+          self
+            .getORCIDApiUrl()
+            .then((url) => {
               return useSendXhr(url, {
-                  method: "POST",
-                  body: {
-                    authorizationCode: this.oauthCode,
-                  },
-                })
-                .then((response) => {
-                  // response logic goes here
-                  self.oauthInfo = response;
+                method: "POST",
+                body: {
+                  authorizationCode: this.oauthCode,
+                },
+              }).then((response) => {
+                // response logic goes here
+                self.oauthInfo = response;
 
-                  return self.updateProfile({
-                    ...self.profile,
-                    orcid: self.oauthInfo,
-                  });
-                })
-            }).catch(self.handleXhrError.bind(this));
-
+                return self.updateProfile({
+                  ...self.profile,
+                  orcid: self.oauthInfo,
+                });
+              });
+            })
+            .catch(self.handleXhrError.bind(this));
         }
       });
     },
