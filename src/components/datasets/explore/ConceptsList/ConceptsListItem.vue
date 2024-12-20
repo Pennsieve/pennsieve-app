@@ -6,14 +6,10 @@
       :content="conceptName"
       :disabled="!showTooltip"
       :popper-options="{
-        boundariesElement: 'body'
+        boundariesElement: 'body',
       }"
     >
-      <div
-        ref="link"
-        class="mr-8 model-name"
-        @mouseenter="setShowTooltip"
-      >
+      <div ref="link" class="mr-8 model-name" @mouseenter="setShowTooltip">
         <template v-if="isLink">
           <router-link :to="modelSearchLink">
             <span v-html="highlight(searchText, conceptName)" />
@@ -21,10 +17,7 @@
         </template>
 
         <template v-else>
-          <a
-            href="#"
-            @click.prevent="onClick"
-          >
+          <a href="#" @click.prevent="onClick">
             <span v-html="highlight(searchText, conceptName)" />
           </a>
         </template>
@@ -37,47 +30,44 @@
 </template>
 
 <script>
-import { propOr, prop } from 'ramda'
+import { propOr, prop } from "ramda";
 
-import HighlightText from '../../../../mixins/highlight-text'
-import EventBus from '../../../../utils/event-bus'
-import CheckOverflow from '../../../../mixins/check-overflow'
+import HighlightText from "../../../../mixins/highlight-text";
+import EventBus from "../../../../utils/event-bus";
+import CheckOverflow from "../../../../mixins/check-overflow";
 
-const formatNumber = (number) => new Intl.NumberFormat('en-EN').format(number)
+const formatNumber = (number) => new Intl.NumberFormat("en-EN").format(number);
 
 export default {
-  name: 'ConceptsListItem',
+  name: "ConceptsListItem",
 
-  mixins: [
-    CheckOverflow,
-    HighlightText
-  ],
+  mixins: [CheckOverflow, HighlightText],
 
   props: {
     item: {
       type: Object,
-      default: function() {
+      default: function () {
         return {
-          name: '',
-          id: '',
-          count: 0
-        }
-      }
+          name: "",
+          id: "",
+          count: 0,
+        };
+      },
     },
     searchText: {
       type: String,
-      default: ''
+      default: "",
     },
     isLink: {
       type: Boolean,
-      default: true
-    }
+      default: true,
+    },
   },
 
   data() {
     return {
-      showTooltip: false
-    }
+      showTooltip: false,
+    };
   },
 
   computed: {
@@ -85,59 +75,59 @@ export default {
      * Displays the model display name
      * @returns {String}
      */
-    conceptName: function() {
-      return propOr('Model', 'displayName', this.item)
+    conceptName: function () {
+      return propOr("Model", "displayName", this.item);
     },
 
     /**
      * Displays the model count
      * @returns {Number}
      */
-    conceptCount: function() {
-      const count = propOr(0, 'count', this.item)
-      return formatNumber(count)
+    conceptCount: function () {
+      const count = propOr(0, "count", this.item);
+      return formatNumber(count);
     },
 
     /**
      * Computes the model search link
      * @return {Object | String}
      */
-    modelSearchLink: function() {
-      const modelId = prop('id', this.item)
+    modelSearchLink: function () {
+      const modelId = prop("id", this.item);
       const routerLink = {
-        name: 'model-detailsh',
-        params: { conceptId: modelId }
-      }
-      return modelId ? routerLink : ''
-    }
+        name: "model-detailsh",
+        params: { conceptId: modelId },
+      };
+      return modelId ? routerLink : "";
+    },
   },
 
-  mounted: function() {
-    this.setShowTooltip()
+  mounted: function () {
+    this.setShowTooltip();
   },
 
   methods: {
     /**
      * Handle click and emit event
      */
-    onClick: function(ev) {
+    onClick: function (ev) {
       // EventBus.$emit('concepts-list-item-click', this.item)
-      ev.stopPropagation()
-      this.$emit('clickModel', this.item)
+      ev.stopPropagation();
+      this.$emit("clickModel", this.item);
     },
 
     /**
      * Set tooltip based on if the model's name is truncated
      */
-    setShowTooltip: function() {
-      this.showTooltip = this.checkWidth(this.$refs.link)
-    }
-  }
-}
+    setShowTooltip: function () {
+      this.showTooltip = this.checkWidth(this.$refs.link);
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables';
+@import "../../../../assets/_variables";
 
 .concepts-list-item {
   display: flex;
@@ -159,7 +149,7 @@ export default {
 }
 </style>
 <style>
-  .concepts-list-item-tooltip {
-    max-width: 200px
-  }
+.concepts-list-item-tooltip {
+  max-width: 200px;
+}
 </style>
