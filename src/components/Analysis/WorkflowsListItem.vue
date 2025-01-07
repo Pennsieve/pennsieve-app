@@ -12,8 +12,8 @@
     </div>
   </div>
 
-  <div v-if="!isActive" class="box red-x">
-    <IconRemove class="icon" />
+  <div v-if="!isActive" class="box gray-circle">
+    <IconWaitingCircle class="icon" />
     <div class="text">
       <div class="workflow-name">
         Workflow UUID: <br />
@@ -75,7 +75,7 @@ export default {
   line-height: 1.4;
   color: #000;
   background-color: #fff;
-  width: 425px; /* Adjust the width as needed */
+  width: 425px;
 }
 
 /* Style for the icon (circle or X) */
@@ -84,22 +84,34 @@ export default {
   align-items: center;
   justify-content: center;
   margin-right: 15px;
-  width: 30px; /* Increase size */
-  height: 30px; /* Increase size */
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  font-size: 26px; /* Adjust font size */
+  font-size: 26px;
 }
 
 /* Green circle box styles */
 .box.green-circle {
-  border-color: #14a758; /* Green border */
+  border-color: #14a758;
 }
 
 .box.green-circle .icon {
-  background-color: #fff; /* Green circle background */
-  color: #14a758; /* White icon color */
-  box-sizing: border-box; /* Include border in size calculation */
-  font-weight: bold; /* Make the 'X' stand out */
+  background-color: #fff;
+  color: #14a758;
+  box-sizing: border-box;
+  font-weight: bold;
+}
+
+/* Gray circle box styles */
+.box.gray-circle {
+  border-color: $gray_4;
+}
+
+.box.gray-circle .icon {
+  background-color: #fff;
+  color: $gray_4;
+  box-sizing: border-box;
+  font-weight: bold;
 }
 
 /* Red X box styles */
