@@ -13,7 +13,7 @@
   </div>
 
   <div v-if="!isActive" class="box gray-circle">
-    <IconWaitingCircle class="icon" />
+    <IconCheck class="icon" />
     <div class="text">
       <div class="workflow-name">
         Workflow UUID: <br />
@@ -29,7 +29,7 @@
 <script>
 import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
-import CircleIcon from "../shared/CircleIcon/CircleIcon.vue";
+import IconCheck from "../icons/IconCheck.vue";
 
 export default {
   name: "WorkflowsListItem",
