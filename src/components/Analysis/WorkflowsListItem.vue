@@ -1,26 +1,33 @@
 <template>
-  <div v-if="isActive" class="box green-circle">
-    <IconWaitingCircle class="icon" />
-    <div class="text">
-      <div class="workflow-name">
-        Workflow UUID: <br />
-        {{ workflow.uuid }}
-      </div>
-      <div class="compute-node-name">
-        Compute Node UUID: {{ workflow.computeNode.uuid }}
+  <div>
+    <div
+      v-if="isActive"
+      class="box green-circle"
+      @click="$emit('click', workflow, $event)"
+    >
+      <IconWaitingCircle class="icon" />
+      <div class="text">
+        <div class="workflow-name">
+          Workflow UUID: <br />
+          {{ workflow.uuid }}
+        </div>
+        <div class="compute-node-name">
+          Compute Node UUID: {{ workflow.computeNode.uuid }}
+        </div>
+        <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
     </div>
-  </div>
 
-  <div v-if="!isActive" class="box gray-circle">
-    <IconCheck class="icon" />
-    <div class="text">
-      <div class="workflow-name">
-        Workflow UUID: <br />
-        {{ workflow.uuid }}
-      </div>
-      <div class="compute-node-name">
-        Compute Node UUID: {{ workflow.computeNode.uuid }}
+    <div v-if="!isActive" class="box gray-circle">
+      <IconCheck class="icon" />
+      <div class="text">
+        <div class="workflow-name">
+          Workflow UUID: <br />
+          {{ workflow.uuid }}
+        </div>
+        <div class="compute-node-name">
+          Compute Node UUID: {{ workflow.computeNode.uuid }}
+        </div>
       </div>
     </div>
   </div>
@@ -30,7 +37,7 @@
 import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
-
+import FormatDate from "../../mixins/format-date";
 export default {
   name: "WorkflowsListItem",
 
@@ -45,15 +52,13 @@ export default {
     },
   },
 
+  mixins: [FormatDate],
+
   data() {
     return {};
   },
 
   computed: {},
-
-  mounted: function () {
-    console.log("workflow", this.workflow);
-  },
 
   methods: {},
 };

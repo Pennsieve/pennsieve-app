@@ -32,6 +32,10 @@ const workflowLogs = computed(
   () => store.getters["analysisModule/workflowLogs"]
 );
 
+const selectedWorkflowActivity = computed(
+  () => store.getters["analysisModule/selectedWorkflowActivity"]
+);
+
 // Local State
 const isLoading = ref(false);
 
@@ -39,20 +43,38 @@ const initialNodes = [
   {
     id: "1",
     type: "input",
-    data: { label: "Preprocessor" },
+    data: {
+      label: `Preprocessor - ${
+        selectedWorkflowActivity ? "" : "no container name"
+      }`,
+    },
     position: { x: 130, y: 100 },
     class: "light",
   },
   {
     id: "2",
-    data: { label: "Processor" },
+    data: {
+      label: `Processor - ${
+        selectedWorkflowActivity
+          ? // ? selectedWorkflowActivity.value.workflow[1].applicationContainerName
+            ""
+          : "no container name"
+      }`,
+    },
     position: { x: 150, y: 250 },
     class: "light",
   },
   {
     id: "3",
     type: "output",
-    data: { label: "Postprocessor" },
+    data: {
+      label: `Preprocessor - ${
+        selectedWorkflowActivity
+          ? // ? selectedWorkflowActivity.value.workflow[2].applicationContainerName
+            ""
+          : "no container name"
+      }`,
+    },
     position: { x: 170, y: 400 },
     class: "light",
   },
@@ -82,6 +104,7 @@ Fetch Initial Data
 */
 
 onMounted(async () => {
+  console.log("selectedWorkflowActivity", selectedWorkflowActivity.value);
   // fetch all workflow instances
   try {
     isLoading.value = true;
@@ -90,7 +113,6 @@ onMounted(async () => {
     console.error(err);
   } finally {
     isLoading.value = false;
-    console.log("workflowInstances", workflowInstances.value);
   }
   // fetch one workflow instance
   // try {
@@ -120,6 +142,10 @@ onMounted(async () => {
   // }
 });
 
+watch(selectedWorkflowActivity, (newVal) => {
+  console.log("selectedWorkflowActivity updated:", newVal);
+});
+
 /*
 VueFlow Config and Create Relationships
  */
@@ -140,29 +166,32 @@ function onTogglePanelVisibility() {
 </script>
 
 <template>
-  <div class="graph-browser">
-    <div class="vue-flow-wrapper">
-      <VueFlow
-        :nodes="nodes"
-        :edges="edges"
-        class="basic-flow"
-        :default-viewport="{ zoom: 1 }"
-        :min-zoom="0.2"
-        :max-zoom="4"
-      >
-        <Background pattern-color="#aaa" :gap="16" />
+  <div>
+    <div></div>
+    <div class="graph-browser">
+      <div class="vue-flow-wrapper">
+        <VueFlow
+          :nodes="nodes"
+          :edges="edges"
+          class="basic-flow"
+          :default-viewport="{ zoom: 1 }"
+          :min-zoom="0.2"
+          :max-zoom="4"
+        >
+          <Background pattern-color="#aaa" :gap="16" />
 
-        <!-- <MiniMap :position="minimapLocation" :pannable="true" /> -->
+          <!-- <MiniMap :position="minimapLocation" :pannable="true" /> -->
 
-        <Controls position="top-left" />
-      </VueFlow>
+          <Controls position="top-left" />
+        </VueFlow>
+      </div>
+
+      <ActivitySidePanel
+        :class="{ visible: sidePanelVisible }"
+        :panel-visible="sidePanelVisible"
+        @toggle-panel-visibility="onTogglePanelVisibility"
+      />
     </div>
-
-    <ActivitySidePanel
-      :class="{ visible: sidePanelVisible }"
-      :panel-visible="sidePanelVisible"
-      @toggle-panel-visibility="onTogglePanelVisibility"
-    />
   </div>
 </template>
 

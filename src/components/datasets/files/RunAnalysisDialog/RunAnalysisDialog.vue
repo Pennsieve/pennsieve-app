@@ -361,7 +361,10 @@ export default {
       });
 
       const formatApplication = (application) => {
+        console.log("application", application);
         return {
+          name: application.name || "",
+          description: application.description || "",
           uuid: application.uuid || "",
           applicationId: application.applicationId || "",
           applicationContainerName: application.applicationContainerName || "",
