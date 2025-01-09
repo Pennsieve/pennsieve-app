@@ -68,7 +68,7 @@ const initialNodes = [
     id: "3",
     type: "output",
     data: {
-      label: `Preprocessor - ${
+      label: `Postprocessor - ${
         selectedWorkflowActivity
           ? // ? selectedWorkflowActivity.value.workflow[2].applicationContainerName
             ""
