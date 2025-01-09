@@ -20,7 +20,8 @@ const initialState = () => ({
     */
     fileCount: 0,
     workflowInstances: [],
-    workflowInstance: {}
+    workflowInstance: {},
+    selectedWorkflowActivity: []
   })
   
   export const state = initialState()
@@ -91,6 +92,10 @@ const initialState = () => ({
     },
     SET_WORKFLOW_LOGS(state, logs) {
       state.workflowLogs= logs
+    }, 
+    SET_SELECTED_WORKFLOW_ACTIVITY(state, workflow) {
+      console.log('SET_SELECTED_WORKFLOW_ACTIVITY runs with workflow:', workflow)
+      state.selectedWorkflowActivity = workflow
     }
 
   }
@@ -173,13 +178,13 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    setSelectedFiles: async({ commit, rootState}, { selectedFiles, parentId }) => {
+    setSelectedFiles: ({ commit, rootState}, { selectedFiles, parentId }) => {
       commit('SET_SELECTED_FILES', { selectedFiles, parentId } )
     },
-    setSelectedFile: async({ commit, rootState}, selectedFile) => {
+    setSelectedFile: ({ commit, rootState}, selectedFile) => {
       commit('SET_SELECTED_FILE', selectedFile)
     },
-    clearSelectedFiles: async({ commit, rootState }) => {
+    clearSelectedFiles: ({ commit, rootState }) => {
       commit('CLEAR_SELECTED_FILES')
     },
     createApplication: async ({ commit, rootState }, newApplication) => {
@@ -363,13 +368,18 @@ const initialState = () => ({
           commit('SET_WORKFLOW_INSTANCE', [])
           return Promise.reject(err)
       }
-    }
+    },
+    setSelectedWorkflowActivity: ({ commit, rootState}, workflow) => {
+      console.log('does this run')
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
+    },
   }
   
   export const getters = {
     workflowInstances: state => state.workflowInstances,
     workflowInstance: state => state.workflowInstance,
-    workflowLogs: state => state.workflowLogs
+    workflowLogs: state => state.workflowLogs,
+    selectedWorkflowActivity: state => state.selectedWorkflowActivity
   }
   
   

@@ -114,7 +114,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization",  "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
 
     filteredApplications: function () {
       let filteredArray = this.integrations.filter(
@@ -278,6 +278,7 @@ export default {
       };
 
       this.createIntegration(integrationDTO).then((response) => {
+        console.log("response", reponse);
         let detailPopup = this.$refs.apiKeyDetails;
         detailPopup.apiKey = {
           key: response.tokenSecret.key,

@@ -1,26 +1,33 @@
 <template>
-  <div v-if="isActive" class="box green-circle">
-    <IconWaitingCircle class="icon" />
-    <div class="text">
-      <div class="workflow-name">
-        Workflow UUID: <br />
-        {{ workflow.uuid }}
-      </div>
-      <div class="compute-node-name">
-        Compute Node UUID: {{ workflow.computeNode.uuid }}
+  <div>
+    <div
+      v-if="isActive"
+      class="box green-circle"
+      @click="$emit('click', workflow, $event)"
+    >
+      <IconWaitingCircle class="icon" />
+      <div class="text">
+        <div class="workflow-name">
+          Workflow UUID: <br />
+          {{ workflow.uuid }}
+        </div>
+        <div class="compute-node-name">
+          Compute Node UUID: {{ workflow.computeNode.uuid }}
+        </div>
+        <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
     </div>
-  </div>
 
-  <div v-if="!isActive" class="box red-x">
-    <IconRemove class="icon" />
-    <div class="text">
-      <div class="workflow-name">
-        Workflow UUID: <br />
-        {{ workflow.uuid }}
-      </div>
-      <div class="compute-node-name">
-        Compute Node UUID: {{ workflow.computeNode.uuid }}
+    <div v-if="!isActive" class="box gray-circle">
+      <IconCheck class="icon" />
+      <div class="text">
+        <div class="workflow-name">
+          Workflow UUID: <br />
+          {{ workflow.uuid }}
+        </div>
+        <div class="compute-node-name">
+          Compute Node UUID: {{ workflow.computeNode.uuid }}
+        </div>
       </div>
     </div>
   </div>
@@ -29,8 +36,8 @@
 <script>
 import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
-import CircleIcon from "../shared/CircleIcon/CircleIcon.vue";
-
+import IconCheck from "../icons/IconCheck.vue";
+import FormatDate from "../../mixins/format-date";
 export default {
   name: "WorkflowsListItem",
 
@@ -45,15 +52,13 @@ export default {
     },
   },
 
+  mixins: [FormatDate],
+
   data() {
     return {};
   },
 
   computed: {},
-
-  mounted: function () {
-    console.log("workflow", this.workflow);
-  },
 
   methods: {},
 };
@@ -75,7 +80,7 @@ export default {
   line-height: 1.4;
   color: #000;
   background-color: #fff;
-  width: 425px; /* Adjust the width as needed */
+  width: 425px;
 }
 
 /* Style for the icon (circle or X) */
@@ -84,22 +89,34 @@ export default {
   align-items: center;
   justify-content: center;
   margin-right: 15px;
-  width: 30px; /* Increase size */
-  height: 30px; /* Increase size */
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  font-size: 26px; /* Adjust font size */
+  font-size: 26px;
 }
 
 /* Green circle box styles */
 .box.green-circle {
-  border-color: #14a758; /* Green border */
+  border-color: #14a758;
 }
 
 .box.green-circle .icon {
-  background-color: #fff; /* Green circle background */
-  color: #14a758; /* White icon color */
-  box-sizing: border-box; /* Include border in size calculation */
-  font-weight: bold; /* Make the 'X' stand out */
+  background-color: #fff;
+  color: #14a758;
+  box-sizing: border-box;
+  font-weight: bold;
+}
+
+/* Gray circle box styles */
+.box.gray-circle {
+  border-color: $gray_4;
+}
+
+.box.gray-circle .icon {
+  background-color: #fff;
+  color: $gray_4;
+  box-sizing: border-box;
+  font-weight: bold;
 }
 
 /* Red X box styles */

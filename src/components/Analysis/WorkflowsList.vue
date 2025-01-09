@@ -8,10 +8,11 @@
             <!-- Display API data -->
             <div>
               <WorkflowsListItem
-                v-for="(workflow, index) in workflowInstances"
+                v-for="(workflow, index) in activeWorkflows"
                 :key="index"
                 :workflow="workflow"
                 :is-active="isActive(workflow)"
+                @click="handleWorkflowClick"
               />
             </div>
           </div>
@@ -60,7 +61,10 @@ export default {
 
   computed: {
     ...mapState("metadataModule", ["models"]),
-    ...mapState("analysisModule", ["workflowInstances"]),
+    ...mapState("analysisModule", [
+      "workflowInstances",
+      "selectedWorkflowActivity",
+    ]),
 
     /**
      * Group concepts by letter
@@ -79,6 +83,23 @@ export default {
 
       return byFirstLetter(filteredConcepts);
     },
+
+    activeWorkflows: function () {
+      // only return active workflows
+      const onlyActiveWorkflows = this.workflowInstances.filter((workflow) => {
+        return this.isActive(workflow);
+        // console.log("workflow", workflow);
+        // show the workflows with the most recent startedAt timestamp at the top of the list
+      });
+
+      const sortedActiveWorkflows = onlyActiveWorkflows.sort(
+        (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
+      );
+
+      console.log(onlyActiveWorkflows);
+
+      return sortedActiveWorkflows;
+    },
   },
 
   watch: {
@@ -96,9 +117,11 @@ export default {
   mounted: function () {
     this.autoFocus();
     this.isLoading = true;
+    this.setSelectedWorkflowActivity(this.activeWorkflows[0]);
   },
 
   methods: {
+    ...mapActions("analysisModule", ["setSelectedWorkflowActivity"]),
     clickModel: function (ev) {
       this.$emit("click", ev);
     },
@@ -116,6 +139,10 @@ export default {
     isActive: function (workflow) {
       // if the workflow does not contain a completedAt property, it is active
       return !workflow.completedAt;
+    },
+    handleWorkflowClick: function (workflow) {
+      console.log("workflow", workflow);
+      this.setSelectedWorkflowActivity(workflow);
     },
   },
 };
