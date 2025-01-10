@@ -254,7 +254,6 @@ export default {
         [256,{"start":1,"end":2,"i":1}],
         [512,{"start":1,"end":4,"i":1}],
         [1024,{"start":2,"end":8,"i":1}],
-        [1024,{"start":2,"end":8,"i":1}],
         [2048,{"start":4,"end":16,"i":1}],
         [4096,{"start":8,"end":30,"i":1}],
         [8192,{"start":16,"end":60,"i":4}],
@@ -437,7 +436,7 @@ function createMemoryItems(cpu, comp) {
   }
 
   for (let value = start; value <= end; value += i) {
-    memoryArray.push({ value, label: value.toString()+" GB" });
+    memoryArray.push({ value:value*1024, label: value.toString()+" GB" });
   }
 
   comp.memoryItems = memoryArray;
