@@ -43,38 +43,20 @@ const initialNodes = [
   {
     id: "1",
     type: "input",
-    data: {
-      label: `Preprocessor - ${
-        selectedWorkflowActivity ? "" : "no container name"
-      }`,
-    },
+    data: {},
     position: { x: 130, y: 100 },
     class: "light",
   },
   {
     id: "2",
-    data: {
-      label: `Processor - ${
-        selectedWorkflowActivity
-          ? // ? selectedWorkflowActivity.value.workflow[1].applicationContainerName
-            ""
-          : "no container name"
-      }`,
-    },
+    data: {},
     position: { x: 150, y: 250 },
     class: "light",
   },
   {
     id: "3",
     type: "output",
-    data: {
-      label: `Postprocessor - ${
-        selectedWorkflowActivity
-          ? // ? selectedWorkflowActivity.value.workflow[2].applicationContainerName
-            ""
-          : "no container name"
-      }`,
-    },
+    data: {},
     position: { x: 170, y: 400 },
     class: "light",
   },
@@ -104,7 +86,6 @@ Fetch Initial Data
 */
 
 onMounted(async () => {
-  console.log("selectedWorkflowActivity", selectedWorkflowActivity.value);
   // fetch all workflow instances
   try {
     isLoading.value = true;
@@ -114,6 +95,65 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
+
+  const isActive = function (workflow) {
+    // if the workflow does not contain a completedAt property, it is active
+    return !workflow.completedAt;
+  };
+
+  const onlyActiveWorkflows = workflowInstances.value.filter((workflow) => {
+    return isActive(workflow);
+    // show the workflows with the most recent startedAt timestamp at the top of the list
+  });
+
+  const sortedActiveWorkflows = onlyActiveWorkflows.sort(
+    (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
+  );
+
+  try {
+    await store.dispatch(
+      "analysisModule/setSelectedWorkflowActivity",
+      sortedActiveWorkflows[0]
+    );
+  } catch (err) {
+    console.error(err);
+  } finally {
+    isLoading.value = false;
+  }
+
+  console.log("***", selectedWorkflowActivity.value);
+
+  nodes.value = [
+    {
+      id: "1",
+      type: "input",
+      data: {
+        label: `${selectedWorkflowActivity.value.workflow[0].applicationContainerName}`,
+      },
+      position: { x: 130, y: 100 },
+      class: "light",
+    },
+    {
+      id: "2",
+      data: {
+        label: `${selectedWorkflowActivity.value.workflow[1].applicationContainerName}`,
+      },
+      position: { x: 150, y: 250 },
+      class: "light",
+    },
+    {
+      id: "3",
+      type: "output",
+      data: {
+        label: `${selectedWorkflowActivity.value.workflow[2].applicationContainerName}`,
+      },
+      position: { x: 170, y: 400 },
+      class: "light",
+    },
+  ];
+
+  console.log("selectedWorkflowActivity.value", selectedWorkflowActivity.value);
+
   // fetch one workflow instance
   // try {
   //   isLoading.value = true;
@@ -142,8 +182,39 @@ onMounted(async () => {
   // }
 });
 
-watch(selectedWorkflowActivity, (newVal) => {
-  console.log("selectedWorkflowActivity updated:", newVal);
+watch(selectedWorkflowActivity, (newVal, oldVal) => {
+  console.log("selectedWorkflowActivity changed:", newVal);
+
+  if (newVal) {
+    nodes.value = [
+      {
+        id: "1",
+        type: "input",
+        data: {
+          label: `${newVal.workflow[0].applicationContainerName}`,
+        },
+        position: { x: 130, y: 100 },
+        class: "light",
+      },
+      {
+        id: "2",
+        data: {
+          label: `${newVal.workflow[1].applicationContainerName}`,
+        },
+        position: { x: 150, y: 250 },
+        class: "light",
+      },
+      {
+        id: "3",
+        type: "output",
+        data: {
+          label: `${newVal.workflow[2].applicationContainerName}`,
+        },
+        position: { x: 170, y: 400 },
+        class: "light",
+      },
+    ];
+  }
 });
 
 /*

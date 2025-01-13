@@ -3,7 +3,7 @@
     <div
       v-if="isActive"
       class="box green-circle"
-      @click="$emit('click', workflow, $event)"
+      @click="$emit('select-workflow', workflow)"
     >
       <IconWaitingCircle class="icon" />
       <div class="text">
@@ -34,10 +34,12 @@
 </template>
 
 <script>
+import { defineEmits } from "vue";
 import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
+
 export default {
   name: "WorkflowsListItem",
 

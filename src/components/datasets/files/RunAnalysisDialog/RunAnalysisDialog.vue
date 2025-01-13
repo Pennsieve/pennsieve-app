@@ -361,7 +361,6 @@ export default {
       });
 
       const formatApplication = (application) => {
-        console.log("application", application);
         return {
           name: application.name || "",
           description: application.description || "",
