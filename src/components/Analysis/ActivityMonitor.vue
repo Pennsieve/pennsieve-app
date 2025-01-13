@@ -81,6 +81,9 @@ const nodes = ref(initialNodes);
 
 const edges = ref(initialEdges);
 
+const getLabel = (workflow, type) =>
+  workflow?.name ? workflow.name : `No ${type} Selected`;
+
 /*
 Fetch Initial Data
 */
@@ -128,7 +131,7 @@ onMounted(async () => {
       id: "1",
       type: "input",
       data: {
-        label: `${selectedWorkflowActivity.value.workflow[0].applicationContainerName}`,
+        label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
       },
       position: { x: 130, y: 100 },
       class: "light",
@@ -136,7 +139,7 @@ onMounted(async () => {
     {
       id: "2",
       data: {
-        label: `${selectedWorkflowActivity.value.workflow[1].applicationContainerName}`,
+        label: getLabel(workflowInstances[0]?.workflow[1], "Processor"),
       },
       position: { x: 150, y: 250 },
       class: "light",
@@ -145,7 +148,7 @@ onMounted(async () => {
       id: "3",
       type: "output",
       data: {
-        label: `${selectedWorkflowActivity.value.workflow[2].applicationContainerName}`,
+        label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -191,7 +194,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         id: "1",
         type: "input",
         data: {
-          label: `${newVal.workflow[0].applicationContainerName}`,
+          label: getLabel(newVal.workflow[0], "Preprocessor"),
         },
         position: { x: 130, y: 100 },
         class: "light",
@@ -199,7 +202,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       {
         id: "2",
         data: {
-          label: `${newVal.workflow[1].applicationContainerName}`,
+          label: getLabel(newVal.workflow[1], "Processor"),
         },
         position: { x: 150, y: 250 },
         class: "light",
@@ -208,7 +211,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         id: "3",
         type: "output",
         data: {
-          label: `${newVal.workflow[2].applicationContainerName}`,
+          label: getLabel(newVal.workflow[2], "Postprocessor"),
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -238,7 +241,9 @@ function onTogglePanelVisibility() {
 
 <template>
   <div>
-    <div></div>
+    <h2 class="vue-flow-title">
+      {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
+    </h2>
     <div class="graph-browser">
       <div class="vue-flow-wrapper">
         <VueFlow
@@ -350,5 +355,15 @@ function onTogglePanelVisibility() {
       width: 5px;
     }
   }
+  .vue-flow-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+}
+</style>
+<style>
+.vue-flow-title {
+  margin: 20px !important;
 }
 </style>
