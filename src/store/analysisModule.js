@@ -21,7 +21,7 @@ const initialState = () => ({
     fileCount: 0,
     workflowInstances: [],
     workflowInstance: {},
-    selectedWorkflowActivity: []
+    selectedWorkflowActivity: [],
   })
   
   export const state = initialState()
@@ -94,7 +94,6 @@ const initialState = () => ({
       state.workflowLogs= logs
     }, 
     SET_SELECTED_WORKFLOW_ACTIVITY(state, workflow) {
-      console.log('SET_SELECTED_WORKFLOW_ACTIVITY runs with workflow:', workflow)
       state.selectedWorkflowActivity = workflow
     }
 
@@ -370,7 +369,7 @@ const initialState = () => ({
       }
     },
     setSelectedWorkflowActivity: ({ commit, rootState}, workflow) => {
-      console.log('does this run')
+      console.log('setSelectedWorkflowActivity ran', workflow)
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
     },
   }

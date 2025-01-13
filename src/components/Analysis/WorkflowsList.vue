@@ -12,7 +12,7 @@
                 :key="index"
                 :workflow="workflow"
                 :is-active="isActive(workflow)"
-                @click="handleWorkflowClick"
+                @select-workflow="handleWorkflowClick"
               />
             </div>
           </div>
@@ -88,15 +88,12 @@ export default {
       // only return active workflows
       const onlyActiveWorkflows = this.workflowInstances.filter((workflow) => {
         return this.isActive(workflow);
-        // console.log("workflow", workflow);
         // show the workflows with the most recent startedAt timestamp at the top of the list
       });
 
       const sortedActiveWorkflows = onlyActiveWorkflows.sort(
         (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
       );
-
-      console.log(onlyActiveWorkflows);
 
       return sortedActiveWorkflows;
     },
@@ -141,7 +138,7 @@ export default {
       return !workflow.completedAt;
     },
     handleWorkflowClick: function (workflow) {
-      console.log("workflow", workflow);
+      console.log("this workflow was clicked:", workflow);
       this.setSelectedWorkflowActivity(workflow);
     },
   },
