@@ -14,6 +14,7 @@
         <div class="compute-node-name">
           Compute Node UUID: {{ workflow.computeNode.uuid }}
         </div>
+        <div class="compute-node-name">Workflow UUID: {{ workflow.uuid }}</div>
         <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
     </div>
