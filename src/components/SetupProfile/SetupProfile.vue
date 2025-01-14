@@ -270,7 +270,9 @@ export default {
         const user = await signIn({
           username: this.$route.params.username,
           password: this.$route.params.password,
-          authFlowType: config.awsConfig.authenticationFlowType,
+          options: {
+            authFlowType: config.awsConfig.authenticationFlowType,
+          },
         });
 
         this.setupProfile(user);
