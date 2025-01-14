@@ -131,7 +131,7 @@ onMounted(async () => {
       id: "1",
       type: "input",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
+        label: getLabel(workflowInstances[0]?g.workflow[0], "Preprocessor"),
       },
       position: { x: 130, y: 100 },
       class: "light",
