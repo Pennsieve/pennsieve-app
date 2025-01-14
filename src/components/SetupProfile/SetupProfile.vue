@@ -97,9 +97,6 @@
         <router-link class="btn-back-to-sign-in" :to="{ name: 'home' }">
           <bf-button> Back to Sign In </bf-button>
         </router-link>
-        <a class="forgot-password" href="#" @click="onForgotPasswordClick">
-          I forgot my password
-        </a>
       </div>
     </div>
   </div>
@@ -109,8 +106,7 @@
 import { mapState } from "vuex";
 import { propOr } from "ramda";
 
-import {AuthError, signIn, signOut, confirmSignUp } from "aws-amplify/auth";
-
+import { AuthError, signIn, signOut, confirmSignUp } from "aws-amplify/auth";
 
 import BfButton from "../shared/bf-button/BfButton.vue";
 import PasswordValidator from "../../mixins/password-validator";
@@ -221,6 +217,7 @@ export default {
      * Compute API url to createUser on initial setup
      */
     createUserUrl: function () {
+      console.log("createUserUrl", createUserUrl);
       const apiUrl = propOr("", "apiUrl", this.config);
       return `${apiUrl}/account/`;
     },
@@ -247,6 +244,7 @@ export default {
      * @param {Object} evt
      */
     onFormSubmit: function (evt) {
+      console.log("on form submit runs");
       // logic goes here
       evt.preventDefault();
 
@@ -257,6 +255,7 @@ export default {
           }
 
           this.isSavingProfile = true;
+
           this.initialLogin();
         }.bind(this)
       );
@@ -266,15 +265,17 @@ export default {
      * Initial login
      */
     async initialLogin() {
+      console.log("initialLogin happens");
       try {
         const user = await signIn({
           username: this.$route.params.username,
           password: this.$route.params.password,
-          authFlowType: config.awsConfig.authenticationFlowType
-        })
+          authFlowType: config.awsConfig.authenticationFlowType,
+        });
 
         this.setupProfile(user);
       } catch (error) {
+        console.error(error);
         this.isSavingProfile = false;
         this.isUserSignInFailed = true;
         this.hideSignInForm = true;
@@ -286,17 +287,13 @@ export default {
      */
     async setupProfile(user) {
       try {
-
-        const newUser = await confirmSignUp(
-          user,
-          this.profileForm.password,
-          {
-            email: this.$route.query.email,
-          }
-        );
+        const newUser = await confirmSignUp(user, this.profileForm.password, {
+          email: this.$route.query.email,
+        });
 
         this.createUser(newUser.signInUserSession.accessToken.jwtToken);
       } catch (error) {
+        console.error(error);
         this.handleFailedUserCreation();
       }
     },

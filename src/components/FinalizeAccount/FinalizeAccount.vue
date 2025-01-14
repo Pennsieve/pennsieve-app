@@ -337,29 +337,6 @@ export default {
         },
       });
     },
-
-    /**
-     * Submit forgot password request and take user to the forgot password page
-     */
-    onForgotPasswordClick: function () {
-      // Auth.forgotPassword(this.$route.params.username)
-      //   .then(() => {
-      //     EventBus.$emit('toast', {
-      //     detail: {
-      //       type: 'message',
-      //       msg: 'Reset password email sent'
-      //     }
-      //   })
-      //   })
-      //   .catch(error => {
-      //     EventBus.$emit('toast', {
-      //     detail: {
-      //       type: 'error',
-      //       msg: error.message
-      //     }
-      //   })
-      //   })
-    },
   },
 };
 </script>
