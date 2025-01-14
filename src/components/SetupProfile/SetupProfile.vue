@@ -266,6 +266,17 @@ export default {
      */
     async initialLogin() {
       console.log("initialLogin happens");
+
+      // Sign out user in case the user was already signed in.
+      try {
+        await signOut();
+      } catch (error) {
+        console.error(error);
+      }
+
+      console.log("username", this.$route.params.username);
+      console.log("password", this.$route.params.password);
+
       try {
         const user = await signIn({
           username: this.$route.params.username,
@@ -288,15 +299,35 @@ export default {
      * API Request to create a new user
      */
     async setupProfile(user) {
+      console.log(user);
       try {
-        const newUser = await confirmSignUp(user, this.profileForm.password, {
-          email: this.$route.query.email,
+        const newUser = await confirmSignUp({
+          username: this.$route.params.username,
+          confirmationCode: this.profileForm.password,
         });
-
-        this.createUser(newUser.signInUserSession.accessToken.jwtToken);
+        handleLoginSuccess(newUser);
       } catch (error) {
         console.error(error);
         this.handleFailedUserCreation();
+      }
+    },
+
+    /**
+     * Handle a successful login: set vuex state
+     * and cookies, close login dialog
+     */
+    async handleLoginSuccess(user) {
+      console.log("Logged IN");
+
+      switch (user.nextStep.signInStep) {
+        // ...
+        case "CONTINUE_SIGN_IN_WITH_TOTP_SETUP":
+          // Open setupUri with an authenticator APP to retrieve an OTP code
+          break;
+        // ...
+        case "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED":
+          this.createUser(user.signInUserSession.accessToken.jwtToken);
+          break;
       }
     },
 
