@@ -98,10 +98,9 @@
       </h2>
       <p>
         We were unable to set up a new profile. If you already have set up your
-        profile and forgot your password, please select “I forgot my password”
-        to receive an email to reset your password.
+        profile and forgot your password, please go back to sign-in and select
+        "Forgot Password" to reset your password.
       </p>
-      <p>Please contact Pennsieve support otherwise.</p>
       <div class="user-already-created-wrap">
         <router-link class="btn-back-to-sign-in" :to="{ name: 'home' }">
           <bf-button> Back to Sign In </bf-button>
