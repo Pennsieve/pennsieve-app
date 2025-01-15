@@ -275,7 +275,6 @@ export default {
      * Initial login
      */
     async initialLogin() {
-      console.log("initialLogin");
       try {
         const result = await signIn({
           username: this.$route.params.username,
@@ -284,8 +283,6 @@ export default {
             authFlowType: config.awsConfig.authenticationFlowType,
           },
         });
-
-        console.log("result", result);
 
         this.setupProfile(result);
       } catch (error) {
@@ -300,14 +297,11 @@ export default {
      * API Request to create a new user
      */
     async setupProfile(result) {
-      console.log("result in setupProfile", result);
       //updatePassword
       try {
         const newUser = await confirmSignIn({
           challengeResponse: this.profileForm.password,
         });
-
-        // console.log("newUser", newUser);
 
         this.createUser(newUser);
       } catch (error) {
@@ -340,7 +334,6 @@ export default {
         this.handleCreateUserSuccess(response);
       } catch (error) {
         console.error(error);
-        // this.handleFailedUserCreation(error);
       }
     },
 
@@ -361,15 +354,6 @@ export default {
       const orgId = response.orgIds[0];
       const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${orgId}`;
 
-      // try {
-      //   await updatePassword({
-      //     newPassword: this.profileForm.password,
-      //     oldPassword: this.$route.params.password,
-      //   });
-      // } catch (error) {
-      //   console.error(error);
-      // }
-
       this.sendXhr(switchOrgUrl, {
         method: "PUT",
         header: {
@@ -382,7 +366,6 @@ export default {
         })
         .catch((error) => {
           console.error(error);
-          // this.handleFailedUserCreation(error);
         });
     },
 
