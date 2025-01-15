@@ -278,7 +278,7 @@ export default {
       };
 
       this.createIntegration(integrationDTO).then((response) => {
-        console.log("response", reponse);
+        console.log("response", response);
         let detailPopup = this.$refs.apiKeyDetails;
         detailPopup.apiKey = {
           key: response.tokenSecret.key,
