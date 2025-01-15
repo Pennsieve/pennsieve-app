@@ -114,7 +114,7 @@ export const actions = {
   
       const integration = await response.json();
       commit('CREATE_INTEGRATION', integration);
-      return Promise.resolve(integration);
+      return integration;
     } catch (err) {
       console.error('Error in createIntegration:', err);
       return Promise.reject(err);
