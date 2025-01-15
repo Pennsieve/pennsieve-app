@@ -275,6 +275,7 @@ export default {
      */
     async initialLogin() {
       try {
+        await signOut();
         const result = await signIn({
           username: this.$route.params.username,
           password: this.$route.params.password,
