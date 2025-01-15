@@ -109,8 +109,7 @@
 import { mapState } from "vuex";
 import { propOr } from "ramda";
 
-import {AuthError, signIn, signOut, confirmSignUp } from "aws-amplify/auth";
-
+import { AuthError, signIn, signOut, confirmSignUp } from "aws-amplify/auth";
 
 import BfButton from "../shared/bf-button/BfButton.vue";
 import PasswordValidator from "../../mixins/password-validator";
@@ -270,8 +269,10 @@ export default {
         const user = await signIn({
           username: this.$route.params.username,
           password: this.$route.params.password,
-          authFlowType: config.awsConfig.authenticationFlowType
-        })
+          options: {
+            authFlowType: config.awsConfig.authenticationFlowType,
+          },
+        });
 
         this.setupProfile(user);
       } catch (error) {
@@ -286,18 +287,18 @@ export default {
      */
     async setupProfile(user) {
       try {
+        // const newUser = await confirmSignUp(user, this.profileForm.password, {
+        //   username: this.$route.params.username,
+        //   email: this.$route.query.email,
+        // });
 
-        const newUser = await confirmSignUp(
-          user,
-          this.profileForm.password,
-          {
-            email: this.$route.query.email,
-          }
-        );
+        // console.log("newUser", newUser);
 
-        this.createUser(newUser.signInUserSession.accessToken.jwtToken);
+        this.createUser(user);
       } catch (error) {
-        this.handleFailedUserCreation();
+        console.error(error);
+
+        // this.handleFailedUserCreation();
       }
     },
 
@@ -323,7 +324,8 @@ export default {
         });
         this.handleCreateUserSuccess(user, jwt);
       } catch (error) {
-        this.handleFailedUserCreation();
+        console.error(error);
+        // this.handleFailedUserCreation(error);
       }
     },
 
@@ -355,7 +357,7 @@ export default {
         })
         .catch((error) => {
           console.error(error);
-          this.handleFailedUserCreation(this);
+          // this.handleFailedUserCreation(error);
         });
     },
 
