@@ -227,7 +227,6 @@ export default {
      * Compute API url to createUser on initial setup
      */
     createUserUrl: function () {
-      console.log("createUserUrl", createUserUrl);
       const apiUrl = propOr("", "apiUrl", this.config);
       return `${apiUrl}/account/`;
     },
