@@ -1,10 +1,6 @@
 <template>
   <div>
-    <div
-      v-if="isActive"
-      class="box green-box"
-      @click="$emit('select-workflow', workflow)"
-    >
+    <div v-if="isActive" class="box green-box" @click="$emit('select-workflow', workflow)">
       <IconWaitingCircle class="icon" />
       <div class="text">
         <div class="workflow-name">
@@ -16,6 +12,13 @@
         </div>
         <div class="compute-node-name">Workflow UUID: {{ workflow.uuid }}</div>
         <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
+      </div>
+      <div>
+        <el-button size="medium">
+          <el-icon >
+            <CircleClose />
+          </el-icon>
+        </el-button>
       </div>
     </div>
 
@@ -35,14 +38,17 @@
 </template>
 
 <script>
-import { defineEmits } from "vue";
-import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
+import { CircleClose } from '@element-plus/icons-vue'
 
 export default {
   name: "WorkflowsListItem",
+
+  components: {
+    CircleClose
+  },
 
   props: {
     workflow: {
@@ -84,9 +90,12 @@ export default {
   color: #000;
   background-color: #fff;
   width: 425px;
+
+  button {
+    font-size: 26px;
+  }
 }
 
-/* Style for the icon (circle or X) */
 .icon {
   display: flex;
   align-items: center;
@@ -120,19 +129,6 @@ export default {
   font-weight: bold;
 }
 
-/* Red X box styles */
-.box.red-x {
-  border-color: #c14d49; /* Red border */
-}
-
-.box.red-x .icon {
-  background-color: #fff;
-  color: #c14d49; /* Red icon color */
-  font-weight: bold; /* Make the 'X' stand out */
-  border: none; /* No border for the 'X' */
-}
-
-/* Text styles (Optional, if further customization is needed) */
 .text {
   display: flex;
   flex-direction: column;
@@ -144,7 +140,7 @@ export default {
 
 .text .compute-node-name {
   font-style: italic;
-  color: #666; /* Gray text */
+  color: #666;
 }
 
 .concepts-list-item {
