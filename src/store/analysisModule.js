@@ -139,6 +139,7 @@ const initialState = () => ({
   
         if (resp.ok) {
           const result = await resp.json()
+          console.log('result', result)
           commit('UPDATE_APPLICATIONS', result)
           const preprocessors = result.filter(application => application.applicationType === 'preprocessor')
           const processors = result.filter(application => application.applicationType === 'processor')
@@ -322,7 +323,7 @@ const initialState = () => ({
       }
     },
     fetchWorkflowLogs: async({commit, rootState }, workflow) => {
-      console.log('fetchWorkflowLogs workflow:', workflow)
+
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
       let computeNodeUrl;
@@ -348,7 +349,6 @@ const initialState = () => ({
 
       try {
         const url = `${computeNodeUrl}logs?integrationId=${integrationId}`
-        console.log('url',url)
 
         const resp = await fetch(url, {
           method: 'GET',
@@ -369,7 +369,6 @@ const initialState = () => ({
       }
     },
     setSelectedWorkflowActivity: ({ commit, rootState}, workflow) => {
-      console.log('setSelectedWorkflowActivity ran', workflow)
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
     },
   }

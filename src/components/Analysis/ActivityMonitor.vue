@@ -124,8 +124,6 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  console.log("***", selectedWorkflowActivity.value);
-
   nodes.value = [
     {
       id: "1",
@@ -154,8 +152,6 @@ onMounted(async () => {
       class: "light",
     },
   ];
-
-  console.log("selectedWorkflowActivity.value", selectedWorkflowActivity.value);
 
   // fetch one workflow instance
   // try {
@@ -186,8 +182,6 @@ onMounted(async () => {
 });
 
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
-  console.log("selectedWorkflowActivity changed:", newVal);
-
   if (newVal) {
     nodes.value = [
       {

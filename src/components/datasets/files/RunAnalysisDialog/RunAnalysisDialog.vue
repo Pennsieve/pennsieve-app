@@ -216,8 +216,8 @@ export default {
       this.formatComputeNodeOptions();
     },
     selectedComputeNode: function () {
-      this.formatProcessorOptions();
       this.formatPreprocessorOptions();
+      this.formatProcessorOptions();
       this.formatPostprocessorOptions();
     },
   },
@@ -444,10 +444,13 @@ export default {
      * Access processors from global state and format options for input select
      */
     formatProcessorOptions: function () {
+      console.log("this.processors", this.processors);
       const filteredProcessors = this.processors.filter(
         (processor) =>
           this.selectedComputeNode.uuid === processor.computeNode.uuid
       );
+
+      console.log("filtedProcessors", filteredProcessors);
       this.processorOptions = filteredProcessors.map((processor) => {
         return {
           value: processor.name,
