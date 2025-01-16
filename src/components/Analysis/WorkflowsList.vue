@@ -138,7 +138,6 @@ export default {
       return !workflow.completedAt;
     },
     handleWorkflowClick: function (workflow) {
-      console.log("this workflow was clicked:", workflow);
       this.setSelectedWorkflowActivity(workflow);
     },
   },

@@ -1,6 +1,10 @@
 <template>
   <div class="workflows-list-item-wrapper">
-    <div v-if="isActive" class="box green-box" @click="$emit('select-workflow', workflow)">
+    <div
+      v-if="isActive"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
       <IconWaitingCircle class="icon" />
       <div class="text">
         <div class="workflow-name">
@@ -44,7 +48,7 @@ import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
 import { CircleClose } from '@element-plus/icons-vue'
-import { mapMutations } from 'vuex';
+import { mapState, mapActions, mapMutations } from "vuex";
 
 export default {
   name: "WorkflowsListItem",
@@ -70,7 +74,35 @@ export default {
     return {};
   },
 
-  computed: {},
+  computed: {
+    ...mapState("analysisModule", ["selectedWorkflowActivity"]),
+    computedClass: function () {
+      // const workflow = this.workflow ? this.workflow.uuid : null;
+      // console.log("workflow UUID:", workflow);
+      // const selectedWorkflow = this.selectedWorkflowActivity
+      //   ? this.selectedWorkflowActivity.uuid
+      //   : null;
+      // console.log("selected UUID:", selectedWorkflow);
+      // const comparison = null;
+      // console.log("Comparison result:", comparison);
+
+      if (false) {
+        return "box isSelected green-box";
+      } else {
+        return "box green-box";
+      }
+    },
+  },
+
+  watch: {
+    /**
+     * Reset the component
+     */
+    selectedWorkflowActivity: function (val) {
+      if (val) {
+      }
+    },
+  },
 
   methods: {
     ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' }),
