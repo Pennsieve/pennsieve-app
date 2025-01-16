@@ -37,6 +37,17 @@ const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
 
+const cancelWorkflowDialogVisible = computed(() => store.state.analysisModule.cancelWorkflowDialogVisible)
+
+const hideCancelWorkflowDialog = () => {
+  store.commit('analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG')
+}
+
+const cancelWorkflow = () => {
+  store.dispatch('analaysisModule/cancelWorkflow',selectedWorkflowActivity?.uuid)
+  hideCancelWorkflowDialog();
+}
+
 // Local State
 const isLoading = ref(false);
 
@@ -249,7 +260,7 @@ function onNodeClick({event, node}) {
 </script>
 
 <template>
-  <div>
+  <div class="activity-monitor">
     <h2 class="vue-flow-title">
       {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
     </h2>
@@ -272,11 +283,19 @@ function onNodeClick({event, node}) {
         </VueFlow>
       </div>
 
-      <ActivitySidePanel
-        :class="{ visible: sidePanelVisible }"
-        :panel-visible="sidePanelVisible"
-        @toggle-panel-visibility="onTogglePanelVisibility"
-      />
+      <ActivitySidePanel :class="{ visible: sidePanelVisible }" :panel-visible="sidePanelVisible"
+        @toggle-panel-visibility="onTogglePanelVisibility" />
+      <el-dialog v-model="cancelWorkflowDialogVisible" title="Cancel Workflow" width="500" center @close="hideCancelWorkflowDialog">
+        <span>
+          Would you like to cancel this workflow: {{ selectedWorkflowActivity?.uuid }} ?
+        </span>
+        <template #footer>
+          <div class="dialog-footer">
+            <bf-button class="secondary"  @click="hideCancelWorkflowDialog">No</bf-button>
+            <bf-button @click="cancelWorkflow">Yes</bf-button>
+          </div>
+        </template>
+      </el-dialog>
     </div>
   </div>
   <ActivityLogs 
@@ -378,8 +397,19 @@ function onNodeClick({event, node}) {
   }
 }
 </style>
-<style>
+<style lang="scss">
 .vue-flow-title {
   margin: 20px !important;
+}
+
+.activity-monitor {
+  .el-dialog__title {
+    color: #ffffff;
+    font-weight: 500;
+  }
+
+  span {
+    color: #4d628c;
+  }
 }
 </style>
