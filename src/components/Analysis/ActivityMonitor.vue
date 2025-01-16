@@ -395,11 +395,5 @@ function onTogglePanelVisibility() {
   span {
     color: #4d628c;
   }
-
-  .dialog-button {
-    border: solid 1px #4d628c;
-    border-radius: 5px;
-    ;
-  }
 }
 </style>
