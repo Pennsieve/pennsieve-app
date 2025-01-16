@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="workflows-list-item-wrapper">
     <div
       v-if="isActive"
       :class="computedClass"
@@ -17,9 +17,18 @@
         <div class="compute-node-name">Workflow UUID: {{ workflow.uuid }}</div>
         <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
+      <div>
+        <el-tooltip class="box-item" effect="dark" content="Cancel this workflow" placement="top-start">
+          <el-button size="medium" @click="showCancelWorkflowDialog">
+            <el-icon>
+              <CircleClose />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
+      </div>
     </div>
 
-    <div v-if="!isActive" class="box gray-circle">
+    <div v-if="!isActive" class="box gray-box">
       <IconCheck class="icon" />
       <div class="text">
         <div class="workflow-name">
@@ -35,15 +44,18 @@
 </template>
 
 <script>
-import { defineEmits } from "vue";
-import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
-import { mapState, mapActions } from "vuex";
+import { CircleClose } from '@element-plus/icons-vue'
+import { mapState, mapActions, mapMutations } from "vuex";
 
 export default {
   name: "WorkflowsListItem",
+
+  components: {
+    CircleClose
+  },
 
   props: {
     workflow: {
@@ -75,9 +87,9 @@ export default {
       // console.log("Comparison result:", comparison);
 
       if (false) {
-        return "box isSelected green-circle";
+        return "box isSelected green-box";
       } else {
-        return "box green-circle";
+        return "box green-box";
       }
     },
   },
@@ -92,7 +104,9 @@ export default {
     },
   },
 
-  methods: {},
+  methods: {
+    ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' }),
+  },
 };
 </script>
 
@@ -113,13 +127,12 @@ export default {
   color: #000;
   background-color: #fff;
   width: 425px;
+
+  button {
+    font-size: 26px;
+  }
 }
 
-.isSelected {
-  border: 3px solid #ccc;
-}
-
-/* Style for the icon (circle or X) */
 .icon {
   display: flex;
   align-items: center;
@@ -131,43 +144,28 @@ export default {
   font-size: 26px;
 }
 
-/* Green circle box styles */
-.box.green-circle {
+.box.green-box {
   border-color: #14a758;
 }
 
-.box.green-circle .icon {
+.box.green-box .icon {
   background-color: #fff;
   color: #14a758;
   box-sizing: border-box;
   font-weight: bold;
 }
 
-/* Gray circle box styles */
-.box.gray-circle {
+.box.gray-box {
   border-color: $gray_4;
 }
 
-.box.gray-circle .icon {
+.box.gray-box .icon {
   background-color: #fff;
   color: $gray_4;
   box-sizing: border-box;
   font-weight: bold;
 }
 
-/* Red X box styles */
-.box.red-x {
-  border-color: #c14d49; /* Red border */
-}
-
-.box.red-x .icon {
-  background-color: #fff;
-  color: #c14d49; /* Red icon color */
-  font-weight: bold; /* Make the 'X' stand out */
-  border: none; /* No border for the 'X' */
-}
-
-/* Text styles (Optional, if further customization is needed) */
 .text {
   display: flex;
   flex-direction: column;
@@ -179,7 +177,7 @@ export default {
 
 .text .compute-node-name {
   font-style: italic;
-  color: #666; /* Gray text */
+  color: #666;
 }
 
 .concepts-list-item {
@@ -191,14 +189,20 @@ export default {
     color: $gray_6;
   }
 }
+
 .model-name {
   overflow: hidden;
+
   span {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+.workflows-list-item-wrapper .green-box {
+  cursor: pointer;
 }
 </style>
 <style>
