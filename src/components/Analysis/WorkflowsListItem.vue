@@ -14,18 +14,13 @@
         <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
       <div>
-        <el-tooltip
-        class="box-item"
-        effect="dark"
-        content="Cancel this workflow"
-        placement="top-start"
-      >
-        <el-button size="medium" @click="showCancelWorkflowDialog">
-          <el-icon >
-            <CircleClose />
-          </el-icon>
-        </el-button>
-      </el-tooltip>
+        <el-tooltip class="box-item" effect="dark" content="Cancel this workflow" placement="top-start">
+          <el-button size="medium" @click="showCancelWorkflowDialog">
+            <el-icon>
+              <CircleClose />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
       </div>
     </div>
 
@@ -78,7 +73,7 @@ export default {
   computed: {},
 
   methods: {
-    ...mapMutations('analysisModule', { showCancelWorkflowDialog : 'SHOW_CANCEL_WORKFLOW_DIALOG'})
+    ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' })
   },
 };
 </script>
@@ -162,8 +157,10 @@ export default {
     color: $gray_6;
   }
 }
+
 .model-name {
   overflow: hidden;
+
   span {
     display: block;
     overflow: hidden;
