@@ -42,12 +42,8 @@ const hideCancelWorkflowDialog = () => {
   store.commit('analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG')
 }
 
-const acceptDialog = () => {
+const cancelWorkflow = () => {
   store.dispatch('analaysisModule/cancelWorkflow',selectedWorkflowActivity?.uuid)
-  hideCancelWorkflowDialog();
-}
-
-const rejectDialog = () => {
   hideCancelWorkflowDialog();
 }
 
@@ -285,10 +281,8 @@ function onTogglePanelVisibility() {
         </span>
         <template #footer>
           <div class="dialog-footer">
-            <el-button class="dialog-button" @click="rejectDialog">No</el-button>
-            <el-button class="dialog-button" @click="acceptDialog">
-              Yes
-            </el-button>
+            <bf-button class="secondary"  @click="hideCancelWorkflowDialog">No</bf-button>
+            <bf-button @click="cancelWorkflow">Yes</bf-button>
           </div>
         </template>
       </el-dialog>
