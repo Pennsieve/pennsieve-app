@@ -36,6 +36,12 @@ const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
 
+const cancelWorkflowDialogVisible = computed(() => store.state.analysisModule.cancelWorkflowDialogVisible)
+
+const hideCancelWorkflowDialog = () => {
+  store.commit('analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG')
+}
+
 // Local State
 const isLoading = ref(false);
 
@@ -240,7 +246,7 @@ function onTogglePanelVisibility() {
 </script>
 
 <template>
-  <div>
+  <div class="activity-monitor">
     <h2 class="vue-flow-title">
       {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
     </h2>
@@ -262,11 +268,21 @@ function onTogglePanelVisibility() {
         </VueFlow>
       </div>
 
-      <ActivitySidePanel
-        :class="{ visible: sidePanelVisible }"
-        :panel-visible="sidePanelVisible"
-        @toggle-panel-visibility="onTogglePanelVisibility"
-      />
+      <ActivitySidePanel :class="{ visible: sidePanelVisible }" :panel-visible="sidePanelVisible"
+        @toggle-panel-visibility="onTogglePanelVisibility" />
+      <el-dialog v-model="cancelWorkflowDialogVisible" title="Cancel Workflow" width="500" center @close="hideCancelWorkflowDialog">
+        <span>
+          Would you like to cancel this workflow?
+        </span>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button class="dialog-button" @click="hideCancelWorkflowDialog">No</el-button>
+            <el-button class="dialog-button" @click="hideCancelWorkflowDialog">
+              Yes
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -362,8 +378,25 @@ function onTogglePanelVisibility() {
   }
 }
 </style>
-<style>
+<style lang="scss">
 .vue-flow-title {
   margin: 20px !important;
+}
+
+.activity-monitor {
+  .el-dialog__title {
+    color: #ffffff;
+    font-weight: 500;
+  }
+
+  span {
+    color: #4d628c;
+  }
+
+  .dialog-button {
+    border: solid 1px #4d628c;
+    border-radius: 5px;
+    ;
+  }
 }
 </style>

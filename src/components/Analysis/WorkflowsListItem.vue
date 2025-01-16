@@ -14,11 +14,18 @@
         <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
       </div>
       <div>
-        <el-button size="medium">
+        <el-tooltip
+        class="box-item"
+        effect="dark"
+        content="Cancel this workflow"
+        placement="top-start"
+      >
+        <el-button size="medium" @click="showCancelWorkflowDialog">
           <el-icon >
             <CircleClose />
           </el-icon>
         </el-button>
+      </el-tooltip>
       </div>
     </div>
 
@@ -42,6 +49,7 @@ import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
 import { CircleClose } from '@element-plus/icons-vue'
+import { mapMutations } from 'vuex';
 
 export default {
   name: "WorkflowsListItem",
@@ -69,7 +77,9 @@ export default {
 
   computed: {},
 
-  methods: {},
+  methods: {
+    ...mapMutations('analysisModule', { showCancelWorkflowDialog : 'SHOW_CANCEL_WORKFLOW_DIALOG'})
+  },
 };
 </script>
 

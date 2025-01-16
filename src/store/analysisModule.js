@@ -22,6 +22,7 @@ const initialState = () => ({
     workflowInstances: [],
     workflowInstance: {},
     selectedWorkflowActivity: [],
+    cancelWorkflowDialogVisible: false,
   })
   
   export const state = initialState()
@@ -95,8 +96,13 @@ const initialState = () => ({
     }, 
     SET_SELECTED_WORKFLOW_ACTIVITY(state, workflow) {
       state.selectedWorkflowActivity = workflow
-    }
-
+    },
+    SHOW_CANCEL_WORKFLOW_DIALOG(state) {
+      state.cancelWorkflowDialogVisible = true
+    },
+    HIDE_CANCEL_WORKFLOW_DIALOG(state) {
+      state.cancelWorkflowDialogVisible = false
+    },
   }
 
   export const actions = {
