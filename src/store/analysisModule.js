@@ -129,7 +129,7 @@ const initialState = () => ({
         const userToken = await useGetToken()
 
         const url = `${rootState.config.api2Url}/applications`;
-  
+        console.log(url)
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
@@ -322,33 +322,14 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    fetchWorkflowLogs: async({commit, rootState }, workflow) => {
-
+    fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
+      console.log('fetchWorkflowLogs workflow:', workflow)
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
-      let computeNodeUrl;
-      // Fetch Compute Node URL 
+      const applicationId = application.uuid;
+      // Fetch application logs
       try {
-        const url = `${rootState.config.api2Url}/compute-nodes/${workflow.computeNode.uuid}`;
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
-
-        if (resp.ok) {
-          const result = await resp.json()
-          computeNodeUrl = result.computeNodeGatewayUrl
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          return Promise.reject(err)
-      } 
-
-      try {
-        const url = `${computeNodeUrl}logs?integrationId=${integrationId}`
+        const url = `${rootState.config.api2Url}/workflows/instances/${integrationId}/logs?applicationUuid=${applicationId}`;
 
         const resp = await fetch(url, {
           method: 'GET',
@@ -359,12 +340,12 @@ const initialState = () => ({
 
         if (resp.ok) {
           const result = await resp.json()
-          commit('SET_WORKFLOW_INSTANCE', result)
+          commit('SET_WORKFLOW_LOGS', result.messages)
         } else {
           return Promise.reject(resp)
         }
       } catch (err) {
-          commit('SET_WORKFLOW_INSTANCE', [])
+          commit('SET_WORKFLOW_LOGS', [])
           return Promise.reject(err)
       }
     },
