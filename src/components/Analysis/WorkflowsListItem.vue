@@ -2,7 +2,7 @@
   <div>
     <div
       v-if="isActive"
-      class="box green-circle"
+      class="box green-box"
       @click="$emit('select-workflow', workflow)"
     >
       <IconWaitingCircle class="icon" />
@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <div v-if="!isActive" class="box gray-circle">
+    <div v-if="!isActive" class="box gray-box">
       <IconCheck class="icon" />
       <div class="text">
         <div class="workflow-name">
@@ -98,24 +98,22 @@ export default {
   font-size: 26px;
 }
 
-/* Green circle box styles */
-.box.green-circle {
+.box.green-box {
   border-color: #14a758;
 }
 
-.box.green-circle .icon {
+.box.green-box .icon {
   background-color: #fff;
   color: #14a758;
   box-sizing: border-box;
   font-weight: bold;
 }
 
-/* Gray circle box styles */
-.box.gray-circle {
+.box.gray-box {
   border-color: $gray_4;
 }
 
-.box.gray-circle .icon {
+.box.gray-box .icon {
   background-color: #fff;
   color: $gray_4;
   box-sizing: border-box;
