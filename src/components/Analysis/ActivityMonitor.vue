@@ -42,6 +42,15 @@ const hideCancelWorkflowDialog = () => {
   store.commit('analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG')
 }
 
+const acceptDialog = () => {
+  store.dispatch('analaysisModule/cancelWorkflow',selectedWorkflowActivity?.uuid)
+  hideCancelWorkflowDialog();
+}
+
+const rejectDialog = () => {
+  hideCancelWorkflowDialog();
+}
+
 // Local State
 const isLoading = ref(false);
 
@@ -272,12 +281,12 @@ function onTogglePanelVisibility() {
         @toggle-panel-visibility="onTogglePanelVisibility" />
       <el-dialog v-model="cancelWorkflowDialogVisible" title="Cancel Workflow" width="500" center @close="hideCancelWorkflowDialog">
         <span>
-          Would you like to cancel this workflow?
+          Would you like to cancel this workflow: {{ selectedWorkflowActivity?.uuid }} ?
         </span>
         <template #footer>
           <div class="dialog-footer">
-            <el-button class="dialog-button" @click="hideCancelWorkflowDialog">No</el-button>
-            <el-button class="dialog-button" @click="hideCancelWorkflowDialog">
+            <el-button class="dialog-button" @click="rejectDialog">No</el-button>
+            <el-button class="dialog-button" @click="acceptDialog">
               Yes
             </el-button>
           </div>

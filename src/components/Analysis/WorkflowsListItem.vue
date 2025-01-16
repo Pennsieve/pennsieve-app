@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="workflows-list-item-wrapper">
     <div v-if="isActive" class="box green-box" @click="$emit('select-workflow', workflow)">
       <IconWaitingCircle class="icon" />
       <div class="text">
@@ -73,7 +73,7 @@ export default {
   computed: {},
 
   methods: {
-    ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' })
+    ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' }),
   },
 };
 </script>
@@ -167,6 +167,10 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+.workflows-list-item-wrapper .green-box {
+  cursor: pointer;
 }
 </style>
 <style>

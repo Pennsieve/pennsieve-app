@@ -378,6 +378,9 @@ const initialState = () => ({
       console.log('setSelectedWorkflowActivity ran', workflow)
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
     },
+    cancelWorkflow: ({commit}, workflowId) => {
+      // make API request to cancel workflow
+    }
   }
   
   export const getters = {
