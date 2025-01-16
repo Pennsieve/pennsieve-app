@@ -129,7 +129,6 @@ const initialState = () => ({
         const userToken = await useGetToken()
 
         const url = `${rootState.config.api2Url}/applications`;
-        console.log(url)
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
@@ -139,7 +138,6 @@ const initialState = () => ({
   
         if (resp.ok) {
           const result = await resp.json()
-          console.log('result', result)
           commit('UPDATE_APPLICATIONS', result)
           const preprocessors = result.filter(application => application.applicationType === 'preprocessor')
           const processors = result.filter(application => application.applicationType === 'processor')
@@ -323,7 +321,6 @@ const initialState = () => ({
       }
     },
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
-      console.log('fetchWorkflowLogs workflow:', workflow)
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
       const applicationId = application.uuid;
