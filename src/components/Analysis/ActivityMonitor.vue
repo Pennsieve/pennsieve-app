@@ -10,6 +10,7 @@ import { MiniMap } from "@vue-flow/minimap";
 import { useLayout } from "../datasets/records/GraphBrowser/useLayout";
 import { useRoute } from "vue-router";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
+import ActivityLogs from "./ActivityLogs.vue";
 
 const route = useRoute();
 const { layout } = useLayout();
@@ -124,8 +125,6 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  console.log("***", selectedWorkflowActivity.value);
-
   nodes.value = [
     {
       id: "1",
@@ -154,8 +153,6 @@ onMounted(async () => {
       class: "light",
     },
   ];
-
-  console.log("selectedWorkflowActivity.value", selectedWorkflowActivity.value);
 
   // fetch one workflow instance
   // try {
@@ -186,8 +183,6 @@ onMounted(async () => {
 });
 
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
-  console.log("selectedWorkflowActivity changed:", newVal);
-
   if (newVal) {
     nodes.value = [
       {
@@ -237,6 +232,20 @@ const sidePanelVisible = ref(true);
 function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
+
+/*
+Event Handler for Node Click
+ */
+const selectedNode = ref({})
+const activityLogsVisible = ref(false);
+function onNodeClick({event, node}) {
+  const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
+  if(selectedAppliction){
+    selectedNode.value = selectedAppliction;
+    activityLogsVisible.value = true;
+  }
+}
+
 </script>
 
 <template>
@@ -253,6 +262,7 @@ function onTogglePanelVisibility() {
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
+          @node-click="onNodeClick"
         >
           <Background pattern-color="#aaa" :gap="16" />
 
@@ -269,6 +279,12 @@ function onTogglePanelVisibility() {
       />
     </div>
   </div>
+  <ActivityLogs 
+    :dialog-visible="activityLogsVisible"
+    :selected-node="selectedNode"
+    :selected-application="selectedWorkflowActivity"
+    @close-dialog="activityLogsVisible=false"
+  ></ActivityLogs>
 </template>
 
 <style lang="sass">

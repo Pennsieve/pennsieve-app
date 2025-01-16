@@ -2,7 +2,7 @@
   <div>
     <div
       v-if="isActive"
-      class="box green-circle"
+      :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
       <IconWaitingCircle class="icon" />
@@ -40,6 +40,7 @@ import IconRemove from "../icons/IconRemove.vue";
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
+import { mapState, mapActions } from "vuex";
 
 export default {
   name: "WorkflowsListItem",
@@ -61,7 +62,35 @@ export default {
     return {};
   },
 
-  computed: {},
+  computed: {
+    ...mapState("analysisModule", ["selectedWorkflowActivity"]),
+    computedClass: function () {
+      // const workflow = this.workflow ? this.workflow.uuid : null;
+      // console.log("workflow UUID:", workflow);
+      // const selectedWorkflow = this.selectedWorkflowActivity
+      //   ? this.selectedWorkflowActivity.uuid
+      //   : null;
+      // console.log("selected UUID:", selectedWorkflow);
+      // const comparison = null;
+      // console.log("Comparison result:", comparison);
+
+      if (false) {
+        return "box isSelected green-circle";
+      } else {
+        return "box green-circle";
+      }
+    },
+  },
+
+  watch: {
+    /**
+     * Reset the component
+     */
+    selectedWorkflowActivity: function (val) {
+      if (val) {
+      }
+    },
+  },
 
   methods: {},
 };
@@ -84,6 +113,10 @@ export default {
   color: #000;
   background-color: #fff;
   width: 425px;
+}
+
+.isSelected {
+  border: 3px solid #ccc;
 }
 
 /* Style for the icon (circle or X) */

@@ -7,7 +7,12 @@
   &.fixed-width {
     width: 540px
   }
-
+  &.large-dialog{
+    width: 80%;
+    height: 80%;
+    margin:auto;
+    margin-top:5%;
+  }
   &.light-header {
     .el-dialog__header {
       background: $white;
