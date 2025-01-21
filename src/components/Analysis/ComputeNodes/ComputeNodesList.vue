@@ -25,7 +25,7 @@
     </bf-empty-page-state>
     <template #actions>
       <bf-button
-        :disabled="!hasAdminRight && !isFeatureFlagEnabled"
+        :disabled="!isFeatureFlagEnabled || !hasAdminRights"
         @click="openCreateComputeNodeDialog"
       >
         Create Compute Node
@@ -140,14 +140,6 @@ export default {
       "fetchComputeNodes",
       "fetchComputeResourceAccounts",
     ]),
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
 
     openCreateComputeNodeDialog: function () {
       this.createComputeNodeDialogVisible = true;
