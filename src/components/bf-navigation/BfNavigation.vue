@@ -430,14 +430,6 @@ export default {
         this.activeOrganization
       );
     },
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl) ||
-        isEnabledForImmuneHealth(orgId)
-      );
-    },
   },
 
   methods: {
