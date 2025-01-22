@@ -19,14 +19,6 @@ const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"]
 );
 
-const workflowInstance = computed(
-  () => store.getters["analysisModule/workflowInstance"]
-);
-
-const workflowLogs = computed(
-  () => store.getters["analysisModule/workflowLogs"]
-);
-
 const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
@@ -110,24 +102,14 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  const isActive = function (workflow) {
-    // if the workflow does not contain a completedAt property, it is active
-    return !workflow.completedAt;
-  };
-
-  const onlyActiveWorkflows = workflowInstances.value.filter((workflow) => {
-    return isActive(workflow);
-    // show the workflows with the most recent startedAt timestamp at the top of the list
-  });
-
-  const sortedActiveWorkflows = onlyActiveWorkflows.sort(
+  const sortedWorkflows = workflowInstances.value.sort(
     (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
   );
 
   try {
     await store.dispatch(
       "analysisModule/setSelectedWorkflowActivity",
-      sortedActiveWorkflows[0]
+      sortedWorkflows[0]
     );
   } catch (err) {
     console.error(err);
@@ -140,7 +122,7 @@ onMounted(async () => {
       id: "1",
       type: "input",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
+        label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
       },
       position: { x: 130, y: 100 },
       class: "light",
@@ -148,7 +130,7 @@ onMounted(async () => {
     {
       id: "2",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[1], "Processor"),
+        label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
       },
       position: { x: 150, y: 250 },
       class: "light",
@@ -157,39 +139,12 @@ onMounted(async () => {
       id: "3",
       type: "output",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
+        label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
       },
       position: { x: 170, y: 400 },
       class: "light",
     },
   ];
-
-  // fetch one workflow instance
-  // try {
-  //   isLoading.value = true;
-  //   await store.dispatch(
-  //     "analysisModule/fetchWorkflowInstance",
-  //     workflowInstances.value[0].uuid
-  //   );
-  // } catch (err) {
-  //   console.error(err);
-  // } finally {
-  //   isLoading.value = false;
-  //   // console.log(workflowInstance.value);
-  // }
-  // fetch logs for one workflow instance
-  // try {
-  //   isLoading.value = true;
-  //   await store.dispatch(
-  //     "analysisModule/fetchWorkflowLogs",
-  //     workflowInstances.value[3]
-  //   );
-  // } catch (err) {
-  //   console.error(err);
-  // } finally {
-  //   isLoading.value = false;
-  //   console.log("workflowFlow Logs", workflowLogs.value);
-  // }
 });
 
 watch(selectedWorkflowActivity, (newVal, oldVal) => {

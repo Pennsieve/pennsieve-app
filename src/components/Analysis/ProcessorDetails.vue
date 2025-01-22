@@ -17,7 +17,6 @@
 </template>
 
 <script>
-import { clone, pathOr, propOr } from "ramda";
 import { mapGetters } from "vuex";
 
 export default {
@@ -29,9 +28,7 @@ export default {
 
   props: {},
 
-  computed: {
-    ...mapGetters(),
-  },
+  computed: {},
 
   watch: {},
 

@@ -1,6 +1,6 @@
 <template>
   <div class="models-list scrolling-list">
-    <h2 class="heading">Active Workflows</h2>
+    <h2 class="heading">Workflows</h2>
     <template v-if="workflowInstances.length > 0">
       <div class="models-list-loading-wrap" element-loading-background="#fff">
         <div class="models-list-wrap-scroll">
@@ -20,9 +20,7 @@
       </div>
     </template>
     <template v-if="!workflowInstances.length && !isLoading">
-      <div class="no-workflows">
-        There are no Active Workflows at this time.
-      </div>
+      <div class="no-workflows">There are no Workflows at this time.</div>
     </template>
   </div>
 </template>
@@ -65,38 +63,6 @@ export default {
       "workflowInstances",
       "selectedWorkflowActivity",
     ]),
-
-    /**
-     * Group concepts by letter
-     * @returns {Array}
-     */
-    groupedConcepts: function () {
-      const byFirstLetter = groupBy(function (concept) {
-        return toUpper(concept.displayName.charAt(0));
-      });
-      const sortedConcepts = sortBy(prop("displayName"), this.models);
-      const searchText = defaultTo("", this.searchText);
-      const matches = (concept) =>
-        concept.displayName.toLowerCase().indexOf(searchText.toLowerCase()) >
-        -1;
-      const filteredConcepts = filter(matches, sortedConcepts);
-
-      return byFirstLetter(filteredConcepts);
-    },
-
-    activeWorkflows: function () {
-      // only return active workflows
-      const onlyActiveWorkflows = this.workflowInstances.filter((workflow) => {
-        return this.isActive(workflow);
-        // show the workflows with the most recent startedAt timestamp at the top of the list
-      });
-
-      const sortedActiveWorkflows = onlyActiveWorkflows.sort(
-        (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
-      );
-
-      return sortedActiveWorkflows;
-    },
   },
 
   watch: {
@@ -109,12 +75,6 @@ export default {
         this.$emit("shouldReset", false);
       }
     },
-  },
-
-  mounted: function () {
-    this.autoFocus();
-    this.isLoading = true;
-    this.setSelectedWorkflowActivity(this.activeWorkflows[0]);
   },
 
   methods: {
@@ -140,6 +100,10 @@ export default {
     handleWorkflowClick: function (workflow) {
       this.setSelectedWorkflowActivity(workflow);
     },
+  },
+  mounted: async function () {
+    this.autoFocus();
+    this.isLoading = true;
   },
 };
 </script>
