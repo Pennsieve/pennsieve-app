@@ -57,7 +57,7 @@ import CreateComputeNodeDialog from "./CreateComputeNodeDialog.vue";
 import ComputeNodesListItem from "./ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
 import {
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
@@ -121,7 +121,7 @@ export default {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
         isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },

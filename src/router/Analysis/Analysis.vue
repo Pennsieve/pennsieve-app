@@ -69,7 +69,7 @@ import EventBus from "@/utils/event-bus";
 import { pathOr, propOr } from "ramda";
 import {
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
 } from "../../utils/feature-flags";
 
@@ -94,7 +94,7 @@ export default {
     isFeatureFlagEnabled: function () {
       return (
         isEnabledForTestOrgs(this.activeOrganizationId) ||
-        isEnabledForImmuneHealth(this.activeOrganizationId) ||
+        isEnabledForSpecificOrgs(this.activeOrganizationId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },

@@ -99,7 +99,7 @@
       </stage-actions>
     </template>
 
-    <div class="file-meta-wrapper" >
+    <div class="file-meta-wrapper">
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
           :data="files"
@@ -230,14 +230,14 @@ import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
 
 import {
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
-import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "BfDatasetFiles",
@@ -358,10 +358,14 @@ export default {
       return this.files.length > 0;
     },
 
-    filesUrl:  function () {
-        const baseUrl = this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id = this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    filesUrl: function () {
+      const baseUrl =
+        this.$route.name === "dataset-files" ? "datasets" : "packages";
+      const id =
+        this.$route.name === "dataset-files"
+          ? this.$route.params.datasetId
+          : this.$route.params.fileId;
+      return `${this.config.apiUrl}/${baseUrl}/${id}?includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
     },
 
     /**
@@ -369,10 +373,9 @@ export default {
      * @returns {String}
      */
     moveUrl: async function () {
-      return useGetToken()
-        .then(token => {
-          return `${this.config.apiUrl}/data/move?api_key=${token}`;
-        })
+      return useGetToken().then((token) => {
+        return `${this.config.apiUrl}/data/move?api_key=${token}`;
+      });
     },
 
     /**
@@ -394,7 +397,7 @@ export default {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
         isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
@@ -415,8 +418,8 @@ export default {
       deep: true,
     },
 
-    offset: function() {
-      this.fetchFiles()
+    offset: function () {
+      this.fetchFiles();
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -493,7 +496,6 @@ export default {
     EventBus.$on("refreshAfterDeleteModal", (data) => {
       var temp = data;
       this.fetchFiles(this.filesUrl);
-
     });
     EventBus.$on("refreshAfterRestore", () => {
       this.fetchFiles(this.filesUrl);
@@ -655,50 +657,48 @@ export default {
       this.filesLoading = true;
 
       useGetToken()
-        .then(token => {
-          const fullUrl = `${this.filesUrl}&api_key=${token}`
-          return useSendXhr(fullUrl)
-            .then((response) => {
-              this.filesLoading = true;
-              this.$store.dispatch(
-                "uploadModule/setCurrentTargetPackage",
-                response
-              );
-              this.file = response;
+        .then((token) => {
+          const fullUrl = `${this.filesUrl}&api_key=${token}`;
+          return useSendXhr(fullUrl).then((response) => {
+            this.filesLoading = true;
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
+            );
+            this.file = response;
 
-              const newFiles = response.children.map((file) => {
-                if (!file.storage) {
-                  file.storage = 0;
-                }
-                file.icon =
-                  file.icon || this.getFilePropertyVal(file.properties, "icon");
-                file.subtype = this.getSubType(file);
-                return file;
-              });
-              if (newFiles.length < this.limit) {
-                this.lastPage = true;
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
               }
-              this.files =
-                this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
-              this.sortedFiles = this.returnSort(
-                "content.name",
-                this.files,
-                this.sortDirection
-              );
-              this.ancestors = response.ancestors;
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            if (newFiles.length < this.limit) {
+              this.lastPage = true;
+            }
+            this.files =
+              this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+            this.ancestors = response.ancestors;
 
-              const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-              if (pkgId) {
-                this.scrollToFile(pkgId);
-              }
-              this.allowFetch = true;
-              this.filesLoading = false;
-            })
-
+            const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+            if (pkgId) {
+              this.scrollToFile(pkgId);
+            }
+            this.allowFetch = true;
+            this.filesLoading = false;
+          });
         })
         .catch((response) => {
           this.handleXhrError(response);
-      })
+        });
     },
     /**
      * Sort table by column
@@ -855,25 +855,22 @@ export default {
      * @param {Array} items
      */
     moveItems: function (destination, items) {
-
-      this.moveUrl
-        .then(url =>{
-          const things = items.map((item) => item.content.id);
-          this.sendXhr(url, {
-            method: "POST",
-            body: {
-              destination,
-              things,
-            },
-          })
-            .then((response) => {
-              this.onMoveItems(response);
-            })
-            .catch((response) => {
-              this.handleXhrError(response);
-            });
+      this.moveUrl.then((url) => {
+        const things = items.map((item) => item.content.id);
+        this.sendXhr(url, {
+          method: "POST",
+          body: {
+            destination,
+            things,
+          },
         })
-
+          .then((response) => {
+            this.onMoveItems(response);
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      });
     },
 
     /**
@@ -915,18 +912,16 @@ export default {
       const promises = files.map((obj) => {
         const id = propOr("", "id", obj);
 
-        useGetToken()
-          .then((token) => {
-            const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
+        useGetToken().then((token) => {
+          const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
 
-            return this.sendXhr(url, {
-              method: "PUT",
-              body: {
-                name: propOr("", "generatedName", obj),
-              },
-            });
-          })
-
+          return this.sendXhr(url, {
+            method: "PUT",
+            body: {
+              name: propOr("", "generatedName", obj),
+            },
+          });
+        });
       });
       Promise.all(promises).then((response) => {
         // Move files again, now with new name
@@ -1108,30 +1103,25 @@ export default {
     processFile: function (file) {
       const packageId = pathOr("", ["content", "id"], file);
 
-      useGetToken()
-        .then((token) => {
-          const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
-          this.sendXhr(url, {
-            method: "PUT",
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-          })
-            .then(() => {
-              // Update the file's state to show that it is processing
-              const updatedFile = assocPath(
-                ["content", "state"],
-                "PROCESSING",
-                file
-              );
-              this.onUpdateUploadedFileState({ packageDTO: updatedFile });
-            })
-            .catch(this.handleXhrError.bind(this));
-
+      useGetToken().then((token) => {
+        const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
+        this.sendXhr(url, {
+          method: "PUT",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
         })
-
-
-
+          .then(() => {
+            // Update the file's state to show that it is processing
+            const updatedFile = assocPath(
+              ["content", "state"],
+              "PROCESSING",
+              file
+            );
+            this.onUpdateUploadedFileState({ packageDTO: updatedFile });
+          })
+          .catch(this.handleXhrError.bind(this));
+      });
     },
 
     /**
@@ -1142,69 +1132,65 @@ export default {
       const packageId = pathOr("", ["content", "id"], file);
 
       // Get the files for the package
-      useGetToken()
-        .then((token) => {
-          const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`;
-          this.sendXhr(url, {
-            method: "GET",
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-          })
-            .then((response) => {
-              const fId = pathOr(
-                "",
-                ["objects", "source", 0, "content", "id"],
-                response
-              );
-              const url = `${this.config.apiUrl}/packages/${packageId}/files/${fId}?short=true&api_key=${token}`;
-              this.sendXhr(url, {
-                method: "GET",
-                header: {
-                  Authorization: `bearer ${token}`,
-                },
-              })
-                .then((response) => {
-                  copyText(
-                    pathOr("", ["url"], response),
-                    undefined,
-                    (error, event) => {
-                      if (error) {
-                        const msg = "Unable to copy to clipboard";
-                        EventBus.$emit("toast", {
-                          detail: {
-                            type: "error",
-                            msg,
-                          },
-                        });
-                      } else {
-                        const msg = "Temporary link to file copied to clipboard";
-                        EventBus.$emit("toast", {
-                          detail: {
-                            type: "success",
-                            msg,
-                          },
-                        });
-                      }
-                    }
-                  );
-                })
-
-                .catch((response) => {
-                  this.handleXhrError(response);
-                });
-            })
-            .catch((response) => {
-              this.handleXhrError(response);
-            });
+      useGetToken().then((token) => {
+        const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`;
+        this.sendXhr(url, {
+          method: "GET",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
         })
+          .then((response) => {
+            const fId = pathOr(
+              "",
+              ["objects", "source", 0, "content", "id"],
+              response
+            );
+            const url = `${this.config.apiUrl}/packages/${packageId}/files/${fId}?short=true&api_key=${token}`;
+            this.sendXhr(url, {
+              method: "GET",
+              header: {
+                Authorization: `bearer ${token}`,
+              },
+            })
+              .then((response) => {
+                copyText(
+                  pathOr("", ["url"], response),
+                  undefined,
+                  (error, event) => {
+                    if (error) {
+                      const msg = "Unable to copy to clipboard";
+                      EventBus.$emit("toast", {
+                        detail: {
+                          type: "error",
+                          msg,
+                        },
+                      });
+                    } else {
+                      const msg = "Temporary link to file copied to clipboard";
+                      EventBus.$emit("toast", {
+                        detail: {
+                          type: "success",
+                          msg,
+                        },
+                      });
+                    }
+                  }
+                );
+              })
 
+              .catch((response) => {
+                this.handleXhrError(response);
+              });
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      });
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-
-
 
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [

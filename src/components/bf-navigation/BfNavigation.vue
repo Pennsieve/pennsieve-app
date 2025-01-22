@@ -186,7 +186,7 @@ import CustomTheme from "../../mixins/custom-theme";
 import {
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
 } from "../../utils/feature-flags";
 
 export default {
