@@ -13,7 +13,7 @@
         </div>
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
-        <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
+        <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
       </div>
       <div>
         <el-tooltip
@@ -47,8 +47,10 @@
           {{ workflow.uuid }}
         </div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
-        <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
-        <div>Completed At: {{ formatDateOnLocale(workflow.completedAt) }}</div>
+        <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
+        <div>
+          Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
+        </div>
       </div>
     </div>
   </div>
