@@ -5,7 +5,7 @@ import IconDocument from "@/components/icons/IconDocument.vue";
 import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
 import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
-import ModelDetails from "@/components/datasets/records/GraphBrowser/ModelDetails.vue";
+import ProcessorDetails from "./ProcessorDetails.vue";
 
 const props = defineProps(["edges", "modelId", "panelVisible"]);
 
@@ -171,7 +171,7 @@ function onOpenEditPropertyDialog(event) {
         @click="focusNode"
       />
 
-      <model-details
+      <processor-details
         v-show="modelInfoSelected"
         :model-id="modelId"
         @open-property-dialog="onOpenPropertyDialog"
