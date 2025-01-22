@@ -5,20 +5,23 @@
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
-      <IconWaitingCircle class="icon" />
+      <IconWaitingCircle class="icon success" />
       <div class="text">
         <div class="workflow-name">
-          Workflow UUID: <br />
-          {{ workflow.uuid }}
+          Workflow Name:
+          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
         </div>
-        <div class="compute-node-name">
-          Compute Node UUID: {{ workflow.computeNode.uuid }}
-        </div>
-        <div class="compute-node-name">Workflow UUID: {{ workflow.uuid }}</div>
-        <div>Started At: {{ formatDateOnLocale(workflow.startedAt) }}</div>
+        <div>Workflow UUID: {{ workflow.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
       </div>
       <div>
-        <el-tooltip class="box-item" effect="dark" content="Cancel this workflow" placement="top-start">
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          content="Cancel this workflow"
+          placement="top-start"
+        >
           <el-button size="medium" @click="showCancelWorkflowDialog">
             <el-icon>
               <CircleClose />
@@ -28,15 +31,25 @@
       </div>
     </div>
 
-    <div v-if="!isActive" class="box gray-box">
-      <IconCheck class="icon" />
+    <div
+      v-if="!isActive"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
+      <IconCheck class="icon completed" />
       <div class="text">
         <div class="workflow-name">
+          Workflow Name:
+          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+        </div>
+        <div>
           Workflow UUID: <br />
           {{ workflow.uuid }}
         </div>
-        <div class="compute-node-name">
-          Compute Node UUID: {{ workflow.computeNode.uuid }}
+        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
+        <div>
+          Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
         </div>
       </div>
     </div>
@@ -47,14 +60,14 @@
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
-import { CircleClose } from '@element-plus/icons-vue'
+import { CircleClose } from "@element-plus/icons-vue";
 import { mapState, mapActions, mapMutations } from "vuex";
 
 export default {
   name: "WorkflowsListItem",
 
   components: {
-    CircleClose
+    CircleClose,
   },
 
   props: {
@@ -70,42 +83,27 @@ export default {
 
   mixins: [FormatDate],
 
-  data() {
-    return {};
-  },
-
   computed: {
     ...mapState("analysisModule", ["selectedWorkflowActivity"]),
     computedClass: function () {
-      // const workflow = this.workflow ? this.workflow.uuid : null;
-      // console.log("workflow UUID:", workflow);
-      // const selectedWorkflow = this.selectedWorkflowActivity
-      //   ? this.selectedWorkflowActivity.uuid
-      //   : null;
-      // console.log("selected UUID:", selectedWorkflow);
-      // const comparison = null;
-      // console.log("Comparison result:", comparison);
+      const workflow = this?.workflow?.uuid;
+      console.log("workflow", this?.workflow?.uuid);
+      const selectedWorkflow = this?.selectedWorkflowActivity?.uuid;
+      console.log("selectedWorkflow", this?.selectedWorkflowActivity?.uuid);
+      const isSelected = workflow === selectedWorkflow;
 
-      if (false) {
-        return "box isSelected green-box";
+      if (isSelected) {
+        return "box selected";
       } else {
-        return "box green-box";
-      }
-    },
-  },
-
-  watch: {
-    /**
-     * Reset the component
-     */
-    selectedWorkflowActivity: function (val) {
-      if (val) {
+        return "box";
       }
     },
   },
 
   methods: {
-    ...mapMutations('analysisModule', { showCancelWorkflowDialog: 'SHOW_CANCEL_WORKFLOW_DIALOG' }),
+    ...mapMutations("analysisModule", {
+      showCancelWorkflowDialog: "SHOW_CANCEL_WORKFLOW_DIALOG",
+    }),
   },
 };
 </script>
@@ -142,28 +140,33 @@ export default {
   height: 30px;
   border-radius: 50%;
   font-size: 26px;
-}
-
-.box.green-box {
   border-color: #14a758;
 }
 
-.box.green-box .icon {
+.success {
+  color: #14a758;
+}
+
+.completed {
+  color: $gray_4;
+}
+
+.box.success .icon {
   background-color: #fff;
   color: #14a758;
   box-sizing: border-box;
   font-weight: bold;
 }
 
-.box.gray-box {
-  border-color: $gray_4;
-}
-
-.box.gray-box .icon {
+.box.completed .icon {
   background-color: #fff;
   color: $gray_4;
   box-sizing: border-box;
   font-weight: bold;
+}
+
+.selected {
+  border: 2px solid black;
 }
 
 .text {
@@ -201,7 +204,7 @@ export default {
   }
 }
 
-.workflows-list-item-wrapper .green-box {
+.workflows-list-item-wrapper {
   cursor: pointer;
 }
 </style>
