@@ -8,7 +8,7 @@
             <!-- Display API data -->
             <div>
               <WorkflowsListItem
-                v-for="(workflow, index) in activeWorkflows"
+                v-for="(workflow, index) in workflowInstances"
                 :key="index"
                 :workflow="workflow"
                 :is-active="isActive(workflow)"
