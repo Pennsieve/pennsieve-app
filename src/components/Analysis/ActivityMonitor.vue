@@ -121,7 +121,7 @@ onMounted(async () => {
   nodes.value = [
     {
       id: "1",
-      type: "custom",
+      type: "input",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
         type: "input"
@@ -131,7 +131,7 @@ onMounted(async () => {
     },
     {
       id: "2",
-      type:"custom",
+      type:"",
       data: {
         label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
       },
@@ -140,7 +140,7 @@ onMounted(async () => {
     },
     {
       id: "3",
-      type: "custom",
+      type: "output",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
         type:"output"
@@ -156,7 +156,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
     nodes.value = [
       {
         id: "1",
-        type: "custom",
+        type: "input",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
           type:"input"
@@ -166,7 +166,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       },
       {
         id: "2",
-        type:"custom",
+        type:"",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
         },
@@ -175,7 +175,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       },
       {
         id: "3",
-        type: "custom",
+        type: "output",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
           type:"output"
