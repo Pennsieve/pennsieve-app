@@ -11,6 +11,7 @@ import { useLayout } from "../datasets/records/GraphBrowser/useLayout";
 import { useRoute } from "vue-router";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
+import CustomNode from "./CustomNode.vue"
 
 const route = useRoute();
 const { layout } = useLayout();
@@ -139,15 +140,17 @@ onMounted(async () => {
   nodes.value = [
     {
       id: "1",
-      type: "input",
+      type: "custom",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
+        type: "input"
       },
       position: { x: 130, y: 100 },
       class: "light",
     },
     {
       id: "2",
+      type:"custom",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[1], "Processor"),
       },
@@ -156,9 +159,10 @@ onMounted(async () => {
     },
     {
       id: "3",
-      type: "output",
+      type: "custom",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
+        type:"output"
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -198,15 +202,17 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
     nodes.value = [
       {
         id: "1",
-        type: "input",
+        type: "custom",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
+          type:"input"
         },
         position: { x: 130, y: 100 },
         class: "light",
       },
       {
         id: "2",
+        type:"custom",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
         },
@@ -215,9 +221,10 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       },
       {
         id: "3",
-        type: "output",
+        type: "custom",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
+          type:"output"
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -249,7 +256,7 @@ Event Handler for Node Click
  */
 const selectedNode = ref({})
 const activityLogsVisible = ref(false);
-function onNodeClick({event, node}) {
+function onNodeClick(node) {
   const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
   if(selectedAppliction){
     selectedNode.value = selectedAppliction;
@@ -273,8 +280,13 @@ function onNodeClick({event, node}) {
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
-          @node-click="onNodeClick"
+
         >
+        <template #node-custom="customNodeProps">
+          <CustomNode 
+          :node-props="customNodeProps"
+          @node-click="onNodeClick"/>
+        </template>
           <Background pattern-color="#aaa" :gap="16" />
 
           <!-- <MiniMap :position="minimapLocation" :pannable="true" /> -->
