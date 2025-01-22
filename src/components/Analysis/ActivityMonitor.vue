@@ -3,17 +3,11 @@ import { computed, watch, nextTick, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 
 // Vue Flow Imports
-import { MarkerType, useVueFlow, VueFlow } from "@vue-flow/core";
+import { useVueFlow, VueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
-import { MiniMap } from "@vue-flow/minimap";
-import { useLayout } from "../datasets/records/GraphBrowser/useLayout";
-import { useRoute } from "vue-router";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
-
-const route = useRoute();
-const { layout } = useLayout();
 
 const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } =
   useVueFlow();
@@ -37,16 +31,21 @@ const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
 
-const cancelWorkflowDialogVisible = computed(() => store.state.analysisModule.cancelWorkflowDialogVisible)
+const cancelWorkflowDialogVisible = computed(
+  () => store.state.analysisModule.cancelWorkflowDialogVisible
+);
 
 const hideCancelWorkflowDialog = () => {
-  store.commit('analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG')
-}
+  store.commit("analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG");
+};
 
 const cancelWorkflow = () => {
-  store.dispatch('analaysisModule/cancelWorkflow',selectedWorkflowActivity?.uuid)
+  store.dispatch(
+    "analaysisModule/cancelWorkflow",
+    selectedWorkflowActivity?.uuid
+  );
   hideCancelWorkflowDialog();
-}
+};
 
 // Local State
 const isLoading = ref(false);
@@ -247,16 +246,17 @@ function onTogglePanelVisibility() {
 /*
 Event Handler for Node Click
  */
-const selectedNode = ref({})
+const selectedNode = ref({});
 const activityLogsVisible = ref(false);
-function onNodeClick({event, node}) {
-  const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
-  if(selectedAppliction){
+function onNodeClick({ event, node }) {
+  const selectedAppliction = selectedWorkflowActivity.value.workflow.find(
+    (x) => x.name === node.data.label
+  );
+  if (selectedAppliction) {
     selectedNode.value = selectedAppliction;
     activityLogsVisible.value = true;
   }
 }
-
 </script>
 
 <template>
@@ -283,26 +283,38 @@ function onNodeClick({event, node}) {
         </VueFlow>
       </div>
 
-      <ActivitySidePanel :class="{ visible: sidePanelVisible }" :panel-visible="sidePanelVisible"
-        @toggle-panel-visibility="onTogglePanelVisibility" />
-      <el-dialog v-model="cancelWorkflowDialogVisible" title="Cancel Workflow" width="500" center @close="hideCancelWorkflowDialog">
+      <ActivitySidePanel
+        :class="{ visible: sidePanelVisible }"
+        :panel-visible="sidePanelVisible"
+        @toggle-panel-visibility="onTogglePanelVisibility"
+      />
+      <el-dialog
+        v-model="cancelWorkflowDialogVisible"
+        title="Cancel Workflow"
+        width="500"
+        center
+        @close="hideCancelWorkflowDialog"
+      >
         <span>
-          Would you like to cancel this workflow: {{ selectedWorkflowActivity?.uuid }} ?
+          Would you like to cancel this workflow:
+          {{ selectedWorkflowActivity?.uuid }} ?
         </span>
         <template #footer>
           <div class="dialog-footer">
-            <bf-button class="secondary"  @click="hideCancelWorkflowDialog">No</bf-button>
+            <bf-button class="secondary" @click="hideCancelWorkflowDialog"
+              >No</bf-button
+            >
             <bf-button @click="cancelWorkflow">Yes</bf-button>
           </div>
         </template>
       </el-dialog>
     </div>
   </div>
-  <ActivityLogs 
+  <ActivityLogs
     :dialog-visible="activityLogsVisible"
     :selected-node="selectedNode"
     :selected-application="selectedWorkflowActivity"
-    @close-dialog="activityLogsVisible=false"
+    @close-dialog="activityLogsVisible = false"
   ></ActivityLogs>
 </template>
 
