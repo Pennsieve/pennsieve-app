@@ -83,7 +83,7 @@ import { pathOr, propOr } from "ramda";
 
 import {
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
 } from "../../../utils/feature-flags.js";
 
@@ -119,7 +119,7 @@ export default {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
         isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
