@@ -126,6 +126,40 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item prop="parameters">
+          <template #label>
+            Parameters <span class="label-helper"> optional</span>
+            <span>
+              <el-button @click="addParameterRow()" type="primary" plain icon="el-icon-plus"><IconPlus></IconPlus></el-button>
+            </span>
+          </template>
+        <el-table :data="application.parameters" border>
+          <el-table-column label="Name">
+            <template #default="scope">
+              <el-form-item
+                  v-if="scope && scope.$index >= 0"
+                  label=" "
+                  v-model="application.parameters[scope.$index].name"
+                  :rules="rules.paramName"
+              >
+                <el-input v-model="scope.row.name"></el-input>
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="Value">
+            <template #default="scope">
+              <el-form-item
+                  v-if="scope && scope.$index >= 0"
+                  label=" "
+                  v-model="application.parameters[scope.$index].value"
+                  :rules="rules.paramValue"
+              >
+                <el-input v-model="scope.row.value"></el-input>
+              </el-form-item>
+            </template>
+          </el-table-column>
+        </el-table>
+        </el-form-item>
         <el-form-item prop="source.type">
           <template #label>
             Source Type <span class="label-helper"> required </span>
@@ -175,6 +209,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
+import IconAddItem from "@/components/icons/IconAddItem.vue";
 
 /**
  * Returns the default values for a property
@@ -198,12 +233,14 @@ const defaultApplicationFormValues = () => ({
     type: "",
     url: "",
   },
+  parameters: [],
 });
 
 export default {
   name: "CreateApplicationDialog",
 
   components: {
+    IconAddItem,
     BfDialogHeader,
     DialogBody,
     BfButton,
@@ -314,6 +351,30 @@ export default {
             trigger: "change",
           },
         ],
+        paramName: [
+          {
+            required: true,
+            message: "Please input the parameter name",
+            trigger: "blur",
+          },
+          {
+            max: 50,
+            message: "Name cannot exceed 50 characters",
+            trigger: "blur",
+          },
+        ],
+        paramValue: [
+          {
+            required: true,
+            message: "Please input the parameter value",
+            trigger: "blur",
+          },
+          {
+            max: 50,
+            message: "Value cannot exceed 50 characters",
+            trigger: "blur",
+          },
+        ],
         "source.url": [
           {
             required: true,
@@ -366,6 +427,23 @@ export default {
       this.$refs.form.clearValidate();
     },
 
+    addParameterRow() {
+      this.application.parameters.push({name: null, value: null});
+    },
+
+    getApplicationParams() {
+      if (this.application.parameters.length > 0) {
+        let paramsEntries = []
+        this.application.parameters.forEach((param) => {
+          paramsEntries.push([param.name, param.value])
+        })
+        let paramsObject = Object.fromEntries(paramsEntries)
+        return paramsObject
+      } else {
+        return null
+      }
+    },
+
     /**
      * POST to API to create new application
      */
@@ -389,13 +467,20 @@ export default {
             type: this.application.source.type,
             url: `git://${this.application.source.url}`,
           };
+
+          const formattedParams = this.getApplicationParams()
+
           const formattedNewApplication = {
             ...this.application,
             account: accountDetails,
             computeNode: computeNodeDetails,
             resources: formattedResources,
             source: formattedSource,
+            params: formattedParams,
           };
+
+          // remove formattedNewApplication.parameters ('params' is what is stored)
+          delete formattedNewApplication.parameters
 
           try {
             await this.createApplication(formattedNewApplication);
