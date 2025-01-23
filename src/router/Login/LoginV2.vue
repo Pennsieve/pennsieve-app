@@ -3,6 +3,7 @@ import { ref } from "vue";
 import * as config from "@/site-config/site.json";
 import { AuthError, signIn, signOut } from "aws-amplify/auth";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import router from "@/router";
 
 //  ==== LOGIN ====
 const logInForm = ref({
