@@ -10,8 +10,15 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
 
-const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } =
-  useVueFlow();
+const {
+  onInit,
+  onConnect,
+  addEdges,
+  fitView,
+  findNode,
+  getSelectedNodes,
+  onNodeClick,
+} = useVueFlow();
 // Access the Vuex store
 const store = useStore();
 
@@ -211,15 +218,15 @@ Event Handler for Node Click
 const selectedNode = ref({});
 const activityLogsVisible = ref(false);
 
-function onNodeClick(node) {
-  const selectedAppliction = selectedWorkflowActivity.value.workflow.find(
+onNodeClick(({ node }) => {
+  const selectedApplication = selectedWorkflowActivity.value.workflow.find(
     (x) => x.name === node.data.label
   );
-  if (selectedAppliction) {
-    selectedNode.value = selectedAppliction;
-    activityLogsVisible.value = true;
+  if (selectedApplication) {
+    selectedNode.value = selectedApplication;
+    console.log("selectedProcessor", selectedApplication);
   }
-}
+});
 </script>
 
 <template>
