@@ -100,13 +100,14 @@ const ConfigureRepo = () => import('../components/Code/ConfigureRepo.vue') // a 
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
 
 /**
- * Integrations Components
+ * Analytics Components 
  */
 const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
+const ActivityMonitor = () => import ('../components/Analysis/ActivityMonitor.vue')
 
 /**
  * Metadata Components
@@ -774,6 +775,13 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsList,
+          }
+        },
+        {
+          name: 'activity',
+          path: 'activity',
+          components: {
+            stage: ActivityMonitor,
           }
         }
       ]

@@ -186,7 +186,7 @@ import CustomTheme from "../../mixins/custom-theme";
 import {
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
 } from "../../utils/feature-flags";
 
 export default {
@@ -428,14 +428,6 @@ export default {
         "Organization",
         ["organization", "id"],
         this.activeOrganization
-      );
-    },
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl) ||
-        isEnabledForImmuneHealth(orgId)
       );
     },
   },

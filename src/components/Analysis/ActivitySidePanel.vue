@@ -2,10 +2,10 @@
 import { ref, watch } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
-import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
+import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
 import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
-import ModelDetails from "@/components/datasets/records/GraphBrowser/ModelDetails.vue";
+import ProcessorDetails from "./ProcessorDetails.vue";
 
 const props = defineProps(["edges", "modelId", "panelVisible"]);
 
@@ -165,15 +165,13 @@ function onOpenEditPropertyDialog(event) {
       <IconArrowRight v-else :width="14" :height="14" />
     </button>
     <div ref="modelsList" class="models-list-scroll">
-      <models-list
+      <workflows-list
         v-show="modelListSelected"
-        :show-heading="false"
-        :is-link="false"
         :scrolling-list="true"
         @click="focusNode"
       />
 
-      <model-details
+      <processor-details
         v-show="modelInfoSelected"
         :model-id="modelId"
         @open-property-dialog="onOpenPropertyDialog"
@@ -189,7 +187,7 @@ function onOpenEditPropertyDialog(event) {
 </template>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
+@import "../../assets/_variables.scss";
 
 .models-list-wrap {
   border-top: 1px solid $gray_2;
@@ -202,7 +200,7 @@ function onOpenEditPropertyDialog(event) {
   top: 0;
   transform: translate3d(100%, 72px, 0);
   transition: transform 0.3s ease-out;
-  width: 300px;
+  width: 500px;
   will-change: transform;
   z-index: 3;
   &.visible {

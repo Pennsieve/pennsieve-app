@@ -9,15 +9,22 @@ export function isEnabledForTestOrgs(orgId) {
 
   const isPennsieveTestProd =
     orgId ===
-    "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
+    "N:organization:760ee96c-9777-46e3-83eb-3099a7e16baa";
   return isPennsieveTestDev || isPennsieveTestProd;
 }
 
-export function isEnabledForImmuneHealth(orgId) {
+export function isEnabledForSpecificOrgs(orgId) {
     const isImmuneHealthProd =
     orgId ===
     "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
-   return isImmuneHealthProd;
+
+    const isCNTProd = 
+    orgId ===
+    "N:organization:fecf73c8-b590-47fa-8de0-74cfb57051a2"
+
+    const isHackathonProd = 
+    orgId === "N:organization:388563ac-49b5-4fc1-b6b0-2fba767e54b0";
+   return isImmuneHealthProd || isCNTProd || isHackathonProd;
 }
 
 export function isEnabledForAllDevOrgs(url) {

@@ -250,8 +250,8 @@ export default {
       this.formatComputeNodeOptions();
     },
     selectedComputeNode: function () {
-      this.formatProcessorOptions();
       this.formatPreprocessorOptions();
+      this.formatProcessorOptions();
       this.formatPostprocessorOptions();
     },
     selectedProcessor: function () {
@@ -422,6 +422,8 @@ export default {
           paramsObject = Object.fromEntries(paramsEntries)
         }
         return {
+          name: application.name || "",
+          description: application.description || "",
           uuid: application.uuid || "",
           applicationId: application.applicationId || "",
           applicationContainerName: application.applicationContainerName || "",
@@ -506,6 +508,7 @@ export default {
         (processor) =>
           this.selectedComputeNode.uuid === processor.computeNode.uuid
       );
+
       this.processorOptions = filteredProcessors.map((processor) => {
         return {
           value: processor.name,
@@ -558,7 +561,9 @@ export default {
      */
     setSelectedPreprocessor: function (value) {
       this.selectedPreprocessor = this.preprocessors.find(
-        (preprocessor) => preprocessor.name === value
+        (preprocessor) =>
+          preprocessor.name === value &&
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
       );
     },
     /**
@@ -566,7 +571,9 @@ export default {
      */
     setSelectedProcessor: function (value) {
       this.selectedProcessor = this.processors.find(
-        (processor) => processor.name === value
+        (processor) =>
+          processor.name === value &&
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
       );
     },
     /**
@@ -574,7 +581,9 @@ export default {
      */
     setSelectedPostprocessor: function (value) {
       this.selectedPostprocessor = this.postprocessors.find(
-        (postprocessor) => postprocessor.name === value
+        (postprocessor) =>
+          postprocessor.name === value &&
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
       );
     },
     /**

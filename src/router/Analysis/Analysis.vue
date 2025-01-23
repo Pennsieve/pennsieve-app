@@ -43,6 +43,9 @@
           <p v-if="this.$route.name === 'applications'">
             Applications allow users to run analytic workflows on the platform.
           </p>
+          <p v-if="this.$route.name === 'activity'">
+            Monitor the activity of your analytic pipeline runs.
+          </p>
         </div>
       </template>
       <template #tabs>
@@ -56,17 +59,17 @@
 </template>
 
 <script>
-import {mapActions, mapState} from "vuex";
+import { mapActions, mapState } from "vuex";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
-import {useGetToken} from "@/composables/useGetToken";
+import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
 import { pathOr, propOr } from "ramda";
 import {
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
 } from "../../utils/feature-flags";
 
@@ -91,7 +94,7 @@ export default {
     isFeatureFlagEnabled: function () {
       return (
         isEnabledForTestOrgs(this.activeOrganizationId) ||
-        isEnabledForImmuneHealth(this.activeOrganizationId) ||
+        isEnabledForSpecificOrgs(this.activeOrganizationId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
@@ -109,17 +112,16 @@ export default {
   },
 
   async mounted() {
-    const p1 = this.fetchIntegrations()
-    const p2 = this.fetchComputeNodes()
-    const p3 = this.fetchApplications()
+    const p1 = this.fetchIntegrations();
+    const p2 = this.fetchComputeNodes();
+    const p3 = this.fetchApplications();
 
-    return Promise.all([p1,p2,p3])
+    return Promise.all([p1, p2, p3]);
   },
 
-  methods:{
+  methods: {
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
     ...mapActions("analysisModule", ["fetchComputeNodes", "fetchApplications"]),
-
   },
 
   data() {
@@ -136,20 +138,20 @@ export default {
       ],
       pennsieveAnalysisFeature: [
         {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
-          name: "Webhooks",
-          to: "webhooks",
-        },
-        {
-          name: "Compute Nodes",
+          name: "Configuration",
           to: "compute-nodes",
         },
         {
           name: "Applications",
           to: "applications",
+        },
+        {
+          name: "Activity",
+          to: "activity",
+        },
+        {
+          name: "Integrations",
+          to: "integrations",
         },
       ],
     };

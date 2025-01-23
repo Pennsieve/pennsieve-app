@@ -25,7 +25,7 @@
     </bf-empty-page-state>
     <template #actions>
       <bf-button
-        :disabled="!hasAdminRight && !isFeatureFlagEnabled"
+        :disabled="!isFeatureFlagEnabled || !hasAdminRights"
         @click="openCreateComputeNodeDialog"
       >
         Create Compute Node
@@ -57,7 +57,7 @@ import CreateComputeNodeDialog from "./CreateComputeNodeDialog.vue";
 import ComputeNodesListItem from "./ComputeNodesListItem.vue";
 import { pathOr, propOr } from "ramda";
 import {
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
   isEnabledForAllDevOrgs,
 } from "../../../utils/feature-flags.js";
@@ -121,7 +121,7 @@ export default {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
         isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
@@ -140,14 +140,6 @@ export default {
       "fetchComputeNodes",
       "fetchComputeResourceAccounts",
     ]),
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
 
     openCreateComputeNodeDialog: function () {
       this.createComputeNodeDialogVisible = true;

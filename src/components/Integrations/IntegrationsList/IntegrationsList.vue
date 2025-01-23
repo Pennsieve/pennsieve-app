@@ -114,7 +114,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization",  "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
 
     filteredApplications: function () {
       let filteredArray = this.integrations.filter(

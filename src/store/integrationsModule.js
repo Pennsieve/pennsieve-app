@@ -95,7 +95,6 @@ export const actions = {
   createIntegration: async ({ commit, rootState }, integrationDTO) => {
     try {
       const token = await useGetToken();
-      console.log('token', token);
       
       const url = `${rootState.config.apiUrl}/webhooks?api_key=${token}`;
       const response = await fetch(url, {
@@ -111,6 +110,7 @@ export const actions = {
         console.error('Error creating integration:', error);
         return Promise.reject(error);
       }
+
   
       const integration = await response.json();
       commit('CREATE_INTEGRATION', integration);
@@ -120,6 +120,7 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  
   removeIntegration: async({ commit, dispatch, rootState }, integrationId) => {
     try {
       useGetToken().then(token => {
