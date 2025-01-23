@@ -59,7 +59,7 @@
     "tsvert": "^0.0.4",
     "uuid": "^9.0.1",
     "valid-url": "^1.0.9",
-    "vite": "^4.5.0",
+    "vite": "^4.5.9",
     "vue": "^3.2.45",
     "vue-content-loader": "^2.0.1",
     "vue-jstree": "^2.1.6",
