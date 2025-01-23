@@ -10,13 +10,21 @@
         {{ application.description }}
       </p>
     </el-row>
-    <el-row v-if="hasAdminRights" class="update-app">
+    <el-row v-if="hasAdminRights" class="update-app" align="bottom">
+       <button
+           @click="deployApplication"
+           class="text-button"
+       >
+         Update
+       </button>
+
+
       <button
-          @click="deployApplication"
+          @click="modifyApplication"
           class="text-button"
-        >
-          Update
-        </button>
+      >
+        Edit
+      </button>
         <div v-if="isWaitingForResponse" 
           class="icon-waiting mr-16">
           <bf-waiting-icon />
@@ -122,7 +130,11 @@ export default {
           //handle update
         }
         
-        }
+        },
+
+    modifyApplication: async function () {
+      console.log("modifyApplication()")
+    }
     },
 };
 </script>
