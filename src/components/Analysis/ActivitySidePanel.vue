@@ -83,6 +83,7 @@ function focusNode(event) {
 }
 
 function toggleModelsList(event) {
+  console.log("event", event);
   const evtId = event.currentTarget.id;
 
   switch (evtId) {
