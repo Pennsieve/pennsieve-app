@@ -8,7 +8,7 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
-import CustomNode from "./CustomNode.vue"
+import CustomNode from "./CustomNode.vue";
 
 const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } =
   useVueFlow();
@@ -124,14 +124,14 @@ onMounted(async () => {
       type: "input",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
-        type: "input"
+        type: "input",
       },
       position: { x: 130, y: 100 },
       class: "light",
     },
     {
       id: "2",
-      type:"",
+      type: "",
       data: {
         label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
       },
@@ -143,7 +143,7 @@ onMounted(async () => {
       type: "output",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
-        type:"output"
+        type: "output",
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -159,14 +159,14 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "input",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
-          type:"input"
+          type: "input",
         },
         position: { x: 130, y: 100 },
         class: "light",
       },
       {
         id: "2",
-        type:"",
+        type: "",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
         },
@@ -178,7 +178,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "output",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
-          type:"output"
+          type: "output",
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -212,8 +212,10 @@ const selectedNode = ref({});
 const activityLogsVisible = ref(false);
 
 function onNodeClick(node) {
-  const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
-  if(selectedAppliction){
+  const selectedAppliction = selectedWorkflowActivity.value.workflow.find(
+    (x) => x.name === node.data.label
+  );
+  if (selectedAppliction) {
     selectedNode.value = selectedAppliction;
     activityLogsVisible.value = true;
   }
@@ -225,6 +227,9 @@ function onNodeClick(node) {
     <h2 class="vue-flow-title">
       {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
     </h2>
+    <h2 class="vue-flow-title">
+      {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+    </h2>
     <div class="graph-browser">
       <div class="vue-flow-wrapper">
         <VueFlow
@@ -234,13 +239,13 @@ function onNodeClick(node) {
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
-
         >
-        <template #node-custom="customNodeProps">
-          <CustomNode 
-          :node-props="customNodeProps"
-          @node-click="onNodeClick"/>
-        </template>
+          <template #node-custom="customNodeProps">
+            <CustomNode
+              :node-props="customNodeProps"
+              @node-click="onNodeClick"
+            />
+          </template>
           <Background pattern-color="#aaa" :gap="16" />
 
           <!-- <MiniMap :position="minimapLocation" :pannable="true" /> -->

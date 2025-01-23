@@ -8,7 +8,7 @@
       <IconWaitingCircle class="icon success" />
       <div class="text">
         <div class="workflow-name">
-          Workflow Name:
+          Workflow Run:
           {{ workflow.name.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>Workflow UUID: {{ workflow.uuid }}</div>
@@ -39,7 +39,7 @@
       <IconCheck class="icon completed" />
       <div class="text">
         <div class="workflow-name">
-          Workflow Name:
+          Workflow Run:
           {{ workflow.name.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>
