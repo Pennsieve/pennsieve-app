@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
 import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
@@ -7,7 +7,13 @@ import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ProcessorDetails from "./ProcessorDetails.vue";
 
-const props = defineProps(["edges", "modelId", "panelVisible"]);
+const props = defineProps([
+  "edges",
+  "modelId",
+  "panelVisible",
+  "showDetailsPanel",
+  "selectedProcessor",
+]);
 
 const modelsListVisible = ref(false);
 const modelListSelected = ref(true);
@@ -26,6 +32,15 @@ const emit = defineEmits([
 
 const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
+
+watch(
+  () => props.showDetailsPanel, // The getter function that watches the prop
+  (newVal, oldVal) => {
+    console.log(newVal);
+    toggleModelsList({ currentTarget: { id: "propPanel" } });
+    console.log(props.selectedProcessor);
+  }
+);
 
 function mouseLeave(event) {
   const evtId = event.currentTarget.id;
@@ -68,22 +83,11 @@ function mouseOver(event) {
   }
 }
 
-watch(
-  () => props.modelId,
-  (modelId, second) => {
-    if (modelId) {
-      modelInfoSelected.value = true;
-      modelListSelected.value = false;
-    }
-  }
-);
-
 function focusNode(event) {
   emit("focusNode", event);
 }
 
 function toggleModelsList(event) {
-  console.log("event", event);
   const evtId = event.currentTarget.id;
 
   switch (evtId) {
@@ -174,14 +178,7 @@ function onOpenEditPropertyDialog(event) {
 
       <processor-details
         v-show="modelInfoSelected"
-        :model-id="modelId"
-        @open-property-dialog="onOpenPropertyDialog"
-        @open-delete-property-dialog="onOpenDeletePropDialog"
-        @open-delete-linked-prop-dialog="onOpenDeleteLinkedPropDialog"
-        @open-delete-relationship-dialog="onOpenDeleteRelationshipDialog"
-        @open-delete-model-dialog="onOpenDeleteModelDialog"
-        @open-edit-property-dialog="onOpenEditPropertyDialog"
-        :edges="edges"
+        :selected-processor="selectedProcessor"
       />
     </div>
   </div>
