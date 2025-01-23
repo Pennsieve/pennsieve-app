@@ -1,6 +1,9 @@
 <template>
   <div class="model-details">
-    <div v-if="false">Hello!</div>
+    <div v-if="true">
+      <div>{{ selectedProcessor.name }}</div>
+      <div>{{ selectedProcessor.description }}</div>
+    </div>
     <div v-else>
       <div class="img-container">
         <img
@@ -26,7 +29,12 @@ export default {
 
   emits: [],
 
-  props: {},
+  props: {
+    selectedProcessor: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
 
   computed: {},
 

@@ -87,9 +87,9 @@ export default {
     ...mapState("analysisModule", ["selectedWorkflowActivity"]),
     computedClass: function () {
       const workflow = this?.workflow?.uuid;
-      console.log("workflow", this?.workflow?.uuid);
+
       const selectedWorkflow = this?.selectedWorkflowActivity?.uuid;
-      console.log("selectedWorkflow", this?.selectedWorkflowActivity?.uuid);
+
       const isSelected = workflow === selectedWorkflow;
 
       if (isSelected) {

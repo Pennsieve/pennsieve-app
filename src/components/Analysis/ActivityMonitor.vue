@@ -212,6 +212,12 @@ function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
 
+const isDetailsPanelOpen = ref(false);
+const selectedProcessor = ref({});
+function openDetailsPanel(selectedApplication) {
+  isDetailsPanelOpen.value = !isDetailsPanelOpen.value;
+  selectedProcessor.value = selectedApplication;
+}
 /*
 Event Handler for Node Click
  */
@@ -224,7 +230,8 @@ onNodeClick(({ node }) => {
   );
   if (selectedApplication) {
     selectedNode.value = selectedApplication;
-    console.log("selectedProcessor", selectedApplication);
+    console.log("runs");
+    openDetailsPanel(selectedApplication);
   }
 });
 </script>
@@ -261,6 +268,8 @@ onNodeClick(({ node }) => {
       <ActivitySidePanel
         :class="{ visible: sidePanelVisible }"
         :panel-visible="sidePanelVisible"
+        :show-details-panel="isDetailsPanelOpen"
+        :selected-processor="selectedProcessor"
         @toggle-panel-visibility="onTogglePanelVisibility"
       />
       <el-dialog
