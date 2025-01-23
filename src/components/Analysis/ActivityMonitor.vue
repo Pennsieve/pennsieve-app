@@ -10,7 +10,7 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue"
 
-const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } =
+const { onInit, onConnect, addEdges, fitView, findNode, onNodeClick, getSelectedNodes } =
   useVueFlow();
 // Access the Vuex store
 const store = useStore();
@@ -124,7 +124,6 @@ onMounted(async () => {
       type: "input",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
-        type: "input"
       },
       position: { x: 130, y: 100 },
       class: "light",
@@ -143,7 +142,6 @@ onMounted(async () => {
       type: "output",
       data: {
         label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
-        type:"output"
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -159,7 +157,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "input",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
-          type:"input"
         },
         position: { x: 130, y: 100 },
         class: "light",
@@ -178,7 +175,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "output",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
-          type:"output"
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -211,13 +207,13 @@ Event Handler for Node Click
 const selectedNode = ref({});
 const activityLogsVisible = ref(false);
 
-function onNodeClick(node) {
+onNodeClick(({event, node}) => {
   const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
   if(selectedAppliction){
     selectedNode.value = selectedAppliction;
     activityLogsVisible.value = true;
   }
-}
+})
 </script>
 
 <template>
@@ -234,12 +230,11 @@ function onNodeClick(node) {
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
-
         >
         <template #node-custom="customNodeProps">
           <CustomNode 
           :node-props="customNodeProps"
-          @node-click="onNodeClick"/>
+   />
         </template>
           <Background pattern-color="#aaa" :gap="16" />
 
