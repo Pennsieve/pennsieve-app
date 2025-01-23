@@ -225,9 +225,6 @@ function onNodeClick(node) {
 <template>
   <div class="activity-monitor">
     <h2 class="vue-flow-title">
-      {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
-    </h2>
-    <h2 class="vue-flow-title">
       {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
     </h2>
     <div class="graph-browser">
