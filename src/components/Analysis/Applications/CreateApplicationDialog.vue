@@ -126,11 +126,14 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item prop="parameters">
+        <el-form-item prop="parameters" id="paramsInput">
           <template #label>
-            Parameters <span class="label-helper"> optional</span>
+            <div>
+              <span > Parameters </span>
+              <span class="label-helper"> optional </span>
+            </div>
             <span>
-              <el-button @click="addParameterRow()" type="primary" plain icon="el-icon-plus"><IconPlus></IconPlus></el-button>
+              <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
             </span>
           </template>
         <el-table :data="application.parameters" border>
@@ -210,6 +213,8 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 import IconAddItem from "@/components/icons/IconAddItem.vue";
+import { Plus } from "@element-plus/icons-vue";
+
 
 /**
  * Returns the default values for a property
@@ -244,6 +249,7 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
+    Plus
   },
 
   props: {
@@ -663,4 +669,11 @@ function createMemoryItems(cpu, comp) {
     text-decoration: underline;
   }
 }
+</style>
+
+<style lang="scss">
+  #paramsInput .el-form-item__label {
+    display: flex;
+    justify-content: space-between
+  }
 </style>
