@@ -37,7 +37,18 @@ watch(
   () => props.showDetailsPanel, // The getter function that watches the prop
   (newVal, oldVal) => {
     console.log(newVal);
-    toggleModelsList({ currentTarget: { id: "propPanel" } });
+    if (modelInfoSelected.value) {
+      modelsListVisible.value = false;
+      modelInfoSelected.value = false;
+    } else if (modelListSelected.value) {
+      modelInfoSelected.value = true;
+      modelListSelected.value = false;
+      mouseHoverInfo.value = true;
+    } else {
+      modelInfoSelected.value = true;
+      mouseHoverInfo.value = true;
+    }
+
     console.log(props.selectedProcessor);
   }
 );

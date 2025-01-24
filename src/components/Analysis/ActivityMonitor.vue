@@ -215,9 +215,10 @@ function onTogglePanelVisibility() {
 const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 function openDetailsPanel(selectedApplication) {
-  isDetailsPanelOpen.value = !isDetailsPanelOpen.value;
+  isDetailsPanelOpen.value = true;
   selectedProcessor.value = selectedApplication;
 }
+
 /*
 Event Handler for Node Click
  */
