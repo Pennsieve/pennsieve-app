@@ -126,6 +126,7 @@
             />
           </el-select>
         </el-form-item>
+        
         <el-form-item prop="parameters" id="paramsInput">
           <template #label>
             <div>
@@ -163,6 +164,7 @@
           </el-table-column>
         </el-table>
         </el-form-item>
+
         <el-form-item prop="source.type">
           <template #label>
             Source Type <span class="label-helper"> required </span>
