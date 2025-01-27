@@ -252,7 +252,6 @@ export default {
       this.selectedProcessorParams = []
       if (this.selectedProcessor && this.selectedProcessor.params) {
         for (const [key, value] of Object.entries(this.selectedProcessor.params)) {
-          console.log(`${key}: ${value}`);
           this.selectedProcessorParams.push({'name': key, 'value': value})
         }
       }
