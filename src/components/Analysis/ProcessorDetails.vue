@@ -1,6 +1,6 @@
 <template>
   <div class="model-details">
-    <div v-if="selectedProcessor.name" class="processor-details">
+    <div v-if="!isEmpty" class="processor-details">
       <bf-button @click="handleLogsClick">View Logs</bf-button>
       <!-- <div class="processor-item">
         <span class="label">Status:</span> <span class="value"></span>
@@ -48,6 +48,12 @@ export default {
 
   data: function () {
     return {};
+  },
+
+  computed: {
+    isEmpty() {
+      return Object.keys(this.selectedProcessor).length === 0;
+    },
   },
 
   methods: {
