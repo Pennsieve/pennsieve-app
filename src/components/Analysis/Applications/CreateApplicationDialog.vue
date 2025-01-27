@@ -133,36 +133,42 @@
               <span > Parameters </span>
               <span class="label-helper"> optional </span>
             </div>
-            <span>
-              <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
-            </span>
           </template>
-        <el-table :data="application.parameters" border>
+        <el-table :data="application.parameters" max-height="250">
           <el-table-column label="Name">
             <template #default="scope">
-              <el-form-item
-                  v-if="scope && scope.$index >= 0"
-                  label=" "
-                  v-model="application.parameters[scope.$index].name"
-                  :rules="rules.paramName"
-              >
-                <el-input v-model="scope.row.name"></el-input>
-              </el-form-item>
+              <el-input
+                v-model="scope.row.name"
+                placeholder="Enter parameter name"
+                :rules="[rules.paramName]"
+              ></el-input>
             </template>
           </el-table-column>
           <el-table-column label="Value">
             <template #default="scope">
-              <el-form-item
-                  v-if="scope && scope.$index >= 0"
-                  label=" "
-                  v-model="application.parameters[scope.$index].value"
-                  :rules="rules.paramValue"
+              <el-input
+                v-model="scope.row.value"
+                placeholder="Enter parameter value"
+                :rules="[rules.paramValue]"
+              ></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right">
+            <template #default="scope">
+              <el-button
+                link
+                type="primary"
+                size="small"
+                @click.prevent="deleteParameterRow(scope.$index)"
               >
-                <el-input v-model="scope.row.value"></el-input>
-              </el-form-item>
+                Remove
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
+        <div>
+            <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
+        </div>
         </el-form-item>
 
         <el-form-item prop="source.type">
@@ -438,6 +444,10 @@ export default {
       this.application.parameters.push({name: null, value: null});
     },
 
+    deleteParameterRow(index) {
+      this.application.parameters.splice(index,1)
+    },
+
     getApplicationParams() {
       if (this.application.parameters.length > 0) {
         let paramsEntries = []
@@ -671,11 +681,4 @@ function createMemoryItems(cpu, comp) {
     text-decoration: underline;
   }
 }
-</style>
-
-<style lang="scss">
-  #paramsInput .el-form-item__label {
-    display: flex;
-    justify-content: space-between
-  }
 </style>
