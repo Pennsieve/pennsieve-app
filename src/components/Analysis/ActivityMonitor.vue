@@ -8,7 +8,7 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
-import CustomNode from "./CustomNode.vue"
+import CustomNode from "./CustomNode.vue";
 
 const { onInit, onConnect, addEdges, fitView, findNode, onNodeClick, getSelectedNodes } =
   useVueFlow();
@@ -130,7 +130,7 @@ onMounted(async () => {
     },
     {
       id: "2",
-      type:"",
+      type: "",
       data: {
         label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
       },
@@ -163,7 +163,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       },
       {
         id: "2",
-        type:"",
+        type: "",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
         },
@@ -218,10 +218,10 @@ onNodeClick(({event, node}) => {
 
 <template>
   <div class="activity-monitor">
-    <h2 class="vue-flow-title">
-      {{ `Workflow UUID: ${selectedWorkflowActivity?.uuid}` }}
-    </h2>
     <div class="graph-browser">
+      <div class="vue-flow-title">
+      {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+      </div>
       <div class="vue-flow-wrapper">
         <VueFlow
           :nodes="nodes"
@@ -300,7 +300,7 @@ onNodeClick(({event, node}) => {
 }
 
 .graph-browser {
-  height: calc(100vh - 114px);
+  height: calc(100vh - 190px);
   overflow: hidden;
   position: relative;
 }
@@ -372,7 +372,15 @@ onNodeClick(({event, node}) => {
 </style>
 <style lang="scss">
 .vue-flow-title {
-  margin: 20px !important;
+  position: absolute;
+  top: 7%;
+  left: 6%;
+  background-color: #F7F7F7;
+  width: fit-content;
+  padding: 10px;
+  z-index: 1;
+  border-radius: 5px;
+  margin:0;
 }
 
 .activity-monitor {

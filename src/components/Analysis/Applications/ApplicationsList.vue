@@ -83,7 +83,7 @@ import { pathOr, propOr } from "ramda";
 
 import {
   isEnabledForAllDevOrgs,
-  isEnabledForImmuneHealth,
+  isEnabledForSpecificOrgs,
   isEnabledForTestOrgs,
 } from "../../../utils/feature-flags.js";
 
@@ -110,7 +110,12 @@ export default {
       applicationEdit: {},
     };
   },
-
+  mounted(){
+    setInterval(() => {
+      console.log("interval 1 min")
+        //this.getApplicationsStatus();
+    }, 60000); 
+  },
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
     ...mapState("analysisModule", ["applications"]),
@@ -119,7 +124,7 @@ export default {
       const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
       return (
         isEnabledForTestOrgs(orgId) ||
-        isEnabledForImmuneHealth(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
@@ -198,6 +203,9 @@ export default {
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
     },
+    getApplicationsStatus: function(){
+      this.applications = this.fetchApplications();
+    }
   },
 };
 </script>
