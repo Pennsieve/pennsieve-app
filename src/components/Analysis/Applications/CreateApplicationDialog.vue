@@ -134,12 +134,12 @@
               <span class="label-helper"> optional </span>
             </div>
           </template>
-        <el-table :data="application.parameters" max-height="250">
+        <el-table :data="application.parameters" max-height="250" :border="true">
           <el-table-column label="Name">
             <template #default="scope">
               <el-input
                 v-model="scope.row.name"
-                placeholder="Enter parameter name"
+                placeholder="Enter name"
                 :rules="[rules.paramName]"
               ></el-input>
             </template>
@@ -148,12 +148,12 @@
             <template #default="scope">
               <el-input
                 v-model="scope.row.value"
-                placeholder="Enter parameter value"
+                placeholder="Enter value"
                 :rules="[rules.paramValue]"
               ></el-input>
             </template>
           </el-table-column>
-          <el-table-column fixed="right">
+          <el-table-column>
             <template #default="scope">
               <el-button
                 link
@@ -166,7 +166,7 @@
             </template>
           </el-table-column>
         </el-table>
-        <div>
+        <div id="addParamButtonWrapper">
             <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
         </div>
         </el-form-item>
@@ -193,7 +193,7 @@
 
         <el-form-item prop="source.url">
           <template #label>
-            Source Url <span class="label-helper"> required </span>
+            Source URL <span class="label-helper"> required </span>
             <span class="url-format-info"> Format: github.com/owner/repo </span>
           </template>
           <el-input
@@ -680,5 +680,38 @@ function createMemoryItems(cpu, comp) {
   .url-format-info a:hover {
     text-decoration: underline;
   }
+
+  #addParamButtonWrapper {
+    width: 100%;
+    text-align: center;
+    margin: 8px 24px;
+
+    .el-button {
+      width: 100%;
+    }
+  }
 }
+</style>
+
+<style lang="scss">
+#paramsInput {
+  .el-form-item__content {
+    border: 1px solid #e5e5e5;
+  }
+
+  .cell {
+    white-space: normal;
+    max-height: unset;
+  }
+
+  .el-table .el-table__body td.el-table__cell {
+    border-right: 1px solid #e5e5e5
+  }
+
+  .el-table {
+    border-collapse: collapse;
+  }
+
+}
+
 </style>
