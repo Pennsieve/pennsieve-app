@@ -122,7 +122,7 @@ onMounted(async () => {
       id: "1",
       type: "input",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
+        label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
         type: "input",
       },
       position: { x: 130, y: 100 },
@@ -141,7 +141,7 @@ onMounted(async () => {
       id: "3",
       type: "output",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
+        label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
         type: "output",
       },
       position: { x: 170, y: 400 },
