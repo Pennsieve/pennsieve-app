@@ -17,14 +17,6 @@
        >
          Update
        </button>
-
-
-      <button
-          @click="modifyApplication"
-          class="text-button"
-      >
-        Edit
-      </button>
         <div v-if="isWaitingForResponse" 
           class="icon-waiting mr-16">
           <bf-waiting-icon />
@@ -131,10 +123,6 @@ export default {
         }
         
         },
-
-    modifyApplication: async function () {
-      console.log("modifyApplication()")
-    }
     },
 };
 </script>
