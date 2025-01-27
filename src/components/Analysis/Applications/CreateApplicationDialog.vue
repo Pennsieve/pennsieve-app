@@ -220,7 +220,6 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
-import IconAddItem from "@/components/icons/IconAddItem.vue";
 import { Plus } from "@element-plus/icons-vue";
 
 
@@ -253,7 +252,6 @@ export default {
   name: "CreateApplicationDialog",
 
   components: {
-    IconAddItem,
     BfDialogHeader,
     DialogBody,
     BfButton,
