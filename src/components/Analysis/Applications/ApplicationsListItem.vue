@@ -10,7 +10,7 @@
         {{ application.description }}
       </p>
     </el-row>
-    <el-row v-if="hasAdminRights" class="update-app" align="bottom">
+    <el-row v-if="hasAdminRights" class="update-app">
        <button
            @click="deployApplication"
            class="text-button"
@@ -122,7 +122,7 @@ export default {
           //handle update
         }
         
-        },
+        }
     },
 };
 </script>
