@@ -140,7 +140,9 @@
               <el-input
                 v-model="scope.row.name"
                 placeholder="Enter name"
-                :rules="[rules.paramName]"
+                maxlength="50"
+                show-word-limit
+                type="text"
               ></el-input>
             </template>
           </el-table-column>
@@ -149,19 +151,21 @@
               <el-input
                 v-model="scope.row.value"
                 placeholder="Enter value"
-                :rules="[rules.paramValue]"
+                maxlength="50"
+                show-word-limit
+                type="text"
               ></el-input>
             </template>
           </el-table-column>
-          <el-table-column>
+          <el-table-column width="70">
             <template #default="scope">
               <el-button
-                link
-                type="primary"
-                size="small"
+                size="medium"
                 @click.prevent="deleteParameterRow(scope.$index)"
               >
-                Remove
+                <el-icon>
+                  <CircleClose />
+                </el-icon>
               </el-button>
             </template>
           </el-table-column>
@@ -221,6 +225,7 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 import { Plus } from "@element-plus/icons-vue";
+import { CircleClose } from "@element-plus/icons-vue";
 
 
 /**
@@ -255,7 +260,8 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
-    Plus
+    Plus,
+    CircleClose
   },
 
   props: {
@@ -360,30 +366,6 @@ export default {
             required: true,
             message: "Please input the source type",
             trigger: "change",
-          },
-        ],
-        paramName: [
-          {
-            required: true,
-            message: "Please input the parameter name",
-            trigger: "blur",
-          },
-          {
-            max: 50,
-            message: "Name cannot exceed 50 characters",
-            trigger: "blur",
-          },
-        ],
-        paramValue: [
-          {
-            required: true,
-            message: "Please input the parameter value",
-            trigger: "blur",
-          },
-          {
-            max: 50,
-            message: "Value cannot exceed 50 characters",
-            trigger: "blur",
           },
         ],
         "source.url": [

@@ -2,7 +2,7 @@
   <bf-stage element-loading-background="transparent">
     <template #actions>
       <bf-button
-        :disabled="!isFeatureFlagEnabled || !hasAdminRights"
+        :disabled="false"
         @click="openCreateApplicationDialog"
       >
         Create Application
