@@ -10,14 +10,26 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
 
-const { onInit, onConnect, addEdges, fitView, findNode, onNodeClick, getSelectedNodes } =
-  useVueFlow();
+const {
+  onInit,
+  onConnect,
+  addEdges,
+  fitView,
+  findNode,
+  getSelectedNodes,
+  onNodeClick,
+} = useVueFlow();
+
 // Access the Vuex store
 const store = useStore();
 
 // Gobal State from Vuex Store
 const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"]
+);
+
+const activityLogsVisible = computed(
+  () => store.getters["analysisModule/activityLogsVisible"]
 );
 
 const selectedWorkflowActivity = computed(
@@ -201,23 +213,36 @@ function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
 
+const isDetailsPanelOpen = ref(false);
+const selectedProcessor = ref({});
+function openDetailsPanel(selectedApplication) {
+  isDetailsPanelOpen.value = true;
+  selectedProcessor.value = selectedApplication;
+}
+
 /*
 Event Handler for Node Click
  */
 const selectedNode = ref({});
-const activityLogsVisible = ref(false);
 
-onNodeClick(({event, node}) => {
-  const selectedAppliction = selectedWorkflowActivity.value.workflow.find((x)=>x.name===node.data.label)
-  if(selectedAppliction){
-    selectedNode.value = selectedAppliction;
-    activityLogsVisible.value = true;
+onNodeClick(({ node }) => {
+  const selectedApplication = selectedWorkflowActivity.value.workflow.find(
+    (x) => x.name === node.data.label
+  );
+  if (selectedApplication) {
+    selectedNode.value = selectedApplication;
+    openDetailsPanel(selectedApplication);
   }
-})
+});
+
 </script>
 
 <template>
   <div class="activity-monitor">
+
+    <h2 class="vue-flow-title">
+      {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
+    </h2>
     <div class="graph-browser">
       <div class="vue-flow-title">
       {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
@@ -247,6 +272,8 @@ onNodeClick(({event, node}) => {
       <ActivitySidePanel
         :class="{ visible: sidePanelVisible }"
         :panel-visible="sidePanelVisible"
+        :show-details-panel="isDetailsPanelOpen"
+        :selected-processor="selectedProcessor"
         @toggle-panel-visibility="onTogglePanelVisibility"
       />
       <el-dialog
@@ -270,13 +297,13 @@ onNodeClick(({event, node}) => {
         </template>
       </el-dialog>
     </div>
+    <ActivityLogs
+      :dialog-visible="activityLogsVisible"
+      :selected-node="selectedNode"
+      :selected-application="selectedWorkflowActivity"
+      @close-dialog="activityLogsVisible = false"
+    ></ActivityLogs>
   </div>
-  <ActivityLogs
-    :dialog-visible="activityLogsVisible"
-    :selected-node="selectedNode"
-    :selected-application="selectedWorkflowActivity"
-    @close-dialog="activityLogsVisible = false"
-  ></ActivityLogs>
 </template>
 
 <style lang="sass">

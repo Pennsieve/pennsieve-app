@@ -1,6 +1,10 @@
 <template>
   <div class="model-details">
-    <div v-if="false">Hello!</div>
+    <div v-if="true">
+      <div>{{ selectedProcessor.name }}</div>
+      <div>{{ selectedProcessor.description }}</div>
+      <button @click="handleLogsClick">Logs</button>
+    </div>
     <div v-else>
       <div class="img-container">
         <img
@@ -17,7 +21,7 @@
 </template>
 
 <script>
-import { mapGetters } from "vuex";
+import { mapGetters, mapMutations } from "vuex";
 
 export default {
   name: "ProcessorDetails",
@@ -26,17 +30,30 @@ export default {
 
   emits: [],
 
-  props: {},
-
-  computed: {},
-
-  watch: {},
-
-  data: function () {
-    return {};
+  props: {
+    selectedProcessor: {
+      type: Object,
+      default: () => ({}),
+    },
   },
 
-  methods: {},
+  data: function () {
+    return {
+      activityLogsVisible: false,
+    };
+  },
+
+  methods: {
+    methods: {
+      ...mapMutations("analysisModule", {
+        showActivityLogsDialog: "SHOW_ACTIVITY_LOGS_DIALOG",
+      }),
+      handleLogsClick() {
+        console.log("hi");
+        showActivityLogsDialog(selectedProcessor);
+      },
+    },
+  },
 };
 </script>
 
