@@ -123,7 +123,6 @@ onMounted(async () => {
       type: "input",
       data: {
         label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
-        type: "input",
       },
       position: { x: 130, y: 100 },
       class: "light",
@@ -142,7 +141,6 @@ onMounted(async () => {
       type: "output",
       data: {
         label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
-        type: "output",
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -158,7 +156,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "input",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
-          type: "input",
         },
         position: { x: 130, y: 100 },
         class: "light",
@@ -177,7 +174,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "output",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
-          type: "output",
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -237,6 +233,9 @@ onNodeClick(({ node }) => {
       {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
     </h2>
     <div class="graph-browser">
+      <div class="vue-flow-title">
+        {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+      </div>
       <div class="vue-flow-wrapper">
         <VueFlow
           :nodes="nodes"
@@ -247,10 +246,7 @@ onNodeClick(({ node }) => {
           :max-zoom="4"
         >
           <template #node-custom="customNodeProps">
-            <CustomNode
-              :node-props="customNodeProps"
-              @node-click="onNodeClick"
-            />
+            <CustomNode :node-props="customNodeProps" />
           </template>
           <Background pattern-color="#aaa" :gap="16" />
 
@@ -318,7 +314,7 @@ onNodeClick(({ node }) => {
 }
 
 .graph-browser {
-  height: calc(100vh - 114px);
+  height: calc(100vh - 190px);
   overflow: hidden;
   position: relative;
 }
@@ -390,7 +386,15 @@ onNodeClick(({ node }) => {
 </style>
 <style lang="scss">
 .vue-flow-title {
-  margin: 20px !important;
+  position: absolute;
+  top: 7%;
+  left: 6%;
+  background-color: #f7f7f7;
+  width: fit-content;
+  padding: 10px;
+  z-index: 1;
+  border-radius: 5px;
+  margin: 0;
 }
 
 .activity-monitor {
