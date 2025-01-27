@@ -110,7 +110,12 @@ export default {
       applicationEdit: {},
     };
   },
-
+  mounted(){
+    setInterval(() => {
+      console.log("interval 1 min")
+        //this.getApplicationsStatus();
+    }, 60000); 
+  },
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
     ...mapState("analysisModule", ["applications"]),
@@ -198,6 +203,9 @@ export default {
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
     },
+    getApplicationsStatus: function(){
+      this.applications = this.fetchApplications();
+    }
   },
 };
 </script>
