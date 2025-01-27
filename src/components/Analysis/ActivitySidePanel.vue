@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from "vue";
+import { ref, watch } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
 import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
@@ -34,11 +34,11 @@ const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
 
 watch(
-  () => props.showDetailsPanel, // The getter function that watches the prop
+  () => props.selectedProcessor, // The getter function that watches the prop
   (newVal, oldVal) => {
-    console.log(newVal);
-    toggleModelsList({ currentTarget: { id: "propPanel" } });
-    console.log(props.selectedProcessor);
+    modelsListVisible.value = true;
+    modelListSelected.value = false;
+    modelInfoSelected.value = true;
   }
 );
 

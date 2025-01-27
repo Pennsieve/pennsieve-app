@@ -10,15 +10,7 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
 
-const {
-  onInit,
-  onConnect,
-  addEdges,
-  fitView,
-  findNode,
-  getSelectedNodes,
-  onNodeClick,
-} = useVueFlow();
+const { onNodeClick } = useVueFlow();
 // Access the Vuex store
 const store = useStore();
 
@@ -35,10 +27,6 @@ const cancelWorkflowDialogVisible = computed(
   () => store.state.analysisModule.cancelWorkflowDialogVisible
 );
 
-const hideCancelWorkflowDialog = () => {
-  store.commit("analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG");
-};
-
 const cancelWorkflow = () => {
   store.dispatch(
     "analaysisModule/cancelWorkflow",
@@ -46,6 +34,10 @@ const cancelWorkflow = () => {
   );
   hideCancelWorkflowDialog();
 };
+
+const activityDialogVisible = computed(
+  () => store.getters["analysisModule/activityDialogVisible"]
+);
 
 // Local State
 const isLoading = ref(false);
@@ -215,14 +207,18 @@ function onTogglePanelVisibility() {
 const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 function openDetailsPanel(selectedApplication) {
-  isDetailsPanelOpen.value = !isDetailsPanelOpen.value;
+  isDetailsPanelOpen.value = true;
   selectedProcessor.value = selectedApplication;
 }
+
+const handleCloseDialog = () => {
+  store.dispatch("analysisModule/hideActivityLogDialog");
+};
+
 /*
 Event Handler for Node Click
  */
 const selectedNode = ref({});
-const activityLogsVisible = ref(false);
 
 onNodeClick(({ node }) => {
   const selectedApplication = selectedWorkflowActivity.value.workflow.find(
@@ -230,7 +226,6 @@ onNodeClick(({ node }) => {
   );
   if (selectedApplication) {
     selectedNode.value = selectedApplication;
-    console.log("runs");
     openDetailsPanel(selectedApplication);
   }
 });
@@ -293,13 +288,13 @@ onNodeClick(({ node }) => {
         </template>
       </el-dialog>
     </div>
+    <ActivityLogs
+      :dialog-visible="activityDialogVisible"
+      :selected-node="selectedNode"
+      :selected-application="selectedWorkflowActivity"
+      @close-dialog="handleCloseDialog"
+    ></ActivityLogs>
   </div>
-  <ActivityLogs
-    :dialog-visible="activityLogsVisible"
-    :selected-node="selectedNode"
-    :selected-application="selectedWorkflowActivity"
-    @close-dialog="activityLogsVisible = false"
-  ></ActivityLogs>
 </template>
 
 <style lang="sass">
