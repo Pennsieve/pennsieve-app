@@ -1,6 +1,6 @@
 <template>
   <div class="model-details">
-    <div v-if="true" class="processor-details">
+    <div v-if="selectedProcessor.name" class="processor-details">
       <bf-button @click="handleLogsClick">View Logs</bf-button>
       <!-- <div class="processor-item">
         <span class="label">Status:</span> <span class="value"></span>
@@ -53,6 +53,7 @@ export default {
   methods: {
     ...mapActions("analysisModule", ["showActivityLogDialog"]),
     handleLogsClick() {
+      console.log("this.selectedProcessor", this.selectedProcessor);
       this.showActivityLogDialog();
     },
   },
