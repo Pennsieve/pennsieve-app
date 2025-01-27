@@ -365,6 +365,7 @@ const initialState = () => ({
     },
     cancelWorkflow: ({commit}, workflowId) => {
       // make API request to cancel workflow
+      commit('HIDE_CANCEL_WORKFLOW_DIALOG')
     },
     showActivityLogDialog: ({ commit, rootState }) => {
       commit('SHOW_ACTIVITY_LOG_DIALOG')
