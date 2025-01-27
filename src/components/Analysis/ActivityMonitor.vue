@@ -10,25 +10,13 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
 
-const {
-  onInit,
-  onConnect,
-  addEdges,
-  fitView,
-  findNode,
-  getSelectedNodes,
-  onNodeClick,
-} = useVueFlow();
+const { onNodeClick } = useVueFlow();
 // Access the Vuex store
 const store = useStore();
 
 // Gobal State from Vuex Store
 const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"]
-);
-
-const activityLogsVisible = computed(
-  () => store.getters["analysisModule/activityLogsVisible"]
 );
 
 const selectedWorkflowActivity = computed(
@@ -39,10 +27,6 @@ const cancelWorkflowDialogVisible = computed(
   () => store.state.analysisModule.cancelWorkflowDialogVisible
 );
 
-const hideCancelWorkflowDialog = () => {
-  store.commit("analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG");
-};
-
 const cancelWorkflow = () => {
   store.dispatch(
     "analaysisModule/cancelWorkflow",
@@ -50,6 +34,10 @@ const cancelWorkflow = () => {
   );
   hideCancelWorkflowDialog();
 };
+
+const activityDialogVisible = computed(
+  () => store.getters["analysisModule/activityDialogVisible"]
+);
 
 // Local State
 const isLoading = ref(false);
@@ -223,6 +211,10 @@ function openDetailsPanel(selectedApplication) {
   selectedProcessor.value = selectedApplication;
 }
 
+const handleCloseDialog = () => {
+  store.dispatch("analysisModule/hideActivityLogDialog");
+};
+
 /*
 Event Handler for Node Click
  */
@@ -297,10 +289,10 @@ onNodeClick(({ node }) => {
       </el-dialog>
     </div>
     <ActivityLogs
-      :dialog-visible="activityLogsVisible"
+      :dialog-visible="activityDialogVisible"
       :selected-node="selectedNode"
       :selected-application="selectedWorkflowActivity"
-      @close-dialog="activityLogsVisible = false"
+      @close-dialog="handleCloseDialog"
     ></ActivityLogs>
   </div>
 </template>

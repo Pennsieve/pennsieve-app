@@ -23,8 +23,7 @@ const initialState = () => ({
     workflowInstance: {},
     selectedWorkflowActivity: [],
     cancelWorkflowDialogVisible: false,
-    activityLogsVisible: false,
-    selectedProcessor: {}
+    activityDialogVisible: false
   })
   
   export const state = initialState()
@@ -105,14 +104,12 @@ const initialState = () => ({
     HIDE_CANCEL_WORKFLOW_DIALOG(state) {
       state.cancelWorkflowDialogVisible = false
     },
-    SHOW_ACTIVITY_LOGS_DIALOG(state, selectedProcessor) {
-      console.log(selectedProcessor)
-      state.activityLogsVisible = true
-      state.setSelectedProcessor = selectedProcessor
+    SHOW_ACTIVITY_LOG_DIALOG(state) {
+      state.activityDialogVisible = true;
     },
-    HIDE_ACTIVITY_LOGS_DIALOG(state) {
-      state.activityLogsVisible = false
-    },
+    HIDE_ACTIVITY_LOG_DIALOG(state) {
+      state.activityDialogVisible = false;
+    }
   
   }
 
@@ -368,6 +365,12 @@ const initialState = () => ({
     },
     cancelWorkflow: ({commit}, workflowId) => {
       // make API request to cancel workflow
+    },
+    showActivityLogDialog: ({ commit, rootState }) => {
+      commit('SHOW_ACTIVITY_LOG_DIALOG')
+    },
+    hideActivityLogDialog: ({ commit, rootState }) => {
+      commit('HIDE_ACTIVITY_LOG_DIALOG')
     }
   }
   
@@ -376,7 +379,7 @@ const initialState = () => ({
     workflowInstance: state => state.workflowInstance,
     workflowLogs: state => state.workflowLogs,
     selectedWorkflowActivity: state => state.selectedWorkflowActivity,
-    activityLogsVisible: state => state.activityLogsVisible
+    activityDialogVisible: state => state.activityDialogVisible
   }
   
   
