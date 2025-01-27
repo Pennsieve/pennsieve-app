@@ -27,6 +27,10 @@ const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"]
 );
 
+const activityLogsVisible = computed(
+  () => store.getters["analysisModule/activityLogsVisible"]
+);
+
 const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
@@ -223,7 +227,6 @@ function openDetailsPanel(selectedApplication) {
 Event Handler for Node Click
  */
 const selectedNode = ref({});
-const activityLogsVisible = ref(false);
 
 onNodeClick(({ node }) => {
   const selectedApplication = selectedWorkflowActivity.value.workflow.find(
@@ -231,7 +234,6 @@ onNodeClick(({ node }) => {
   );
   if (selectedApplication) {
     selectedNode.value = selectedApplication;
-    console.log("runs");
     openDetailsPanel(selectedApplication);
   }
 });
@@ -294,13 +296,13 @@ onNodeClick(({ node }) => {
         </template>
       </el-dialog>
     </div>
+    <ActivityLogs
+      :dialog-visible="activityLogsVisible"
+      :selected-node="selectedNode"
+      :selected-application="selectedWorkflowActivity"
+      @close-dialog="activityLogsVisible = false"
+    ></ActivityLogs>
   </div>
-  <ActivityLogs
-    :dialog-visible="activityLogsVisible"
-    :selected-node="selectedNode"
-    :selected-application="selectedWorkflowActivity"
-    @close-dialog="activityLogsVisible = false"
-  ></ActivityLogs>
 </template>
 
 <style lang="sass">

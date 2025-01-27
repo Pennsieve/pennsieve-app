@@ -23,6 +23,8 @@ const initialState = () => ({
     workflowInstance: {},
     selectedWorkflowActivity: [],
     cancelWorkflowDialogVisible: false,
+    activityLogsVisible: false,
+    selectedProcessor: {}
   })
   
   export const state = initialState()
@@ -103,6 +105,15 @@ const initialState = () => ({
     HIDE_CANCEL_WORKFLOW_DIALOG(state) {
       state.cancelWorkflowDialogVisible = false
     },
+    SHOW_ACTIVITY_LOGS_DIALOG(state, selectedProcessor) {
+      console.log(selectedProcessor)
+      state.activityLogsVisible = true
+      state.setSelectedProcessor = selectedProcessor
+    },
+    HIDE_ACTIVITY_LOGS_DIALOG(state) {
+      state.activityLogsVisible = false
+    },
+  
   }
 
   export const actions = {
@@ -364,7 +375,8 @@ const initialState = () => ({
     workflowInstances: state => state.workflowInstances,
     workflowInstance: state => state.workflowInstance,
     workflowLogs: state => state.workflowLogs,
-    selectedWorkflowActivity: state => state.selectedWorkflowActivity
+    selectedWorkflowActivity: state => state.selectedWorkflowActivity,
+    activityLogsVisible: state => state.activityLogsVisible
   }
   
   

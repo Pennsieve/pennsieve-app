@@ -3,6 +3,7 @@
     <div v-if="true">
       <div>{{ selectedProcessor.name }}</div>
       <div>{{ selectedProcessor.description }}</div>
+      <button @click="handleLogsClick">Logs</button>
     </div>
     <div v-else>
       <div class="img-container">
@@ -20,7 +21,7 @@
 </template>
 
 <script>
-import { mapGetters } from "vuex";
+import { mapGetters, mapMutations } from "vuex";
 
 export default {
   name: "ProcessorDetails",
@@ -36,15 +37,23 @@ export default {
     },
   },
 
-  computed: {},
-
-  watch: {},
-
   data: function () {
-    return {};
+    return {
+      activityLogsVisible: false,
+    };
   },
 
-  methods: {},
+  methods: {
+    methods: {
+      ...mapMutations("analysisModule", {
+        showActivityLogsDialog: "SHOW_ACTIVITY_LOGS_DIALOG",
+      }),
+      handleLogsClick() {
+        console.log("hi");
+        showActivityLogsDialog(selectedProcessor);
+      },
+    },
+  },
 };
 </script>
 
