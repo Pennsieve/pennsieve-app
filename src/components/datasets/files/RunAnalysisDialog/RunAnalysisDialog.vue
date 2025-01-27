@@ -77,32 +77,26 @@
           The selected Processor has no parameter values.
         </div>
         <el-form v-if="selectedProcessorHasParams()">
-          <el-form-item prop="parameters">
-            <el-table :data="selectedProcessorParams" border>
-              <el-table-column label="Name">
-                <template #default="scope">
-                  <el-form-item
-                      v-if="scope && scope.$index >= 0"
-                      label=" "
-                      v-model="selectedProcessorParams[scope.$index].name"
-                  >
-                    <el-input v-model="scope.row.name" disabled="true"></el-input>
-                  </el-form-item>
-                </template>
-              </el-table-column>
-              <el-table-column label="Value">
-                <template #default="scope">
-                  <el-form-item
-                      v-if="scope && scope.$index >= 0"
-                      label=" "
-                      v-model="selectedProcessorParams[scope.$index].value"
-                  >
-                    <el-input v-model="scope.row.value"></el-input>
-                  </el-form-item>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-form-item>
+          <el-form-item prop="parameters" id="paramsInput">
+          <el-table :data="selectedProcessorParams" max-height="250" :border="true">
+            <el-table-column label="Name">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.name"
+                  disabled
+                ></el-input>
+              </template>
+            </el-table-column>
+            <el-table-column label="Value">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.value"
+                  placeholder="Enter value"
+                ></el-input>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-form-item>
         </el-form>
       </div>
       <div v-show="shouldShow(4)">
@@ -699,6 +693,15 @@ export default {
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+</style>
+
+<style lang="scss">
+#paramsInput {
+  .cell {
+    white-space: normal;
+    max-height: unset;
   }
 }
 </style>
