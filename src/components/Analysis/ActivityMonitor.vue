@@ -27,6 +27,10 @@ const cancelWorkflowDialogVisible = computed(
   () => store.state.analysisModule.cancelWorkflowDialogVisible
 );
 
+const hideCancelWorkflowDialog = () => {
+  store.dispatch("analysisModule/hideCancelWorkflowDialog");
+};
+
 const cancelWorkflow = () => {
   store.dispatch(
     "analysisModule/cancelWorkflow",
