@@ -378,7 +378,7 @@ export default {
           isValid = this.validateProcessors();
       }
 
-      isValid ? this.processStep += step: "";
+      if(isValid){this.processStep += step;}
 
       // When you click Cancel
       if (this.processStep === 0) {
