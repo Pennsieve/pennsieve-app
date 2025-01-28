@@ -126,6 +126,55 @@
             />
           </el-select>
         </el-form-item>
+        
+        <el-form-item prop="parameters" id="paramsInput">
+          <template #label>
+            <div>
+              <span > Parameters </span>
+              <span class="label-helper"> optional </span>
+            </div>
+          </template>
+        <el-table :data="application.parameters" max-height="250" :border="true">
+          <el-table-column label="Name">
+            <template #default="scope">
+              <el-input
+                v-model="scope.row.name"
+                placeholder="Enter name"
+                maxlength="50"
+                show-word-limit
+                type="text"
+              ></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column label="Value">
+            <template #default="scope">
+              <el-input
+                v-model="scope.row.value"
+                placeholder="Enter value"
+                maxlength="50"
+                show-word-limit
+                type="text"
+              ></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column width="70">
+            <template #default="scope">
+              <el-button
+                size="medium"
+                @click.prevent="deleteParameterRow(scope.$index)"
+              >
+                <el-icon>
+                  <CircleClose />
+                </el-icon>
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div id="addParamButtonWrapper">
+            <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
+        </div>
+        </el-form-item>
+
         <el-form-item prop="source.type">
           <template #label>
             Source Type <span class="label-helper"> required </span>
@@ -148,7 +197,7 @@
 
         <el-form-item prop="source.url">
           <template #label>
-            Source Url <span class="label-helper"> required </span>
+            Source URL <span class="label-helper"> required </span>
             <span class="url-format-info"> Format: github.com/owner/repo </span>
           </template>
           <el-input
@@ -175,6 +224,9 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
+import { Plus } from "@element-plus/icons-vue";
+import { CircleClose } from "@element-plus/icons-vue";
+
 
 /**
  * Returns the default values for a property
@@ -198,6 +250,7 @@ const defaultApplicationFormValues = () => ({
     type: "",
     url: "",
   },
+  parameters: [],
 });
 
 export default {
@@ -207,6 +260,8 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
+    Plus,
+    CircleClose
   },
 
   props: {
@@ -365,6 +420,27 @@ export default {
       this.$refs.form.clearValidate();
     },
 
+    addParameterRow() {
+      this.application.parameters.push({name: null, value: null});
+    },
+
+    deleteParameterRow(index) {
+      this.application.parameters.splice(index,1)
+    },
+
+    getApplicationParams() {
+      if (this.application.parameters.length > 0) {
+        let paramsEntries = []
+        this.application.parameters.forEach((param) => {
+          paramsEntries.push([param.name, param.value])
+        })
+        let paramsObject = Object.fromEntries(paramsEntries)
+        return paramsObject
+      } else {
+        return null
+      }
+    },
+
     /**
      * POST to API to create new application
      */
@@ -388,13 +464,20 @@ export default {
             type: this.application.source.type,
             url: `git://${this.application.source.url}`,
           };
+
+          const formattedParams = this.getApplicationParams()
+
           const formattedNewApplication = {
             ...this.application,
             account: accountDetails,
             computeNode: computeNodeDetails,
             resources: formattedResources,
             source: formattedSource,
+            params: formattedParams,
           };
+
+          // remove formattedNewApplication.parameters ('params' is what is stored)
+          delete formattedNewApplication.parameters
 
           try {
             await this.createApplication(formattedNewApplication);
@@ -577,5 +660,38 @@ function createMemoryItems(cpu, comp) {
   .url-format-info a:hover {
     text-decoration: underline;
   }
+
+  #addParamButtonWrapper {
+    width: 100%;
+    text-align: center;
+    margin: 8px 24px;
+
+    .el-button {
+      width: 100%;
+    }
+  }
 }
+</style>
+
+<style lang="scss">
+#paramsInput {
+  .el-form-item__content {
+    border: 1px solid #e5e5e5;
+  }
+
+  .cell {
+    white-space: normal;
+    max-height: unset;
+  }
+
+  .el-table .el-table__body td.el-table__cell {
+    border-right: 1px solid #e5e5e5
+  }
+
+  .el-table {
+    border-collapse: collapse;
+  }
+
+}
+
 </style>
