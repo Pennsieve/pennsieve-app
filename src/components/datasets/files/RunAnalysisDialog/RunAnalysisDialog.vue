@@ -202,7 +202,7 @@ export default {
       tableResultsTotalCount: 0,
       targetDirectory: "",
       clearSelectedValues: false,
-      warningMessage:""
+      warningMessage:"",
       selectedProcessorParams: [],
 
     };
