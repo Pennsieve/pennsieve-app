@@ -131,6 +131,8 @@ export default {
           params.push({'name': key, 'value': value})
         }
         return params
+      } else {
+        return []
       }
     },
 

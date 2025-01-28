@@ -13,7 +13,6 @@
         v-for="application in applications"
         :key="application.id"
         :application="application"
-        @open-delete-application="openDeleteApplicationDialog"
         @open-edit-application-dialog="openEditApplicationDialog"
       />
     </div>
@@ -46,7 +45,7 @@
       @close="onCloseAddDialog"
     />
     <edit-application-dialog
-      :dialogVisible="editApplicationDialogVisible"
+      :dialog-visible="editApplicationDialogVisible"
       :application="selectedApplication"
       @edit-application="onEditApplicationConfirm"
       @close="onCloseEditDialog"
