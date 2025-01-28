@@ -160,7 +160,7 @@
           <el-table-column width="70">
             <template #default="scope">
               <el-button
-                size="medium"
+                :size="'default'"
                 @click.prevent="deleteParameterRow(scope.$index)"
               >
                 <el-icon>
@@ -224,8 +224,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
-import { Plus } from "@element-plus/icons-vue";
-import { CircleClose } from "@element-plus/icons-vue";
+import { CircleClose, Plus } from "@element-plus/icons-vue";
 
 
 /**
