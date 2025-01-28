@@ -372,10 +372,28 @@ const initialState = () => ({
           },
         })
 
+        function mergeByUUID(applications, statuses) {
+          // Create a map of statuses for quick lookup by uuid
+          const statusMap = statuses.reduce((map, status) => {
+              map[status.uuid] = status;
+              return map;
+          }, {});
+      
+          // Merge applications with their corresponding statuses
+          return applications.map(app => {
+              const matchingStatus = statusMap[app.uuid] || {};
+              return {
+                  ...app,
+                  ...matchingStatus
+              };
+          });
+      }
+      
+
         if (resp.ok) {
           const result = await resp.json()
-          result.workflow = result.processors
-          delete result.processors
+          result.workflow = mergeByUUID(workflow.workflow, result.processors)
+          result.name = workflow.name
           console.log('workflow', result)
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
         } else {
@@ -385,9 +403,6 @@ const initialState = () => ({
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
           return Promise.reject(err)
       }
-
-
-      // commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
     },
     cancelWorkflow: ({commit}, workflowId) => {
       // make API request to cancel workflow
