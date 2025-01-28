@@ -73,6 +73,33 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
+        <div v-if="!selectedProcessorHasParams()">
+          The selected Processor has no parameter values.
+        </div>
+        <el-form v-if="selectedProcessorHasParams()">
+          <el-form-item prop="parameters" id="paramsInput">
+          <el-table :data="selectedProcessorParams" max-height="250" :border="true">
+            <el-table-column label="Name">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.name"
+                  disabled
+                ></el-input>
+              </template>
+            </el-table-column>
+            <el-table-column label="Value">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.value"
+                  placeholder="Enter value"
+                ></el-input>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-form-item>
+        </el-form>
+      </div>
+      <div v-show="shouldShow(4)">
         <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
@@ -149,7 +176,7 @@ export default {
   data: function () {
     return {
       processStep: 1,
-      lastProcessStep: 4,
+      lastProcessStep: 5,
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
@@ -176,6 +203,8 @@ export default {
       targetDirectory: "",
       clearSelectedValues: false,
       warningMessage:""
+      selectedProcessorParams: [],
+
     };
   },
   computed: {
@@ -208,7 +237,7 @@ export default {
      * @returns {String}
      */
     proceedText: function () {
-      return this.processStep === 3 ? "Run Analysis" : "Next";
+      return this.processStep === 4 ? "Run Analysis" : "Next";
     },
     stepBackText: function () {
       return this.processStep > 1 ? "Back" : "Cancel";
@@ -223,6 +252,14 @@ export default {
       this.formatPreprocessorOptions();
       this.formatProcessorOptions();
       this.formatPostprocessorOptions();
+    },
+    selectedProcessor: function () {
+      this.selectedProcessorParams = []
+      if (this.selectedProcessor && this.selectedProcessor.params) {
+        for (const [key, value] of Object.entries(this.selectedProcessor.params)) {
+          this.selectedProcessorParams.push({'name': key, 'value': value})
+        }
+      }
     },
   },
 
@@ -348,7 +385,7 @@ export default {
         this.closeDialog();
       }
       // When you click "Run Analysis"
-      if (this.processStep > 3 ) {
+       if (this.processStep > 4) {
         await this.runAnalysis();
       }
     },
@@ -376,6 +413,13 @@ export default {
           return false;
         }
     },
+    selectedProcessorHasParams: function() {
+      if (this.selectedProcessorParams.length > 0) {
+        return true
+      } else {
+        return false
+      }
+    },
     /**
      * Run Analysis Workflow on Selected Files
      */
@@ -395,7 +439,15 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = (application) => {
+      const formatApplication = (application, parameters) => {
+        let paramsObject = {}
+        if (parameters != null) {
+          let paramsEntries = []
+          parameters.forEach((param) => {
+            paramsEntries.push([param.name, param.value])
+          })
+          paramsObject = Object.fromEntries(paramsEntries)
+        }
         return {
           name: application.name || "",
           description: application.description || "",
@@ -403,7 +455,7 @@ export default {
           applicationId: application.applicationId || "",
           applicationContainerName: application.applicationContainerName || "",
           applicationType: application.applicationType || "",
-          params: application.params || {},
+          params: paramsObject,
           commandArguments: application.commandArguments || [],
         };
       };
@@ -416,9 +468,9 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         workflow: [
-          formatApplication(this.selectedPreprocessor),
-          formatApplication(this.selectedProcessor),
-          formatApplication(this.selectedPostprocessor),
+          formatApplication(this.selectedPreprocessor, null),
+          formatApplication(this.selectedProcessor, this.selectedProcessorParams),
+          formatApplication(this.selectedPostprocessor, null),
         ],
         params: {
           target_path: this.targetDirectory,
@@ -679,5 +731,14 @@ export default {
 .warning-message-div{
   color:red;
   margin:3px;
+}
+</style>
+
+<style lang="scss">
+#paramsInput {
+  .cell {
+    white-space: normal;
+    max-height: unset;
+  }
 }
 </style>
