@@ -132,6 +132,9 @@
       <bf-button @click="advanceStep(1)">
         {{ proceedText }}
       </bf-button>
+      <div class="warning-message-div">
+        {{ warningMessage }}
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -199,7 +202,9 @@ export default {
       tableResultsTotalCount: 0,
       targetDirectory: "",
       clearSelectedValues: false,
+      warningMessage:"",
       selectedProcessorParams: [],
+
     };
   },
   computed: {
@@ -365,19 +370,49 @@ export default {
      * Manages the Multi Step Functionality
      */
     advanceStep: async function (step) {
-      this.processStep += step;
+      let isValid = true;
+      if(this.processStep===1){
+        isValid = this.validateNode();
+      }
+      if(this.processStep===2){
+          isValid = this.validateProcessors();
+      }
+
+      if(isValid){this.processStep += step;}
 
       // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
       }
-
       // When you click "Run Analysis"
-      if (this.processStep > 4) {
+       if (this.processStep > 4) {
         await this.runAnalysis();
       }
     },
-
+      /**
+     * validate to make sure node has been selected
+     */
+    validateNode:function(){
+      if(this.computeNodeValue){
+          this.warningMessage = "";
+          return true;
+      }else{
+        this.warningMessage = "please select a compute node"
+          return false;
+      }
+    },
+    /**
+     * validate to make sure all processors have been assigned
+     */
+    validateProcessors:function(){
+        if(this.preprocessorValue && this.processorValue && this.postprocessorValue){
+          this.warningMessage = "";
+          return true;
+        }else{
+          this.warningMessage = "please select a value for all processors"
+          return false;
+        }
+    },
     selectedProcessorHasParams: function() {
       if (this.selectedProcessorParams.length > 0) {
         return true
@@ -385,7 +420,6 @@ export default {
         return false
       }
     },
-
     /**
      * Run Analysis Workflow on Selected Files
      */
@@ -693,6 +727,10 @@ export default {
   100% {
     transform: rotate(360deg);
   }
+}
+.warning-message-div{
+  color:red;
+  margin:3px;
 }
 </style>
 

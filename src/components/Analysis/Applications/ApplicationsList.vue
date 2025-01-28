@@ -112,8 +112,7 @@ export default {
   },
   mounted(){
     setInterval(() => {
-      console.log("interval 1 min")
-        //this.getApplicationsStatus();
+        this.getApplicationsStatus();
     }, 60000); 
   },
   computed: {
@@ -204,7 +203,7 @@ export default {
       this.createApplication(application);
     },
     getApplicationsStatus: function(){
-      this.applications = this.fetchApplications();
+      this.fetchApplications();
     }
   },
 };
