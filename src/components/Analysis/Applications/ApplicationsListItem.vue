@@ -11,12 +11,11 @@
       </p>
     </el-row>
     <el-row v-if="hasAdminRights" class="applications-update-app">
-
       <div class="update-button-div">
         <el-button
           @click="deployApplication"
           class="update-button"
-          :class="{disabled:application.status!=='registered' || isWaitingForResponse}"
+          :disabled="updateButtonDisabled"
         >
           Update
         </el-button>
@@ -76,7 +75,20 @@ export default {
       }
     },
     updateStatusText:function () {
-        return "last "+this.application.status +" on 12/25/25";
+        if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
+          return "application is " +this.application.status;
+        }else if(this.application.status==="error"){
+          return "applicaiton encountered and error"
+        }
+        else{return "application has been " +this.application.status;}
+    },
+    updateButtonDisabled:function(){
+      if(['registering', 'deploying', 're-deploying', 'pending'].includes(this.application.status) 
+      || this.isWaitingForResponse){
+        return true;
+      }else{
+        return false;
+      }
     } 
   },
 
@@ -94,8 +106,10 @@ export default {
     };
   },
   methods: {
-    ...mapActions("analysisModule", ["updateApplication"]),
-
+    ...mapActions("analysisModule", [
+      "updateApplication",
+      "fetchApplications"
+    ]),
     deployApplication: async function () {
 
       this.isWaitingForResponse = true;
@@ -136,7 +150,8 @@ export default {
             },
           });
         } finally {
-          this.isWaitingForResponse = false;
+          await this.fetchApplications();
+          this.isWaitingForResponse= false;
           //handle update
         }
         
