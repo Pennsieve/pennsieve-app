@@ -22,7 +22,7 @@
           content="Cancel this workflow"
           placement="top-start"
         >
-          <el-button size="medium" @click="showCancelWorkflowDialog">
+          <el-button :size="'default'" @click="showCancelWorkflowDialog">
             <el-icon>
               <CircleClose />
             </el-icon>

@@ -160,7 +160,7 @@
           <el-table-column width="70">
             <template #default="scope">
               <el-button
-                size="medium"
+                :size="'default'"
                 @click.prevent="deleteParameterRow(scope.$index)"
               >
                 <el-icon>
