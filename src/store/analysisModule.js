@@ -20,8 +20,7 @@ const initialState = () => ({
     */
     fileCount: 0,
     workflowInstances: [],
-    workflowInstance: {},
-    selectedWorkflowActivity: [],
+    selectedWorkflowActivity: {},
     cancelWorkflowDialogVisible: false,
     activityDialogVisible: false
   })
@@ -88,9 +87,6 @@ const initialState = () => ({
     },
     SET_WORKFLOW_INSTANCES(state, instances) {
       state.workflowInstances = instances
-    },
-    SET_WORKFLOW_INSTANCE(state, instance) {
-      state.workflowInstance = instance
     },
     SET_WORKFLOW_LOGS(state, logs) {
       state.workflowLogs= logs
@@ -311,29 +307,6 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    fetchWorkflowInstance: async({commit, rootState }, uuid) => {
-      try {
-        const url = `${rootState.config.api2Url}/workflows/instances/${uuid}`;
-
-        const userToken = await useGetToken()
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
-
-        if (resp.ok) {
-          const result = await resp.json()
-          commit('SET_WORKFLOW_INSTANCE', result)
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          commit('SET_WORKFLOW_INSTANCE', [])
-          return Promise.reject(err)
-      }
-    },
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
@@ -360,8 +333,61 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    setSelectedWorkflowActivity: ({ commit, rootState}, workflow) => {
-      commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
+    fetchWorkflowInstance: async({commit, rootState }, uuid) => {
+      try {
+        const url = `${rootState.config.api2Url}/workflows/instances/${uuid}/status`;
+
+        const userToken = await useGetToken()
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          result.workflow = result.processors
+          delete result.processors
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+          return Promise.reject(err)
+      }
+    },
+    setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+      // await dispatch('fetchWorkflowInstance', workflow.uuid);
+      console.log('workflow that gets passed to setSelectedWorkflowActivity', workflow)
+      try {
+        const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
+
+        const userToken = await useGetToken()
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          result.workflow = result.processors
+          delete result.processors
+          console.log('workflow', result)
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+          return Promise.reject(err)
+      }
+
+
+      // commit('SET_SELECTED_WORKFLOW_ACTIVITY', workflow )
     },
     cancelWorkflow: ({commit}, workflowId) => {
       // make API request to cancel workflow

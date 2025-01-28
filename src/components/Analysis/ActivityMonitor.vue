@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, nextTick, ref, onMounted } from "vue";
+import { computed, watch, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 
 // Vue Flow Imports
@@ -43,7 +43,6 @@ const activityDialogVisible = computed(
   () => store.getters["analysisModule/activityDialogVisible"]
 );
 
-// Local State
 const isLoading = ref(false);
 
 const initialNodes = [
@@ -187,16 +186,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
 });
 
 /*
-VueFlow Config and Create Relationships
- */
-const minimapLocation = computed(() => {
-  if (sidePanelVisible.value) {
-    return "bottom-left";
-  }
-
-  return "bottom-right";
-});
-/*
 Side Panel Logic
  */
 const sidePanelVisible = ref(true);
@@ -253,9 +242,6 @@ onNodeClick(({ node }) => {
             <CustomNode :node-props="customNodeProps" />
           </template>
           <Background pattern-color="#aaa" :gap="16" />
-
-          <!-- <MiniMap :position="minimapLocation" :pannable="true" /> -->
-
           <Controls position="top-left" />
         </VueFlow>
       </div>

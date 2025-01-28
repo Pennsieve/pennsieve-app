@@ -59,7 +59,6 @@ export default {
   methods: {
     ...mapActions("analysisModule", ["showActivityLogDialog"]),
     handleLogsClick() {
-      console.log("this.selectedProcessor", this.selectedProcessor);
       this.showActivityLogDialog();
     },
   },
