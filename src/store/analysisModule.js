@@ -23,6 +23,7 @@ const initialState = () => ({
     workflowInstance: {},
     selectedWorkflowActivity: [],
     cancelWorkflowDialogVisible: false,
+    activityDialogVisible: false
   })
   
   export const state = initialState()
@@ -103,6 +104,13 @@ const initialState = () => ({
     HIDE_CANCEL_WORKFLOW_DIALOG(state) {
       state.cancelWorkflowDialogVisible = false
     },
+    SHOW_ACTIVITY_LOG_DIALOG(state) {
+      state.activityDialogVisible = true;
+    },
+    HIDE_ACTIVITY_LOG_DIALOG(state) {
+      state.activityDialogVisible = false;
+    }
+  
   }
 
   export const actions = {
@@ -357,6 +365,16 @@ const initialState = () => ({
     },
     cancelWorkflow: ({commit}, workflowId) => {
       // make API request to cancel workflow
+      commit('HIDE_CANCEL_WORKFLOW_DIALOG')
+    },
+    hideCancelWorkflowDialog: ({commit}) => {
+      commit('HIDE_CANCEL_WORKFLOW_DIALOG')
+    },
+    showActivityLogDialog: ({ commit, rootState }) => {
+      commit('SHOW_ACTIVITY_LOG_DIALOG')
+    },
+    hideActivityLogDialog: ({ commit, rootState }) => {
+      commit('HIDE_ACTIVITY_LOG_DIALOG')
     }
   }
   
@@ -364,7 +382,8 @@ const initialState = () => ({
     workflowInstances: state => state.workflowInstances,
     workflowInstance: state => state.workflowInstance,
     workflowLogs: state => state.workflowLogs,
-    selectedWorkflowActivity: state => state.selectedWorkflowActivity
+    selectedWorkflowActivity: state => state.selectedWorkflowActivity,
+    activityDialogVisible: state => state.activityDialogVisible
   }
   
   

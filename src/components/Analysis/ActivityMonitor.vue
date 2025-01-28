@@ -10,8 +10,7 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
 
-const { onInit, onConnect, addEdges, fitView, findNode, getSelectedNodes } =
-  useVueFlow();
+const { onNodeClick } = useVueFlow();
 // Access the Vuex store
 const store = useStore();
 
@@ -29,16 +28,20 @@ const cancelWorkflowDialogVisible = computed(
 );
 
 const hideCancelWorkflowDialog = () => {
-  store.commit("analysisModule/HIDE_CANCEL_WORKFLOW_DIALOG");
+  store.dispatch("analysisModule/hideCancelWorkflowDialog");
 };
 
 const cancelWorkflow = () => {
   store.dispatch(
-    "analaysisModule/cancelWorkflow",
+    "analysisModule/cancelWorkflow",
     selectedWorkflowActivity?.uuid
   );
   hideCancelWorkflowDialog();
 };
+
+const activityDialogVisible = computed(
+  () => store.getters["analysisModule/activityDialogVisible"]
+);
 
 // Local State
 const isLoading = ref(false);
@@ -123,8 +126,7 @@ onMounted(async () => {
       id: "1",
       type: "input",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[0], "Preprocessor"),
-        type: "input",
+        label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
       },
       position: { x: 130, y: 100 },
       class: "light",
@@ -142,8 +144,7 @@ onMounted(async () => {
       id: "3",
       type: "output",
       data: {
-        label: getLabel(workflowInstances[0]?.workflow[2], "Postprocessor"),
-        type: "output",
+        label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
       },
       position: { x: 170, y: 400 },
       class: "light",
@@ -159,7 +160,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "input",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
-          type: "input",
         },
         position: { x: 130, y: 100 },
         class: "light",
@@ -178,7 +178,6 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         type: "output",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
-          type: "output",
         },
         position: { x: 170, y: 400 },
         class: "light",
@@ -205,29 +204,42 @@ function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
 
+const isDetailsPanelOpen = ref(false);
+const selectedProcessor = ref({});
+function openDetailsPanel(selectedApplication) {
+  isDetailsPanelOpen.value = true;
+  selectedProcessor.value = selectedApplication;
+}
+
+const handleCloseDialog = () => {
+  store.dispatch("analysisModule/hideActivityLogDialog");
+};
+
 /*
 Event Handler for Node Click
  */
 const selectedNode = ref({});
-const activityLogsVisible = ref(false);
 
-function onNodeClick(node) {
-  const selectedAppliction = selectedWorkflowActivity.value.workflow.find(
+onNodeClick(({ node }) => {
+  const selectedApplication = selectedWorkflowActivity.value.workflow.find(
     (x) => x.name === node.data.label
   );
-  if (selectedAppliction) {
-    selectedNode.value = selectedAppliction;
-    activityLogsVisible.value = true;
+  if (selectedApplication) {
+    selectedNode.value = selectedApplication;
+    openDetailsPanel(selectedApplication);
   }
-}
+});
 </script>
 
 <template>
   <div class="activity-monitor">
     <h2 class="vue-flow-title">
-      {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+      {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
     </h2>
     <div class="graph-browser">
+      <div class="vue-flow-title">
+        {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+      </div>
       <div class="vue-flow-wrapper">
         <VueFlow
           :nodes="nodes"
@@ -238,10 +250,7 @@ function onNodeClick(node) {
           :max-zoom="4"
         >
           <template #node-custom="customNodeProps">
-            <CustomNode
-              :node-props="customNodeProps"
-              @node-click="onNodeClick"
-            />
+            <CustomNode :node-props="customNodeProps" />
           </template>
           <Background pattern-color="#aaa" :gap="16" />
 
@@ -254,6 +263,8 @@ function onNodeClick(node) {
       <ActivitySidePanel
         :class="{ visible: sidePanelVisible }"
         :panel-visible="sidePanelVisible"
+        :show-details-panel="isDetailsPanelOpen"
+        :selected-processor="selectedProcessor"
         @toggle-panel-visibility="onTogglePanelVisibility"
       />
       <el-dialog
@@ -277,13 +288,13 @@ function onNodeClick(node) {
         </template>
       </el-dialog>
     </div>
+    <ActivityLogs
+      :dialog-visible="activityDialogVisible"
+      :selected-node="selectedNode"
+      :selected-application="selectedWorkflowActivity"
+      @close-dialog="handleCloseDialog"
+    ></ActivityLogs>
   </div>
-  <ActivityLogs
-    :dialog-visible="activityLogsVisible"
-    :selected-node="selectedNode"
-    :selected-application="selectedWorkflowActivity"
-    @close-dialog="activityLogsVisible = false"
-  ></ActivityLogs>
 </template>
 
 <style lang="sass">
@@ -307,7 +318,7 @@ function onNodeClick(node) {
 }
 
 .graph-browser {
-  height: calc(100vh - 114px);
+  height: calc(100vh - 190px);
   overflow: hidden;
   position: relative;
 }
@@ -379,7 +390,15 @@ function onNodeClick(node) {
 </style>
 <style lang="scss">
 .vue-flow-title {
-  margin: 20px !important;
+  position: absolute;
+  top: 7%;
+  left: 6%;
+  background-color: #f7f7f7;
+  width: fit-content;
+  padding: 10px;
+  z-index: 1;
+  border-radius: 5px;
+  margin: 0;
 }
 
 .activity-monitor {

@@ -7,7 +7,13 @@ import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ProcessorDetails from "./ProcessorDetails.vue";
 
-const props = defineProps(["edges", "modelId", "panelVisible"]);
+const props = defineProps([
+  "edges",
+  "modelId",
+  "panelVisible",
+  "showDetailsPanel",
+  "selectedProcessor",
+]);
 
 const modelsListVisible = ref(false);
 const modelListSelected = ref(true);
@@ -26,6 +32,15 @@ const emit = defineEmits([
 
 const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
+
+watch(
+  () => props.selectedProcessor, // The getter function that watches the prop
+  (newVal, oldVal) => {
+    modelsListVisible.value = true;
+    modelListSelected.value = false;
+    modelInfoSelected.value = true;
+  }
+);
 
 function mouseLeave(event) {
   const evtId = event.currentTarget.id;
@@ -67,16 +82,6 @@ function mouseOver(event) {
       break;
   }
 }
-
-watch(
-  () => props.modelId,
-  (modelId, second) => {
-    if (modelId) {
-      modelInfoSelected.value = true;
-      modelListSelected.value = false;
-    }
-  }
-);
 
 function focusNode(event) {
   emit("focusNode", event);
@@ -173,14 +178,7 @@ function onOpenEditPropertyDialog(event) {
 
       <processor-details
         v-show="modelInfoSelected"
-        :model-id="modelId"
-        @open-property-dialog="onOpenPropertyDialog"
-        @open-delete-property-dialog="onOpenDeletePropDialog"
-        @open-delete-linked-prop-dialog="onOpenDeleteLinkedPropDialog"
-        @open-delete-relationship-dialog="onOpenDeleteRelationshipDialog"
-        @open-delete-model-dialog="onOpenDeleteModelDialog"
-        @open-edit-property-dialog="onOpenEditPropertyDialog"
-        :edges="edges"
+        :selected-processor="selectedProcessor"
       />
     </div>
   </div>

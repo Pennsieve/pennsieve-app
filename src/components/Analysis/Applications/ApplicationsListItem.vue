@@ -10,17 +10,28 @@
         {{ application.description }}
       </p>
     </el-row>
-    <el-row v-if="hasAdminRights" class="update-app">
-       <button
-           @click="deployApplication"
-           class="text-button"
-       >
-         Update
-       </button>
+    <el-row v-if="hasAdminRights" class="applications-update-app">
+      <div class="update-button-div">
+        <el-button
+          @click="deployApplication"
+          class="update-button"
+          :class="{disabled:application.status!=='registered' || isWaitingForResponse}"
+        >
+          Update
+        </el-button>
         <div v-if="isWaitingForResponse" 
           class="icon-waiting mr-16">
           <bf-waiting-icon />
-    </div>
+        </div>
+      </div>
+      <div>
+        <el-row class="applications-status"> 
+          <p>
+            {{ updateStatusText }}
+          </p>
+        </el-row>
+      </div>
+
     </el-row>
   </div>
 
@@ -63,12 +74,16 @@ export default {
         return false;
       }
     },
+    updateStatusText:function () {
+        return "last "+this.application.status +" on 12/25/25";
+    } 
   },
 
   data: function () {
     return {
       isActive: false,
       isWaitingForResponse: false,
+      status: 'deployed',
       integrationEdit: {
         type: Object,
         default: function () {
@@ -81,6 +96,7 @@ export default {
     ...mapActions("analysisModule", ["updateApplication"]),
 
     deployApplication: async function () {
+
       this.isWaitingForResponse = true;
       try {
         const accountDetails = {
@@ -160,14 +176,35 @@ export default {
   background: $purple_tint;
   padding: 8px;
 }
-.update-app{
+.applications-update-app{
+  flex-flow: row;
   height: 100%;
-  align-self: flex-start;
-  display: flex;
-  flex-direction: column-reverse;
+  width: 100%;
+  align-items: end;
   margin: 8px;
 
+  .applications-status{
+    color: gray;
+    margin-right: 15px;
+    text-align: end;
+    p{  
+      margin:0%
+    }
+  }
+
+  .update-button-div{
+    max-width: 33%;
+    margin-right: 5px;
+  }
+  .update-button{
+    background-color: #011F5B;
+    color:white;
+    &.disabled{
+      opacity: .6;
+    }
 }
+}
+
 .icon-waiting {
   align-items: center;
   display: flex;
@@ -176,4 +213,5 @@ export default {
   justify-content: center;
   width: 24px;
 }
+
 </style>
