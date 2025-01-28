@@ -88,7 +88,7 @@ const nodes = ref(initialNodes);
 const edges = ref(initialEdges);
 
 const getLabel = (workflow, type) =>
-  workflow?.name ? workflow.name : `No ${type} Selected`;
+  workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
 
 /*
 Fetch Initial Data

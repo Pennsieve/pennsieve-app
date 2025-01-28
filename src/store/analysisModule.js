@@ -333,7 +333,7 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    fetchWorkflowInstance: async({commit, rootState }, uuid) => {
+    fetchWorkflowInstance: async({commit, dispatch, rootState }, uuid) => {
       try {
         const url = `${rootState.config.api2Url}/workflows/instances/${uuid}/status`;
 
@@ -359,8 +359,6 @@ const initialState = () => ({
       }
     },
     setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
-      // await dispatch('fetchWorkflowInstance', workflow.uuid);
-      console.log('workflow that gets passed to setSelectedWorkflowActivity', workflow)
       try {
         const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
 
