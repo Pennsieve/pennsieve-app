@@ -1,16 +1,11 @@
 <template>
   <div class="applications-list-item">
     <el-row class="info">
-      <div class="application-title">
-        {{ application.name }}
-      </div>
-    </el-row>
-    <el-row>
-      <p class="application-description">
-        {{ application.description }}
-      </p>
-    </el-row>
-    <div v-if="hasAdminRights">
+      <el-col :span="20" class="application-title">
+          <span>{{ application.name }}</span>
+      </el-col>
+      <el-col :span="4" class="application-title">
+        <template v-if="hasAdminRights">
       <el-tooltip class="box-item" effect="dark" content="Edit Application Params" placement="top-start">
         <el-button :size="'default'" @click.prevent="editApplication()">
           <el-icon>
@@ -18,24 +13,29 @@
           </el-icon>
         </el-button>
       </el-tooltip>
-    </div>
+    </template>
+      </el-col>
+
+
+    </el-row>
+    <el-row>
+      <p class="application-description">
+        {{ application.description }}
+      </p>
+    </el-row>
     <el-row v-if="hasAdminRights" class="applications-update-app">
 
       <div class="update-button-div">
-        <el-button
-          @click="deployApplication"
-          class="update-button"
-          :class="{disabled:application.status!=='registered' || isWaitingForResponse}"
-        >
+        <el-button @click="deployApplication" class="update-button"
+          :class="{disabled:application.status!=='registered' || isWaitingForResponse}">
           Update
         </el-button>
-        <div v-if="isWaitingForResponse" 
-          class="icon-waiting mr-16">
+        <div v-if="isWaitingForResponse" class="icon-waiting mr-16">
           <bf-waiting-icon />
         </div>
       </div>
       <div>
-        <el-row class="applications-status"> 
+        <el-row class="applications-status">
           <p>
             {{ updateStatusText }}
           </p>
@@ -174,10 +174,11 @@ export default {
 }
 
 .application-title {
+  display: flex;
   font-size: 16px;
-  margin: 16px 4px;
   color: black;
-  text-align: center;
+  justify-content: center;
+  align-items: center;
 }
 
 .application-description {
@@ -191,7 +192,7 @@ export default {
 
 .info {
   background: $purple_tint;
-  padding: 8px;
+  padding: 16px 8px;
 }
 .applications-update-app{
   flex-flow: row;
