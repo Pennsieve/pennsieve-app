@@ -11,6 +11,7 @@
       </p>
     </el-row>
     <el-row v-if="hasAdminRights" class="applications-update-app">
+
       <div class="update-button-div">
         <el-button
           @click="deployApplication"
@@ -113,6 +114,7 @@ export default {
           url: this.application.source.url,
         };
         const formattedUpdateDataset = {
+          uuid: this.application.uuid,
           account: accountDetails,
           destination: destination,
           source: formattedSource,
