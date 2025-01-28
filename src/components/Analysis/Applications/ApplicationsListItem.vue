@@ -33,6 +33,18 @@
       </div>
 
     </el-row>
+    <el-row>
+      <div>
+        <el-button
+          :size="'default'"
+          @click.prevent="editApplication()"
+        >
+          <el-icon>
+            <Setting />
+          </el-icon>
+        </el-button>
+      </div>
+    </el-row>
   </div>
 
 </template>
@@ -45,14 +57,16 @@ import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import { Setting } from "@element-plus/icons-vue";
 
 
 export default {
-  name: "IntegrationListItem",
+  name: "ApplicationsListItem",
 
   components: {
     IconMenu,
     Avatar,
+    Setting
   },
   mixins: [FormatDate],
 
@@ -138,6 +152,10 @@ export default {
           //handle update
         }
         
+        },
+
+    editApplication: function () {
+      this.$emit('open-edit-application-dialog', this.application)
         }
     },
 };

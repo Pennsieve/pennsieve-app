@@ -45,7 +45,7 @@ import {
 // import PsSwitch from '../../../shared/PsSwitch/PsSwitch.vue'
 
 export default {
-  name: 'IntegrationListItem',
+  name: 'IntegrationItemSmall',
 
   components: {
     // PsSwitch

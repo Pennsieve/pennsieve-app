@@ -1,10 +1,64 @@
 <template>
-  <el-dialog>
+  <el-dialog :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event">
     <template #header>
       <bf-dialog-header slot="title" title="Edit Application" />
     </template>
 
-    <dialog-body> </dialog-body>
+    <dialog-body>
+      <el-form-item prop="parameters" id="paramsInput">
+          <template #label>
+            <div>
+              <span> Parameters</span>
+            </div>
+          </template>
+        <el-table :data="applicationParams" max-height="250" :border="true">
+          <el-table-column label="Name">
+            <template #default="scope">
+              <el-input
+                v-model="scope.row.name"
+                placeholder="Enter name"
+                maxlength="50"
+                show-word-limit
+                type="text"
+              ></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column label="Value">
+            <template #default="scope">
+              <el-input
+                v-model="scope.row.value"
+                placeholder="Enter value"
+                maxlength="50"
+                show-word-limit
+                type="text"
+              ></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column width="70">
+            <template #default="scope">
+              <el-button
+                :size="'default'"
+                @click.prevent="deleteParameterRow(scope.$index)"
+              >
+                <el-icon>
+                  <CircleClose />
+                </el-icon>
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div id="addParamButtonWrapper">
+            <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
+        </div>
+        </el-form-item>
+    </dialog-body>
+
+    <template #footer>
+      <bf-button @click="editApplication">
+        Update application params
+      </bf-button>
+    </template>
   </el-dialog>
 </template>
 
@@ -14,7 +68,8 @@ import { mapState } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
-import Request from "../../../mixins/request";
+import { CircleClose, Plus } from "@element-plus/icons-vue";
+
 
 /**
  * Returns the default values for a property
@@ -28,25 +83,76 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
+    CircleClose,
+    Plus
   },
 
   mixins: [],
 
   props: {
-    dialogVisible: Boolean,
+    application: {
+      type: Object,
+      required: true,
+      default: () => ({})
+    },
+    dialogVisible: Boolean
   },
   mounted: function () {},
   data: function () {
-    return {};
+    return {
+      applicationParams: this.formatParamsForUI(this.application)
+    };
   },
 
   computed: {
     ...mapState(["userToken", "config"]),
   },
 
-  watch: {},
+  watch: {
+    application(newValue) {
+      this.applicationParams = this.formatParamsForUI(newValue)
+    }
+  },
 
-  methods: {},
+  methods: {
+    addParameterRow() {
+      console.log('clicked')
+      this.applicationParams.push({name: null, value: null});
+    },
+
+    deleteParameterRow(index) {
+      this.applicationParams.splice(index,1)
+    },
+
+    formatParamsForUI(application) {
+      if (application && application.params) {
+        let params = []
+        for (const [key, value] of Object.entries(application.params)) {
+          params.push({'name': key, 'value': value})
+        }
+        return params
+      }
+    },
+
+    editApplication() {
+      let payload = this.application
+      payload.params = this.formatParamsForPayload()
+      this.$emit('edit-application', payload)
+    },
+
+    formatParamsForPayload() {
+      if (this.applicationParams.length > 0) {
+        let paramsEntries = []
+        this.applicationParams.forEach((param) => {
+          paramsEntries.push([param.name, param.value])
+        })
+        let paramsObject = Object.fromEntries(paramsEntries)
+        return paramsObject
+      } else {
+        return null
+      }
+    },
+  },
 };
 </script>
 

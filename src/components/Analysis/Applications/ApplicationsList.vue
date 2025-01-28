@@ -14,7 +14,7 @@
         :key="application.id"
         :application="application"
         @open-delete-application="openDeleteApplicationDialog"
-        @open-edit-application="openEditApplicationDialog"
+        @open-edit-application-dialog="openEditApplicationDialog"
       />
     </div>
     <bf-empty-page-state v-else class="empty">
@@ -46,10 +46,8 @@
       @close="onCloseAddDialog"
     />
     <edit-application-dialog
-      :dialog-visible="editApplicationDialogVisible"
-      :application-edit.sync="applicationEdit"
-      applicationType="Application"
-      @add-application="onAddApplicationConfirm"
+      :dialogVisible="editApplicationDialogVisible"
+      :application="selectedApplication"
       @edit-application="onEditApplicationConfirm"
       @close="onCloseEditDialog"
     />
@@ -76,6 +74,7 @@ import ApplicationsListItem from "./ApplicationsListItem.vue";
 
 import Sorter from "../../../mixins/sorter";
 import UserRoles from "../../../mixins/user-roles";
+import EventBus from "../../../utils/event-bus";
 
 import { pathOr, propOr } from "ramda";
 
@@ -105,7 +104,7 @@ export default {
       addApplicationDialogVisible: false,
       editApplicationDialogVisible: false,
       deleteApplicationDialogVisible: false,
-      applicationEdit: {},
+      selectedApplication: {},
     };
   },
   mounted(){
@@ -165,15 +164,12 @@ export default {
     openCreateApplicationDialog: function () {
       this.addApplicationDialogVisible = true;
     },
-    openEditApplication: function () {
-      this.editApplicationDialogVisible = true;
-    },
     openDeleteApplicationDialog: function (application) {
       this.$refs.deleteApplicationDialog.setApplication(application);
       this.deleteApplicationDialogVisible = true;
     },
     openEditApplicationDialog: function (application) {
-      this.applicationEdit = application;
+      this.selectedApplication = application;
       this.editApplicationDialogVisible = true;
     },
 
@@ -190,8 +186,27 @@ export default {
      * Update application via API
      * @param {Object} updatedApplication
      */
-    onEditApplicationConfirm: function (updatedApplication) {
-      this.editApplication(updatedApplication);
+    onEditApplicationConfirm: async function (selectedApplication) {
+      try {
+        let response = await this.editApplication(selectedApplication);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+        
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        this.editApplicationDialogVisible = false
+      }
     },
 
     /**
