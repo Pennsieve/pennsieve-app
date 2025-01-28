@@ -41,10 +41,8 @@
     </bf-empty-page-state>
     <create-application-dialog
       :dialog-visible="addApplicationDialogVisible"
-      :application-edit.sync="applicationEdit"
       applicationType="Application"
       @add-application="onAddApplicationConfirm"
-      @edit-application="onEditApplicationConfirm"
       @close="onCloseAddDialog"
     />
     <edit-application-dialog
