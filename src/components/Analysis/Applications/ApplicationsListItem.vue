@@ -10,6 +10,15 @@
         {{ application.description }}
       </p>
     </el-row>
+    <div v-if="hasAdminRights">
+      <el-tooltip class="box-item" effect="dark" content="Edit Application Params" placement="top-start">
+        <el-button :size="'default'" @click.prevent="editApplication()">
+          <el-icon>
+            <Setting />
+          </el-icon>
+        </el-button>
+      </el-tooltip>
+    </div>
     <el-row v-if="hasAdminRights" class="applications-update-app">
 
       <div class="update-button-div">
@@ -33,18 +42,6 @@
         </el-row>
       </div>
 
-    </el-row>
-    <el-row>
-      <div>
-        <el-button
-          :size="'default'"
-          @click.prevent="editApplication()"
-        >
-          <el-icon>
-            <Setting />
-          </el-icon>
-        </el-button>
-      </div>
     </el-row>
   </div>
 
