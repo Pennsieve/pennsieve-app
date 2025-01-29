@@ -34,10 +34,7 @@
         <el-button
           @click="deployApplication"
           class="update-button"
-          :class="{
-            disabled:
-              application.status !== 'registered' || isWaitingForResponse,
-          }"
+          disabled="updatedButtonDisabled"
         >
           Update
         </el-button>
