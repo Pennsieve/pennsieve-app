@@ -33,24 +33,24 @@ const hideCancelWorkflowDialog = () => {
 };
 
 const cancelWorkflow = () => {
-  store.dispatch(
-    "analysisModule/cancelWorkflow",
-    selectedWorkflowActivity?.uuid
-  ).then(() => {
-    EventBus.$emit('toast', {
-      detail: {
-                type: "success",
-                msg: "Your cancellation request was successful. It may take some time to complete.",
-              },
+  store
+    .dispatch("analysisModule/cancelWorkflow", selectedWorkflowActivity?.uuid)
+    .then(() => {
+      EventBus.$emit("toast", {
+        detail: {
+          type: "success",
+          msg: "Your cancellation request was successful. It may take some time to complete.",
+        },
+      });
     })
-  }).catch((err) => {
-    EventBus.$emit('toast', {
-      detail: {
-                type: "error",
-                msg: "Something went wrong, please try again later.",
-              },
-    })
-  })
+    .catch((err) => {
+      EventBus.$emit("toast", {
+        detail: {
+          type: "error",
+          msg: "Something went wrong, please try again later.",
+        },
+      });
+    });
 };
 
 const activityDialogVisible = computed(
@@ -262,12 +262,12 @@ onNodeClick(({ node }) => {
 
 <template>
   <div class="activity-monitor">
-    <h2 class="vue-flow-title">
+    <h2 v-if="selectedWorkflowActivity" class="vue-flow-title">
       {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
     </h2>
-    <div class="graph-browser">
+    <div v-if="!isLoading && selectedWorkflowActivity" class="graph-browser">
       <div class="vue-flow-title">
-        {{ `Workflow Run: ${selectedWorkflowActivity.name}` }}
+        {{ `Workflow Run: ${selectedWorkflowActivity.name || "Loading..."}` }}
       </div>
       <div class="vue-flow-wrapper">
         <VueFlow
