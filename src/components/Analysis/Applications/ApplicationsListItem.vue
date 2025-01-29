@@ -19,22 +19,19 @@
         >
           Update
         </el-button>
-        <div v-if="isWaitingForResponse" 
-          class="icon-waiting mr-16">
+        <div v-if="isWaitingForResponse" class="icon-waiting mr-16">
           <bf-waiting-icon />
         </div>
       </div>
       <div>
-        <el-row class="applications-status"> 
+        <el-row class="applications-status">
           <p>
             {{ updateStatusText }}
           </p>
         </el-row>
       </div>
-
     </el-row>
   </div>
-
 </template>
 
 <script>
@@ -75,7 +72,7 @@ export default {
       }
     },
     updateStatusText:function () {
-        if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
+      if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
           return "application is " +this.application.status;
         }else if(this.application.status==="error"){
           return "applicaiton encountered an error"
@@ -83,13 +80,13 @@ export default {
         else{return "application has been " +this.application.status;}
     },
     updateButtonDisabled:function(){
-      if(['registering', 'deploying', 're-deploying', 'pending'].includes(this.application.status) 
+      if(['registering', 'deploying', 're-deploying', 'pending'].includes(this.application.status)
       || this.isWaitingForResponse){
         return true;
       }else{
         return false;
       }
-    } 
+    }
   },
 
   data: function () {
@@ -110,6 +107,10 @@ export default {
       "updateApplication",
       "fetchApplications"
     ]),
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8c042a1e88a353056e5affe08199d2ae3d86c984
     deployApplication: async function () {
 
       this.isWaitingForResponse = true;
@@ -152,9 +153,8 @@ export default {
         } finally {
           await this.fetchApplications();
           this.isWaitingForResponse= false;
-          //handle update
         }
-        
+
         }
     },
 };
@@ -193,33 +193,33 @@ export default {
   background: $purple_tint;
   padding: 8px;
 }
-.applications-update-app{
+.applications-update-app {
   flex-flow: row;
   height: 100%;
   width: 100%;
   align-items: end;
   margin: 8px;
 
-  .applications-status{
+  .applications-status {
     color: gray;
     margin-right: 15px;
     text-align: end;
-    p{  
-      margin:0%
+    p {
+      margin: 0%;
     }
   }
 
-  .update-button-div{
+  .update-button-div {
     max-width: 33%;
     margin-right: 5px;
   }
-  .update-button{
-    background-color: #011F5B;
-    color:white;
-    &.disabled{
-      opacity: .6;
+  .update-button {
+    background-color: #011f5b;
+    color: white;
+    &.disabled {
+      opacity: 0.6;
     }
-}
+  }
 }
 
 .icon-waiting {
@@ -230,5 +230,4 @@ export default {
   justify-content: center;
   width: 24px;
 }
-
 </style>

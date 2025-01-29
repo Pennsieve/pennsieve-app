@@ -110,10 +110,11 @@ export default {
       applicationEdit: {},
     };
   },
-  mounted(){
+  mounted() {
     setInterval(() => {
-        this.getApplicationsStatus();
-    }, 60000); 
+      //this will be replaced by pusher
+      this.getApplicationsStatus();
+    }, 60000);
   },
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
@@ -202,9 +203,13 @@ export default {
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
     },
-    getApplicationsStatus: function(){
+    /**
+     * Get and recieve application statuses
+     * pusher code should go here
+     */
+    getApplicationsStatus: function () {
       this.fetchApplications();
-    }
+    },
   },
 };
 </script>
