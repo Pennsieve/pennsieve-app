@@ -97,9 +97,6 @@
         <router-link class="btn-back-to-sign-in" :to="{ name: 'home' }">
           <bf-button> Back to Sign In </bf-button>
         </router-link>
-        <a class="forgot-password" href="#" @click="onForgotPasswordClick">
-          I forgot my password
-        </a>
       </div>
     </div>
   </div>
@@ -256,6 +253,7 @@ export default {
      * @param {Object} evt
      */
     onFormSubmit: function (evt) {
+      console.log("on form submit runs");
       // logic goes here
       evt.preventDefault();
 
@@ -266,6 +264,7 @@ export default {
           }
 
           this.isSavingProfile = true;
+
           this.initialLogin();
         }.bind(this)
       );
