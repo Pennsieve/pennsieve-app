@@ -78,25 +78,26 @@
         </div>
         <el-form v-if="selectedProcessorHasParams()">
           <el-form-item prop="parameters" id="paramsInput">
-          <el-table :data="selectedProcessorParams" max-height="250" :border="true">
-            <el-table-column label="Name">
-              <template #default="scope">
-                <el-input
-                  v-model="scope.row.name"
-                  disabled
-                ></el-input>
-              </template>
-            </el-table-column>
-            <el-table-column label="Value">
-              <template #default="scope">
-                <el-input
-                  v-model="scope.row.value"
-                  placeholder="Enter value"
-                ></el-input>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-form-item>
+            <el-table
+              :data="selectedProcessorParams"
+              max-height="250"
+              :border="true"
+            >
+              <el-table-column label="Name">
+                <template #default="scope">
+                  <el-input v-model="scope.row.name" disabled></el-input>
+                </template>
+              </el-table-column>
+              <el-table-column label="Value">
+                <template #default="scope">
+                  <el-input
+                    v-model="scope.row.value"
+                    placeholder="Enter value"
+                  ></el-input>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-form-item>
         </el-form>
       </div>
       <div v-show="shouldShow(4)">
@@ -202,8 +203,9 @@ export default {
       tableResultsTotalCount: 0,
       targetDirectory: "",
       clearSelectedValues: false,
+      warningMessage: "",
       selectedProcessorParams: [],
-      warningMessage:"",
+      warningMessage: "",
     };
   },
   computed: {
@@ -253,10 +255,12 @@ export default {
       this.formatPostprocessorOptions();
     },
     selectedProcessor: function () {
-      this.selectedProcessorParams = []
+      this.selectedProcessorParams = [];
       if (this.selectedProcessor && this.selectedProcessor.params) {
-        for (const [key, value] of Object.entries(this.selectedProcessor.params)) {
-          this.selectedProcessorParams.push({'name': key, 'value': value})
+        for (const [key, value] of Object.entries(
+          this.selectedProcessor.params
+        )) {
+          this.selectedProcessorParams.push({ name: key, value: value });
         }
       }
     },
@@ -371,53 +375,57 @@ export default {
     advanceStep: async function (step) {
       let isValid = true;
 
-      if(this.processStep===1 && step===1){
+      if (this.processStep === 1 && step === 1) {
         isValid = this.validateNode();
       }
-      if(this.processStep===2 && step===1){
-          isValid = this.validateProcessors();
+      if (this.processStep === 2 && step === 1) {
+        isValid = this.validateProcessors();
       }
-      if(isValid){this.processStep += step}
-      console.log("here")
+      if (isValid) {
+        this.processStep += step;
+      }
+      console.log("here");
       // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
       }
-
       // When you click "Run Analysis"
       if (this.processStep > 4) {
         await this.runAnalysis();
       }
     },
-    validateNode:function(){
-      if(this.computeNodeValue){
-          this.warningMessage = "";
-          return true;
-      }else{
-        this.warningMessage = "please select a compute node"
-          return false;
+    validateNode: function () {
+      if (this.computeNodeValue) {
+        this.warningMessage = "";
+        return true;
+      } else {
+        this.warningMessage = "please select a compute node";
+        return false;
       }
     },
     /**
      * validate to make sure all processors have been assigned
      */
-    validateProcessors:function(){
-        if(this.preprocessorValue && this.processorValue && this.postprocessorValue){
-          this.warningMessage = "";
-          return true;
-        }else{
-          this.warningMessage = "please select a value for all processors"
-          return false;
-        }
-      },
-    selectedProcessorHasParams: function() {
-      if (this.selectedProcessorParams.length > 0) {
-        return true
+    validateProcessors: function () {
+      if (
+        this.preprocessorValue &&
+        this.processorValue &&
+        this.postprocessorValue
+      ) {
+        this.warningMessage = "";
+        return true;
       } else {
-        return false
+        this.warningMessage = "please select a value for all processors";
+        return false;
       }
     },
-
+    selectedProcessorHasParams: function () {
+      if (this.selectedProcessorParams.length > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    },
     /**
      * Run Analysis Workflow on Selected Files
      */
@@ -438,13 +446,13 @@ export default {
       });
 
       const formatApplication = (application, parameters) => {
-        let paramsObject = {}
+        let paramsObject = {};
         if (parameters != null) {
-          let paramsEntries = []
+          let paramsEntries = [];
           parameters.forEach((param) => {
-            paramsEntries.push([param.name, param.value])
-          })
-          paramsObject = Object.fromEntries(paramsEntries)
+            paramsEntries.push([param.name, param.value]);
+          });
+          paramsObject = Object.fromEntries(paramsEntries);
         }
         return {
           name: application.name || "",
@@ -467,7 +475,10 @@ export default {
         },
         workflow: [
           formatApplication(this.selectedPreprocessor, null),
-          formatApplication(this.selectedProcessor, this.selectedProcessorParams),
+          formatApplication(
+            this.selectedProcessor,
+            this.selectedProcessorParams
+          ),
           formatApplication(this.selectedPostprocessor, null),
         ],
         params: {
@@ -726,9 +737,9 @@ export default {
     transform: rotate(360deg);
   }
 }
-.warning-message-div{
-  color:red;
-  margin:3px;
+.warning-message-div {
+  color: red;
+  margin: 3px;
 }
 </style>
 

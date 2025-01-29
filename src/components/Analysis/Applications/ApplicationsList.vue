@@ -207,13 +207,13 @@ export default {
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
     },
-      /**
-     * Get and recieve application statuses 
+    /**
+     * Get and recieve application statuses
      * pusher code should go here
      */
-    getApplicationsStatus: function(){
+    getApplicationsStatus: function () {
       this.fetchApplications();
-    }
+    },
   },
 };
 </script>
