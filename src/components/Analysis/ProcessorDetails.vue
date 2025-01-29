@@ -7,12 +7,36 @@
         <span class="value">{{ selectedProcessor.name }}</span>
       </div>
       <div class="processor-item">
+        <span class="label">Uuid: </span>
+        <span class="value">{{ selectedProcessor.uuid }}</span>
+      </div>
+      <div class="processor-item">
         <span class="label">Description: </span>
         <span class="value">{{ selectedProcessor.description }}</span>
       </div>
       <div class="processor-item">
         <span class="label">Status: </span>
         <span class="value">{{ selectedProcessor.status }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">Parameters: </span>
+        <span v-if="!hasParams" class="value">none</span>
+      </div>
+      <div class="table-container">
+        <table v-if="hasParams">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(value, key) in selectedProcessor.params" :key="key">
+              <td>{{ key }}</td>
+              <td>{{ value }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     <div v-else>
@@ -55,6 +79,12 @@ export default {
     isEmpty() {
       return Object.keys(this.selectedProcessor).length === 0;
     },
+    formatParams() {
+      return this.selectedProcessor.params;
+    },
+    hasParams() {
+      return Object.keys(this.selectedProcessor.params).length;
+    },
   },
 
   methods: {
@@ -68,6 +98,32 @@ export default {
 
 <style scoped lang="scss">
 @import "../../assets/_variables.scss";
+
+.table-container {
+  min-width: 400px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  background-color: #f4f4f4;
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
 
 .model-details {
   margin: 30px;
