@@ -72,7 +72,7 @@ function closeDialog() {
     <template #header>
       <bf-dialog-header slot="title" title="Activity Logs" />
     </template>
-    <dialog-body>
+    <dialog-body class="activity-log-body">
       <div v-if="isLoading" class="icon-waiting mr-16">
         <bf-waiting-icon />
       </div>
