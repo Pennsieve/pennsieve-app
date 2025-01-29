@@ -36,7 +36,6 @@ const mouseHoverList = ref(false);
 watch(
   () => props.selectedProcessor, // The getter function that watches the prop
   (newVal, oldVal) => {
-    console.log(props.selectedProcessor);
     modelsListVisible.value = true;
     modelListSelected.value = false;
     modelInfoSelected.value = true;
