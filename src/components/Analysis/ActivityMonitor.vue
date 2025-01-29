@@ -111,7 +111,6 @@ Fetch Initial Data
 const intervalIdApplicationStatus = ref(null);
 
 const getApplicationsStatus = async () => {
-  console.log("selectedWorkflowActivity", selectedWorkflowActivity.value);
   await store.dispatch(
     "analysisModule/setSelectedWorkflowActivity",
     selectedWorkflowActivity.value
