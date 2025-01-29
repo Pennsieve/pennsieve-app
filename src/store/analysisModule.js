@@ -365,27 +365,27 @@ const initialState = () => ({
     },
     cancelWorkflow: async ({commit}, workflowId) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
+      // API work inprogress for this feature
+      // try {
+      //   const url = `${rootState.config.api2Url}/cancel/workflows/${workflowId}`;
 
-      try {
-        // const url = `${rootState.config.api2Url}/cancel/workflows/${workflowId}`;
+      //   const userToken = await useGetToken()
+      //   const resp = await fetch(url, {
+      //     method: 'POST',
+      //     headers: {
+      //       Authorization: `Bearer ${userToken}`,
+      //     },
+      //   })
 
-        const userToken = await useGetToken()
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
-
-        if (resp.ok) {
-          const result = await resp.json()
-          return result
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          return Promise.reject(err)
-      }
+      //   if (resp.ok) {
+      //     const result = await resp.json()
+      //     return result
+      //   } else {
+      //     return Promise.reject(resp)
+      //   }
+      // } catch (err) {
+      //     return Promise.reject(err)
+      // }
     },
     hideCancelWorkflowDialog: ({commit}) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
