@@ -719,10 +719,17 @@ const router = createRouter({
         navigation: BfNavigation
       },
       redirect: {
-        name: 'integrations'
+        name: 'activity'
       },
       props: true,
       children: [
+        {
+          name: 'activity',
+          path: 'activity',
+          components: {
+            stage: ActivityMonitor,
+          }
+        },
         {
           name: 'integrations',
           path: 'integrations',
@@ -752,13 +759,6 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsList,
-          }
-        },
-        {
-          name: 'activity',
-          path: 'activity',
-          components: {
-            stage: ActivityMonitor,
           }
         }
       ]
