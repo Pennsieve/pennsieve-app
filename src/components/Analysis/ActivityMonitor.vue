@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, ref, onMounted } from "vue";
+import { computed, watch, ref, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 
 // Vue Flow Imports
@@ -73,13 +73,13 @@ const initialEdges = [
     id: "e1-1",
     source: "1",
     target: "2",
-    animated: true,
+    animated: false,
   },
   {
     id: "e1-2",
     source: "2",
     target: "3",
-    animated: true,
+    animated: false,
   },
 ];
 
@@ -94,6 +94,20 @@ const getLabel = (workflow, type) =>
 Fetch Initial Data
 */
 
+const intervalIdApplicationStatus = ref(null);
+
+const getApplicationsStatus = async () => {
+  console.log("selectedWorkflowActivity", selectedWorkflowActivity.value);
+  await store.dispatch(
+    "analysisModule/setSelectedWorkflowActivity",
+    selectedWorkflowActivity.value
+  );
+};
+
+const getWorkflowStatus = async () => {
+  await store.dispatch("analysisModule/fetchWorkflowInstances");
+};
+
 onMounted(async () => {
   // fetch all workflow instances
   try {
@@ -105,10 +119,12 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
+  // sort workflow instances with most recently started first
   const sortedWorkflows = workflowInstances.value.sort(
     (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
   );
 
+  // set initial selected workflow activity to show the first instance in the list
   try {
     await store.dispatch(
       "analysisModule/setSelectedWorkflowActivity",
@@ -149,6 +165,16 @@ onMounted(async () => {
       class: "light",
     },
   ];
+
+  // Fetch data to get updates
+
+  // intervalIdApplicationStatus.value = setInterval(() => {
+  //   getApplicationsStatus();
+  // }, 10000);
+});
+
+onUnmounted(() => {
+  clearInterval(intervalIdApplicationStatus.value);
 });
 
 watch(selectedWorkflowActivity, (newVal, oldVal) => {

@@ -392,7 +392,6 @@ const initialState = () => ({
           const result = await resp.json()
           result.workflow = mergeByUUID(workflow.workflow, result.processors)
           result.name = workflow.name
-          console.log('workflow', result)
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
         } else {
           return Promise.reject(resp)

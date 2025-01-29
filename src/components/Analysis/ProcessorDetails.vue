@@ -2,9 +2,6 @@
   <div class="model-details">
     <div v-if="!isEmpty" class="processor-details">
       <bf-button @click="handleLogsClick">View Logs</bf-button>
-      <!-- <div class="processor-item">
-        <span class="label">Status:</span> <span class="value"></span>
-      </div> -->
       <div class="processor-item">
         <span class="label">Name: </span>
         <span class="value">{{ selectedProcessor.name }}</span>
@@ -12,6 +9,10 @@
       <div class="processor-item">
         <span class="label">Description: </span>
         <span class="value">{{ selectedProcessor.description }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">Status: </span>
+        <span class="value">{{ selectedProcessor.status }}</span>
       </div>
     </div>
     <div v-else>
