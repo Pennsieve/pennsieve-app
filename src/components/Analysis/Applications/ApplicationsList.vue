@@ -108,13 +108,17 @@ export default {
       editApplicationDialogVisible: false,
       deleteApplicationDialogVisible: false,
       applicationEdit: {},
+      intervalId:0,
     };
   },
   mounted(){
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       //this will be replaced by pusher 
         this.getApplicationsStatus();
-    }, 60000); 
+    }, 10000); 
+  },
+  unmounted(){
+    clearInterval(this.intervalId);
   },
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
