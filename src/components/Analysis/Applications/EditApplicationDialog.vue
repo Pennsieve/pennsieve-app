@@ -1,6 +1,7 @@
 <template>
   <el-dialog :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event">
+    @update:modelValue="dialogVisible = $event"
+    class="edit-application-dialog">
     <template #header>
       <bf-dialog-header slot="title" title="Edit Application" />
     </template>
@@ -55,8 +56,8 @@
     </dialog-body>
 
     <template #footer>
-      <bf-button @click="editApplication">
-        Update application params
+      <bf-button @click="confirmUpdateApplicationParams">
+        Confirm changes
       </bf-button>
     </template>
   </el-dialog>
@@ -136,10 +137,10 @@ export default {
       }
     },
 
-    editApplication() {
+    confirmUpdateApplicationParams() {
       let payload = this.application
       payload.params = this.formatParamsForPayload()
-      this.$emit('edit-application', payload)
+      this.$emit('confirm-edit', payload)
     },
 
     formatParamsForPayload() {
@@ -161,119 +162,33 @@ export default {
 <style scoped lang="scss">
 @import "../../../assets/_variables.scss";
 
-.text-area-wrapper {
-  width: 100%;
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
+</style>
 
-.add-integration-dialog {
+<style lang="scss">
+.edit-application-dialog {
   .el-form-item {
     .el-form-item__label {
-      font-weight: 500;
-      color: $gray_5;
+      font-size: 18px;
     }
-  }
-
-  .el-select {
-    &.input-property {
-      width: 100%;
-
-      &.target {
-        max-width: 200px;
-        margin-right: 8px;
-      }
-
-      &.filter {
-        margin-right: 8px;
-      }
-    }
-  }
-
-  .item-field {
-    margin-bottom: 24px;
-    &.has-enums {
-      margin-bottom: 14px;
-    }
-  }
-
-  .el-checkbox {
-    &.input-property {
-      width: 100%;
-    }
-  }
-
-  .check-description {
-    margin-left: 25px;
-    line-height: 1em;
-  }
-  .el-checkbox__inner {
-    border: 1px solid $gray_5;
-  }
-
-  .el-checkbox__label,
-  .el-form-item__label {
-    color: $gray_6;
-    font-weight: 400;
-  }
-
-  .targetOptions {
-    flex-direction: row;
     display: flex;
-    margin: 8px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
   }
-
-  .disabled-label {
-    color: #c0c4cc;
-    cursor: not-allowed;
-    margin-top: 10px;
-  }
-
-  .label {
-    margin-top: 10px;
-  }
-
-  .el-select-group,
-  .el-select-dropdown__item {
-    padding-bottom: 10px;
-  }
-  .item-checkbox .el-form-item__content {
-    line-height: 1em;
-  }
-  #item-concept-title {
-    #current-name {
-      margin-left: 24px;
-    }
-  }
-  .info {
-    font-size: 12px;
-    color: $gray_4;
-    line-height: 16px;
-  }
-  .info {
-    font-size: 12px;
-    color: $gray_4;
-    &.disabled-label {
-      color: #c0c4cc;
-      cursor: not-allowed;
-      margin-top: -18px;
-      height: 26px;
-      margin-left: 25px;
-    }
-  }
-  .el-form-item {
-    .el-form-item__label {
-      text-align: left;
-    }
-  }
-  .el-dialog {
-    height: auto;
-    width: 524px;
-  }
-  .el-dialog__footer {
+  #addParamButtonWrapper {
     width: 100%;
-  }
-  .string-sub-type {
-    display: flex;
-    flex-direction: row;
+    text-align: center;
+    margin: 8px 24px;
+
+    .el-button {
+      width: 100%;
+    }
   }
 }
 </style>

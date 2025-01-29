@@ -47,7 +47,7 @@
     <edit-application-dialog
       :dialog-visible="editApplicationDialogVisible"
       :application="selectedApplication"
-      @edit-application="onEditApplicationConfirm"
+      @confirm-edit="onEditApplicationConfirm"
       @close="onCloseEditDialog"
     />
     <delete-application-dialog
