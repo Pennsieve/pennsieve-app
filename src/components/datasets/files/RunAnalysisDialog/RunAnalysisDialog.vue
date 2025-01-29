@@ -132,6 +132,9 @@
       <bf-button @click="advanceStep(1)">
         {{ proceedText }}
       </bf-button>
+      <div class="warning-message-div">
+        {{ warningMessage }}
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -200,6 +203,7 @@ export default {
       targetDirectory: "",
       clearSelectedValues: false,
       selectedProcessorParams: [],
+      warningMessage:"",
     };
   },
   computed: {
@@ -365,8 +369,16 @@ export default {
      * Manages the Multi Step Functionality
      */
     advanceStep: async function (step) {
-      this.processStep += step;
+      let isValid = true;
 
+      if(this.processStep===1 && step===1){
+        isValid = this.validateNode();
+      }
+      if(this.processStep===2 && step===1){
+          isValid = this.validateProcessors();
+      }
+      if(isValid){this.processStep += step}
+      console.log("here")
       // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
@@ -377,7 +389,27 @@ export default {
         await this.runAnalysis();
       }
     },
-
+    validateNode:function(){
+      if(this.computeNodeValue){
+          this.warningMessage = "";
+          return true;
+      }else{
+        this.warningMessage = "please select a compute node"
+          return false;
+      }
+    },
+    /**
+     * validate to make sure all processors have been assigned
+     */
+    validateProcessors:function(){
+        if(this.preprocessorValue && this.processorValue && this.postprocessorValue){
+          this.warningMessage = "";
+          return true;
+        }else{
+          this.warningMessage = "please select a value for all processors"
+          return false;
+        }
+      },
     selectedProcessorHasParams: function() {
       if (this.selectedProcessorParams.length > 0) {
         return true
@@ -693,6 +725,10 @@ export default {
   100% {
     transform: rotate(360deg);
   }
+}
+.warning-message-div{
+  color:red;
+  margin:3px;
 }
 </style>
 
