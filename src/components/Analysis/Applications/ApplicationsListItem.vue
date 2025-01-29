@@ -6,14 +6,19 @@
       </el-col>
       <el-col :span="4" class="application-title">
         <template v-if="hasAdminRights">
-      <el-tooltip class="box-item" effect="dark" content="Edit Application Params" placement="top-start">
-        <el-button :size="'default'" @click.prevent="updateApplicationParams">
-          <el-icon>
-            <Setting />
-          </el-icon>
-        </el-button>
-      </el-tooltip>
-    </template>
+          <el-tooltip
+            class="box-item"
+            effect="dark"
+            content="Edit Application Params"
+            placement="top-start"
+          >
+            <el-button :size="'default'" @click.prevent="updateApplicationParams">
+              <el-icon>
+                <Setting />
+              </el-icon>
+            </el-button>
+          </el-tooltip>
+        </template>
       </el-col>
 
 
@@ -132,26 +137,26 @@ export default {
         };
 
         await this.updateApplication(formattedUpdateDataset);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg: "Your request has been successfully submitted.",
-            },
-          });
-        } catch (error) {
-          console.error(error);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "error",
-              msg: "There was a problem submitting your request.",
-            },
-          });
-        } finally {
-          this.isWaitingForResponse = false;
-          //handle update
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        await this.fetchApplications();
+        this.isWaitingForResponse = false;
         }
         
-        },
+      },
 
       updateApplicationParams: function () {
         this.$emit('open-edit-application-dialog', this.application)
