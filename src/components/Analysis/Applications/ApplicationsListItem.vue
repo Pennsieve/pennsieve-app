@@ -34,7 +34,7 @@
         <el-button
           @click="deployApplication"
           class="update-button"
-          disabled="updatedButtonDisabled"
+          disabled="updateButtonDisabled"
         >
           Update
         </el-button>
