@@ -108,9 +108,6 @@ function closeDialog() {
   height: 80%;
   width: 80%;
 }
-.log-table {
-  height: inherit;
-}
 .icon-waiting {
   align-items: center;
   display: flex;
@@ -118,5 +115,12 @@ function closeDialog() {
   height: 24px;
   justify-content: center;
   width: 24px;
+}
+.activity-log-body{
+  height: 79%;
+  overflow: hidden;
+  .log-table{
+    height: 63vh;
+  }
 }
 </style>
