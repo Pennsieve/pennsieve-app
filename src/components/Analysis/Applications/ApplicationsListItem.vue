@@ -43,7 +43,6 @@ import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 
-
 export default {
   name: "IntegrationListItem",
 
@@ -71,29 +70,38 @@ export default {
         return false;
       }
     },
-    updateStatusText:function () {
-      if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
-          return "application is " +this.application.status;
-        }else if(this.application.status==="error"){
-          return "applicaiton encountered an error"
-        }
-        else{return "application has been " +this.application.status;}
+    updateStatusText: function () {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.application.status
+        )
+      ) {
+        return "application is " + this.application.status;
+      } else if (this.application.status === "error") {
+        return "applicaiton encountered an error";
+      } else {
+        return "application has been " + this.application.status;
+      }
     },
-    updateButtonDisabled:function(){
-      if(['registering', 'deploying', 're-deploying', 'pending'].includes(this.application.status)
-      || this.isWaitingForResponse){
+    updateButtonDisabled: function () {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.application.status
+        ) ||
+        this.isWaitingForResponse
+      ) {
         return true;
-      }else{
+      } else {
         return false;
       }
-    }
+    },
   },
 
   data: function () {
     return {
       isActive: false,
       isWaitingForResponse: false,
-      status: 'deployed',
+      status: "deployed",
       integrationEdit: {
         type: Object,
         default: function () {
@@ -103,16 +111,8 @@ export default {
     };
   },
   methods: {
-    ...mapActions("analysisModule", [
-      "updateApplication",
-      "fetchApplications"
-    ]),
-<<<<<<< HEAD
-=======
-
->>>>>>> 8c042a1e88a353056e5affe08199d2ae3d86c984
+    ...mapActions("analysisModule", ["updateApplication", "fetchApplications"]),
     deployApplication: async function () {
-
       this.isWaitingForResponse = true;
       try {
         const accountDetails = {
@@ -136,27 +136,26 @@ export default {
         };
 
         await this.updateApplication(formattedUpdateDataset);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg: "Your request has been successfully submitted.",
-            },
-          });
-        } catch (error) {
-          console.error(error);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "error",
-              msg: "There was a problem submitting your request.",
-            },
-          });
-        } finally {
-          await this.fetchApplications();
-          this.isWaitingForResponse= false;
-        }
-
-        }
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        await this.fetchApplications();
+        this.isWaitingForResponse = false;
+      }
     },
+  },
 };
 </script>
 
