@@ -15,7 +15,7 @@
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
       </div>
-      <div>
+      <div v-if="enableCancelWorkflow">
         <el-tooltip
           class="box-item"
           effect="dark"
@@ -61,7 +61,9 @@ import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
 import FormatDate from "../../mixins/format-date";
 import { CircleClose } from "@element-plus/icons-vue";
-import { mapState, mapActions, mapMutations } from "vuex";
+import { mapState, mapMutations } from "vuex";
+import * as site from "../../site-config/site.json"
+
 
 export default {
   name: "WorkflowsListItem",
@@ -98,6 +100,12 @@ export default {
         return "box";
       }
     },
+  },
+
+  data: () => {
+    return {
+      enableCancelWorkflow : site.environment !== "prod"
+    }
   },
 
   methods: {
