@@ -112,8 +112,8 @@ export default {
   },
   mounted(){
     setInterval(() => {
-      console.log("interval 1 min")
-        //this.getApplicationsStatus();
+      //this will be replaced by pusher 
+        this.getApplicationsStatus();
     }, 60000); 
   },
   computed: {
@@ -203,8 +203,12 @@ export default {
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
     },
+      /**
+     * Get and recieve application statuses 
+     * pusher code should go here
+     */
     getApplicationsStatus: function(){
-      this.applications = this.fetchApplications();
+      this.fetchApplications();
     }
   },
 };
