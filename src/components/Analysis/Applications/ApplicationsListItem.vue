@@ -70,18 +70,13 @@ export default {
         return false;
       }
     },
-    updateStatusText: function () {
-      if (
-        ["registering", "deploying", "re-deploying", "pending"].includes(
-          this.application.status
-        )
-      ) {
-        return "application is " + this.application.status;
-      } else if (this.application.status === "error") {
-        return "applicaiton encountered an error";
-      } else {
-        return "application has been " + this.application.status;
-      }
+    updateStatusText:function () {
+      if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
+          return "application is " +this.application.status;
+        }else if(this.application.status.startsWith("error")){
+          return "application encountered an error"
+        }
+        else{return "application has been " +this.application.status;}
     },
     updateButtonDisabled: function () {
       if (
