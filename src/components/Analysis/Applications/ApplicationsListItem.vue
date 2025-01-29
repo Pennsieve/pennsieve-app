@@ -7,7 +7,7 @@
       <el-col :span="4" class="application-title">
         <template v-if="hasAdminRights">
       <el-tooltip class="box-item" effect="dark" content="Edit Application Params" placement="top-start">
-        <el-button :size="'default'" @click.prevent="changeApplicationParams">
+        <el-button :size="'default'" @click.prevent="updateApplicationParams">
           <el-icon>
             <Setting />
           </el-icon>
@@ -153,7 +153,7 @@ export default {
         
         },
 
-      changeApplicationParams: function () {
+      updateApplicationParams: function () {
         this.$emit('open-edit-application-dialog', this.application)
       }
     },
