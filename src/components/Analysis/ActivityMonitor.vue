@@ -9,6 +9,7 @@ import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
+import EventBus from "../../utils/event-bus";
 
 const { onNodeClick } = useVueFlow();
 // Access the Vuex store
@@ -35,8 +36,21 @@ const cancelWorkflow = () => {
   store.dispatch(
     "analysisModule/cancelWorkflow",
     selectedWorkflowActivity?.uuid
-  );
-  hideCancelWorkflowDialog();
+  ).then(() => {
+    EventBus.$emit('toast', {
+      detail: {
+                type: "success",
+                msg: "Your cancellation request was successful. It may take some time to complete.",
+              },
+    })
+  }).catch((err) => {
+    EventBus.$emit('toast', {
+      detail: {
+                type: "error",
+                msg: "Something went wrong, please try again later.",
+              },
+    })
+  })
 };
 
 const activityDialogVisible = computed(
