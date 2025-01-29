@@ -413,6 +413,34 @@ const initialState = () => ({
     },
     hideActivityLogDialog: ({ commit, rootState }) => {
       commit('HIDE_ACTIVITY_LOG_DIALOG')
+    },
+
+    editApplication: async ({commit, rootState}, application) => {
+      const url = `${rootState.config.api2Url}/applications/${application?.uuid}`;
+      const userToken = await useGetToken()
+
+      try {
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: JSON.stringify(application)
+        });
+    
+        if (!response.ok) {
+          const errorDetails = await response.text();
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+    
+        const result = await response.json();
+        return result;
+    
+      } catch (err) {
+        console.error('Failed to update application:', err.message);
+        throw err;
+      }
     }
   }
   

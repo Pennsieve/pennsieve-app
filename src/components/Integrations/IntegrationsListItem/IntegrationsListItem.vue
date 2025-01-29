@@ -63,7 +63,7 @@ import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 
 export default {
-  name: "IntegrationListItem",
+  name: "IntegrationsListItem",
 
   components: {
     IconMenu,

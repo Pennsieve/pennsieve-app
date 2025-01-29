@@ -1,9 +1,28 @@
 <template>
   <div class="applications-list-item">
     <el-row class="info">
-      <div class="application-title">
-        {{ application.name }}
-      </div>
+      <el-col :span="20" class="application-title">
+        <span>{{ application.name }}</span>
+      </el-col>
+      <el-col :span="4" class="application-title">
+        <template v-if="hasAdminRights">
+          <el-tooltip
+            class="box-item"
+            effect="dark"
+            content="Edit Application Params"
+            placement="top-start"
+          >
+            <el-button
+              :size="'default'"
+              @click.prevent="updateApplicationParams"
+            >
+              <el-icon>
+                <Setting />
+              </el-icon>
+            </el-button>
+          </el-tooltip>
+        </template>
+      </el-col>
     </el-row>
     <el-row>
       <p class="application-description">
@@ -15,7 +34,10 @@
         <el-button
           @click="deployApplication"
           class="update-button"
-          :disabled="updateButtonDisabled"
+          :class="{
+            disabled:
+              application.status !== 'registered' || isWaitingForResponse,
+          }"
         >
           Update
         </el-button>
@@ -42,13 +64,15 @@ import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import { Setting } from "@element-plus/icons-vue";
 
 export default {
-  name: "IntegrationListItem",
+  name: "ApplicationsListItem",
 
   components: {
     IconMenu,
     Avatar,
+    Setting,
   },
   mixins: [FormatDate],
 
@@ -70,13 +94,18 @@ export default {
         return false;
       }
     },
-    updateStatusText:function () {
-      if(["registering","deploying","re-deploying","pending"].includes(this.application.status)){
-          return "application is " +this.application.status;
-        }else if(this.application.status.startsWith("error")){
-          return "application encountered an error"
-        }
-        else{return "application has been " +this.application.status;}
+    updateStatusText: function () {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.application.status
+        )
+      ) {
+        return "application is " + this.application.status;
+      } else if (this.application.status.startsWith("error")) {
+        return "application encountered an error";
+      } else {
+        return "application has been " + this.application.status;
+      }
     },
     updateButtonDisabled: function () {
       if (
@@ -150,6 +179,10 @@ export default {
         this.isWaitingForResponse = false;
       }
     },
+
+    updateApplicationParams: function () {
+      this.$emit("open-edit-application-dialog", this.application);
+    },
   },
 };
 </script>
@@ -168,10 +201,11 @@ export default {
 }
 
 .application-title {
+  display: flex;
   font-size: 16px;
-  margin: 16px 4px;
   color: black;
-  text-align: center;
+  justify-content: center;
+  align-items: center;
 }
 
 .application-description {
@@ -185,7 +219,7 @@ export default {
 
 .info {
   background: $purple_tint;
-  padding: 8px;
+  padding: 16px 8px;
 }
 .applications-update-app {
   flex-flow: row;

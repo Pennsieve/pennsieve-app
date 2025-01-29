@@ -13,8 +13,7 @@
         v-for="application in applications"
         :key="application.id"
         :application="application"
-        @open-delete-application="openDeleteApplicationDialog"
-        @open-edit-application="openEditApplicationDialog"
+        @open-edit-application-dialog="openEditApplicationDialog"
       />
     </div>
     <bf-empty-page-state v-else class="empty">
@@ -41,18 +40,14 @@
     </bf-empty-page-state>
     <create-application-dialog
       :dialog-visible="addApplicationDialogVisible"
-      :application-edit.sync="applicationEdit"
       applicationType="Application"
       @add-application="onAddApplicationConfirm"
-      @edit-application="onEditApplicationConfirm"
       @close="onCloseAddDialog"
     />
     <edit-application-dialog
       :dialog-visible="editApplicationDialogVisible"
-      :application-edit.sync="applicationEdit"
-      applicationType="Application"
-      @add-application="onAddApplicationConfirm"
-      @edit-application="onEditApplicationConfirm"
+      :application="selectedApplication"
+      @confirm-edit="onEditApplicationConfirm"
       @close="onCloseEditDialog"
     />
     <delete-application-dialog
@@ -78,6 +73,7 @@ import ApplicationsListItem from "./ApplicationsListItem.vue";
 
 import Sorter from "../../../mixins/sorter";
 import UserRoles from "../../../mixins/user-roles";
+import EventBus from "../../../utils/event-bus";
 
 import { pathOr, propOr } from "ramda";
 
@@ -108,16 +104,17 @@ export default {
       editApplicationDialogVisible: false,
       deleteApplicationDialogVisible: false,
       applicationEdit: {},
-      intervalId:0,
+      intervalId: 0,
+      selectedApplication: {},
     };
   },
-  mounted(){
+  mounted() {
     this.intervalId = setInterval(() => {
-      //this will be replaced by pusher 
-        this.getApplicationsStatus();
-    }, 10000); 
+      //this will be replaced by pusher
+      this.getApplicationsStatus();
+    }, 10000);
   },
-  unmounted(){
+  unmounted() {
     clearInterval(this.intervalId);
   },
   computed: {
@@ -171,15 +168,12 @@ export default {
     openCreateApplicationDialog: function () {
       this.addApplicationDialogVisible = true;
     },
-    openEditApplication: function () {
-      this.editApplicationDialogVisible = true;
-    },
     openDeleteApplicationDialog: function (application) {
       this.$refs.deleteApplicationDialog.setApplication(application);
       this.deleteApplicationDialogVisible = true;
     },
     openEditApplicationDialog: function (application) {
-      this.applicationEdit = application;
+      this.selectedApplication = application;
       this.editApplicationDialogVisible = true;
     },
 
@@ -196,8 +190,26 @@ export default {
      * Update application via API
      * @param {Object} updatedApplication
      */
-    onEditApplicationConfirm: function (updatedApplication) {
-      this.editApplication(updatedApplication);
+    onEditApplicationConfirm: async function (selectedApplication) {
+      try {
+        let response = await this.editApplication(selectedApplication);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        this.editApplicationDialogVisible = false;
+      }
     },
 
     /**
