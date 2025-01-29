@@ -15,26 +15,23 @@
         <el-button
           @click="deployApplication"
           class="update-button"
-          :class="{disabled:application.status!=='registered' || isWaitingForResponse}"
+          :disabled="updateButtonDisabled"
         >
           Update
         </el-button>
-        <div v-if="isWaitingForResponse" 
-          class="icon-waiting mr-16">
+        <div v-if="isWaitingForResponse" class="icon-waiting mr-16">
           <bf-waiting-icon />
         </div>
       </div>
       <div>
-        <el-row class="applications-status"> 
+        <el-row class="applications-status">
           <p>
             {{ updateStatusText }}
           </p>
         </el-row>
       </div>
-
     </el-row>
   </div>
-
 </template>
 
 <script>
@@ -45,7 +42,6 @@ import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
-
 
 export default {
   name: "IntegrationListItem",
@@ -74,16 +70,38 @@ export default {
         return false;
       }
     },
-    updateStatusText:function () {
-        return "last "+this.application.status +" on 12/25/25";
-    } 
+    updateStatusText: function () {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.application.status
+        )
+      ) {
+        return "application is " + this.application.status;
+      } else if (this.application.status === "error") {
+        return "applicaiton encountered an error";
+      } else {
+        return "application has been " + this.application.status;
+      }
+    },
+    updateButtonDisabled: function () {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.application.status
+        ) ||
+        this.isWaitingForResponse
+      ) {
+        return true;
+      } else {
+        return false;
+      }
+    },
   },
 
   data: function () {
     return {
       isActive: false,
       isWaitingForResponse: false,
-      status: 'deployed',
+      status: "deployed",
       integrationEdit: {
         type: Object,
         default: function () {
@@ -93,10 +111,8 @@ export default {
     };
   },
   methods: {
-    ...mapActions("analysisModule", ["updateApplication"]),
-
+    ...mapActions("analysisModule", ["updateApplication", "fetchApplications"]),
     deployApplication: async function () {
-
       this.isWaitingForResponse = true;
       try {
         const accountDetails = {
@@ -113,33 +129,33 @@ export default {
           url: this.application.source.url,
         };
         const formattedUpdateDataset = {
+          uuid: this.application.uuid,
           account: accountDetails,
           destination: destination,
           source: formattedSource,
         };
 
         await this.updateApplication(formattedUpdateDataset);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "success",
-              msg: "Your request has been successfully submitted.",
-            },
-          });
-        } catch (error) {
-          console.error(error);
-          EventBus.$emit("toast", {
-            detail: {
-              type: "error",
-              msg: "There was a problem submitting your request.",
-            },
-          });
-        } finally {
-          this.isWaitingForResponse = false;
-          //handle update
-        }
-        
-        }
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request has been successfully submitted.",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "There was a problem submitting your request.",
+          },
+        });
+      } finally {
+        await this.fetchApplications();
+        this.isWaitingForResponse = false;
+      }
     },
+  },
 };
 </script>
 
@@ -176,33 +192,33 @@ export default {
   background: $purple_tint;
   padding: 8px;
 }
-.applications-update-app{
+.applications-update-app {
   flex-flow: row;
   height: 100%;
   width: 100%;
   align-items: end;
   margin: 8px;
 
-  .applications-status{
+  .applications-status {
     color: gray;
     margin-right: 15px;
     text-align: end;
-    p{  
-      margin:0%
+    p {
+      margin: 0%;
     }
   }
 
-  .update-button-div{
+  .update-button-div {
     max-width: 33%;
     margin-right: 5px;
   }
-  .update-button{
-    background-color: #011F5B;
-    color:white;
-    &.disabled{
-      opacity: .6;
+  .update-button {
+    background-color: #011f5b;
+    color: white;
+    &.disabled {
+      opacity: 0.6;
     }
-}
+  }
 }
 
 .icon-waiting {
@@ -213,5 +229,4 @@ export default {
   justify-content: center;
   width: 24px;
 }
-
 </style>
