@@ -91,7 +91,9 @@ export default {
 
   watch: {
     "selectedProcessor.status": {
-      handler(newStatus) {
+      handler(newStatus, prevStatus) {
+        console.log("a new status:", newStatus);
+
         this.currentStatus = newStatus;
       },
       immediate: true,
