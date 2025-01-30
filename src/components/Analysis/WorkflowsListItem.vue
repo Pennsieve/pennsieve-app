@@ -1,7 +1,7 @@
 <template>
   <div class="workflows-list-item-wrapper">
     <div
-      v-if="isActive"
+      v-if="workflow.status === 'STARTED'"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
@@ -14,6 +14,7 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
+        <div>Status {{ workflow.status }}</div>
       </div>
       <div v-if="enableCancelWorkflow">
         <el-tooltip
@@ -30,9 +31,26 @@
         </el-tooltip>
       </div>
     </div>
+    <div
+      v-if="workflow.status === 'FAILED'"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
+      <div class="icon failure">×</div>
+      <div class="text">
+        <div class="workflow-name">
+          Workflow Run:
+          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+        </div>
+        <div>Workflow UUID: {{ workflow.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
+        <div>Status {{ workflow.status }}</div>
+      </div>
+    </div>
 
     <div
-      v-if="!isActive"
+      v-if="workflow.status === 'SUCCEEDED'"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
@@ -51,6 +69,7 @@
         <div>
           Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
         </div>
+        <div>Status {{ workflow.status }}</div>
       </div>
     </div>
   </div>
@@ -59,11 +78,11 @@
 <script>
 import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
 import IconCheck from "../icons/IconCheck.vue";
+import IconXCircle from "../icons/IconXCircle.vue";
 import FormatDate from "../../mixins/format-date";
 import { CircleClose } from "@element-plus/icons-vue";
 import { mapState, mapMutations } from "vuex";
-import * as site from "../../site-config/site.json"
-
+import * as site from "../../site-config/site.json";
 
 export default {
   name: "WorkflowsListItem",
@@ -104,8 +123,8 @@ export default {
 
   data: () => {
     return {
-      enableCancelWorkflow : site.environment !== "prod"
-    }
+      enableCancelWorkflow: site.environment !== "prod",
+    };
   },
 
   methods: {
@@ -152,7 +171,11 @@ export default {
 }
 
 .success {
-  color: #14a758;
+  color: $status_green;
+}
+
+.failure {
+  color: $status_red;
 }
 
 .completed {
@@ -215,8 +238,7 @@ export default {
 .workflows-list-item-wrapper {
   cursor: pointer;
 }
-</style>
-<style>
+
 .concepts-list-item-tooltip {
   max-width: 200px;
 }
