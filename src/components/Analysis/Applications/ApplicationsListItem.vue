@@ -80,9 +80,7 @@ export default {
     },
     updateButtonDisabled: function () {
       if (
-        ["registering", "deploying", "re-deploying", "pending"].includes(
-          this.application.status
-        ) ||
+        ["registering", "deploying", "re-deploying", "pending"].includes(this.application.status) ||
         this.isWaitingForResponse
       ) {
         return true;
