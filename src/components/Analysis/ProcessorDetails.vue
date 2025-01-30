@@ -16,7 +16,7 @@
       </div>
       <div class="processor-item">
         <span class="label">Status: </span>
-        <span class="value">{{ selectedProcessor.status }}</span>
+        <span class="value">{{ currentStatus }}</span>
       </div>
       <div class="processor-item">
         <span class="label">Parameters: </span>
@@ -72,7 +72,9 @@ export default {
   },
 
   data: function () {
-    return {};
+    return {
+      currentStatus: this.selectedProcessor.status,
+    };
   },
 
   computed: {
@@ -84,6 +86,15 @@ export default {
     },
     hasParams() {
       return Object.keys(this.selectedProcessor.params).length;
+    },
+  },
+
+  watch: {
+    "selectedProcessor.status": {
+      handler(newStatus) {
+        this.currentStatus = newStatus;
+      },
+      immediate: true,
     },
   },
 
@@ -132,16 +143,16 @@ tr:nth-child(even) {
 .processor-details {
   display: flex;
   flex-direction: column;
-  gap: 1rem; /* Adds spacing between each element */
+  gap: 1rem;
 }
 
 .label {
   font-weight: bold;
-  color: $purple_3; /* Dark blue for the text before the colon */
+  color: $purple_3;
 }
 
 .value {
-  color: black; /* Black for the text after the colon */
+  color: black;
   font-weight: normal;
 }
 .processor-item {
@@ -151,7 +162,7 @@ tr:nth-child(even) {
 
 .processor-value {
   font-weight: normal;
-  color: inherit; /* Keep inherited text color for the values */
+  color: inherit;
 }
 
 li {
