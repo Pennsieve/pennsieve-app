@@ -284,29 +284,66 @@ const initialState = () => ({
       commit('UPDATE_SELECTED_FILE_COUNT')
     },
 
-    fetchWorkflowInstances: async({commit, rootState }) => {
+    fetchWorkflowInstances: async ({ commit, rootState }) => {
+      let workflowInstances = [];
       try {
         const url = `${rootState.config.api2Url}/workflows/instances`;
-
-        const userToken = await useGetToken()
+        const userToken = await useGetToken();
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${userToken}`,
           },
-        })
-
+        });
+    
         if (resp.ok) {
-          const result = await resp.json()
-          commit('SET_WORKFLOW_INSTANCES', result)
+          workflowInstances = await resp.json();
+          // commit("SET_WORKFLOW_INSTANCES", workflowInstances);
         } else {
-          return Promise.reject(resp)
+          return Promise.reject(resp);
         }
       } catch (err) {
-          commit('SET_WORKFLOW_INSTANCES', [])
-          return Promise.reject(err)
+        commit("SET_WORKFLOW_INSTANCES", []);
+        return Promise.reject(err);
       }
+    
+      try {
+        const userToken = await useGetToken();
+        const statusRequests = workflowInstances.map(async (instance) => {
+          const statusUrl = `${rootState.config.api2Url}/workflows/instances/${instance.uuid}/status`;
+          const resp = await fetch(statusUrl, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${userToken}`,
+            },
+          });
+    
+          if (resp.ok) {
+            return resp.json();
+          } else {
+            return { uuid: instance.uuid, status: "UNKNOWN" }; 
+          }
+        });
+    
+        // Wait for all status requests to complete
+        const statusResults = await Promise.all(statusRequests);
+    
+        // Merge status into workflow instances
+        const mergedObjects = workflowInstances.map(workflow => {
+          const matchedStatus = statusResults.find(status => status.uuid === workflow.uuid);
+          return {
+            ...workflow,
+            status: matchedStatus ? matchedStatus.status : "UNKNOWN",
+          };
+        });
+    
+        commit("SET_WORKFLOW_INSTANCES",  mergedObjects);
+    
+      } catch (err) {
+        console.error("Error fetching statuses:", err);
+      } 
     },
+    
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
