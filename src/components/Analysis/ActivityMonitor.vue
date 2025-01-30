@@ -110,15 +110,11 @@ Fetch Initial Data
 
 const intervalIdApplicationStatus = ref(null);
 
-const getApplicationsStatus = async () => {
+const fetchApplicationsStatus = async () => {
   await store.dispatch(
     "analysisModule/setSelectedWorkflowActivity",
     selectedWorkflowActivity.value
   );
-};
-
-const getWorkflowStatus = async () => {
-  await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
 onMounted(async () => {
@@ -181,9 +177,9 @@ onMounted(async () => {
 
   // Fetch data to get updates
 
-  // intervalIdApplicationStatus.value = setInterval(() => {
-  //   getApplicationsStatus();
-  // }, 10000);
+  intervalIdApplicationStatus.value = setInterval(() => {
+    fetchApplicationsStatus();
+  }, 10000);
 });
 
 onUnmounted(() => {
