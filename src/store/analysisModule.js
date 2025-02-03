@@ -1,5 +1,4 @@
 import {useGetToken} from "@/composables/useGetToken";
-import {useHandleXhrError} from "@/mixins/request/request_composable";
 
 const initialState = () => ({
     computeNodes: [],
