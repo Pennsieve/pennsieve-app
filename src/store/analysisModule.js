@@ -1,4 +1,4 @@
-import {useGetToken} from "@/composables/useGetToken";
+import { useGetToken } from "@/composables/useGetToken";
 
 const initialState = () => ({
     computeNodes: [],
