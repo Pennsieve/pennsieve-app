@@ -28,7 +28,7 @@
 <script>
 import { mapState, mapActions } from "vuex";
 
-import AutoFocus from "../../mixins/auto-focus/index";
+import AutoFocus from "../../../mixins/auto-focus/index";
 import WorkflowsListItem from "./WorkflowsListItem.vue";
 
 export default {
@@ -109,7 +109,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 :deep(.models-list.scrolling-list.input-wrap) {
   padding: 0 0 0 16px;

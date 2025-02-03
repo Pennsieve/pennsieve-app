@@ -9,7 +9,7 @@ import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
-import EventBus from "../../utils/event-bus";
+import EventBus from "../../../utils/event-bus";
 
 const { onNodeClick } = useVueFlow();
 // Access the Vuex store
@@ -329,14 +329,14 @@ onNodeClick(({ node }) => {
 @import '@vue-flow/core/dist/style.css'
 
 /* this contains the default theme, these are optional styles */
-@import '../..//assets/_vueflow_core.scss'
-@import '../../assets/_vueflow.css'
+@import '../../../assets/_vueflow_core.scss'
+@import '../../../assets/_vueflow.css'
 
 @import '@vue-flow/minimap/dist/style.css'
 </style>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .modified-stage {
   margin: 0;

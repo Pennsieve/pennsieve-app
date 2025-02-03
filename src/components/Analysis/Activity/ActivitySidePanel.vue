@@ -2,7 +2,7 @@
 import { ref, watch } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
-import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
+import WorkflowsList from "@/components/Analysis/Activity/WorkflowsList.vue";
 import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ProcessorDetails from "./ProcessorDetails.vue";
@@ -185,7 +185,7 @@ function onOpenEditPropertyDialog(event) {
 </template>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .models-list-wrap {
   border-top: 1px solid $gray_2;

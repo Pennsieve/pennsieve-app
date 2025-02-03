@@ -76,13 +76,13 @@
 </template>
 
 <script>
-import IconWaitingCircle from "../icons/IconWaitingCircle.vue";
-import IconCheck from "../icons/IconCheck.vue";
-import IconXCircle from "../icons/IconXCircle.vue";
-import FormatDate from "../../mixins/format-date";
+import IconWaitingCircle from "../../icons/IconWaitingCircle.vue";
+import IconCheck from "../../icons/IconCheck.vue";
+import IconXCircle from "../../icons/IconXCircle.vue";
+import FormatDate from "../../../mixins/format-date";
 import { CircleClose } from "@element-plus/icons-vue";
 import { mapState, mapMutations } from "vuex";
-import * as site from "../../site-config/site.json";
+import * as site from "../../../site-config/site.json";
 
 export default {
   name: "WorkflowsListItem",
@@ -136,7 +136,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables";
+@import "../../../assets/_variables";
 
 /* Common styles for the box */
 .box {

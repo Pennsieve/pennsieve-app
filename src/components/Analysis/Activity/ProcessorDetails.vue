@@ -97,7 +97,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .table-container {
   min-width: 400px;

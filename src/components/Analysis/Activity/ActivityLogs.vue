@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
-import BfWaitingIcon from "../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 
 const store = useStore();
 const props = defineProps([
@@ -102,7 +102,7 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .log-dialog {
   height: 80%;
@@ -116,10 +116,10 @@ function closeDialog() {
   justify-content: center;
   width: 24px;
 }
-.activity-log-body{
+.activity-log-body {
   height: 79%;
   overflow: hidden;
-  .log-table{
+  .log-table {
     height: 63vh;
   }
 }

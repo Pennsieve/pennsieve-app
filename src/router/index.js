@@ -102,7 +102,7 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
-const ActivityMonitor = () => import ('../components/Analysis/ActivityMonitor.vue')
+const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 
 /**
  * Metadata Components
