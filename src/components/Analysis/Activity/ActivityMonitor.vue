@@ -53,9 +53,9 @@ const initialEdges = [
   },
 ];
 
-/*
+/* 
 Local State
- */
+*/
 const isLoading = ref(false);
 const nodes = ref(initialNodes);
 const edges = ref(initialEdges);
@@ -65,9 +65,9 @@ const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
 
-/*
-Global State
- */
+/* 
+Global State 
+*/
 const store = useStore();
 const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"]
@@ -116,15 +116,16 @@ const getWorkflowStatus = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
-/* Helpers
- */
+/* 
+Helpers
+*/
 
 const getLabel = (workflow, type) =>
   workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
 
 /*
 Fetch Initial Data
- */
+*/
 onMounted(async () => {
   // fetch all workflow instances
   try {
@@ -196,7 +197,7 @@ onUnmounted(() => {
 
 /*
 Show Processors associated with the workflow that the user selects
- */
+*/
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
   if (newVal) {
     nodes.value = [
@@ -249,7 +250,7 @@ const handleCloseDialog = () => {
 
 /*
 Event Handler for Node Click
- */
+*/
 
 onNodeClick(({ node }) => {
   const selectedApplication = selectedWorkflowActivity.value.workflow.find(
