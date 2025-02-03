@@ -28,7 +28,6 @@ const initialState = () => ({
   export const state = initialState()
   
   export const mutations = {
- 
     UPDATE_COMPUTE_NODES(state, computeNodes) {
       state.computeNodes = computeNodes
       state.computeNodesLoaded = true
@@ -51,7 +50,6 @@ const initialState = () => ({
       for (const parentId in state.selectedFilesForAnalysis) {
           total = total + state.selectedFilesForAnalysis[parentId].length
       }
-
       state.fileCount = total;
     },
     SET_SELECTED_FILES(state, { selectedFiles, parentId }) {
@@ -223,7 +221,6 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
-
     createComputeNode: async ({ commit, rootState }, newComputeNode) => {
       const url = `${rootState.config.api2Url}/compute-nodes`;
 
@@ -251,7 +248,6 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
-
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
       const userToken = await useGetToken()
@@ -279,11 +275,9 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
-
     updateFileCount: async ({ commit, rootState }) => {
       commit('UPDATE_SELECTED_FILE_COUNT')
     },
-
     fetchWorkflowInstances: async ({ commit, rootState }) => {
       let workflowInstances = [];
       try {
@@ -343,7 +337,6 @@ const initialState = () => ({
         console.error("Error fetching statuses:", err);
       } 
     },
-    
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
       const userToken = await useGetToken()
       const integrationId = workflow.uuid;
@@ -471,7 +464,6 @@ const initialState = () => ({
     hideActivityLogDialog: ({ commit, rootState }) => {
       commit('HIDE_ACTIVITY_LOG_DIALOG')
     },
-
     editApplication: async ({commit, rootState}, application) => {
       const url = `${rootState.config.api2Url}/applications/${application?.uuid}`;
       const userToken = await useGetToken()
@@ -508,7 +500,6 @@ const initialState = () => ({
     selectedWorkflowActivity: state => state.selectedWorkflowActivity,
     activityDialogVisible: state => state.activityDialogVisible
   }
-  
   
   const analysisModule = {
     namespaced: true,
