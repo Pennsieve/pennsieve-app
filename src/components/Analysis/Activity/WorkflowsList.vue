@@ -1,10 +1,13 @@
 <template>
-  <div class="models-list scrolling-list">
+  <div class="workflows-list scrolling-list">
     <h2 class="heading">Workflows</h2>
     <template v-if="workflowInstances.length > 0">
-      <div class="models-list-loading-wrap" element-loading-background="#fff">
-        <div class="models-list-wrap-scroll">
-          <div class="models-list-wrap">
+      <div
+        class="workflows-list-loading-wrap"
+        element-loading-background="#fff"
+      >
+        <div class="workflows-list-wrap-scroll">
+          <div class="workflows-list-wrap">
             <!-- Display API data -->
             <div>
               <WorkflowsListItem
@@ -58,7 +61,6 @@ export default {
   },
 
   computed: {
-    ...mapState("metadataModule", ["models"]),
     ...mapState("analysisModule", [
       "workflowInstances",
       "selectedWorkflowActivity",
@@ -111,7 +113,7 @@ export default {
 <style lang="scss" scoped>
 @import "../../../assets/_variables.scss";
 
-:deep(.models-list.scrolling-list.input-wrap) {
+:deep(.workflos-list.scrolling-list.input-wrap) {
   padding: 0 0 0 16px;
 }
 
@@ -123,20 +125,20 @@ export default {
   padding-left: 32px;
 }
 
-.models-list.scrolling-list {
+.workflows-list.scrolling-list {
   box-sizing: border-box;
   height: 100%;
   display: flex;
   flex-direction: column;
 
-  .models-list-wrap-scroll {
+  .workflows-list-wrap-scroll {
     box-sizing: border-box;
     flex: 1;
     overflow-y: auto;
     padding: 0 0 16px 8px;
   }
 
-  .models-list-loading-wrap {
+  .workflows-list-loading-wrap {
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -151,22 +153,9 @@ export default {
   }
 }
 
-.models-list-wrap {
+.workflows-list-wrap {
   background: $gray_1;
   padding: 16px;
-}
-.model-group {
-  display: flex;
-  &:first-child {
-    margin-top: 0;
-  }
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-.model-group-col {
-  flex: 1;
-  overflow: hidden;
 }
 .group-key {
   line-height: 1;

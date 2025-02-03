@@ -15,7 +15,7 @@ const { onNodeClick } = useVueFlow();
 
 /*
 Initial Values
- */
+*/
 const initialNodes = [
   {
     id: "1",
@@ -196,9 +196,10 @@ onUnmounted(() => {
 });
 
 /*
-Show Processors associated with the workflow that the user selects
+Watch
 */
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
+  // Update Nodes and Edges to render processors for selected workflow
   if (newVal) {
     nodes.value = [
       {
@@ -367,54 +368,10 @@ onNodeClick(({ node }) => {
     right: 170px;
   }
 }
-
-.btn-toggle-model-details {
-  align-items: center;
-  background: $gray_1;
-  border-left: 1px solid $gray_2;
-  border-right: 1px solid $gray_2;
-  border-top: 1px solid $gray_2;
-  border-bottom: 1px solid $gray_2;
-  border-radius: 4px 0 0 4px;
-  display: flex;
-  height: 48px;
-  left: -35px;
-  justify-content: center;
-  position: absolute;
-  top: 88px;
-  width: 35px;
-}
-
-.btn-toggle-models-list {
-  align-items: center;
-  background: $gray_1;
-  border: 1px solid $gray_2;
-  border-radius: 4px 0 0 4px;
-  display: flex;
-  height: 48px;
-  left: -35px;
-  justify-content: center;
-  position: absolute;
-  top: 33px;
-  width: 35px;
-
-  &.selected {
-    &:after {
-      background: $gray_1;
-      content: "";
-      height: 100%;
-      pointer-events: none;
-      position: absolute;
-      top: 0;
-      right: -5px;
-      width: 5px;
-    }
-  }
-  .vue-flow-wrapper {
-    width: 100%;
-    height: 100%;
-    position: relative;
-  }
+.vue-flow-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 </style>
 <style lang="scss">

@@ -221,17 +221,6 @@ export default {
   }
 }
 
-.model-name {
-  overflow: hidden;
-
-  span {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
 .workflows-list-item-wrapper {
   cursor: pointer;
 }
