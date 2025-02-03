@@ -146,7 +146,7 @@ export default {
   font-family: Arial, sans-serif;
   font-size: 14px;
   line-height: 1.4;
-  color: #000;
+  color: $black;
   background-color: $gray_1;
   width: 425px;
 
@@ -180,7 +180,7 @@ export default {
 }
 
 .box.success .icon {
-  background-color: #fff;
+  background-color: $white;
   color: $status_green;
   box-sizing: border-box;
   font-weight: bold;
@@ -194,7 +194,7 @@ export default {
 }
 
 .selected {
-  border: 2px solid black;
+  border: 2px solid $black;
 }
 
 .text {

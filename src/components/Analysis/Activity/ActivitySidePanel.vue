@@ -34,7 +34,7 @@ const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
 
 watch(
-  () => props.selectedProcessor, // The getter function that watches the prop
+  () => props.selectedProcessor,
   (newVal, oldVal) => {
     modelsListVisible.value = true;
     modelListSelected.value = false;
@@ -122,28 +122,6 @@ function toggleModelsList(event) {
       }
       break;
   }
-}
-
-function onOpenPropertyDialog() {
-  emit("openPropertyDialog");
-}
-
-function onOpenDeleteLinkedPropDialog(event) {
-  emit("openDeleteLinkedPropDialog", event);
-}
-function onOpenDeletePropDialog(event) {
-  emit("openDeletePropDialog", event);
-}
-function onOpenDeleteRelationshipDialog(event) {
-  emit("openDeleteRelationshipDialog", event);
-}
-
-function onOpenDeleteModelDialog(event) {
-  emit("openDeleteModelDialog", event);
-}
-
-function onOpenEditPropertyDialog(event) {
-  emit("openEditPropertyDialog", event);
 }
 </script>
 

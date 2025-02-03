@@ -418,7 +418,7 @@ onNodeClick(({ node }) => {
   position: absolute;
   top: 7%;
   left: 6%;
-  background-color: #f7f7f7;
+  background-color: $gray_1;
   width: fit-content;
   padding: 10px;
   z-index: 1;
@@ -428,12 +428,12 @@ onNodeClick(({ node }) => {
 
 .activity-monitor {
   .el-dialog__title {
-    color: #ffffff;
+    color: $white;
     font-weight: 500;
   }
 
   span {
-    color: #4d628c;
+    color: $purple_2;
   }
 }
 </style>

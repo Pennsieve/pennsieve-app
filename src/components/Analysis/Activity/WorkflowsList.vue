@@ -125,14 +125,14 @@ export default {
 
 .models-list.scrolling-list {
   box-sizing: border-box;
-  height: 100%; // Ensure the parent container takes the full height
+  height: 100%;
   display: flex;
-  flex-direction: column; // Stack children vertically
+  flex-direction: column;
 
   .models-list-wrap-scroll {
     box-sizing: border-box;
-    flex: 1; // Take up available space
-    overflow-y: auto; // Enable vertical scrolling
+    flex: 1;
+    overflow-y: auto;
     padding: 0 0 16px 8px;
   }
 
