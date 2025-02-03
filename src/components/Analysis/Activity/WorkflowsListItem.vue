@@ -144,13 +144,13 @@ export default {
   align-items: center;
   padding: 10px;
   margin: 5px 0;
-  border: 1px solid #ccc;
+  border: 1px solid $gray_3;
   border-radius: 5px;
   font-family: Arial, sans-serif;
   font-size: 14px;
   line-height: 1.4;
   color: #000;
-  background-color: #fff;
+  background-color: $gray_1;
   width: 425px;
 
   button {
@@ -167,7 +167,7 @@ export default {
   height: 30px;
   border-radius: 50%;
   font-size: 26px;
-  border-color: #14a758;
+  border-color: $status_green;
 }
 
 .success {
@@ -179,18 +179,18 @@ export default {
 }
 
 .completed {
-  color: $gray_4;
+  color: $status_green;
 }
 
 .box.success .icon {
   background-color: #fff;
-  color: #14a758;
+  color: $status_green;
   box-sizing: border-box;
   font-weight: bold;
 }
 
 .box.completed .icon {
-  background-color: #fff;
+  background-color: $gray_1;
   color: $gray_4;
   box-sizing: border-box;
   font-weight: bold;
@@ -211,7 +211,7 @@ export default {
 
 .text .compute-node-name {
   font-style: italic;
-  color: #666;
+  color: $gray_4;
 }
 
 .concepts-list-item {
