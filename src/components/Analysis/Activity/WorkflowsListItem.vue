@@ -14,7 +14,7 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
-        <div>Status {{ workflow.status }}</div>
+        <div>Status: {{ workflow.status }}</div>
       </div>
       <div v-if="enableCancelWorkflow">
         <el-tooltip
@@ -45,7 +45,7 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
-        <div>Status {{ workflow.status }}</div>
+        <div>Status: {{ workflow.status }}</div>
       </div>
     </div>
 
@@ -69,16 +69,13 @@
         <div>
           Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
         </div>
-        <div>Status {{ workflow.status }}</div>
+        <div>Status: {{ workflow.status }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import IconWaitingCircle from "../../icons/IconWaitingCircle.vue";
-import IconCheck from "../../icons/IconCheck.vue";
-import IconXCircle from "../../icons/IconXCircle.vue";
 import FormatDate from "../../../mixins/format-date";
 import { CircleClose } from "@element-plus/icons-vue";
 import { mapState, mapMutations } from "vuex";
