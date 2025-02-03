@@ -147,7 +147,7 @@ export default {
   font-size: 14px;
   line-height: 1.4;
   color: $black;
-  background-color: $gray_1;
+  background-color: $white;
   width: 425px;
 
   button {
