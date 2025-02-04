@@ -24,7 +24,12 @@ export function isEnabledForSpecificOrgs(orgId) {
 
     const isHackathonProd = 
     orgId === "N:organization:388563ac-49b5-4fc1-b6b0-2fba767e54b0";
-   return isImmuneHealthProd || isCNTProd || isHackathonProd;
+ 
+
+   const isSPARCProd = 
+   orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"
+
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd;
 }
 
 export function isEnabledForAllDevOrgs(url) {
