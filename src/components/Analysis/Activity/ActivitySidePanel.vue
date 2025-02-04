@@ -2,23 +2,28 @@
 import { ref, watch } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
-import WorkflowsList from "@/components/Analysis/WorkflowsList.vue";
+import WorkflowsList from "@/components/Analysis/Activity/WorkflowsList.vue";
 import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ProcessorDetails from "./ProcessorDetails.vue";
 
-const props = defineProps([
-  "edges",
-  "modelId",
-  "panelVisible",
-  "showDetailsPanel",
-  "selectedProcessor",
-]);
+/* 
+Props
+*/
+const props = defineProps(["edges", "panelVisible", "selectedProcessor"]);
 
-const modelsListVisible = ref(false);
-const modelListSelected = ref(true);
-const modelInfoSelected = ref(false);
+/* 
+Local State
+*/
+const workflowsListVisible = ref(false);
+const workflowsListSelected = ref(true);
+const processorInfoSelected = ref(false);
+const mouseHoverInfo = ref(false);
+const mouseHoverList = ref(false);
 
+/* 
+Emits
+*/
 const emit = defineEmits([
   "openDeleteLinkedPropDialog",
   "togglePanelVisibility",
@@ -30,17 +35,21 @@ const emit = defineEmits([
   "openEditPropertyDialog",
 ]);
 
-const mouseHoverInfo = ref(false);
-const mouseHoverList = ref(false);
-
+/*
+Watch
+*/
 watch(
-  () => props.selectedProcessor, // The getter function that watches the prop
+  () => props.selectedProcessor,
   (newVal, oldVal) => {
-    modelsListVisible.value = true;
-    modelListSelected.value = false;
-    modelInfoSelected.value = true;
+    workflowsListVisible.value = true;
+    workflowsListSelected.value = false;
+    processorInfoSelected.value = true;
   }
 );
+
+/*
+Side Panel Actions 
+*/
 
 function mouseLeave(event) {
   const evtId = event.currentTarget.id;
@@ -51,10 +60,10 @@ function mouseLeave(event) {
   }
 
   switch (evtId) {
-    case "infoPanel":
+    case "workflowsList":
       mouseHoverList.value = false;
       break;
-    case "propPanel":
+    case "processorInfo":
       mouseHoverInfo.value = false;
       break;
   }
@@ -70,88 +79,66 @@ function mouseOver(event) {
   }
 
   switch (evtId) {
-    case "infoPanel":
-      if (modelListSelected.value) {
+    case "workflowsList":
+      if (workflowsListSelected.value) {
         mouseHoverList.value = true;
       }
       break;
-    case "propPanel":
-      if (modelInfoSelected.value) {
+    case "proccessorInfo":
+      if (processorInfoSelected.value) {
         mouseHoverInfo.value = true;
       }
       break;
   }
-}
-
-function focusNode(event) {
-  emit("focusNode", event);
 }
 
 function toggleModelsList(event) {
   const evtId = event.currentTarget.id;
 
   switch (evtId) {
-    case "infoPanel":
-      if (modelListSelected.value) {
-        modelsListVisible.value = false;
-        modelListSelected.value = false;
+    case "workflowsList":
+      if (workflowsListSelected.value) {
+        workflowsListVisible.value = false;
+        workflowsListSelected.value = false;
         emit("togglePanelVisibility");
-      } else if (modelInfoSelected.value) {
-        modelListSelected.value = true;
-        modelInfoSelected.value = false;
+      } else if (processorInfoSelected.value) {
+        workflowsListSelected.value = true;
+        processorInfoSelected.value = false;
         mouseHoverList.value = true;
       } else {
-        modelListSelected.value = true;
+        workflowsListSelected.value = true;
         mouseHoverList.value = true;
         emit("togglePanelVisibility");
       }
       break;
-    case "propPanel":
-      if (modelInfoSelected.value) {
-        modelsListVisible.value = false;
-        modelInfoSelected.value = false;
+    case "processorInfo":
+      if (processorInfoSelected.value) {
+        workflowsListVisible.value = false;
+        processorInfoSelected.value = false;
         emit("togglePanelVisibility");
-      } else if (modelListSelected.value) {
-        modelInfoSelected.value = true;
-        modelListSelected.value = false;
+      } else if (workflowsListSelected.value) {
+        processorInfoSelected.value = true;
+        workflowsListSelected.value = false;
         mouseHoverInfo.value = true;
       } else {
-        modelInfoSelected.value = true;
+        processorInfoSelected.value = true;
         mouseHoverInfo.value = true;
         emit("togglePanelVisibility");
       }
       break;
   }
 }
-
-function onOpenPropertyDialog() {
-  emit("openPropertyDialog");
-}
-
-function onOpenDeleteLinkedPropDialog(event) {
-  emit("openDeleteLinkedPropDialog", event);
-}
-function onOpenDeletePropDialog(event) {
-  emit("openDeletePropDialog", event);
-}
-function onOpenDeleteRelationshipDialog(event) {
-  emit("openDeleteRelationshipDialog", event);
-}
-
-function onOpenDeleteModelDialog(event) {
-  emit("openDeleteModelDialog", event);
-}
-
-function onOpenEditPropertyDialog(event) {
-  emit("openEditPropertyDialog", event);
-}
 </script>
 
 <template>
-  <div class="models-list-wrap" :class="{ visible: modelsListVisible }">
+  <div class="workflows-list-wrap" :class="{ visible: workflowsListVisible }">
     <button
-      id="propPanel"
-      :class="{ selected: modelInfoSelected, 'btn-toggle': true, second: true }"
+      id="processorInfo"
+      :class="{
+        selected: processorInfoSelected,
+        'btn-toggle': true,
+        second: true,
+      }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
@@ -160,8 +147,12 @@ function onOpenEditPropertyDialog(event) {
       <IconArrowRight v-else :width="14" :height="14" />
     </button>
     <button
-      id="infoPanel"
-      :class="{ selected: modelListSelected, 'btn-toggle': true, first: true }"
+      id="workflowsList"
+      :class="{
+        selected: workflowsListSelected,
+        'btn-toggle': true,
+        first: true,
+      }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
@@ -169,15 +160,11 @@ function onOpenEditPropertyDialog(event) {
       <IconDocument v-if="!mouseHoverList" :width="24" :height="24" />
       <IconArrowRight v-else :width="14" :height="14" />
     </button>
-    <div ref="modelsList" class="models-list-scroll">
-      <workflows-list
-        v-show="modelListSelected"
-        :scrolling-list="true"
-        @click="focusNode"
-      />
+    <div ref="workflowsList" class="workflows-list-scroll">
+      <workflows-list v-show="workflowsListSelected" :scrolling-list="true" />
 
       <processor-details
-        v-show="modelInfoSelected"
+        v-show="processorInfoSelected"
         :selected-processor="selectedProcessor"
       />
     </div>
@@ -185,9 +172,9 @@ function onOpenEditPropertyDialog(event) {
 </template>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
-.models-list-wrap {
+.workflows-list-wrap {
   border-top: 1px solid $gray_2;
   border-left: 1px solid $gray_2;
   border-bottom: 1px solid $gray_2;
@@ -205,7 +192,7 @@ function onOpenEditPropertyDialog(event) {
     transform: translate3d(0, 72px, 0);
   }
 }
-.models-list-scroll {
+.workflows-list-scroll {
   height: 100%;
   overflow: hidden;
   background: $gray_1;

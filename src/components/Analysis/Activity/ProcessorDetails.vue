@@ -97,7 +97,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .table-container {
   min-width: 400px;
@@ -111,18 +111,18 @@ table {
 
 th,
 td {
-  border: 1px solid #ddd;
+  border: 1px solid $gray_2;
   padding: 10px;
   text-align: left;
 }
 
 th {
-  background-color: #f4f4f4;
+  background-color: $gray_2;
   font-weight: bold;
 }
 
 tr:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: $gray_2;
 }
 
 .model-details {
@@ -132,26 +132,26 @@ tr:nth-child(even) {
 .processor-details {
   display: flex;
   flex-direction: column;
-  gap: 1rem; /* Adds spacing between each element */
+  gap: 1rem;
 }
 
 .label {
   font-weight: bold;
-  color: $purple_3; /* Dark blue for the text before the colon */
+  color: $purple_3;
 }
 
 .value {
-  color: black; /* Black for the text after the colon */
+  color: $black;
   font-weight: normal;
 }
 .processor-item {
   font-weight: bold;
-  color: darkblue;
+  color: $purple_3;
 }
 
 .processor-value {
   font-weight: normal;
-  color: inherit; /* Keep inherited text color for the values */
+  color: inherit;
 }
 
 li {

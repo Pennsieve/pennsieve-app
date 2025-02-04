@@ -9,56 +9,13 @@ import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import CustomNode from "./CustomNode.vue";
-import EventBus from "../../utils/event-bus";
+import EventBus from "../../../utils/event-bus";
 
 const { onNodeClick } = useVueFlow();
-// Access the Vuex store
-const store = useStore();
 
-// Gobal State from Vuex Store
-const workflowInstances = computed(
-  () => store.getters["analysisModule/workflowInstances"]
-);
-
-const selectedWorkflowActivity = computed(
-  () => store.getters["analysisModule/selectedWorkflowActivity"]
-);
-
-const cancelWorkflowDialogVisible = computed(
-  () => store.state.analysisModule.cancelWorkflowDialogVisible
-);
-
-const hideCancelWorkflowDialog = () => {
-  store.dispatch("analysisModule/hideCancelWorkflowDialog");
-};
-
-const cancelWorkflow = () => {
-  store
-    .dispatch("analysisModule/cancelWorkflow", selectedWorkflowActivity?.uuid)
-    .then(() => {
-      EventBus.$emit("toast", {
-        detail: {
-          type: "success",
-          msg: "Your cancellation request was successful. It may take some time to complete.",
-        },
-      });
-    })
-    .catch((err) => {
-      EventBus.$emit("toast", {
-        detail: {
-          type: "error",
-          msg: "Something went wrong, please try again later.",
-        },
-      });
-    });
-};
-
-const activityDialogVisible = computed(
-  () => store.getters["analysisModule/activityDialogVisible"]
-);
-
-const isLoading = ref(false);
-
+/*
+Initial Values
+*/
 const initialNodes = [
   {
     id: "1",
@@ -81,7 +38,6 @@ const initialNodes = [
     class: "light",
   },
 ];
-
 const initialEdges = [
   {
     id: "e1-1",
@@ -97,18 +53,57 @@ const initialEdges = [
   },
 ];
 
-const nodes = ref(initialNodes);
-
-const edges = ref(initialEdges);
-
-const getLabel = (workflow, type) =>
-  workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
-
-/*
-Fetch Initial Data
+/* 
+Local State
 */
-
+const isLoading = ref(false);
+const nodes = ref(initialNodes);
+const edges = ref(initialEdges);
 const intervalIdApplicationStatus = ref(null);
+const sidePanelVisible = ref(true);
+const isDetailsPanelOpen = ref(false);
+const selectedProcessor = ref({});
+const selectedNode = ref({});
+
+/* 
+Global State 
+*/
+const store = useStore();
+const workflowInstances = computed(
+  () => store.getters["analysisModule/workflowInstances"]
+);
+const selectedWorkflowActivity = computed(
+  () => store.getters["analysisModule/selectedWorkflowActivity"]
+);
+const cancelWorkflowDialogVisible = computed(
+  () => store.state.analysisModule.cancelWorkflowDialogVisible
+);
+const hideCancelWorkflowDialog = () => {
+  store.dispatch("analysisModule/hideCancelWorkflowDialog");
+};
+const cancelWorkflow = () => {
+  store
+    .dispatch("analysisModule/cancelWorkflow", selectedWorkflowActivity?.uuid)
+    .then(() => {
+      EventBus.$emit("toast", {
+        detail: {
+          type: "success",
+          msg: "Your cancellation request was successful. It may take some time to complete.",
+        },
+      });
+    })
+    .catch((err) => {
+      EventBus.$emit("toast", {
+        detail: {
+          type: "error",
+          msg: "Something went wrong, please try again later.",
+        },
+      });
+    });
+};
+const activityDialogVisible = computed(
+  () => store.getters["analysisModule/activityDialogVisible"]
+);
 
 const getApplicationsStatus = async () => {
   await store.dispatch(
@@ -121,6 +116,16 @@ const getWorkflowStatus = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
+/* 
+Helpers
+*/
+
+const getLabel = (workflow, type) =>
+  workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
+
+/*
+Fetch Initial Data
+*/
 onMounted(async () => {
   // fetch all workflow instances
   try {
@@ -190,7 +195,11 @@ onUnmounted(() => {
   clearInterval(intervalIdApplicationStatus.value);
 });
 
+/*
+Watch
+*/
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
+  // Update Nodes and Edges to render processors for selected workflow
   if (newVal) {
     nodes.value = [
       {
@@ -227,13 +236,10 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
 /*
 Side Panel Logic
  */
-const sidePanelVisible = ref(true);
 function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
 
-const isDetailsPanelOpen = ref(false);
-const selectedProcessor = ref({});
 function openDetailsPanel(selectedApplication) {
   isDetailsPanelOpen.value = true;
   selectedProcessor.value = selectedApplication;
@@ -245,8 +251,7 @@ const handleCloseDialog = () => {
 
 /*
 Event Handler for Node Click
- */
-const selectedNode = ref({});
+*/
 
 onNodeClick(({ node }) => {
   const selectedApplication = selectedWorkflowActivity.value.workflow.find(
@@ -329,14 +334,14 @@ onNodeClick(({ node }) => {
 @import '@vue-flow/core/dist/style.css'
 
 /* this contains the default theme, these are optional styles */
-@import '../..//assets/_vueflow_core.scss'
-@import '../../assets/_vueflow.css'
+@import '../../../assets/_vueflow_core.scss'
+@import '../../../assets/_vueflow.css'
 
 @import '@vue-flow/minimap/dist/style.css'
 </style>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .modified-stage {
   margin: 0;
@@ -363,54 +368,10 @@ onNodeClick(({ node }) => {
     right: 170px;
   }
 }
-
-.btn-toggle-model-details {
-  align-items: center;
-  background: $gray_1;
-  border-left: 1px solid $gray_2;
-  border-right: 1px solid $gray_2;
-  border-top: 1px solid $gray_2;
-  border-bottom: 1px solid $gray_2;
-  border-radius: 4px 0 0 4px;
-  display: flex;
-  height: 48px;
-  left: -35px;
-  justify-content: center;
-  position: absolute;
-  top: 88px;
-  width: 35px;
-}
-
-.btn-toggle-models-list {
-  align-items: center;
-  background: $gray_1;
-  border: 1px solid $gray_2;
-  border-radius: 4px 0 0 4px;
-  display: flex;
-  height: 48px;
-  left: -35px;
-  justify-content: center;
-  position: absolute;
-  top: 33px;
-  width: 35px;
-
-  &.selected {
-    &:after {
-      background: $gray_1;
-      content: "";
-      height: 100%;
-      pointer-events: none;
-      position: absolute;
-      top: 0;
-      right: -5px;
-      width: 5px;
-    }
-  }
-  .vue-flow-wrapper {
-    width: 100%;
-    height: 100%;
-    position: relative;
-  }
+.vue-flow-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 </style>
 <style lang="scss">
@@ -418,7 +379,7 @@ onNodeClick(({ node }) => {
   position: absolute;
   top: 7%;
   left: 6%;
-  background-color: #f7f7f7;
+  background-color: $gray_1;
   width: fit-content;
   padding: 10px;
   z-index: 1;
@@ -428,12 +389,12 @@ onNodeClick(({ node }) => {
 
 .activity-monitor {
   .el-dialog__title {
-    color: #ffffff;
+    color: $white;
     font-weight: 500;
   }
 
   span {
-    color: #4d628c;
+    color: $purple_2;
   }
 }
 </style>

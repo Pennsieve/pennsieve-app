@@ -1,35 +1,41 @@
 <script setup>
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import BfWaitingIcon from "../shared/bf-waiting-icon/bf-waiting-icon.vue";
+import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 
-const store = useStore();
+/* 
+Props
+*/
 const props = defineProps([
   "dialogVisible",
   "selectedNode",
   "selectedApplication",
 ]);
-const emit = defineEmits(["close-dialog"]);
 
+/* 
+Local State
+*/
 const isLoading = ref(false);
 const TableData = ref();
 const noLogsAvailable = ref(false);
 
-function buildTable() {
-  noLogsAvailable.value = false;
-  let _tempArr = [];
-  LogList.value.forEach((log) => {
-    let column = {
-      CreationTime: log.utcTime,
-      Message: log.message,
-    };
-    _tempArr.push(column);
-  });
-  TableData.value = _tempArr;
-}
+/*
+Emits
+*/
+const emit = defineEmits(["close-dialog"]);
 
-// Fetch Logs on Workflow Change from Vuex Store
+/* 
+Global State
+*/
+const store = useStore();
+
+const LogList = computed(() => store.getters["analysisModule/workflowLogs"]);
+
+/*
+Watch
+*/
 watch(
+  // Fetch Logs on Workflow Change from Vuex Store
   () => props.selectedNode,
   async (newval, oldval) => {
     if (!props.selectedNode.uuid) {
@@ -49,14 +55,30 @@ watch(
   }
 );
 
-const LogList = computed(() => store.getters["analysisModule/workflowLogs"]);
 watch(LogList, () => {
+  // Build table to display logs
   LogList.value.length ? buildTable() : (noLogsAvailable.value = true);
 });
 
-/**
- * Closes the dialog
- */
+/* 
+Build Table for Logs 
+*/
+function buildTable() {
+  noLogsAvailable.value = false;
+  let _tempArr = [];
+  LogList.value.forEach((log) => {
+    let column = {
+      CreationTime: log.utcTime,
+      Message: log.message,
+    };
+    _tempArr.push(column);
+  });
+  TableData.value = _tempArr;
+}
+
+/*
+Closes the dialog
+*/
 function closeDialog() {
   emit("close-dialog", false);
 }
@@ -102,7 +124,7 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@import "../../../assets/_variables.scss";
 
 .log-dialog {
   height: 80%;
@@ -116,10 +138,10 @@ function closeDialog() {
   justify-content: center;
   width: 24px;
 }
-.activity-log-body{
+.activity-log-body {
   height: 79%;
   overflow: hidden;
-  .log-table{
+  .log-table {
     height: 63vh;
   }
 }
