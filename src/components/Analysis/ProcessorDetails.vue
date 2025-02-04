@@ -22,6 +22,12 @@
         <span class="label">Parameters: </span>
         <span v-if="!hasParams" class="value">none</span>
       </div>
+      <div>
+        <bf-button @click="openPlotlyApp">View Plot ></bf-button>
+      </div>
+      <div>
+        <bf-button class="button-plotly">Stop Process</bf-button>
+      </div>
       <div class="table-container">
         <table v-if="hasParams">
           <thead>
@@ -92,7 +98,11 @@ export default {
     handleLogsClick() {
       this.showActivityLogDialog();
     },
+    openPlotlyApp(){
+      window.open("http://127.0.0.1:8050/",'_blank').focus()
+    }
   },
+
 };
 </script>
 
@@ -159,5 +169,8 @@ li {
   display: flex;
   font-size: 12px;
   margin-bottom: 8px;
+}
+.button-plotly{
+  background-color: blue;
 }
 </style>

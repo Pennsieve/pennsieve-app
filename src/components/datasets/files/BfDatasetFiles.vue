@@ -19,6 +19,16 @@
           <template v-if="quickActionsVisible">
             <bf-button
               :disabled="!isFeatureFlagEnabled"
+              @click="openPlotlyDialog"
+              class="mr-8 flex"
+            >
+              <template #prefix>
+                <IconAnalysis class="mr-8" :height="20" :width="20" />
+              </template>
+              Plot CSV
+            </bf-button>
+            <bf-button
+              :disabled="!isFeatureFlagEnabled"
               @click="openRunAnalysisDialog"
               class="mr-8 flex"
             >
@@ -177,7 +187,11 @@
       :dialog-visible="runAnalysisDialogVisible"
       @close="onCloseRunAnalysisDialog"
     />
-
+    <run-plotly-dialog
+      :datasetId="datasetId"
+      :dialogVisible="runPlotlyDialogVisible"
+      @close="onClosePlotlyDialog"
+    />
     <bf-drop-info
       v-if="showDropInfo"
       v-model:show-drop-info="showDropInfo"
@@ -207,6 +221,7 @@ import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
 import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
 import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
+import RunPlotlyDialog from "./RunPlotlyDialog/RunPlotlyDialog.vue"
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -312,6 +327,7 @@ export default {
       pusherChannelName: "",
       pusherChannel: {},
       runAnalysisDialogVisible: false,
+      runPlotlyDialogVisible: false,
     };
   },
 
@@ -582,6 +598,9 @@ export default {
     },
     onCloseRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = false;
+    },
+    onClosePlotlyDialog:function(){
+      this.runPlotlyDialogVisible = false;
     },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
@@ -1191,7 +1210,9 @@ export default {
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
-
+    openPlotlyDialog: function (){
+      this.runPlotlyDialogVisible = true;
+    },
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
         "dataset-files",
