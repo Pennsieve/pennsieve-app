@@ -104,19 +104,10 @@ export default {
       editApplicationDialogVisible: false,
       deleteApplicationDialogVisible: false,
       applicationEdit: {},
-      intervalId: 0,
       selectedApplication: {},
     };
   },
-  mounted() {
-    this.intervalId = setInterval(() => {
-      //this will be replaced by pusher
-      this.getApplicationsStatus();
-    }, 10000);
-  },
-  unmounted() {
-    clearInterval(this.intervalId);
-  },
+
   computed: {
     ...mapState(["activeOrganization", "userToken", "config"]),
     ...mapState("analysisModule", ["applications"]),
@@ -218,13 +209,6 @@ export default {
      */
     onAddApplicationConfirm: function (application) {
       this.createApplication(application);
-    },
-    /**
-     * Get and recieve application statuses
-     * pusher code should go here
-     */
-    getApplicationsStatus: function () {
-      this.fetchApplications();
     },
   },
 };
