@@ -20,23 +20,19 @@ Initial Values
 const initialNodes = [
   {
     id: "1",
-    type: "input",
     data: {},
     position: { x: 130, y: 100 },
-    class: "light",
   },
   {
     id: "2",
     data: {},
     position: { x: 150, y: 250 },
-    class: "light",
   },
   {
     id: "3",
     type: "output",
     data: {},
     position: { x: 170, y: 400 },
-    class: "light",
   },
 ];
 const initialEdges = [
@@ -124,6 +120,36 @@ Helpers
 const getLabel = (workflow, type) =>
   workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
 
+const getClass = (workflow, processorIdx) => {
+  switch (workflow.workflow[processorIdx].status) {
+    case "NOT_STARTED":
+      return "custom-node gray-node";
+    case "STARTED":
+      return "custom-node blue-node";
+    case "SUCCEEDED":
+      return "custom-node green-node";
+    case "FAILED":
+      return "custom-node red-node";
+    default:
+      return "custom-node green-node";
+  }
+};
+
+const statusClass = computed(() => {
+  switch (selectedWorkflowActivity.value) {
+    case "NOT_STARTED":
+      return "custom-node gray-node";
+    case "STARTED":
+      return "custom-node blue-node";
+    case "SUCCEEDED":
+      return "custom-node green-node";
+    case "FAILED":
+      return "custom-node red-node";
+    default:
+      return "custom-node green-node";
+  }
+});
+
 /*
 Computed Properties
 */
@@ -166,30 +192,30 @@ onMounted(async () => {
     nodes.value = [
       {
         id: "1",
-        type: "input",
         data: {
           label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
+          status: sortedWorkflows[0].workflow[0].status,
         },
         position: { x: 130, y: 100 },
-        class: "light",
+        class: getClass(sortedWorkflows[0], 0),
       },
       {
         id: "2",
-        type: "",
         data: {
           label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
+          status: sortedWorkflows[0].workflow[1].status,
         },
         position: { x: 150, y: 250 },
-        class: "light",
+        class: getClass(sortedWorkflows[0], 1),
       },
       {
         id: "3",
-        type: "output",
         data: {
           label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
+          status: sortedWorkflows[0].workflow[2].status,
         },
         position: { x: 170, y: 400 },
-        class: "light",
+        class: getClass(sortedWorkflows[0], 2),
       },
     ];
   }
@@ -214,30 +240,34 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
     nodes.value = [
       {
         id: "1",
-        type: "input",
+
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
+          status: newVal.workflow[0].status,
         },
         position: { x: 130, y: 100 },
-        class: "light",
+        class: getClass(newVal, 0),
       },
       {
         id: "2",
-        type: "",
+
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
+          status: newVal.workflow[1].status,
+          class: getClass(newVal, 1),
         },
         position: { x: 150, y: 250 },
-        class: "light",
+        class: getClass(newVal, 2),
       },
       {
         id: "3",
-        type: "output",
+
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
+          status: newVal.workflow[2].status,
         },
         position: { x: 170, y: 400 },
-        class: "light",
+        class: statusClass,
       },
     ];
   }
@@ -305,14 +335,10 @@ onNodeClick(({ node }) => {
         <VueFlow
           :nodes="nodes"
           :edges="edges"
-          class="basic-flow"
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
         >
-          <template #customNode="nodeProps">
-            <CustomNode v-bind="nodeProps" />
-          </template>
           <Background pattern-color="#aaa" :gap="16" />
           <Controls position="top-left" />
         </VueFlow>
@@ -423,6 +449,38 @@ onNodeClick(({ node }) => {
 
   span {
     color: $purple_2;
+  }
+
+  .custom-node {
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+    width: 100px;
+  }
+
+  .gray-node {
+    background-color: gray;
+  }
+  .green-node {
+    background-color: $status_green;
+  }
+  .red-node {
+    background-color: red;
+  }
+
+  .blue-node {
+    background-color: blue;
+    animation: pulse 1s infinite alternate;
+  }
+
+  @keyframes pulse {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.5;
+    }
   }
 }
 </style>
