@@ -9,7 +9,6 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
-import CustomNode from "./CustomNode.vue";
 import EventBus from "../../../utils/event-bus";
 
 const { onNodeClick } = useVueFlow();
@@ -121,34 +120,26 @@ const getLabel = (workflow, type) =>
   workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
 
 const getClass = (workflow, processorIdx) => {
+  if (!workflow || !workflow.workflow || !workflow.workflow[processorIdx]) {
+    return "vue-flow__node-custom gray-node"; // Default fallback
+  }
+
+  console.log("workflow", workflow);
+  console.log("processorIdx", processorIdx);
+
   switch (workflow.workflow[processorIdx].status) {
     case "NOT_STARTED":
-      return "custom-node gray-node";
+      return "gray-node";
     case "STARTED":
-      return "custom-node blue-node";
+      return "blue-node animate";
     case "SUCCEEDED":
-      return "custom-node green-node";
+      return "green-node";
     case "FAILED":
-      return "custom-node red-node";
+      return "red-node";
     default:
-      return "custom-node green-node";
+      return "gray-node";
   }
 };
-
-const statusClass = computed(() => {
-  switch (selectedWorkflowActivity.value) {
-    case "NOT_STARTED":
-      return "custom-node gray-node";
-    case "STARTED":
-      return "custom-node blue-node";
-    case "SUCCEEDED":
-      return "custom-node green-node";
-    case "FAILED":
-      return "custom-node red-node";
-    default:
-      return "custom-node green-node";
-  }
-});
 
 /*
 Computed Properties
@@ -189,35 +180,6 @@ onMounted(async () => {
     } finally {
       isLoading.value = false;
     }
-    nodes.value = [
-      {
-        id: "1",
-        data: {
-          label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
-          status: sortedWorkflows[0].workflow[0].status,
-        },
-        position: { x: 130, y: 100 },
-        class: getClass(sortedWorkflows[0], 0),
-      },
-      {
-        id: "2",
-        data: {
-          label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
-          status: sortedWorkflows[0].workflow[1].status,
-        },
-        position: { x: 150, y: 250 },
-        class: getClass(sortedWorkflows[0], 1),
-      },
-      {
-        id: "3",
-        data: {
-          label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
-          status: sortedWorkflows[0].workflow[2].status,
-        },
-        position: { x: 170, y: 400 },
-        class: getClass(sortedWorkflows[0], 2),
-      },
-    ];
   }
 
   // Fetch data to get updates
@@ -240,7 +202,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
     nodes.value = [
       {
         id: "1",
-
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
           status: newVal.workflow[0].status,
@@ -250,24 +212,24 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
       },
       {
         id: "2",
-
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
           status: newVal.workflow[1].status,
           class: getClass(newVal, 1),
         },
         position: { x: 150, y: 250 },
-        class: getClass(newVal, 2),
+        class: getClass(newVal, 1),
       },
       {
         id: "3",
-
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
           status: newVal.workflow[2].status,
         },
         position: { x: 170, y: 400 },
-        class: statusClass,
+        class: getClass(newVal, 2),
       },
     ];
   }
@@ -394,8 +356,17 @@ onNodeClick(({ node }) => {
 @import '@vue-flow/minimap/dist/style.css'
 </style>
 
-<style lang="scss" scoped>
+<style lang="scss">
 @import "../../../assets/_variables.scss";
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
 
 .modified-stage {
   margin: 0;
@@ -422,13 +393,7 @@ onNodeClick(({ node }) => {
     right: 170px;
   }
 }
-.vue-flow-wrapper {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-</style>
-<style lang="scss">
+
 .vue-flow-title {
   position: absolute;
   top: 7%;
@@ -441,6 +406,53 @@ onNodeClick(({ node }) => {
   margin: 0;
 }
 
+.vue-flow__node.gray-node {
+  border: 2px solid gray;
+}
+
+.vue-flow__node.blue-node {
+  border: 2px solid blue;
+}
+
+.vue-flow__node.blue-node.animate {
+  border: 3px dotted $status_green; /* Initial border color */
+  animation: border-dotted 4s linear infinite;
+}
+
+.vue-flow__node.green-node {
+  border: 2px solid $status_green;
+}
+
+.vue-flow__node.red-node {
+  border: 2px solid red;
+}
+
+/* Animation of a dotted line running around the perimeter of the box */
+@keyframes border-dotted {
+  0% {
+    border-top-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+  25% {
+    border-top-color: $status_green;
+  }
+  50% {
+    border-right-color: $status_green;
+  }
+  75% {
+    border-bottom-color: $status_green;
+  }
+  100% {
+    border-left-color: $status_green;
+  }
+}
+
+.vue-flow__node.selected {
+  background-color: $gray_2;
+}
+
 .activity-monitor {
   .el-dialog__title {
     color: $white;
@@ -449,38 +461,6 @@ onNodeClick(({ node }) => {
 
   span {
     color: $purple_2;
-  }
-
-  .custom-node {
-    padding: 10px;
-    border-radius: 6px;
-    text-align: center;
-    font-weight: bold;
-    width: 100px;
-  }
-
-  .gray-node {
-    background-color: gray;
-  }
-  .green-node {
-    background-color: $status_green;
-  }
-  .red-node {
-    background-color: red;
-  }
-
-  .blue-node {
-    background-color: blue;
-    animation: pulse 1s infinite alternate;
-  }
-
-  @keyframes pulse {
-    0% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0.5;
-    }
   }
 }
 </style>
