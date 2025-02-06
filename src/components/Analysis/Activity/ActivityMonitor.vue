@@ -54,7 +54,7 @@ const initialEdges = [
   },
 ];
 
-/* 
+/*
 Local State
 */
 const isLoading = ref(false);
@@ -66,8 +66,8 @@ const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
 
-/* 
-Global State 
+/*
+Global State
 */
 const store = useStore();
 const workflowInstances = computed(
@@ -117,7 +117,7 @@ const getWorkflowStatus = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
-/* 
+/*
 Helpers
 */
 
@@ -283,8 +283,8 @@ onNodeClick(({ node }) => {
           :min-zoom="0.2"
           :max-zoom="4"
         >
-          <template #node-custom="customNodeProps">
-            <CustomNode :node-props="customNodeProps" />
+          <template #customNode="nodeProps">
+            <CustomNode v-bind="nodeProps" />
           </template>
           <Background pattern-color="#aaa" :gap="16" />
           <Controls position="top-left" />
