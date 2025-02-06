@@ -5,7 +5,11 @@
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     > -->
-    <div :class="computedClass" @click="$emit('select-workflow', workflow)">
+    <div
+      v-if="workflow.startedAt && !workflow.completedAt"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
       <IconWaitingCircle class="icon success" />
       <div class="text">
         <div class="workflow-name">
@@ -37,7 +41,11 @@
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     > -->
-    <div :class="computedClass" @click="$emit('select-workflow', workflow)">
+    <div
+      v-if="workflow.completedAt"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
       <!-- <div class="icon failure">×</div> -->
       <IconCheck class="icon neutral" />
       <div class="text">
@@ -108,6 +116,10 @@ export default {
   computed: {
     ...mapState("analysisModule", ["selectedWorkflowActivity"]),
     computedClass: function () {
+      console.log(
+        "this?.selectedWorkflowActivity",
+        this.selectedWorkflowActivity
+      );
       const workflow = this?.workflow?.uuid;
 
       const selectedWorkflow = this?.selectedWorkflowActivity?.uuid;
