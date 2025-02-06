@@ -1,27 +1,63 @@
-<script setup>
-import { Position, Handle } from '@vue-flow/core'
-import { toRef, ref } from 'vue';
-
-const props = defineProps(['nodeProps'])
-const nodeProps = toRef(props,'nodeProps')
-const type = ref(nodeProps.value.data.type)
-
-
-</script>
-
 <template>
-  <div class="vue-flow__node-default" :class="{input:type==='input', output:type==='output'}">
-    <Handle type="target" :position="Position.Top" />
-    <div>{{ nodeProps.data.label }}</div>
-    <button>View Logs</button>
-    <Handle type="source" :position="Position.Bottom" />
+  <div class="custom-node" :class="statusClass">
+    <slot />
   </div>
 </template>
+
+<script setup>
+import { computed } from "vue";
+import { useVueFlow } from "@vue-flow/core";
+
+const props = defineProps(["id", "data"]);
+const { findNode } = useVueFlow();
+const node = computed(() => findNode(props.id));
+
+const statusClass = computed(() => {
+  switch (node.value?.data?.status) {
+    case "NOT_STARTED":
+      return "gray-node";
+    case "STARTED":
+      return "blue-node";
+    case "SUCCEEDED":
+      return "green-node";
+    case "FAILED":
+      return "red-node";
+    default:
+      return "gray-node";
+  }
+});
+</script>
+
 <style scoped>
-  .input{
-    border-color: #0041d0;
+.custom-node {
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+  width: 100px;
+}
+
+.gray-node {
+  background-color: gray;
+}
+.green-node {
+  background-color: green;
+}
+.red-node {
+  background-color: red;
+}
+
+.blue-node {
+  background-color: blue;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
   }
-  .output{
-    border-color: #ff0072;
+  100% {
+    opacity: 0.5;
   }
+}
 </style>
