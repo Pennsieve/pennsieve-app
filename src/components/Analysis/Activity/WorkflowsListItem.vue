@@ -1,7 +1,12 @@
 <template>
   <div class="workflows-list-item-wrapper">
-    <div
+    <!-- <div
       v-if="workflow.status === 'STARTED'"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    > -->
+    <div
+      v-if="workflow.startedAt && !workflow.completedAt"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
@@ -14,7 +19,7 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
-        <div>Status: {{ workflow.status }}</div>
+        <!-- <div>Status: {{ workflow.status }}</div> -->
       </div>
       <div v-if="enableCancelWorkflow">
         <el-tooltip
@@ -31,12 +36,18 @@
         </el-tooltip>
       </div>
     </div>
-    <div
+    <!-- <div
       v-if="workflow.status === 'FAILED'"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
+    > -->
+    <div
+      v-if="workflow.completedAt"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
     >
-      <div class="icon failure">×</div>
+      <!-- <div class="icon failure">×</div> -->
+      <IconCheck class="icon neutral" />
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
@@ -45,15 +56,16 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
-        <div>Status: {{ workflow.status }}</div>
+        <!-- <div>Status: {{ workflow.status }}</div> -->
       </div>
     </div>
 
-    <div
+    <!-- <div
       v-if="workflow.status === 'SUCCEEDED'"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
-    >
+    > -->
+    <!-- <div :class="computedClass" @click="$emit('select-workflow', workflow)">
       <IconCheck class="icon completed" />
       <div class="text">
         <div class="workflow-name">
@@ -70,8 +82,8 @@
           Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
         </div>
         <div>Status: {{ workflow.status }}</div>
-      </div>
-    </div>
+      </div> -->
+    <!-- </div> -->
   </div>
 </template>
 
@@ -104,6 +116,10 @@ export default {
   computed: {
     ...mapState("analysisModule", ["selectedWorkflowActivity"]),
     computedClass: function () {
+      console.log(
+        "this?.selectedWorkflowActivity",
+        this.selectedWorkflowActivity
+      );
       const workflow = this?.workflow?.uuid;
 
       const selectedWorkflow = this?.selectedWorkflowActivity?.uuid;
@@ -177,6 +193,10 @@ export default {
 
 .completed {
   color: $status_green;
+}
+
+.neutral {
+  color: $gray_4;
 }
 
 .box.success .icon {

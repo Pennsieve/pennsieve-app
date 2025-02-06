@@ -291,7 +291,7 @@ const initialState = () => ({
     
         if (resp.ok) {
           workflowInstances = await resp.json();
-          // commit("SET_WORKFLOW_INSTANCES", workflowInstances);
+          commit("SET_WORKFLOW_INSTANCES", workflowInstances);
         } else {
           return Promise.reject(resp);
         }
@@ -300,41 +300,41 @@ const initialState = () => ({
         return Promise.reject(err);
       }
     
-      try {
-        const userToken = await useGetToken();
-        const statusRequests = workflowInstances.map(async (instance) => {
-          const statusUrl = `${rootState.config.api2Url}/workflows/instances/${instance.uuid}/status`;
-          const resp = await fetch(statusUrl, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${userToken}`,
-            },
-          });
+      // try {
+      //   const userToken = await useGetToken();
+      //   const statusRequests = workflowInstances.map(async (instance) => {
+      //     const statusUrl = `${rootState.config.api2Url}/workflows/instances/${instance.uuid}/status`;
+      //     const resp = await fetch(statusUrl, {
+      //       method: "GET",
+      //       headers: {
+      //         Authorization: `Bearer ${userToken}`,
+      //       },
+      //     });
     
-          if (resp.ok) {
-            return resp.json();
-          } else {
-            return { uuid: instance.uuid, status: "UNKNOWN" }; 
-          }
-        });
+      //     if (resp.ok) {
+      //       return resp.json();
+      //     } else {
+      //       return { uuid: instance.uuid, status: "UNKNOWN" }; 
+      //     }
+      //   });
     
-        // Wait for all status requests to complete
-        const statusResults = await Promise.all(statusRequests);
+      //   // Wait for all status requests to complete
+      //   const statusResults = await Promise.all(statusRequests);
     
-        // Merge status into workflow instances
-        const mergedObjects = workflowInstances.map(workflow => {
-          const matchedStatus = statusResults.find(status => status.uuid === workflow.uuid);
-          return {
-            ...workflow,
-            status: matchedStatus ? matchedStatus.status : "UNKNOWN",
-          };
-        });
+      //   // Merge status into workflow instances
+      //   const mergedObjects = workflowInstances.map(workflow => {
+      //     const matchedStatus = statusResults.find(status => status.uuid === workflow.uuid);
+      //     return {
+      //       ...workflow,
+      //       status: matchedStatus ? matchedStatus.status : "UNKNOWN",
+      //     };
+      //   });
     
-        commit("SET_WORKFLOW_INSTANCES",  mergedObjects);
+      //   commit("SET_WORKFLOW_INSTANCES",  mergedObjects);
     
-      } catch (err) {
-        console.error("Error fetching statuses:", err);
-      } 
+      // } catch (err) {
+      //   console.error("Error fetching statuses:", err);
+      // } 
     },
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
       const userToken = await useGetToken()
