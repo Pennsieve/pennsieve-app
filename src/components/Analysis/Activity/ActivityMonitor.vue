@@ -125,6 +125,14 @@ const getLabel = (workflow, type) =>
   workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
 
 /*
+Computed Properties
+*/
+
+const isSelectedWorkflowActivitySet = computed(
+  () => Object.keys(selectedWorkflowActivity.value).length > 0
+);
+
+/*
 Fetch Initial Data
 */
 onMounted(async () => {
@@ -144,46 +152,47 @@ onMounted(async () => {
   );
 
   // set initial selected workflow activity to show the first instance in the list
-  try {
-    await store.dispatch(
-      "analysisModule/setSelectedWorkflowActivity",
-      sortedWorkflows[0]
-    );
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoading.value = false;
+  if (sortedWorkflows.length) {
+    try {
+      await store.dispatch(
+        "analysisModule/setSelectedWorkflowActivity",
+        sortedWorkflows[0]
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      isLoading.value = false;
+    }
+    nodes.value = [
+      {
+        id: "1",
+        type: "input",
+        data: {
+          label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
+        },
+        position: { x: 130, y: 100 },
+        class: "light",
+      },
+      {
+        id: "2",
+        type: "",
+        data: {
+          label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
+        },
+        position: { x: 150, y: 250 },
+        class: "light",
+      },
+      {
+        id: "3",
+        type: "output",
+        data: {
+          label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
+        },
+        position: { x: 170, y: 400 },
+        class: "light",
+      },
+    ];
   }
-
-  nodes.value = [
-    {
-      id: "1",
-      type: "input",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
-      },
-      position: { x: 130, y: 100 },
-      class: "light",
-    },
-    {
-      id: "2",
-      type: "",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
-      },
-      position: { x: 150, y: 250 },
-      class: "light",
-    },
-    {
-      id: "3",
-      type: "output",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
-      },
-      position: { x: 170, y: 400 },
-      class: "light",
-    },
-  ];
 
   // Fetch data to get updates
 
@@ -267,12 +276,26 @@ onNodeClick(({ node }) => {
 
 <template>
   <div class="activity-monitor">
-    <h2 v-if="selectedWorkflowActivity" class="vue-flow-title">
-      {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
-    </h2>
-    <div v-if="!isLoading && selectedWorkflowActivity" class="graph-browser">
+    <bf-empty-page-state
+      v-if="!isLoading && !isSelectedWorkflowActivitySet"
+      class="empty"
+    >
+      <img
+        src="/src/assets/images/illustrations/illo-collaboration.svg"
+        height="240"
+        width="247"
+        alt="Teams illustration"
+      />
+      <div>
+        <h2>There is no Workflow Activity yet</h2>
+      </div>
+    </bf-empty-page-state>
+    <div
+      v-if="!isLoading && isSelectedWorkflowActivitySet"
+      class="graph-browser"
+    >
       <div class="vue-flow-title">
-        {{ `Workflow Run: ${selectedWorkflowActivity.name || "Loading..."}` }}
+        {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
       </div>
       <div class="vue-flow-wrapper">
         <VueFlow
