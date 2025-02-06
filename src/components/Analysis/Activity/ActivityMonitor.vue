@@ -288,6 +288,10 @@ onNodeClick(({ node }) => {
       />
       <div>
         <h2>There is no Workflow Activity yet</h2>
+        <p>
+          Once you run an Analysis Workflow, you can view the status of your
+          workflow here.
+        </p>
       </div>
     </bf-empty-page-state>
     <div
