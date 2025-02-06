@@ -54,25 +54,20 @@
 </template>
 
 <script>
+
 import { mapActions, mapState } from "vuex";
 import { find, propEq } from "ramda";
 import FormatDate from "../../../mixins/format-date";
-import Avatar from "../../shared/avatar/Avatar.vue";
-import IconMenu from "../../icons/IconMenu.vue";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 import { Setting } from "@element-plus/icons-vue";
 
 export default {
   name: "ApplicationsListItem",
-
   components: {
-    IconMenu,
-    Avatar,
     Setting,
   },
   mixins: [FormatDate],
-
   props: {
     application: {
       type: Object,
@@ -91,26 +86,21 @@ export default {
         return false;
       }
     },
-    updateStatusText: function () {
-      if (
-        ["registering", "deploying", "re-deploying", "pending"].includes(
-          this.application.status
-        )
-      ) {
-        return "application is " + this.application.status;
-      } else if (this.application.status.startsWith("error")) {
-        return "application encountered an error";
-      } else {
-        return "application has been " + this.application.status;
-      }
+    updateStatusText: function () { 
+    if (!this.status) return "Status unavailable";
+
+    if (["registering", "deploying", "re-deploying", "pending"].includes(this.status)) {
+      return `Application is ${this.status}`;
+    }
+    if (this.status.startsWith("error")) {
+      return "Application encountered an error";
+    }
+    return `Application has been ${this.status}`;
+  
     },
     updateButtonDisabled: function () {
-      if (
-        ["registering", "deploying", "re-deploying", "pending"].includes(
-          this.application.status
-        ) ||
-        this.isWaitingForResponse
-      ) {
+      if (["registering", "deploying", "re-deploying", "pending"].includes(this.status) ||
+        this.isWaitingForResponse) {
         return true;
       } else {
         return false;
@@ -120,17 +110,12 @@ export default {
 
   data: function () {
     return {
-      isActive: false,
       isWaitingForResponse: false,
-      status: "deployed",
-      integrationEdit: {
-        type: Object,
-        default: function () {
-          return {};
-        },
-      },
+      status: this.application.status,
+      pusherChannel: null,
     };
   },
+
   methods: {
     ...mapActions("analysisModule", ["updateApplication", "fetchApplications"]),
     deployApplication: async function () {
@@ -172,15 +157,45 @@ export default {
           },
         });
       } finally {
-        await this.fetchApplications();
+        //await this.fetchApplications();
         this.isWaitingForResponse = false;
       }
     },
-
     updateApplicationParams: function () {
       this.$emit("open-edit-application-dialog", this.application);
     },
+    /**
+     * Open pusher channel for each List item
+     * 
+     */
+    setupPusherChannel() {
+      const pusher = this.$pusher;
+
+      if (!pusher || !this.application.uuid) return;
+
+      // Subscribe to a unique channel
+      this.channel = pusher.subscribe(`application-${this.application.uuid}`);
+      //bind event name to channel
+      this.channel.bind("application_status_event", (data) => {
+        this.status = data.status; 
+      });
+    },
+    cleanupPusherChannel() {
+      if (this.channel) {
+        this.channel.unbind("application_status_event");
+        this.channel.unsubscribe();
+        this.channel = null;
+      }
+    },
   },
+
+  mounted() {
+    this.setupPusherChannel();
+  },
+
+  beforeUnmount() {
+    this.cleanupPusherChannel();
+  }
 };
 </script>
 
