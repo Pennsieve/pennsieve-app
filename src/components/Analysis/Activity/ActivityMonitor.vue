@@ -1,5 +1,6 @@
 <script setup>
 import { computed, watch, ref, onMounted, onUnmounted } from "vue";
+
 import { useStore } from "vuex";
 
 // Vue Flow Imports
@@ -8,7 +9,6 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
-import CustomNode from "./CustomNode.vue";
 import EventBus from "../../../utils/event-bus";
 
 const { onNodeClick } = useVueFlow();
@@ -19,23 +19,19 @@ Initial Values
 const initialNodes = [
   {
     id: "1",
-    type: "input",
     data: {},
     position: { x: 130, y: 100 },
-    class: "light",
   },
   {
     id: "2",
     data: {},
     position: { x: 150, y: 250 },
-    class: "light",
   },
   {
     id: "3",
     type: "output",
     data: {},
     position: { x: 170, y: 400 },
-    class: "light",
   },
 ];
 const initialEdges = [
@@ -53,7 +49,7 @@ const initialEdges = [
   },
 ];
 
-/* 
+/*
 Local State
 */
 const isLoading = ref(false);
@@ -65,8 +61,8 @@ const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
 
-/* 
-Global State 
+/*
+Global State
 */
 const store = useStore();
 const workflowInstances = computed(
@@ -116,12 +112,42 @@ const getWorkflowStatus = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
-/* 
+/*
 Helpers
 */
 
 const getLabel = (workflow, type) =>
   workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
+
+const getClass = (workflow, processorIdx) => {
+  if (!workflow || !workflow.workflow || !workflow.workflow[processorIdx]) {
+    return "vue-flow__node-custom gray-node"; // Default fallback
+  }
+
+  console.log("workflow", workflow);
+  console.log("processorIdx", processorIdx);
+
+  switch (workflow.workflow[processorIdx].status) {
+    case "NOT_STARTED":
+      return "gray-node";
+    case "STARTED":
+      return "blue-node animate";
+    case "SUCCEEDED":
+      return "green-node";
+    case "FAILED":
+      return "red-node";
+    default:
+      return "gray-node";
+  }
+};
+
+/*
+Computed Properties
+*/
+
+const isSelectedWorkflowActivitySet = computed(
+  () => Object.keys(selectedWorkflowActivity.value).length > 0
+);
 
 /*
 Fetch Initial Data
@@ -143,46 +169,18 @@ onMounted(async () => {
   );
 
   // set initial selected workflow activity to show the first instance in the list
-  try {
-    await store.dispatch(
-      "analysisModule/setSelectedWorkflowActivity",
-      sortedWorkflows[0]
-    );
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoading.value = false;
+  if (sortedWorkflows.length) {
+    try {
+      await store.dispatch(
+        "analysisModule/setSelectedWorkflowActivity",
+        sortedWorkflows[0]
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      isLoading.value = false;
+    }
   }
-
-  nodes.value = [
-    {
-      id: "1",
-      type: "input",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[0], "Preprocessor"),
-      },
-      position: { x: 130, y: 100 },
-      class: "light",
-    },
-    {
-      id: "2",
-      type: "",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[1], "Processor"),
-      },
-      position: { x: 150, y: 250 },
-      class: "light",
-    },
-    {
-      id: "3",
-      type: "output",
-      data: {
-        label: getLabel(sortedWorkflows[0]?.workflow[2], "Postprocessor"),
-      },
-      position: { x: 170, y: 400 },
-      class: "light",
-    },
-  ];
 
   // Fetch data to get updates
 
@@ -204,30 +202,34 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
     nodes.value = [
       {
         id: "1",
-        type: "input",
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[0], "Preprocessor"),
+          status: newVal.workflow[0].status,
         },
         position: { x: 130, y: 100 },
-        class: "light",
+        class: getClass(newVal, 0),
       },
       {
         id: "2",
-        type: "",
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[1], "Processor"),
+          status: newVal.workflow[1].status,
+          class: getClass(newVal, 1),
         },
         position: { x: 150, y: 250 },
-        class: "light",
+        class: getClass(newVal, 1),
       },
       {
         id: "3",
-        type: "output",
+        type: "default",
         data: {
           label: getLabel(newVal.workflow[2], "Postprocessor"),
+          status: newVal.workflow[2].status,
         },
         position: { x: 170, y: 400 },
-        class: "light",
+        class: getClass(newVal, 2),
       },
     ];
   }
@@ -266,25 +268,39 @@ onNodeClick(({ node }) => {
 
 <template>
   <div class="activity-monitor">
-    <h2 v-if="selectedWorkflowActivity" class="vue-flow-title">
-      {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
-    </h2>
-    <div v-if="!isLoading && selectedWorkflowActivity" class="graph-browser">
+    <bf-empty-page-state
+      v-if="!isLoading && !isSelectedWorkflowActivitySet"
+      class="empty"
+    >
+      <img
+        src="/src/assets/images/illustrations/illo-collaboration.svg"
+        height="240"
+        width="247"
+        alt="Teams illustration"
+      />
+      <div>
+        <h2>There is no Workflow Activity yet</h2>
+        <p>
+          Once you run an Analysis Workflow, you can view the status of your
+          workflow here.
+        </p>
+      </div>
+    </bf-empty-page-state>
+    <div
+      v-if="!isLoading && isSelectedWorkflowActivitySet"
+      class="graph-browser"
+    >
       <div class="vue-flow-title">
-        {{ `Workflow Run: ${selectedWorkflowActivity.name || "Loading..."}` }}
+        {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
       </div>
       <div class="vue-flow-wrapper">
         <VueFlow
           :nodes="nodes"
           :edges="edges"
-          class="basic-flow"
           :default-viewport="{ zoom: 1 }"
           :min-zoom="0.2"
           :max-zoom="4"
         >
-          <template #node-custom="customNodeProps">
-            <CustomNode :node-props="customNodeProps" />
-          </template>
           <Background pattern-color="#aaa" :gap="16" />
           <Controls position="top-left" />
         </VueFlow>
@@ -340,8 +356,17 @@ onNodeClick(({ node }) => {
 @import '@vue-flow/minimap/dist/style.css'
 </style>
 
-<style lang="scss" scoped>
+<style lang="scss">
 @import "../../../assets/_variables.scss";
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
 
 .modified-stage {
   margin: 0;
@@ -368,13 +393,7 @@ onNodeClick(({ node }) => {
     right: 170px;
   }
 }
-.vue-flow-wrapper {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-</style>
-<style lang="scss">
+
 .vue-flow-title {
   position: absolute;
   top: 7%;
@@ -385,6 +404,53 @@ onNodeClick(({ node }) => {
   z-index: 1;
   border-radius: 5px;
   margin: 0;
+}
+
+.vue-flow__node.gray-node {
+  border: 2px solid gray;
+}
+
+.vue-flow__node.blue-node {
+  border: 2px solid blue;
+}
+
+.vue-flow__node.blue-node.animate {
+  border: 3px dotted $status_green; /* Initial border color */
+  animation: border-dotted 4s linear infinite;
+}
+
+.vue-flow__node.green-node {
+  border: 2px solid $status_green;
+}
+
+.vue-flow__node.red-node {
+  border: 2px solid red;
+}
+
+/* Animation of a dotted line running around the perimeter of the box */
+@keyframes border-dotted {
+  0% {
+    border-top-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+  25% {
+    border-top-color: $status_green;
+  }
+  50% {
+    border-right-color: $status_green;
+  }
+  75% {
+    border-bottom-color: $status_green;
+  }
+  100% {
+    border-left-color: $status_green;
+  }
+}
+
+.vue-flow__node.selected {
+  background-color: $gray_2;
 }
 
 .activity-monitor {
