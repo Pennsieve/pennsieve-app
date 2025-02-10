@@ -359,15 +359,6 @@ onNodeClick(({ node }) => {
 <style lang="scss">
 @import "../../../assets/_variables.scss";
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.5;
-  }
-}
-
 .modified-stage {
   margin: 0;
 }
@@ -415,7 +406,7 @@ onNodeClick(({ node }) => {
 }
 
 .vue-flow__node.blue-node.animate {
-  border: 3px dotted $status_green; /* Initial border color */
+  border: 3px dotted $status_green;
   animation: border-dotted 4s linear infinite;
 }
 
@@ -427,7 +418,15 @@ onNodeClick(({ node }) => {
   border: 2px solid red;
 }
 
-/* Animation of a dotted line running around the perimeter of the box */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
 @keyframes border-dotted {
   0% {
     border-top-color: transparent;
@@ -451,6 +450,12 @@ onNodeClick(({ node }) => {
 
 .vue-flow__node.selected {
   background-color: $gray_2;
+}
+
+.vue-flow__node {
+  &:hover {
+    background-color: $gray_2;
+  }
 }
 
 .activity-monitor {
