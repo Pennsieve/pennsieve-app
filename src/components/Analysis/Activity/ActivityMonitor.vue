@@ -156,8 +156,6 @@ const isSelectedWorkflowActivitySet = computed(
 Fetch Initial Data
 */
 const fetchData = async () => {
-  console.log(`Fetched data at ${new Date().toLocaleTimeString()}`);
-
   try {
     await store.dispatch(
       "analysisModule/setSelectedWorkflowActivity",
