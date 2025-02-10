@@ -66,7 +66,7 @@ const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
-let intervalId = null; // Variable to store the interval ID
+let intervalId = null;
 
 /*
 Global State
