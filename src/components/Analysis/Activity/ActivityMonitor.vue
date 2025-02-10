@@ -66,7 +66,6 @@ const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
-const data = ref(null); // Reactive reference to hold the fetched data
 let intervalId = null; // Variable to store the interval ID
 
 /*
@@ -161,8 +160,6 @@ const fetchData = async () => {
       "analysisModule/setSelectedWorkflowActivity",
       selectedWorkflowActivity.value
     );
-
-    data.value = `Fetched data at ${new Date().toLocaleTimeString()}`;
   } catch (error) {
     console.error(error);
   }
