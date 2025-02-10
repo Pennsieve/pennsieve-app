@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, ref, onMounted, onUnmounted } from "vue";
+import { computed, watch, ref, onMounted, onBeforeUnmount } from "vue";
 
 import { useStore } from "vuex";
 
@@ -55,11 +55,12 @@ Local State
 const isLoading = ref(false);
 const nodes = ref(initialNodes);
 const edges = ref(initialEdges);
-const intervalIdApplicationStatus = ref(null);
 const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
 const selectedProcessor = ref({});
 const selectedNode = ref({});
+const data = ref(null); // Reactive reference to hold the fetched data
+let intervalId = null; // Variable to store the interval ID
 
 /*
 Global State
@@ -100,14 +101,12 @@ const cancelWorkflow = () => {
 const activityDialogVisible = computed(
   () => store.getters["analysisModule/activityDialogVisible"]
 );
-
-const getApplicationsStatus = async () => {
+const getApplicationsStatus = async (selectedWorkflow) => {
   await store.dispatch(
     "analysisModule/setSelectedWorkflowActivity",
-    selectedWorkflowActivity.value
+    selectedWorkflow
   );
 };
-
 const getWorkflowStatus = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
@@ -123,9 +122,6 @@ const getClass = (workflow, processorIdx) => {
   if (!workflow || !workflow.workflow || !workflow.workflow[processorIdx]) {
     return "vue-flow__node-custom gray-node"; // Default fallback
   }
-
-  console.log("workflow", workflow);
-  console.log("processorIdx", processorIdx);
 
   switch (workflow.workflow[processorIdx].status) {
     case "NOT_STARTED":
@@ -152,6 +148,29 @@ const isSelectedWorkflowActivitySet = computed(
 /*
 Fetch Initial Data
 */
+const fetchData = async () => {
+  console.log(`Fetched data at ${new Date().toLocaleTimeString()}`);
+
+  try {
+    await store.dispatch(
+      "analysisModule/setSelectedWorkflowActivity",
+      selectedWorkflowActivity.value
+    );
+
+    data.value = `Fetched data at ${new Date().toLocaleTimeString()}`;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const startFetching = () => {
+  if (intervalId) {
+    clearInterval(intervalId);
+  }
+  fetchData();
+  intervalId = setInterval(fetchData, 10000);
+};
+
 onMounted(async () => {
   // fetch all workflow instances
   try {
@@ -171,10 +190,7 @@ onMounted(async () => {
   // set initial selected workflow activity to show the first instance in the list
   if (sortedWorkflows.length) {
     try {
-      await store.dispatch(
-        "analysisModule/setSelectedWorkflowActivity",
-        sortedWorkflows[0]
-      );
+      await getApplicationsStatus(sortedWorkflows[0]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -182,15 +198,13 @@ onMounted(async () => {
     }
   }
 
-  // Fetch data to get updates
-
-  // intervalIdApplicationStatus.value = setInterval(() => {
-  //   getApplicationsStatus();
-  // }, 10000);
+  startFetching();
 });
 
-onUnmounted(() => {
-  clearInterval(intervalIdApplicationStatus.value);
+onBeforeUnmount(() => {
+  if (intervalId) {
+    clearInterval(intervalId);
+  }
 });
 
 /*
