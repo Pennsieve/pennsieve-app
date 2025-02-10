@@ -406,8 +406,11 @@ onNodeClick(({ node }) => {
 }
 
 .vue-flow__node.blue-node.animate {
-  border: 3px dotted $status_green;
-  animation: border-dotted 4s linear infinite;
+  animation: border-glow 5s infinite ease-in-out;
+}
+
+.vue-flow__node.pulsing {
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
 .vue-flow__node.green-node {
@@ -421,30 +424,29 @@ onNodeClick(({ node }) => {
 @keyframes pulse {
   0% {
     opacity: 1;
-  }
-  100% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes border-dotted {
-  0% {
-    border-top-color: transparent;
-    border-right-color: transparent;
-    border-bottom-color: transparent;
-    border-left-color: transparent;
-  }
-  25% {
-    border-top-color: $status_green;
+    transform: scale(1);
   }
   50% {
-    border-right-color: $status_green;
-  }
-  75% {
-    border-bottom-color: $status_green;
+    opacity: 0.7;
+    transform: scale(1.05);
   }
   100% {
-    border-left-color: $status_green;
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes border-glow {
+  0% {
+    border-color: transparent;
+    box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
+  }
+  50% {
+    border-color: $status_green;
+    box-shadow: 0 0 15px rgba(0, 255, 128, 0.6);
+  }
+  100% {
+    border-color: transparent;
+    box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
   }
 }
 
