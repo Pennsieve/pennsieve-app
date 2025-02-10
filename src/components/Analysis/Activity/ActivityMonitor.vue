@@ -1,5 +1,12 @@
 <script setup>
-import { computed, watch, ref, onMounted, onBeforeUnmount } from "vue";
+import {
+  computed,
+  watch,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  onUnmounted,
+} from "vue";
 
 import { useStore } from "vuex";
 
@@ -188,9 +195,12 @@ onMounted(async () => {
   );
 
   // set initial selected workflow activity to show the first instance in the list
-  if (sortedWorkflows.length) {
+  const workflow = Object.keys(selectedWorkflowActivity.value).length
+    ? selectedWorkflowActivity.value
+    : sortedWorkflows[0];
+  if (sortedWorkflows.length && !intervalId) {
     try {
-      await getApplicationsStatus(sortedWorkflows[0]);
+      await getApplicationsStatus(workflow);
     } catch (err) {
       console.error(err);
     } finally {
@@ -205,6 +215,10 @@ onBeforeUnmount(() => {
   if (intervalId) {
     clearInterval(intervalId);
   }
+});
+
+onUnmounted(async () => {
+  await store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
 });
 
 /*

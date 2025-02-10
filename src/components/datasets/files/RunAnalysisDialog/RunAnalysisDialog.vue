@@ -384,7 +384,6 @@ export default {
       if (isValid) {
         this.processStep += step;
       }
-      console.log("here");
       // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
