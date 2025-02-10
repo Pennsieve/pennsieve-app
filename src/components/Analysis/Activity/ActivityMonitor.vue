@@ -409,10 +409,6 @@ onNodeClick(({ node }) => {
   animation: border-glow 5s infinite ease-in-out;
 }
 
-.vue-flow__node.pulsing {
-  animation: pulse 1.5s infinite ease-in-out;
-}
-
 .vue-flow__node.green-node {
   border: 2px solid $status_green;
 }
