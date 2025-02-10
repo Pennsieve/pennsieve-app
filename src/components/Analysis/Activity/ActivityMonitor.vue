@@ -188,7 +188,6 @@ onMounted(async () => {
   const sortedWorkflows = workflowInstances.value.sort(
     (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
   );
-
   // set initial selected workflow activity to show the first instance in the list
   const workflow = Object.keys(selectedWorkflowActivity.value).length
     ? selectedWorkflowActivity.value
@@ -232,6 +231,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         },
         position: { x: 130, y: 100 },
         class: getClass(newVal, 0),
+        selected: false,
       },
       {
         id: "2",
@@ -243,6 +243,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         },
         position: { x: 150, y: 250 },
         class: getClass(newVal, 1),
+        selected: false,
       },
       {
         id: "3",
@@ -253,6 +254,7 @@ watch(selectedWorkflowActivity, (newVal, oldVal) => {
         },
         position: { x: 170, y: 400 },
         class: getClass(newVal, 2),
+        selected: false,
       },
     ];
   }
@@ -283,7 +285,6 @@ onNodeClick(({ node }) => {
     (x) => x.name === node.data.label
   );
   if (selectedApplication) {
-    selectedNode.value = selectedApplication;
     openDetailsPanel(selectedApplication);
   }
 });
