@@ -167,6 +167,12 @@ export default {
   }
 }
 
+.box {
+  &:hover {
+    border: 2px solid $black;
+  }
+}
+
 .icon {
   display: flex;
   align-items: center;
