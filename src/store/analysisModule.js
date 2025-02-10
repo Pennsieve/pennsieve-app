@@ -388,6 +388,10 @@ const initialState = () => ({
       }
     },
     setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+      if (!workflow) {
+        commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+        return;
+      }
       try {
         const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
 
