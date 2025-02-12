@@ -50,16 +50,6 @@
               Move to&hellip;
             </button>
           </li>
-          <li class="mr-8">
-            <button
-              class="linked btn-selection-action"
-              :disabled="datasetLocked"
-              @click="$emit('custom-actions-click')"
-            >
-              <IconDoneCheckCircle class="mr-8" :height="16" :width="16" />
-              Actions
-            </button>
-          </li>
         </template>
         <li>
           <button
@@ -345,13 +335,12 @@ export default {
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
-      if(this.data[0] && this.data[0].content){
+      if (this.data[0] && this.data[0].content) {
         this.selection = selection;
         const parentId = this.data[0].content.parentId || "root";
         this.$emit("selection-change", selection, parentId);
         this.checkAll = this.data.length === selection.length;
       }
-
     },
 
     /**
