@@ -108,7 +108,6 @@
           @move="showMove"
           @delete="showDeleteDialog"
           @rename-file="showRenameFileDialog"
-          @custom-actions-click="showCustomActionsDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
@@ -167,11 +166,6 @@
       @close="onCloseDeleteDialog"
     />
 
-    <custom-actions-dialog
-      ref="customActionsDialog"
-      :selected-files="selectedFiles"
-    />
-
     <run-analysis-dialog
       :datasetId="datasetId"
       :dialog-visible="runAnalysisDialogVisible"
@@ -205,7 +199,6 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
-import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
 import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
@@ -255,7 +248,6 @@ export default {
     BfEmptyPageState,
     BfPackageDialog,
     BfDeleteDialog,
-    CustomActionsDialog,
     BfMoveDialog,
     BfDropInfo,
     BfUploadInfo,
