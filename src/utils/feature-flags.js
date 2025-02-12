@@ -27,9 +27,11 @@ export function isEnabledForSpecificOrgs(orgId) {
  
 
    const isSPARCProd = 
-   orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"
+   orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0";
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd;
+   const isStandardBiotools = orgId === "N:organization:09bf8aa4-ea99-4816-9c83-15cbc785ba8e";
+
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools;
 }
 
 export function isEnabledForAllDevOrgs(url) {
