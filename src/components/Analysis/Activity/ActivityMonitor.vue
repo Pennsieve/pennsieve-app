@@ -285,6 +285,7 @@ onNodeClick(({ node }) => {
     (x) => x.name === node.data.label
   );
   if (selectedApplication) {
+    selectedNode.value = selectedApplication;
     openDetailsPanel(selectedApplication);
   }
 });
