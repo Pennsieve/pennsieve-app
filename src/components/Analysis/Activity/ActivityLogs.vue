@@ -38,7 +38,6 @@ watch(
   // Fetch Logs on Workflow Change from Vuex Store
   () => props.selectedNode,
   async (newval, oldval) => {
-    console.log("!props.selectedNode.uuid", !props.selectedNode.uuid);
     if (!props.selectedNode.uuid) {
       return;
     }
