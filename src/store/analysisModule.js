@@ -110,7 +110,7 @@ const initialState = () => ({
     fetchComputeNodes: async({ commit, rootState }) => {
       return useGetToken()
         .then(token => {
-          const url = `${rootState.config.api2Url}/compute-nodes`;
+          const url = `${rootState.config.api2Url}/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
           return fetch(url, {
             method: 'GET',
             headers: {
@@ -135,7 +135,7 @@ const initialState = () => ({
       try {
         const userToken = await useGetToken()
 
-        const url = `${rootState.config.api2Url}/applications`;
+        const url = `${rootState.config.api2Url}/applications?organization_id=${rootState.activeOrganization.organization.id}`;
         const resp = await fetch(url, {
           method: 'GET',
           headers: {
@@ -162,7 +162,7 @@ const initialState = () => ({
     },
     fetchComputeResourceAccounts: async({ commit, rootState }) => {
       try {
-        const url = `${rootState.config.api2Url}/accounts`;
+        const url = `${rootState.config.api2Url}/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
 
         const userToken = await useGetToken()
         const resp = await fetch(url, {
@@ -280,7 +280,7 @@ const initialState = () => ({
     fetchWorkflowInstances: async ({ commit, rootState }) => {
       let workflowInstances = [];
       try {
-        const url = `${rootState.config.api2Url}/workflows/instances`;
+        const url = `${rootState.config.api2Url}/workflows/instances?organization_id=${rootState.activeOrganization.organization.id}`;
         const userToken = await useGetToken();
         const resp = await fetch(url, {
           method: 'GET',
