@@ -31,7 +31,7 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isStandardBiotools = orgId === "N:organization:09bf8aa4-ea99-4816-9c83-15cbc785ba8e";
 
-   const isBMIN5100 = "N:organization:c153f6a1-8ba1-4eeb-9459-2ccd50f721af"
+   const isBMIN5100 = orgId === "N:organization:c153f6a1-8ba1-4eeb-9459-2ccd50f721af";
 
    return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100;
 }
