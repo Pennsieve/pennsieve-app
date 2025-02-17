@@ -25,6 +25,10 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import { createPinia } from "pinia";
+import ElementPlus from 'element-plus'
+import {default as SparcDashboard, installDashboard} from 'sparc-dashboard-beta'
+
 
 Amplify.configure(AWSConfig)
 
@@ -40,6 +44,11 @@ app.directive('click-outside', ClickOutside)
 
 app.use(store);
 
+//Import Dashboard
+let piniaInstance = createPinia();
+app.use(piniaInstance);
+app.use(ElementPlus)
+installDashboard(app, piniaInstance,["TextWidget", "CountWidget"]);
 
 app.use(VueClipboard, {
     autoSetContainer: true,

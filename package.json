@@ -71,7 +71,9 @@
     "vue3-swatches": "^1.2.3",
     "vuex": "^4.0.2",
     "woofmark": "^4.2.6",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "pinia": "^2.1.7",
+    "sparc-dashboard-beta": "^0.4.2"
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.1.4",
