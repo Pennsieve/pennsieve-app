@@ -18,10 +18,11 @@
             <template #dropdown>
               <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
                 <el-dropdown-item
-                  disabled="!hasAdminRights"
+                  :disabled="!hasAdminRights"
                   @click.prevent="updateApplicationParams"
                 >
                   <el-tooltip
+                    disabled="hasAdminRights"
                     class="box-item"
                     effect="dark"
                     content="Only Admin users can edit application params"
@@ -33,9 +34,10 @@
 
                 <el-dropdown-item
                   @click="isDeleteApplicationDialogOpen = true"
-                  disabled="!hasAdminRights"
+                  :disabled="!hasAdminRights"
                 >
                   <el-tooltip
+                    disabled="hasAdminRights"
                     class="box-item"
                     effect="dark"
                     content="Only Admin users can delete applications"

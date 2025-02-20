@@ -110,7 +110,7 @@ export default {
     deleteComputeNodeButtonTooltip: function () {
       return this.isOwner
         ? "Delete this Compute Node"
-        : "Only Workspace Owners can Delete Compute Nodes";
+        : "Only Workspace Owners can delete Compute Nodes";
     },
   },
 
