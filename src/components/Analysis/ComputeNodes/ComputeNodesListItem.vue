@@ -14,11 +14,11 @@
         <el-tooltip
           class="box-item"
           effect="dark"
-          content="Delete this Compute Node"
+          :content="deleteComputeNodeButtonTooltip"
           placement="right-start"
         >
           <el-button
-            :disabled="!hasAdminRights"
+            :disabled="!isOwner"
             @click="isDeleteComputeNodeDialogOpen = true"
           >
             <el-icon :size="24">
@@ -30,13 +30,6 @@
     </div>
     <div class="margin-10">
       <div>
-        <!-- <div v-if="false" class="margin-10">
-          {{
-            computeNode.environment.charAt(0).toUpperCase() +
-            computeNode.environment.slice(1)
-          }}
-          Node
-        </div> -->
         <div class="margin-10">
           Created Date: {{ this.formatDateFNS(computeNode.createdAt) }}
         </div>
@@ -110,6 +103,14 @@ export default {
       } else {
         return false;
       }
+    },
+    isOwner: function () {
+      return propOr(false, "isOwner", this.activeOrganization);
+    },
+    deleteComputeNodeButtonTooltip: function () {
+      return this.isOwner
+        ? "Delete this Compute Node"
+        : "Only Workspace Owners can Delete Compute Nodes";
     },
   },
 

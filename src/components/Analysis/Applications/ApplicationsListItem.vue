@@ -1,26 +1,11 @@
 <template>
   <div class="applications-list-item">
-    <!-- <div class="delete-application-container">
-      <el-tooltip
-        class="box-item"
-        effect="dark"
-        content="Delete this Application"
-        placement="top-end"
-      >
-        <el-button
-          :disabled="!hasAdminRights"
-          @click="isDeleteComputeNodeDialogOpen = true"
-        >
-          <el-icon :size="16"><CircleClose /></el-icon>
-        </el-button>
-      </el-tooltip>
-    </div> -->
     <el-row class="info">
       <el-col :span="20" class="application-title">
         <span>{{ application.name }}</span>
       </el-col>
       <el-col :span="4" class="application-title">
-        <el-col :sm="8" class="integration-menu">
+        <el-col :sm="8">
           <el-dropdown
             class="options-icon"
             trigger="click"
@@ -32,33 +17,37 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
-                <el-dropdown-item @click.prevent="updateApplicationParams">
-                  Edit Application Params
+                <el-dropdown-item
+                  disabled="!hasAdminRights"
+                  @click.prevent="updateApplicationParams"
+                >
+                  <el-tooltip
+                    class="box-item"
+                    effect="dark"
+                    content="Only Admin users can edit application params"
+                    placement="top-start"
+                  >
+                    Edit Application Params
+                  </el-tooltip>
                 </el-dropdown-item>
-                <el-dropdown-item @click="isDeleteApplicationDialogOpen = true">
-                  Delete Application
+
+                <el-dropdown-item
+                  @click="isDeleteApplicationDialogOpen = true"
+                  disabled="!hasAdminRights"
+                >
+                  <el-tooltip
+                    class="box-item"
+                    effect="dark"
+                    content="Only Admin users can delete applications"
+                    placement="top-start"
+                  >
+                    Delete Application
+                  </el-tooltip>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </el-col>
-        <!-- <template v-if="hasAdminRights">
-          <el-tooltip
-            class="box-item"
-            effect="dark"
-            content="Edit Application Params"
-            placement="top-start"
-          >
-            <el-button
-              :size="'default'"
-              @click.prevent="updateApplicationParams"
-            >
-              <el-icon>
-                <Setting />
-              </el-icon>
-            </el-button>
-          </el-tooltip>
-        </template> -->
       </el-col>
     </el-row>
     <el-row>
@@ -307,7 +296,7 @@ export default {
   display: flex;
   font-size: 16px;
   color: black;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
 }
 
