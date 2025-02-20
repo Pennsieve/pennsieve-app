@@ -55,7 +55,7 @@
           </template>
           <el-select
             ref="enum"
-            v-model="computeNode.account"
+            v-model="selectedValue"
             class="input-property"
             placeholder="Choose an Account"
           >
@@ -64,7 +64,6 @@
               :key="account.accountId"
               :label="account.accountId"
               :value="account.accountId"
-              :selected="isSelected(account.accountId)"
             />
           </el-select>
         </el-form-item>
@@ -128,7 +127,11 @@ export default {
           },
         ],
       },
+      selectedValue: null,
     };
+  },
+  mounted() {
+    this.selectedValue = this.selectedComputeNode.account.accountId;
   },
 
   computed: {
