@@ -5,23 +5,49 @@
         <span>{{ application.name }}</span>
       </el-col>
       <el-col :span="4" class="application-title">
-        <template v-if="hasAdminRights">
-          <el-tooltip
-            class="box-item"
-            effect="dark"
-            content="Edit Application Params"
-            placement="top-start"
+        <el-col :sm="8">
+          <el-dropdown
+            class="options-icon"
+            trigger="click"
+            placement="bottom-end"
+            @command="onIntegrationMenu"
           >
-            <el-button
-              :size="'default'"
-              @click.prevent="updateApplicationParams"
-            >
-              <el-icon>
-                <Setting />
-              </el-icon>
-            </el-button>
-          </el-tooltip>
-        </template>
+            <span class="btn-file-menu el-dropdown-link">
+              <IconMenu :height="20" :width="20" />
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
+                <el-dropdown-item
+                  disabled="!hasAdminRights"
+                  @click.prevent="updateApplicationParams"
+                >
+                  <el-tooltip
+                    class="box-item"
+                    effect="dark"
+                    content="Only Admin users can edit application params"
+                    placement="top-start"
+                  >
+                    Edit Application Params
+                  </el-tooltip>
+                </el-dropdown-item>
+
+                <el-dropdown-item
+                  @click="isDeleteApplicationDialogOpen = true"
+                  disabled="!hasAdminRights"
+                >
+                  <el-tooltip
+                    class="box-item"
+                    effect="dark"
+                    content="Only Admin users can delete applications"
+                    placement="top-start"
+                  >
+                    Delete Application
+                  </el-tooltip>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </el-col>
       </el-col>
     </el-row>
     <el-row>
@@ -50,22 +76,43 @@
         </el-row>
       </div>
     </el-row>
+    <el-dialog
+      v-model="isDeleteApplicationDialogOpen"
+      width="500"
+      @close="isDeleteApplicationDialogOpen = false"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Delete Application" />
+      </template>
+      <span> Would you like to delete this application? </span>
+      <template #footer>
+        <div class="dialog-footer">
+          <bf-button
+            class="secondary"
+            @click="isDeleteApplicationDialogOpen = false"
+            >No</bf-button
+          >
+          <bf-button @click="handleDeleteApplication">Yes</bf-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-
 import { mapActions, mapState } from "vuex";
 import { find, propEq } from "ramda";
 import FormatDate from "../../../mixins/format-date";
 import EventBus from "../../../utils/event-bus";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 import { Setting } from "@element-plus/icons-vue";
+import { CircleClose } from "@element-plus/icons-vue";
 
 export default {
   name: "ApplicationsListItem",
   components: {
     Setting,
+    CircleClose,
   },
   mixins: [FormatDate],
   props: {
@@ -86,21 +133,28 @@ export default {
         return false;
       }
     },
-    updateStatusText: function () { 
-    if (!this.status) return "Status unavailable";
+    updateStatusText: function () {
+      if (!this.status) return "Status unavailable";
 
-    if (["registering", "deploying", "re-deploying", "pending"].includes(this.status)) {
-      return `Application is ${this.status}`;
-    }
-    if (this.status.startsWith("error")) {
-      return "Application encountered an error";
-    }
-    return `Application has been ${this.status}`;
-  
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.status
+        )
+      ) {
+        return `Application is ${this.status}`;
+      }
+      if (this.status.startsWith("error")) {
+        return "Application encountered an error";
+      }
+      return `Application has been ${this.status}`;
     },
     updateButtonDisabled: function () {
-      if (["registering", "deploying", "re-deploying", "pending"].includes(this.status) ||
-        this.isWaitingForResponse) {
+      if (
+        ["registering", "deploying", "re-deploying", "pending"].includes(
+          this.status
+        ) ||
+        this.isWaitingForResponse
+      ) {
         return true;
       } else {
         return false;
@@ -113,11 +167,37 @@ export default {
       isWaitingForResponse: false,
       status: this.application.status,
       pusherChannel: null,
+      isDeleteApplicationDialogOpen: false,
     };
   },
 
   methods: {
-    ...mapActions("analysisModule", ["updateApplication", "fetchApplications"]),
+    ...mapActions("analysisModule", [
+      "updateApplication",
+      "fetchApplications",
+      "deleteApplication",
+    ]),
+    handleDeleteApplication: async function () {
+      try {
+        await this.deleteApplication(this.application);
+
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your request was successful. It may take some time to complete.",
+          },
+        });
+      } catch (error) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "Something went wrong, please try again later.",
+          },
+        });
+      } finally {
+        this.isDeleteApplicationDialogOpen = false;
+      }
+    },
     deployApplication: async function () {
       this.isWaitingForResponse = true;
       try {
@@ -166,7 +246,7 @@ export default {
     },
     /**
      * Open pusher channel for each List item
-     * 
+     *
      */
     setupPusherChannel() {
       const pusher = this.$pusher;
@@ -177,7 +257,7 @@ export default {
       this.channel = pusher.subscribe(`application-${this.application.uuid}`);
       //bind event name to channel
       this.channel.bind("application_status_event", (data) => {
-        this.status = data.status; 
+        this.status = data.status;
       });
     },
     cleanupPusherChannel() {
@@ -195,7 +275,7 @@ export default {
 
   beforeUnmount() {
     this.cleanupPusherChannel();
-  }
+  },
 };
 </script>
 
@@ -216,7 +296,7 @@ export default {
   display: flex;
   font-size: 16px;
   color: black;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -269,5 +349,11 @@ export default {
   height: 24px;
   justify-content: center;
   width: 24px;
+}
+
+.delete-application-container {
+  display: flex;
+  justify-content: flex-end;
+  background: $purple_tint;
 }
 </style>
