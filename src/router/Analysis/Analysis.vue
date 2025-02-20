@@ -122,10 +122,6 @@ export default {
     return {
       tabs: [
         {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
           name: "Webhooks",
           to: "webhooks",
         },
@@ -146,6 +142,10 @@ export default {
         {
           name: "Integrations",
           to: "integrations",
+        },
+        {
+          name: "Webhooks",
+          to: "webhooks",
         },
       ],
     };

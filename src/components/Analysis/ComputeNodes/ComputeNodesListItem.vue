@@ -3,11 +3,29 @@
     <div class="flex-row">
       <div class="compute-node-title">
         {{ computeNode.name }}
+        <div class="compute-node-account-info margin-top">
+          ({{ computeNode.account.accountType }}) #{{
+            computeNode.account.accountId
+          }}
+        </div>
       </div>
-      <div class="compute-node-account-info">
-        ({{ computeNode.account.accountType }}) #{{
-          computeNode.account.accountId
-        }}
+
+      <div>
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          content="Delete this Compute Node"
+          placement="right-start"
+        >
+          <el-button
+            :disabled="!hasAdminRights"
+            @click="isDeleteComputeNodeDialogOpen = true"
+          >
+            <el-icon :size="24">
+              <CircleClose />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
       </div>
     </div>
     <div class="margin-10">
@@ -27,6 +45,26 @@
         </div>
       </div>
     </div>
+    <el-dialog
+      v-model="isDeleteComputeNodeDialogOpen"
+      width="500"
+      @close="isDeleteComputeNodeDialogOpen = false"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Delete Compute Node" />
+      </template>
+      <span> Would you like to delete this compute node? </span>
+      <template #footer>
+        <div class="dialog-footer">
+          <bf-button
+            class="secondary"
+            @click="isDeleteComputeNodeDialogOpen = false"
+            >No</bf-button
+          >
+          <bf-button @click="handleDeleteComputeNode">Yes</bf-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -34,12 +72,16 @@
 import { mapGetters } from "vuex";
 import { mapActions, mapState } from "vuex";
 import FormatDate from "../../../mixins/format-date";
-import { pathOr } from "ramda";
+import { pathOr, propOr } from "ramda";
+import { CircleClose } from "@element-plus/icons-vue";
+import EventBus from "../../../utils/event-bus";
 
 export default {
   name: "ComputeNodesListItem",
 
-  components: {},
+  components: {
+    CircleClose,
+  },
 
   props: {
     computeNode: {
@@ -60,13 +102,46 @@ export default {
     activeOrgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
+    hasAdminRights: function () {
+      if (this.activeOrganization) {
+        const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
+        const isOwner = propOr(false, "isOwner", this.activeOrganization);
+        return isAdmin || isOwner;
+      } else {
+        return false;
+      }
+    },
   },
 
   data: function () {
-    return {};
+    return {
+      isDeleteComputeNodeDialogOpen: false,
+    };
   },
   methods: {
     ...mapActions(["updateDataset"]),
+    ...mapActions("analysisModule", ["deleteComputeNode"]),
+    handleDeleteComputeNode: async function () {
+      try {
+        await this.deleteComputeNode(this.computeNode);
+
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your cancellation request was successful. It may take some time to complete.",
+          },
+        });
+      } catch (error) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "Something went wrong, please try again later.",
+          },
+        });
+      } finally {
+        this.isDeleteComputeNodeDialogOpen = false;
+      }
+    },
   },
 };
 </script>
@@ -76,6 +151,10 @@ export default {
 
 .margin-10 {
   margin: 10px;
+}
+
+.margin-top {
+  margin-top: 10px;
 }
 
 .flex-row {
