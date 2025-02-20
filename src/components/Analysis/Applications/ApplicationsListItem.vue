@@ -10,7 +10,6 @@
             class="options-icon"
             trigger="click"
             placement="bottom-end"
-            @command="onIntegrationMenu"
           >
             <span class="btn-file-menu el-dropdown-link">
               <IconMenu :height="20" :width="20" />
