@@ -20,7 +20,7 @@
               @click="isEditComputeNodeDialogOpen = true"
             >
               <el-tooltip
-                disabled="hasAdminRights"
+                ;disabled="hasAdminRights"
                 class="box-item"
                 effect="dark"
                 content="Only admin users can edit compute nodes"
