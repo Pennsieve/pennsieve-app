@@ -514,6 +514,27 @@ const initialState = () => ({
         console.error('Failed to update application:', err.message);
         throw err;
       }
+    },
+    deleteApplication: async ({ commit, rootState }, application) => {
+      const url = `${rootState.config.api2Url}/applications/${application?.uuid}`;
+      const userToken = await useGetToken()
+      try {
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          }
+        });
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error('Failed to update application:', err.message);
+        throw err;
+      }
     }
   }
   
