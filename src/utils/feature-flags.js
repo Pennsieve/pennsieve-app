@@ -33,7 +33,13 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isBMIN5100 = orgId === "N:organization:c153f6a1-8ba1-4eeb-9459-2ccd50f721af";
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100;
+   const isSEED = orgId === "N:organization:301af08c-3302-4f89-82fe-d7f66608545f";
+
+   const isPedQuest = orgId === "N:organization:42b5c50f-48e3-4c7e-b107-cedaf12b7271";
+
+   const isEpilepsyScience = orgId === "N:organization:f921dd34-f0f3-417a-bbe6-23f71020146f";
+
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience;
 }
 
 export function isEnabledForAllDevOrgs(url) {
