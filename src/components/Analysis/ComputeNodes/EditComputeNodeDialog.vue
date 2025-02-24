@@ -15,7 +15,7 @@
         :rules="rules"
         ref="computeNodeForm"
         label-position="top"
-        @submit.native.prevent="handleCreateComputeNode"
+        @submit.native.prevent="handleEditComputeNode"
       >
         <el-form-item prop="name">
           <template #label>
@@ -47,33 +47,11 @@
             />
           </div>
         </el-form-item>
-
-        <el-form-item prop="account">
-          <template #label>
-            <span>Account</span>
-            <span class="label-helper"> required </span>
-          </template>
-          <el-select
-            ref="enum"
-            v-model="selectedValue"
-            class="input-property"
-            placeholder="Choose an Account"
-          >
-            <el-option
-              v-for="account in computeResourceAccounts"
-              :key="account.accountId"
-              :label="account.accountId"
-              :value="account.accountId"
-            />
-          </el-select>
-        </el-form-item>
       </el-form>
     </dialog-body>
 
     <template #footer>
-      <bf-button @click="handleCreateComputeNode">
-        Create Compute Node
-      </bf-button>
+      <bf-button @click="handleEditComputeNode"> Submit </bf-button>
     </template>
   </el-dialog>
 </template>
@@ -88,7 +66,7 @@ import EventBus from "../../../utils/event-bus";
 const defaultComputeNodeFormValues = () => ({
   name: "",
   description: "",
-  account: null,
+  uuid: null,
 });
 
 export default {
@@ -119,19 +97,15 @@ export default {
             trigger: "blur",
           },
         ],
-        account: [
-          {
-            required: true,
-            message: "Please select an account",
-            trigger: "change",
-          },
-        ],
       },
       selectedValue: null,
     };
   },
   mounted() {
     this.selectedValue = this.selectedComputeNode.account.accountId;
+    this.computeNode.name = this.selectedComputeNode.name;
+    this.computeNode.description = this.selectedComputeNode.description;
+    this.computeNode.uuid = this.selectedComputeNode.uuid;
   },
 
   computed: {
@@ -140,7 +114,7 @@ export default {
   },
 
   methods: {
-    ...mapActions("analysisModule", ["createComputeNode"]),
+    ...mapActions("analysisModule", ["editComputeNode"]),
     isSelected(accountId) {
       return this.selectedComputeNode?.account?.accountId === accountId
         ? true
@@ -153,20 +127,15 @@ export default {
       this.$refs.computeNodeForm.clearValidate();
     },
 
-    async handleCreateComputeNode() {
+    async handleEditComputeNode() {
       this.$refs.computeNodeForm.validate(async (valid) => {
         if (valid) {
-          const accountToSend = this.computeResourceAccounts.find(
-            (elem) => elem.accountId === this.computeNode.account
-          );
-
           const formattedComputeNode = {
             ...this.computeNode,
-            account: accountToSend,
           };
 
           try {
-            const result = await this.createComputeNode(formattedComputeNode);
+            const result = await this.editComputeNode(formattedComputeNode);
             EventBus.$emit("toast", {
               detail: {
                 type: "success",

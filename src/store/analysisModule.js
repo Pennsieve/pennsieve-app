@@ -524,7 +524,8 @@ const initialState = () => ({
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${userToken}`
-          }
+          },
+          body: JSON.stringify(computeNode)
         });
     
         if (!response.ok) {
@@ -535,7 +536,29 @@ const initialState = () => ({
         console.error('Failed to update application:', err.message);
         throw err;
       }
-    }
+    },
+    editComputeNode: async ({ commit, rootState }, computeNode) => {
+      const url = `${rootState.config.api2Url}/compute-nodes/${computeNode?.uuid}`;
+      const userToken = await useGetToken()
+      try {
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: JSON.stringify(computeNode)
+        });
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error('Failed to update compute node:', err.message);
+        throw err;
+      }
+    },
   }
   
   export const getters = {

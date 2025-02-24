@@ -15,12 +15,12 @@
         </span>
         <template #dropdown>
           <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
-            <el-dropdown-item
+            <!-- <el-dropdown-item
               :disabled="!hasAdminRights"
               @click="isEditComputeNodeDialogOpen = true"
             >
               <el-tooltip
-                ;disabled="hasAdminRights"
+                :disabled="hasAdminRights"
                 class="box-item"
                 effect="dark"
                 content="Only admin users can edit compute nodes"
@@ -28,7 +28,7 @@
               >
                 Edit Compute Node
               </el-tooltip>
-            </el-dropdown-item>
+            </el-dropdown-item> -->
 
             <el-dropdown-item
               @click="isDeleteComputeNodeDialogOpen = true"
