@@ -247,6 +247,7 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
+    // Note that this to to deploy application, there is another action for editing application
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
       const userToken = await useGetToken()
@@ -524,8 +525,7 @@ const initialState = () => ({
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${userToken}`
-          },
-          body: JSON.stringify(computeNode)
+          }
         });
     
         if (!response.ok) {
