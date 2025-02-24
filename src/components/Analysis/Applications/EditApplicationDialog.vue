@@ -1,18 +1,20 @@
 <template>
-  <el-dialog :modelValue="dialogVisible"
+  <el-dialog
+    :modelValue="dialogVisible"
     @update:modelValue="dialogVisible = $event"
-    class="edit-application-dialog">
+    class="edit-application-dialog"
+  >
     <template #header>
       <bf-dialog-header slot="title" title="Edit Application" />
     </template>
 
     <dialog-body>
       <el-form-item prop="parameters" id="paramsInput">
-          <template #label>
-            <div>
-              <span> Parameters</span>
-            </div>
-          </template>
+        <template #label>
+          <div>
+            <span> Parameters</span>
+          </div>
+        </template>
         <el-table :data="applicationParams" max-height="250" :border="true">
           <el-table-column label="Name">
             <template #default="scope">
@@ -50,9 +52,11 @@
           </el-table-column>
         </el-table>
         <div id="addParamButtonWrapper">
-            <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
+          <el-button @click="addParameterRow" type="primary" plain
+            >Add param<el-icon class="el-icon--right"><Plus /></el-icon
+          ></el-button>
         </div>
-        </el-form-item>
+      </el-form-item>
     </dialog-body>
 
     <template #footer>
@@ -71,7 +75,6 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import { CircleClose, Plus } from "@element-plus/icons-vue";
 
-
 /**
  * Returns the default values for a property
  * @returns {Object}
@@ -85,7 +88,7 @@ export default {
     DialogBody,
     BfButton,
     CircleClose,
-    Plus
+    Plus,
   },
 
   mixins: [],
@@ -94,14 +97,14 @@ export default {
     application: {
       type: Object,
       required: true,
-      default: () => ({})
+      default: () => ({}),
     },
-    dialogVisible: Boolean
+    dialogVisible: Boolean,
   },
   mounted: function () {},
   data: function () {
     return {
-      applicationParams: this.formatParamsForUI(this.application)
+      applicationParams: this.formatParamsForUI(this.application),
     };
   },
 
@@ -111,48 +114,47 @@ export default {
 
   watch: {
     application(newValue) {
-      this.applicationParams = this.formatParamsForUI(newValue)
-    }
+      this.applicationParams = this.formatParamsForUI(newValue);
+    },
   },
 
   methods: {
     addParameterRow() {
-      console.log('clicked')
-      this.applicationParams.push({name: null, value: null});
+      this.applicationParams.push({ name: null, value: null });
     },
 
     deleteParameterRow(index) {
-      this.applicationParams.splice(index,1)
+      this.applicationParams.splice(index, 1);
     },
 
     formatParamsForUI(application) {
       if (application && application.params) {
-        let params = []
+        let params = [];
         for (const [key, value] of Object.entries(application.params)) {
-          params.push({'name': key, 'value': value})
+          params.push({ name: key, value: value });
         }
-        return params
+        return params;
       } else {
-        return []
+        return [];
       }
     },
 
     confirmUpdateApplicationParams() {
-      let payload = this.application
-      payload.params = this.formatParamsForPayload()
-      this.$emit('confirm-edit', payload)
+      let payload = this.application;
+      payload.params = this.formatParamsForPayload();
+      this.$emit("confirm-edit", payload);
     },
 
     formatParamsForPayload() {
       if (this.applicationParams.length > 0) {
-        let paramsEntries = []
+        let paramsEntries = [];
         this.applicationParams.forEach((param) => {
-          paramsEntries.push([param.name, param.value])
-        })
-        let paramsObject = Object.fromEntries(paramsEntries)
-        return paramsObject
+          paramsEntries.push([param.name, param.value]);
+        });
+        let paramsObject = Object.fromEntries(paramsEntries);
+        return paramsObject;
       } else {
-        return null
+        return null;
       }
     },
   },

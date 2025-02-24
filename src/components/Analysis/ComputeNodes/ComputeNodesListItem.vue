@@ -9,8 +9,45 @@
           }}
         </div>
       </div>
+      <el-dropdown class="options-icon" trigger="click" placement="bottom-end">
+        <span class="btn-file-menu el-dropdown-link">
+          <IconMenu :height="20" :width="20" />
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
+            <!-- <el-dropdown-item
+              :disabled="!hasAdminRights"
+              @click="isEditComputeNodeDialogOpen = true"
+            >
+              <el-tooltip
+                :disabled="hasAdminRights"
+                class="box-item"
+                effect="dark"
+                content="Only admin users can edit compute nodes"
+                placement="top-start"
+              >
+                Edit Compute Node
+              </el-tooltip>
+            </el-dropdown-item> -->
 
-      <div>
+            <el-dropdown-item
+              @click="isDeleteComputeNodeDialogOpen = true"
+              :disabled="!isOwner"
+            >
+              <el-tooltip
+                :disabled="isOwner"
+                class="box-item"
+                effect="dark"
+                :content="deleteComputeNodeButtonTooltip"
+                placement="top-start"
+              >
+                Delete Compute Node
+              </el-tooltip>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <!-- <div>
         <el-tooltip
           class="box-item"
           effect="dark"
@@ -26,7 +63,7 @@
             </el-icon>
           </el-button>
         </el-tooltip>
-      </div>
+      </div> -->
     </div>
     <div class="margin-10">
       <div>
@@ -58,6 +95,10 @@
         </div>
       </template>
     </el-dialog>
+    <edit-compute-node-dialog
+      :selectedComputeNode="computeNode"
+      v-model="isEditComputeNodeDialogOpen"
+    />
   </div>
 </template>
 
@@ -68,6 +109,7 @@ import FormatDate from "../../../mixins/format-date";
 import { pathOr, propOr } from "ramda";
 import { CircleClose } from "@element-plus/icons-vue";
 import EventBus from "../../../utils/event-bus";
+import EditComputeNodeDialog from "./EditComputeNodeDialog.vue";
 
 export default {
   name: "ComputeNodesListItem",
@@ -117,6 +159,7 @@ export default {
   data: function () {
     return {
       isDeleteComputeNodeDialogOpen: false,
+      isEditComputeNodeDialogOpen: false,
     };
   },
   methods: {
