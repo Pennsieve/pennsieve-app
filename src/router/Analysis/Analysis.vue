@@ -128,16 +128,16 @@ export default {
       ],
       pennsieveAnalysisFeature: [
         {
+          name: "Activity",
+          to: "activity",
+        },
+        {
           name: "Configuration",
           to: "compute-nodes",
         },
         {
           name: "Applications",
           to: "applications",
-        },
-        {
-          name: "Activity",
-          to: "activity",
         },
         {
           name: "Integrations",
