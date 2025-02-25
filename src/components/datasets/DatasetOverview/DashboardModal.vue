@@ -59,7 +59,7 @@ const dashboardItems=
   const dashboardOptions =ref({
   //key value pairs that can be accessed to the user from high-configurable widgets. 
   globalData:{
-    FileCount:toString(filesCount),
+    FileCount:filesCount,
     Status:publicationStatus,
     CollaboaratorCount:collaboratorCounts
   }
