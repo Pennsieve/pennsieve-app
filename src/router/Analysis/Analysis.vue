@@ -122,15 +122,15 @@ export default {
     return {
       tabs: [
         {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
           name: "Webhooks",
           to: "webhooks",
         },
       ],
       pennsieveAnalysisFeature: [
+        {
+          name: "Activity",
+          to: "activity",
+        },
         {
           name: "Configuration",
           to: "compute-nodes",
@@ -140,12 +140,12 @@ export default {
           to: "applications",
         },
         {
-          name: "Activity",
-          to: "activity",
-        },
-        {
           name: "Integrations",
           to: "integrations",
+        },
+        {
+          name: "Webhooks",
+          to: "webhooks",
         },
       ],
     };

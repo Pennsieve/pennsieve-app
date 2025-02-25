@@ -7,7 +7,7 @@
         </bf-button>
       </template>
 
-      <div v-if="integrations.length > 0" class="integration-list">
+      <div v-if="filteredWebhooks.length > 0" class="integration-list">
         <integrations-list-item
           v-for="integration in filteredWebhooks"
           :key="integration.id"
@@ -24,13 +24,11 @@
           :width="247"
           alt="Teams illustration"
         />
-        <div v-if="hasAdminRights" class="copy">
-          <h2>There are no integrations yet</h2>
+        <div class="copy">
+          <h2>There are no Webhooks yet</h2>
           <p>
-            Integrations allow external services to be notified when certain
-            events occur on Pennsieve. These integrations are available to all
-            members within the organization and can be managed at the dataset
-            level under settings.
+            Webhooks allow external services to be notified when certain events
+            occur on Pennsieve.
           </p>
         </div>
         <div v-if="!hasAdminRights" class="copy">
@@ -117,7 +115,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization",  "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
 
     filteredWebhooks: function () {
       let filteredArray = this.integrations.filter(
