@@ -3,22 +3,70 @@
     <div class="flex-row">
       <div class="compute-node-title">
         {{ computeNode.name }}
+        <div class="compute-node-account-info margin-top">
+          ({{ computeNode.account.accountType }}) #{{
+            computeNode.account.accountId
+          }}
+        </div>
       </div>
-      <div class="compute-node-account-info">
-        ({{ computeNode.account.accountType }}) #{{
-          computeNode.account.accountId
-        }}
-      </div>
+      <el-dropdown class="options-icon" trigger="click" placement="bottom-end">
+        <span class="btn-file-menu el-dropdown-link">
+          <IconMenu :height="20" :width="20" />
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
+            <!-- <el-dropdown-item
+              :disabled="!hasAdminRights"
+              @click="isEditComputeNodeDialogOpen = true"
+            >
+              <el-tooltip
+                :disabled="hasAdminRights"
+                class="box-item"
+                effect="dark"
+                content="Only admin users can edit compute nodes"
+                placement="top-start"
+              >
+                Edit Compute Node
+              </el-tooltip>
+            </el-dropdown-item> -->
+
+            <el-dropdown-item
+              @click="isDeleteComputeNodeDialogOpen = true"
+              :disabled="!isOwner"
+            >
+              <el-tooltip
+                :disabled="isOwner"
+                class="box-item"
+                effect="dark"
+                :content="deleteComputeNodeButtonTooltip"
+                placement="top-start"
+              >
+                Delete Compute Node
+              </el-tooltip>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <!-- <div>
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          :content="deleteComputeNodeButtonTooltip"
+          placement="right-start"
+        >
+          <el-button
+            :disabled="!isOwner"
+            @click="isDeleteComputeNodeDialogOpen = true"
+          >
+            <el-icon :size="24">
+              <CircleClose />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
+      </div> -->
     </div>
     <div class="margin-10">
       <div>
-        <!-- <div v-if="false" class="margin-10">
-          {{
-            computeNode.environment.charAt(0).toUpperCase() +
-            computeNode.environment.slice(1)
-          }}
-          Node
-        </div> -->
         <div class="margin-10">
           Created Date: {{ this.formatDateFNS(computeNode.createdAt) }}
         </div>
@@ -27,6 +75,30 @@
         </div>
       </div>
     </div>
+    <el-dialog
+      v-model="isDeleteComputeNodeDialogOpen"
+      width="500"
+      @close="isDeleteComputeNodeDialogOpen = false"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Delete Compute Node" />
+      </template>
+      <span> Would you like to delete this compute node? </span>
+      <template #footer>
+        <div class="dialog-footer">
+          <bf-button
+            class="secondary"
+            @click="isDeleteComputeNodeDialogOpen = false"
+            >No</bf-button
+          >
+          <bf-button @click="handleDeleteComputeNode">Yes</bf-button>
+        </div>
+      </template>
+    </el-dialog>
+    <edit-compute-node-dialog
+      :selectedComputeNode="computeNode"
+      v-model="isEditComputeNodeDialogOpen"
+    />
   </div>
 </template>
 
@@ -34,12 +106,17 @@
 import { mapGetters } from "vuex";
 import { mapActions, mapState } from "vuex";
 import FormatDate from "../../../mixins/format-date";
-import { pathOr } from "ramda";
+import { pathOr, propOr } from "ramda";
+import { CircleClose } from "@element-plus/icons-vue";
+import EventBus from "../../../utils/event-bus";
+import EditComputeNodeDialog from "./EditComputeNodeDialog.vue";
 
 export default {
   name: "ComputeNodesListItem",
 
-  components: {},
+  components: {
+    CircleClose,
+  },
 
   props: {
     computeNode: {
@@ -60,13 +137,55 @@ export default {
     activeOrgName: function () {
       return pathOr("", ["organization", "name"], this.activeOrganization);
     },
+    hasAdminRights: function () {
+      if (this.activeOrganization) {
+        const isAdmin = propOr(false, "isAdmin", this.activeOrganization);
+        const isOwner = propOr(false, "isOwner", this.activeOrganization);
+        return isAdmin || isOwner;
+      } else {
+        return false;
+      }
+    },
+    isOwner: function () {
+      return propOr(false, "isOwner", this.activeOrganization);
+    },
+    deleteComputeNodeButtonTooltip: function () {
+      return this.isOwner
+        ? "Delete this Compute Node"
+        : "Only Workspace Owners can delete Compute Nodes";
+    },
   },
 
   data: function () {
-    return {};
+    return {
+      isDeleteComputeNodeDialogOpen: false,
+      isEditComputeNodeDialogOpen: false,
+    };
   },
   methods: {
     ...mapActions(["updateDataset"]),
+    ...mapActions("analysisModule", ["deleteComputeNode"]),
+    handleDeleteComputeNode: async function () {
+      try {
+        await this.deleteComputeNode(this.computeNode);
+
+        EventBus.$emit("toast", {
+          detail: {
+            type: "success",
+            msg: "Your cancellation request was successful. It may take some time to complete.",
+          },
+        });
+      } catch (error) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: "Something went wrong, please try again later.",
+          },
+        });
+      } finally {
+        this.isDeleteComputeNodeDialogOpen = false;
+      }
+    },
   },
 };
 </script>
@@ -76,6 +195,10 @@ export default {
 
 .margin-10 {
   margin: 10px;
+}
+
+.margin-top {
+  margin-top: 10px;
 }
 
 .flex-row {

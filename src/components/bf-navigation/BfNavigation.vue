@@ -67,6 +67,24 @@
           <IconDatasets :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
+
+      <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        id="nav-integrations"
+        :link="{
+          name: 'analysis',
+          params: { orgId: activeOrganizationId },
+        }"
+        label="Analysis
+        "
+        :condensed="primaryNavCondensed"
+        :styleColor="navStyleColor"
+      >
+        <template v-slot:icon>
+          <IconIntegrations :width="20" :height="20" color="currentColor" />
+        </template>
+      </bf-navigation-item>
+
       <div>
         <bf-navigation-item
           v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
@@ -118,23 +136,6 @@
       >
         <template v-slot:icon>
           <IconPublic :width="20" :height="20" />
-        </template>
-      </bf-navigation-item>
-
-      <bf-navigation-item
-        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
-        id="nav-integrations"
-        :link="{
-          name: 'analysis',
-          params: { orgId: activeOrganizationId },
-        }"
-        label="Analysis
-        "
-        :condensed="primaryNavCondensed"
-        :styleColor="navStyleColor"
-      >
-        <template v-slot:icon>
-          <IconIntegrations :width="20" :height="20" color="currentColor" />
         </template>
       </bf-navigation-item>
 

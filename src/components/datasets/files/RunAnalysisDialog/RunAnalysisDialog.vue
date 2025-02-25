@@ -30,6 +30,11 @@
           v-model="targetDirectory"
           placeholder="Target Directory (optional)"
         />
+        <el-input
+          class="margin"
+          v-model="name"
+          placeholder="Workflow Run Name (optional)"
+        />
       </div>
       <div v-show="shouldShow(2)">
         <el-select
@@ -202,6 +207,7 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
+      name: "",
       clearSelectedValues: false,
       warningMessage: "",
       selectedProcessorParams: [],
@@ -472,6 +478,7 @@ export default {
           uuid: this.selectedComputeNode.uuid,
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
+        name: this.name,
         workflow: [
           formatApplication(this.selectedPreprocessor, null),
           formatApplication(

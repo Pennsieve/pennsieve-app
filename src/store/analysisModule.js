@@ -247,6 +247,7 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
+    // Note that this to to deploy application, there is another action for editing application
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
       const userToken = await useGetToken()
@@ -493,7 +494,71 @@ const initialState = () => ({
         console.error('Failed to update application:', err.message);
         throw err;
       }
-    }
+    },
+    deleteComputeNode: async ({ commit, rootState }, computeNode) => {
+      const url = `${rootState.config.api2Url}/compute-nodes/${computeNode?.uuid}`;
+      const userToken = await useGetToken()
+      try {
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          }
+        });
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error('Failed to update application:', err.message);
+        throw err;
+      }
+    },
+    deleteApplication: async ({ commit, rootState }, application) => {
+      const url = `${rootState.config.api2Url}/applications/${application?.uuid}`;
+      const userToken = await useGetToken()
+      try {
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          }
+        });
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error('Failed to update application:', err.message);
+        throw err;
+      }
+    },
+    editComputeNode: async ({ commit, rootState }, computeNode) => {
+      const url = `${rootState.config.api2Url}/compute-nodes/${computeNode?.uuid}`;
+      const userToken = await useGetToken()
+      try {
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: JSON.stringify(computeNode)
+        });
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error('Failed to update compute node:', err.message);
+        throw err;
+      }
+    },
   }
   
   export const getters = {

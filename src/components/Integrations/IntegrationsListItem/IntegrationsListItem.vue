@@ -20,7 +20,7 @@
           class="options-icon"
           trigger="click"
           placement="bottom-end"
-          v-if="isOwner"
+          v-if="isAdmin"
           @command="onIntegrationMenu"
         >
           <span class="btn-file-menu el-dropdown-link">
