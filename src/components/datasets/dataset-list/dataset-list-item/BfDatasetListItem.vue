@@ -15,6 +15,7 @@
                 {{ dataset.content.name }}
               </router-link>
             </h2>
+            {{ publishStatus }}
             <div
               v-if="publishStatus === 'PUBLISH_SUCCEEDED'"
               class="publish-info mb-8"

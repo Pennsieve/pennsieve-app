@@ -50,7 +50,7 @@
                 >
                   Version {{ publishedVersionLabel }}
                 </a>)
-                  <div class="sharing-status">
+                  <div v-if="publishedDate && publishedDate!=='Invalid date'" class="sharing-status">
 
                     Last published on <strong>{{ publishedDate }}</strong>
                     <a
@@ -287,6 +287,7 @@
   import EventBus from '../../../utils/event-bus';
   import {useGetToken} from "@/composables/useGetToken";
   import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+  import { PublicationStatus, PublicationType } from '../../../utils/constants';
 
 
   const replaceLineBreaks = str => {
@@ -381,7 +382,10 @@ export default {
       return "https://doi.org/" + this.datasetDoi.doi
     },
 
-
+    isPublished: function() {
+        const status = pathOr('', ['publication', 'status'], this.dataset)
+        return status === PublicationStatus.COMPLETED
+      },
     /**
      * Return corresponding contributor details
      * @returns {Object}
