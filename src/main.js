@@ -25,6 +25,9 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import ElementPlus from 'element-plus'
+import {default as SparcDashboard, installDashboard} from 'sparc-dashboard-beta'
+
 
 Amplify.configure(AWSConfig)
 
@@ -40,6 +43,10 @@ app.directive('click-outside', ClickOutside)
 
 app.use(store);
 
+//Import Dashboard
+
+app.use(ElementPlus)
+installDashboard(app, ["TextWidget", "CountWidget"]);
 
 app.use(VueClipboard, {
     autoSetContainer: true,

@@ -13,6 +13,16 @@
     margin:auto;
     margin-top:5%;
   }
+  &.full-dialog{
+    width: 95%;
+    height: 95%;
+    margin:auto;
+    margin-top:1%;
+    overflow: hidden;
+    .el-dialog__body{
+      padding:0px !important;
+    }
+  }
   &.light-header {
     .el-dialog__header {
       background: $white;
