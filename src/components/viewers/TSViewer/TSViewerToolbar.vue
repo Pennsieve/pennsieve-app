@@ -158,6 +158,7 @@
     export default {
         name: 'TimeseriesViewerToolbar',
       components: {
+        IconNextAnnotationRightFacing,
         IconControllerPlay,
         IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
       computed: {
