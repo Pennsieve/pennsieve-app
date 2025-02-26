@@ -72,10 +72,9 @@
         <button
           class="btn-icon"
           @click="togglePlayback()">
-<!--          <svg-icon-->
-<!--            :name="iconPlay"-->
-<!--            height="12"-->
-<!--            width="18"/>-->
+          <IconControllerPlay
+            :height="12"
+            :width="18"/>
         </button>
       </el-tooltip>
       <el-tooltip
@@ -84,7 +83,7 @@
         <button
           class="btn-icon"
           @click="nextAnnotation()">
-          <IconNextAnnotationLeftFacing
+          <IconNextAnnotationRightFacing
             name="next-annotation-right-facing"
             :height="12"
             :width="18"/>
@@ -152,11 +151,15 @@
     import IconTimescale from "../../icons/IconTimeschale.vue";
     import IconPreviousPage from "../../icons/IconPreviousPage.vue";
     import IconNextAnnotationLeftFacing from "../../icons/IconNextAnnotationLeftFacing.vue";
+    import IconNextAnnotationRightFacing from "@/components/icons/IconNextAnnotationRightFacing.vue";
     import IconNextPage from "../../icons/IconNextPage.vue";
     import IconStopwatch from "../../icons/IconStopwatch.vue";
+    import IconControllerPlay from "@/components/icons/IconControllerPlay.vue";
     export default {
         name: 'TimeseriesViewerToolbar',
-      components: {IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
+      components: {
+        IconControllerPlay,
+        IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
       computed: {
           iconPlay: function() {
             if(this.isPlaying === true) {

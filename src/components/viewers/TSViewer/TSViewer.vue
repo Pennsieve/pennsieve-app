@@ -487,7 +487,7 @@
                 const labelDiv = this.$refs.channelLabels;
                 this.labelWidth = labelDiv.clientWidth
                 this.cWidth = (this.window_width - labelDiv.clientWidth - 16);
-                this.cHeight = (this.window_height - 88);
+                this.cHeight = (this.window_height - 40);
             },
             _computeLabelInfo: function(item, globalZoomMult, rowscale) {
                 const n = ( ( (this.constants['DEFAULTDPI'] * window.devicePixelRatio)/(globalZoomMult * rowscale) )/25.4).toFixed(1);
@@ -594,7 +594,7 @@
         flex-direction: column;
         justify-content: space-around;
         line-height: normal;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
         min-width: 75px;
     }
 
