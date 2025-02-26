@@ -56,6 +56,9 @@
         <div>Workflow UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
+        <div>
+          Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}
+        </div>
         <!-- <div>Status: {{ workflow.status }}</div> -->
       </div>
     </div>
