@@ -124,7 +124,7 @@ export const actions = {
   enableRepoTracking: async({ commit, rootState }, { repo }) => {
       return useGetToken()
         .then(token =>{
-          const url = `${rootState.config.api2Url}/repository/enable`
+          const url = `${rootState.config.api2Url}/repository/enable?organization_id=${rootState.activeOrganization.organization.id}`
           const myHeaders = new Headers();
           myHeaders.append('Authorization', 'Bearer ' + token)
           myHeaders.append('Accept', 'application/json')
@@ -147,7 +147,7 @@ export const actions = {
   disableRepoTracking: async({ commit, rootState }, { repo }) => {
       return useGetToken()
           .then(token =>{
-            const url = `${rootState.config.api2Url}/repository/disable`
+            const url = `${rootState.config.api2Url}/repository/disable?organization_id=${rootState.activeOrganization.organization.id}`
             const myHeaders = new Headers();
             myHeaders.append('Authorization', 'Bearer ' + token)
             myHeaders.append('Accept', 'application/json')
@@ -223,7 +223,7 @@ export const actions = {
     try {
       return useGetToken()
           .then(token =>{
-            const url = `${rootState.config.api2Url}/repository/external`
+            const url = `${rootState.config.api2Url}/repository/external?organization_id=${rootState.activeOrganization.organization.id}`
             const myHeaders = new Headers();
             myHeaders.append('Authorization', 'Bearer ' + token)
             myHeaders.append('Accept', 'application/json')
@@ -260,7 +260,7 @@ export const actions = {
     try {
       return useGetToken()
           .then(token =>{
-            const url = `${rootState.config.api2Url}/repository/publish`
+            const url = `${rootState.config.api2Url}/repository/publish?organization_id=${rootState.activeOrganization.organization.id}`
             const myHeaders = new Headers();
             myHeaders.append('Authorization', 'Bearer ' + token)
             myHeaders.append('Accept', 'application/json')
