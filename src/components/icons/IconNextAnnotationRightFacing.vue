@@ -13,7 +13,7 @@
 
 <script>
 export default {
-  name: "IconNextAnnotationLeftFacing",
+  name: "IconNextAnnotationRightFacing",
   props: {
     width: {
       type: Number,

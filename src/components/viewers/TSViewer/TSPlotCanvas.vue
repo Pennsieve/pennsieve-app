@@ -1,7 +1,7 @@
 <template>
     <div class="timeseries-plot-canvas">
         <canvas id="blurArea" class="canvas" ref="blurArea"
-            :width="_cpCanvasScaler(cWidth, pixelRatio, 0)"
+            :width="canvasWidth"
             :height="_cpCanvasScaler(pHeight, pixelRatio, 0)"
             :style="canvasStyle"></canvas>
         <slot name="axisCanvas">
@@ -9,7 +9,7 @@
         <slot name="annCanvas">
         </slot>
         <canvas id="plotArea" class="canvas" ref="plotArea"
-            :width="_cpCanvasScaler(cWidth, pixelRatio, 0)"
+            :width="canvasWidth"
             :height="_cpCanvasScaler(pHeight, pixelRatio, 0)"
             :style="canvasStyle">
         </canvas>
@@ -67,6 +67,11 @@
                 'viewerChannels',
                 'viewerMontageScheme'
             ]),
+
+            canvasWidth: function() {
+              return this.pixelRatio * this.cWidth;
+            },
+
             canvasStyle: function() {
                 return {
                     width: this.cWidth  + 'px',
