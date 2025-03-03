@@ -8,7 +8,7 @@ let route = useRoute();
 
   <bf-rafter slot="heading">
     <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="$router.go(-1)" class="link-to-files">
+      <a @click="handleClick" class="link-to-files">
         <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
@@ -48,6 +48,7 @@ export default {
   mounted() {
     const r = useRoute();
     // this.getReadmeDocument(r.meta.helpSection);
+    console.log("this.$router", this.$router);
   },
 
   computed: {
@@ -85,6 +86,18 @@ export default {
   methods: {
     toggleHelp: function () {
       this.showHelp = !this.showHelp;
+    },
+    handleClick() {
+      // Handles case where user will need to go(-2) if they open the viewer
+      // but only go(-1) if they do not
+
+      const lastRoute = this.$router.options.history.state.back;
+
+      if (lastRoute && lastRoute.includes("viewer")) {
+        this.$router.go(-2);
+      } else {
+        this.$router.back();
+      }
     },
   },
 };
