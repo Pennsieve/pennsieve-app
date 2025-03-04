@@ -98,13 +98,9 @@
 
         <checklist-item
           :is-complete="datasetOwnerHasOrcidId"
-          cta="Link ORCID Account"
-          :route="{
-            query: {
-              focusInput: 'orcidId',
-            },
-          }"
-          :show-link="isDatasetOwner"
+          :externalLinkUrl="getROrcidLink()"
+          externalLinkText="Link ORCID Account"
+          :enableLink="isDatasetOwner"
         >
           <template v-if="isDatasetOwner">
             link your ORCID iD to distinguish yourself from other researchers
@@ -428,6 +424,10 @@ export default {
      */
     computeChecklistIcon: function (prop = false) {
       return prop ? "IconDoneCheckCircle" : "IconInfo";
+    },
+
+    getROrcidLink: function() {
+      return this.config.environment === 'prod' ? 'https://discover.pennsieve.io/user/profile' : 'https://discover.pennsieve.net/user/profile'
     },
   },
 };
