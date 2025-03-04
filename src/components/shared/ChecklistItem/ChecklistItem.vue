@@ -1,30 +1,25 @@
 <template>
   <div class="dataset-discover-checklist-item">
     <div class="icon-link-wrap">
-      <IconDoneCheckCircle
-        v-if="isComplete"
-        class="mr-8 checked"
-        :height="20"
-        :width="20"
-      />
+      <IconDoneCheckCircle v-if="isComplete" class="mr-8 checked" :height="20" :width="20" />
       <IconInfo v-else class="mr-8" :height="20" :width="20" />
 
       <div class="link-wrap mr-8">
-        <router-link
-          v-if="showLink"
-          :to="route"
-          @click.native="$emit('click-link', $event)"
-        >
+        <router-link v-if="cta" :to="route" @click.native="$emit('click-link', $event)">
           {{ cta }}
         </router-link>
-        <strong v-if="!showLink">
-          {{ cta }}
-        </strong>
-        <a :href="externalLinkUrl" target="_blank">
-          <strong v-if="externalLinkText">
+        <template v-if="enableLink">
+          <a :href="externalLinkUrl" target="_blank">
+            <strong>
+              {{ externalLinkText }}
+            </strong>
+          </a>
+        </template>
+        <template v-else>
+          <strong>
             {{ externalLinkText }}
           </strong>
-        </a>
+        </template>
 
         &nbsp; &mdash;
       </div>
@@ -61,11 +56,7 @@ export default {
         return {};
       },
     },
-    showLink: {
-      type: Boolean,
-      default: true,
-    },
-    externalLink: {
+    externalLinkUrl: {
       type: String,
       default: "",
     },
@@ -73,11 +64,10 @@ export default {
       type: String,
       default: "",
     },
-  },
-  computed: {
-    externalLinkUrl: function () {
-      return this.externalLink;
-    },
+    enableLink: {
+      type: Boolean,
+      default: true,
+    }
   },
 };
 </script>
