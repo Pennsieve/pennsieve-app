@@ -12,21 +12,21 @@
         :padding="false"
       >
         <checklist-item
-          externalLink="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
+          externalLinkUrl="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release"
           externalLinkText="Create a Release"
           :is-complete="hasRelease(codeRepo)"
         >
           create at least one release in your repository on GithHub
         </checklist-item>
         <checklist-item
-          externalLink="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
+          externalLinkUrl="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository"
           externalLinkText="Add a License"
           :is-complete="hasLicense(codeRepo)"
         >
           add a license to your repository on GitHub
         </checklist-item>
         <checklist-item
-          externalLink="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
+          externalLinkUrl="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes"
           externalLinkText="Add a README"
           :is-complete="hasReadMe(readMe)"
         >
