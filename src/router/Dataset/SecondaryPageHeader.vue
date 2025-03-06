@@ -48,7 +48,6 @@ export default {
   mounted() {
     const r = useRoute();
     // this.getReadmeDocument(r.meta.helpSection);
-    console.log("this.$router", this.$router);
   },
 
   computed: {

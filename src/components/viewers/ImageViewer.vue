@@ -20,11 +20,6 @@ export default {
     pkg: Object,
     idx: Number,
   },
-
-  mounted() {
-    console.log("Image Viewer Mounted");
-    console.log("pkg", this.pkg);
-  },
 };
 </script>
 

@@ -1327,7 +1327,6 @@ export default {
   },
 
   mounted: function () {
-    console.log("this.proxyRecord", this.proxyRecord);
     // Listen for property value changes
     EventBus.$on("instance-value-changed", this.onValueChanged);
 
