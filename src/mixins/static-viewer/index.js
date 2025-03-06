@@ -71,10 +71,10 @@ export default {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
 
-      // return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/`
+      // return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}`
       const fileUrlData = await useGetToken()
       .then(token => {
-        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
+        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}?api_key=${token}`
       })
 
       this.fileUrl = fileUrlData;
