@@ -15,7 +15,6 @@ import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import p
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"
-import 'element-plus/es/components/message/style/index';
 import { CookieStorage } from 'aws-amplify/utils';
 import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import {fetchAuthSession} from "aws-amplify/auth";
@@ -25,8 +24,7 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
-import ElementPlus from 'element-plus'
-import {default as SparcDashboard, installDashboard} from 'sparc-dashboard-beta'
+import {installDashboard} from 'sparc-dashboard-beta'
 
 
 Amplify.configure(AWSConfig)
@@ -44,9 +42,7 @@ app.directive('click-outside', ClickOutside)
 app.use(store);
 
 //Import Dashboard
-
-app.use(ElementPlus)
-installDashboard(app, ["TextWidget", "CountWidget"]);
+installDashboard(app, ["TextWidget"]);
 
 app.use(VueClipboard, {
     autoSetContainer: true,

@@ -1,5 +1,4 @@
 <script setup>
-import 'sparc-dashboard-beta/dist/style.css'
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
 import { PublicationStatus } from '../../../utils/constants';
@@ -88,21 +87,20 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
 
-.full-dialog{
-padding: 0px;
-}
-.dialog-dash-header{
-    height: 40px;
-    margin-left: 10px;
-}
-:deep(.dash-header){
-    background-color: transparent;
-}
-:deep(.widget-body){
-    margin: auto;
-    min-width: 50px;
-    margin-top: 20px;
-}  
+// .full-dialog{
+// padding: 0px;
+// }
+// .dialog-dash-header{
+//     height: 40px;
+//     margin-left: 10px;
+// }
+// :deep(.dash-header){
+//     background-color: transparent;
+// }
+// :deep(.widget-body){
+//     margin: auto;
+//     min-width: 50px;
+//     margin-top: 20px;
+// }  
 </style>
