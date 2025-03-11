@@ -24,8 +24,7 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
-import {installDashboard} from 'sparc-dashboard-beta'
-
+import {installDashboard} from 'sparc-dashboard-beta';
 
 Amplify.configure(AWSConfig)
 
@@ -42,10 +41,9 @@ app.directive('click-outside', ClickOutside)
 app.use(store);
 
 //Import Dashboard
-import ElementPlus from 'element-plus';
-import 'element-plus/dist/index.css';
-app.use(ElementPlus);
-installDashboard(app, ["TextWidget"]);
+
+app.use(ElementPlus)
+installDashboard(app, ["TextWidget", "CountWidget"]);
 
 app.use(VueClipboard, {
     autoSetContainer: true,
