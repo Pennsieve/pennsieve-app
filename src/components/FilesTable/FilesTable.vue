@@ -117,6 +117,31 @@
           />
         </template>
       </el-table-column>
+      <el-table-column
+        v-if="withinRunAnalysisDialog"
+        prop="storage"
+        label="Size"
+        :sortable="!isSearchResults"
+        :sort-orders="sortOrders"
+      >
+        <template #header> Size </template>
+        <template #default="scope">
+          {{ formatMetric(scope.row.storage) }}
+        </template>
+      </el-table-column>
+      <el-table-column
+        v-if="withinRunAnalysisDialog"
+        prop="content.createdAt"
+        label="Date Created"
+        width="180"
+        :sortable="!isSearchResults"
+        :sort-orders="sortOrders"
+      >
+        <template #header> Date Created </template>
+        <template #default="scope">
+          {{ formatDate(scope.row.content.createdAt) }}
+        </template>
+      </el-table-column>
       <template v-if="!withinDeleteMenu && !withinRunAnalysisDialog">
         <el-table-column
           prop="subtype"
