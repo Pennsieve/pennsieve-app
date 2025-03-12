@@ -5,6 +5,7 @@
     :show-close="true"
     @close="closeDialog"
     v-if="processStep < lastProcessStep"
+    fullscreen
   >
     <template #header>
       <bf-dialog-header slot="title" title="Run Analysis Workflow" />
@@ -688,7 +689,7 @@ export default {
 .table-container {
   overflow-y: scroll;
   display: block;
-  max-height: 450px;
+  max-height: 650px;
   margin-top: 1px;
 }
 
