@@ -135,6 +135,7 @@
         isEmpty
     } from 'ramda'
 
+    import { nextTick } from 'vue';
     import ViewerActiveTool from '@/mixins/viewer-active-tool'
     import Request from '@/mixins/request'
     import TsAnnotation from '@/mixins/ts-annotation'
@@ -142,8 +143,6 @@
 
     export default {
         name: 'TimeseriesViewer',
-
-
 
         components:{
             'timeseries-scrubber': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue')),
@@ -469,7 +468,8 @@
                 }
                 return id
             },
-            onResize(event) {
+            async onResize(event) {
+              console.log('onresize...')
                 if (this.$refs.ts_viewer === undefined) {
                     return
                 }
@@ -482,12 +482,15 @@
               this.window_height = hhh - toolbarOffset;
 
                 // this.window_height = window.innerHeight - 100;
+                await nextTick();
                 this.window_width = this.$refs.ts_viewer.offsetWidth
 
                 const labelDiv = this.$refs.channelLabels;
                 this.labelWidth = labelDiv.clientWidth
                 this.cWidth = (this.window_width - labelDiv.clientWidth - 16);
-                this.cHeight = (this.window_height - 88);
+                this.cHeight = (this.window_height - 40);
+
+                console.log(this.cWidth)
             },
             _computeLabelInfo: function(item, globalZoomMult, rowscale) {
                 const n = ( ( (this.constants['DEFAULTDPI'] * window.devicePixelRatio)/(globalZoomMult * rowscale) )/25.4).toFixed(1);
@@ -594,7 +597,7 @@
         flex-direction: column;
         justify-content: space-around;
         line-height: normal;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
         min-width: 75px;
     }
 
