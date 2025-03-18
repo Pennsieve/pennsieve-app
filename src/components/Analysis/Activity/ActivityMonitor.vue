@@ -113,7 +113,7 @@ const getApplicationsStatus = async (selectedWorkflow) => {
     selectedWorkflow
   );
 };
-const getWorkflowStatus = async () => {
+const fetchWorkflowInstance = async () => {
   await store.dispatch("analysisModule/fetchWorkflowInstances");
 };
 
@@ -268,6 +268,7 @@ function onTogglePanelVisibility() {
 }
 
 function openDetailsPanel(selectedApplication) {
+  console.log("selectedApplication", selectedApplication);
   isDetailsPanelOpen.value = true;
   selectedProcessor.value = selectedApplication;
 }
