@@ -87,17 +87,22 @@ export default {
       this.showHelp = !this.showHelp;
     },
     goBackToFiles() {
-      // Handles case where user will need to go back to the main files page
-      // but only go back once if they do not
+    const { datasetId, fileId } = this.$route.params;
 
-      const lastRoute = this.$router.options.history.state.back;
-
-      if (lastRoute && lastRoute.includes("viewer")) {
-        this.$router.go(-2)
-      } else {
-        this.$router.back();
-      }
-    },
+    // Look to see if we are inside a collection
+    if (fileId && fileId.startsWith("N:collection:")) {
+      this.$router.push({
+        name: "collection-files",
+        params: { datasetId, fileId }
+      });
+    } else {
+      // Default to dataset files list if no collection is detected
+      this.$router.push({
+        name: "dataset-files",
+        params: { datasetId }
+      });
+    }
+  }
   },
 };
 </script>
