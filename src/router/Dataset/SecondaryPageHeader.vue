@@ -8,7 +8,7 @@ let route = useRoute();
 
   <bf-rafter slot="heading">
     <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="$router.go(-1)" class="link-to-files">
+      <a @click="goBackToFiles" class="link-to-files">
         <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
@@ -86,6 +86,12 @@ export default {
     toggleHelp: function () {
       this.showHelp = !this.showHelp;
     },
+    goBackToFiles() {
+      this.$router.push({
+        name: "dataset-files",
+        params: { datasetId: this.$route.params.datasetId }
+      });
+  }
   },
 };
 </script>
