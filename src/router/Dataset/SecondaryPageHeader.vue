@@ -87,16 +87,13 @@ export default {
       this.showHelp = !this.showHelp;
     },
     goBackToFiles() {
-      // Handles case where user will need to go(-2) if they open the viewer
-      // but only go(-1) if they do not
+      // Handles case where user will need to go back to the main files page
+      // but only go back once if they do not
 
       const lastRoute = this.$router.options.history.state.back;
 
       if (lastRoute && lastRoute.includes("viewer")) {
-       this.$router.push({
-          name: "dataset-files",
-          params: { datasetId: this.$route.params.datasetId }
-        });
+        this.$router.go(-2)
       } else {
         this.$router.back();
       }
