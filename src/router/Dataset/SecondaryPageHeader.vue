@@ -8,7 +8,7 @@ let route = useRoute();
 
   <bf-rafter slot="heading">
     <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="handleClick" class="link-to-files">
+      <a @click="goBackToFiles" class="link-to-files">
         <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
@@ -86,18 +86,23 @@ export default {
     toggleHelp: function () {
       this.showHelp = !this.showHelp;
     },
-    handleClick() {
-      // Handles case where user will need to go(-2) if they open the viewer
-      // but only go(-1) if they do not
+    goBackToFiles() {
+    const { datasetId, fileId } = this.$route.params;
 
-      const lastRoute = this.$router.options.history.state.back;
-
-      if (lastRoute && lastRoute.includes("viewer")) {
-        this.$router.go(-2);
-      } else {
-        this.$router.back();
-      }
-    },
+    // Look to see if we are inside a collection
+    if (fileId && fileId.startsWith("N:collection:")) {
+      this.$router.push({
+        name: "collection-files",
+        params: { datasetId, fileId }
+      });
+    } else {
+      // Default to dataset files list if no collection is detected
+      this.$router.push({
+        name: "dataset-files",
+        params: { datasetId }
+      });
+    }
+  }
   },
 };
 </script>
