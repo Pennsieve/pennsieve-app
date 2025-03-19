@@ -292,7 +292,15 @@ const initialState = () => ({
     
         if (resp.ok) {
           workflowInstances = await resp.json();
-          commit("SET_WORKFLOW_INSTANCES", workflowInstances);
+          function sortByStartDate(arr) {
+            return arr.sort((a, b) => {
+              const dateA = new Date(a.startedAt);
+              const dateB = new Date(b.startedAt);
+          
+              return dateB - dateA;
+            });
+          }
+          commit("SET_WORKFLOW_INSTANCES",sortByStartDate(workflowInstances));
         } else {
           return Promise.reject(resp);
         }
