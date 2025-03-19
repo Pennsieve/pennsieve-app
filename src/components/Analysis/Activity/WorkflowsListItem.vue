@@ -1,7 +1,7 @@
 <template>
   <div class="workflows-list-item-wrapper">
     <div
-      v-if="workflow.status === 'STARTED'"
+      v-if="workflow.status === 'STARTED' || workflow.status === ''"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
