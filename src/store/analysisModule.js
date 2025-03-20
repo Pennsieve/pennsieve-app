@@ -385,6 +385,7 @@ const initialState = () => ({
       
         if (resp.ok) {
           const result = await resp.json()
+          result.name = workflow.name
           result.workflow[0] = {...workflow.workflow[0], ...result.workflow[0]}
           result.workflow[1] = {...workflow.workflow[1], ...result.workflow[1]}
           result.workflow[2] = {...workflow.workflow[2], ...result.workflow[2]}
