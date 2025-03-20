@@ -113,9 +113,6 @@ const getApplicationsStatus = async (selectedWorkflow) => {
     selectedWorkflow
   );
 };
-const fetchWorkflowInstance = async () => {
-  await store.dispatch("analysisModule/fetchWorkflowInstances");
-};
 
 /*
 Helpers
@@ -184,15 +181,12 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  // sort workflow instances with most recently started first
-  const sortedWorkflows = workflowInstances.value.sort(
-    (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
-  );
   // set initial selected workflow activity to show the first instance in the list
   const workflow = Object.keys(selectedWorkflowActivity.value).length
     ? selectedWorkflowActivity.value
-    : sortedWorkflows[0];
-  if (sortedWorkflows.length && !intervalId) {
+    : workflowInstances.value[0];
+
+  if (workflowInstances.value.length && !intervalId) {
     try {
       await getApplicationsStatus(workflow);
     } catch (err) {
@@ -221,6 +215,9 @@ Watch
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
   // Update Nodes and Edges to render processors for selected workflow
   if (newVal) {
+    if (isDetailsPanelOpen.value === true) {
+      console.log("newVal", newVal);
+    }
     nodes.value = [
       {
         id: "1",

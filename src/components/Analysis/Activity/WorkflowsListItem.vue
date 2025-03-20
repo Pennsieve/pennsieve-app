@@ -1,7 +1,26 @@
 <template>
   <div class="workflows-list-item-wrapper">
     <div
-      v-if="workflow.status === 'STARTED' || workflow.status === ''"
+      v-if="workflow.status === 'NOT_STARTED' || workflow.status === ''"
+      :class="computedClass"
+      @click="$emit('select-workflow', workflow)"
+    >
+      <IconWaitingCircle class="icon neutral" />
+      <div class="text">
+        <div class="workflow-name">
+          Workflow Run:
+          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+        </div>
+        <div>Workflow UUID: {{ workflow.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div v-if="workflow.startedAt">
+          Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}
+        </div>
+        <div v-if="workflow.status">Status: {{ workflow.status }}</div>
+      </div>
+    </div>
+    <div
+      v-if="workflow.status === 'STARTED'"
       :class="computedClass"
       @click="$emit('select-workflow', workflow)"
     >
