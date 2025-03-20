@@ -267,10 +267,9 @@ function onTogglePanelVisibility() {
   sidePanelVisible.value = !sidePanelVisible.value;
 }
 
-function openDetailsPanel(selectedApplication) {
-  console.log("selectedApplication", selectedApplication);
+function openDetailsPanel(processor) {
   isDetailsPanelOpen.value = true;
-  selectedProcessor.value = selectedApplication;
+  selectedProcessor.value = processor;
 }
 
 const handleCloseDialog = () => {
