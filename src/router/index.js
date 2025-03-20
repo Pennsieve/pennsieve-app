@@ -18,6 +18,7 @@ const BfDatasetList = () => import('../components/datasets/dataset-list/BfDatase
 const DatasetListHeader = () => import('./Datasets/DatasetListHeader.vue')
 const DatasetOverview = () => import('../components/datasets/DatasetOverview/DatasetOverview.vue')
 const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
+const SecondaryPageHeaderFiles = () => import('./Dataset/SecondaryPageHeaderFiles.vue')
 const DatasetActivityHeader = () => import('./Dataset/DatasetActivityHeader.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
@@ -120,6 +121,11 @@ const InstanceEdit = () => import('../components/datasets/explore/ConceptInstanc
  * 404
  */
 const PS404 = () => import('../components/PS-404/PS-404.vue')
+/**
+ * for page navigation
+ * if more navigation history is needed, this functionality should be moved to its own store. 
+ */
+let previousCollection = null;
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -317,7 +323,7 @@ const router = createRouter({
           name: 'dataset-files-wrapper',
           path: ':datasetId/files',
           components: {
-            stageHeader: SecondaryPageHeader,
+            stageHeader: SecondaryPageHeaderFiles,
             stage: DatasetFilesView
           },
           props: {
@@ -860,6 +866,24 @@ const router = createRouter({
 
   ],
 });
+
+/**
+ * Store last visited collection ID
+ */
+router.beforeEach((to, from, next) => {
+  if (from.params.fileId && from.params.fileId.startsWith("N:collection:")) {
+    previousCollection = from.params.fileId; 
+  }
+  next();
+});
+
+/**
+ * function to get most recent collection id
+ */
+export function getPreviousCollection() {
+  return previousCollection;
+}
+
 
 export default router;
 
