@@ -208,16 +208,16 @@ const initialState = () => ({
         });
 
         if (!response.ok) {
-          const errorDetails = await response.text(); // Extract error details
+          const errorDetails = await response.text(); 
           throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
         }
 
         const result = await response.json();
-        return result; // Return the result for further processing if needed
+        return result;
 
       } catch (err) {
-        console.error('Failed to create application:', err.message); // Log error details
-        throw err; // Rethrow the error to be handled by the caller
+        console.error('Failed to create application:', err.message); 
+        throw err;
       }
     },
     createComputeNode: async ({ commit, rootState }, newComputeNode) => {
@@ -240,7 +240,7 @@ const initialState = () => ({
         }
 
         const result = await response.json();
-        return result; // Return the result for further processing if needed
+        return result;
 
       } catch (err) {
         console.error('Failed to create compute node:', err.message); // Log detailed error message
@@ -263,16 +263,16 @@ const initialState = () => ({
         });
     
         if (!response.ok) {
-          const errorDetails = await response.text(); // Extract error details
+          const errorDetails = await response.text(); 
           throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
         }
     
         const result = await response.json();
-        return result; // Return the result for further processing if needed
+        return result; 
     
       } catch (err) {
-        console.error('Failed to update application:', err.message); // Log error details
-        throw err; // Rethrow the error to be handled by the caller
+        console.error('Failed to update application:', err.message); 
+        throw err; 
       }
     },
     updateFileCount: async ({ commit, rootState }) => {
@@ -295,12 +295,9 @@ const initialState = () => ({
           const sortedWorkflows = workflowInstances.sort((a, b) => {
             const dateA = new Date(a.startedAt).getTime();
             const dateB = new Date(b.startedAt).getTime();
-          
-            // Handle invalid dates by falling back to 0 (or another fallback strategy)
-            if (isNaN(dateA)) return 1; // Consider `a` invalid and sort it after `b`
-            if (isNaN(dateB)) return -1; // Consider `b` invalid and sort it after `a`
-          
-            return dateB - dateA; // Sort descending
+            if (isNaN(dateA)) return 1; 
+            if (isNaN(dateB)) return -1; 
+            return dateB - dateA; 
           });
           commit("SET_WORKFLOW_INSTANCES", sortedWorkflows);
         } else {
@@ -360,7 +357,6 @@ const initialState = () => ({
           result.workflow[0] = {...workflow.workflow[0], ...result.workflow[0]}
           result.workflow[1] = {...workflow.workflow[1], ...result.workflow[1]}
           result.workflow[2] = {...workflow.workflow[2], ...result.workflow[2]}
-          // result.name = workflow.name
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
         } else {
           return Promise.reject(resp)
@@ -372,27 +368,8 @@ const initialState = () => ({
     },
     cancelWorkflow: async ({commit}, workflowId) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
-      // API work inprogress for this feature
-      // try {
-      //   const url = `${rootState.config.api2Url}/cancel/workflows/${workflowId}`;
-
-      //   const userToken = await useGetToken()
-      //   const resp = await fetch(url, {
-      //     method: 'POST',
-      //     headers: {
-      //       Authorization: `Bearer ${userToken}`,
-      //     },
-      //   })
-
-      //   if (resp.ok) {
-      //     const result = await resp.json()
-      //     return result
-      //   } else {
-      //     return Promise.reject(resp)
-      //   }
-      // } catch (err) {
-      //     return Promise.reject(err)
-      // }
+      // API not yet available 
+      // const url = `${rootState.config.api2Url}/cancel/workflows/${workflowId}`;
     },
     hideCancelWorkflowDialog: ({commit}) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
