@@ -18,6 +18,7 @@ Local State
 const isLoading = ref(false);
 const TableData = ref();
 const noLogsAvailable = ref(false);
+const logsPending = ref(false);
 
 /*
 Emits
@@ -99,6 +100,7 @@ function closeDialog() {
         <bf-waiting-icon />
       </div>
       <div v-else>
+        <div v-if="logsPending">Logs Pending...</div>
         <div v-if="noLogsAvailable">No Logs Available</div>
         <div v-else>
           <el-table :data="TableData" class="tw-text-sm log-table">
