@@ -105,6 +105,8 @@ import * as site from "../../../site-config/site.json";
 export default {
   name: "WorkflowsListItem",
 
+  emits: ["select-workflow"],
+
   components: {
     CircleClose,
   },
