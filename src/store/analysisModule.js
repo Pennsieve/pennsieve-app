@@ -8,6 +8,7 @@ const initialState = () => ({
     processors: [],
     preprocessors:[],
     selectedWorkflow: {},
+    selectedProcessor: {},
     selectedFilesForAnalysis: [],
     computeResourceAccounts: [] ,
     /*
@@ -102,6 +103,9 @@ const initialState = () => ({
     },
     HIDE_ACTIVITY_LOG_DIALOG(state) {
       state.activityDialogVisible = false;
+    },
+    SET_SELECTED_PROCESSOR(state, processor) {
+      state.selectedProcessor = processor;
     }
   
   }
@@ -358,6 +362,12 @@ const initialState = () => ({
           result.workflow[1] = {...workflow.workflow[1], ...result.workflow[1]}
           result.workflow[2] = {...workflow.workflow[2], ...result.workflow[2]}
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
+          const updatedProcessor = result.workflow.find(processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid)
+          if (updatedProcessor) {
+            commit('SET_SELECTED_PROCESSOR', updatedProcessor)
+          }
+
+
         } else {
           return Promise.reject(resp)
         }
@@ -471,6 +481,9 @@ const initialState = () => ({
         throw err;
       }
     },
+    setSelectedProcessor: ({ commit, rootState }, processor) => {
+      commit('SET_SELECTED_PROCESSOR', processor)
+    },
   }
   
   export const getters = {
@@ -478,7 +491,8 @@ const initialState = () => ({
     workflowInstance: state => state.workflowInstance,
     workflowLogs: state => state.workflowLogs,
     selectedWorkflowActivity: state => state.selectedWorkflowActivity,
-    activityDialogVisible: state => state.activityDialogVisible
+    activityDialogVisible: state => state.activityDialogVisible,
+    selectedProcessor: state => state.selectedProcessor
   }
   
   const analysisModule = {
