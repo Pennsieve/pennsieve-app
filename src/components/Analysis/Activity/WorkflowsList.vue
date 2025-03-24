@@ -113,7 +113,7 @@ export default {
 <style lang="scss" scoped>
 @import "../../../assets/_variables.scss";
 
-:deep(.workflos-list.scrolling-list.input-wrap) {
+:deep(.workflows-list.scrolling-list.input-wrap) {
   padding: 0 0 0 16px;
 }
 

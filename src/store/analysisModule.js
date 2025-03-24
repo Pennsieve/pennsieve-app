@@ -279,7 +279,7 @@ const initialState = () => ({
       commit('UPDATE_SELECTED_FILE_COUNT')
     },
     fetchWorkflowInstances: async ({ commit, rootState }) => {
-      let workflowInstances = [];
+
       try {
         const url = `${rootState.config.api2Url}/workflows/instances?organization_id=${rootState.activeOrganization.organization.id}`;
         const userToken = await useGetToken();
@@ -291,8 +291,18 @@ const initialState = () => ({
         });
     
         if (resp.ok) {
-          workflowInstances = await resp.json();
-          commit("SET_WORKFLOW_INSTANCES", workflowInstances);
+          const workflowInstances = await resp.json();
+          const sortedWorkflows = workflowInstances.sort((a, b) => {
+            const dateA = new Date(a.startedAt).getTime();
+            const dateB = new Date(b.startedAt).getTime();
+          
+            // Handle invalid dates by falling back to 0 (or another fallback strategy)
+            if (isNaN(dateA)) return 1; // Consider `a` invalid and sort it after `b`
+            if (isNaN(dateB)) return -1; // Consider `b` invalid and sort it after `a`
+          
+            return dateB - dateA; // Sort descending
+          });
+          commit("SET_WORKFLOW_INSTANCES", sortedWorkflows);
         } else {
           return Promise.reject(resp);
         }
@@ -300,42 +310,6 @@ const initialState = () => ({
         commit("SET_WORKFLOW_INSTANCES", []);
         return Promise.reject(err);
       }
-    
-      // try {
-      //   const userToken = await useGetToken();
-      //   const statusRequests = workflowInstances.map(async (instance) => {
-      //     const statusUrl = `${rootState.config.api2Url}/workflows/instances/${instance.uuid}/status`;
-      //     const resp = await fetch(statusUrl, {
-      //       method: "GET",
-      //       headers: {
-      //         Authorization: `Bearer ${userToken}`,
-      //       },
-      //     });
-    
-      //     if (resp.ok) {
-      //       return resp.json();
-      //     } else {
-      //       return { uuid: instance.uuid, status: "UNKNOWN" }; 
-      //     }
-      //   });
-    
-      //   // Wait for all status requests to complete
-      //   const statusResults = await Promise.all(statusRequests);
-    
-      //   // Merge status into workflow instances
-      //   const mergedObjects = workflowInstances.map(workflow => {
-      //     const matchedStatus = statusResults.find(status => status.uuid === workflow.uuid);
-      //     return {
-      //       ...workflow,
-      //       status: matchedStatus ? matchedStatus.status : "UNKNOWN",
-      //     };
-      //   });
-    
-      //   commit("SET_WORKFLOW_INSTANCES",  mergedObjects);
-    
-      // } catch (err) {
-      //   console.error("Error fetching statuses:", err);
-      // } 
     },
     fetchWorkflowLogs: async({commit, rootState }, [workflow, application]) => {
       const userToken = await useGetToken()
@@ -363,32 +337,8 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    fetchWorkflowInstance: async({commit, dispatch, rootState }, uuid) => {
-      try {
-        const url = `${rootState.config.api2Url}/workflows/instances/${uuid}/status`;
-
-        const userToken = await useGetToken()
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
-
-        if (resp.ok) {
-          const result = await resp.json()
-          result.workflow = result.processors
-          delete result.processors
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
-          return Promise.reject(err)
-      }
-    },
     setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+
       if (!workflow) {
         commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
         return;
@@ -403,29 +353,14 @@ const initialState = () => ({
             Authorization: `Bearer ${userToken}`,
           },
         })
-
-        function mergeByUUID(applications, statuses) {
-          // Create a map of statuses for quick lookup by uuid
-          const statusMap = statuses.reduce((map, status) => {
-              map[status.uuid] = status;
-              return map;
-          }, {});
       
-          // Merge applications with their corresponding statuses
-          return applications.map(app => {
-              const matchingStatus = statusMap[app.uuid] || {};
-              return {
-                  ...app,
-                  ...matchingStatus
-              };
-          });
-      }
-      
-
         if (resp.ok) {
           const result = await resp.json()
-          result.workflow = mergeByUUID(workflow.workflow, result.processors)
           result.name = workflow.name
+          result.workflow[0] = {...workflow.workflow[0], ...result.workflow[0]}
+          result.workflow[1] = {...workflow.workflow[1], ...result.workflow[1]}
+          result.workflow[2] = {...workflow.workflow[2], ...result.workflow[2]}
+          // result.name = workflow.name
           commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
         } else {
           return Promise.reject(resp)

@@ -55,7 +55,7 @@
 </template>
 
 <script>
-import { mapActions } from "vuex";
+import { mapActions, mapState } from "vuex";
 
 export default {
   name: "ProcessorDetails",
@@ -76,6 +76,10 @@ export default {
   },
 
   computed: {
+    ...mapState("analysisModule", [
+      "workflowInstances",
+      "selectedWorkflowActivity",
+    ]),
     isEmpty() {
       return Object.keys(this.selectedProcessor).length === 0;
     },
