@@ -365,6 +365,9 @@ const initialState = () => ({
           const updatedProcessor = result.workflow.find(processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid)
           if (updatedProcessor) {
             commit('SET_SELECTED_PROCESSOR', updatedProcessor)
+            if (rootState.analysisModule.activityDialogVisible) {
+              dispatch('fetchWorkflowLogs', [workflow, updatedProcessor])
+            }
           }
 
 
