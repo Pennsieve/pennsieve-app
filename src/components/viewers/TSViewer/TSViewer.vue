@@ -93,33 +93,32 @@
       @setStart="updateStart"
     />
 
-<!--    <timeseries-filter-modal-->
-<!--      ref="filterWindow"-->
-<!--      :filter-window-open="filterWindowOpen"-->
-<!--      @closeWindow="onCloseFilterWindow"-->
-<!--    />-->
+    <!-- <timeseries-filter-modal
+     ref="filterWindow"
+     :filter-window-open="filterWindowOpen"
+     @closeWindow="onCloseFilterWindow"
+    /> -->
 
-<!--    <timeseries-annotation-modal-->
-<!--      ref="annotationModal"-->
-<!--      :visible.sync="annotationWindowOpen"-->
-<!--      @closeWindow="onCloseAnnotationWindow"-->
-<!--      @createUpdateAnnotation="onCreateUpdateAnnotation"-->
-<!--    />-->
+   <timeseries-annotation-modal
+     ref="annotationModal"
+     :visible="annotationWindowOpen"
+     @update:visible="annotationWindowOpen = $event"
+     @closeWindow="onCloseAnnotationWindow"
+     @createUpdateAnnotation="onCreateUpdateAnnotation"
+   />
 
-<!--    <timeseries-annotation-layer-modal-->
-<!--      ref="layerModal"-->
-<!--      :annotation-layer-window-open="annotationLayerWindowOpen"-->
-<!--      @closeWindow="onCloseAnnotationLayerWindow"-->
-<!--      @createLayer="onCreateAnnotationLayer"-->
-<!--    />-->
+    <!-- <timeseries-annotation-layer-modal
+     ref="layerModal"
+     :annotation-layer-window-open="annotationLayerWindowOpen"
+     @closeWindow="onCloseAnnotationLayerWindow"
+     @createLayer="onCreateAnnotationLayer"
+   />
 
-<!--    <ts-annotation-delete-dialog-->
-<!--      :visible.sync="isTsAnnotationDeleteDialogVisible"-->
-<!--      :delete-annotation.sync="annotationDelete"-->
-<!--      @delete="deleteAnnotation"-->
-<!--    />-->
-
-
+   <ts-annotation-delete-dialog
+     :visible.sync="isTsAnnotationDeleteDialogVisible"
+     :delete-annotation.sync="annotationDelete"
+     @delete="deleteAnnotation"
+   /> -->
   </div>
 </template>
 
@@ -460,7 +459,7 @@
 
             },
             getChannelId: function(channel) {
-                const isViewingMontage = this.$store.state.viewer.viewerMontageScheme !== 'NOT_MONTAGED'
+                const isViewingMontage = this.$store.state.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 let list = []
                 if (isViewingMontage) {
