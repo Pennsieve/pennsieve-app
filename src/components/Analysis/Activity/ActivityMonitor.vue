@@ -64,7 +64,6 @@ const nodes = ref(initialNodes);
 const edges = ref(initialEdges);
 const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
-const selectedProcessor = ref({});
 const selectedNode = ref({});
 let intervalId = null;
 
@@ -77,6 +76,9 @@ const workflowInstances = computed(
 );
 const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
+);
+const selectedProcessor = computed(
+  () => store.getters["analysisModule/selectedProcessor"]
 );
 const cancelWorkflowDialogVisible = computed(
   () => store.state.analysisModule.cancelWorkflowDialogVisible
@@ -273,7 +275,7 @@ function onTogglePanelVisibility() {
 
 function openDetailsPanel(processor) {
   isDetailsPanelOpen.value = true;
-  selectedProcessor.value = processor;
+  store.dispatch("analysisModule/setSelectedProcessor", processor);
 }
 
 const handleCloseDialog = () => {
