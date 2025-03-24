@@ -884,6 +884,4 @@ export function getPreviousCollection() {
   return previousCollection;
 }
 
-
 export default router;
-
