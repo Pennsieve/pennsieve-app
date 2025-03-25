@@ -500,7 +500,7 @@ export default {
                 } else {
                     // if no annotations exist, force render layers in side panel
                     // just to be safe
-                    this.fire('render-side-panel-layers')
+                    // this.fire('render-side-panel-layers')
                 }
                 this.$emit('annotationsReceived')
             },

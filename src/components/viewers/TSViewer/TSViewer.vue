@@ -99,12 +99,13 @@
 <!--      @closeWindow="onCloseFilterWindow"-->
 <!--    />-->
 
-<!--    <timeseries-annotation-modal-->
-<!--      ref="annotationModal"-->
-<!--      :visible.sync="annotationWindowOpen"-->
-<!--      @closeWindow="onCloseAnnotationWindow"-->
-<!--      @createUpdateAnnotation="onCreateUpdateAnnotation"-->
-<!--    />-->
+<timeseries-annotation-modal
+     ref="annotationModal"
+     :visible="annotationWindowOpen"
+     @update:visible="annotationWindowOpen = $event"
+     @closeWindow="onCloseAnnotationWindow"
+     @createUpdateAnnotation="onCreateUpdateAnnotation"
+   />
 
 <!--    <timeseries-annotation-layer-modal-->
 <!--      ref="layerModal"-->
@@ -459,7 +460,7 @@
 
             },
             getChannelId: function(channel) {
-                const isViewingMontage = this.$store.state.viewer.viewerMontageScheme !== 'NOT_MONTAGED'
+                const isViewingMontage = this.$store.state.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 let list = []
                 if (isViewingMontage) {
