@@ -64,7 +64,6 @@ const nodes = ref(initialNodes);
 const edges = ref(initialEdges);
 const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
-const selectedProcessor = ref({});
 const selectedNode = ref({});
 let intervalId = null;
 
@@ -77,6 +76,9 @@ const workflowInstances = computed(
 );
 const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
+);
+const selectedProcessor = computed(
+  () => store.getters["analysisModule/selectedProcessor"]
 );
 const cancelWorkflowDialogVisible = computed(
   () => store.state.analysisModule.cancelWorkflowDialogVisible
@@ -166,8 +168,7 @@ const startFetching = () => {
   if (intervalId) {
     clearInterval(intervalId);
   }
-  fetchData();
-  intervalId = setInterval(fetchData, 20000);
+  intervalId = setInterval(fetchData, 5000);
 };
 
 onMounted(async () => {
@@ -214,47 +215,55 @@ Watch
 */
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
   // Update Nodes and Edges to render processors for selected workflow
-  if (newVal) {
-    if (isDetailsPanelOpen.value === true) {
-      console.log("newVal", newVal);
-    }
-    nodes.value = [
-      {
-        id: "1",
-        type: "default",
-        data: {
-          label: getLabel(newVal.workflow[0], "Preprocessor"),
-          status: newVal.workflow[0].status,
-        },
-        position: { x: 130, y: 100 },
-        class: getClass(newVal, 0),
-        selected: false,
+
+  nodes.value = [
+    {
+      id: "1",
+      type: "default",
+      data: {
+        label: getLabel(newVal.workflow[0], "Preprocessor"),
+        status: newVal.workflow[0].status,
       },
-      {
-        id: "2",
-        type: "default",
-        data: {
-          label: getLabel(newVal.workflow[1], "Processor"),
-          status: newVal.workflow[1].status,
-          class: getClass(newVal, 1),
-        },
-        position: { x: 150, y: 250 },
+      position: { x: 130, y: 100 },
+      class: getClass(newVal, 0),
+      selected:
+        selectedProcessor.value.uuid ===
+        selectedWorkflowActivity.value.workflow[0].uuid
+          ? true
+          : false,
+    },
+    {
+      id: "2",
+      type: "default",
+      data: {
+        label: getLabel(newVal.workflow[1], "Processor"),
+        status: newVal.workflow[1].status,
         class: getClass(newVal, 1),
-        selected: false,
       },
-      {
-        id: "3",
-        type: "default",
-        data: {
-          label: getLabel(newVal.workflow[2], "Postprocessor"),
-          status: newVal.workflow[2].status,
-        },
-        position: { x: 170, y: 400 },
-        class: getClass(newVal, 2),
-        selected: false,
+      position: { x: 150, y: 250 },
+      class: getClass(newVal, 1),
+      selected:
+        selectedProcessor.value.uuid ===
+        selectedWorkflowActivity.value.workflow[1].uuid
+          ? true
+          : false,
+    },
+    {
+      id: "3",
+      type: "default",
+      data: {
+        label: getLabel(newVal.workflow[2], "Postprocessor"),
+        status: newVal.workflow[2].status,
       },
-    ];
-  }
+      position: { x: 170, y: 400 },
+      class: getClass(newVal, 2),
+      selected:
+        selectedProcessor.value.uuid ===
+        selectedWorkflowActivity.value.workflow[2].uuid
+          ? true
+          : false,
+    },
+  ];
 });
 
 /*
@@ -266,7 +275,7 @@ function onTogglePanelVisibility() {
 
 function openDetailsPanel(processor) {
   isDetailsPanelOpen.value = true;
-  selectedProcessor.value = processor;
+  store.dispatch("analysisModule/setSelectedProcessor", processor);
 }
 
 const handleCloseDialog = () => {

@@ -64,12 +64,7 @@ export default {
 
   emits: [],
 
-  props: {
-    selectedProcessor: {
-      type: Object,
-      default: () => ({}),
-    },
-  },
+  props: {},
 
   data: function () {
     return {};
@@ -79,6 +74,8 @@ export default {
     ...mapState("analysisModule", [
       "workflowInstances",
       "selectedWorkflowActivity",
+      ,
+      "selectedProcessor",
     ]),
     isEmpty() {
       return Object.keys(this.selectedProcessor).length === 0;
@@ -88,6 +85,15 @@ export default {
     },
     hasParams() {
       return Object.keys(this.selectedProcessor.params).length;
+    },
+  },
+
+  watch: {
+    selectedProcessor: {
+      immediate: true, // Run this watcher immediately on component load
+      handler(newProcessor) {
+        this.currentProcessor = { ...newProcessor }; // Update local data when `selectedProcessor` changes
+      },
     },
   },
 
