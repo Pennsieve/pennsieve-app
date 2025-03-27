@@ -357,12 +357,22 @@ const initialState = () => ({
       
         if (resp.ok) {
           const result = await resp.json()
-          result.name = workflow.name
-          result.workflow[0] = {...workflow.workflow[0], ...result.workflow[0]}
-          result.workflow[1] = {...workflow.workflow[1], ...result.workflow[1]}
-          result.workflow[2] = {...workflow.workflow[2], ...result.workflow[2]}
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', result)
-          const updatedProcessor = result.workflow.find(processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid)
+          const updatedResult = {...result, workflow: [...result.workflow]}
+          updatedResult.name = workflow.name
+          const preprocessorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'preprocessor')
+          const preprocessorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === preprocessorFromInstancesEndpoint.uuid)
+          const processorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'processor')
+          const processorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === processorFromInstancesEndpoint.uuid)
+          const postprocessorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'postprocessor')
+          const postprocessorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === postprocessorFromInstancesEndpoint.uuid)
+
+          updatedResult.workflow[0] = {...preprocessorFromInstancesEndpoint, ...preprocessorFromStatusEndpoint}
+          updatedResult.workflow[1] = {...processorFromInstancesEndpoint, ...processorFromStatusEndpoint}
+          updatedResult.workflow[2] = {...postprocessorFromInstancesEndpoint, ...postprocessorFromStatusEndpoint}
+
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult)
+          
+          const updatedProcessor = updatedResult.workflow.find(processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid)
           if (updatedProcessor) {
             commit('SET_SELECTED_PROCESSOR', updatedProcessor)
             if (rootState.analysisModule.activityDialogVisible) {
