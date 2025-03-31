@@ -373,7 +373,6 @@ const initialState = () => ({
           const updatedProcessor = updatedResult.workflow.find(
             processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
           );
-          console.log('updatedProcessor', updatedProcessor)
           if (updatedProcessor) {
             commit('SET_SELECTED_PROCESSOR', updatedProcessor);
             if (rootState.analysisModule.activityDialogVisible) {
