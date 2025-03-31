@@ -356,31 +356,29 @@ const initialState = () => ({
         })
       
         if (resp.ok) {
-          const result = await resp.json()
-          const updatedResult = {...result, workflow: [...result.workflow]}
-          updatedResult.name = workflow.name
-          const preprocessorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'preprocessor')
-          const preprocessorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === preprocessorFromInstancesEndpoint.uuid)
-          const processorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'processor')
-          const processorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === processorFromInstancesEndpoint.uuid)
-          const postprocessorFromInstancesEndpoint = workflow.workflow.find(workflow =>workflow.applicationType === 'postprocessor')
-          const postprocessorFromStatusEndpoint = result.workflow.find(workflow => workflow.uuid === postprocessorFromInstancesEndpoint.uuid)
+          const result = await resp.json();
 
-          updatedResult.workflow[0] = {...preprocessorFromInstancesEndpoint, ...preprocessorFromStatusEndpoint}
-          updatedResult.workflow[1] = {...processorFromInstancesEndpoint, ...processorFromStatusEndpoint}
-          updatedResult.workflow[2] = {...postprocessorFromInstancesEndpoint, ...postprocessorFromStatusEndpoint}
-
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult)
+          // This code combines two API reponses (/status and /instances) we need properties from, matching on uuid
+          // The /instances response is missing status, and the /status response does not tell us the applicationType
+          // Do not rely on array position for applicationType, array index does not reliably correlate to preprocessor/ processor/ postprocessor
           
-          const updatedProcessor = updatedResult.workflow.find(processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid)
+          const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
+          const applicationTypes = ['preprocessor', 'processor', 'postprocessor'];
+          updatedResult.workflow = applicationTypes.map((type, index) => {
+            const fromInstances = workflow.workflow.find(w => w.applicationType === type);
+            const fromStatus = result.workflow.find(w => w.uuid === fromInstances.uuid);
+            return { ...fromInstances, ...fromStatus };
+          });
+          commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
+          const updatedProcessor = updatedResult.workflow.find(
+            processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
+          );
           if (updatedProcessor) {
-            commit('SET_SELECTED_PROCESSOR', updatedProcessor)
+            commit('SET_SELECTED_PROCESSOR', updatedProcessor);
             if (rootState.analysisModule.activityDialogVisible) {
-              dispatch('fetchWorkflowLogs', [workflow, updatedProcessor])
+              dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
             }
           }
-
-
         } else {
           return Promise.reject(resp)
         }

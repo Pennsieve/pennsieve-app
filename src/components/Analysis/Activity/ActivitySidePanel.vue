@@ -21,18 +21,12 @@ const processorInfoSelected = ref(false);
 const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
 
-/* 
+/*
 Emits
 */
 const emit = defineEmits([
   "openDeleteLinkedPropDialog",
   "togglePanelVisibility",
-  "focusNode",
-  "openPropertyDialog",
-  "openDeletePropDialog",
-  "openDeleteRelationshipDialog",
-  "openDeleteModelDialog",
-  "openEditPropertyDialog",
 ]);
 
 /*
@@ -41,9 +35,10 @@ Watch
 watch(
   () => props.selectedProcessor,
   (newVal, oldVal) => {
-    workflowsListVisible.value = true;
-    workflowsListSelected.value = false;
-    processorInfoSelected.value = true;
+    if (newVal.uuid !== oldVal.uuid) {
+      workflowsListSelected.value = false;
+      processorInfoSelected.value = true;
+    }
   }
 );
 
