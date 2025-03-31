@@ -21,7 +21,7 @@ const processorInfoSelected = ref(false);
 const mouseHoverInfo = ref(false);
 const mouseHoverList = ref(false);
 
-/* 
+/*
 Emits
 */
 const emit = defineEmits([
@@ -35,11 +35,10 @@ Watch
 watch(
   () => props.selectedProcessor,
   (newVal, oldVal) => {
-    console.log("workflowsListVisible", workflowsListVisible.value);
-    console.log("workflowsListSelected", workflowsListSelected.value);
-    workflowsListVisible.value = true;
-    workflowsListSelected.value = false;
-    processorInfoSelected.value = true;
+    if (newVal.uuid !== oldVal.uuid) {
+      workflowsListSelected.value = false;
+      processorInfoSelected.value = true;
+    }
   }
 );
 
@@ -89,7 +88,6 @@ function mouseOver(event) {
 }
 
 function toggleModelsList(event) {
-  console.log("toggleModelsList ran");
   const evtId = event.currentTarget.id;
 
   switch (evtId) {
