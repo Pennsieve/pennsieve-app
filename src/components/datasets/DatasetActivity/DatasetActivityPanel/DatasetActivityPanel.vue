@@ -180,7 +180,6 @@ export default {
      * @returns {Number}
      */
     publishedId: function () {
-      console.log("this.publishedId", this.publishedId);
       return pathOr(0, ["publication", "publishedDataset", "id"], this.dataset);
     },
 
