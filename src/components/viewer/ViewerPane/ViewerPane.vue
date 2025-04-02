@@ -112,7 +112,11 @@ export default {
       }
 
       const viewerType = this.checkViewerType(this.pkg);
-      this.loadVueViewer(viewerType);
+      if(this.isTimeseriesPackageUnprocessed(this.pkg)) {
+        this.loadVueViewer("UnknownViewer");
+      } else {
+        this.loadVueViewer(viewerType);
+      }
     },
 
     /**
@@ -122,6 +126,12 @@ export default {
     loadVueViewer: function (component) {
       this.cmpViewer = component;
     },
+
+    isTimeseriesPackageUnprocessed: function (pkg) {
+      const isTimeseriesFile = pathOr('unknown', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries'
+      const isUnprocessed = pathOr('unknown', ['content', 'state'], pkg).toLowerCase() === "uploaded"
+      return (isTimeseriesFile && isUnprocessed)
+    }
   },
 };
 </script>
