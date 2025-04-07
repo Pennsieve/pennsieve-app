@@ -606,7 +606,7 @@ export const mutations = {
 
 export const actions = {
   resetState({ commit }) {
-    commit('resetState');
+    commit('RESET_STATE');
   },
   setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
