@@ -269,11 +269,6 @@ export const actions = {
           }
 
         })
-
-
-
-
-
   },
 
   getDatasetProposalCount: async ({ commit, rootState }, type) => {
