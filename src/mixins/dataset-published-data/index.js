@@ -49,17 +49,8 @@ export default {
      * Compute link for dataset on discover
      * @returns {String}
      */
-    discoverLink: function(publishedData) {
-
-      let publishedDatasetId;
-
-      if (publishedData) {
-        publishedDatasetId =  propOr(1, 'publishedDatasetId', publishedData)
-      } else {
-        publishedDatasetId =  propOr(1, 'publishedDatasetId', this.publishedData)
-      }
-
-
+    discoverLink: function() {
+      const publishedDatasetId =  propOr(1, 'publishedDatasetId', this.publishedData)
       return this.config.environment === 'prod'
         ? `https://discover.pennsieve.io/datasets/${publishedDatasetId}`
         : `https://discover.pennsieve.net/datasets/${publishedDatasetId}`
