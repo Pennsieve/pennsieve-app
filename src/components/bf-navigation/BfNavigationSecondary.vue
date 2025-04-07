@@ -270,7 +270,7 @@ export default {
       default: "",
     },
     datasetId: {
-      ype: String,
+      type: String,
       default: "",
     },
   },
