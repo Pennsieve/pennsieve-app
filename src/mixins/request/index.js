@@ -106,8 +106,10 @@ export default {
       } // unauthorized
       else if (status === 403) {
         console.log(err)
-        return this.$router.replace({name: 'datasets-list'})
+        if (this.$router) {
+          return this.$router.replace({name: 'datasets-list'})
         }
+      }
       else {
         // emit ajaxError
         console.log(err)
