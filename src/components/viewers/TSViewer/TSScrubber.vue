@@ -359,7 +359,16 @@
             },
             renderViewPort: function() {
                 this.$nextTick(() => {
-                    const ctx = this.$refs.iCanvas.getContext('2d');
+                    const canvas = this.$refs.iCanvas; 
+                    if (!canvas) {
+                      console.warn('iCanvas ref is missing, skipping render');
+                      return;
+                    }
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                      console.warn('2D context is not available');
+                      return;
+                    }
                     ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                     ctx.clearRect(0, 0, this.cWidth, this.viewportHeight);
 
@@ -387,7 +396,17 @@
             },
             renderSegments: function() {
               this.$nextTick(() => {
-                const ctx = this.$refs.segmentsCanvas.getContext('2d');
+                const canvas = this.$refs.segmentsCanvas;
+                if (!canvas) {
+                  console.warn('segmentsCanvas ref is missing, skipping renderSegments');
+                  return;
+                }
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  console.warn('Unable to get 2D context for segmentsCanvas, skipping renderSegments');
+                  return;
+                }
                 ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                 ctx.fillStyle = ctx.createPattern(this.patternCnvs, 'repeat');
                 ctx.clearRect(0, 0, this.cWidth, this.viewportHeight);
@@ -401,7 +420,17 @@
 
             },
             renderTimelimeLine: function() {
-                const ctx = this.$refs.annotationCanvas.getContext('2d');
+                const canvas = this.$refs.annotationCanvas;
+                if (!canvas) {
+                  console.warn('annotationCanvas ref is missing, skipping renderTimelimeLine');
+                  return;
+                }
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  console.warn('Unable to get 2D context for annotationCanvas, skipping renderTimelimeLine');
+                  return;
+                }
                 ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
                 ctx.clearRect(0, 0, this.cWidth, this.scrubberHeight);
