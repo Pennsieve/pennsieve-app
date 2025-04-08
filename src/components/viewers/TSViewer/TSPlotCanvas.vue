@@ -1449,9 +1449,10 @@
                     this.async(() => {this.sendMontageMessage(value)}, 500)
                 }
             },
-            _onWebsocketClose: async function(e) {
+            _onWebsocketClose: function(e) {
                 clearTimeout(this.preFetchTime);
                 this.aSyncPreRequests = [];
+                this.openWebsocket();
             },
             _onWebsocketFinalClose: function(e) {
             },
