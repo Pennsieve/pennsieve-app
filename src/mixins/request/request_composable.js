@@ -98,7 +98,9 @@ export function useHandleXhrError(err) {
         return useHandleLogout()
     } // unauthorized
     else if (status === 403) {
-        return router.replace({name: 'datasets-list'})
+        if (router) {
+            return router.replace({name: 'datasets-list'})
+        }
     }
     else {
         // emit ajaxError
