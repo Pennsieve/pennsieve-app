@@ -70,16 +70,31 @@ export default {
     getFileUrl: async function() {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
+      const token = await useGetToken()
+      const url = `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}?api_key=${token}`
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
 
-      // return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/`
-      const fileUrlData = await useGetToken()
-      .then(token => {
-        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${token}`
-      })
-
-      this.fileUrl = fileUrlData;
-
-      return fileUrlData
+        if (response.ok) {
+         const result = await response.json()
+         const fileUrl = result.url
+          this.fileUrl = fileUrl
+          return fileUrl;
+        }
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error(err)
+        throw err;
+      }
     },
 
     /**
