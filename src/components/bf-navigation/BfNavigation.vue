@@ -86,7 +86,7 @@
       </bf-navigation-item>
 
       <div>
-        <bf-navigation-item
+        <!-- <bf-navigation-item
           v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
           :link="{
             name: 'code',
@@ -99,7 +99,7 @@
           <template v-slot:icon>
             <IconGitHub :width="20" :height="20" color="currentColor" />
           </template>
-        </bf-navigation-item>
+        </bf-navigation-item> -->
       </div>
 
       <bf-navigation-item
