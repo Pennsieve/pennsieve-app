@@ -14,7 +14,7 @@
           <router-tabs :tabs="tabs" />
           <ul slot="tabs" class="tabs unstyled">
             <li v-for="tab in tabs" :key="tab.route.name">
-              <router-link :to="tab.route">
+              <router-link :to="tab.to">
                 {{ tab.label }} ({{ this.getTotalCount(tab.type) }})
               </router-link>
             </li>
