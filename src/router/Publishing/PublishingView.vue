@@ -12,20 +12,13 @@
 
         <template #tabs>
           <router-tabs :tabs="tabs" />
-
-          <!--          <ul-->
-          <!--            slot="tabs"-->
-          <!--            class="tabs unstyled"-->
-          <!--          >-->
-          <!--            <li-->
-          <!--              v-for="tab in tabs"-->
-          <!--              :key="tab.route.name"-->
-          <!--            >-->
-          <!--              <router-link :to="tab.route">-->
-          <!--                {{ tab.label }} ({{ this.getTotalCount(tab.type) }})-->
-          <!--              </router-link>-->
-          <!--            </li>-->
-          <!--          </ul>-->
+          <ul slot="tabs" class="tabs unstyled">
+            <li v-for="tab in tabs" :key="tab.route.name">
+              <router-link :to="tab.route">
+                {{ tab.label }} ({{ this.getTotalCount(tab.type) }})
+              </router-link>
+            </li>
+          </ul>
         </template>
       </bf-rafter>
     </template>
