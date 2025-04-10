@@ -176,7 +176,7 @@
       </a>
       <a
         v-if="datasetPublicationType === PublicationType.PUBLICATION"
-        :href="discoverLink(dataset)"
+        :href="discoverLink"
         target="_blank"
       >
         View on Discover
