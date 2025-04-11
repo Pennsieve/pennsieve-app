@@ -361,17 +361,6 @@
             _cpCanvasScaler: function(sz, pixelRatio, offset) {
                 return pixelRatio * (sz + offset);
             },
-            getScreenPixelRatio: function() {
-                let ctx = this.$refs.plotArea.getContext('2d');
-                let dpr = window.devicePixelRatio || 1
-                let bsr = ctx.webkitBackingStorePixelRatio ||
-                ctx.mozBackingStorePixelRatio ||
-                ctx.msBackingStorePixelRatio ||
-                ctx.oBackingStorePixelRatio ||
-                ctx.backingStorePixelRatio || 1;
-
-                return dpr / bsr;
-            },
             getChannelId: function(channel) {
                 const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
@@ -1071,14 +1060,31 @@
                 }
             },
             _renderData: function(isRedraw=false) {
-                const ba = this.$refs.blurArea;
-                const ctxb = ba.getContext('2d');
+                const blurCanvas = this.$refs.blurArea;
+                if (!blurCanvas) {
+                  console.warn('blurArea ref is missing, skipping _renderData');
+                  return;
+                }
+                const ctxb = blurCanvas.getContext('2d');
+                if (!ctxb) {
+                  console.warn('Unable to get 2D context for blurArea, skipping _renderData');
+                  return;
+                }
                 ctxb.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                 ctxb.fillStyle = 'rgb(220,220,220)'
 
 
-                const pa = this.$refs.plotArea;
-                const ctx = pa.getContext('2d');
+                const plotCanvas = this.$refs.plotArea;
+                if (!plotCanvas) {
+                  console.warn('plotArea ref is missing, skipping drawing.');
+                  return;
+                }
+
+                const ctx = plotCanvas.getContext('2d');
+                if (!ctx) {
+                  console.warn('Unable to get 2D context for plotArea, skipping drawing.');
+                  return;
+                }
                 ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
                 // clear canvas
