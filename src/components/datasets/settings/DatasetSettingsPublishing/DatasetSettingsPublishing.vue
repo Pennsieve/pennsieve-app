@@ -1,21 +1,22 @@
 <template>
   <el-row>
-    <h2>
-      Publishing Your Dataset
-    </h2>
+    <h2>Publishing Your Dataset</h2>
     <el-col>
-      <dataset-settings-publishing-loader v-if="isLoadingDatasetPublishedData" />
-      <h3 class="heading">
-        Status
-      </h3>
+      <dataset-settings-publishing-loader
+        v-if="isLoadingDatasetPublishedData"
+      />
+      <h3 class="heading">Status</h3>
       <template v-if="publicationStatus === PublicationStatus.FAILED">
         <status-failed />
       </template>
-      <template v-else-if="publicationStatus === PublicationStatus.REQUESTED && publicationType !== PublicationType.REVISION">
+      <template
+        v-else-if="
+          publicationStatus === PublicationStatus.REQUESTED &&
+          publicationType !== PublicationType.REVISION
+        "
+      >
         <status-requested :publication-type="publicationType" />
-        <h3 class="heading publication">
-          Request to Publish
-        </h3>
+        <h3 class="heading publication">Request to Publish</h3>
         <sharing-info />
         <submit-for-publication
           :has-dataset="true"
@@ -45,14 +46,19 @@
           </template>
           <template v-else>
             <div v-if="canPublish">
-              <p>Your publishing checklist is complete and the dataset is ready to be submitted for review.</p>
+              <p>
+                Your publishing checklist is complete and the dataset is ready
+                to be submitted for review.
+              </p>
             </div>
             <div v-else>
-              <p>Your dataset is missing items and cannot be published. Please review the checklist at the top of the page for more information.</p>
+              <p>
+                Your dataset is missing items and cannot be published. Please
+                review the checklist at the top of the page for more
+                information.
+              </p>
             </div>
-            <h3 class="heading publication">
-              Request to Publish
-            </h3>
+            <h3 class="heading publication">Request to Publish</h3>
             <sharing-info />
             <submit-for-publication
               :has-dataset="true"
@@ -63,35 +69,34 @@
         </template>
       </template>
 
-      <hr>
-      <dataset-settings-publication-actions
-        :can-publish="canPublish"
-      />
+      <hr />
+      <dataset-settings-publication-actions :can-publish="canPublish" />
     </el-col>
   </el-row>
-
-
 </template>
 
 <script>
-import { mapActions, mapGetters, mapState } from 'vuex';
-import { all, defaultTo,  path, pathOr, propOr } from 'ramda';
-import { PublicationStatus, PublicationType } from '../../../../utils/constants';
-import DatasetSettingsPublishingLoader from './DatasetSettingsPublishingLoader.vue';
-import DatasetSettingsPublicationActions from '../DatasetSettingsPublicationActions/DatasetSettingsPublicationActions.vue'
+import { mapActions, mapGetters, mapState } from "vuex";
+import { all, defaultTo, path, pathOr, propOr } from "ramda";
+import {
+  PublicationStatus,
+  PublicationType,
+} from "../../../../utils/constants";
+import DatasetSettingsPublishingLoader from "./DatasetSettingsPublishingLoader.vue";
+import DatasetSettingsPublicationActions from "../DatasetSettingsPublicationActions/DatasetSettingsPublicationActions.vue";
 
-import Request from '../../../../mixins/request';
-import FormatDate from '../../../../mixins/format-date/index';
-import OwnerOrcid from './OwnerOrcid.vue';
-import SubmitForPublication from './SubmitForPublication.vue';
-import StatusPublished from './StatusPublished.vue';
-import StatusRequested from './StatusRequested.vue';
-import StatusAccepted from './StatusAccepted.vue';
-import StatusFailed from './StatusFailed.vue';
-import SharingInfo from './SharingInfo.vue';
+import Request from "../../../../mixins/request";
+import FormatDate from "../../../../mixins/format-date/index";
+import OwnerOrcid from "./OwnerOrcid.vue";
+import SubmitForPublication from "./SubmitForPublication.vue";
+import StatusPublished from "./StatusPublished.vue";
+import StatusRequested from "./StatusRequested.vue";
+import StatusAccepted from "./StatusAccepted.vue";
+import StatusFailed from "./StatusFailed.vue";
+import SharingInfo from "./SharingInfo.vue";
 
 export default {
-  name: 'DatasetSettingsPublishing',
+  name: "DatasetSettingsPublishing",
 
   components: {
     StatusPublished,
@@ -102,7 +107,7 @@ export default {
     StatusFailed,
     StatusRequested,
     StatusAccepted,
-    SharingInfo
+    SharingInfo,
   },
 
   mixins: [FormatDate, Request],
@@ -110,96 +115,95 @@ export default {
   props: {
     orcidAPIUrl: {
       type: String,
-      default: ''
+      default: "",
     },
     orcidUrl: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
 
-  data: function() {
+  data: function () {
     return {
       isPublishing: false,
       isUnpublishing: false,
-      oauthWindow: '',
-      oauthCode: '',
-      isPublisherRole: '',
+      oauthWindow: "",
+      oauthCode: "",
+      isPublisherRole: "",
       PublicationStatus,
-      PublicationType
-    }
+      PublicationType,
+    };
   },
 
   computed: {
     ...mapState([
-      'dataset',
-      'isLoadingDatasetPublishedData',
-      'datasetBanner',
-      'datasetContributors',
-      'datasetDescription',
-      'getPermission',
-      'orgMembers',
+      "dataset",
+      "isLoadingDatasetPublishedData",
+      "datasetBanner",
+      "datasetContributors",
+      "datasetDescription",
+      "getPermission",
+      "orgMembers",
     ]),
     ...mapGetters([
-      'getPermission',
-      'datasetOwner',
-      'profile',
-      'config',
-      'datasetOwnerHasOrcidId',
-      'datasetLocked',
-      'getPublishedDataByIntId',
-      'isUserSuperAdmin',
-      'isUserPublisher'
+      "getPermission",
+      "datasetOwner",
+      "profile",
+      "config",
+      "datasetOwnerHasOrcidId",
+      "datasetLocked",
+      "getPublishedDataByIntId",
+      "isUserSuperAdmin",
+      "isUserPublisher",
     ]),
 
     /**
      * Get dataset tags
      * @returns {Array}
      */
-    datasetTags: function() {
-      return pathOr([], ['content', 'tags'], this.dataset)
+    datasetTags: function () {
+      return pathOr([], ["content", "tags"], this.dataset);
     },
 
     /**
      * Get datasetId
      * @returns {String}
      */
-    datasetId: function() {
-      return pathOr('', ['content', 'id'], this.dataset)
+    datasetId: function () {
+      return pathOr("", ["content", "id"], this.dataset);
     },
 
     /**
      * Returns the full dataset owner name
      * @returns {String}
      */
-    datasetOwnerName: function() {
-      const firstName = propOr('', 'firstName', this.datasetOwner)
-      const lastName = propOr('', 'lastName', this.datasetOwner)
-      return `${firstName} ${lastName}`
+    datasetOwnerName: function () {
+      const firstName = propOr("", "firstName", this.datasetOwner);
+      const lastName = propOr("", "lastName", this.datasetOwner);
+      return `${firstName} ${lastName}`;
     },
 
     /**
      * Returns the dataset owner email
      * @returns {String}
      */
-    datasetOwnerEmail: function() {
-      return propOr('', 'email', this.datasetOwner)
+    datasetOwnerEmail: function () {
+      return propOr("", "email", this.datasetOwner);
     },
-
 
     /**
      * Compute if the publish button is disabled
      * @returns {Boolean}
      */
-    canPublish: function() {
-      const name = path(['content', 'name'], this.dataset)
-      const subtitle = path(['content', 'description'], this.dataset)
-      const license = path(['content', 'license'], this.dataset)
-      const contributors = this.datasetContributors
-      const banner = this.datasetBanner
-      const datasetDescription = this.datasetDescription
+    canPublish: function () {
+      const name = path(["content", "name"], this.dataset);
+      const subtitle = path(["content", "description"], this.dataset);
+      const license = path(["content", "license"], this.dataset);
+      const contributors = this.datasetContributors;
+      const banner = this.datasetBanner;
+      const datasetDescription = this.datasetDescription;
 
-      const isTrue = item => item === true
+      const isTrue = (item) => item === true;
 
       return all(isTrue, [
         Boolean(name),
@@ -209,140 +213,156 @@ export default {
         this.datasetTags.length > 0,
         contributors.length > 0,
         Boolean(datasetDescription),
-        Boolean(this.getPermission('owner'))
-      ])
+        Boolean(this.getPermission("owner")),
+      ]);
     },
 
     /**
      * Compute if the dataset is published
      * @returns {Boolean}
      */
-    isPublished: function() {
-      return this.publishedData && Object.keys(this.publishedData).length > 0 && this.publicationType !== PublicationType.REMOVAL
+    isPublished: function () {
+      return (
+        this.publishedData &&
+        Object.keys(this.publishedData).length > 0 &&
+        this.publicationType !== PublicationType.REMOVAL
+      );
     },
 
     /**
      * Compute dataset's current publication status
      * @returns {String}
      */
-    publicationStatus: function() {
-      return pathOr(PublicationStatus.DRAFT, ['publication', 'status'], this.dataset)
+    publicationStatus: function () {
+      return pathOr(
+        PublicationStatus.DRAFT,
+        ["publication", "status"],
+        this.dataset
+      );
     },
 
     /**
      * Compute dataset's current publication type
      * @returns {String}
      */
-    publicationType: function() {
-      return this.dataset.publication.type || ''
+    publicationType: function () {
+      return this.dataset.publication.type || "";
     },
 
     /**
      * Compute published data
      * @returns {Object}
      */
-    publishedData: function() {
-      const dataset = defaultTo({}, this.dataset)
-      const datasetIntId = path(['content', 'intId'], dataset)
-      return this.getPublishedDataByIntId(datasetIntId)
+    publishedData: function () {
+      const dataset = defaultTo({}, this.dataset);
+      const datasetIntId = path(["content", "intId"], dataset);
+      return this.getPublishedDataByIntId(datasetIntId);
     },
 
     /**
      * Compute published date
      * @returns {String}
      */
-    publishedDate: function() {
-      const date = propOr('', 'lastPublishedDate', this.publishedData)
-      return this.formatDate(date)
+    publishedDate: function () {
+      const date = propOr("", "lastPublishedDate", this.publishedData);
+      return this.formatDate(date);
     },
 
     /**
      * Compute link for dataset on discover
      * @returns {String}
      */
-    discoverLink: function() {
-      const publishedDatasetId =  propOr(1, 'publishedDatasetId', this.publishedData)
+    discoverLink: function () {
+      const publishedDatasetId = propOr(
+        1,
+        "publishedDatasetId",
+        this.publishedData
+      );
 
-      return this.config.environment === 'prod'
+      return this.config.environment === "prod"
         ? `https://discover.pennsieve.io/datasets/${publishedDatasetId}`
-        : `https://discover.pennsieve.net/datasets/${publishedDatasetId}`
+        : `https://discover.pennsieve.net/datasets/${publishedDatasetId}`;
     },
   },
 
-
-  mounted () {
+  mounted() {
     // assign isPublisherRole based on user account
-    this.orgMembers.forEach(member => {
+    this.orgMembers.forEach((member) => {
       if (member.id === this.profile.id) {
         // found a match!
-        this.isPublisherRole = member.isPublisher
+        this.isPublisherRole = member.isPublisher;
       }
-    })
+    });
   },
 
   methods: {
     ...mapActions([
-      'addDatasetPublishedData',
-      'updateDatasetPublishedData',
-      'deleteDatasetPublishedData',
-      'updateDataset',
-      'updateProfile'
+      "addDatasetPublishedData",
+      "updateDatasetPublishedData",
+      "deleteDatasetPublishedData",
+      "updateDataset",
+      "updateProfile",
     ]),
 
     /**
      * Logic to connect to user's ORCID
      */
-    openORCID: function() {
-      this.oauthWindow = window.open(this.getORCIDUrl, "_blank", "toolbar=no, scrollbars=yes, width=500, height=600, top=500, left=500");
-      const self = this
-      window.addEventListener('message', function(event) {
-        this.oauthCode = event.data
-        if (this.oauthCode !== '') {
-           if (!self.getORCIDApiUrl) {
-            return
+    openORCID: function () {
+      this.oauthWindow = window.open(
+        this.getORCIDUrl,
+        "_blank",
+        "toolbar=no, scrollbars=yes, width=500, height=600, top=500, left=500"
+      );
+      const self = this;
+      window.addEventListener("message", function (event) {
+        this.oauthCode = event.data;
+        if (this.oauthCode !== "") {
+          if (!self.getORCIDApiUrl) {
+            return;
           }
 
-          self.sendXhr(self.getORCIDApiUrl, {
-            method: 'POST',
-            body: {
-                "authorizationCode": this.oauthCode
-              }
+          self
+            .sendXhr(self.getORCIDApiUrl, {
+              method: "POST",
+              body: {
+                authorizationCode: this.oauthCode,
+              },
             })
             .then((response) => {
               // response logic goes here
-              self.oauthInfo = response
+              self.oauthInfo = response;
 
               self.updateProfile({
                 ...self.profile,
-                orcid: self.oauthInfo
-              })
+                orcid: self.oauthInfo,
+              });
             })
-            .catch(self.handleXhrError.bind(this))
+            .catch(self.handleXhrError.bind(this));
         }
-      })
+      });
     },
 
     /**
      * Set published data
      * @param {Object} response
      */
-    setPublishedData: function(response) {
+    setPublishedData: function (response) {
       if (this.publicationStatus === PublicationStatus.DRAFT) {
-        this.addDatasetPublishedData(response)
+        this.addDatasetPublishedData(response);
       } else {
-        this.updateDatasetPublishedData(response)
+        this.updateDatasetPublishedData(response);
       }
 
       // Set locked property on dataset
-      const updatedDataset = merge(this.dataset, { locked: true })
-      return this.updateDataset(updatedDataset)
-    }
-  }
-}
+      const updatedDataset = merge(this.dataset, { locked: true });
+      return this.updateDataset(updatedDataset);
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@import "../../../../assets/_variables.scss";
 
 .sharing-info {
   color: #000;
