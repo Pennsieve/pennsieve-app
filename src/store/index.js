@@ -349,7 +349,6 @@ export const mutations = {
       },
 
       SET_DATASET_PUBLISHED_DATA(state, data) {
-        console.log('SET_DATASET_PUBLISHED_DATA', data)
         state.datasetPublishedData = data;
       },
 
