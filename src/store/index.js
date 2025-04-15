@@ -963,13 +963,13 @@ export const getters = {
   getPublishedDataByIntId: (state) => (id) => {
     return R.defaultTo(
         {},
-        find(R.propEq("sourceDatasetId", id), state.datasetPublishedData)
+        find(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets)
     );
   },
   getPublishedDataIndexByIntId: (state) => (id) => {
     return R.defaultTo(
         {},
-        R.findIndex(R.propEq("sourceDatasetId", id), state.datasetPublishedData)
+        R.findIndex(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets)
     );
   },
   datasetOwner: (state, getters) => {
