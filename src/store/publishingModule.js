@@ -98,7 +98,9 @@ export const mutations = {
   },
 
   UPDATE_DATASETS(state, { type, datasets }) {
+    console.log('type', type)
     state[type].datasets = datasets
+ 
   },
 
   UPDATE_PUBLISHING_SEARCH_QUERY(state, searchQuery) {
@@ -187,51 +189,76 @@ export const actions = {
     commit('UPDATE_IS_LOADING_DATASETS', isLoadingDatasets)
   },
 
-  fetchDatasets: async ({state, commit, rootState}) => {
+  fetchDatasets: async ({ state, commit, rootState }) => {
     /**
      * Only fetch the datasets if the user is in the publishing tab
      */
-    const publicationStatus = PublicationTabsStatuses[router.currentRoute.value.name]
-    if(!publicationStatus.length) {
-      return
+    const routeName = router.currentRoute.value.name;
+    const publicationStatus = PublicationTabsStatuses[routeName];
+  
+    if (!publicationStatus.length) {
+      return;
     }
-
-    commit('UPDATE_IS_LOADING_DATASETS', true)
-
-    const publicationType = PublicationTabsTypes[router.currentRoute.value.name]
-
-    const isOnPublishedTab = publicationType === PublicationTabsTypes[PublicationTabs.PUBLISHED]
-
-    const urlPromise = fetchDatasetsUrl(state, rootState, publicationStatus, publicationType, isOnPublishedTab)
-
+  
+    commit('UPDATE_IS_LOADING_DATASETS', true);
+  
+    const publicationType = PublicationTabsTypes[routeName];
+    const isOnPublishedTab =
+      publicationType === PublicationTabsTypes[PublicationTabs.PUBLISHED];
+  
     try {
-      urlPromise.then(url => {
-        fetch(url).then(resp => {
-          return resp.json()
-              .then(json => {
-                commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', json.totalCount);
-                // If on the published tab, merge the dataset and published
-                // dataset DTOs if the user has permissions for the dataset
-                const updatedDatasets = isOnPublishedTab
-                    ? json.datasets.map(dataset => {
-                      const embargoAccess = dataset.embargoAccess || ''
-                      const publishedDataset = { ...dataset.publishedDataset, embargoAccess}
-
-                      return dataset.dataset
-                          ? {...dataset.dataset, ...publishedDataset}
-                          : publishedDataset
-                    })
-                    : json.datasets;
-                commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: updatedDatasets });
-                commit('UPDATE_IS_LOADING_DATASETS', false);
-              })
-        })
-      })
-
+      const url = await fetchDatasetsUrl(
+        state,
+        rootState,
+        publicationStatus,
+        publicationType,
+        isOnPublishedTab
+      );
+  
+      const token = await useGetToken();
+  
+      const headers = new Headers({
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      });
+  
+      const response = await fetch(url, { method: 'GET', headers });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to fetch datasets: ${response.statusText}`);
+      }
+  
+      const json = await response.json();
+  
+      commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', json.totalCount);
+  
+      // Merge dataset + publishedDataset if needed
+      const updatedDatasets = isOnPublishedTab
+        ? json.datasets.map((dataset) => {
+            const embargoAccess = dataset.embargoAccess || '';
+            const publishedDataset = {
+              ...dataset.publishedDataset,
+              embargoAccess,
+            };
+  
+            return dataset.dataset
+              ? { ...dataset.dataset, ...publishedDataset }
+              : publishedDataset;
+          })
+        : json.datasets;
+  
+      commit('UPDATE_DATASETS', {
+        type: routeName,
+        datasets: updatedDatasets,
+      });
     } catch (err) {
-      EventBus.$emit('ajaxError', err)
+      EventBus.$emit('ajaxError', err);
+      console.error(err);
+    } finally {
+      commit('UPDATE_IS_LOADING_DATASETS', false);
     }
   },
+  
 
   getDatasetCount: async ({commit, rootState}, type) => {
 
