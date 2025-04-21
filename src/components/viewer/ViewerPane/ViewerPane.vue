@@ -49,6 +49,9 @@ export default {
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
+    UMAPViewer: defineAsyncComponent( () =>
+      import ("../../viewers/UmapViewer/wrapper.vue")
+    ),
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -104,6 +107,7 @@ export default {
      * loads appropriate viewer based on package type
      */
     loadViewer: function () {
+
       // Reset viewers
       this.cmpViewer = "";
       const viewerWrap = this.$refs.viewerWrap;
