@@ -26,38 +26,3 @@ export async function useGetProfileAndOrg(store) {
 
 
 }
-
-
-// /**
-//  * Gets user profile and active org data
-//  * @param {String} token
-//  */
-// getProfileAndOrg: function(token) {
-//     // add logic to only make organizations request if profile is defined
-//     let currentPath = this.$router.currentRoute.path
-//     const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
-//     const profilePromise = this.sendXhr(this.getProfileUrl(token))
-//
-//     return Promise.all([orgPromise, profilePromise])
-//         .then(([orgs, profile]) => {
-//             this.updateProfile(profile)
-//
-//             const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
-//             this.updateOrganizations(sortedOrgs)
-//
-//             const preferredOrgId = profile.preferredOrganization
-//
-//             // check route params for orgId
-//             const activeOrgId = preferredOrgId ?
-//                 pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
-//                 path(['organizations', 0, 'organization', 'id'], orgs)
-//             const activeOrgIndex = orgs.organizations.findIndex(org => Boolean(org.organization.id === activeOrgId))
-//             const activeOrg = orgs.organizations[activeOrgIndex]
-//
-//             // handle org switch
-//
-//             return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
-
-//         })
-//         .catch(this.handleXhrError.bind(this))
-// },
