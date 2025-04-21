@@ -740,7 +740,6 @@ export default {
     handleNavigateBreadcrumb: function (id = "") {
       this.files = [];
       this.offset = 0;
-      this.fetchFiles();
       if (id) {
         this.navigateToFile(id);
       } else {
