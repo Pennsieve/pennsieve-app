@@ -3,7 +3,8 @@
         class="timeseries-filter-modal"
         ref="filter-modal"
         title="Set Filter"
-        :open="filterWindowOpen"
+        :modelValue="visible"
+        @update:modelValue="visible = $event"
         @close='close'>
 
       <template #default>
@@ -192,7 +193,10 @@
 
         },
         props: {
-            filterWindowOpen: Boolean
+            visible: {
+              type: Boolean,
+              default: false
+            }
         },
         data: function () {
             return {
@@ -247,7 +251,6 @@
             onButtonClick: function () {
             },
             submitForm: function(e) {
-                // this.set('processing', true);
                 EventBus.$emit('active-viewer-action', {
                     method: 'setTimeseriesFilters',
                     payload: {

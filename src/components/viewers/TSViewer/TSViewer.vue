@@ -93,11 +93,12 @@
       @setStart="updateStart"
     />
 
-<!--    <timeseries-filter-modal-->
-<!--      ref="filterWindow"-->
-<!--      :filter-window-open="filterWindowOpen"-->
-<!--      @closeWindow="onCloseFilterWindow"-->
-<!--    />-->
+   <timeseries-filter-modal
+     ref="filterWindow"
+     :visible="filterWindowOpen"
+     @update:visible="filterWindowOpen = $event"
+     @closeWindow="onCloseFilterWindow"
+   />
 
 <timeseries-annotation-modal
      ref="annotationModal"
@@ -548,7 +549,7 @@
                         }
                     }
 
-                    for (let i=0; i<filterWindow._notchValues.length; i++) {
+                    for (let i=0; i<filterWindow._notchValues?.length; i++) {
                         if (filterWindow._notchValues[i].value === filter.notchFreq) {
                             filterWindow.selectedNotch = filter.notchFreq;
                             break;
