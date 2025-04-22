@@ -10,19 +10,19 @@
             </el-option>
           </el-select>
 
-          <div v-if="computeVisible0">
+          <div v-if="computeVisible0" class="filter-input-wrapper">
             {{computePlaceholder1}}
             <el-input-number class="filterInput" v-model="input0" controls-position="right" :precision="2"
               @change="handleChange"></el-input-number>
           </div>
 
-          <div v-if="computeVisible1">
+          <div v-if="computeVisible1" class="filter-input-wrapper">
             {{computePlaceholder2}}
             <el-input-number class="filterInput" v-model="input1" controls-position="right" :precision="2"
               @change="handleChange"></el-input-number>
           </div>
 
-          <el-select v-model="selectedNotch" v-if="computeVisible2" placeholder="Select">
+          <el-select v-model="selectedNotch" v-if="computeVisible2" placeholder="Select" class="filter-input-wrapper">
             <el-option v-for="item in notchOptions" :key="item.value" :label="item.label" :value="item.value">
             </el-option>
           </el-select>
@@ -35,10 +35,11 @@
     <template #footer>
       <div slot="footer">
         <div class="button-wrapper">
-          <div class="channelsSelected">
-
-            <svg-icon name="icon-selection" height="16" width="16" />
-
+          <div class="channels-selected">
+            <IconSelection
+            :height="24"
+            :width="24"
+            />
             <div v-if="onSingleChannel">
               Adding to single channel
             </div>
@@ -63,28 +64,18 @@
 
 <script>
 import {
-  mapActions,
-  mapGetters,
   mapState
 } from 'vuex'
 
-import {
-  compose,
-  defaultTo,
-  find,
-  head,
-  pathOr,
-  propEq,
-  propOr
-} from 'ramda'
-
 import EventBus from '../../../utils/event-bus'
+import IconSelection from "../../icons/IconSelection.vue"
 
 export default {
   name: 'TimeseriesFilterModal',
 
   components: {
-    'bf-button': () => import('@/components/shared/bf-button/BfButton.vue')
+    'bf-button': () => import('@/components/shared/bf-button/BfButton.vue'),
+    IconSelection
   },
 
   mixins: [
@@ -268,15 +259,31 @@ export default {
 .button-wrapper {
   display: flex;
   flex-direction: row;
+  align-items: center;
 }
 
-.channelsSelected {
+.channels-selected {
   display: flex;
   flex-direction: row;
   margin-right: 20px;
+  line-height: 24px;
+
+  svg {
+    margin-right: 8px;
+  }
 }
 
 h2 {
   margin: 20px 30px 30px 30px;
+}
+
+.filter-input-wrapper {
+  margin-top: 24px;
+}
+</style>
+
+<style lang="scss">
+.timeseries-filter-modal span {
+  font-size: 24px;
 }
 </style>
