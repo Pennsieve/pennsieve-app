@@ -410,10 +410,6 @@ export default {
       deep: true,
     },
 
-    offset: function () {
-      this.fetchFiles();
-    },
-
     "$store.state.uploadModule.uploadComplete": function () {
       setTimeout(() => {
         this.resetUpload();
@@ -586,6 +582,7 @@ export default {
       ) {
         this.allowFetch = false;
         this.offset = this.offset + this.limit;
+        this.fetchFiles();
         event.currentTarget.scrollTop = scrollTop - 20;
       }
     },
