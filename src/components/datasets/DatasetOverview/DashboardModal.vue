@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
 import { PublicationStatus } from '../../../utils/constants';
+
 /* 
 Props
 */
@@ -49,10 +50,10 @@ Local State
 */
 
 const dashboardItems=
-[{ id: "TextWidget-1", x: 0, y: 0, h: 1, w:4, componentName:"Text",component:"TextWidget",Props:{displayText:"Dastaset Overview",hideHeader:true} },
-{ id: "TextWidget-2", x: 0, y: 1, h: 2, w:1, componentName:"Files",component:"TextWidget",Props:{displayText:filesCount} },
-{ id: "TextWidget-3", x: 1, y: 1, h: 2, w:2, componentName:"Status",component:"TextWidget",Props:{displayText:publicationStatus}},
-{ id: "TextWidget-4", x: 3, y: 1, h: 2, w:2, componentName:"Collaborator Counts",component:"TextWidget",Props:{displayText:collaboratorCounts}}];
+[{ id: "TextWidget-1", x: 0, y: 0, h: 1, w:4, componentName:"Text",component:"TextWidget",hideHeader:true, Props:{displayText:"Dastaset Overview",hideHeader:true} },
+{ id: "TextWidget-2", x: 0, y: 1, h: 2, w:1, componentName:"Files",component:"TextWidget",Props:{bindedKey:"FileCount"} },
+{ id: "TextWidget-3", x: 1, y: 1, h: 2, w:2, componentName:"Status",component:"TextWidget",Props:{bindedKey:"Status"}},
+{ id: "TextWidget-4", x: 3, y: 1, h: 2, w:2, componentName:"Collaborator Counts",component:"TextWidget",Props:{bindedKey:"CollaboaratorCount"}}];
 
   //options object ot pass the Dashboard. 
   const dashboardOptions =ref({
@@ -87,20 +88,36 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
-
-// .full-dialog{
-// padding: 0px;
-// }
-// .dialog-dash-header{
-//     height: 40px;
-//     margin-left: 10px;
-// }
-// :deep(.dash-header){
-//     background-color: transparent;
-// }
-// :deep(.widget-body){
-//     margin: auto;
-//     min-width: 50px;
-//     margin-top: 20px;
-// }  
+.dashboard-app{
+    --el-color-primary: #243d8e;
+    --el-color-primary-light-3: #fbfdff;
+    --el-color-primary-dark-2: #546085;
+    --el-text-color-primary:white;
+    --color:#243d8e;
+    --el-dialog-width: 90%;
+    --dash-secondary: #243d8e;
+    .el-input-inner{
+      background: none;
+    }
+}
+.dialog-dash-header{
+    height: 40px;
+    margin-left: 10px;
+}
+:deep(.dash-header){
+    background-color: transparent;
+    padding-top: 10px;
+}
+:deep(.widget-body){
+    margin: auto;
+    min-width: 50px;
+    margin-top: 20px;
+}  
+:deep(.dash-header-hide){
+  height: 0;
+}
+.el-input{
+  height: 42px;
+}
 </style>
+

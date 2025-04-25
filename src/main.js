@@ -42,6 +42,9 @@ app.directive('click-outside', ClickOutside)
 app.use(store);
 
 //Import Dashboard
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
+app.use(ElementPlus);
 installDashboard(app, ["TextWidget"]);
 
 app.use(VueClipboard, {
