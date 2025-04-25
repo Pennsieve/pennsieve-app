@@ -107,10 +107,6 @@ function closeDialog() {
     min-width: 50px;
     margin-top: 20px;
 }  
-:deep(.dash-header-hide){
-
-  position:absolute;
-}
 
 </style>
 <style>
