@@ -16,7 +16,10 @@
 .el-input__inner {
   height: 40px;
 }
-
+.el-select__wrapper{
+  height: 42px;
+  width: 243px;
+}
 .el-textarea__inner {
   &.single-line {
     height: 40px;
