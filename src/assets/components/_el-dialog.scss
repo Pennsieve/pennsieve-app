@@ -3,7 +3,7 @@
 .el-dialog {
   border-radius: 5px;
   box-shadow: 0 2px 15px 0 rgba(0,0,0,0.25), 0 28px 41px 0 rgba(33,43,54,0.2);
-  padding:0;
+
   &.fixed-width {
     width: 540px
   }
@@ -19,7 +19,6 @@
     margin:auto;
     margin-top:1%;
     overflow: hidden;
-
     .el-dialog__body{
       padding:0px !important;
     }
@@ -36,9 +35,7 @@
     color: $white;
     padding: 24px 32px;
     margin: 0;
-    .el-dialog__title{
-      color:#ffff;
-    }
+
     .el-dialog__headerbtn {
       color: white;
       &:focus, &:hover{

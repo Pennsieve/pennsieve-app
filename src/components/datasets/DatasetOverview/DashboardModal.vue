@@ -96,14 +96,8 @@ function closeDialog() {
     --color:#243d8e;
     --el-dialog-width: 90%;
     --dash-secondary: #243d8e;
-    .el-input-inner{
-      background: none;
-    }
 }
-.dialog-dash-header{
-    height: 40px;
-    margin-left: 10px;
-}
+
 :deep(.dash-header){
     background-color: transparent;
     padding-top: 10px;
@@ -114,10 +108,13 @@ function closeDialog() {
     margin-top: 20px;
 }  
 :deep(.dash-header-hide){
-  height: 0;
+
+  position:absolute;
 }
-.el-input{
-  height: 42px;
-}
+
 </style>
+<style>
+.el-dialog__title {
+  color: white;
+}</style>
 

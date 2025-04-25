@@ -14,6 +14,9 @@
     "build-dev": "npm run site-config-dev && npm run build",
     "build-production": "npm run site-config-prod && npm run build"
   },
+  "overrides": {
+    "element-plus": "2.3.9"
+  } ,
   "dependencies": {
     "@aws-sdk/client-cognito-identity": "^3.499.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.499.0",
@@ -51,8 +54,8 @@
     "pdfjs-dist": "^4.0.379",
     "protobufjs": "^7.2.6",
     "ramda": "^0.28.0",
-    "element-plus":"2.8.4",
-    "sparc-dashboard-beta": "^0.4.21",
+    "element-plus":"2.3.9",
+    "sparc-dashboard-beta": "^0.4.22",
     "striptags": "^3.2.0",
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
