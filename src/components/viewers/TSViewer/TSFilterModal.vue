@@ -219,7 +219,7 @@ export default {
           notch: this.selectedNotch
         }
       })
-
+      this.$emit('closeWindow')
     },
   }
     }
