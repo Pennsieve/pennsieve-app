@@ -305,7 +305,6 @@
               this.isTsAnnotationDeleteDialogVisible = true
             },
             deleteAnnotation: function(annotation) {
-              console.log('annotation to delete', annotation)
               this.isTsAnnotationDeleteDialogVisible = false
               this.removeAnnotation(annotation)
             },
