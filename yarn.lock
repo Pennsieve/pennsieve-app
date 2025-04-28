@@ -12748,10 +12748,10 @@ source-map@0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.6.tgz"
   integrity sha512-MjZkVp0NHr5+TPihLcadqnlVoGIoWo4IBHptutGh9wI3ttUYvCG26HkSuDi+K6lsZ25syXJXcctwgyVCt//xqA==
 
-sparc-dashboard-beta@^0.4.22:
-  version "0.4.22"
-  resolved "https://registry.npmjs.org/sparc-dashboard-beta/-/sparc-dashboard-beta-0.4.22.tgz"
-  integrity sha512-Lw3pM+h6Xo7mss4qoU9oS0KAc0e37QRdADmLEinwKdmSy3Mho/GQqjNkGYrdLQioaFwPIIOSpBgbW0NYOovOpA==
+sparc-dashboard-beta@^0.4.24:
+  version "0.4.24"
+  resolved "https://registry.npmjs.org/sparc-dashboard-beta/-/sparc-dashboard-beta-0.4.24.tgz"
+  integrity sha512-IQV+6w6/FgE+V/UnkJu+qDozPnmlen3IKAlGMdxQaraYQIpkKrvohSUI3kG2Bc6X+Gl7rvtSRxXUlooWNq+hUQ==
   dependencies:
     "@abi-software/flatmapvuer" "1.7.4"
     "@abi-software/scaffoldvuer" "^1.8.0"
