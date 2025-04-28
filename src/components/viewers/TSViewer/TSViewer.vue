@@ -115,11 +115,12 @@
 <!--      @createLayer="onCreateAnnotationLayer"-->
 <!--    />-->
 
-<!--    <ts-annotation-delete-dialog-->
-<!--      :visible.sync="isTsAnnotationDeleteDialogVisible"-->
-<!--      :delete-annotation.sync="annotationDelete"-->
-<!--      @delete="deleteAnnotation"-->
-<!--    />-->
+   <ts-annotation-delete-dialog
+      :visible="isTsAnnotationDeleteDialogVisible"
+      :delete-annotation="annotationDelete"
+      @update:visible="isTsAnnotationDeleteDialogVisible = $event"
+      @delete="deleteAnnotation"
+    />
 
 
   </div>
@@ -304,6 +305,7 @@
               this.isTsAnnotationDeleteDialogVisible = true
             },
             deleteAnnotation: function(annotation) {
+              console.log('annotation to delete', annotation)
               this.isTsAnnotationDeleteDialogVisible = false
               this.removeAnnotation(annotation)
             },
