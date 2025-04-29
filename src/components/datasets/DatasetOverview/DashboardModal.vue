@@ -6,9 +6,9 @@ import { PublicationStatus } from '../../../utils/constants';
 /* 
 Props
 */
-const props = defineProps([
-  "dialogVisible",
-]);
+const props = defineProps({
+  dialogVisible: Boolean,
+});
 
 
 /*
@@ -29,41 +29,33 @@ const publicationStatus = computed(() => {
 });
 
 const filesCount = computed(() => {
-   if(dataset.value?.packageTypeCounts){
-    const allCount = Object.values(dataset.value.packageTypeCounts)
-      .filter(value => typeof value === 'number') 
-      .reduce((sum, value) => sum + value, 0);
-      return allCount.toString();
-   }
+  const counts = dataset.value?.packageTypeCounts;
+  return counts ? Object.values(counts).filter(Number.isFinite).reduce((sum, val) => sum + val, 0).toString() : "0";
 });
 
 const collaboratorCounts = computed(()=>{
-  if(dataset.value?.collaboratorCounts){
-    const allCount = Object.values(dataset.value.collaboratorCounts)
-      .filter(value => typeof value === 'number') 
-      .reduce((sum, value) => sum + value, 0);
-      return allCount.toString();
-   }
+  const counts = dataset.value?.collaboratorCounts;
+  return counts ? Object.values(counts).filter(Number.isFinite).reduce((sum, val) => sum + val, 0).toString() : "0";
 })
+
+const dashboardOptions = computed(() => ({
+  globalData: {
+    FileCount: filesCount.value,
+    Status: publicationStatus.value,
+    CollaboratorCounts: collaboratorCounts.value
+  }
+}));
+
 /* 
 Local State
 */
 
 const dashboardItems=
-[{ id: "TextWidget-1", x: 0, y: 0, h: 1, w:4, componentName:"Text",component:"TextWidget",hideHeader:true, Props:{displayText:"Dastaset Overview",hideHeader:true} },
+[{ id: "TextWidget-1", x: 0, y: 0, h: 1, w:4, componentName:"Text",component:"TextWidget",hideHeader:true, Props:{displayText:"Dataset Overview",hideHeader:true} },
 { id: "TextWidget-2", x: 0, y: 1, h: 2, w:1, componentName:"Files",component:"TextWidget",Props:{bindedKey:"FileCount"} },
 { id: "TextWidget-3", x: 1, y: 1, h: 2, w:2, componentName:"Status",component:"TextWidget",Props:{bindedKey:"Status"}},
-{ id: "TextWidget-4", x: 3, y: 1, h: 2, w:2, componentName:"Collaborator Counts",component:"TextWidget",Props:{bindedKey:"CollaboaratorCount"}}];
+{ id: "TextWidget-4", x: 3, y: 1, h: 2, w:2, componentName:"Collaborator Counts",component:"TextWidget",Props:{bindedKey:"CollaboratorCounts"}}];
 
-  //options object ot pass the Dashboard. 
-  const dashboardOptions =ref({
-  //key value pairs that can be accessed to the user from high-configurable widgets. 
-  globalData:{
-    FileCount:filesCount,
-    Status:publicationStatus,
-    CollaboaratorCount:collaboratorCounts
-  }
-})
 /*
 Closes the dialog
 */
