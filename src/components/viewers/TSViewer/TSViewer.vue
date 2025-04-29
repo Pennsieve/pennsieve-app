@@ -542,20 +542,20 @@
                 if (!isEmpty(filter)) {
                     filterWindow.input0 = filter.input0;
                     filterWindow.input1 = filter.input1;
+                    // TODO: commenting the following code, 'filterWindow' does not seem to have '_filters' or '_notchValues' properties, review and add the following if needed
+                    // for (let i=0; i<._filters.length; i++) {
+                    //     if (filterWindow._filters[i].value === filter.type) {
+                    //         filterWindow.selectedFilter = filter.type;
+                    //         break;
+                    //     }
+                    // }
 
-                    for (let i=0; i<filterWindow._filters.length; i++) {
-                        if (filterWindow._filters[i].value === filter.type) {
-                            filterWindow.selectedFilter = filter.type;
-                            break;
-                        }
-                    }
-
-                    for (let i=0; i<filterWindow._notchValues?.length; i++) {
-                        if (filterWindow._notchValues[i].value === filter.notchFreq) {
-                            filterWindow.selectedNotch = filter.notchFreq;
-                            break;
-                        }
-                    }
+                    // for (let i=0; i<filterWindow._notchValues?.length; i++) {
+                    //     if (filterWindow._notchValues[i].value === filter.notchFreq) {
+                    //         filterWindow.selectedNotch = filter.notchFreq;
+                    //         break;
+                    //     }
+                    // }
                 } else {
                     filterWindow.input0 = NaN;
                     filterWindow.input1 = NaN;
