@@ -78,6 +78,9 @@
                   <IconCopyDocument/>
                 </button>
               </div>
+              <div class="dataset-heading-cta">
+                <bf-button @click="dashboardDialogVisible=true">Open Dashboard</bf-button>
+              </div>
             </div>
           </div>
 
@@ -253,6 +256,10 @@
       :dialog-visible = "staleUpdateDialogVisible"
       @close="staleUpdateDialogClose"
     />
+    <DashboardModal
+      :dialog-visible="dashboardDialogVisible"
+      @close-dialog="handleCloseDashDialog"
+    />
   </div>
 
 
@@ -266,6 +273,7 @@
   import DataCard from '../../shared/DataCard/DataCard.vue'
   import ChecklistItem from '../../shared/ChecklistItem/ChecklistItem.vue'
   import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
+  import DashboardModal from './DashboardModal.vue'
 
   import BfStorageMetrics from '../../../mixins/bf-storage-metrics/index'
   import FormatDate from '../../../mixins/format-date/index'
@@ -344,7 +352,9 @@ export default {
       changelogDescriptionEmptyState,
       packageTypeCount: 0,
       isDialogVisible: false,
-      staleUpdateDialogVisible: false
+      staleUpdateDialogVisible: false,
+      staleUpdateDialogVisible: false,
+      dashboardDialogVisible:false,
     }
   },
 
@@ -658,6 +668,9 @@ export default {
 
     staleUpdateDialogClose: function() {
       this.staleUpdateDialogVisible = false
+    },
+    handleCloseDashDialog: function(){
+      this.dashboardDialogVisible = false;
     },
     /**
      * Check if the dataset checklist
