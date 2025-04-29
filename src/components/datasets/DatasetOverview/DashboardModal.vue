@@ -88,9 +88,9 @@ function closeDialog() {
     --el-color-primary-light-3: #fbfdff;
     --el-color-primary-dark-2: #011F5B;
     --el-text-color-primary:white;
-    --color:#243d8e;
+    --color:#4d628c;
     --el-dialog-width: 90%;
-    --dash-secondary: #243d8e;
+    --dash-secondary: #4d628c;
     background: none;
 
 }
