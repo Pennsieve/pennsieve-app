@@ -67,7 +67,8 @@ function closeDialog() {
 <template>
   <el-dialog
     :modelValue="dialogVisible"
-    class="full-dialog"
+    class="dashboard-modal"
+    fullscreen
     @close="closeDialog"
   >
     <template #header>
@@ -80,19 +81,23 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
+@import "../../../../src/assets/_variables.scss";
+
 .dashboard-app{
-    --el-color-primary: #243d8e;
+    --el-color-primary: #011F5B;
     --el-color-primary-light-3: #fbfdff;
-    --el-color-primary-dark-2: #546085;
+    --el-color-primary-dark-2: #011F5B;
     --el-text-color-primary:white;
     --color:#243d8e;
     --el-dialog-width: 90%;
     --dash-secondary: #243d8e;
+    background: none;
+
 }
 
 :deep(.dash-header){
     background-color: transparent;
-    padding-top: 10px;
+    padding: 10px 0 10px 0;
 }
 :deep(.widget-body){
     margin: auto;
@@ -102,7 +107,94 @@ function closeDialog() {
 }  
 
 </style>
-<style>
-.el-dialog__title {
+<style lang="scss">
+
+.full-dialog-dashboard .el-dialog__title {
   color: white;
-}</style>
+}
+.full-dialog-dashboard .el-dialog__footer .el-button {
+  margin-bottom: 10px;
+  background-color: $purple_3;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: row;
+  font-size: 14px;
+  justify-content: center;
+  line-height: 1;
+  margin: 0;
+  margin-right: 0px;
+  min-width: 160px;
+  outline: none;
+  padding: 12px 16px;
+  text-transform: none;
+  min-height: 40px;
+
+  &:hover {
+    background-color: $purple_3;
+    color: white;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+
+    // Fix: also style the span inside
+    .el-button__text {
+      color: #011F5B;
+    }
+  }
+}
+.full-dialog-dashboard .el-dialog__footer .secondary{
+    background:
+  #F7F7F7;
+    border-color:
+  #d3d5da;
+    color: #4d4d4d;
+    &:hover{
+      box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+      background-color:#eeeeee;
+      color: #4d4d4d;
+      border:inherit
+    }
+}
+
+
+.dashboard-modal .el-dialog__body{
+  background-color: $purple_tint;
+  .edit-button{
+    margin-bottom: 10px;
+    background-color: $purple_3;
+    align-items: center;
+        background:
+      #011F5B;
+        border:
+      1px solid transparent;
+        border-radius:
+      3px;
+        color: #ffffff;
+        cursor: pointer;
+        display: inline-flex;
+        flex-direction: row;
+        font-size: 14px;
+        justify-content: center;
+        line-height: 1;
+        margin:
+      0;
+          margin-right: 0px;
+        min-width: 160px;
+        outline:
+      none;
+        padding:
+      12px 16px;
+        text-transform: none;
+        min-height: 40px;
+        &:hover{
+          background-color: $purple_3;
+          color:white;
+          box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+
+        }
+  }
+}
+
+</style>
