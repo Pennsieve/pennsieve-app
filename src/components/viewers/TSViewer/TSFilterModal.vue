@@ -216,7 +216,7 @@ export default {
           filterType: this.selectedFilter,
           input0: this.input0,
           input1: this.input1,
-          notch: this.selectedNotch
+          notchFreq: this.selectedNotch
         }
       })
       this.$emit('closeWindow')

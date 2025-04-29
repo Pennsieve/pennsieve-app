@@ -420,7 +420,7 @@
                             hover: false,                               // User is hovering over channel
                             unit: curC.unit,                            // unit of data
                             sf: curC.rate,                              // sampling rate
-                            filter: {},                                 // filter object (type, var0, var1, notch)
+                            filter: {},                                 // filter object (type, var0, var1, notchFreq)
                             hideFilter: true,
                             isEditing: false,
                             virtualId: curChannel.virtualId
@@ -1717,9 +1717,9 @@
               }
             },
             isTruthy: val => val && val !== '' && !val.isNaN,
-            calcFilterType: function(low, high, notch) {
+            calcFilterType: function(low, high, notchFreq) {
               switch(true) {
-                case !this.isTruthy(low) && !this.isTruthy(high) && !notch:
+                case !this.isTruthy(low) && !this.isTruthy(high) && !notchFreq:
                   return 'clear';
                 case this.isTruthy(low) && this.isTruthy(high):
                   return 'bandpass';
