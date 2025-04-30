@@ -476,10 +476,8 @@ export default {
         }
       }
 
-      console.log(packageProperties)
       // Check for properties
       if (packageProperties['ViewerSupport']) {
-        debugger
         console.log(packageProperties['ViewerSupport'])
       }
 
