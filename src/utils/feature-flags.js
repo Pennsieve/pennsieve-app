@@ -7,10 +7,14 @@ export function isEnabledForTestOrgs(orgId) {
     orgId ===
     "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
 
-  const isPennsieveTestProd =
+  const isPennsieveTest =
     orgId ===
     "N:organization:760ee96c-9777-46e3-83eb-3099a7e16baa";
-  return isPennsieveTestDev || isPennsieveTestProd;
+
+  const isPennsieveTestProd = 
+    orgId ===
+    "N:organization:4d7c1f5a-3e2b-4f9e-8e0c-4c7a6b1d9a8f";
+  return isPennsieveTestDev || isPennsieveTest || isPennsieveTestProd;
 }
 
 export function isEnabledForSpecificOrgs(orgId) {
