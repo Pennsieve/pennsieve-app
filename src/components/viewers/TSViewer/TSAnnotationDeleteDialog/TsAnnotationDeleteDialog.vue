@@ -1,19 +1,20 @@
 <template>
   <el-dialog
     class="simple"
-    :visible="visible"
+    :modelValue="visible"
+    @update:modelValue="visible = $event"
     :show-close="false"
     @close="close"
     @closed="onClosed"
   >
     <bf-dialog-header slot="title" />
     <dialog-body>
-      <svg-icon
-        class="mb-16"
-        name="icon-warning-circle"
-        height="32"
-        width="32"
-      />
+      <icon-warning-circle
+          class="mb-16"
+          :height="32"
+          :width="32"
+          color="#C14D49"
+        />
       <h2>Delete annotation?</h2>
       <template v-if="deleteDiscussions">
         <p>
@@ -55,6 +56,7 @@ import {
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import IconWarningCircle from '@/components/icons/IconWarningCircle.vue'
 
 export default {
   name: 'TsAnnotationDeleteDialog',
@@ -62,7 +64,8 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
-    BfButton
+    BfButton,
+    IconWarningCircle
   },
 
   props: {
