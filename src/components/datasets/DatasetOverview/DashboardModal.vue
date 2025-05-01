@@ -42,7 +42,7 @@ const dashboardOptions = computed(() => ({
   globalData: {
     FileCount: filesCount.value,
     Status: publicationStatus.value,
-    CollaboratorCounts: collaboratorCounts.value
+    CollaboratorCounts: collaboratorCounts.value,
   }
 }));
 
