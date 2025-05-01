@@ -105,3 +105,7 @@ For an example using the mock API look here: `/src/mixins/request/request.spec.j
 ```sh
 npm run test
 ```
+
+## Updating Dependencies 
+
+It's good practice for us to regularly update dependencies. We currently have a dev assigned to update our dependencies 1x per month per Dependabots helpful recomendation (with human oversight).
