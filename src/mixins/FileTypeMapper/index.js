@@ -454,7 +454,7 @@ export default {
         component = 'xls'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls']
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds']
       const vueViewerMap = {
         image: 'ImageViewer',
         pdf: 'PDFViewer',
@@ -464,7 +464,21 @@ export default {
         slide:'SlideViewer',
         timeseries:'TimeseriesViewer',
         csv:'CSVViewer',
-        xls: 'XLSViewer'
+        xls: 'XLSViewer',
+        parquet_umap_viewer: 'UMAPViewer'
+      }
+
+      // TODO: This currently picks the first of the viewers and should be replaced by more solid support
+      for (let i in packageProperties) {
+        if (packageProperties[i].category === "ViewerSupport") {
+          let mappedViewer = packageProperties[i].properties[0]['key'].replaceAll("-", "_");
+          return vueViewerMap[mappedViewer]
+        }
+      }
+
+      // Check for properties
+      if (packageProperties['ViewerSupport']) {
+        console.log(packageProperties['ViewerSupport'])
       }
 
       if (vueViewers.indexOf(component) >= 0) {
