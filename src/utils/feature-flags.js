@@ -13,7 +13,7 @@ export function isEnabledForTestOrgs(orgId) {
 
   const isPennsieveTestProd = 
     orgId ===
-    "N:organization:4d7c1f5a-3e2b-4f9e-8e0c-4c7a6b1d9a8f";
+    "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
   return isPennsieveTestDev || isPennsieveTest || isPennsieveTestProd;
 }
 
