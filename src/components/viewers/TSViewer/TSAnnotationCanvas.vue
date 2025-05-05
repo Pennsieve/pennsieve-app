@@ -11,25 +11,17 @@
 
 <script>
 
-    import ViewerActiveTool from '@/mixins/viewer-active-tool'
-    import Request from '@/mixins/request'
-    import EventBus from '@/utils/event-bus'
+import ViewerActiveTool from '@/mixins/viewer-active-tool'
+import Request from '@/mixins/request'
+import EventBus from '@/utils/event-bus'
 
-    import {
-        mapState
-    } from 'vuex'
+import {mapState} from 'vuex'
 
-    import {
-        defaultTo,
-        find,
-        head,
-        pathOr,
-        propEq,
-        propOr,
-        prop
-    } from 'ramda'
+import {defaultTo, find, head, pathOr, prop, propEq, propOr} from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
-    export default {
+export default {
         name: 'TimeseriesAnnotationCanvas',
 
         mixins: [
@@ -90,7 +82,6 @@
         computed: {
             ...mapState([
                 'config',
-                'userToken'
             ]),
             ...mapState('viewerModule', [
                 'activeViewer',
@@ -110,14 +101,18 @@
             },
         },
         mounted: function () {
-            const url = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/layers?api_key=${this.userToken}`;
-            this.sendXhr(url)
+          useGetToken()
+            .then(token => {
+              const url = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/layers?api_key=${token}`;
+              return useSendXhr(url)
                 .then(resp => {
-                    this._getLayerResponse(resp)
-                .then(() => {
-                    this.checkAnnotationRange(this.start, this.start + this.duration);
+                  this._getLayerResponse(resp)
+                    .then(() => {
+                      this.checkAnnotationRange(this.start, this.start + this.duration);
+                    })
                 })
-                })
+            }).catch(useHandleXhrError)
+
     },
 
         methods: {
@@ -373,28 +368,32 @@
                                 layerId: curLayer.id,
                                 limit: this.constants['LIMITANNFETCH']
                             }
-                            const apiUrl = this.config.apiUrl
-                            const baseUrl = `${apiUrl}/timeseries/${this.activeViewer.content.id}/layers/${curLayer.id}/annotations?api_key=${this.userToken}`;
-                            const urlParams = Object.keys(params).map(k => `&${k}=${params[k]}`).join('');
-                            const url = `${baseUrl}${urlParams}`;
 
-                            fetch(url, {
-                                method: 'GET',
-                                headers: {
+                            useGetToken()
+                              .then(token => {
+                                const apiUrl = this.config.apiUrl
+                                const baseUrl = `${apiUrl}/timeseries/${this.activeViewer.content.id}/layers/${curLayer.id}/annotations?api_key=${token}`;
+                                const urlParams = Object.keys(params).map(k => `&${k}=${params[k]}`).join('');
+                                const url = `${baseUrl}${urlParams}`;
+
+                                return fetch(url, {
+                                  method: 'GET',
+                                  headers: {
                                     'Content-type': 'application/json'
-                                }
-                            })
-                            .then(response => {
-                                const {status} = response;
-                                if (status >= 400) {
-                                    throw new Error(status);
-                                }
-                            return response.json();
-                            })
-                            .then(this._getAnnResponse.bind(this))
-                            .catch(err => {
+                                  }
+                                })
+                                  .then(response => {
+                                    const {status} = response;
+                                    if (status >= 400) {
+                                      throw new Error(status);
+                                    }
+                                    return response.json();
+                                  })
+                                  .then(this._getAnnResponse.bind(this))
+                              })
+                              .catch(err => {
                                 this.handleXhrError(err)
-                            })
+                              })
                         }
                         this.cachedAnnRange.push({start: Math.floor(curRange.start), end: Math.floor(curRange.end)});
                     }
@@ -501,7 +500,7 @@
                 } else {
                     // if no annotations exist, force render layers in side panel
                     // just to be safe
-                    this.fire('render-side-panel-layers')
+                    // this.fire('render-side-panel-layers') TODO: commenting this out for now, can be worked upon when working on annotation laters
                 }
                 this.$emit('annotationsReceived')
             },
@@ -633,37 +632,43 @@
             },
             createAnnotationLayer: function(newLayer) {
 
-                const url = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/layers?api_key=${this.userToken}`;
-                this.sendXhr(url, {
+              useGetToken()
+                .then(token => {
+                  const url = `${this.config.apiUrl}/timeseries/${this.activeViewer.content.id}/layers?api_key=${token}`;
+                  return useSendXhr(url, {
                     method: "POST",
                     body: {
-                        name: newLayer.name,
-                        color: newLayer.color,
-                        description: newLayer.name
+                      name: newLayer.name,
+                      color: newLayer.color,
+                      description: newLayer.name
                     }
-                }).then(resp => {
-                    var layer = resp
+                  }).then(resp => {
+                    let layer = resp
                     layer.annotations = []
 
                     const hexColor = layer.color
                     layer.hexColor = hexColor
-                    layer.color = this.hexToRgbA(hexColor, 0.7),
-                    layer.bkColor = this.hexToRgbA(hexColor, 0.15),
+                    layer.color = this.hexToRgbA(hexColor, 0.7)
+                    layer.bkColor = this.hexToRgbA(hexColor, 0.15)
                     layer.selColor = this.hexToRgbA(hexColor, 0.9)
                     layer.visible = true
 
-                    this.$store.dispatch('viewerModule/createLayer', layer).then(() => {
-                        this.$store.dispatch('viewerModule/setActiveAnnotationLayer', layer).then(() => {
+                    return this.$store.dispatch('viewerModule/createLayer', layer)
+                      .then(() => {
+                        return this.$store.dispatch('viewerModule/setActiveAnnotationLayer', layer)
+                          .then(() => {
                             EventBus.$emit('toast', {
-                                detail: {
+                              detail: {
                                 msg: `'${layer.name}' Layer Created`
-                                }
+                              }
                             })
                         })
                     })
-                    this.$emit('closeAnnotationLayerWindow')
-
+                  })
                 })
+                .catch(useHandleXhrError)
+                .finally(() => this.$emit('closeAnnotationLayerWindow'))
+
 
 
             },
@@ -909,17 +914,22 @@
 
                     // if there's an image preview available
                     if (fileType === 'PNG') {
-                        const { id, packageId } = preview
-                        const apiUrl = this.config.apiUrl
-                        img.src = `${apiUrl}/packages/${packageId}/files/${id}/presign/?api_key=${this.userToken}`
-                        if (!img.complete) {
+                      const { id, packageId } = preview
+                      const apiUrl = this.config.apiUrl
+
+                      useGetToken()
+                        .then(token => {
+                          img.src = `${apiUrl}/packages/${packageId}/files/${id}/presign/?api_key=${token}`
+                          if (!img.complete) {
                             img.addEventListener('load', () => this.render(), { once: true })
-                        }
-                        ctx.drawImage(img, curAnnStartRounded, firstOffset - halfAnnotationHeight, 27, annotationHeight)
+                          }
+                          ctx.drawImage(img, curAnnStartRounded, firstOffset - halfAnnotationHeight, 27, annotationHeight)
+                        })
+                        .catch(console.log)
+
                     } else {
-                        const iconPath = this._computeIcon(linkedPackageDTO)
-                        img.src = iconPath
-                        ctx.drawImage(img, curAnnStartRounded + 5, firstOffset - halfAnnotationHeight, 20, 20)
+                      img.src = this._computeIcon(linkedPackageDTO)
+                      ctx.drawImage(img, curAnnStartRounded + 5, firstOffset - halfAnnotationHeight, 20, 20)
                     }
                     }
                 }

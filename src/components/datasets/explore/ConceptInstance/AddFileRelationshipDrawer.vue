@@ -10,10 +10,7 @@
       You can attach files to this record by selecting from the files below.
     </div>
     These {{ numItems }} will be added as relationships to {{ conceptName }}.
-    <div
-      slot="body"
-      class="full-width"
-    >
+    <div slot="body" class="full-width">
       <template>
         <div class="table-nav-bar">
           <div class="table-nav-bar--breadcrumb">
@@ -39,14 +36,10 @@
           @cell-mouse-enter="handleTableCellEnter"
           @cell-mouse-leave="handleTableCellLeave"
         >
-          <el-table-column
-            width="60"
-            type="selection"
-            fixed
-          >
+          <el-table-column width="60" type="selection" fixed>
             <template slot-scope="scope">
               <el-checkbox
-                v-if="showRowCheckbox(scope.store, scope.row, hoverRow) "
+                v-if="showRowCheckbox(scope.store, scope.row, hoverRow)"
                 :value="scope.store.isSelected(scope.row)"
                 @input="scope.store.commit('rowSelectedChanged', scope.row)"
               />
@@ -54,7 +47,7 @@
                 v-else
                 class="svg-icon icon-item"
                 :src="fileIcon(scope.row.icon, scope.row.content.packageType)"
-              >
+              />
             </template>
           </el-table-column>
           <el-table-column
@@ -76,10 +69,7 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column
-            prop="subtype"
-            label="Kind"
-          />
+          <el-table-column prop="subtype" label="Kind" />
           <el-table-column
             prop="content.createdAt"
             label="Date Created"
@@ -92,16 +82,10 @@
 
     <div slot="buttons">
       <template>
-        <bf-button
-          class="secondary"
-          @click="closeSideDrawer"
-        >
+        <bf-button class="secondary" @click="closeSideDrawer">
           Cancel
         </bf-button>
-        <bf-button
-          :disabled="disableButton"
-          @click="createRelationship"
-        >
+        <bf-button :disabled="disableButton" @click="createRelationship">
           Add Files
         </bf-button>
       </template>
@@ -110,25 +94,27 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
-import { defaultTo, propOr, pathOr, find, propEq, pathEq, uniq } from 'ramda'
+import { mapGetters } from "vuex";
+import { defaultTo, propOr, pathOr, find, propEq, pathEq, uniq } from "ramda";
 
-import BreadcrumbNavigation from '../../files/BreadcrumbNavigation/BreadcrumbNavigation.vue'
-import SideDrawer from '@/components/shared/side-drawer/SideDrawer.vue'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import BreadcrumbNavigation from "../../files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
+import SideDrawer from "@/components/shared/side-drawer/SideDrawer.vue";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
-import TableFunctions from '@/mixins/table-functions'
-import Sorter from '@/mixins/sorter'
-import Request from '@/mixins/request'
-import StorageMetrics from '@/mixins/bf-storage-metrics/index'
-import FileIcon from '@/mixins/file-icon/index'
-import FormatDate from '@/mixins/format-date'
+import TableFunctions from "@/mixins/table-functions";
+import Sorter from "@/mixins/sorter";
+import Request from "@/mixins/request";
+import StorageMetrics from "@/mixins/bf-storage-metrics/index";
+import FileIcon from "@/mixins/file-icon/index";
+import FormatDate from "@/mixins/format-date";
 
-import EventBus from '@/utils/event-bus'
-import { packageDisplayName } from '@/utils/packages'
+import EventBus from "@/utils/event-bus";
+import { packageDisplayName } from "@/utils/packages";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
-  name: 'AddFileRelationshipDrawer',
+  name: "AddFileRelationshipDrawer",
 
   components: {
     SideDrawer,
@@ -148,18 +134,18 @@ export default {
   props: {
     relatedFiles: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     concept: {
       type: Object,
-      default: () => {}
-    }
+      default: () => {},
+    },
   },
 
   data() {
     return {
       hoverRow: {},
-      title: 'Select Files/Folders',
+      title: "Select Files/Folders",
       headingBorder: false,
       visible: false,
       showCancelButton: false,
@@ -169,85 +155,82 @@ export default {
       ancestors: [],
       file: {},
       fileId: null,
-      isCreating: false
-    }
+      isCreating: false,
+    };
   },
 
   computed: {
-    ...mapGetters([
-      'config',
-      'userToken',
-    ]),
+    ...mapGetters(["config"]),
 
     /**
      * Returns hard-coded concept name for files
      * @returns {Object}
      */
-    relationship: function() {
-      return {conceptName: 'Files'}
+    relationship: function () {
+      return { conceptName: "Files" };
     },
 
     /**
      * Returns concept display name
      * @returns {Object}
      */
-    conceptName: function() {
-      return propOr('', 'displayName', this.concept)
+    conceptName: function () {
+      return propOr("", "displayName", this.concept);
     },
 
     /**
      * Returns number selected files
      * @returns {Number}
      */
-    numItems: function() {
-      const count = this.selectedItems.length
-      const plural = count > 1 || count === 0 ? 's' : ''
-      return `${count} item${plural}`
+    numItems: function () {
+      const count = this.selectedItems.length;
+      const plural = count > 1 || count === 0 ? "s" : "";
+      return `${count} item${plural}`;
     },
 
     /**
      * Computes whether or not to disable next step
      * @returns {Boolean}
      */
-    disableButton: function() {
+    disableButton: function () {
       if (this.isCreating) {
-        return true
+        return true;
       }
-      return this.selectedItems.length === 0
+      return this.selectedItems.length === 0;
     },
 
     /**
      * Detect if the model is a file
      * @returns {Boolean}
      */
-    isFile: function() {
-      const id = this.$route.params.instanceId
-      return id.indexOf('package') >= 0
+    isFile: function () {
+      const id = this.$route.params.instanceId;
+      return id.indexOf("package") >= 0;
     },
   },
 
   watch: {
-    files: function(files) {
-        if (!files) {
-          return
+    files: function (files) {
+      if (!files) {
+        return;
+      }
+      this.files.forEach((file) => {
+        const packageType = pathOr("", ["content", "packageType"], file);
+        file.subtype = this.getFilePropertyVal(file.properties, "subtype");
+        file.icon = this.getFilePropertyVal(file.properties, "icon");
+        if (packageType === "Collection") {
+          file.subtype = "Folder";
         }
-        this.files.forEach(file => {
-          const packageType = pathOr('', ['content', 'packageType'], file)
-          file.subtype = this.getFilePropertyVal(file.properties, 'subtype')
-          file.icon = this.getFilePropertyVal(file.properties, 'icon')
-          if (packageType === 'Collection') {
-            file.subtype = 'Folder'
-          }
-          if (file.externalFile) {
-            file.subtype = 'External File'
-          }
-          const fileId = pathOr('', ['content', 'id'], file)
-          const obj = find(pathEq(['content', 'id'], fileId), this.selectedItems)
-          if (obj) {
-            this.$refs.Table.toggleRowSelection(file, true)
-          }
-        })
-    }
+        if (file.externalFile) {
+          file.subtype = "External File";
+        }
+        const fileId = pathOr("", ["content", "id"], file);
+        const obj = find(pathEq(["content", "id"], fileId), this.selectedItems);
+        if (obj) {
+          this.$refs.Table.toggleRowSelection(file, true);
+        }
+      });
+    },
   },
 
   methods: {
@@ -256,81 +239,93 @@ export default {
      * @params {Object} file
      * @returns {String}
      */
-    getPackageDisplayName: function(file) {
-      return packageDisplayName(file.content.name, file.extension, file.children)
+    getPackageDisplayName: function (file) {
+      return packageDisplayName(
+        file.content.name,
+        file.extension,
+        file.children
+      );
     },
 
     /**
      * Handles navigate-breadcrumb event
      * @param {String} fileId
      */
-    handleNavigateBreadcrumb: function(fileId) {
-      this.getFiles(fileId)
+    handleNavigateBreadcrumb: function (fileId) {
+      this.getFiles(fileId);
     },
 
     /**
      * Creates default relationship
      */
-    createDefaultRelationship: function(datasetId) {
-      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      return this.sendXhr(url, {
-        method: 'POST',
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        },
-        body: {
-          name: 'belongs_to',
-          displayName: 'Belongs To',
-          description: '',
-          schema: []
-        }
-      }).then(this.createFileRelationship.bind(this))
+    createDefaultRelationship: function (datasetId) {
+      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`;
+      return useGetToken().then((token) => {
+        this.sendXhr(url, {
+          method: "POST",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+          body: {
+            name: "belongs_to",
+            displayName: "Belongs To",
+            description: "",
+            schema: [],
+          },
+        }).then(this.createFileRelationship.bind(this));
+      });
     },
 
     /**
      * Creates relationships with file(s)
      */
-    createFileRelationship: function() {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package/instances`
-      const modelId = propOr('', 'id', this.concept)
+    createFileRelationship: function () {
+      const datasetId = pathOr("", ["params", "datasetId"], this.$route);
+      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package/instances`;
+      const modelId = propOr("", "id", this.concept);
 
-      const queues = this.selectedItems.map(item => {
-        const recordId = pathOr('', ['params', 'instanceId'], this.$route)
-        const packageId = pathOr('', ['content', 'id'], item)
+      const queues = this.selectedItems.map((item) => {
+        const recordId = pathOr("", ["params", "instanceId"], this.$route);
+        const packageId = pathOr("", ["content", "id"], item);
         let linkTarget = {
-          'ConceptInstance': {
-            id: recordId
-          }
-        }
+          ConceptInstance: {
+            id: recordId,
+          },
+        };
         if (this.isFile) {
           linkTarget = {
-            'ProxyInstance': {
-              type: 'package',
-              externalId: packageId
-            }
-          }
+            ProxyInstance: {
+              type: "package",
+              externalId: packageId,
+            },
+          };
         }
-        return this.sendXhr(url, {
-          method: 'POST',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body: {
-            externalId: packageId,
-            targets: [{
-              direction: 'FromTarget',
-              linkTarget,
-              relationshipType: 'belongs_to',
-              relationshipData: []
-            }]
-          }
-        })
-      })
+        return useGetToken().then((token) => {
+          return useSendXhr(url, {
+            method: "POST",
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            body: {
+              externalId: packageId,
+              targets: [
+                {
+                  direction: "FromTarget",
+                  linkTarget,
+                  relationshipType: "belongs_to",
+                  relationshipData: [],
+                },
+              ],
+            },
+          });
+        });
+      });
       // this maps over all the queued responses to guarantee that all responses are returned regardless of error status
-      return Promise.all(queues.map(q => {
-        return q.catch(err => ({status: err.status}))
-      }))
+      return Promise.all(
+        queues.map((q) => {
+          return q.catch((err) => ({ status: err.status }));
+        })
+      );
     },
 
     /**
@@ -338,81 +333,86 @@ export default {
      * @param {Array} responses
      * @returns {Boolean}
      */
-    checkForRelationshipErrors: function(responses) {
-      const errors = defaultTo([], responses).filter(resp => resp && resp.status >= 400)
-      return errors.length > 0
+    checkForRelationshipErrors: function (responses) {
+      const errors = defaultTo([], responses).filter(
+        (resp) => resp && resp.status >= 400
+      );
+      return errors.length > 0;
     },
 
     /**
      * Create relationship
      */
-    createRelationship: function() {
-      this.isCreating = true
+    createRelationship: function () {
+      this.isCreating = true;
 
       // check if relationship exists for dataset amongst list
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
-      this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(resp => {
-        const belongsTo = find(propEq('name', 'belongs_to'), resp)
-        if (resp.length === 0 || !belongsTo) {
-          // if not, create a default, then create the file relationship
-          return this.createDefaultRelationship(datasetId)
-        }
-        return this.createFileRelationship()
-      })
-      .then((resp) => {
-        // check for errors
-        const hasErrors = this.checkForRelationshipErrors(resp)
-        if (hasErrors) {
-          this.isCreating = false
-          const hasConflict = find(propEq('status', 409), resp)
-          const msg = hasConflict ? 'File relationship already exists. Please choose a different file.' : 'Error trying to add files.'
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg
+      const datasetId = pathOr("", ["params", "datasetId"], this.$route);
+      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`;
+
+      useGetToken().then((token) => {
+        return this.sendXhr(url, {
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+        })
+          .then((resp) => {
+            const belongsTo = find(propEq("name", "belongs_to"), resp);
+            if (resp.length === 0 || !belongsTo) {
+              // if not, create a default, then create the file relationship
+              return this.createDefaultRelationship(datasetId);
             }
+            return this.createFileRelationship();
           })
+          .then((resp) => {
+            // check for errors
+            const hasErrors = this.checkForRelationshipErrors(resp);
+            if (hasErrors) {
+              this.isCreating = false;
+              const hasConflict = find(propEq("status", 409), resp);
+              const msg = hasConflict
+                ? "File relationship already exists. Please choose a different file."
+                : "Error trying to add files.";
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "error",
+                  msg,
+                },
+              });
+              return this.handleXhrError(resp);
+            }
 
-          return this.handleXhrError(resp)
-        }
+            // add relationships to file(s)
+            EventBus.$emit("refresh-table-data", {
+              name: "package",
+              displayName: "Files",
+              count: this.selectedItems.length,
+              type: "Add",
+            });
 
-        // add relationships to file(s)
-        EventBus.$emit('refresh-table-data', {
-          name: 'package',
-          displayName: 'Files',
-          count: this.selectedItems.length,
-          type: 'Add'
-        })
-
-        EventBus.$emit('toast', {
-          detail: {
-            msg: `A new relationship has been created`,
-            type: 'success'
-          }
-        })
-        this.closeSideDrawer()
-        this.isCreating = false
-      })
+            EventBus.$emit("toast", {
+              detail: {
+                msg: `A new relationship has been created`,
+                type: "success",
+              },
+            });
+            this.closeSideDrawer();
+            this.isCreating = false;
+          });
+      });
     },
 
     /**
      * Creates the GET url for files
      * @param {String} fileId
      */
-    getFilesUrl: function(fileId) {
-      const datasetId = pathOr('', ['params', 'datasetId'], this.$route)
-      if (!datasetId || !this.userToken) {
-        return
-      }
-      const qString = `api_key=${this.userToken}&includeAncestors=true`
-      const url = fileId ? `packages/${fileId}` : `datasets/${datasetId}`
-      return `${this.config.apiUrl}/${url}?${qString}`
+    getFilesUrl: async function (fileId) {
+      return useGetToken().then((token) => {
+        const datasetId = pathOr("", ["params", "datasetId"], this.$route);
+        const qString = `api_key=${token}&includeAncestors=true`;
+        const url = fileId ? `packages/${fileId}` : `datasets/${datasetId}`;
+        return `${this.config.apiUrl}/${url}?${qString}`;
+      });
     },
 
     /**
@@ -420,60 +420,64 @@ export default {
      * @param {Object} payload
      * @returns {Array}
      */
-    filterFiles: function(payload) {
-      const allFiles = propOr([], 'children', payload)
-      const ancestors = propOr([], 'ancestors', payload)
-      const getFileId = pathOr('', ['content', 'id'])
+    filterFiles: function (payload) {
+      const allFiles = propOr([], "children", payload);
+      const ancestors = propOr([], "ancestors", payload);
+      const getFileId = pathOr("", ["content", "id"]);
 
-      this.ancestors = ancestors
-      this.file = payload
+      this.ancestors = ancestors;
+      this.file = payload;
 
       if (this.relatedFiles.length === 0) {
-        this.files = this.returnSort(this.sortBy, allFiles, 'asc')
-        return
+        this.files = this.returnSort(this.sortBy, allFiles, "asc");
+        return;
       }
 
-      const pred = file => this.relatedFiles.indexOf(getFileId(file)) < 0
-      const filteredFiles = allFiles.filter(pred)
-      this.files = this.returnSort(this.sortBy, filteredFiles, this.sortDirection)
+      const pred = (file) => this.relatedFiles.indexOf(getFileId(file)) < 0;
+      const filteredFiles = allFiles.filter(pred);
+      this.files = this.returnSort(
+        this.sortBy,
+        filteredFiles,
+        this.sortDirection
+      );
     },
 
     /**
      * Get files for dataset or collection
      * @param {String} fileId
      */
-    getFiles: function(fileId) {
-      this.fileId = fileId
-      const url = this.getFilesUrl(fileId)
-      if (!url) {
-        return
-      }
-      this.sendXhr(url)
-        .then(this.filterFiles.bind(this))
-        .catch(this.handleXhrError.bind(this))
+    getFiles: function (fileId) {
+      return this.getFilesUrl()
+        .then((url) => {
+          this.fileId = fileId;
+          this.sendXhr(url)
+            .then(this.filterFiles.bind(this))
+            .catch(this.handleXhrError.bind(this));
+        })
+        .catch((err) => console.log(err));
     },
 
     /**
      * Opens the side drawer and sets the drawer title
      * @param {String} conceptId
      */
-    openDrawer: function(conceptId) {
-      this.conceptId = conceptId
-      this.visible = true
-      this.getFiles()
+    openDrawer: function (conceptId) {
+      this.conceptId = conceptId;
+      this.visible = true;
+      this.getFiles();
     },
 
     /**
      * Handles close-side-drawer event
      */
-    closeSideDrawer: function() {
-      this.visible = false
+    closeSideDrawer: function () {
+      this.visible = false;
 
       this.$nextTick(() => {
-        this.showCancelButton = false
-        this.files = []
-        this.selectedItems = []
-      })
+        this.showCancelButton = false;
+        this.files = [];
+        this.selectedItems = [];
+      });
     },
 
     /**
@@ -482,7 +486,7 @@ export default {
      * @param {Object} column
      */
     fileStorageFormatter(row, column) {
-      return this.formatMetric(row.storage)
+      return this.formatMetric(row.storage);
     },
 
     /**
@@ -491,7 +495,7 @@ export default {
      * @param {Object} column
      */
     dateCreatedFormatter(row, column) {
-      return this.formatDate(row.content.createdAt)
+      return this.formatDate(row.content.createdAt);
     },
 
     /**
@@ -499,7 +503,7 @@ export default {
      * @param {String} column
      */
     handleSortChange(column) {
-      this.files = this.returnSort(column, this.files)
+      this.files = this.returnSort(column, this.files);
     },
 
     /**
@@ -509,22 +513,26 @@ export default {
      * @param {Object} hoverRow
      */
     showRowCheckbox(store, currentRow, hoverRow) {
-      const tableState = store.states
+      const tableState = store.states;
 
       // check if rows match
-      const matchPath = pathOr('', ['content', 'id'])
-      const currentRowId = matchPath(currentRow)
-      const hoverRowId = matchPath(hoverRow)
-      const rowsMatch = (currentRowId === hoverRowId)
+      const matchPath = pathOr("", ["content", "id"]);
+      const currentRowId = matchPath(currentRow);
+      const hoverRowId = matchPath(hoverRow);
+      const rowsMatch = currentRowId === hoverRowId;
 
       // check if row is in table state selection array
-      const selection = tableState.selection
-      const rowIdx = selection.findIndex(row => row.content.id)
+      const selection = tableState.selection;
+      const rowIdx = selection.findIndex((row) => row.content.id);
 
-      if (tableState.isAllSelected === true || rowsMatch === true || rowIdx >= 0) {
-        return true
+      if (
+        tableState.isAllSelected === true ||
+        rowsMatch === true ||
+        rowIdx >= 0
+      ) {
+        return true;
       }
-      return false
+      return false;
     },
 
     /**
@@ -534,17 +542,17 @@ export default {
     handleTableSelectAll(selection) {
       // if selection length is greater than zero, then add to selectedItems;
       if (selection.length > 0) {
-        const allItems = this.selectedItems.concat(selection)
-        this.selectedItems = uniq(allItems)
-        return
+        const allItems = this.selectedItems.concat(selection);
+        this.selectedItems = uniq(allItems);
+        return;
       }
       // if not, use iterate through selectedItems and filter out items in the data list
-      const filteredItems = this.selectedItems.filter(item => {
-        const itemId = pathOr('', ['content', 'id'], item)
-        const row = find(pathEq(['content', 'id'], itemId), this.files)
-        return !row
-      })
-      this.selectedItems = uniq(filteredItems)
+      const filteredItems = this.selectedItems.filter((item) => {
+        const itemId = pathOr("", ["content", "id"], item);
+        const row = find(pathEq(["content", "id"], itemId), this.files);
+        return !row;
+      });
+      this.selectedItems = uniq(filteredItems);
     },
 
     /**
@@ -552,36 +560,38 @@ export default {
      * @param {Array} selection
      * @param {Object} row
      */
-    handleSelect: function(selection, row) {
+    handleSelect: function (selection, row) {
       // check if row is in selectedItems, if yes, then remove it
-      const rowId = pathOr('', ['content', 'id'], row)
-      const obj = find(pathEq(['content', 'id'], rowId), this.selectedItems)
+      const rowId = pathOr("", ["content", "id"], row);
+      const obj = find(pathEq(["content", "id"], rowId), this.selectedItems);
       if (obj) {
-        this.selectedItems = this.selectedItems.filter(item => pathOr('', ['content', 'id'], item) !== rowId)
-        return
+        this.selectedItems = this.selectedItems.filter(
+          (item) => pathOr("", ["content", "id"], item) !== rowId
+        );
+        return;
       }
       // if no, then add it to selectedItems
-      this.selectedItems.push(row)
+      this.selectedItems.push(row);
     },
 
     /**
-    * Handle table cell enter
-    * @param {Object} row
-    */
+     * Handle table cell enter
+     * @param {Object} row
+     */
     handleTableCellEnter(row) {
-      this.hoverRow = row
+      this.hoverRow = row;
     },
 
     /**
-    * Handle table cell leave
-    * @param {Object} event
-    */
+     * Handle table cell leave
+     * @param {Object} event
+     */
     handleTableCellLeave(row, column, cell, event) {
-      const nodeName = pathOr('', ['toElement', 'nodeName'])(event)
-      const whiteList = ['TD', 'TR']
+      const nodeName = pathOr("", ["toElement", "nodeName"])(event);
+      const whiteList = ["TD", "TR"];
       // if moving to element other than TD or TR, reset hover row
       if (whiteList.indexOf(nodeName) < 0) {
-        this.hoverRow = {}
+        this.hoverRow = {};
       }
     },
 
@@ -589,18 +599,17 @@ export default {
      * Sorts review table
      * @param {String} sortPath
      */
-    sortColumn: function(sortPath) {
-      this.selectedItems = this.returnSort(sortPath, this.selectedItems)
-    }
-  }
-}
+    sortColumn: function (sortPath) {
+      this.selectedItems = this.returnSort(sortPath, this.selectedItems);
+    },
+  },
+};
 </script>
 
 <style lang="scss">
-@import '../../../../assets/variables';
+@import "../../../../assets/variables";
 
 .drawer {
-
   .el-table {
     border: solid 1px $gray_2;
 

@@ -58,6 +58,7 @@ import DatasetActivityDetail from '../DatasetActivityDetail/DatasetActivityDetai
 
 import Request from '../../../../mixins/request'
 import IconArrowUp from "../../../icons/IconArrowUp.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
   export default {
     name: 'DatasetActivityPanelDropdown',
@@ -97,8 +98,7 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
     },
 
     computed: {
-      ...mapGetters(['getOrgMemberByIntId']),
-      ...mapState(['config', 'userToken']),
+      ...mapState(['config']),
 
       /**
        * Get dataset int id
@@ -111,8 +111,11 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
       /**
        * Returns event
        */
-      eventsUrl: function() {
-        return `${this.config.apiUrl}/datasets/${this.datasetId}/changelog/events?api_key=${this.userToken}`
+      eventsUrl: async function() {
+        return useGetToken().then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/changelog/events?api_key=${token}`
+
+        })
       }
     },
 
@@ -125,9 +128,12 @@ import IconArrowUp from "../../../icons/IconArrowUp.vue";
        *
        */
       loadCursorEvents: function(cursor) {
-        this.sendXhr(`${this.eventsUrl}&cursor=${cursor}`).then(resp => {
-          this.changelogEvents = resp
-        }).catch(this.handleXhrError.bind(this))
+        this.eventsUrl.then(url=> {
+          this.sendXhr(`${url}&cursor=${cursor}`).then(resp => {
+            this.changelogEvents = resp
+          }).catch(this.handleXhrError.bind(this))
+        })
+
       },
       /**
        * Loads the event details for a particular changelog item

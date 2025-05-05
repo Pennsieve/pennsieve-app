@@ -2,6 +2,7 @@ import { pathOr, propOr, head, compose, defaultTo } from 'ramda'
 import { mapState } from 'vuex'
 
 import Request from '../../mixins/request'
+import {useGetToken} from "@/composables/useGetToken";
 
 const getPkgId = compose(
   pathOr('', ['content', 'id']),
@@ -20,40 +21,36 @@ export default {
 
   data() {
     return {
-      viewerDataId: ''
+      viewerDataId: '',
+      fileUrl: ''
     }
   },
 
   computed: {
     ...mapState([
       'config',
-      'userToken'
     ]),
 
     getViewerDataUrl: function() {
       const apiUrl = propOr('', 'apiUrl', this.config)
       const pkgId = pathOr('', ['content', 'id'], this.pkg)
 
-      if (apiUrl && pkgId && this.userToken) {
-        return `${apiUrl}/packages/${pkgId}/view?api_key=${this.userToken}`
-      }
+      return `${apiUrl}/packages/${pkgId}/view`
     },
 
-    getFileUrl: function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      const pkgId = pathOr('', ['content', 'id'], this.pkg)
 
-      if (apiUrl && pkgId && this.viewerDataId && this.userToken) {
-        return `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}/presign/?api_key=${this.userToken}`
-      }
-    },
   },
 
   watch: {
     getViewerDataUrl: {
       handler: function(url) {
         if (url) {
-          this.getViewerData()
+          useGetToken()
+              .then(token => {
+                const fullUrl = `${url}?api_key=${token}`
+                this.getViewerData(fullUrl)
+              })
+
         }
       },
       immediate: true
@@ -64,18 +61,49 @@ export default {
     /**
      * Request viewer data
      */
-    getViewerData: function() {
-      this.sendXhr(this.getViewerDataUrl)
+    getViewerData: async function(url) {
+      return this.sendXhr(url)
         .then(this.handleGetViewerData.bind(this))
         .catch(this.handleXhrError.bind(this))
     },
 
+    getFileUrl: async function() {
+      const apiUrl = propOr('', 'apiUrl', this.config)
+      const pkgId = pathOr('', ['content', 'id'], this.pkg)
+      const token = await useGetToken()
+      const url = `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}?api_key=${token}`
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+         const result = await response.json()
+         const fileUrl = result.url
+          this.fileUrl = fileUrl
+          return fileUrl;
+        }
+    
+        if (!response.ok) {
+          return;
+        }
+    
+      } catch (err) {
+        console.error(err)
+        throw err;
+      }
+    },
+
     /**
-     * Handle get viewer data hxr response
+     * Handle get viewer data xhr response
      * @param {Object} response
      */
     handleGetViewerData: function(response) {
       this.viewerDataId = getPkgId(response)
+      this.getFileUrl()
     }
   }
 }

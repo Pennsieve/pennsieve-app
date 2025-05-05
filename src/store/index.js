@@ -13,6 +13,7 @@ import filesModule from "./filesModule";
 import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
+import codeReposModule from "./codeReposModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -95,7 +96,6 @@ const initialState = () => ({
   consortiumId: 1,
   consortiumDatasets: [],
   consortiumDatasetsImporting: [],
-  gettingStartedOpen: false,
   modelTemplates: [],
   datasetTemplates: [],
   isLoadingDatasetTemplates: false,
@@ -113,12 +113,10 @@ const initialState = () => ({
   pageNotFound: false,
   dataUseAgreements: [],
   cognitoUser: {},
-  onboardingEvents: [],
-  shouldShowLinkOrcidDialog: false,
-  isLinkOrcidDialogVisible: false,
-  userToken: '',
   sessionTimer: null,
-  isRefreshing: false
+  isRefreshing: false,
+  gitHubProfile: null,
+  computeNodes: []
 })
 
 export const state = initialState();
@@ -185,14 +183,8 @@ export const mutations = {
         Cookies.set("preferred_org_id", orgId);
         state.profile = profile;
       },
-      UPDATE_USER_TOKEN(state, userToken) {
-        if (Object.prototype.toString.call(userToken) === "[object String]") {
-          state.userToken = userToken;
-        }
-      },
       CLEAR_STATE(state) {
         state.profile = {};
-        state.userToken = "";
         state.activeOrganization = {};
         state.organizations = {};
         state.orgMembers = [];
@@ -205,10 +197,8 @@ export const mutations = {
         state.datasetDescription = "";
         state.changelogText = "";
         state.datasetDoi = "";
+        state.datasetTemplates = [];
         state.searchModalVisible = false;
-        state.shouldShowLinkOrcidDialog = false;
-        state.isLinkOrcidDialogVisible = false;
-        state.gettingStartedOpen = false;
         state.cognitoUser = {};
         state.sessionTimer = null
       },
@@ -447,13 +437,6 @@ export const mutations = {
       UPDATE_IS_LOADING_RELATIONSHIP_TYPES(state, data) {
         state.isLoadingRelationshipTypes = data;
       },
-      UPDATE_ONBOARDING_EVENTS(state, onboardingEvents) {
-        state.onboardingEvents = onboardingEvents;
-      },
-
-      SET_GETTING_STARTED_OPEN(state, data) {
-        state.gettingStartedOpen = data;
-      },
 
       UPDATE_MODEL_TEMPLATES(state, data) {
         state.modelTemplates = data;
@@ -616,25 +599,24 @@ export const mutations = {
         state.dataUseAgreements = dataUseAgreements;
       },
 
-      UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG(state, shouldShowLinkOrcidDialog) {
-        state.shouldShowLinkOrcidDialog = shouldShowLinkOrcidDialog;
+      UPDATE_GITHUB_PROFILE(state, githubProfile) {
+        state.gitHubProfile = githubProfile;
       },
 
-      UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE(state, isLinkOrcidDialogVisible) {
-        state.isLinkOrcidDialogVisible = isLinkOrcidDialogVisible;
-      },
+      UPDATE_COLORS(state, colorMap) {
+        state.activeOrganization.organization.colorTheme = colorMap
+      }
     }
 
 export const actions = {
   resetState({ commit }) {
-    commit('resetState');
+    commit('RESET_STATE');
   },
   setIsRefreshing: ({ commit }, evt) => commit("SET_IS_REFRESHING", evt),
   setSessionTimer:  ({ commit }, evt) => commit("SET_SESSION_TIMER", evt),
   setActiveOrgSynced: ({ commit }) => commit("SET_ACTIVE_ORG_SYNC"),
-  updateIsLinkOrcidDialogVisible: ({ commit }, evt) =>
-      commit("UPDATE_IS_LINK_ORCID_DIALOG_VISIBLE", evt),
   updateCognitoUser: ({ commit }, evt) => commit("UPDATE_COGNITO_USER", evt),
+  updateGithubProfile: ({ commit }, evt) => commit("UPDATE_GITHUB_PROFILE", evt),
   updatePageNotFound: ({ commit }, evt) => commit("SET_PAGE_NOT_FOUND", evt),
   updateScientificUnits: ({ commit }, evt) =>
       commit("UPDATE_SCIENTIFIC_UNITS", evt),
@@ -667,10 +649,9 @@ export const actions = {
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
-  updateUserToken: ({ commit }, evt) => {
-    Cookies.set('user_token', evt)
-    commit("UPDATE_USER_TOKEN", evt)
-  },
+
+  updateWorkspaceColors: ({commit}, evt) => commit("UPDATE_COLORS", evt),
+
   clearState: ({ commit }) => {
     commit("CLEAR_STATE");
     commit("viewerModule/CLEAR_STATE");
@@ -759,10 +740,6 @@ export const actions = {
       commit("DELETE_RELATIONSHIP_TYPE", evt),
   updateIsLoadingRelationshipTypes: ({ commit }, evt) =>
       commit("UPDATE_IS_LOADING_RELATIONSHIP_TYPES", evt),
-  updateOnboardingEvents: ({ commit }, evt) =>
-      commit("UPDATE_ONBOARDING_EVENTS", evt),
-  setGettingStartedOpen: ({ commit }, evt) =>
-      commit("SET_GETTING_STARTED_OPEN", evt),
   updateModelTemplates: ({ commit }, evt) =>
       commit("UPDATE_MODEL_TEMPLATES", evt),
   setDatasetRole: ({ commit }, evt) => commit("SET_DATASET_ROLE", evt),
@@ -799,6 +776,7 @@ export const actions = {
   addContributor: ({ commit }, contributor) => {
     commit("ADD_DATASET_CONTRIBUTOR", R.clone(contributor));
   },
+
   updateDatasetContributor: ({ commit }, contributor) => {
     commit("UPDATE_DATASET_CONTRIBUTOR", R.clone(contributor));
     commit("UPDATE_ORG_CONTRIBUTOR", R.clone(contributor));
@@ -828,11 +806,16 @@ export const actions = {
       commit("UPDATE_DATA_USE_AGREEMENT", evt),
   updateDefaultDataUseAgreement: ({ commit }, evt) =>
       commit("UPDATE_DEFAULT_DATA_USE_AGREEMENT", evt),
-  updateShouldShowLinkOrcidDialog: ({ commit }, evt) =>
-      commit("UPDATE_SHOULD_SHOW_LINK_ORCID_DIALOG", evt),
 }
 
 export const getters = {
+
+  // NOTE: Getters need to have a different name than the state property. The syntax should be `getStatePropertyName` not `statePropertyName.`
+
+  // NOTE: Getters are used for manipulating data, not just reading it. If simple reading global state, use mapState instead of mapGetters.
+
+  // TODO: Refactor usages of these simple data-accessing getters so the state property is accessed from mapState.
+
   sessionTimer: (state) => state.sessionTimer,
   isRefreshing: (state) => state.isRefreshing,
   isWelcomeOrg: state => {
@@ -842,7 +825,6 @@ export const getters = {
   isOrgSynced: (state) => state.activeOrgSynced,
   config: (state) => state.config,
   profile: (state) => state.profile,
-  userToken: (state) => state.userToken,
   getProfile: (state) => () => state.profile,
   organizations: (state) => state.organizations,
   activeOrganization: (state) => state.activeOrganization,
@@ -854,7 +836,18 @@ export const getters = {
     return R.defaultTo({}, R.find(R.propEq("id", id), state.orgMembers));
   },
   getOrgMemberByIntId: (state) => (id) => {
-    return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+    for (let i = 0; i < state.orgMembers.length; i++) {
+     if (state.orgMembers[i].intId === id ) {
+       return state.orgMembers[i]
+     }
+    }
+    return null
+
+
+    // return R.defaultTo({}, R.find(R.propEq("intId", id), state.orgMembers));
+  },
+  getModelByHash: (state) => (id) => {
+    return state.conceptsHash[id]
   },
   getOrgMembersById: (state) => (list) => {
     return state.orgMembers.filter((member) => list.includes(member.id));
@@ -865,7 +858,6 @@ export const getters = {
   getTeam: (state) => (id) => {
     return R.defaultTo({}, R.find(R.pathEq(["team", "id"], id), state.teams));
   },
-  getUserToken: (state) => () => state.userToken,
   uploadCount: (state) => state.uploadCount,
   uploading: (state) => state.uploading,
   uploadRemaining: (state) => state.uploadRemaining,
@@ -921,11 +913,15 @@ export const getters = {
           R.defaultTo({}),
           R.find(R.propEq("id", datasetId))
       )(state.consortiumDatasetsImporting),
-  getOrganizationByIntId: (state) => (id) =>
-      R.compose(
-          R.defaultTo({}),
-          find(R.pathEq(["organization", "intId"], id))
-      )(state.organizations),
+  getOrganizationByIntId: (state) => (id) => {
+    for (let i = 0; i < state.organizations; i++) {
+      if (state.organizations[i].organization.intId === id ) {
+        return state.organizations[i]
+      }
+    }
+    return {}
+
+  },
   getRelationshipTypes: (state) => () => state.relationshipTypes,
   getRelationshipTypeByName: (state) => (name) => {
     return R.compose(
@@ -957,7 +953,6 @@ export const getters = {
         R.find(R.propEq("name", name))
     )(state.relationshipTypes);
   },
-  getGettingStartedOpen: (state) => () => state.gettingStartedOpen,
   modelTemplates: (state) => () => state.modelTemplates,
   getPermission:
       (state) =>
@@ -974,13 +969,13 @@ export const getters = {
   getPublishedDataByIntId: (state) => (id) => {
     return R.defaultTo(
         {},
-        find(R.propEq("sourceDatasetId", id), state.datasetPublishedData)
+        find(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets)
     );
   },
   getPublishedDataIndexByIntId: (state) => (id) => {
     return R.defaultTo(
         {},
-        R.findIndex(R.propEq("sourceDatasetId", id), state.datasetPublishedData)
+        R.findIndex(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets)
     );
   },
   datasetOwner: (state, getters) => {
@@ -993,6 +988,9 @@ export const getters = {
   },
   hasOrcidId: (state) => {
     return R.pathOr(false, ["profile", "orcid", "orcid"], state);
+  },
+  hasGitHubId: (state) => {
+    return R.pathOr(false, ["gitHubProfile"], state);
   },
   publishToOrcid:(state)=>{
     return state.profile.orcid.scope && state.profile.orcid.scope[1] && state.profile.orcid.scope[1]==='/activities/update';
@@ -1017,13 +1015,12 @@ export const getters = {
   datasetIntId: (state) => {
     return state.dataset.content ? state.dataset.content.intId : null;
   },
-  hasOrcidOnboardingEvent: (state) => {
-    return state.onboardingEvents.includes("AddedOrcid") || false;
-  },
   getComputeNodes: (state) => {
     return state.computeNodes
   }
 }
+
+
 
 
 export default createStore({
@@ -1041,7 +1038,8 @@ export default createStore({
     filesModule,
     uploadModule,
     metadataModule,
-    analysisModule
+    analysisModule,
+    codeReposModule
   }
 
 });

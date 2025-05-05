@@ -93,18 +93,20 @@
       @setStart="updateStart"
     />
 
-<!--    <timeseries-filter-modal-->
-<!--      ref="filterWindow"-->
-<!--      :filter-window-open="filterWindowOpen"-->
-<!--      @closeWindow="onCloseFilterWindow"-->
-<!--    />-->
+   <timeseries-filter-modal
+     ref="filterWindow"
+     :visible="filterWindowOpen"
+     @update:visible="filterWindowOpen = $event"
+     @closeWindow="onCloseFilterWindow"
+   />
 
-<!--    <timeseries-annotation-modal-->
-<!--      ref="annotationModal"-->
-<!--      :visible.sync="annotationWindowOpen"-->
-<!--      @closeWindow="onCloseAnnotationWindow"-->
-<!--      @createUpdateAnnotation="onCreateUpdateAnnotation"-->
-<!--    />-->
+<timeseries-annotation-modal
+     ref="annotationModal"
+     :visible="annotationWindowOpen"
+     @update:visible="annotationWindowOpen = $event"
+     @closeWindow="onCloseAnnotationWindow"
+     @createUpdateAnnotation="onCreateUpdateAnnotation"
+   />
 
 <!--    <timeseries-annotation-layer-modal-->
 <!--      ref="layerModal"-->
@@ -113,11 +115,12 @@
 <!--      @createLayer="onCreateAnnotationLayer"-->
 <!--    />-->
 
-<!--    <ts-annotation-delete-dialog-->
-<!--      :visible.sync="isTsAnnotationDeleteDialogVisible"-->
-<!--      :delete-annotation.sync="annotationDelete"-->
-<!--      @delete="deleteAnnotation"-->
-<!--    />-->
+   <ts-annotation-delete-dialog
+      :visible="isTsAnnotationDeleteDialogVisible"
+      :delete-annotation="annotationDelete"
+      @update:visible="isTsAnnotationDeleteDialogVisible = $event"
+      @delete="deleteAnnotation"
+    />
 
 
   </div>
@@ -135,6 +138,7 @@
         isEmpty
     } from 'ramda'
 
+    import { nextTick } from 'vue';
     import ViewerActiveTool from '@/mixins/viewer-active-tool'
     import Request from '@/mixins/request'
     import TsAnnotation from '@/mixins/ts-annotation'
@@ -142,8 +146,6 @@
 
     export default {
         name: 'TimeseriesViewer',
-
-
 
         components:{
             'timeseries-scrubber': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue')),
@@ -178,7 +180,6 @@
         computed: {
             ...mapState([
                 'config',
-                'userToken'
             ]),
             ...mapState('viewerModule', [
                 'activeViewer',
@@ -461,7 +462,7 @@
 
             },
             getChannelId: function(channel) {
-                const isViewingMontage = this.$store.state.viewer.viewerMontageScheme !== 'NOT_MONTAGED'
+                const isViewingMontage = this.$store.state.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 let list = []
                 if (isViewingMontage) {
@@ -470,7 +471,8 @@
                 }
                 return id
             },
-            onResize(event) {
+            async onResize(event) {
+              console.log('onresize...')
                 if (this.$refs.ts_viewer === undefined) {
                     return
                 }
@@ -483,12 +485,15 @@
               this.window_height = hhh - toolbarOffset;
 
                 // this.window_height = window.innerHeight - 100;
+                await nextTick();
                 this.window_width = this.$refs.ts_viewer.offsetWidth
 
                 const labelDiv = this.$refs.channelLabels;
                 this.labelWidth = labelDiv.clientWidth
                 this.cWidth = (this.window_width - labelDiv.clientWidth - 16);
-                this.cHeight = (this.window_height - 88);
+                this.cHeight = (this.window_height - 40);
+
+                console.log(this.cWidth)
             },
             _computeLabelInfo: function(item, globalZoomMult, rowscale) {
                 const n = ( ( (this.constants['DEFAULTDPI'] * window.devicePixelRatio)/(globalZoomMult * rowscale) )/25.4).toFixed(1);
@@ -537,20 +542,20 @@
                 if (!isEmpty(filter)) {
                     filterWindow.input0 = filter.input0;
                     filterWindow.input1 = filter.input1;
+                    // TODO: commenting the following code, 'filterWindow' does not seem to have '_filters' or '_notchValues' properties, review and add the following if needed
+                    // for (let i=0; i<._filters.length; i++) {
+                    //     if (filterWindow._filters[i].value === filter.type) {
+                    //         filterWindow.selectedFilter = filter.type;
+                    //         break;
+                    //     }
+                    // }
 
-                    for (let i=0; i<filterWindow._filters.length; i++) {
-                        if (filterWindow._filters[i].value === filter.type) {
-                            filterWindow.selectedFilter = filter.type;
-                            break;
-                        }
-                    }
-
-                    for (let i=0; i<filterWindow._notchValues.length; i++) {
-                        if (filterWindow._notchValues[i].value === filter.notchFreq) {
-                            filterWindow.selectedNotch = filter.notchFreq;
-                            break;
-                        }
-                    }
+                    // for (let i=0; i<filterWindow._notchValues?.length; i++) {
+                    //     if (filterWindow._notchValues[i].value === filter.notchFreq) {
+                    //         filterWindow.selectedNotch = filter.notchFreq;
+                    //         break;
+                    //     }
+                    // }
                 } else {
                     filterWindow.input0 = NaN;
                     filterWindow.input1 = NaN;
@@ -595,7 +600,7 @@
         flex-direction: column;
         justify-content: space-around;
         line-height: normal;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
         min-width: 75px;
     }
 

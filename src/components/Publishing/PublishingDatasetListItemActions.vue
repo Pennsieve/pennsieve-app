@@ -1,7 +1,11 @@
 <template>
   <div class="button-wrapper">
     <template
-      v-if="PublicationTabsStatuses[PublicationTabs.REVIEW].includes(datasetPublicationStatus)"
+      v-if="
+        PublicationTabsStatuses[PublicationTabs.REVIEW].includes(
+          datasetPublicationStatus
+        )
+      "
     >
       <!-- If user is a publisher -->
       <template v-if="isUserPublisher && !isPublishedTab">
@@ -10,83 +14,133 @@
             class="red"
             :disabled="!!inFlightStatus"
             href="#"
-            @click.prevent="triggerRequest(PublicationStatus.ACCEPTED, PublicationType.REMOVAL)"
+            @click.prevent="
+              triggerRequest(
+                PublicationStatus.ACCEPTED,
+                PublicationType.REMOVAL
+              )
+            "
           >
             Unpublish Dataset
           </a>
         </template>
-        <template v-else-if="datasetPublicationType === PublicationType.REVISION">
+        <template
+          v-else-if="datasetPublicationType === PublicationType.REVISION"
+        >
           <a
             :disabled="!!inFlightStatus"
             href="#"
-            @click.prevent="triggerRequest(PublicationStatus.ACCEPTED, PublicationType.REVISION)"
+            @click.prevent="
+              triggerRequest(
+                PublicationStatus.ACCEPTED,
+                PublicationType.REVISION
+              )
+            "
           >
             Accept Revision
           </a>
         </template>
-        <template v-else-if="datasetPublicationType === PublicationType.EMBARGO">
+        <template
+          v-else-if="datasetPublicationType === PublicationType.EMBARGO"
+        >
           <a
-            :disabled="!!inFlightStatus || datasetPublicationStatus === PublicationStatus.ACCEPTED"
+            :disabled="
+              !!inFlightStatus ||
+              datasetPublicationStatus === PublicationStatus.ACCEPTED
+            "
             href="#"
-            @click.prevent="triggerRequest(PublicationStatus.ACCEPTED, PublicationType.EMBARGO)"
+            @click.prevent="
+              triggerRequest(
+                PublicationStatus.ACCEPTED,
+                PublicationType.EMBARGO
+              )
+            "
           >
-            <template v-if="datasetPublicationStatus === PublicationStatus.FAILED">
+            <template
+              v-if="datasetPublicationStatus === PublicationStatus.FAILED"
+            >
               Try Again
             </template>
-            <template v-else>
-              Publish Dataset
-            </template>
+            <template v-else> Publish Dataset </template>
           </a>
         </template>
-        <template v-else-if="datasetPublicationType === PublicationType.RELEASE">
+        <template
+          v-else-if="datasetPublicationType === PublicationType.RELEASE"
+        >
           <a
-            :disabled="!!inFlightStatus || datasetPublicationStatus === PublicationStatus.ACCEPTED"
+            :disabled="
+              !!inFlightStatus ||
+              datasetPublicationStatus === PublicationStatus.ACCEPTED
+            "
             href="#"
-            @click.prevent="triggerRequest(PublicationStatus.ACCEPTED, PublicationType.RELEASE)"
+            @click.prevent="
+              triggerRequest(
+                PublicationStatus.ACCEPTED,
+                PublicationType.RELEASE
+              )
+            "
           >
-            <template v-if="datasetPublicationStatus === PublicationStatus.FAILED">
+            <template
+              v-if="datasetPublicationStatus === PublicationStatus.FAILED"
+            >
               Try Again
             </template>
-            <template v-else>
-              Release Now
-            </template>
+            <template v-else> Release Now </template>
           </a>
         </template>
         <template v-else>
           <a
-            :disabled="!!inFlightStatus || datasetPublicationStatus === PublicationStatus.ACCEPTED"
+            :disabled="
+              !!inFlightStatus ||
+              datasetPublicationStatus === PublicationStatus.ACCEPTED
+            "
             href="#"
-            @click.prevent="triggerRequest(PublicationStatus.ACCEPTED, PublicationType.PUBLICATION)"
+            @click.prevent="
+              triggerRequest(
+                PublicationStatus.ACCEPTED,
+                PublicationType.PUBLICATION
+              )
+            "
           >
-            <template v-if="datasetPublicationStatus === PublicationStatus.FAILED">
+            <template
+              v-if="datasetPublicationStatus === PublicationStatus.FAILED"
+            >
               Try Again
             </template>
-            <template v-else>
-              Publish Dataset
-            </template>
+            <template v-else> Publish Dataset </template>
           </a>
         </template>
         <a
           v-if="datasetPublicationStatus === PublicationStatus.FAILED"
           :disabled="!!inFlightStatus"
           href="#"
-          @click.prevent="triggerRequest(PublicationStatus.REJECTED, datasetPublicationType)"
+          @click.prevent="
+            triggerRequest(PublicationStatus.REJECTED, datasetPublicationType)
+          "
         >
           Cancel
         </a>
         <a
           v-else
-          :disabled="!!inFlightStatus || datasetPublicationStatus === PublicationStatus.ACCEPTED"
+          :disabled="
+            !!inFlightStatus ||
+            datasetPublicationStatus === PublicationStatus.ACCEPTED
+          "
           href="#"
           @click.prevent="openRejectDialog"
         >
           Reject Revision
         </a>
         <a
-          v-if="isUserDatasetOwner(dataset) && datasetPublicationStatus !== PublicationStatus.FAILED"
+          v-if="
+            isUserDatasetOwner(dataset) &&
+            datasetPublicationStatus !== PublicationStatus.FAILED
+          "
           href="#"
           :disabled="!!inFlightStatus"
-          @click.prevent="triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)"
+          @click.prevent="
+            triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)
+          "
         >
           Withdraw Dataset
         </a>
@@ -97,27 +151,28 @@
           v-if="isUserDatasetOwner(dataset)"
           href="#"
           :disabled="!!inFlightStatus"
-          @click.prevent="triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)"
+          @click.prevent="
+            triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)
+          "
         >
           Withdraw Dataset
         </a>
       </template>
     </template>
-    <template
-      v-if="datasetPublicationStatus === PublicationStatus.COMPLETED"
-    >
+    <template v-if="datasetPublicationStatus === PublicationStatus.COMPLETED">
       <a
-        v-if="dataset.embargoAccess !== 'granted' && datasetPublicationType === PublicationType.EMBARGO"
-        :class="{ 'disabled': dataset.embargoAccess === 'requested' }"
+        v-if="
+          dataset.embargoAccess !== 'granted' &&
+          datasetPublicationType === PublicationType.EMBARGO
+        "
+        :class="{ disabled: dataset.embargoAccess === 'requested' }"
         href="#"
         @click.prevent="onRequestAccessClick"
       >
         <template v-if="dataset.embargoAccess === 'requested'">
           Access Request Pending
         </template>
-        <template v-else>
-          Request Access
-        </template>
+        <template v-else> Request Access </template>
       </a>
       <a
         v-if="datasetPublicationType === PublicationType.PUBLICATION"
@@ -127,17 +182,27 @@
         View on Discover
       </a>
       <a
-        v-if="hasAgreement && dataset.embargoAccess === 'granted' && datasetPublicationType === PublicationType.EMBARGO"
+        v-if="
+          hasAgreement &&
+          dataset.embargoAccess === 'granted' &&
+          datasetPublicationType === PublicationType.EMBARGO
+        "
         href="#"
         @click.prevent="viewAgreement"
       >
         Data Use Agreement
       </a>
       <a
-        v-if="isUserDatasetOwner(dataset) && datasetPublicationType === PublicationType.EMBARGO && isReleaseRequestEnabled"
+        v-if="
+          isUserDatasetOwner(dataset) &&
+          datasetPublicationType === PublicationType.EMBARGO &&
+          isReleaseRequestEnabled
+        "
         href="#"
         :disabled="!!inFlightStatus"
-        @click.prevent="triggerRequest(PublicationStatus.REQUESTED, PublicationType.RELEASE)"
+        @click.prevent="
+          triggerRequest(PublicationStatus.REQUESTED, PublicationType.RELEASE)
+        "
       >
         Request Release
       </a>
@@ -145,33 +210,37 @@
         v-if="isUserDatasetOwner(dataset)"
         href="#"
         :disabled="!!inFlightStatus"
-        @click.prevent="triggerRequest(PublicationStatus.REQUESTED, PublicationType.REMOVAL)"
+        @click.prevent="
+          triggerRequest(PublicationStatus.REQUESTED, PublicationType.REMOVAL)
+        "
       >
         Remove Dataset
       </a>
     </template>
-    <template
-      v-if="datasetPublicationStatus === PublicationStatus.REJECTED"
-    >
-      <router-link
-        :to="datasetLink"
-        :disabled="!!inFlightStatus"
-      >
+    <template v-if="datasetPublicationStatus === PublicationStatus.REJECTED">
+      <router-link :to="datasetLink" :disabled="!!inFlightStatus">
         View
       </router-link>
       <a
         v-if="isUserDatasetOwner(dataset)"
         href="#"
         :disabled="!!inFlightStatus"
-        @click.prevent="triggerRequest(PublicationStatus.REQUESTED, datasetPublicationType)"
+        @click.prevent="
+          triggerRequest(PublicationStatus.REQUESTED, datasetPublicationType)
+        "
       >
         Re-submit Dataset
       </a>
       <a
-        v-if="isUserDatasetOwner(dataset) && datasetPublicationStatus !== PublicationStatus.FAILED"
+        v-if="
+          isUserDatasetOwner(dataset) &&
+          datasetPublicationStatus !== PublicationStatus.FAILED
+        "
         href="#"
         :disabled="!!inFlightStatus"
-        @click.prevent="triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)"
+        @click.prevent="
+          triggerRequest(PublicationStatus.CANCELLED, datasetPublicationType)
+        "
       >
         Withdraw Dataset
       </a>
@@ -195,105 +264,108 @@
 </template>
 
 <script>
+import { mapActions, mapGetters, mapState } from "vuex";
+import { pathOr, propOr } from "ramda";
 
-import { mapActions, mapGetters, mapState } from 'vuex';
-import { pathOr, propOr } from 'ramda';
+import DataUseAgreementSignDialog from "./DataUseAgreementSignDialog/DataUseAgreementSignDialog.vue";
+import RejectRequestDialog from "./RejectRequestDialog/RejectRequestDialog.vue";
 
-import DataUseAgreementSignDialog from './DataUseAgreementSignDialog/DataUseAgreementSignDialog.vue'
-import RejectRequestDialog from './RejectRequestDialog/RejectRequestDialog.vue'
+import DatasetPublishedData from "../../mixins/dataset-published-data";
+import Request from "../../mixins/request";
 
-import DatasetPublishedData from '../../mixins/dataset-published-data'
-import Request from '../../mixins/request'
-
-import EventBus from '../../utils/event-bus.js';
-import { PublicationTabsStatuses, PublicationTabs, PublicationStatus, PublicationType } from '../../utils/constants';
+import EventBus from "../../utils/event-bus.js";
+import {
+  PublicationTabsStatuses,
+  PublicationTabs,
+  PublicationStatus,
+  PublicationType,
+} from "../../utils/constants";
+import { useGetToken } from "@/composables/useGetToken";
+import {
+  useHandleXhrError,
+  useSendXhr,
+} from "@/mixins/request/request_composable";
 
 const getPublicationSuffix = (publicationStatus) => {
-   return publicationStatus === PublicationStatus.REQUESTED
-      ? 'request'
-      : publicationStatus === PublicationStatus.REJECTED
-        ? 'reject'
-        : publicationStatus === PublicationStatus.CANCELLED
-          ? 'cancel'
-          : 'accept'
-}
+  return publicationStatus === PublicationStatus.REQUESTED
+    ? "request"
+    : publicationStatus === PublicationStatus.REJECTED
+    ? "reject"
+    : publicationStatus === PublicationStatus.CANCELLED
+    ? "cancel"
+    : "accept";
+};
 
 export default {
-  name: 'PublishingDatasetListItemActions',
+  name: "PublishingDatasetListItemActions",
 
   components: {
     DataUseAgreementSignDialog,
-    RejectRequestDialog
+    RejectRequestDialog,
   },
 
-  mixins: [
-    DatasetPublishedData,
-    Request
-  ],
+  mixins: [DatasetPublishedData, Request],
 
   props: {
     dataset: {
       type: Object,
-      required: true
+      required: true,
     },
     isUserPublisher: {
       type: Boolean,
-      required: true
+      required: true,
     },
     datasetLink: {
       type: Object,
-      required: true
+      required: true,
     },
     isPublishedTab: {
       type: Boolean,
-      require: true
+      require: true,
     },
     datasetPublicationStatus: {
       type: String,
-      required: true
+      required: true,
     },
     datasetPublicationType: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
 
-  data: function() {
+  data: function () {
     return {
       inFlightStatus: false,
       isDataUseAgreementSignDialogVisible: false,
       isRejectRequestDialogVisible: false,
       dataUseAgreement: {},
       hasAgreement: false,
-      isSigningAgreement: false
-    }
+      isSigningAgreement: false,
+    };
   },
 
   computed: {
-    ...mapState(['config']),
-    ...mapGetters([
-      'userToken',
-      'isUserDatasetOwner'
-    ]),
+    ...mapState(["config"]),
+    ...mapGetters(["isUserDatasetOwner"]),
 
-    datasetId: function() {
-      return propOr(0, 'sourceDatasetId', this.dataset)
+    datasetId: function () {
+      return propOr(0, "sourceDatasetId", this.dataset);
     },
 
-    PublicationStatus: function() {
-      return PublicationStatus
+    PublicationStatus: function () {
+      return PublicationStatus;
     },
 
-    PublicationTabsStatuses: function() {
-      return PublicationTabsStatuses
+    PublicationTabsStatuses: function () {
+      return PublicationTabsStatuses;
     },
 
-    PublicationTabs: function() {
-      return PublicationTabs
+    PublicationTabs: function () {
+      return PublicationTabs;
     },
 
-    PublicationType: function() {
-      return PublicationType
+    PublicationType: function () {
+      return PublicationType;
     },
 
     /**
@@ -303,8 +375,8 @@ export default {
      * status of the published dataset
      * @returns {String}
      */
-    publicationStatus: function() {
-      return pathOr('', ['publication', 'status'], this.dataset)
+    publicationStatus: function () {
+      return pathOr("", ["publication", "status"], this.dataset);
     },
 
     /**
@@ -312,16 +384,19 @@ export default {
      * for release
      * @returns {Boolean}
      */
-    isRelease: function() {
-      return pathOr('', ['publication', 'type'], this.dataset) == this.PublicationType.RELEASE
+    isRelease: function () {
+      return (
+        pathOr("", ["publication", "type"], this.dataset) ==
+        this.PublicationType.RELEASE
+      );
     },
 
     /**
      * True if dataset is embargoed
      * @returns {Boolean}
      */
-    isEmbargo: function() {
-      return this.datasetPublicationType == this.PublicationType.EMBARGO
+    isEmbargo: function () {
+      return this.datasetPublicationType == this.PublicationType.EMBARGO;
     },
 
     /**
@@ -329,8 +404,8 @@ export default {
      * requested for publication
      * @returns {Boolean}
      */
-    isRequested: function() {
-      return this.publicationStatus == this.PublicationStatus.REQUESTED
+    isRequested: function () {
+      return this.publicationStatus == this.PublicationStatus.REQUESTED;
     },
 
     /**
@@ -338,8 +413,8 @@ export default {
      * accepted for publication
      * @returns {Boolean}
      */
-    isAccepted: function() {
-      return this.publicationStatus == this.PublicationStatus.ACCEPTED
+    isAccepted: function () {
+      return this.publicationStatus == this.PublicationStatus.ACCEPTED;
     },
 
     /**
@@ -349,133 +424,139 @@ export default {
      * for early release
      * @returns {Boolean}
      */
-    isReleaseRequestEnabled: function() {
-      return this.isEmbargo && !this.isRequested && !this.isAccepted
-    }
+    isReleaseRequestEnabled: function () {
+      return this.isEmbargo && !this.isRequested && !this.isAccepted;
+    },
   },
 
   watch: {
     isEmbargo: {
-      handler: function(val) {
+      handler: function (val) {
         if (val) {
-          this.getAgreement()
+          this.getAgreement();
         }
       },
-      immediate: true
-    }
+      immediate: true,
+    },
   },
 
   methods: {
-    ...mapActions('publishingModule', [
-      'refreshPublishingData'
-    ]),
-    openRejectDialog: function() {
-      this.isRejectRequestDialogVisible = true
+    ...mapActions("publishingModule", ["refreshPublishingData"]),
+    openRejectDialog: function () {
+      this.isRejectRequestDialogVisible = true;
     },
-    closeRejectDialog: function(){
+    closeRejectDialog: function () {
       this.isRejectRequestDialogVisible = false;
     },
     /**
      * Called when user clicks on REJECT in rejectDialog
      */
-    rejectPublishingRequest: function(message) {
-      this.isRejectRequestDialogVisible = false
-      this.triggerRequest(PublicationStatus.REJECTED, this.datasetPublicationType, message)
+    rejectPublishingRequest: function (message) {
+      this.isRejectRequestDialogVisible = false;
+      this.triggerRequest(
+        PublicationStatus.REJECTED,
+        this.datasetPublicationType,
+        message
+      );
     },
     /**
      * Opens Data Use Agreement Modal
      * @param {Number} dataUseAgreementId
      */
-    requestAccess: function(dataUseAgreementId) {
-      const id = pathOr(this.dataset.id, ['content', 'intId'], this.dataset)
-      const url = `${this.config.apiUrl}/discover/datasets/${id}/preview?api_key=${this.userToken}`
-
-      this.sendXhr(url, {
-        method: 'POST',
-        body: {
-          datasetId: id,
-          dataUseAgreementId
-        }
-      }).then(() => {
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: 'Your request was successfully sent to the dataset owner'
-          }
+    requestAccess: function (dataUseAgreementId) {
+      useGetToken()
+        .then((token) => {
+          const id = pathOr(
+            this.dataset.id,
+            ["content", "intId"],
+            this.dataset
+          );
+          const url = `${this.config.apiUrl}/discover/datasets/${id}/preview?api_key=${token}`;
+          return useSendXhr(url, {
+            method: "POST",
+            body: {
+              datasetId: id,
+              dataUseAgreementId,
+            },
+          }).then(() => {
+            EventBus.$emit("toast", {
+              detail: {
+                type: "success",
+                msg: "Your request was successfully sent to the dataset owner",
+              },
+            });
+            this.isDataUseAgreementSignDialogVisible = false;
+            this.isSigningAgreement = false;
+            this.refreshPublishingData(PublicationStatus.COMPLETED);
+          });
         })
-        this.isDataUseAgreementSignDialogVisible = false
-        this.isSigningAgreement = false
-        this.refreshPublishingData(PublicationStatus.COMPLETED)
-      }).catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError);
     },
 
-    triggerRequest: async function(publicationStatus, publicationType, message = "") {
-      const publicationSuffix = getPublicationSuffix(publicationStatus)
-      let url = ''
+    triggerRequest: async function (
+      publicationStatus,
+      publicationType,
+      message = ""
+    ) {
+      const publicationSuffix = getPublicationSuffix(publicationStatus);
+      let url = "";
 
-      if (this.dataset.publication.type === 'embargo') {
-         url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken
-      }&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`
-
-      } else {
-        url = `${this.config.apiUrl
-      }/datasets/${this.dataset.content.id
-      }/publication/${publicationSuffix
-      }?publicationType=${publicationType
-      }&api_key=${this.userToken
-      }&comments=${encodeURI(message.replaceAll('\n','<br>'))}`
-      }
-
-      this.inFlightStatus = true;
-      try {
-        await this.sendXhr(url, { method: 'POST' })
-
-        const actionWord =
-          publicationStatus === PublicationStatus.REQUESTED
-            ? 'sent'
-            : publicationStatus
-
-        const pubTypeWord =
-          publicationType === PublicationType.REMOVAL
-            ? 'Cancel'
-            : publicationType.charAt(0).toUpperCase() + publicationType.slice(1)
-
-        EventBus.$emit('toast', {
-          detail: {
-            type: 'success',
-            msg: `${pubTypeWord} request ${actionWord} for dataset ${this.dataset.content.name}`
+      useGetToken()
+        .then(async (token) => {
+          if (this.dataset.publication.type === "embargo") {
+            url = `${this.config.apiUrl}/datasets/${this.dataset.content.id}/publication/${publicationSuffix}?publicationType=${publicationType}&api_key=${token}&embargoReleaseDate=${this.dataset.publication.embargoReleaseDate}`;
+          } else {
+            url = `${this.config.apiUrl}/datasets/${
+              this.dataset.content.id
+            }/publication/${publicationSuffix}?publicationType=${publicationType}&api_key=${token}&comments=${encodeURI(
+              message.replaceAll("\n", "<br>")
+            )}`;
           }
+
+          this.inFlightStatus = true;
+          return this.sendXhr(url, { method: "POST" }).then(() => {
+            const actionWord =
+              publicationStatus === PublicationStatus.REQUESTED
+                ? "sent"
+                : publicationStatus;
+
+            const pubTypeWord =
+              publicationType === PublicationType.REMOVAL
+                ? "Cancel"
+                : publicationType.charAt(0).toUpperCase() +
+                  publicationType.slice(1);
+
+            EventBus.$emit("toast", {
+              detail: {
+                type: "success",
+                msg: `${pubTypeWord} request ${actionWord} for dataset ${this.dataset.content.name}`,
+              },
+            });
+
+            this.refreshPublishingData(publicationStatus);
+          });
         })
-
-        this.refreshPublishingData(publicationStatus)
-
-        // NOTE: we explicitly DO NOT reset inFlight here because we expect further GET requests to update the parent
-        // lists and re-mount this component
-      } catch (e) {
-        this.handleXhrError(e)
-        // set inFlight to false so we can attempt to hit the button again
-        this.inFlightStatus = false;
-      }
+        .catch((err) => {
+          useHandleXhrError(err);
+          // set inFlight to false so we can attempt to hit the button again
+          this.inFlightStatus = false;
+        });
     },
 
     /**
      * If has agreement, open dialog and prompt user to sign
      * Otherwise, request access
      */
-    onRequestAccessClick: function() {
-      if (this.dataset.embargoAccess === 'requested') {
-        return
+    onRequestAccessClick: function () {
+      if (this.dataset.embargoAccess === "requested") {
+        return;
       }
 
       if (this.hasAgreement) {
-        this.isSigningAgreement = true
-        this.isDataUseAgreementSignDialogVisible = true
+        this.isSigningAgreement = true;
+        this.isDataUseAgreementSignDialogVisible = true;
       } else {
-        this.requestAccess()
+        this.requestAccess();
       }
     },
 
@@ -483,73 +564,72 @@ export default {
      * Get agreement for dataset
      * @returns {Promise}
      */
-    getAgreement: function() {
-      const id = pathOr(this.dataset.id, ['content', 'intId'], this.dataset)
+    getAgreement: function () {
+      const id = pathOr(this.dataset.id, ["content", "intId"], this.dataset);
       fetch(`${this.config.apiUrl}/discover/datasets/${id}/data-use-agreement`)
-        .then(async (response)=> {
-          this.hasAgreement = response.status === 200
+        .then(async (response) => {
+          this.hasAgreement = response.status === 200;
           if (response.status === 200) {
-            this.dataUseAgreement = await response.json()
+            this.dataUseAgreement = await response.json();
           }
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(this.handleXhrError.bind(this));
     },
 
     /**
      * Open agreement dialog and set that the user is not signing.
      * This will allow the user to download the agreement
      */
-    viewAgreement: function() {
-      this.isSigningAgreement = false
-      this.isDataUseAgreementSignDialogVisible = true
+    viewAgreement: function () {
+      this.isSigningAgreement = false;
+      this.isDataUseAgreementSignDialogVisible = true;
     },
-    closeDataUseAgreementSignDialog: function(){
-      isDataUseAgreementSignDialogVisible=false;
+    closeDataUseAgreementSignDialog: function () {
+      this.isDataUseAgreementSignDialogVisible = false;
     },
     /**
      * Download the agreement
      */
-    downloadAgreement: function() {
-      const id = pathOr(this.dataset.id, ['content', 'intId'], this.dataset)
-      const url = `${this.config.apiUrl}/discover/datasets/${id}/data-use-agreement/download`
-      this.isDataUseAgreementSignDialogVisible = false
-      this.isSigningAgreement = false
+    downloadAgreement: function () {
+      const id = pathOr(this.dataset.id, ["content", "intId"], this.dataset);
+      const url = `${this.config.apiUrl}/discover/datasets/${id}/data-use-agreement/download`;
+      this.isDataUseAgreementSignDialogVisible = false;
+      this.isSigningAgreement = false;
 
-      const downloadEl = document.createElement('a')
-      downloadEl.setAttribute('href', url)
-      downloadEl.setAttribute('download', 'download')
+      const downloadEl = document.createElement("a");
+      downloadEl.setAttribute("href", url);
+      downloadEl.setAttribute("download", "download");
 
       if (document.createEvent) {
-        const event = document.createEvent('MouseEvents')
-        event.initEvent('click', true, true)
-        downloadEl.dispatchEvent(event)
+        const event = document.createEvent("MouseEvents");
+        event.initEvent("click", true, true);
+        downloadEl.dispatchEvent(event);
       } else {
-        downloadEl.click()
+        downloadEl.click();
       }
-
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
-  .button-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
+.button-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 
-    a {
-      margin-bottom: 12px;
+  a {
+    margin-bottom: 12px;
+  }
+}
+
+@media only screen and (min-width: 1079px) and (max-width: 1462px) {
+  .bf-button {
+    &.button-spacing {
+      margin-top: 10px;
     }
   }
-
-  @media only screen and (min-width: 1079px) and (max-width: 1462px) {
-    .bf-button {
-      &.button-spacing {
-        margin-top: 10px;
-      }
-    }
-  }
+}
 </style>

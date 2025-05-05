@@ -4,6 +4,8 @@
     data-cy="runAnalysisDialog"
     :show-close="true"
     @close="closeDialog"
+    v-if="processStep < lastProcessStep"
+    fullscreen
   >
     <template #header>
       <bf-dialog-header slot="title" title="Run Analysis Workflow" />
@@ -28,6 +30,11 @@
           class="margin"
           v-model="targetDirectory"
           placeholder="Target Directory (optional)"
+        />
+        <el-input
+          class="margin"
+          v-model="name"
+          placeholder="Workflow Run Name (optional)"
         />
       </div>
       <div v-show="shouldShow(2)">
@@ -72,7 +79,35 @@
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
-        <div>Selected Files: {{ selectedFilesForAnalysis.length }}</div>
+        <div v-if="!selectedProcessorHasParams()">
+          The selected Processor has no parameter values.
+        </div>
+        <el-form v-if="selectedProcessorHasParams()">
+          <el-form-item prop="parameters" id="paramsInput">
+            <el-table
+              :data="selectedProcessorParams"
+              max-height="250"
+              :border="true"
+            >
+              <el-table-column label="Name">
+                <template #default="scope">
+                  <el-input v-model="scope.row.name" disabled></el-input>
+                </template>
+              </el-table-column>
+              <el-table-column label="Value">
+                <template #default="scope">
+                  <el-input
+                    v-model="scope.row.value"
+                    placeholder="Enter value"
+                  ></el-input>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-form-item>
+        </el-form>
+      </div>
+      <div v-show="shouldShow(4)">
+        <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
           <div class="bf-dataset-breadcrumbs">
             <breadcrumb-navigation
@@ -86,6 +121,7 @@
           <div class="table-container">
             <files-table
               :data="files"
+              :clear-selected-values="clearSelectedValues"
               withinRunAnalysisDialog
               :enable-download="false"
               @selection-change="onFileSelect"
@@ -103,6 +139,9 @@
       <bf-button @click="advanceStep(1)">
         {{ proceedText }}
       </bf-button>
+      <div class="warning-message-div">
+        {{ warningMessage }}
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -116,6 +155,8 @@ import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "RunAnalysisDialog",
@@ -142,6 +183,7 @@ export default {
   data: function () {
     return {
       processStep: 1,
+      lastProcessStep: 5,
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
@@ -166,6 +208,11 @@ export default {
       limit: 100,
       tableResultsTotalCount: 0,
       targetDirectory: "",
+      name: "",
+      clearSelectedValues: false,
+      warningMessage: "",
+      selectedProcessorParams: [],
+      warningMessage: "",
     };
   },
   computed: {
@@ -175,15 +222,10 @@ export default {
       "processors",
       "postprocessors",
       "selectedFilesForAnalysis",
+      "fileCount",
     ]),
-    ...mapGetters(["userToken", "config"]),
+    ...mapGetters(["config"]),
 
-    /**
-     * Item has files
-     */
-    // hasFiles: function () {
-    //   return this.files.length > 0;
-    // },
     fileId() {
       return pathOr(
         propOr("", "node_id", this.file),
@@ -203,7 +245,7 @@ export default {
      * @returns {String}
      */
     proceedText: function () {
-      return this.processStep === 3 ? "Run Analysis" : "Next";
+      return this.processStep === 4 ? "Run Analysis" : "Next";
     },
     stepBackText: function () {
       return this.processStep > 1 ? "Back" : "Cancel";
@@ -214,14 +256,20 @@ export default {
     computeNodes: function () {
       this.formatComputeNodeOptions();
     },
-    processors: function () {
-      this.formatProcessorOptions();
-    },
-    preprocessors: function () {
+    selectedComputeNode: function () {
       this.formatPreprocessorOptions();
-    },
-    postprocessors: function () {
+      this.formatProcessorOptions();
       this.formatPostprocessorOptions();
+    },
+    selectedProcessor: function () {
+      this.selectedProcessorParams = [];
+      if (this.selectedProcessor && this.selectedProcessor.params) {
+        for (const [key, value] of Object.entries(
+          this.selectedProcessor.params
+        )) {
+          this.selectedProcessorParams.push({ name: key, value: value });
+        }
+      }
     },
   },
 
@@ -235,29 +283,33 @@ export default {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "setSelectedFile",
       "fetchComputeNodes",
       "fetchApplications",
+      "updateFileCount",
     ]),
+    handleClearSelectedValues: function () {
+      this.clearSelectedValues = !this.clearSelected;
+    },
     /**
      * Get files URL for dataset
      * @returns {String}
      */
-    getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
+    getFilesUrl: async function () {
+      return useGetToken().then((token) => {
         const baseUrl = "datasets";
         const id = this.datasetId;
-
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      });
     },
     /**
      * Send API request to get files for item
      */
     fetchFiles: function () {
-      this.sendXhr(this.getFilesUrl())
-        .then((response) => {
-          this.files = [...response.children];
+      this.getFilesUrl()
+        .then((url) => {
+          this.sendXhr(url).then((response) => {
+            this.files = [...response.children];
+          });
         })
         .catch((response) => {
           this.handleXhrError(response);
@@ -276,50 +328,34 @@ export default {
       this.fileId = file.content.id;
       this.fileName = file.content.name;
 
-      const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+      useGetToken()
+        .then(async (token) => {
+          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          return this.sendXhr(url).then((response) => {
+            this.files = [...response.children];
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+            if (file.content.packageType === "Collection") {
+              //If we click on a folder, we want to add that folder to the ancestors list
+              if (this.fileId && this.fileName) {
+                this.ancestorList.push({
+                  content: {
+                    id: this.fileId,
+                    name: this.fileName,
+                  },
+                });
+              }
+              this.file = file;
+              this.navigateToFile(this.fileId);
+            }
+          });
         })
         .catch((response) => {
           this.handleXhrError(response);
         });
-
-      if (file.content.packageType === "Collection") {
-        //If we click on a folder, we want to add that folder to the ancestors list
-        if (this.fileId && this.fileName) {
-          this.ancestorList.push({
-            content: {
-              id: this.fileId,
-              name: this.fileName,
-            },
-          });
-        }
-        this.file = file;
-        this.navigateToFile(this.fileId);
-      }
     },
-    onFileSelect: function (selectedFiles) {
-      if (this.selectedFilesForAnalysis.length) {
-        selectedFiles.forEach((file) => {
-          const condition = !this.selectedFilesForAnalysis.find(
-            (globalSelectedFile) =>
-              globalSelectedFile.content.id === file.content.id
-          );
-          if (condition) {
-            this.setSelectedFile(file);
-          }
-          return;
-        });
-      } else {
-        this.setSelectedFiles(selectedFiles);
-      }
-      if (selectedFiles.length === 0) {
-        this.clearSelectedFiles();
-      }
-
-      // this.setSelectedFiles(selectedFiles);
+    onFileSelect: function (selectedFiles, parentId) {
+      this.setSelectedFiles({ selectedFiles, parentId });
+      this.updateFileCount();
     },
     /**
      * Closes the dialog
@@ -336,92 +372,153 @@ export default {
       this.postprocessorValue = "";
       this.selectedPostprocessor = {};
       this.clearSelectedFiles();
+      this.updateFileCount();
       this.targetDirectory = "";
+      this.handleClearSelectedValues();
     },
     /**
      * Manages the Multi Step Functionality
      */
-    advanceStep: function (step) {
-      this.processStep += step;
+    advanceStep: async function (step) {
+      let isValid = true;
+
+      if (this.processStep === 1 && step === 1) {
+        isValid = this.validateNode();
+      }
+      if (this.processStep === 2 && step === 1) {
+        isValid = this.validateProcessors();
+      }
+      if (isValid) {
+        this.processStep += step;
+      }
+      // When you click Cancel
       if (this.processStep === 0) {
         this.closeDialog();
       }
-
-      if (this.processStep > 3) {
-        try {
-          this.runAnalysis();
-        } catch {
-        } finally {
-          this.closeDialog();
-        }
+      // When you click "Run Analysis"
+      if (this.processStep > 4) {
+        await this.runAnalysis();
+      }
+    },
+    validateNode: function () {
+      if (this.computeNodeValue) {
+        this.warningMessage = "";
+        return true;
+      } else {
+        this.warningMessage = "please select a compute node";
+        return false;
       }
     },
     /**
-     * Run Analaysis Workflow on Selected Files
+     * validate to make sure all processors have been assigned
      */
-    runAnalysis: function () {
-      const url = `${this.config.api2Url}/workflows`;
+    validateProcessors: function () {
+      if (
+        this.preprocessorValue &&
+        this.processorValue &&
+        this.postprocessorValue
+      ) {
+        this.warningMessage = "";
+        return true;
+      } else {
+        this.warningMessage = "please select a value for all processors";
+        return false;
+      }
+    },
+    selectedProcessorHasParams: function () {
+      if (this.selectedProcessorParams.length > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    },
+    /**
+     * Run Analysis Workflow on Selected Files
+     */
+    runAnalysis: async function () {
+      const url = `${this.config.api2Url}/workflows/instances`;
 
-      const packageIds = this.selectedFilesForAnalysis.map((file) => {
-        return pathOr("", ["content", "id"], file);
+      let arrayOfPackageIds = [];
+      const keysInSelectedFilesForAnalysisArray = Object.keys(
+        this.selectedFilesForAnalysis
+      );
+
+      keysInSelectedFilesForAnalysisArray.forEach((key) => {
+        const ids = this.selectedFilesForAnalysis[key].map((file) => {
+          return pathOr("", ["content", "id"], file);
+        });
+
+        arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = (application) => {
+      const formatApplication = (application, parameters) => {
+        let paramsObject = {};
+        if (parameters != null) {
+          let paramsEntries = [];
+          parameters.forEach((param) => {
+            paramsEntries.push([param.name, param.value]);
+          });
+          paramsObject = Object.fromEntries(paramsEntries);
+        }
         return {
+          name: application.name || "",
+          description: application.description || "",
           uuid: application.uuid || "",
           applicationId: application.applicationId || "",
           applicationContainerName: application.applicationContainerName || "",
           applicationType: application.applicationType || "",
-          params: application.params || {},
+          params: paramsObject,
           commandArguments: application.commandArguments || [],
         };
       };
 
       const body = {
         datasetId: this.datasetId,
-        packageIds: packageIds,
+        packageIds: arrayOfPackageIds,
         computeNode: {
           uuid: this.selectedComputeNode.uuid,
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
+        name: this.name,
         workflow: [
-          formatApplication(this.selectedPreprocessor),
-          formatApplication(this.selectedProcessor),
-          formatApplication(this.selectedPostprocessor),
+          formatApplication(this.selectedPreprocessor, null),
+          formatApplication(
+            this.selectedProcessor,
+            this.selectedProcessorParams
+          ),
+          formatApplication(this.selectedPostprocessor, null),
         ],
         params: {
           target_path: this.targetDirectory,
         },
       };
-      this.sendXhr(url, {
-        method: "POST",
-        header: {
-          Authorization: `Bearer ${this.userToken}`,
-        },
-        body: body,
-      })
-        .then((response) => {
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Your workflow has been successfully initiated!",
-              type: "success",
-            },
-          });
-          this.closeDialog();
-        })
-        .catch((response) => {
-          this.handleXhrError(response);
-          EventBus.$emit("toast", {
-            detail: {
-              msg: "Sorry! There was an issue initiating your event",
-              type: "error",
-            },
-          });
-          this.closeDialog();
-          this.targetDirectory = "";
-          this.selectedApplication = {};
-          this.value = "";
+
+      const token = await useGetToken();
+
+      try {
+        this.sendXhr(url, {
+          method: "POST",
+          header: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: body,
         });
+
+        EventBus.$emit("toast", {
+          detail: {
+            msg: "Your workflow has been successfully initiated!",
+            type: "success",
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        this.closeDialog();
+      } finally {
+        this.closeDialog();
+        this.targetDirectory = "";
+        this.selectedApplication = {};
+        this.value = "";
+      }
     },
     /**
      * Determines if tab content is active
@@ -436,6 +533,9 @@ export default {
      * Access integrations from global state and format options for input select
      */
     formatComputeNodeOptions: function () {
+      if (!this.computeNodes) {
+        return;
+      }
       this.computeNodeOptions = this.computeNodes.map((computeNode) => {
         return {
           value: computeNode.name,
@@ -447,7 +547,12 @@ export default {
      * Access processors from global state and format options for input select
      */
     formatProcessorOptions: function () {
-      this.processorOptions = this.processors.map((processor) => {
+      const filteredProcessors = this.processors.filter(
+        (processor) =>
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
+      );
+
+      this.processorOptions = filteredProcessors.map((processor) => {
         return {
           value: processor.name,
           label: processor.name,
@@ -458,7 +563,11 @@ export default {
      * Access preprocessors from global state and format options for input select
      */
     formatPreprocessorOptions: function () {
-      this.preprocessorOptions = this.preprocessors.map((preprocessor) => {
+      const filteredPreprocessors = this.preprocessors.filter(
+        (preprocessor) =>
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
+      );
+      this.preprocessorOptions = filteredPreprocessors.map((preprocessor) => {
         return {
           value: preprocessor.name,
           label: preprocessor.name,
@@ -469,12 +578,18 @@ export default {
      * Access postprocessors from global state and format options for input select
      */
     formatPostprocessorOptions: function () {
-      this.postprocessorOptions = this.postprocessors.map((postprocessor) => {
-        return {
-          value: postprocessor.name,
-          label: postprocessor.name,
-        };
-      });
+      const filteredPostprocessors = this.postprocessors.filter(
+        (postprocessor) =>
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+      );
+      this.postprocessorOptions = filteredPostprocessors.map(
+        (postprocessor) => {
+          return {
+            value: postprocessor.name,
+            label: postprocessor.name,
+          };
+        }
+      );
     },
     /**
      * Set Selected Compute Node
@@ -489,7 +604,9 @@ export default {
      */
     setSelectedPreprocessor: function (value) {
       this.selectedPreprocessor = this.preprocessors.find(
-        (preprocessor) => preprocessor.name === value
+        (preprocessor) =>
+          preprocessor.name === value &&
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
       );
     },
     /**
@@ -497,7 +614,9 @@ export default {
      */
     setSelectedProcessor: function (value) {
       this.selectedProcessor = this.processors.find(
-        (processor) => processor.name === value
+        (processor) =>
+          processor.name === value &&
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
       );
     },
     /**
@@ -505,7 +624,9 @@ export default {
      */
     setSelectedPostprocessor: function (value) {
       this.selectedPostprocessor = this.postprocessors.find(
-        (postprocessor) => postprocessor.name === value
+        (postprocessor) =>
+          postprocessor.name === value &&
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
       );
     },
     /**
@@ -541,16 +662,18 @@ export default {
       }
     },
     fetchFilesForAnalysisDialog: function (offset, limit, id = null) {
-      let url;
-      if (this.ancestorList.length === 0) {
-        url = this.getFilesUrl();
-      } else {
-        url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
+      useGetToken()
+        .then(async (token) => {
+          let url;
+          if (this.ancestorList.length === 0) {
+            url = await this.getFilesUrl();
+          } else {
+            url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          }
 
-      this.sendXhr(url)
-        .then((response) => {
-          this.files = [...response.children];
+          return this.sendXhr(url).then((response) => {
+            this.files = [...response.children];
+          });
         })
         .catch((response) => {
           this.handleXhrError(response);
@@ -566,7 +689,7 @@ export default {
 .table-container {
   overflow-y: scroll;
   display: block;
-  max-height: 450px;
+  max-height: 650px;
   margin-top: 1px;
 }
 
@@ -619,6 +742,19 @@ export default {
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+.warning-message-div {
+  color: red;
+  margin: 3px;
+}
+</style>
+
+<style lang="scss">
+#paramsInput {
+  .cell {
+    white-space: normal;
+    max-height: unset;
   }
 }
 </style>

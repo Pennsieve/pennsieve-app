@@ -1,6 +1,5 @@
 <script setup>
-
-import { ref,watch} from "vue";
+import { ref, watch } from "vue";
 
 import IconDocument from "@/components/icons/IconDocument.vue";
 import ModelsList from "@/components/datasets/records/ModelsList/ModelsList.vue";
@@ -8,192 +7,164 @@ import IconInfo from "@/components/icons/IconInfo.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 import ModelDetails from "@/components/datasets/records/GraphBrowser/ModelDetails.vue";
 
-const props = defineProps(['edges', 'modelId', 'panelVisible'])
+const props = defineProps(["edges", "modelId", "panelVisible"]);
 
-const modelsListVisible = ref(false)
-const modelListSelected = ref(true)
-const modelInfoSelected = ref(false)
+const modelsListVisible = ref(false);
+const modelListSelected = ref(true);
+const modelInfoSelected = ref(false);
 
 const emit = defineEmits([
-  'openDeleteLinkedPropDialog',
-  'togglePanelVisibility',
-  'focusNode',
-  'openPropertyDialog',
-  'openDeletePropDialog',
-  'openDeleteRelationshipDialog',
-  'openDeleteModelDialog',
-  'openEditPropertyDialog'
-])
+  "openDeleteLinkedPropDialog",
+  "togglePanelVisibility",
+  "focusNode",
+  "openPropertyDialog",
+  "openDeletePropDialog",
+  "openDeleteRelationshipDialog",
+  "openDeleteModelDialog",
+  "openEditPropertyDialog",
+]);
 
-const mouseHoverInfo = ref(false)
-const mouseHoverList = ref(false)
+const mouseHoverInfo = ref(false);
+const mouseHoverList = ref(false);
 
 function mouseLeave(event) {
-
-  const evtId = event.currentTarget.id
+  const evtId = event.currentTarget.id;
   if (!props.panelVisible) {
-    mouseHoverInfo.value = false
-    mouseHoverList.value = false
-    return
+    mouseHoverInfo.value = false;
+    mouseHoverList.value = false;
+    return;
   }
 
-  switch(evtId) {
-    case 'infoPanel':
-      mouseHoverList.value = false
-      break
-    case 'propPanel':
-      mouseHoverInfo.value = false
-      break
+  switch (evtId) {
+    case "infoPanel":
+      mouseHoverList.value = false;
+      break;
+    case "propPanel":
+      mouseHoverInfo.value = false;
+      break;
   }
-
 }
 
 function mouseOver(event) {
-
-  const evtId = event.currentTarget.id
+  const evtId = event.currentTarget.id;
 
   if (!props.panelVisible) {
-    mouseHoverInfo.value = false
-    mouseHoverList.value = false
-    return
+    mouseHoverInfo.value = false;
+    mouseHoverList.value = false;
+    return;
   }
 
-  switch(evtId) {
-    case 'infoPanel':
+  switch (evtId) {
+    case "infoPanel":
       if (modelListSelected.value) {
-        mouseHoverList.value = true
+        mouseHoverList.value = true;
       }
-      break
-    case 'propPanel':
+      break;
+    case "propPanel":
       if (modelInfoSelected.value) {
-        mouseHoverInfo.value = true
+        mouseHoverInfo.value = true;
       }
-      break
+      break;
   }
-
 }
 
-watch(() => props.modelId, (modelId, second) => {
-  if (modelId) {
-    modelInfoSelected.value = true
-    modelListSelected.value = false
+watch(
+  () => props.modelId,
+  (modelId, second) => {
+    if (modelId) {
+      modelInfoSelected.value = true;
+      modelListSelected.value = false;
+    }
   }
-})
+);
 
 function focusNode(event) {
-  emit('focusNode', event)
+  emit("focusNode", event);
 }
 
 function toggleModelsList(event) {
-  const evtId = event.currentTarget.id
+  const evtId = event.currentTarget.id;
 
   switch (evtId) {
-    case 'infoPanel':
+    case "infoPanel":
       if (modelListSelected.value) {
-        modelsListVisible.value = false
-        modelListSelected.value = false
-        emit('togglePanelVisibility')
+        modelsListVisible.value = false;
+        modelListSelected.value = false;
+        emit("togglePanelVisibility");
       } else if (modelInfoSelected.value) {
-        modelListSelected.value = true
-        modelInfoSelected.value = false
-        mouseHoverList.value = true
+        modelListSelected.value = true;
+        modelInfoSelected.value = false;
+        mouseHoverList.value = true;
       } else {
-        modelListSelected.value = true
-        mouseHoverList.value = true
-        emit('togglePanelVisibility')
+        modelListSelected.value = true;
+        mouseHoverList.value = true;
+        emit("togglePanelVisibility");
       }
-      break
-    case 'propPanel':
+      break;
+    case "propPanel":
       if (modelInfoSelected.value) {
-        modelsListVisible.value = false
-        modelInfoSelected.value = false
-        emit('togglePanelVisibility')
+        modelsListVisible.value = false;
+        modelInfoSelected.value = false;
+        emit("togglePanelVisibility");
       } else if (modelListSelected.value) {
-        modelInfoSelected.value = true
-        modelListSelected.value = false
-        mouseHoverInfo.value = true
-
+        modelInfoSelected.value = true;
+        modelListSelected.value = false;
+        mouseHoverInfo.value = true;
       } else {
-        modelInfoSelected.value = true
-        mouseHoverInfo.value = true
-        emit('togglePanelVisibility')
+        modelInfoSelected.value = true;
+        mouseHoverInfo.value = true;
+        emit("togglePanelVisibility");
       }
-      break
+      break;
   }
-
-
 }
 
 function onOpenPropertyDialog() {
-  emit('openPropertyDialog')
+  emit("openPropertyDialog");
 }
 
 function onOpenDeleteLinkedPropDialog(event) {
-  emit('openDeleteLinkedPropDialog', event)
+  emit("openDeleteLinkedPropDialog", event);
 }
 function onOpenDeletePropDialog(event) {
-  emit('openDeletePropDialog', event)
+  emit("openDeletePropDialog", event);
 }
 function onOpenDeleteRelationshipDialog(event) {
-  emit('openDeleteRelationshipDialog', event)
+  emit("openDeleteRelationshipDialog", event);
 }
 
 function onOpenDeleteModelDialog(event) {
-  emit('openDeleteModelDialog', event)
+  emit("openDeleteModelDialog", event);
 }
 
 function onOpenEditPropertyDialog(event) {
-  emit('openEditPropertyDialog', event)
+  emit("openEditPropertyDialog", event);
 }
-
 </script>
 
 <template>
-  <div
-    class="models-list-wrap"
-    :class="{ 'visible': modelsListVisible }"
-  >
+  <div class="models-list-wrap" :class="{ visible: modelsListVisible }">
     <button
       id="propPanel"
-      :class="{ 'selected': modelInfoSelected, 'btn-toggle':true, 'second':true }"
+      :class="{ selected: modelInfoSelected, 'btn-toggle': true, second: true }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
     >
-      <IconInfo
-        v-if="!mouseHoverInfo"
-        :width="24"
-        :height="24"
-      />
-      <IconArrowRight
-        v-else
-        :width="14"
-        :height="14"
-      />
+      <IconInfo v-if="!mouseHoverInfo" :width="24" :height="24" />
+      <IconArrowRight v-else :width="14" :height="14" />
     </button>
     <button
       id="infoPanel"
-      :class="{ 'selected': modelListSelected, 'btn-toggle':true, 'first':true }"
+      :class="{ selected: modelListSelected, 'btn-toggle': true, first: true }"
       @click="toggleModelsList"
       @mouseenter="mouseOver"
       @mouseleave="mouseLeave"
     >
-      <IconDocument
-        v-if="!mouseHoverList"
-        :width="24"
-        :height="24"
-      />
-      <IconArrowRight
-        v-else
-        :width="14"
-        :height="14"
-      />
-
+      <IconDocument v-if="!mouseHoverList" :width="24" :height="24" />
+      <IconArrowRight v-else :width="14" :height="14" />
     </button>
-    <div
-      ref="modelsList"
-      class="models-list-scroll"
-    >
+    <div ref="modelsList" class="models-list-scroll">
       <models-list
         v-show="modelListSelected"
         :show-heading="false"
@@ -201,7 +172,6 @@ function onOpenEditPropertyDialog(event) {
         :scrolling-list="true"
         @click="focusNode"
       />
-
 
       <model-details
         v-show="modelInfoSelected"
@@ -214,21 +184,12 @@ function onOpenEditPropertyDialog(event) {
         @open-edit-property-dialog="onOpenEditPropertyDialog"
         :edges="edges"
       />
-
-
-
     </div>
-
-
-
-
-
   </div>
-
 </template>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@import "../../../../assets/_variables.scss";
 
 .models-list-wrap {
   border-top: 1px solid $gray_2;
@@ -240,13 +201,12 @@ function onOpenEditPropertyDialog(event) {
   right: 0;
   top: 0;
   transform: translate3d(100%, 72px, 0);
-  transition: transform .3s ease-out;
+  transition: transform 0.3s ease-out;
   width: 300px;
   will-change: transform;
   z-index: 3;
   &.visible {
     transform: translate3d(0, 72px, 0);
-
   }
 }
 .models-list-scroll {
@@ -269,7 +229,7 @@ function onOpenEditPropertyDialog(event) {
   width: 35px;
   color: $purple_1;
   fill: $purple_1;
-  background:$gray_1;
+  background: $gray_1;
 
   &.first {
     top: 33px;
@@ -284,7 +244,7 @@ function onOpenEditPropertyDialog(event) {
 
     &:after {
       background: $gray_1;
-      content: '';
+      content: "";
       height: 100%;
       pointer-events: none;
       position: absolute;
@@ -293,9 +253,5 @@ function onOpenEditPropertyDialog(event) {
       width: 5px;
     }
   }
-
-
-
 }
-
 </style>

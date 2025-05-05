@@ -20,7 +20,7 @@
           class="options-icon"
           trigger="click"
           placement="bottom-end"
-          v-if="isOwner"
+          v-if="isAdmin"
           @command="onIntegrationMenu"
         >
           <span class="btn-file-menu el-dropdown-link">
@@ -63,7 +63,7 @@ import Avatar from "../../shared/avatar/Avatar.vue";
 import IconMenu from "../../icons/IconMenu.vue";
 
 export default {
-  name: "IntegrationListItem",
+  name: "IntegrationsListItem",
 
   components: {
     IconMenu,

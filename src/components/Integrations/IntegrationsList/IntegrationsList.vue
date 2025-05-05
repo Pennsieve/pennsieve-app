@@ -1,51 +1,48 @@
 <template>
-  <bf-page class="integrations-list">
-    <bf-stage slot="stage" element-loading-background="transparent">
-      <template #actions>
-        <bf-button v-if="hasAdminRights" @click="openAddIntegration">
-          Register Webhook
-        </bf-button>
-      </template>
+  <bf-stage element-loading-background="transparent">
+    <template #actions>
+      <bf-button v-if="hasAdminRights" @click="openAddIntegration">
+        Register Integration
+      </bf-button>
+    </template>
+    <div v-if="integrations.length > 0" class="integration-list">
+      <IntegrationsListItem
+        v-for="integration in filteredApplications"
+        :key="integration.id"
+        :integration="integration"
+        @open-remove-integration="openDeleteIntegrationDialog"
+        @open-edit-integration="openEditIntegrationDialog"
+      />
+    </div>
 
-      <div v-if="integrations.length > 0" class="integration-list">
-        <integrations-list-item
-          v-for="integration in filteredWebhooks"
-          :key="integration.id"
-          :integration="integration"
-          @open-remove-integration="openDeleteIntegrationDialog"
-          @open-edit-integration="openEditIntegrationDialog"
-        />
+    <bf-empty-page-state v-else class="empty">
+      <img
+        src="../../../assets/images/illustrations/illo-collaboration.svg"
+        height="240"
+        width="247"
+        alt="Teams illustration"
+      />
+      <div v-if="hasAdminRights" class="copy">
+        <h2>There are no integrations yet</h2>
+        <p>
+          Integrations allow external services to be notified when certain
+          events occur on Pennsieve. These integrations are available to all
+          members within the organization and can be managed at the dataset
+          level under settings.
+        </p>
       </div>
-
-      <bf-empty-page-state v-else class="empty">
-        <img
-          src="../../../assets/images/illustrations/illo-collaboration.svg"
-          :height="240"
-          :width="247"
-          alt="Teams illustration"
-        />
-        <div v-if="hasAdminRights" class="copy">
-          <h2>There are no integrations yet</h2>
-          <p>
-            Integrations allow external services to be notified when certain
-            events occur on Pennsieve. These integrations are available to all
-            members within the organization and can be managed at the dataset
-            level under settings.
-          </p>
-        </div>
-        <div v-if="!hasAdminRights" class="copy">
-          <h2>{{ orgName }} doesn't have any integrations yet.</h2>
-          <p>
-            Contact your administrator to get started working with Integrations.
-          </p>
-        </div>
-      </bf-empty-page-state>
-    </bf-stage>
+      <div v-if="!hasAdminRights" class="copy">
+        <h2>{{ orgName }} doesn't have any integrations yet.</h2>
+        <p>
+          Contact your administrator to get started working with Integrations.
+        </p>
+      </div>
+    </bf-empty-page-state>
 
     <add-edit-integration-dialog
       :dialog-visible="addEditIntegrationDialogVisible"
       :integration-edit.sync="integrationEdit"
-      integrationType="Webhook"
+      integrationType="Application"
       @add-integration="onAddIntegrationConfirm"
       @edit-integration="onEditIntegrationConfirm"
       @close="onCloseAddEditDialog"
@@ -63,7 +60,7 @@
       :dialog-visible="APIKeyDetailsVisible"
       @close="onApiKeyCloseDialog"
     />
-  </bf-page>
+  </bf-stage>
 </template>
 
 <script>
@@ -117,13 +114,12 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["activeOrganization", "userToken", "config", "hasFeature"]),
+    ...mapGetters(["activeOrganization", "config", "hasFeature"]),
 
-    filteredWebhooks: function () {
+    filteredApplications: function () {
       let filteredArray = this.integrations.filter(
-        (x) => !x.customTargets || x.customTargets.length == 0
+        (x) => x.customTargets && x.customTargets.length > 0
       );
-
       return filteredArray;
     },
 
@@ -161,14 +157,13 @@ export default {
     ...mapState([]),
 
     onApiKeyCloseDialog: function () {
-      this.APIKeyDetailsVisisble = false;
+      this.APIKeyDetailsVisible = false;
     },
     onRemoveIntegrationCloseDialog: function () {
       this.removeIntegrationDialogVisible = false;
     },
 
     onCloseAddEditDialog: function () {
-      this.integrationEdit = {};
       this.addEditIntegrationDialogVisible = false;
     },
 
@@ -180,17 +175,7 @@ export default {
       this.removeIntegration(integration.id);
       this.removeIntegrationDialogVisible = false;
     },
-    /**
-     * Model URL
-     * @returns {String}
-     */
-    getIntegrationUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/webhooks`;
-      }
 
-      return "";
-    },
     openEditIntegrationDialog: function (integration) {
       this.integrationEdit = integration;
       this.addEditIntegrationDialogVisible = true;
@@ -238,11 +223,45 @@ export default {
      * @param {Object} integration
      */
     onAddIntegrationConfirm: function (integration) {
-      let eventTargets = [];
-      for (const [key, value] of Object.entries(integration.eventTypeList)) {
-        if (value) {
-          eventTargets.push(key);
+      let customTargets = {};
+      for (const [key, value] of Object.entries(integration.customTargets)) {
+        switch (value.target) {
+          case "DATASET":
+            customTargets.DATASET = null;
+            break;
+          case "PACKAGE":
+            if (!("PACKAGE" in customTargets)) {
+              customTargets.PACKAGE = [];
+            }
+            customTargets.PACKAGE.push(value.filter);
+            break;
+          case "PACKAGES":
+            if (!("PACKAGES" in customTargets)) {
+              customTargets.PACKAGES = [];
+            }
+            customTargets.PACKAGES.push(value.filter);
+            break;
         }
+      }
+
+      let customTargetDTO = [];
+      for (const [key, value] of Object.entries(customTargets)) {
+        let targetEntry = {
+          target: key,
+        };
+        if (value && value.filter && value.filter.length > 0) {
+          switch (key) {
+            case "PACKAGE":
+            case "PACKAGES":
+              targetEntry.filter = {
+                packageFilter: {
+                  fileType: value,
+                },
+              };
+              break;
+          }
+        }
+        customTargetDTO.push(targetEntry);
       }
 
       let integrationDTO = {
@@ -254,7 +273,8 @@ export default {
         imageUrl: integration.imageUrl,
         isDefault: integration.isDefault,
         hasAccess: integration.integrationType === "viewer" ? false : true,
-        targetEvents: eventTargets,
+        customTargets: customTargetDTO,
+        targetEvents: ["CUSTOM"],
       };
 
       this.createIntegration(integrationDTO).then((response) => {
@@ -263,7 +283,7 @@ export default {
           key: response.tokenSecret.key,
           secret: response.tokenSecret.secret,
         };
-        this.APIKeyDetailsVisisble = true;
+        this.APIKeyDetailsVisible = true;
       });
     },
   },
@@ -296,7 +316,6 @@ export default {
 }
 
 .description {
-  //margin-left: 8px;
   max-width: 500px;
 }
 

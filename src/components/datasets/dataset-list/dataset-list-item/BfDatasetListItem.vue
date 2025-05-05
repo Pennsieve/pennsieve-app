@@ -207,7 +207,6 @@ export default {
       "activeOrganization",
       "orgMembers",
       "config",
-      "userToken",
       "orgDatasetStatuses",
     ]),
 
@@ -343,11 +342,11 @@ export default {
      */
     publicatonStatus: function () {
       const status = this.dataset.publication.status;
-      if (status == PublicationStatus.REQUESTED) {
+      if (status === PublicationStatus.REQUESTED) {
         return UserFriendlyPublicationStatus.REQUESTED;
-      } else if (status == PublicationStatus.COMPLETED) {
+      } else if (status === PublicationStatus.COMPLETED) {
         return UserFriendlyPublicationStatus.COMPLETED;
-      } else if (status == PublicationStatus.REJECTED) {
+      } else if (status === PublicationStatus.REJECTED) {
         return UserFriendlyPublicationStatus.REJECTED;
       } else {
         return "";
@@ -359,16 +358,12 @@ export default {
      * @returns {String}
      */
     publicationStatusColor: function () {
-      console.log(
-        "this.dataset.publication.status",
-        this.dataset.publication.status
-      );
       const status = this.dataset.publication.status;
-      if (status == PublicationStatus.REQUESTED) {
+      if (status === PublicationStatus.REQUESTED) {
         return PublicationStatusColor.REQUESTED;
-      } else if (status == PublicationStatus.COMPLETED) {
+      } else if (status === PublicationStatus.COMPLETED) {
         return PublicationStatusColor.COMPLETED;
-      } else if (status == PublicationStatus.REJECTED) {
+      } else if (status === PublicationStatus.REJECTED) {
         return PublicationStatusColor.REJECTED;
       } else {
         return ""; //	should we return a default color here?

@@ -22,6 +22,7 @@ import Request from "../../../mixins/request";
 import {mapGetters} from "vuex";
 import {propOr} from "ramda";
 import IconUpload from "../../icons/IconUpload.vue";
+import {useGetToken} from "@/composables/useGetToken";
 
 export default {
   name: 'ReadmeDoc',
@@ -69,7 +70,6 @@ export default {
   computed: {
     ...mapGetters([
       "config",
-      'userToken'
     ]),
 
     docTitle: function() {
@@ -87,17 +87,20 @@ export default {
   },
 
   methods: {
-    getReadmeDocument: function(val) {
-      const url = `${this.config.api2Url}/readme/docs/${val}`
+    getReadmeDocument: async function(val) {
 
-      this.sendXhr(url, {
-        method: 'GET',
-        header: {
-          'Authorization': `Bearer ${this.userToken}`
-        },
-      }).then( result => {
-        this.content = result
-      })
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.api2Url}/readme/docs/${val}`
+          this.sendXhr(url, {
+            method: 'GET',
+            header: {
+              'Authorization': `Bearer ${token}`
+            },
+          }).then( result => {
+            this.content = result
+          })
+        })
     }
   }
 }

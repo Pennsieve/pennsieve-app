@@ -1,7 +1,7 @@
 <template>
     <div class="timeseries-plot-canvas">
         <canvas id="blurArea" class="canvas" ref="blurArea"
-            :width="_cpCanvasScaler(cWidth, pixelRatio, 0)"
+            :width="canvasWidth"
             :height="_cpCanvasScaler(pHeight, pixelRatio, 0)"
             :style="canvasStyle"></canvas>
         <slot name="axisCanvas">
@@ -9,7 +9,7 @@
         <slot name="annCanvas">
         </slot>
         <canvas id="plotArea" class="canvas" ref="plotArea"
-            :width="_cpCanvasScaler(cWidth, pixelRatio, 0)"
+            :width="canvasWidth"
             :height="_cpCanvasScaler(pHeight, pixelRatio, 0)"
             :style="canvasStyle">
         </canvas>
@@ -35,6 +35,7 @@
     } from 'ramda'
 
     import protobuf from 'protobufjs'
+    import {useGetToken} from "@/composables/useGetToken";
 
     export default {
         name: 'TimeseriesPlotCanvas',
@@ -66,6 +67,11 @@
                 'viewerChannels',
                 'viewerMontageScheme'
             ]),
+
+            canvasWidth: function() {
+              return this.pixelRatio * this.cWidth;
+            },
+
             canvasStyle: function() {
                 return {
                     width: this.cWidth  + 'px',
@@ -74,12 +80,7 @@
             },
             pHeight: function () {
                 return this.cHeight - 20
-            },
-            timeSeriesUrl: function() {
-                const url = this.$store.state.config.timeSeriesUrl
-                const token = this.$store.state.userToken
-                return url + '?session=' + token + '&package=' + this.activeViewer.content.id
-            },
+            }
         },
         data: function () {
             return {
@@ -360,17 +361,6 @@
             _cpCanvasScaler: function(sz, pixelRatio, offset) {
                 return pixelRatio * (sz + offset);
             },
-            getScreenPixelRatio: function() {
-                let ctx = this.$refs.plotArea.getContext('2d');
-                let dpr = window.devicePixelRatio || 1
-                let bsr = ctx.webkitBackingStorePixelRatio ||
-                ctx.mozBackingStorePixelRatio ||
-                ctx.msBackingStorePixelRatio ||
-                ctx.oBackingStorePixelRatio ||
-                ctx.backingStorePixelRatio || 1;
-
-                return dpr / bsr;
-            },
             getChannelId: function(channel) {
                 const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
@@ -430,7 +420,7 @@
                             hover: false,                               // User is hovering over channel
                             unit: curC.unit,                            // unit of data
                             sf: curC.rate,                              // sampling rate
-                            filter: {},                                 // filter object (type, var0, var1, notch)
+                            filter: {},                                 // filter object (type, var0, var1, notchFreq)
                             hideFilter: true,
                             isEditing: false,
                             virtualId: curChannel.virtualId
@@ -1070,14 +1060,31 @@
                 }
             },
             _renderData: function(isRedraw=false) {
-                const ba = this.$refs.blurArea;
-                const ctxb = ba.getContext('2d');
+                const blurCanvas = this.$refs.blurArea;
+                if (!blurCanvas) {
+                  console.warn('blurArea ref is missing, skipping _renderData');
+                  return;
+                }
+                const ctxb = blurCanvas.getContext('2d');
+                if (!ctxb) {
+                  console.warn('Unable to get 2D context for blurArea, skipping _renderData');
+                  return;
+                }
                 ctxb.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
                 ctxb.fillStyle = 'rgb(220,220,220)'
 
 
-                const pa = this.$refs.plotArea;
-                const ctx = pa.getContext('2d');
+                const plotCanvas = this.$refs.plotArea;
+                if (!plotCanvas) {
+                  console.warn('plotArea ref is missing, skipping drawing.');
+                  return;
+                }
+
+                const ctx = plotCanvas.getContext('2d');
+                if (!ctx) {
+                  console.warn('Unable to get 2D context for plotArea, skipping drawing.');
+                  return;
+                }
                 ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
                 // clear canvas
@@ -1421,11 +1428,17 @@
                     return;
                 }
 
-                let url = this.timeSeriesUrl
-                this._websocket = new WebSocket(url);
-                this._websocket.onopen = this._onWebsocketOpen.bind(this);
-                this._websocket.onclose = this._onWebsocketClose.bind(this);
-                this._websocket.onmessage = this._onWebsocketMessage.bind(this);
+              useGetToken()
+                .then(token => {
+                  const url =  this.$store.state.config.timeSeriesUrl + '?session=' + token + '&package=' + this.activeViewer.content.id
+                  this._websocket = new WebSocket(url);
+                  this._websocket.onopen = this._onWebsocketOpen.bind(this);
+                  this._websocket.onclose = this._onWebsocketClose.bind(this);
+                  this._websocket.onmessage = this._onWebsocketMessage.bind(this);
+                })
+                .catch(console.log)
+
+
 
             },
             sendMontageMessage: function (value) {
@@ -1704,9 +1717,9 @@
               }
             },
             isTruthy: val => val && val !== '' && !val.isNaN,
-            calcFilterType: function(low, high, notch) {
+            calcFilterType: function(low, high, notchFreq) {
               switch(true) {
-                case !this.isTruthy(low) && !this.isTruthy(high) && !notch:
+                case !this.isTruthy(low) && !this.isTruthy(high) && !notchFreq:
                   return 'clear';
                 case this.isTruthy(low) && this.isTruthy(high):
                   return 'bandpass';

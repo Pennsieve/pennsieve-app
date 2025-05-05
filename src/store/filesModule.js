@@ -1,6 +1,8 @@
 import Cookie from 'js-cookie'
 import toQueryParams from '../utils/toQueryParams.js'
 import router from '@/router'
+import {useGetToken} from "@/composables/useGetToken";
+import EventBus from "../utils/event-bus.js"
 
 
 const initialState = () => ({
@@ -59,7 +61,7 @@ export const actions = {
     const datasetId = currentRoute.params.datasetId
     const endpoint = `${rootState.config.api2Url}/metadata/package`
 
-    const apiKey = rootState.userToken || Cookies.get('user_token')
+    const apiKey = await useGetToken()
     const queryParams = getPackageMetadataQueryParams(state.datasetManifestParams, datasetId, packageId)
 
     const url = `${endpoint}?${queryParams}`

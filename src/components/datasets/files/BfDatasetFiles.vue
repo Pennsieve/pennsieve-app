@@ -16,10 +16,9 @@
           />
         </template>
         <template #right>
-
           <template v-if="quickActionsVisible">
             <bf-button
-              v-if="showRunAnalysisFlow"
+              :disabled="!isFeatureFlagEnabled"
               @click="openRunAnalysisDialog"
               class="mr-8 flex"
             >
@@ -42,13 +41,15 @@
               New Folder
             </bf-button>
           </template>
-
-          <ps-button-dropdown @click="toggleActionDropdown" :menu-open="!quickActionsVisible">
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
             <template #buttons>
               <bf-button
-                v-if="showRunAnalysisFlow"
+                :disabled="!isFeatureFlagEnabled"
                 @click="openRunAnalysisDialog"
-                class="dropdown-button "
+                class="dropdown-button"
               >
                 <template #prefix>
                   <IconAnalysis class="mr-8" :height="20" :width="20" />
@@ -92,11 +93,8 @@
 
                 Restore
               </bf-button>
-
             </template>
-
           </ps-button-dropdown>
-
         </template>
       </stage-actions>
     </template>
@@ -110,7 +108,6 @@
           @move="showMove"
           @delete="showDeleteDialog"
           @rename-file="showRenameFileDialog"
-          @custom-actions-click="showCustomActionsDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
@@ -169,11 +166,6 @@
       @close="onCloseDeleteDialog"
     />
 
-    <custom-actions-dialog
-      ref="customActionsDialog"
-      :selected-files="selectedFiles"
-    />
-
     <run-analysis-dialog
       :datasetId="datasetId"
       :dialog-visible="runAnalysisDialogVisible"
@@ -201,14 +193,12 @@ import {
   pathEq,
   findIndex,
   pluck,
-  includes,
 } from "ramda";
 
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
-import CustomActionsDialog from "./custom-actions-dialog/CustomActionsDialog.vue";
 import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
@@ -231,8 +221,16 @@ import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
+
+import {
+  isEnabledForSpecificOrgs,
+  isEnabledForTestOrgs,
+  isEnabledForAllDevOrgs,
+} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "BfDatasetFiles",
@@ -250,7 +248,6 @@ export default {
     BfEmptyPageState,
     BfPackageDialog,
     BfDeleteDialog,
-    CustomActionsDialog,
     BfMoveDialog,
     BfDropInfo,
     BfUploadInfo,
@@ -291,7 +288,6 @@ export default {
       selectedFiles: [],
       moveConflict: {},
       showDropInfo: false,
-      // showUploadInfo: false,
       sortDirection: "asc",
       singleFile: {},
       deletedDialogOpen: false,
@@ -321,7 +317,6 @@ export default {
     ]),
     ...mapState(["activeOrganization"]),
     ...mapGetters([
-      "userToken",
       "config",
       "uploading",
       "dataset",
@@ -332,28 +327,15 @@ export default {
     ]),
     ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
 
-    ...mapGetters("datasetModule", ["getPusherChannel", "getManifestNotification"]),
+    ...mapGetters("datasetModule", [
+      "getPusherChannel",
+      "getManifestNotification",
+    ]),
 
     showUploadInfo: function () {
       return this.getUploadComplete() || this.getIsUploading();
     },
-    /**
-     * Feature Flag for Run Analysis Flow
-     *
-     */
-    showRunAnalysisFlow: function () {
-      // only release this feature for Pennsieve Test in dev and Immune Health in Prod
-      const isPennsieveTestDev =
-        this.organizationId ===
-        "N:organization:050fae39-4412-43ef-a514-703ed8e299d5";
-      const isImmuneHealthProd =
-        this.organizationId ===
-        "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
-      const isPennsieveTestProd =
-        this.organizationId ===
-        "N:organization:400e5ec8-56b3-4e31-8932-738a7ea6d385";
-      return isPennsieveTestDev || isImmuneHealthProd || isPennsieveTestProd;
-    },
+
     /**
      * Compute organization's ID
      * @returns {String}
@@ -368,14 +350,24 @@ export default {
       return this.files.length > 0;
     },
 
+    filesUrl: function () {
+      const baseUrl =
+        this.$route.name === "dataset-files" ? "datasets" : "packages";
+      const id =
+        this.$route.name === "dataset-files"
+          ? this.$route.params.datasetId
+          : this.$route.params.fileId;
+      return `${this.config.apiUrl}/${baseUrl}/${id}?includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+    },
+
     /**
      * Get move URL
      * @returns {String}
      */
-    moveUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        return `${this.config.apiUrl}/data/move?api_key=${this.userToken}`;
-      } else return null;
+    moveUrl: async function () {
+      return useGetToken().then((token) => {
+        return `${this.config.apiUrl}/data/move?api_key=${token}`;
+      });
     },
 
     /**
@@ -393,22 +385,29 @@ export default {
     isExploreEnabled: function () {
       return this.hasFeature("concepts_feature");
     },
+    isFeatureFlagEnabled: function () {
+      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
+      return (
+        isEnabledForTestOrgs(orgId) ||
+        isEnabledForSpecificOrgs(orgId) ||
+        isEnabledForAllDevOrgs(this.config.apiUrl)
+      );
+    },
   },
 
   watch: {
-
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit('toast', {
+        EventBus.$emit("toast", {
           detail: {
             type: "warning",
             msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
             duration: 0,
-            showClose: true
-          }
-        })
+            showClose: true,
+          },
+        });
       },
-      deep: true
+      deep: true,
     },
 
     "$store.state.uploadModule.uploadComplete": function () {
@@ -449,7 +448,7 @@ export default {
 
               for (let x in data) {
                 if ((data[x].parent_id.Int64 = curFolderId)) {
-                  this.fetchFiles();
+                  this.fetchFiles(this.filesUrl);
                   break;
                 }
               }
@@ -460,13 +459,14 @@ export default {
       immediate: true,
     },
 
-    $route: 'handleRouteChange'
+    $route: "handleRouteChange",
   },
 
   mounted: function () {
-    if (this.getFilesUrl() && !this.files.length) {
+    if (this.filesUrl && !this.files.length) {
       this.fetchFiles();
     }
+
     this.$el.addEventListener("dragenter", this.onDragEnter.bind(this));
     EventBus.$on("add-uploaded-file", this.onAddUploadedFile.bind(this));
     EventBus.$on("dismiss-upload-info", this.onDismissUploadInfo.bind(this));
@@ -483,10 +483,10 @@ export default {
     });
     EventBus.$on("refreshAfterDeleteModal", (data) => {
       var temp = data;
-      this.fetchFiles();
+      this.fetchFiles(this.filesUrl);
     });
     EventBus.$on("refreshAfterRestore", () => {
-      this.fetchFiles();
+      this.fetchFiles(this.filesUrl);
     });
   },
 
@@ -525,26 +525,24 @@ export default {
       "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
+    ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
-    ...mapActions("datasetModule",[
-      'createDatasetManifest'
-    ]),
+    ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
-    generateManifest: function() {
+    generateManifest: function () {
+      this.createDatasetManifest();
 
-      this.createDatasetManifest()
-
-      EventBus.$emit('toast', {
+      EventBus.$emit("toast", {
         detail: {
           type: "success",
           msg: "Dataset manifest is being prepared.",
-          duration: 1000
-        }
-      })
+          duration: 1000,
+        },
+      });
     },
 
-    toggleActionDropdown: function() {
-      this.quickActionsVisible = !this.quickActionsVisible
+    toggleActionDropdown: function () {
+      this.quickActionsVisible = !this.quickActionsVisible;
     },
 
     // Ignore drops to component outside the drop target and close drop-target
@@ -584,6 +582,7 @@ export default {
       ) {
         this.allowFetch = false;
         this.offset = this.offset + this.limit;
+        this.fetchFiles();
         event.currentTarget.scrollTop = scrollTop - 20;
       }
     },
@@ -643,44 +642,48 @@ export default {
     /**
      * Send API request to get files for item
      */
-    fetchFiles: function () {
+    fetchFiles: function (url) {
       this.filesLoading = true;
-      this.sendXhr(this.getFilesUrl())
-        .then((response) => {
-          this.filesLoading = true;
-          this.$store.dispatch(
-            "uploadModule/setCurrentTargetPackage",
-            response
-          );
-          this.file = response;
 
-          const newFiles = response.children.map((file) => {
-            if (!file.storage) {
-              file.storage = 0;
+      useGetToken()
+        .then((token) => {
+          const fullUrl = `${this.filesUrl}&api_key=${token}`;
+          return useSendXhr(fullUrl).then((response) => {
+            this.filesLoading = true;
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
+            );
+            this.file = response;
+
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
+              }
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            if (newFiles.length < this.limit) {
+              this.lastPage = true;
             }
-            file.icon =
-              file.icon || this.getFilePropertyVal(file.properties, "icon");
-            file.subtype = this.getSubType(file);
-            return file;
-          });
-          if (newFiles.length < this.limit) {
-            this.lastPage = true;
-          }
-          this.files =
-            this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
-          this.sortedFiles = this.returnSort(
-            "content.name",
-            this.files,
-            this.sortDirection
-          );
-          this.ancestors = response.ancestors;
+            this.files =
+              this.offset > 0 ? [...this.files, ...newFiles] : newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+            this.ancestors = response.ancestors;
 
-          const pkgId = pathOr("", ["query", "pkgId"], this.$route);
-          if (pkgId) {
-            this.scrollToFile(pkgId);
-          }
-          this.allowFetch = true;
-          this.filesLoading = false;
+            const pkgId = pathOr("", ["query", "pkgId"], this.$route);
+            if (pkgId) {
+              this.scrollToFile(pkgId);
+            }
+            this.allowFetch = true;
+            this.filesLoading = false;
+          });
         })
         .catch((response) => {
           this.handleXhrError(response);
@@ -841,9 +844,9 @@ export default {
      * @param {Array} items
      */
     moveItems: function (destination, items) {
-      if (this.moveUrl) {
+      this.moveUrl.then((url) => {
         const things = items.map((item) => item.content.id);
-        this.sendXhr(this.moveUrl, {
+        this.sendXhr(url, {
           method: "POST",
           body: {
             destination,
@@ -856,7 +859,7 @@ export default {
           .catch((response) => {
             this.handleXhrError(response);
           });
-      }
+      });
     },
 
     /**
@@ -897,13 +900,16 @@ export default {
       // Rename each file with proposed new name
       const promises = files.map((obj) => {
         const id = propOr("", "id", obj);
-        const url = `${this.config.apiUrl}/packages/${id}?api_key=${this.userToken}`;
 
-        return this.sendXhr(url, {
-          method: "PUT",
-          body: {
-            name: propOr("", "generatedName", obj),
-          },
+        useGetToken().then((token) => {
+          const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
+
+          return this.sendXhr(url, {
+            method: "PUT",
+            body: {
+              name: propOr("", "generatedName", obj),
+            },
+          });
         });
       });
       Promise.all(promises).then((response) => {
@@ -1085,24 +1091,26 @@ export default {
      */
     processFile: function (file) {
       const packageId = pathOr("", ["content", "id"], file);
-      const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${this.userToken}`;
 
-      this.sendXhr(url, {
-        method: "PUT",
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-      })
-        .then(() => {
-          // Update the file's state to show that it is processing
-          const updatedFile = assocPath(
-            ["content", "state"],
-            "PROCESSING",
-            file
-          );
-          this.onUpdateUploadedFileState({ packageDTO: updatedFile });
+      useGetToken().then((token) => {
+        const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
+        this.sendXhr(url, {
+          method: "PUT",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
         })
-        .catch(this.handleXhrError.bind(this));
+          .then(() => {
+            // Update the file's state to show that it is processing
+            const updatedFile = assocPath(
+              ["content", "state"],
+              "PROCESSING",
+              file
+            );
+            this.onUpdateUploadedFileState({ packageDTO: updatedFile });
+          })
+          .catch(this.handleXhrError.bind(this));
+      });
     },
 
     /**
@@ -1113,88 +1121,83 @@ export default {
       const packageId = pathOr("", ["content", "id"], file);
 
       // Get the files for the package
-      const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${this.userToken}`;
-      this.sendXhr(url, {
-        method: "GET",
-        header: {
-          Authorization: `bearer ${this.userToken}`,
-        },
-      })
-        .then((response) => {
-          const fId = pathOr(
-            "",
-            ["objects", "source", 0, "content", "id"],
-            response
-          );
-          const url = `${this.config.apiUrl}/packages/${packageId}/files/${fId}?short=true&api_key=${this.userToken}`;
-          this.sendXhr(url, {
-            method: "GET",
-            header: {
-              Authorization: `bearer ${this.userToken}`,
-            },
-          })
-            .then((response) => {
-              copyText(
-                pathOr("", ["url"], response),
-                undefined,
-                (error, event) => {
-                  if (error) {
-                    const msg = "Unable to copy to clipboard";
-                    EventBus.$emit("toast", {
-                      detail: {
-                        type: "error",
-                        msg,
-                      },
-                    });
-                  } else {
-                    const msg = "Temporary link to file copied to clipboard";
-                    EventBus.$emit("toast", {
-                      detail: {
-                        type: "success",
-                        msg,
-                      },
-                    });
-                  }
-                }
-              );
-            })
-
-            .catch((response) => {
-              this.handleXhrError(response);
-            });
+      useGetToken().then((token) => {
+        const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`;
+        this.sendXhr(url, {
+          method: "GET",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
         })
-        .catch((response) => {
-          this.handleXhrError(response);
-        });
+          .then((response) => {
+            const fId = pathOr(
+              "",
+              ["objects", "source", 0, "content", "id"],
+              response
+            );
+            const url = `${this.config.apiUrl}/packages/${packageId}/files/${fId}?short=true&api_key=${token}`;
+            this.sendXhr(url, {
+              method: "GET",
+              header: {
+                Authorization: `bearer ${token}`,
+              },
+            })
+              .then((response) => {
+                copyText(
+                  pathOr("", ["url"], response),
+                  undefined,
+                  (error, event) => {
+                    if (error) {
+                      const msg = "Unable to copy to clipboard";
+                      EventBus.$emit("toast", {
+                        detail: {
+                          type: "error",
+                          msg,
+                        },
+                      });
+                    } else {
+                      const msg = "Temporary link to file copied to clipboard";
+                      EventBus.$emit("toast", {
+                        detail: {
+                          type: "success",
+                          msg,
+                        },
+                      });
+                    }
+                  }
+                );
+              })
+
+              .catch((response) => {
+                this.handleXhrError(response);
+              });
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      });
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
     },
 
-        /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
-     getFilesUrl: function () {
-      if (this.config.apiUrl && this.userToken) {
-        const baseUrl =
-          this.$route.name === "dataset-files" ? "datasets" : "packages";
-        const id =
-          this.$route.name === "dataset-files" ? this.$route.params.datasetId : this.$route.params.fileId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${this.userToken}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
-      }
-    },
-
-    handleRouteChange: function(to, from) {
-      const DATASET_FILES_ROUTES = ["dataset-files", "collection-files", "file-record", "dataset-files-wrapper"]
+    handleRouteChange: function (to, from) {
+      const DATASET_FILES_ROUTES = [
+        "dataset-files",
+        "collection-files",
+        "file-record",
+        "dataset-files-wrapper",
+      ];
       const routeChanged = to.name !== from.name;
       const fileIdChanged = to.params.fileId !== from.params.fileId;
-      const isNavigatingWithinDatasetFiles = DATASET_FILES_ROUTES.includes(to.name) && (routeChanged || fileIdChanged);
+      const isNavigatingWithinDatasetFiles =
+        DATASET_FILES_ROUTES.includes(to.name) &&
+        (routeChanged || fileIdChanged);
 
       if (isNavigatingWithinDatasetFiles) {
         this.fetchFiles();
       }
-    }
+    },
   },
 };
 </script>
@@ -1221,7 +1224,7 @@ export default {
   overflow-y: scroll;
   display: block;
   margin-top: 1px;
-  border: 1px solid $gray_2;
+  //border: 1px solid $gray_2;
   max-height: calc(100vh - 200px);
 }
 

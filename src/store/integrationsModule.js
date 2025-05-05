@@ -1,3 +1,5 @@
+import {useGetToken} from "@/composables/useGetToken";
+
 const sortIntegrations = (integrations) => {
   return integrations.sort((a, b) => a.displayName.localeCompare(b.name, 'en', { numeric: true}))
 }
@@ -42,22 +44,25 @@ export const actions = {
 
   fetchIntegrations: async({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks?api_key=${rootState.userToken}`
+      useGetToken()
+          .then(token => {
+            const url = `${rootState.config.apiUrl}/webhooks?api_key=${token}`
+            fetch(url, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+                .then(response => {
+                  response.json()
+                      .then(collections => {
+                        commit('UPDATE_INTEGRATIONS', collections)
+                      })
+                })
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (resp.ok) {
-        const collections = await resp.json()
-        commit('UPDATE_INTEGRATIONS', collections)
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
+          })
+    }
+    catch(err) {
       commit('UPDATE_INTEGRATIONS', [])
       return Promise.reject(err)
     }
@@ -65,68 +70,74 @@ export const actions = {
 
   editIntegration: async ({commit, rootState}, integrationDTO ) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks/${integrationDTO.id}?api_key=${rootState.userToken}`
-      const resp = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(integrationDTO)
+      useGetToken().then(token => {
+        const url = `${rootState.config.apiUrl}/webhooks/${integrationDTO.id}?api_key=${token}`
+        fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(integrationDTO)
+        }).then(resp =>{
+          if (resp.ok) {
+            resp.json().then(integration =>{
+              commit('EDIT_INTEGRATION', integration)
+            })
+          } else {
+            return Promise.reject(resp)
+          }
+        })
       })
-
-      if (resp.ok) {
-        const integration = await resp.json()
-        commit('EDIT_INTEGRATION', integration)
-
-      } else {
-        return Promise.reject(resp)
-      }
-
     }catch (err) {
       return Promise.reject(err)
     }
   },
-
-  createIntegration: async ({commit, rootState}, integrationDTO ) => {
+  createIntegration: async ({ commit, rootState }, integrationDTO) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks?api_key=${rootState.userToken}`
-
-      const resp = await fetch(url, {
+      const token = await useGetToken();
+      
+      const url = `${rootState.config.apiUrl}/webhooks?api_key=${token}`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(integrationDTO)
-      })
-
-      if (resp.ok) {
-        const integration = await resp.json()
-        commit('CREATE_INTEGRATION', integration)
-        return Promise.resolve(integration)
-
-      } else {
-        return Promise.reject(resp)
+        body: JSON.stringify(integrationDTO),
+      });
+  
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Error creating integration:', error);
+        return Promise.reject(error);
       }
+
+  
+      const integration = await response.json();
+      commit('CREATE_INTEGRATION', integration);
+      return integration;
     } catch (err) {
-      return Promise.reject(err)
+      console.error('Error in createIntegration:', err);
+      return Promise.reject(err);
     }
   },
+  
   removeIntegration: async({ commit, dispatch, rootState }, integrationId) => {
     try {
-      const url = `${rootState.config.apiUrl}/webhooks/${integrationId}?api_key=${rootState.userToken}`
-
-      const resp = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      useGetToken().then(token => {
+        const url = `${rootState.config.apiUrl}/webhooks/${integrationId}?api_key=${token}`
+        fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }).then(resp => {
+          if (resp.ok) {
+            commit('REMOVE_INTEGRATION', integrationId)
+          } else {
+            return Promise.reject(resp)
+          }
+        })
       })
-
-      if (resp.ok) {
-        commit('REMOVE_INTEGRATION', integrationId)
-      } else {
-        return Promise.reject(resp)
-      }
     } catch (err) {
       return Promise.reject(err)
     }

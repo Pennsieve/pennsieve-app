@@ -146,7 +146,6 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['userToken']),
     ...mapGetters('filesModule', ['curPackageMetaData']),
 
     fileLocation: function() {
@@ -359,7 +358,7 @@ export default {
 }
 
 .file-meta-data-info {
-  border: 1px solid $gray_2;
+  //border: 1px solid $gray_2;
   margin-left: 16px;
   border-radius: 4px;
   flex: 0 0 260px;
@@ -370,11 +369,11 @@ export default {
 .header {
   height: 38px;
   font-size: 16px;
-  background-color: $gray_1;
+  //background-color: $gray_1;
   border-bottom: 1px solid $gray_2;
   line-height: 38px;
   padding-left: 16px;
-  color: $gray_4;
+  color: $purple_3;
 }
 
 .record-info {

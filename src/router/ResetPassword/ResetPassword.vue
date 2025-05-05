@@ -166,7 +166,7 @@
 <script>
 import { mapState } from 'vuex'
 import { pathOr, propOr } from 'ramda'
-import {Auth} from '@aws-amplify/auth'
+import { confirmResetPassword, resetPassword, signIn } from 'aws-amplify/auth';
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
 import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
@@ -321,17 +321,27 @@ export default {
     /**
      * Submit the password reset request
      */
-    submitResetRequest: function() {
+    submitResetRequest: async function() {
       this.isSendingEmail = true
 
-      Auth.forgotPassword(this.emailForm.email)
-        .then(this.onEmailFormSuccess.bind(this))
-        .catch(error => {
-          this.errorMsg = error.message
-        })
-        .finally(() => {
+      const output = await resetPassword({
+        username: this.emailForm.email
+      });
+
+      const { nextStep } = output;
+      switch (nextStep.resetPasswordStep) {
+        case 'CONFIRM_RESET_PASSWORD_WITH_CODE':
+          const codeDeliveryDetails = nextStep.codeDeliveryDetails;
+          console.log(
+            `Confirmation code was sent to ${codeDeliveryDetails.deliveryMedium}`
+          );
           this.isSendingEmail = false
-        })
+          // Collect the confirmation code from the user and pass to confirmResetPassword.
+          break;
+        case 'DONE':
+          console.log('Successfully reset password.');
+          break;
+      }
     },
 
     /**
@@ -351,7 +361,7 @@ export default {
      * Send XHR to set new password
      * @param {Object} e
      */
-    onPasswordFormSubmit: function(e) {
+    onPasswordFormSubmit: function (e) {
       this.resettingPasswordText = 'Saving'
 
       this.$refs.passwordForm.validate(valid => {
@@ -359,19 +369,26 @@ export default {
           return
         }
 
-      this.isResettingPassword = true
+        this.isResettingPassword = true
 
-      const { email, code, password } = this.passwordForm
-      // Collect confirmation code and new password, then
-      Auth.forgotPasswordSubmit(email, code, password)
-        .then(() => {
-          this.loginUser()
-          this.resettingPasswordText = 'Logging In'
+        const { email, code, password } = this.passwordForm
+        // Collect confirmation code and new password, then
+        confirmResetPassword({
+          username: email,
+          confirmationCode: code,
+          newPassword: password
         })
-        .catch(error => {
-          this.errorMsg = error.message
-          this.isResettingPassword = false
-        })
+          .then(() => {
+            this.resettingPasswordText = 'Reset successful!'
+            EventBus.$emit('toast', {
+              type: 'success',
+              msg: 'Password successfully reset'
+            })
+          })
+          .catch(error => {
+            this.errorMsg = error.message
+            this.isResettingPassword = false
+          })
       })
     },
 
@@ -379,21 +396,20 @@ export default {
      * Login the user after successfully resetting their password
      * On failure, take the user back to the login page
      */
-    loginUser: async function() {
-      try {
-        const { email, password } = this.passwordForm
-        const user = await Auth.signIn(email, password)
-        const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
-        const userAttributes = propOr({}, 'attributes', user)
-        EventBus.$emit('login', { token, userAttributes })
-      } catch (error) {
-        EventBus.$emit('toast', {
-          type: 'success',
-          msg: 'Password successfully reset'
-        })
-        this.$router.push({name: 'home'})
-      }
-    }
+    // loginUser: async function() {
+    //   try {
+    //     const { email, password } = this.passwordForm
+    //     const user = await signIn(email, password)
+    //     const token = pathOr('', ['signInUserSession', 'accessToken', 'jwtToken'], user)
+    //     const userAttributes = propOr({}, 'attributes', user)
+    //     EventBus.$emit('login', { token, userAttributes })
+    //   } catch (error) {
+    //     EventBus.$emit('toast', {
+    //       type: 'success',
+    //       msg: 'Password successfully reset'
+    //     })
+    //   }
+    // }
   }
 }
 </script>

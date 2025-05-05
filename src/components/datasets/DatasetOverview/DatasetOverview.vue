@@ -11,6 +11,9 @@
             <dataset-banner
               empty-state-text="Add a banner image."
               @click.native="goToBanner"
+              :dataset = "dataset"
+              :datasetBannerURL = "datasetBanner"
+              :isLoadingBanner="isLoadingDatasetBanner"
             />
 
             <div class="dataset-heading-info">
@@ -74,6 +77,9 @@
                 <button @click="copyToClipboard(datasetNodeId)">
                   <IconCopyDocument/>
                 </button>
+              </div>
+              <div class="dataset-heading-cta">
+                <bf-button @click="dashboardDialogVisible=true">Open Dashboard</bf-button>
               </div>
             </div>
           </div>
@@ -250,6 +256,10 @@
       :dialog-visible = "staleUpdateDialogVisible"
       @close="staleUpdateDialogClose"
     />
+    <DashboardModal
+      :dialog-visible="dashboardDialogVisible"
+      @close-dialog="handleCloseDashDialog"
+    />
   </div>
 
 
@@ -260,10 +270,10 @@
   import Cookie from 'js-cookie'
   import {compose, defaultTo, head, last, pathOr, propOr, split, sum, values} from 'ramda'
 
-  import DatasetBanner from '../DatasetBanner/DatasetBanner.vue'
   import DataCard from '../../shared/DataCard/DataCard.vue'
   import ChecklistItem from '../../shared/ChecklistItem/ChecklistItem.vue'
   import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
+  import DashboardModal from './DashboardModal.vue'
 
   import BfStorageMetrics from '../../../mixins/bf-storage-metrics/index'
   import FormatDate from '../../../mixins/format-date/index'
@@ -283,6 +293,8 @@
   import IconLicense from "../../icons/IconLicense.vue";
   import IconCopyDocument from "../../icons/IconCopyDocument.vue";
   import EventBus from '../../../utils/event-bus';
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 
   const replaceLineBreaks = str => {
@@ -307,7 +319,6 @@ export default {
     IconFiles,
     IconCopyDocument,
     LockedBanner,
-    DatasetBanner,
     ChecklistItem,
     DataCard,
     MarkdownEditor,
@@ -341,7 +352,9 @@ export default {
       changelogDescriptionEmptyState,
       packageTypeCount: 0,
       isDialogVisible: false,
-      staleUpdateDialogVisible: false
+      staleUpdateDialogVisible: false,
+      staleUpdateDialogVisible: false,
+      dashboardDialogVisible:false,
     }
   },
 
@@ -362,7 +375,6 @@ export default {
       'datasetBanner',
       'isLoadingDatasetBanner',
       'isDatasetOwner',
-      'userToken',
       'config',
       'datasetDescription',
       'changelogText',
@@ -372,8 +384,7 @@ export default {
       'isLoadingDatasetDescription',
       'datasetContributors',
       'activeOrganization',
-      'changelogComponent',
-      //'isLoadingChangelog'
+      'changelogComponent'
     ]),
 
     doiUrl: function(){
@@ -424,17 +435,7 @@ export default {
         : false
     },
 
-    /**
-     * Compute URL for total package count
-     * @returns {String}
-     */
-    getPackageTypeCountsUrl: function() {
-      return this.userToken && this.isOrgSynced
-        ? `${this.config.apiUrl}/datasets/${
-            this.datasetId
-          }/packageTypeCounts?api_key=${this.userToken}`
-        : ''
-    },
+
 
     /**
      * Compute if the dataset has a DOI
@@ -586,27 +587,16 @@ export default {
       return pathOr('Add a license', ['content', 'license'], this.dataset)
     },
 
-    /**
-     * Compute URL for readme endpoint
-     * @returns {String}
-     */
-    datasetReadmeUrl: function() {
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${
-            this.userToken
-          }`
-        : ''
-    },
-
     /*
     *compute changelog endpoint
     */
     datasetChangelogUrl: function() {
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/${this.datasetId}/changelog?api_key=${
-            this.userToken
+      return useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/${this.datasetId}/changelog?api_key=${
+            token
           }`
-        : ''
+        })
     },
     /**
      * Compute dataset intId
@@ -662,10 +652,25 @@ export default {
 
   methods: {
     ...mapActions(['setDatasetDescription', 'setDatasetDescriptionEtag', 'setChangelogText']),
+    /**
+     * Compute URL for total package count
+     * @returns {String}
+     */
+    getPackageTypeCountsUrl: async function() {
+      return await useGetToken()
+        .then(token => {
+          return `${this.config.apiUrl}/datasets/${
+            this.datasetId
+          }/packageTypeCounts?api_key=${token}`
+        })
 
+    },
 
     staleUpdateDialogClose: function() {
       this.staleUpdateDialogVisible = false
+    },
+    handleCloseDashDialog: function(){
+      this.dashboardDialogVisible = false;
     },
     /**
      * Check if the dataset checklist
@@ -682,15 +687,19 @@ export default {
      */
     getPackageTypeCounts: function() {
       this.packageTypeCount = 0
-      this.sendXhr(this.getPackageTypeCountsUrl)
-        .then(response => {
-          this.packageTypeCount = compose(
-            sum,
-            values,
-            defaultTo({})
-          )(response)
+      this.getPackageTypeCountsUrl()
+        .then(url => {
+          useSendXhr(url)
+            .then(response => {
+              this.packageTypeCount = compose(
+                sum,
+                values,
+                defaultTo({})
+              )(response)
+            })
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
     },
 
     /**
@@ -732,33 +741,42 @@ export default {
      * @params {String} markdown
      */
     onReadmeSave: function(markdown) {
-      fetch(this.datasetReadmeUrl, {
-        body: JSON.stringify({
-          readme: markdown
-        }),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'If-Match': this.datasetDescriptionEtag,
-        }
-      })
-        .then(response => {
-          if (response.ok) {
-            this.setDatasetDescriptionEtag(response.headers.get('etag'))
-            this.setDatasetDescription(markdown).finally(() => {
-              this.isSavingMarkdownDescription = false
-              this.isEditingMarkdownDescription
- = false
+      console.log('saving readme')
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${token}`
+          return useSendXhr(url, {
+            body: {
+              readme: markdown
+            },
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'If-Match': this.datasetDescriptionEtag,
+            }
+          })
+            .then(response => {
+              if (response.ok) {
+                this.setDatasetDescriptionEtag(response.headers.get('etag'))
+                this.setDatasetDescription(markdown).finally(() => {
+                  this.isSavingMarkdownDescription = false
+                  this.isEditingMarkdownDescription
+                    = false
+                })
+              } else if (response.status === 412) {
+                this.isSavingMarkdownDescription = false
+                this.staleUpdateDialogVisible = true
+              } else {
+                throw response
+              }
             })
-          } else if (response.status === 412) {
-            this.isSavingMarkdownDescription = false
-            this.staleUpdateDialogVisible = true
-          } else {
-            throw response
-          }
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError)
+
     },
+
+
+
 
     /**
      * On changelog save, emitted from the MarkdownEditor
@@ -767,50 +785,60 @@ export default {
      */
 
     onChangelogSave: function(markdown) {
-      fetch(this.datasetChangelogUrl, {
-        body: JSON.stringify({
-          changelog: markdown
-        }),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-        .then(response => {
-          if (response.ok) {
-            this.setChangelogText(markdown).finally(() => {
-              this.isSavingMarkdownChangelog = false
-              this.isEditingMarkdownChangelog = false
+      this.datasetChangelogUrl
+        .then(url => {
+          fetch(url, {
+            body: JSON.stringify({
+              changelog: markdown
+            }),
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+            .then(response => {
+              if (response.ok) {
+                this.setChangelogText(markdown).finally(() => {
+                  this.isSavingMarkdownChangelog = false
+                  this.isEditingMarkdownChangelog = false
+                })
+              } else if (response.status === 412) {
+                this.isSavingMarkdownChangelog = false
+                this.$refs.staleUpdateDialog.dialogVisible = true
+              } else {
+                throw response
+              }
             })
-          } else if (response.status === 412) {
-            this.isSavingMarkdownChangelog = false
-            this.$refs.staleUpdateDialog.dialogVisible = true
-          } else {
-            throw response
-          }
+            .catch(this.handleXhrError.bind(this))
         })
-        .catch(this.handleXhrError.bind(this))
+
     },
 
 
     getChangelog: function(datasetId) {
       //this.setIsLoadingDatasetDescription(true)
-      const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${this.userToken}`
-      fetch(url)
-        .then(response => {
-          if (response.ok) {
-            response.json().then(data => {
-              const changelog = propOr('', 'changelog', data)
-              this.setChangelogText(changelog)
-            })
-          } else {
-            throw response
-          }
-        })
-        .catch(this.handleXhrError.bind(this))
-        .finally(() => {
-          //this.setIsLoadingChangelog(false)
-        })
+      useGetToken().
+        then(token => {
+        const url = `${this.config.apiUrl}/datasets/${datasetId}/changelog?api_key=${token}`
+        fetch(url)
+          .then(response => {
+            if (response.ok) {
+              response.json().then(data => {
+                const changelog = propOr('', 'changelog', data)
+                this.setChangelogText(changelog)
+              })
+            } else {
+              throw response
+            }
+          })
+          .catch(this.handleXhrError.bind(this))
+          .finally(() => {
+            //this.setIsLoadingChangelog(false)
+          })
+      })
+
+
+
     },
 
     /**

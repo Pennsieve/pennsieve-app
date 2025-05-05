@@ -16,6 +16,9 @@ export default {
     formatDateFNS: function(date) {
       return formatFNS(date, 'MMMM d, yyyy')
     },
+    formatDateAndTimeFNS: function(date) {
+      return formatFNS(date, 'MMMM d, yyyy hh:mm a')
+    },
     /**
      * Formats a date range for display
      * @param {Date} date

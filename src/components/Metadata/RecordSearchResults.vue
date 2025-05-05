@@ -351,7 +351,7 @@ export default {
   computed: {
     ...mapGetters(['getModelById']),
 
-    ...mapState(['config', 'userToken', 'activeOrganization', 'concepts']),
+    ...mapState(['config', 'activeOrganization', 'concepts']),
 
     ...mapState('metadataModule',[
       'filterParams','records', 'models'

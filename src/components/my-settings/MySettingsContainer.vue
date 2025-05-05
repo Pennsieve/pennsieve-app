@@ -188,6 +188,7 @@
         </el-row>
       </el-col>
     </el-row>
+
     <div class="divider" />
     <!-- ORCID -->
     <el-row>
@@ -214,53 +215,53 @@
             Register or Connect your ORCID iD
           </button>
         </div>
-        <el-row v-else>
-          <div>
-            <p class="orcid-success-text">
-              Below is the ORCID associated with your Pennsieve account.
-              <a
-                href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
-                target="_blank"
-              >
-                Learn More
-              </a>
-            </p>
-            <div v-if="!loading" class="orcid-success">
-              <img src="../../assets/images/orcid.png" />
-              <el-row
-                class="orcid-success-info"
-                align="middle"
-                alt="Logo for ORCID"
-              >
-                <el-col>
-                  <a :href="getORCIDResultUrl" target="_blank">
-                    {{ getORCIDResultUrl }}
-                  </a>
-                </el-col>
-              </el-row>
-              <el-col class="orcid-delete-button">
-                <button @click="isDeleteOrcidDialogVisible = true">
-                  <IconRemove :height="10" :width="10" color="black" />
-                </button>
+        <!--        <el-row v-else>-->
+        <div v-else>
+          <p class="orcid-success-text">
+            Below is the ORCID associated with your Pennsieve account.
+            <a
+              href="https://docs.pennsieve.io/docs/orcid-ids-on-the-pennsieve-platform"
+              target="_blank"
+            >
+              Learn More
+            </a>
+          </p>
+          <div v-if="!loading" class="integration-success">
+            <img src="../../assets/images/orcid.png" alt="orcid image" />
+            <el-row
+              class="orcid-success-info"
+              align="middle"
+              alt="Logo for ORCID"
+            >
+              <el-col>
+                <a :href="getORCIDResultUrl" target="_blank">
+                  {{ getORCIDResultUrl }}
+                </a>
               </el-col>
-            </div>
-            <div v-else class="orcid-waiting">
-              <el-row>
-                <div v-loading="loading" class="orcid-loader" />
-              </el-row>
-            </div>
-            <el-row class="mt-20" v-if="!publishToOrcid">
-              <el-tooltip
-                placement="right"
-                content="Authorize Pennsieve to update ORCID with all of your Published Datasets"
-              >
-                <bf-button @click="openORCID">
-                  Update ORCID Publish Preferences
-                </bf-button>
-              </el-tooltip>
             </el-row>
+            <el-col class="delete orcid-delete-button">
+              <button @click="isDeleteOrcidDialogVisible = true">
+                <IconRemove :height="10" :width="10" color="black" />
+              </button>
+            </el-col>
           </div>
-        </el-row>
+          <!--          <div v-else class="orcid-waiting">-->
+          <!--            <el-row>-->
+          <!--              <div v-loading="loading" class="orcid-loader" />-->
+          <!--            </el-row>-->
+          <!--          </div>-->
+          <el-row class="mt-20" v-if="!publishToOrcid">
+            <el-tooltip
+              placement="right"
+              content="Authorize Pennsieve to update ORCID with all of your Published Datasets"
+            >
+              <bf-button @click="openORCID">
+                Update ORCID Publish Preferences
+              </bf-button>
+            </el-tooltip>
+          </el-row>
+        </div>
+        <!--        </el-row>-->
       </el-col>
     </el-row>
 
@@ -287,9 +288,16 @@
 
     <delete-orcid
       ref="deleteOrcidDialog"
-      :visible.sync="isDeleteOrcidDialogVisible"
+      :visible="isDeleteOrcidDialogVisible"
       @orcid-deleted-success="updateORCID"
       @orcid-close="updateORCID2"
+    />
+
+    <delete-git-hub
+      ref="deleteGitHubDialog"
+      :visible="isDeleteGitHubDialogVisible"
+      @deleted-success="updateGitHub"
+      @close="closeGitHubDialog"
     />
   </bf-stage>
 </template>
@@ -297,8 +305,9 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import EventBus from "../../utils/event-bus";
-import { pathOr, propOr, prop } from "ramda";
-import {Auth} from "@aws-amplify/auth";
+import {getCurrentUser} from "aws-amplify/auth";
+
+import { pathOr, propOr, prop, has } from "ramda";
 
 import BfRafter from "../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
@@ -314,11 +323,20 @@ import Request from "../../mixins/request";
 import Sorter from "../../mixins/sorter";
 import IconRemove from "../icons/IconRemove.vue";
 import IconSort from "../icons/IconSort.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import IconLock from "@/components/icons/IconLock.vue";
+import IconGitHub from "@/components/icons/IconGitHub.vue";
+import DeleteGitHub from "@/components/my-settings/windows/DeleteGitHub.vue";
+import { isEnabledForTestOrgs } from "../../utils/feature-flags";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "MySettingsContainer",
 
   components: {
+    DeleteGitHub,
+    IconGitHub,
+    IconLock,
     IconSort,
     IconRemove,
     BfRafter,
@@ -381,6 +399,7 @@ export default {
       orcidInfo: {},
       loading: false,
       isDeleteOrcidDialogVisible: false,
+      isDeleteGitHubDialogVisible: false,
       prevEmail: "",
       apiKey: {
         name: "",
@@ -393,13 +412,20 @@ export default {
     ...mapState([
       "profile",
       "activeOrganization",
-      "userToken",
       "config",
-      "onboardingEvents",
       "cognitoUser",
+      "gitHubProfile",
     ]),
 
     ...mapGetters(["hasOrcidId", "publishToOrcid"]),
+
+    hasGithubProfile: function () {
+      return has("login", this.gitHubProfile);
+    },
+
+    windowLocation: function () {
+      return window.location.origin;
+    },
 
     /**
      * Checks whether or not auth is enabled
@@ -417,44 +443,14 @@ export default {
       return this.apiKeys.length > 0;
     },
 
-    getApiKeysUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-
-      if (!url || !userToken) {
-        return "";
-      }
-      return `${url}/token?api_key=${userToken}`;
-    },
-    updateProfileUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-
-      if (!url || !userToken) {
-        return "";
-      }
-
-      return `${url}/user?api_key=${userToken}`;
-    },
-    updateEmailUrl: function () {
-      const url = pathOr("", ["config", "apiUrl"])(this);
-      const userToken = prop("userToken", this);
-      if (!url || !userToken) {
-        return "";
-      }
-      return `${url}/user/email?api_key=${userToken}`;
-    },
-    /**
-     * Retrieves the API URL for adding ORCID
-     */
-    getORCIDApiUrl: function () {
+    getApiKeysUrl: async function () {
       const url = pathOr("", ["config", "apiUrl"])(this);
 
-      if (!url) {
-        return "";
-      }
+      return await useGetToken()
+        .then(token => {
+          return `${url}/token?api_key=${token}`;
+        })
 
-      return `${url}/user/orcid?api_key=${this.userToken}`;
     },
 
     /**
@@ -473,14 +469,35 @@ export default {
      * Retrieves Url to display with name once ORCID is connected to user profile
      */
     getORCIDResultUrl: function () {
-      const env = pathOr("", ["config", "environment"])(this);
+      const env = pathOr("N/A", ["environment"], this.config);
+      const orcid = pathOr("", ["orcid", "orcid"], this.profile);
+
       return env === "dev"
-        ? `https://sandbox.orcid.org/${this.profile.orcid.orcid}`
-        : `https://orcid.org/${this.profile.orcid.orcid}`;
+        ? `https://sandbox.orcid.org/${orcid}`
+        : `https://orcid.org/${orcid}`;
+    },
+
+    getGitHubAppUrl: function () {
+      const url = pathOr("", ["config", "GitHubAppUrl"])(this);
+
+      if (!url) {
+        return "";
+      }
+      return url;
     },
 
     isEmailButtonDisabled: function () {
       return this.emailButtonDisabled;
+    },
+    activeOrganizationId: function () {
+      return pathOr(
+        "Organization",
+        ["organization", "id"],
+        this.activeOrganization
+      );
+    },
+    showFeatureForTestOrgs: function () {
+      return isEnabledForTestOrgs(this.activeOrganizationId);
     },
   },
 
@@ -495,7 +512,6 @@ export default {
       this.getApiKeys();
     },
   },
-
   mounted() {
     this.setRuleFormData(this.profile);
     this.setEmailFormData(this.profile.email);
@@ -506,17 +522,29 @@ export default {
   },
 
   methods: {
-    ...mapActions(["updateProfile", "updateCognitoUser"]),
+    ...mapActions([
+      "updateProfile",
+      "updateGithubProfile",
+      "updateCognitoUser",
+    ]),
 
     changeStatus: function (val) {
       this.mfaStatus = val;
+    },
+
+    closeGitHubDialog: function () {
+      this.isDeleteGitHubDialogVisible = false;
+    },
+
+    updateGitHub: function () {
+      this.updateGithubProfile({});
     },
 
     /**
      * Get current authenticated Cognito user
      */
     getCognitoUser: function () {
-      Auth.currentAuthenticatedUser()
+      getCurrentUser()
         .then((user) => {
           this.updateCognitoUser(user);
         })
@@ -540,7 +568,7 @@ export default {
     },
 
     /**
-     * Makes call to resort table by column
+     * Makes call to re-sort table by column
      * @param {String} key
      */
     sortColumn: function (key) {
@@ -613,33 +641,43 @@ export default {
      * Makes XHR call to update a user profile
      */
     submitUpdateProfileRequest: function () {
-      this.sendXhr(this.updateProfileUrl, {
-        method: "PUT",
-        body: {
-          organization: this.profile.preferredOrganization,
-          email: this.profile.email,
-          url: this.profile.url,
-          color: this.profile.color,
-          ...this.ruleForm,
-        },
-      })
+      useGetToken()
+        .then(token => {
+          const url = `${this.config.apiUrl}/user?api_key=${token}`
+          return this.sendXhr(url, {
+            method: "PUT",
+            body: {
+              organization: this.profile.preferredOrganization,
+              email: this.profile.email,
+              url: this.profile.url,
+              color: this.profile.color,
+              ...this.ruleForm,
+            },
+          })
+
+        })
         .then(this.handleUpdateProfileXhrSuccess.bind(this))
         .catch(this.handleXhrError.bind(this));
     },
     //XHR call to update email address
     submitUpdateEmailRequest: function () {
       this.emailButtonDisabled = true;
-      this.sendXhr(this.updateEmailUrl, {
-        method: "PUT",
-        body: {
-          organization: this.profile.preferredOrganization,
-          url: this.profile.url,
-          color: this.profile.color,
-          userRequestedChange: true,
-          ...this.emailForm,
-          ...this.ruleForm,
-        },
-      })
+
+      useGetToken()
+        .then(token => {
+          const url =`${this.config.apiUrl}/user/email?api_key=${token}`
+          return useSendXhr(url, {
+            method: "PUT",
+            body: {
+              organization: this.profile.preferredOrganization,
+              url: this.profile.url,
+              color: this.profile.color,
+              userRequestedChange: true,
+              ...this.emailForm,
+              ...this.ruleForm,
+            },
+          })
+        })
         .then(this.handleUpdateEmailXhrSuccess.bind(this))
         .catch(this.handleXhrEmailError.bind(this));
     },
@@ -691,16 +729,18 @@ export default {
      * Fetches api keys for logged in user
      */
     getApiKeys: function () {
-      if (!this.getApiKeysUrl) {
-        return;
-      }
 
-      this.sendXhr(this.getApiKeysUrl)
-        .then((response) => {
-          this.apiKeys = this.returnSort("name", response);
-          this.isApiKeysLoading = false;
+      this.getApiKeysUrl
+        .then(url => {
+          this.sendXhr(url)
+            .then((response) => {
+              this.apiKeys = this.returnSort("name", response);
+              this.isApiKeysLoading = false;
+            })
+            .catch(this.handleXhrError.bind(this));
         })
-        .catch(this.handleXhrError.bind(this));
+
+
     },
     /**
      * Update API keys after CREATE & DELETE XHR calls
@@ -758,6 +798,62 @@ export default {
       EventBus.$emit("logout");
     },
 
+    openGitHub: function () {
+      this.oauthWindow = window.open(
+        `${this.getGitHubAppUrl}?redirect_uri=${this.windowLocation}`,
+        "_blank",
+        "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
+      );
+      const self = this;
+      window.addEventListener("message", function (event) {
+        if (
+          event.data &&
+          event.data.source &&
+          event.data.source === "github-redirect-response" &&
+          event.data.code
+        ) {
+          this.oauthCode = event.data.code;
+          if (this.oauthCode !== "") {
+            if (!self.getGitHubApiUrl) {
+              return;
+            }
+
+            self
+              .sendXhr(self.getGitHubApiUrl, {
+                method: "POST",
+                header: {
+                  Authorization: `Bearer ${self.userToken}`,
+                },
+                body: {
+                  code: this.oauthCode,
+                  installation_id: event.data.installationId,
+                },
+              })
+              .then((response) => {
+                // TODO: Handle the Authentication token
+                // response logic goes here
+                self.updateGithubProfile(response);
+
+                // self.oauthInfo = response;
+                //
+                // self.updateProfile({
+                //   ...self.profile,
+                //   orcid: self.oauthInfo,
+                // });
+
+                EventBus.$emit("toast", {
+                  detail: {
+                    type: "success",
+                    msg: "Your GitHub account has been successfully added",
+                  },
+                });
+              })
+              .catch(self.handleXhrError.bind(this));
+          }
+        }
+      });
+    },
+
     /**
      * Logic to connect to user's ORCID
      */
@@ -777,35 +873,35 @@ export default {
         ) {
           this.oauthCode = event.data.code;
           if (this.oauthCode !== "") {
-            if (!self.getORCIDApiUrl) {
-              return;
-            }
 
-            self
-              .sendXhr(self.getORCIDApiUrl, {
-                method: "POST",
-                body: {
-                  authorizationCode: {
-                    source: "orcid-redirect-response",
-                    code: this.oauthCode,
+            useGetToken()
+              .then(token => {
+                const url = `${self.config.apiUrl}/user/orcid?api_key=${token}`;
+                return useSendXhr(url, {
+                  method: "POST",
+                  body: {
+                    authorizationCode: {
+                      source: "orcid-redirect-response",
+                      code: this.oauthCode,
+                    },
                   },
-                },
-              })
-              .then((response) => {
-                // response logic goes here
-                self.oauthInfo = response;
+                })
+                  .then((response) => {
+                    // response logic goes here
+                    self.oauthInfo = response;
 
-                self.updateProfile({
-                  ...self.profile,
-                  orcid: self.oauthInfo,
-                });
+                    self.updateProfile({
+                      ...self.profile,
+                      orcid: self.oauthInfo,
+                    });
 
-                EventBus.$emit("toast", {
-                  detail: {
-                    type: "success",
-                    msg: "Your ORCID has been successfully added",
-                  },
-                });
+                    EventBus.$emit("toast", {
+                      detail: {
+                        type: "success",
+                        msg: "Your ORCID has been successfully added",
+                      },
+                    });
+                  })
               })
               .catch(self.handleXhrError.bind(this));
           }
@@ -930,12 +1026,23 @@ p {
   float: left;
 }
 
-.orcid-success {
+.integration-success {
   border: solid 1px #dadada;
   padding: 10px;
   display: flex;
   flex-direction: row;
   background: #fff;
+  align-content: center;
+  align-items: center;
+
+  .link {
+    margin-left: 20px;
+  }
+
+  .delete {
+    flex: 1;
+    text-align: right;
+  }
 
   .orcid-waiting {
     padding-top: 30px;

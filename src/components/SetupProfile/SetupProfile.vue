@@ -97,9 +97,6 @@
         <router-link class="btn-back-to-sign-in" :to="{ name: 'home' }">
           <bf-button> Back to Sign In </bf-button>
         </router-link>
-        <a class="forgot-password" href="#" @click="onForgotPasswordClick">
-          I forgot my password
-        </a>
       </div>
     </div>
   </div>
@@ -108,13 +105,25 @@
 <script>
 import { mapState } from "vuex";
 import { propOr } from "ramda";
-import Auth from "@aws-amplify/auth";
+
+import {
+  AuthError,
+  signIn,
+  signOut,
+  confirmSignIn,
+  updatePassword,
+} from "aws-amplify/auth";
+import { useGetToken } from "@/composables/useGetToken";
 
 import BfButton from "../shared/bf-button/BfButton.vue";
 import PasswordValidator from "../../mixins/password-validator";
 
 import EventBus from "../../utils/event-bus";
 import Request from "../../mixins/request";
+import * as config from "@/site-config/site.json";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 export default {
   name: "SetupProfile",
@@ -244,6 +253,7 @@ export default {
      * @param {Object} evt
      */
     onFormSubmit: function (evt) {
+      console.log("on form submit runs");
       // logic goes here
       evt.preventDefault();
 
@@ -254,6 +264,7 @@ export default {
           }
 
           this.isSavingProfile = true;
+
           this.initialLogin();
         }.bind(this)
       );
@@ -264,49 +275,55 @@ export default {
      */
     async initialLogin() {
       try {
-        this.user = await Auth.signIn(
-          this.$route.params.username,
-          this.$route.params.password
-        );
-        this.setupProfile();
+        await signOut();
+        const result = await signIn({
+          username: this.$route.params.username,
+          password: this.$route.params.password,
+          options: {
+            authFlowType: config.awsConfig.authenticationFlowType,
+          },
+        });
+
+        this.setupProfile(result);
       } catch (error) {
+        console.error(error);
         this.isSavingProfile = false;
         this.isUserSignInFailed = true;
+        this.hideSignInForm = true;
       }
     },
 
     /**
      * API Request to create a new user
      */
-    async setupProfile() {
+    async setupProfile(result) {
+      //updatePassword
       try {
-        const newUser = await Auth.completeNewPassword(
-          this.user,
-          this.profileForm.password,
-          {
-            email: this.$route.query.email,
-          }
-        );
+        const newUser = await confirmSignIn({
+          challengeResponse: this.profileForm.password,
+        });
 
-        this.createUser(newUser.signInUserSession.accessToken.jwtToken);
+        this.createUser(newUser);
       } catch (error) {
-        this.handleFailedUserCreation();
+        console.error(error);
+
+        // this.handleFailedUserCreation();
       }
     },
 
     /**
      * Create the user on Pennsieve
-     * @param {String} jwt
+     * @param {Object} newUser
      */
-    async createUser(jwt) {
+    async createUser(newUser) {
       // Note: We need to call the createUserURL with a PUT if we are creating a Guest user
       // and a POST if we are creating a new standard Pennsieve user account.
-
+      const userToken = await useGetToken();
       try {
-        const user = await this.sendXhr(this.createUserUrl, {
+        const response = await this.sendXhr(this.createUserUrl, {
           method: this.isGuestUserRegistration ? "PUT" : "POST",
           header: {
-            Authorization: `bearer ${jwt}`,
+            Authorization: `bearer ${userToken}`,
           },
           body: {
             lastName: this.profileForm.lastName,
@@ -314,22 +331,22 @@ export default {
             title: this.profileForm.jobTitle,
           },
         });
-        this.handleCreateUserSuccess(user, jwt);
+        this.handleCreateUserSuccess(response);
       } catch (error) {
-        this.handleFailedUserCreation();
+        console.error(error);
       }
     },
 
     /**
      * Handle successful API response to createUser
      * @param {Object} response
-     * @param {String} jwt
      *
      */
-    handleCreateUserSuccess: function (response, jwt) {
+    handleCreateUserSuccess: async function (response) {
+      const userToken = await useGetToken();
       this.isSavingProfile = false;
       let loginBody = {
-        token: jwt,
+        token: userToken,
         profile: response.profile,
         firstTimeSignOn: true,
       };
@@ -340,15 +357,15 @@ export default {
       this.sendXhr(switchOrgUrl, {
         method: "PUT",
         header: {
-          Authorization: `Bearer ${jwt}`,
+          Authorization: `Bearer ${userToken}`,
         },
       })
-        .then(() => {
+        .then(async () => {
           EventBus.$emit("login", loginBody);
+          this.$router.push({ path: "/" });
         })
         .catch((error) => {
           console.error(error);
-          this.handleFailedUserCreation(this);
         });
     },
 

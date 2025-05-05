@@ -4,24 +4,7 @@
 
     <bf-navigation-item
       :link="{ name: 'user-overview', params: {orgId: activeOrganizationId} }"
-      label="My Workspace"
-      :condensed="primaryNavCondensed"
-      :styleColor="navStyleColor"
-    >
-      <template #icon>
-        <IconOrganization
-          :width="20"
-          :height="20"
-          color="currentColor"
-        />
-      </template>
-
-
-    </bf-navigation-item>
-
-    <bf-navigation-item
-      :link="{ name: 'about-pennsieve', params: {orgId: activeOrganizationId} }"
-      label="Help and Support"
+      label="Dataset Proposals"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"
     >
@@ -35,6 +18,23 @@
 
 
     </bf-navigation-item>
+
+<!--    <bf-navigation-item-->
+<!--      :link="{ name: 'about-pennsieve', params: {orgId: activeOrganizationId} }"-->
+<!--      label="Help and Support"-->
+<!--      :condensed="primaryNavCondensed"-->
+<!--      :styleColor="navStyleColor"-->
+<!--    >-->
+<!--      <template #icon>-->
+<!--        <PennsieveMark-->
+<!--          :width="20"-->
+<!--          :height="20"-->
+<!--          color="currentColor"-->
+<!--        />-->
+<!--      </template>-->
+
+
+<!--    </bf-navigation-item>-->
 
 <!--    <help-menu :condensed="primaryNavCondensed" />-->
     <user-menu :style="{ backgroundColor: `${bkColor}` }"/>

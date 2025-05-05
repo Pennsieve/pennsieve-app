@@ -1,5 +1,7 @@
 import { mapGetters, mapActions, mapState } from 'vuex'
-import {Auth} from '@aws-amplify/auth'
+import * as siteConfig from '@/site-config/site.json'
+
+import { signOut } from 'aws-amplify/auth'
 import EventBus from '../../utils/event-bus'
 import Request from '../request'
 import UserRoles from '../../mixins/user-roles'
@@ -8,11 +10,13 @@ import Sorter from '../../mixins/sorter'
 import LogoutHandler from '../logout-handler'
 import Cookies from 'js-cookie'
 import { path, pathOr, propOr, find, pathEq, defaultTo, compose, prop, propEq } from 'ramda'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import router from "@/router";
 
 export default {
   data() {
     return {
-      minCompletedEvents: 2,
       datasetStatusList: [],
       oauthInfo: ''
     }
@@ -28,13 +32,12 @@ export default {
 
   mounted() {
     // Vue event listeners
-    EventBus.$on('login', this.onLogin.bind(this))
     EventBus.$on('logout', this.onLogout.bind(this))
+    EventBus.$on('switch-organization', useSwitchWorkspace.bind(this))
     EventBus.$on('toast', this.onToast.bind(this))
     EventBus.$on('ajaxError', this.onToast.bind(this))
     EventBus.$on('trigger-download', this.onTriggerDownload.bind(this))
     EventBus.$on('trigger-record-csv-download', this.onTriggerRecordCsvDownload.bind(this))
-    EventBus.$on('switch-organization', this.onSwitchOrganization.bind(this))
     EventBus.$on('open-viewer', this.onOpenViewer.bind(this))
     EventBus.$on('add-to-upload-queue', this.addToUploadQueue.bind(this))
     EventBus.$on('add-input-files-to-upload-queue', this.addInputFilesToUploadQueue.bind(this))
@@ -51,11 +54,11 @@ export default {
   beforeUnmount() {
     // Vue event listeners
     EventBus.$off('logout', this.onLogout.bind(this))
+    EventBus.$on('switch-organization', useSwitchWorkspace.bind(this))
     EventBus.$off('toast', this.onToast.bind(this))
     EventBus.$off('ajaxError', this.onToast.bind(this))
     EventBus.$off('trigger-download', this.onTriggerDownload.bind(this))
     EventBus.$off('trigger-record-csv-download', this.onTriggerRecordCsvDownload.bind(this))
-    EventBus.$off('switch-organization', this.onSwitchOrganization.bind(this))
     EventBus.$off('open-viewer', this.onOpenViewer.bind(this))
     EventBus.$off('add-to-upload-queue', this.addToUploadQueue.bind(this))
     EventBus.$off('add-input-files-to-upload-queue', this.addInputFilesToUploadQueue.bind(this))
@@ -72,7 +75,6 @@ export default {
   computed: {
     ...mapGetters([
       'activeOrganization',
-      'userToken',
       'config',
       'organizations',
       'profile',
@@ -81,10 +83,8 @@ export default {
     ]),
 
     ...mapState([
-      'onboardingEvents',
       'bfTermsOfServiceVersion',
       'orgDatasetStatuses',
-      'shouldShowLinkOrcidDialog'
     ]),
 
     /**
@@ -99,22 +99,21 @@ export default {
      * Generates org members GET url
      * @returns {String}
      */
-    orgMembersUrl: function() {
-      if (!this.activeOrgId || !this.userToken) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/members?api_key=${this.userToken}`
+    orgMembersUrl: async function() {
+      return useGetToken().then(token => {
+        return `${this.config.apiUrl}/organizations/${this.activeOrgId}/members?api_key=${token}`
+      }).catch(err => console.log(err))
     },
 
     /**
      * Compute org contributors URL
      * @returns {String}
      */
-    getOrgContributorsUrl: function() {
-      if (!this.userToken) {
-        return
-      }
-      return `${this.config.apiUrl}/contributors?api_key=${this.userToken}`
+    getOrgContributorsUrl: async function() {
+      return useGetToken().then( (token) => {
+        return `${this.config.apiUrl}/contributors?api_key=${token}`
+      })
+
     },
 
     /**
@@ -139,7 +138,6 @@ export default {
       'updateActiveOrganization',
       'updateOrganizations',
       'updateOrgMembers',
-      'updateUserToken',
       'updateProfile',
       'clearState',
       'updateTeams',
@@ -149,13 +147,12 @@ export default {
       'togglePrimaryNav',
       'toggleSecondaryNav',
       'setDatasets',
-      'updateOnboardingEvents',
-      'setGettingStartedOpen',
       'setDatasetTemplates',
       'setOrgContributors',
       'clearDatasetFilters',
       'updateDataUseAgreements',
-      'updateCognitoUser'
+      'updateCognitoUser',
+      'updateGithubProfile'
     ]),
 
     ...mapActions('datasetModule', [
@@ -203,96 +200,101 @@ export default {
     getFilesProxyId: function() {
       const defaultPromise = Promise.resolve([])
 
+
+
       const datasetId = pathOr(0, ['params', 'datasetId'], this.$route)
       if (datasetId === 0) {
         return this.updateFilesProxyId('')
       }
 
-      const url = `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package`
-      return this.sendXhr(url, {
-        header: {
-          'Authorization': `bearer ${this.userToken}`
-        }
-      })
-      .then(response => {
-        this.updateFilesProxyId(response.id)
-      })
+      useGetToken()
+          .then((token) => {
+            const url = `${this.config.conceptsUrl}/datasets/${datasetId}/proxy/package`
+            return this.sendXhr(url, {
+              header: {
+                'Authorization': `bearer ${token}`
+              }
+            })
+          })
+          .then(response => {
+            this.updateFilesProxyId(response.id)
+          })
+
     },
 
-    /**
-     * Gets user profile and active org data
-     * @param {String} token
-     */
-    getProfileAndOrg: function(token) {
-      if (!token) {
-        return
-      }
-      
+    // /**
+    //  * Gets user profile and active org data
+    //  * @param {String} token
+    //  */
+    // getProfileAndOrg: function(token) {
+    //   // add logic to only make organizations request if profile is defined
+    //   let currentPath = this.$router.currentRoute.path
+    //   const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
+    //   const profilePromise = this.sendXhr(this.getProfileUrl(token))
+    //
+    //   return Promise.all([orgPromise, profilePromise])
+    //     .then(([orgs, profile]) => {
+    //       this.updateProfile(profile)
+    //
+    //       const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
+    //         this.updateOrganizations(sortedOrgs)
+    //
+    //       const preferredOrgId = profile.preferredOrganization
+    //
+    //       // check route params for orgId
+    //       const activeOrgId = preferredOrgId ?
+    //         pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
+    //         path(['organizations', 0, 'organization', 'id'], orgs)
+    //       const activeOrgIndex = orgs.organizations.findIndex(org => Boolean(org.organization.id === activeOrgId))
+    //       const activeOrg = orgs.organizations[activeOrgIndex]
+    //
+    //       // handle org switch
+    //
+    //       return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
+    //
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
 
-      // add logic to only make organizations request if profile is defined
-      let currentPath = this.$router.currentRoute.path
-      const orgPromise = this.sendXhr(this.getActiveOrgUrl(token))
-      const profilePromise = this.sendXhr(this.getProfileUrl(token))
+    // /**
+    //  * Sequence of Xhr calls to get data for org-level. These data should always be present
+    //  * in workspace.
+    //  */
+    // getPrimaryData: async function(userToken) {
+    //
+    //
+    //   const teamPromise = this.getTeams()
+    //     .then( () =>{
+    //       this.getPublishers()
+    //     })
+    //
+    //   const membersPromise = this.getOrgMembers()
+    //   const orgContributorsPromise = this.getOrgContributors()
+    //   const dataUseAgreementPromise = this.getDataUseAgreements()
+    //
+    //   return Promise.all([
+    //       teamPromise,
+    //       membersPromise,
+    //       orgContributorsPromise,
+    //       dataUseAgreementPromise,
+    //   ]).catch(this.handleXhrError.bind(this))
+    // },
 
-      return Promise.all([orgPromise, profilePromise])
-        .then(([orgs, profile]) => {
-          this.updateProfile(profile)
-          this.updateUserToken(token)
-
-          const sortedOrgs = this.returnSort('organization.name', orgs.organizations)
-            this.updateOrganizations(sortedOrgs)
-
-          const preferredOrgId = profile.preferredOrganization
-
-          // check route params for orgId
-          const activeOrgId = preferredOrgId ?
-            pathOr(preferredOrgId, ['params', 'orgId'], this.$route) :
-            path(['organizations', 0, 'organization', 'id'], orgs)
-          const activeOrgIndex = orgs.organizations.findIndex(org => Boolean(org.organization.id === activeOrgId))
-          const activeOrg = orgs.organizations[activeOrgIndex]
-
-          // handle org switch
-          
-          return this.handleRedirects(activeOrg, activeOrgId, preferredOrgId)
-
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
-
-    /**
-     * Sequence of Xhr calls to get data for org-level. These data should always be present
-     * in workspace.
-     */
-    getPrimaryData: async function() {
-      const teamsPromise = await this.getTeams()
-      const membersPromise = this.getOrgMembers()
-      const publisherPromise = this.getPublishers()
-      const orgContributorsPromise = this.getOrgContributors()
-      const dataUseAgreementPromise = this.getDataUseAgreements()
-
-
-      return Promise.all([membersPromise,
-        publisherPromise,
-        orgContributorsPromise,
-        dataUseAgreementPromise,
-        teamsPromise]).catch(this.handleXhrError.bind(this))
-    },
-
-    /**
-     * Switch orgs if active org is not preferred org
-     * @param {Object} activeOrg
-     * @param {String} activeOrgId
-     * @param {String} preferredOrgId
-     * @returns {Promise}
-     */
-    handleRedirects: function(activeOrg, activeOrgId, preferredOrgId) {
-      // handle direct links
-      if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
-        EventBus.$emit('switch-organization', activeOrg, false)
-        return Promise.resolve()
-      }
-      return this.updateActiveOrganization(activeOrg)
-    },
+    // /**
+    //  * Switch orgs if active org is not preferred org
+    //  * @param {Object} activeOrg
+    //  * @param {String} activeOrgId
+    //  * @param {String} preferredOrgId
+    //  * @returns {Promise}
+    //  */
+    // handleRedirects: function(activeOrg, activeOrgId, preferredOrgId) {
+    //   // handle direct links
+    //   if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
+    //     EventBus.$emit('switch-organization', activeOrg, false)
+    //     return Promise.resolve()
+    //   }
+    //   return this.updateActiveOrganization(activeOrg)
+    // },
     /**
      * Get active org url
      * @param {String} token
@@ -307,12 +309,18 @@ export default {
     getProfileUrl: function(token) {
       return `${this.config.apiUrl}/user?api_key=${token}`
     },
+    getGithubProfileUrl: function() {
+      return `${this.config.api2Url}/accounts/github/user`
+    },
+
     /**
      * Get the active org that is defined on the server side.
      * Then update the active org on the client side to match.
      */
-    getActiveOrg: function() {
-      const url = this.getActiveOrgUrl(this.userToken)
+    getActiveOrg: async function() {
+      const userToken = await useGetToken()
+
+      const url = this.getActiveOrgUrl(userToken)
       if (!url) {
         return
       }
@@ -330,57 +338,41 @@ export default {
     /**
      * @param {Object} evt
      */
-    onLogin: function(evt) {
-      let token = pathOr('', ['token'], evt)
-
-      // handle onboarding case
-      if (!token && evt.detail) {
-        token = pathOr('', ['detail', 'token'], evt)
-      }
-
-      // short circuit if we still don't have a token
-      if (!token) {
-        return
-      }
-
-      Cookies.set('user_token', token)
-
-      const FirstTimeSignOn = pathOr(false, ['detail', 'firstTimeSignOn'], evt)
-      if (FirstTimeSignOn) {
-        this.saveFirstTimeSignOnEvent(token)
-      }
-
-      this.bootUp(token, true)
-        .then(() => {
-          const activeOrg = this.activeOrganization
-          const orgId = this.activeOrgId
-          const isSubscribed = this.checkIsSubscribed(activeOrg)
-
-          if (!isSubscribed) {
-            if (this.profile.email.split("@")[1] === "pennsieve-nonexistent.email") {
-              this.$router.replace(`/${orgId}/welcome/federated-sign-up`)
-            } else {
-              this.$router.replace(`/${orgId}/welcome/terms-of-service`)
-            }
-          } else {
-            this.setDefaultRoute(orgId)
-         }
-        })
-        .catch(this.handleXhrError.bind(this))
-    },
-
-    /**
-     * Launch onboarding components
-     */
-    launchOnboarding: function() {
-      const events = defaultTo([], this.onboardingEvents)
-      if (this.userIsLessThan30DaysOld && events.length < this.minCompletedEvents) {
-        // getting started guide
-        this.setGettingStartedOpen(true)
-      } else if (this.shouldShowLinkOrcidDialog) {
-        this.updateIsLinkOrcidDialogVisible(true)
-      }
-    },
+    // onLogin: function(evt) {
+    //
+    //
+    //
+    //   let token = pathOr('', ['token'], evt)
+    //
+    //   // handle onboarding case
+    //   if (!token && evt.detail) {
+    //     token = pathOr('', ['detail', 'token'], evt)
+    //   }
+    //
+    //   // short circuit if we still don't have a token
+    //   if (!token) {
+    //     return
+    //   }
+    //
+    //
+    //   this.bootUp(token, true)
+    //     .then(() => {
+    //       const activeOrg = this.activeOrganization
+    //       const orgId = this.activeOrgId
+    //       const isSubscribed = this.checkIsSubscribed(activeOrg)
+    //
+    //       if (!isSubscribed) {
+    //         if (this.profile.email.split("@")[1] === "pennsieve-nonexistent.email") {
+    //           this.$router.replace(`/${orgId}/welcome/federated-sign-up`)
+    //         } else {
+    //           this.$router.replace(`/${orgId}/welcome/terms-of-service`)
+    //         }
+    //       } else {
+    //         this.setDefaultRoute(orgId)
+    //      }
+    //     })
+    //     .catch(this.handleXhrError.bind(this))
+    // },
     /**
      * Set the default route for the user based off of their feature flag
      * @param {String} orgId
@@ -393,7 +385,6 @@ export default {
         this.$router.push(`/${orgId}/overview`)
       } else {
           this.$router.push(`/${orgId}/datasets`)
-          this.launchOnboarding()
       }
     },
 
@@ -402,75 +393,15 @@ export default {
      * @param {Object} payload
      */
     onLogout: async function(payload) {
-      try {
-        clearInterval(this.interval)
-        await Auth.signOut()
-        this.handleLogout(payload)
-      } catch (error) {
-        this.handleXhrError()
-      }
-    },
-    /**
-     * Handles switch-organization event
-     * @param {Object} evt
-     * @param {Boolean} bool
-     */
-    onSwitchOrganization: function(evt, redirect = true) {
-      const newOrg = propOr({}, 'organization', evt)
-      const newDestNodeId = pathOr('', ['destination', 'datasetNodeId'], evt)
-      const newOrgId = propOr(1, 'id', newOrg)
-      const newOrgIntId = propOr(1, 'intId', newOrg)
-      const activeOrgId = pathOr(0, ['organization', 'id'], this.activeOrganization)
-      // Do nothing if the user is trying to switch to the organization that is already active or if no userToken found
-      if (newOrgId === activeOrgId || !this.userToken) {
-        return
-      }
-      // switch org in vue app
-      const switchOrgUrl = `${this.config.apiUrl}/session/switch-organization?organization_id=${newOrgIntId}&api_key=${this.userToken}`
-      
-      this.sendXhr(switchOrgUrl, { method: 'PUT' })
-        .then(response => {
-          const updatedOrg = find(pathEq(['organization', 'id'], newOrgId), this.organizations)
-
-          // Clear filters and search query
-          this.clearDatasetFilters()
-          this.clearSearchState()
-
-          // Reset state of dataset
-          this.setDatasets([])
-          this.updateConcepts([])
-          this.updateFilesProxyId(null)
-
-          this.updateActiveOrganization(updatedOrg)
-          this.updateProfile(response)
-
-          // Reset state of menu
-          // this.togglePrimaryNav(true)
-          // this.toggleSecondaryNav(false)
-
-          // Reset state of dataset templates
-          this.setDatasetTemplates([])
-
-          // Check to see if user has accepted terms of service
-          const isSubscribed = this.checkIsSubscribed(updatedOrg)
-          if (redirect === true) {
-            if (!isSubscribed) {
-              this.$router.replace(`/${newOrgId}/welcome/terms-of-service`)
-            } else {
-              this.setDefaultRoute(newOrgId)
-            }
-          }
-          if (newDestNodeId !== '') {
-            this.$router.replace(`/${newOrgId}/datasets/${newDestNodeId}/overview`)
-          }
-          return this.getOrgMembers()
-                  .then(this.getTeams.bind(this))
-                  .then(this.getOrgContributors.bind(this))
-        })
-        .catch((error) => {
-          console.error(error)
-          this.handleXhrError.bind(this)
-        })
+      window.location.href = siteConfig.discoverAppUrl + "/workspaces"
+      // try {
+      //
+      //   // clearInterval(this.interval)
+      //   // await signOut()
+      //   // this.handleLogout(payload)
+      // } catch (error) {
+      //   this.handleXhrError()
+      // }
     },
     /**
      * Updates org users object with any missing fields required for sorting
@@ -493,62 +424,71 @@ export default {
     /**
      * Retrieves all members of an organization
      */
-    getOrgMembers: function() {
+    getOrgMembers: async function() {
 
-      const url = this.orgMembersUrl
-      if (!url) {
-        return
-      }
       if (this.hasFeature('sandbox_org_feature')) {
         return
       }
-      return this.sendXhr(url).then(resp => {
-        const members = this.updateMembers(resp)
-        this.updateOrgMembers(members)
+      return this.orgMembersUrl.then(url => {
+        return this.sendXhr(url).then(resp => {
+          const members = this.updateMembers(resp)
+          this.updateOrgMembers(members)
+        })
       })
     },
     /**
      * Generates teams GET url
      */
-    getTeamsUrl: function() {
-      if (!this.activeOrgId || !this.userToken) {
+    getTeamsUrl: async function() {
+      const userToken = await useGetToken()
+      if (!this.activeOrgId) {
         return
       }
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams?api_key=${this.userToken}`
+      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams?api_key=${userToken}`
     },
     /**
      * Retrieves all teams of an organization
      */
     getTeams: function() {
-      const url = this.getTeamsUrl()
-      if (!url) {
-        return
-      }
-      return this.sendXhr(url).then(this.updateTeams.bind(this))
+      return this.getTeamsUrl()
+          .then((url) => {
+            return this.sendXhr(url)})
+          .then(async (r) => {
+            this.updateTeams(r)
+          })
     },
-    getPublishersUrl: function() {
-      if (!this.activeOrgId || !this.userToken || !this.publisherTeam) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams/${this.publisherTeam.id}/members?api_key=${this.userToken}`
+    getPublishersUrl: async function() {
+
+      useGetToken().then( (token) => {
+        const publisherTeam = this.publisherTeam?.id
+          return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams/${publisherTeam}/members?api_key=${token}`
+      })
     },
     /**
      * retrieves the users in the system defined publishers team
      */
-    getPublishers: function() {
-      const url = this.getPublishersUrl()
-      if (!url) {
-        return
-      }
-      return this.sendXhr(url).then(this.updatePublishers.bind(this))
+    getPublishers: async function() {
+      useGetToken()
+          .then( async (token) => {
+            const publisherTeam = await this.publisherTeam.id
+
+            return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams/${publisherTeam}/members?api_key=${token}`
+          })
+          .then((url) => {
+            this.sendXhr(url).then((r) => {
+              return this.updatePublishers.bind(this)
+            })
+          })
     },
     /**
      * Retrieves all contributors of an organization
      */
     getOrgContributors: function() {
-      return this.sendXhr(this.getOrgContributorsUrl)
-              .then(this.setOrgContributors.bind(this))
-              .catch(this.handleXhrError.bind(this))
+      return this.getOrgContributorsUrl.then((url) => {
+        this.sendXhr(url)
+            .then(this.setOrgContributors.bind(this))
+            .catch(this.handleXhrError.bind(this))
+      })
     },
     /**
      * @param {Object} evt
@@ -661,26 +601,6 @@ export default {
     },
 
     /**
-     * Check if this is a first time user
-     * @param {String} userToken
-     */
-    saveFirstTimeSignOnEvent: function(userToken) {
-      this.sendXhr(`${this.config.apiUrl}/onboarding/events?api_key=${userToken}`, {
-        method: 'POST',
-        body: 'FirstTimeSignOn',
-        header: {
-          'Authorization': `bearer ${userToken}`
-        }
-      })
-      .then(() => {
-        const list = defaultTo([], this.onboardingEvents)
-        const onboardingEvents = [...list, 'FirstTimeSignOn']
-        this.updateOnboardingEvents(onboardingEvents)
-      })
-      .catch(this.handleXhrError.bind(this))
-    },
-
-    /**
      * Handle open-external-file-modal event
      * @param {Object} file
      */
@@ -709,14 +629,20 @@ export default {
     /**
      * Get data use agreements for organization
      */
-    getDataUseAgreements: function() {
-      return this.sendXhr(`${this.config.apiUrl}/organizations/${this.activeOrgId}/data-use-agreements?api_key=${this.userToken}`)
-        .then((response) => {
-          return this.updateDataUseAgreements(response)
-        })
-        .catch(() =>  {
-          return this.updateDataUseAgreements([])
-        })
+    getDataUseAgreements: async function() {
+      const apiKey = await useGetToken()
+
+      return useGetToken().then((token) => {
+        this.sendXhr(`${this.config.apiUrl}/organizations/${this.activeOrgId}/data-use-agreements?api_key=${token}`)
+            .then((response) => {
+              return this.updateDataUseAgreements(response)
+            })
+            .catch(() =>  {
+              return this.updateDataUseAgreements([])
+            })
+      })
+
+
     },
 
     finalizeOrcidIntegration: function(event) {
@@ -724,29 +650,33 @@ export default {
       if (oauthCode !== '') {
         const url = this.getORCIDApiUrl
 
-        this.sendXhr(url, {
-          method: 'POST',
-          header: {
-            'Authorization': `bearer ${this.userToken}`
-          },
-          body: {
-            "authorizationCode": oauthCode
-          }
-        })
-          .then(response => {
-            this.oauthInfo = response
-            this.updateProfile({
-              ...this.profile,
-              orcid: this.oauthInfo
+        useGetToken()
+            .then(token => {
+              this.sendXhr(url, {
+                method: 'POST',
+                header: {
+                  'Authorization': `bearer ${token}`
+                },
+                body: {
+                  "authorizationCode": oauthCode
+                }
+              })
+                  .then(response => {
+                    this.oauthInfo = response
+                    this.updateProfile({
+                      ...this.profile,
+                      orcid: this.oauthInfo
+                    })
+                    EventBus.$emit('toast', {
+                      detail: {
+                        type: 'success',
+                        msg: 'Your ORCID has been successfully added'
+                      }
+                    })
+                  })
+                  .catch(this.handleXhrError.bind(this))
             })
-            EventBus.$emit('toast', {
-              detail: {
-                type: 'success',
-                  msg: 'Your ORCID has been successfully added'
-              }
-            })
-          })
-          .catch(this.handleXhrError.bind(this))
+
       }
     },
   },

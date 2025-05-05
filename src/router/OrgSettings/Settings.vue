@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter
       slot="heading"
-      title="Organization Settings"
+      title="Workspace Configuration"
       class="primary"
     />
     <router-view name="stage" />

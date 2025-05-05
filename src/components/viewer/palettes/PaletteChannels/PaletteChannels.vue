@@ -133,6 +133,8 @@
   import IconFilterFilled from "../../../icons/IconFilterFilled.vue";
   import IconEyeball from "../../../icons/IconEyeball.vue";
   import IconPencil from "../../../icons/IconPencil.vue";
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'PaletteChannels',
@@ -175,7 +177,6 @@
       ...mapState([
         'bulkEditingChannels',
         'config',
-        'userToken'
       ]),
 
       /**
@@ -198,19 +199,6 @@
         )(this.viewerChannels)
       },
 
-      /**
-       * Compute channels url
-       * @returns {String}
-       */
-      channelsUrl: function() {
-        const timeseriesId = pathOr('', ['content', 'id'], this.activeViewer)
-
-        if (!timeseriesId) {
-          return ''
-        }
-
-        return `${this.config.apiUrl}/timeseries/${timeseriesId}/channels?api_key=${this.userToken}`
-      }
     },
 
     beforeDestroy() {
@@ -339,10 +327,6 @@
        * Handle save changes event
        */
       onSaveChanges: function() {
-        if (!this.channelsUrl) {
-          return
-        }
-
         const channels = this.sortedChannels.map(channel => {
           return {
             rate: propOr(0, 'sf', channel),
@@ -357,48 +341,54 @@
           }
         })
 
-        this.sendXhr(this.channelsUrl, {
-          method: 'PUT',
-          body: channels
-        })
-        .then(() => {
-          this.isSavingChanges = false
+        useGetToken()
+          .then(token => {
+            const timeseriesId = pathOr('', ['content', 'id'], this.activeViewer)
+            const url =  `${this.config.apiUrl}/timeseries/${timeseriesId}/channels?api_key=${token}`
 
-          // update channels in vuex
-          const updatedChannels = this.sortedChannels.map(channel => {
-            channel.isEditing = false
-            return channel
-          })
-
-          this.setChannels(updatedChannels).then(() => {
-            // re-render canvas
-            // TODO move to vuex
-            EventBus.$emit('active-viewer-action', {
-              method: 'updateChannels'
+            return useSendXhr(url, {
+              method: 'PUT',
+              body: channels
             })
+              .then(() => {
+                this.isSavingChanges = false
 
-            // display success message
+                // update channels in vuex
+                const updatedChannels = this.sortedChannels.map(channel => {
+                  channel.isEditing = false
+                  return channel
+                })
+
+                return this.setChannels(updatedChannels)
+                  .then(() => {
+                    // re-render canvas
+                    // TODO move to vuex
+                    EventBus.$emit('active-viewer-action', {
+                      method: 'updateChannels'
+                    })
+
+                    // display success message
+                    EventBus.$emit('toast', {
+                      detail: {
+                        type: 'success',
+                        msg: 'Your changes have been saved.'
+                      }
+                    })
+                  })
+              })
+          })
+          .catch(err => {
+            this.isSavingChanges = false
+            this.handleXhrError(err)
+
             EventBus.$emit('toast', {
               detail: {
-                type: 'success',
-                msg: 'Your changes have been saved.'
+                type: 'error',
+                msg: 'There was an error saving changes.'
               }
             })
           })
-
-          this.setBulkEditingChannels(false)
-        })
-        .catch(err => {
-          this.isSavingChanges = false
-          this.handleXhrError(err)
-
-          EventBus.$emit('toast', {
-            detail: {
-              type: 'error',
-              msg: 'There was an error saving changes.'
-            }
-          })
-        })
+          .finally(() => this.setBulkEditingChannels(false))
       },
 
       /**

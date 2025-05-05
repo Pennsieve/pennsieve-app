@@ -84,6 +84,8 @@
   import AutoFocus from '../../../../mixins/auto-focus'
   import Sorter from '../../../../mixins/sorter'
   import checkUniqueName from '../../../../mixins/check-unique-names'
+  import {useGetToken} from "@/composables/useGetToken";
+  import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
   export default {
     name: 'CreateConceptDialog',
@@ -126,12 +128,8 @@
 
     computed: {
       ...mapGetters([
-        'userToken',
         'config',
         'hasFeature',
-      ]),
-      ...mapState([
-        'onboardingEvents'
       ]),
       ...mapState('metadataModule',[
         'models'
@@ -143,17 +141,6 @@
        */
       name: function() {
         return snakeCase(this.concept.displayName)
-      },
-
-      /**
-       * Onboarding Events Url
-       * @returns {String}
-       */
-      onboardingEventsUrl() {
-        const apiUrl = propOr('', 'apiUrl', this.config)
-        if (apiUrl && this.userToken) {
-          return `${apiUrl}/onboarding/events?api_key=${this.userToken}`
-        }
       }
     },
 
@@ -168,9 +155,6 @@
     },
 
     methods: {
-      ...mapActions([
-        'updateOnboardingEvents'
-      ]),
       ...mapActions('metadataModule',[
         'updateModels'
       ]),
@@ -197,23 +181,27 @@
           const datasetId = this.$route.params.datasetId
           const url = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts`
 
-          this.sendXhr(url, {
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            },
-            method: 'POST',
-            body: {
-              name: this.concept.name,
-              displayName: this.concept.displayName,
-              description: '',
-              locked: false
-            }
-          })
-          .then(this.handleCreateConcept.bind(this))
-          .catch(err => {
-            this.processing = false
-            this.handleXhrError(err)
-          })
+          useGetToken()
+            .then(token => {
+              return useSendXhr(url, {
+                header: {
+                  'Authorization': `bearer ${token}`
+                },
+                method: 'POST',
+                body: {
+                  name: this.concept.name,
+                  displayName: this.concept.displayName,
+                  description: '',
+                  locked: false
+                }
+              })
+                .then(this.handleCreateConcept.bind(this))
+                .catch(err => {
+                  this.processing = false
+                  useHandleXhrError(err)
+                })
+            }).catch(err => useHandleXhrError(err))
+
         })
       },
 
@@ -225,13 +213,6 @@
         // Add to state
         const models = [...this.models, model]
         const sortedConcepts = this.returnSort('displayName', models, 'asc')
-
-        // check for onboarding event state for creating a model
-        if (this.onboardingEvents.indexOf('CreatedModel') === -1){
-          // make post request
-          this.sendOnboardingEventsRequest()
-        }
-
         this.updateModels(sortedConcepts).then(() => {
           // Redirect user to new concept instance page
           // this.$router.replace({
@@ -275,24 +256,6 @@
         }
         callback()
       },
-
-      sendOnboardingEventsRequest: function(){
-        if (this.onboardingEventsUrl){
-          this.sendXhr(this.onboardingEventsUrl, {
-            method: 'POST',
-            body: 'CreatedModel',
-            header: {
-              'Authorization': `bearer ${this.userToken}`
-            }
-          })
-          .then(response => {
-            const onboardingEvents = [...this.onboardingEvents, 'CreatedModel']
-            this.updateOnboardingEvents(onboardingEvents)
-          })
-          .catch(this.handleXhrError.bind(this))
-        }
-
-      }
     }
   }
 </script>

@@ -8,16 +8,13 @@
     @close="closeDialog"
   >
     <template #header>
-      <bf-dialog-header
-        slot="title"
-        :title="dialogTitle"
-      />
+      <bf-dialog-header slot="title" :title="dialogTitle" />
     </template>
 
     <dialog-body>
       <!-- Step 1 -->
       <el-form
-        v-show="shouldShow(1,'All')"
+        v-show="shouldShow(1, 'All')"
         ref="integrationFormStep1"
         :model="integration"
         :rules="rules"
@@ -26,9 +23,7 @@
       >
         <el-form-item prop="displayName">
           <template #label>
-            Name <span class="label-helper">
-              required
-            </span>
+            Name <span class="label-helper"> required </span>
           </template>
           <el-input
             v-model="integration.displayName"
@@ -38,11 +33,8 @@
         </el-form-item>
 
         <el-form-item prop="description">
-
           <template #label>
-            Description <span class="label-helper">
-              required
-            </span>
+            Description <span class="label-helper"> required </span>
           </template>
           <div class="text-area-wrapper">
             <el-input
@@ -55,14 +47,16 @@
               :show-word-limit="true"
             />
           </div>
-
         </el-form-item>
 
         <el-form-item prop="isPublic">
           <template #label>
-            Integration permissions <span class="label-helper">
-            </span>
-            <div class="info">Allow the integration to be used by everyone in the organization. By default the integration is private and can only be managed by the current user.</div>
+            Integration permissions <span class="label-helper"> </span>
+            <div class="info">
+              Allow the integration to be used by everyone in the organization.
+              By default the integration is private and can only be managed by
+              the current user.
+            </div>
           </template>
           <el-checkbox
             v-model="integration.isPublic"
@@ -70,35 +64,32 @@
           />
         </el-form-item>
 
-        <el-form-item prop="isDefault"
-                      v-show="integration.isPublic">
+        <el-form-item prop="isDefault" v-show="integration.isPublic">
           <template #label>
-            Enable by default <span class="label-helper">
-            </span>
-            <div class="info">Enable this integration for all new datasets added to your organization. Individual dataset owners can opt-out or turn off.</div>
+            Enable by default <span class="label-helper"> </span>
+            <div class="info">
+              Enable this integration for all new datasets added to your
+              organization. Individual dataset owners can opt-out or turn off.
+            </div>
           </template>
           <el-checkbox
             v-model="integration.isDefault"
             label="Enable by default on new datasets"
           />
         </el-form-item>
-
       </el-form>
 
       <!-- Step 2 -->
-      <div class="form-container"
-        v-show="shouldShow(2, 'All')">
+      <div class="form-container" v-show="shouldShow(2, 'All')">
         <el-form
           ref="integrationFormStep2"
           label-position="top"
           :model="integration"
-          :rules="rules">
-
+          :rules="rules"
+        >
           <el-form-item prop="integrationType">
             <template #label>
-              Integration Type <span class="label-helper">
-                required
-              </span>
+              Integration Type <span class="label-helper"> required </span>
             </template>
             <el-select
               ref="enum"
@@ -113,14 +104,11 @@
                 :value="item.value"
               />
             </el-select>
-
           </el-form-item>
 
           <el-form-item prop="apiUrl">
             <template #label>
-              API URL <span class="label-helper">
-              required
-            </span>
+              API URL <span class="label-helper"> required </span>
             </template>
             <el-input
               v-model="integration.apiUrl"
@@ -130,9 +118,7 @@
 
           <el-form-item prop="imageUrl">
             <template #label>
-              Image URL <span class="label-helper">
-              optional
-            </span>
+              Image URL <span class="label-helper"> optional </span>
             </template>
             <el-input
               v-model="integration.imageUrl"
@@ -140,43 +126,36 @@
             />
           </el-form-item>
 
-          <el-form-item
-            prop="secret">
+          <el-form-item prop="secret">
             <template #label>
-              Secret <span class="label-helper">
-            </span>
-              <p class="info">This unique string is sent with all published events to this webhook and can be used to validate the origin of the message.</p>
+              Secret <span class="label-helper"> </span>
+              <p class="info">
+                This unique string is sent with all published events to this
+                webhook and can be used to validate the origin of the message.
+              </p>
             </template>
             <el-input
               v-if="showSecret"
               v-model="integration.secret"
               placeholder="TODO: Create secret"
             />
-            <bf-button
-              v-else
-              class="secondary"
-              @click="generateSecret"
-            >
+            <bf-button v-else class="secondary" @click="generateSecret">
               Generate new secret
             </bf-button>
           </el-form-item>
-
         </el-form>
       </div>
 
       <!-- Step 3 (Webhook) -->
-      <div class="form-container"
-           v-show="shouldShow(3, 'Webhook')">
+      <div class="form-container" v-show="shouldShow(3, 'Webhook')">
         <el-form
           ref="integrationFormStep3a"
           :model="integration"
           label-position="top"
         >
-
           <el-form-item prop="triggers">
             <template #label>
-              Select Triggers <span class="label-helper">
-            </span>
+              Select Triggers <span class="label-helper"> </span>
             </template>
 
             <el-checkbox
@@ -185,7 +164,8 @@
               label="Metadata"
             />
             <div class="check-description">
-              Dataset name, subtitle, licences, description, image, references, tags, contributors, collections, or ignore files list
+              Dataset name, subtitle, licences, description, image, references,
+              tags, contributors, collections, or ignore files list
             </div>
 
             <el-checkbox
@@ -193,27 +173,21 @@
               class="input-property"
               label="Status"
             />
-            <div class="check-description">
-              All changes to dataset status
-            </div>
+            <div class="check-description">All changes to dataset status</div>
 
             <el-checkbox
               v-model="integration.eventTypeList.RECORDS_AND_MODELS"
               class="input-property"
               label="Records and Models"
             />
-            <div class="check-description">
-              Creating, managing, or removing
-            </div>
+            <div class="check-description">Creating, managing, or removing</div>
 
             <el-checkbox
               v-model="integration.eventTypeList.FILES"
               class="input-property"
               label="Files"
             />
-            <div class="check-description">
-              Creating, managing, or removing
-            </div>
+            <div class="check-description">Creating, managing, or removing</div>
 
             <el-checkbox
               v-model="integration.eventTypeList.PERMISSIONS"
@@ -245,15 +219,14 @@
       </div>
 
       <!-- Step 3 (Application) -->
-      <div class="form-container"
-           v-show="shouldShow(3, 'Application')">
-
+      <div class="form-container" v-show="shouldShow(3, 'Application')">
         <div>
-          The application will be available as an action for the selected targets.
-          Optionally, you can provide a filter to restrict objects that can invoke the application.
-          You can select the same target multiple times with different filters.
-          Valid targets include: Dataset, File, and Files.
-          <br><br>
+          The application will be available as an action for the selected
+          targets. Optionally, you can provide a filter to restrict objects that
+          can invoke the application. You can select the same target multiple
+          times with different filters. Valid targets include: Dataset, File,
+          and Files.
+          <br /><br />
 
           <b>Select targets</b> <span class="label-helper">required</span>
         </div>
@@ -261,11 +234,13 @@
         <el-form
           ref="integrationFormStep3b"
           :model="integration"
-          :rules="rules">
-
+          :rules="rules"
+        >
           <el-form-item prop="customTargets">
-
-            <div v-for="(item, index) in integration.customTargets" class="targetOptions">
+            <div
+              v-for="(item, index) in integration.customTargets"
+              class="targetOptions"
+            >
               <el-select
                 ref="enum"
                 v-model="item.target"
@@ -297,228 +272,217 @@
                 <Minus style="width: 1em; height: 1em; margin-right: 8px" />
               </el-button>
             </div>
-
-
           </el-form-item>
           <el-button size="small" @click="addCustomTarget">
             <Plus style="width: 1em; height: 1em; margin-right: 8px" />
           </el-button>
-
         </el-form>
       </div>
-
     </dialog-body>
 
     <!-- Overview buttons -->
     <template #footer>
-      <bf-button
-        class="secondary"
-        @click="advanceStep(-1)"
-      >
+      <bf-button class="secondary" @click="advanceStep(-1)">
         {{ stepBackText }}
       </bf-button>
       <bf-button @click="advanceStep(1)">
         {{ createText }}
       </bf-button>
     </template>
-
   </el-dialog>
 </template>
 
 <script>
-import snakeCase from 'lodash.snakecase'
-import {mapState} from 'vuex'
+import snakeCase from "lodash.snakecase";
+import { mapState } from "vuex";
 
-import BfButton from '../shared/bf-button/BfButton.vue'
-import BfDialogHeader from '../shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '../shared/dialog-body/DialogBody.vue'
-import Request from '../../mixins/request'
-import GetDataType from '../../mixins/data-type'
-import AutoFocus from '../../mixins/auto-focus'
-import checkUniqueName from '../../mixins/check-unique-names'
-import FileTypeMapper from '../../mixins/FileTypeMapper'
-import { Minus, Plus } from '@element-plus/icons-vue'
+import BfButton from "../shared/bf-button/BfButton.vue";
+import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "../shared/dialog-body/DialogBody.vue";
+import Request from "../../mixins/request";
+import GetDataType from "../../mixins/data-type";
+import AutoFocus from "../../mixins/auto-focus";
+import checkUniqueName from "../../mixins/check-unique-names";
+import FileTypeMapper from "../../mixins/FileTypeMapper";
+import { Minus, Plus } from "@element-plus/icons-vue";
 
 /**
  * Returns the default values for a property
  * @returns {Object}
  */
-const defaultIntegration = () => (
-  {
-    displayName: '',
-    description: '',
-    apiUrl:'',
-    imageUrl:'',
-    secret: '',
-    isDefault: false,
-    isDisabled: false,
-    isPublic: false,
-    name: '',
-    integrationType: 'viewer',
-    customTargets: [{target: "DATASET", filter: null}],
-    eventTypeList: {
-      METADATA: false,
-      STATUS: false,
-      RECORDS_AND_MODELS: false,
-      FILES: false,
-      PERMISSIONS: false,
-      PUBLISHING: false,
-      CUSTOM: false
-    }
-  }
-)
+const defaultIntegration = () => ({
+  displayName: "",
+  description: "",
+  apiUrl: "",
+  imageUrl: "",
+  secret: "",
+  isDefault: false,
+  isDisabled: false,
+  isPublic: false,
+  name: "",
+  integrationType: "viewer",
+  customTargets: [{ target: "DATASET", filter: null }],
+  eventTypeList: {
+    METADATA: false,
+    STATUS: false,
+    RECORDS_AND_MODELS: false,
+    FILES: false,
+    PERMISSIONS: false,
+    PUBLISHING: false,
+    CUSTOM: false,
+  },
+});
 
 export default {
-  name: 'AddEditIntegrationDialog',
+  name: "AddEditIntegrationDialog",
 
   components: {
     BfDialogHeader,
     DialogBody,
     BfButton,
     Plus,
-    Minus
+    Minus,
   },
 
-  mixins: [
-    Request,
-    AutoFocus,
-    checkUniqueName,
-    GetDataType,
-    FileTypeMapper
-  ],
+  mixins: [Request, AutoFocus, checkUniqueName, GetDataType, FileTypeMapper],
 
   props: {
     dialogVisible: Boolean,
     integrationType: String,
     integrationEdit: {
       type: Object,
-      default: function(){
-        return {}
-      }
+      default: function () {
+        return {};
+      },
     },
   },
-  mounted: function() {
+  mounted: function () {
     this.fileTypes.unshift({
-      value: '',
-      label: '(No Filter)'
-    })
+      value: "",
+      label: "(No Filter)",
+    });
   },
-  data: function() {
+  data: function () {
     return {
       integration: defaultIntegration(),
       processStep: 1,
       rules: {
         displayName: [
-          { required: true, validator: this.validateName, trigger: 'false' },
+          { required: true, validator: this.validateName, trigger: "false" },
         ],
         description: [
-          { required: true, validator: this.validateDescription, trigger: 'false' },
+          {
+            required: true,
+            validator: this.validateDescription,
+            trigger: "false",
+          },
         ],
         integrationType: [
-          { required: true, validator: this.validateType, trigger: 'false' },
+          { required: true, validator: this.validateType, trigger: "false" },
         ],
         name: [
-          { required: true, validator: this.validateName, trigger: 'false' },
+          { required: true, validator: this.validateName, trigger: "false" },
         ],
         dataType: [
-          { required: true, message: 'Please select a type', trigger: 'false' }
+          { required: true, message: "Please select a type", trigger: "false" },
         ],
         apiUrl: [
-          { required: true, validator: this.validateApiUrl, trigger: 'false' },
+          { required: true, validator: this.validateApiUrl, trigger: "false" },
         ],
         customTargets: [
-          { required: true, validator: this.validateCustomTargets, trigger: 'false'}
-        ]
+          {
+            required: true,
+            validator: this.validateCustomTargets,
+            trigger: "false",
+          },
+        ],
       },
       subscriptionKeys: [
-        'metadata',
-        'status',
-        'models',
-        'files',
-        'permissions',
-        'publishing'
+        "metadata",
+        "status",
+        "models",
+        "files",
+        "permissions",
+        "publishing",
       ],
       typeItems: [
         {
-          value: 'viewer',
-          label: 'Viewer'
+          value: "viewer",
+          label: "Viewer",
         },
         {
-          value: 'manager',
-          label: 'Manager'
-        }
+          value: "manager",
+          label: "Manager",
+        },
       ],
       customTargets: [
         {
-          value: 'DATASET',
-          label: 'Dataset'
+          value: "DATASET",
+          label: "Dataset",
         },
         {
-          value: 'PACKAGE',
-          label: 'File'
+          value: "PACKAGE",
+          label: "File",
         },
         {
-          value: 'PACKAGES',
-          label: 'Files'
-        }
+          value: "PACKAGES",
+          label: "Files",
+        },
       ],
-    }
+    };
   },
 
   computed: {
-    ...mapState([
-      'userToken',
-      'config',
-      'concepts',
-      'dataset',
-      'scientificUnits'
-    ]),
-    showSecret: function() {
-      return Boolean(this.integration.secret)
+    ...mapState(["config", "concepts", "dataset", "scientificUnits"]),
+    showSecret: function () {
+      return Boolean(this.integration.secret);
     },
     /**
      * Computes create property CTA
      * @returns {String}
      */
-    createText: function() {
-      let createText = 'Add Integration'
+    createText: function () {
+      let createText = "Add Integration";
       if (this.editingIntegration) {
-        createText = 'Update Integration'
+        createText = "Update Integration";
       }
 
-      return this.processStep > 2 ? createText : 'Continue'
+      return this.processStep > 2 ? createText : "Continue";
     },
 
-    stepBackText: function() {
-      return this.processStep > 1 ? 'Back' : 'Cancel'
+    stepBackText: function () {
+      return this.processStep > 1 ? "Back" : "Cancel";
     },
 
     /**
      * Convert display name into snake case
      * @returns {String}
      */
-    name: function() {
+    name: function () {
       // Do not mutate if the user is editing a property
       if (this.editingIntegration) {
-        return this.integration.name
+        return this.integration.name;
       }
 
-      return snakeCase(this.integration.displayName)
+      return snakeCase(this.integration.displayName);
     },
     /**
      * Compute if user is editing an integration
      * @returns {Boolean}
      */
-    editingIntegration: function() {
-      return Boolean(Object.keys(this.integrationEdit).length)
+    editingIntegration: function () {
+      return Boolean(Object.keys(this.integrationEdit).length);
     },
 
     /**
      * Compute dialog title based on if the user is editing a property
      * @returns {String}
      */
-    dialogTitle: function() {
-      return this.editingIntegration ? 'Update Integration' : 'Add Integration'
+    dialogTitle: function () {
+      if (this.integrationType === "Webhook") {
+        return this.editingIntegration ? "Update Webhook" : "Add Webhook";
+      }
+      return this.editingIntegration ? "Update Integration" : "Add Integration";
     },
   },
 
@@ -527,18 +491,17 @@ export default {
      * Watch name and set form model to the value
      * @param {String} val
      */
-    name: function(val) {
-      this.integration.name = val
-    }
+    name: function (val) {
+      this.integration.name = val;
+    },
   },
 
   methods: {
-
-    showFilter: function(target){
-      return target === "PACKAGE" || target === "PACKAGES"
+    showFilter: function (target) {
+      return target === "PACKAGE" || target === "PACKAGES";
     },
-    generateSecret: function() {
-      this.integration.secret = this.generateId(16)
+    generateSecret: function () {
+      this.integration.secret = this.generateId(16);
     },
     /**
      * Determines if tab content is active
@@ -546,141 +509,137 @@ export default {
      * @param {String} type
      * @returns {Boolean}
      */
-    shouldShow: function(key, type) {
-      return this.processStep === key && (this.integrationType === type || type === "All")
+    shouldShow: function (key, type) {
+      return (
+        this.processStep === key &&
+        (this.integrationType === type || type === "All")
+      );
     },
 
     /**
      * Handles open event
      */
-    onOpen: function() {
-
+    onOpen: function () {
       if (this.editingIntegration) {
         // set properties in local state to be referenced in createIntegration fn
-        const ei = this.integrationEdit
-        this.integration.displayName = ei.displayName
-        this.integration.apiUrl = ei.apiUrl
-        this.integration.name = ei.name
-        this.integration.id = ei.id
-        this.integration.description = ei.description
-        this.integration.secret = ei.secret
-        this.integration.isDefault = ei.isDefault
-        this.integration.isDisabled = ei.isDisabled
-        this.integration.isPrivate = ei.isPrivate
-        this.integration.integrationType = ei.hasAccess? 'manager' : 'viewer'
+        const ei = this.integrationEdit;
+        this.integration.displayName = ei.displayName;
+        this.integration.apiUrl = ei.apiUrl;
+        this.integration.name = ei.name;
+        this.integration.id = ei.id;
+        this.integration.description = ei.description;
+        this.integration.secret = ei.secret;
+        this.integration.isDefault = ei.isDefault;
+        this.integration.isDisabled = ei.isDisabled;
+        this.integration.isPrivate = ei.isPrivate;
+        this.integration.integrationType = ei.hasAccess ? "manager" : "viewer";
         for (let target in ei.eventTargets) {
-          this.integration.eventTypeList[ei.eventTargets[target]] = true
+          this.integration.eventTypeList[ei.eventTargets[target]] = true;
         }
-
       } else {
-        this.integration.secret = this.generateId(16)
+        this.integration.secret = this.generateId(16);
       }
 
-      this.autoFocus()
+      this.autoFocus();
     },
-    addCustomTarget: function() {
-      this.integration.customTargets.push( {target: "Dataset", filter: ""})
+    addCustomTarget: function () {
+      this.integration.customTargets.push({ target: "Dataset", filter: "" });
     },
-    removeCustomTarget: function(index) {
-      this.integration.customTargets.splice(index,1)
+    removeCustomTarget: function (index) {
+      this.integration.customTargets.splice(index, 1);
     },
 
     /**
      * Closes the dialog
      */
-    closeDialog: function() {
-      this.$emit('close', false)
+    closeDialog: function () {
+      this.$emit("close", false);
 
       // delays the reset for the state
       setTimeout(() => {
-        this.processStep = 1
-        this.integration = defaultIntegration()
-        this.$refs.integrationFormStep1.resetFields()
-        this.$refs.integrationFormStep2.resetFields()
-        this.$refs.integrationFormStep3a.resetFields()
-        this.$refs.integrationFormStep3b.resetFields()
-        this.isE
-        this.$emit('update:integrationEdit', {})
-      }, 500)
+        this.processStep = 1;
+        this.integration = defaultIntegration();
+        this.$refs.integrationFormStep1.resetFields();
+        this.$refs.integrationFormStep2.resetFields();
+        this.$refs.integrationFormStep3a.resetFields();
+        this.$refs.integrationFormStep3b.resetFields();
+        this.isE;
+        this.$emit("update:integrationEdit", {});
+      }, 500);
     },
 
-    advanceStep: function(step) {
-      this.processStep += step
+    advanceStep: function (step) {
+      this.processStep += step;
       if (this.processStep === 0) {
-        this.closeDialog()
+        this.closeDialog();
       }
 
       if (this.processStep === 4) {
-        this.createIntegration()
+        this.createIntegration();
       }
     },
 
     /**
      * Send integration to API to create it
      */
-    createIntegration: function() {
-      let isValid = true
-      this.$refs.integrationFormStep1.validate((valid) => {
-        if (!valid) {
-          // switch tab views
-          isValid = false
-          return this.processStep = 1
-        }
-      })
+    createIntegration: function () {
+      let isValid = true;
+      this.$refs.integrationFormStep1
+        .validate((valid) => {
+          if (!valid) {
+            // switch tab views
+            isValid = false;
+            return (this.processStep = 1);
+          }
+        })
         .then(() => {
           this.$refs.integrationFormStep2.validate((valid) => {
             if (!valid) {
               // switch tab views
-              isValid = false
-              return this.processStep = 2
+              isValid = false;
+              return (this.processStep = 2);
             }
-
-          })
+          });
         })
-      .then(() => {
-        this.$refs.integrationFormStep3a.validate((valid) => {
-          if (!valid) {
-            // switch tab views
-            isValid = false
-            return this.processStep = 3
-          }
-
+        .then(() => {
+          this.$refs.integrationFormStep3a.validate((valid) => {
+            if (!valid) {
+              // switch tab views
+              isValid = false;
+              return (this.processStep = 3);
+            }
+          });
         })
-      })
-      .then(() => {
-        this.$refs.integrationFormStep3b.validate((valid) => {
-          if (!valid) {
-            // switch tab views
-            isValid = false
-            return this.processStep = 3
-          }
-
+        .then(() => {
+          this.$refs.integrationFormStep3b.validate((valid) => {
+            if (!valid) {
+              // switch tab views
+              isValid = false;
+              return (this.processStep = 3);
+            }
+          });
         })
-      })
-      .then(() => {
-        if (isValid) {
-          if (this.editingIntegration) {
-            this.$emit('edit-integration', this.integration)
-          } else {
-            this.$emit('add-integration', this.integration)
+        .then(() => {
+          if (isValid) {
+            if (this.editingIntegration) {
+              this.$emit("edit-integration", this.integration);
+            } else {
+              this.$emit("add-integration", this.integration);
+            }
+            this.closeDialog();
           }
-          this.closeDialog()
-        }
-      })
-
-
-
-
-
-
+        });
     },
-    validURL: function(str) {
-      var pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
-        '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
-        '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
-        '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
-        '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
-        '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+    validURL: function (str) {
+      var pattern = new RegExp(
+        "^(https?:\\/\\/)?" + // protocol
+          "((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|" + // domain name
+          "((\\d{1,3}\\.){3}\\d{1,3}))" + // OR ip (v4) address
+          "(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*" + // port and path
+          "(\\?[;&a-z\\d%_.~+=-]*)?" + // query string
+          "(\\#[-a-z\\d_]*)?$",
+        "i"
+      ); // fragment locator
       return !!pattern.test(str);
     },
 
@@ -690,70 +649,73 @@ export default {
      * @param {String} value
      * @param {Function} callback
      */
-    validateName: function(rule, value, callback) {
-      const displayNameMsg = rule.field === 'displayName' ? 'display name' : 'name'
-      if (value === '') {
-        callback(new Error(`Please provide a unique ${displayNameMsg}`))
+    validateName: function (rule, value, callback) {
+      const displayNameMsg =
+        rule.field === "displayName" ? "display name" : "name";
+      if (value === "") {
+        callback(new Error(`Please provide a unique ${displayNameMsg}`));
       }
-      callback()
+      callback();
     },
-    validateType: function(rule, value, callback) {
-      if (value === '') {
-        callback(new Error('Please select either "Viewer" or "Manager" as the integration type.'))
+    validateType: function (rule, value, callback) {
+      if (value === "") {
+        callback(
+          new Error(
+            'Please select either "Viewer" or "Manager" as the integration type.'
+          )
+        );
       }
-      callback()
+      callback();
     },
-    validateDescription: function(rule, value, callback) {
-      if (value === '' || value.length < 20) {
-        callback(new Error(`Please provide a short description (>50 characters)`))
+    validateDescription: function (rule, value, callback) {
+      if (value === "" || value.length < 20) {
+        callback(
+          new Error(`Please provide a short description (>50 characters)`)
+        );
       }
-      callback()
+      callback();
     },
-    validateApiUrl: function(rule, value, callback) {
+    validateApiUrl: function (rule, value, callback) {
       if (!this.validURL(value)) {
-        callback(new Error(`Please provide a valid API url`))
+        callback(new Error(`Please provide a valid API url`));
       }
-      callback()
+      callback();
     },
-    validateCustomTargets: function(rule, value, callback) {
+    validateCustomTargets: function (rule, value, callback) {
       // Check unique rows
-      const uniques = new Set(value.map(item => item.target + item.filter))
+      const uniques = new Set(value.map((item) => item.target + item.filter));
       if ([...uniques].length !== value.length) {
-        callback(new Error(`Please remove duplicate entries`))
+        callback(new Error(`Please remove duplicate entries`));
       }
-      callback()
-
-
+      callback();
     },
-    dec2hex: function(dec) {
-      return dec.toString(16).padStart(2, "0")
+    dec2hex: function (dec) {
+      return dec.toString(16).padStart(2, "0");
     },
     // generateId :: Integer -> String
-    generateId: function(len) {
+    generateId: function (len) {
       const arr = new Uint8Array((len || 40) / 2);
-      window.crypto.getRandomValues(arr)
-      return Array.from(arr, this.dec2hex).join('')
-    }
-  }
-}
+      window.crypto.getRandomValues(arr);
+      return Array.from(arr, this.dec2hex).join("");
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@import "../../assets/_variables.scss";
 
 .text-area-wrapper {
   width: 100%;
 }
 
 .add-integration-dialog {
-
   .el-form-item {
     .el-form-item__label {
       font-weight: 500;
-      color: $gray_5
+      color: $gray_5;
     }
   }
-
 
   .el-select {
     &.input-property {
@@ -791,19 +753,20 @@ export default {
     border: 1px solid $gray_5;
   }
 
-  .el-checkbox__label, .el-form-item__label {
+  .el-checkbox__label,
+  .el-form-item__label {
     color: $gray_6;
     font-weight: 400;
   }
 
   .targetOptions {
     flex-direction: row;
-    display:flex;
+    display: flex;
     margin: 8px 0;
   }
 
   .disabled-label {
-    color: #C0C4CC;
+    color: #c0c4cc;
     cursor: not-allowed;
     margin-top: 10px;
   }
@@ -812,7 +775,8 @@ export default {
     margin-top: 10px;
   }
 
-  .el-select-group, .el-select-dropdown__item {
+  .el-select-group,
+  .el-select-dropdown__item {
     padding-bottom: 10px;
   }
   .item-checkbox .el-form-item__content {
@@ -832,7 +796,7 @@ export default {
     font-size: 12px;
     color: $gray_4;
     &.disabled-label {
-      color: #C0C4CC;
+      color: #c0c4cc;
       cursor: not-allowed;
       margin-top: -18px;
       height: 26px;
@@ -857,4 +821,3 @@ export default {
   }
 }
 </style>
-

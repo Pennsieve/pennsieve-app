@@ -1,15 +1,12 @@
 <template>
-
   <div
     class="dataset-activity-panel"
-    :class="{'date-grouped': dateGroupHeading }"
+    :class="{ 'date-grouped': dateGroupHeading }"
   >
     <h3 v-if="dateGroupHeading">
       {{ dateGroupHeading }}
     </h3>
-    <div
-      class="dataset-activity-panel-item"
-    >
+    <div class="dataset-activity-panel-item">
       <div class="dataset-activity-panel-item__info">
         <div class="dataset-activity-panel-item__info__label-wrap">
           <div class="dataset-activity-panel-item__info__label-activity">
@@ -19,7 +16,6 @@
             >
               Publishing
             </span>
-
 
             <dataset-activity-metadata-label
               v-if="isMetadataUpdate"
@@ -31,17 +27,24 @@
             </span>
 
             <a
-              v-if="event.eventType === 'ACCEPT_PUBLICATION' || event.eventType === 'RELEASE_EMBARGO'"
+              v-if="
+                event.eventType === 'ACCEPT_PUBLICATION' ||
+                event.eventType === 'RELEASE_EMBARGO'
+              "
               target="_blank"
               :href="discoverLink"
-              :class="[!wasPublished ? 'disabled': '']"
+              :class="[!wasPublished ? 'disabled' : '']"
             >
               View on Discover
             </a>
           </div>
 
           <dataset-activity-detail
-            v-if="totalCount === 1 && !isPublishingChange(event.eventType) && !hideMetadataDetails(event.eventType)"
+            v-if="
+              totalCount === 1 &&
+              !isPublishingChange(event.eventType) &&
+              !hideMetadataDetails(event.eventType)
+            "
             :parent-panel="true"
             :event-detail="event.event"
           />
@@ -50,30 +53,22 @@
         <div class="dataset-activity-panel-item__info--meta">
           <div class="user-wrap">
             <div
-              v-for="userId in event.userIds.slice(0,3)"
+              v-for="userId in event.userIds.slice(0, 3)"
               :key="userId"
               class="user-avatar-list"
             >
               <div class="user-avatar">
-                <avatar
-                  :user="getOrgMemberByIntId(userId)"
-                  :tooltip="true"
-                />
+                <avatar :user="userId" :tooltip="true" />
               </div>
             </div>
 
-            <div
-              v-if="event.userIds.length > 3"
-              class="truncate-user-tooltip"
-            >
+            <div v-if="event.userIds.length > 3" class="truncate-user-tooltip">
               <el-tooltip
                 ref="tooltip"
                 placement="top-start"
                 :content="populateUserList"
               >
-                <div class="test">
-                  + {{ (event.userIds.length - 3) }}
-                </div>
+                <div class="test">+ {{ event.userIds.length - 3 }}</div>
               </el-tooltip>
             </div>
           </div>
@@ -84,7 +79,12 @@
       </div>
 
       <dataset-activity-panel-dropdown
-        v-if="totalCount > 1 && !isPublishingChange(event.eventType) && event.eventType !== 'UPDATE_IGNORE_FILES' && event.eventType !== 'UPDATE_BANNER_IMAGE'"
+        v-if="
+          totalCount > 1 &&
+          !isPublishingChange(event.eventType) &&
+          event.eventType !== 'UPDATE_IGNORE_FILES' &&
+          event.eventType !== 'UPDATE_BANNER_IMAGE'
+        "
         class="event-details-wrap"
         :event="event"
         :total-count="totalCount"
@@ -101,205 +101,225 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from 'vuex'
-import { pathOr } from 'ramda'
-import moment from 'moment'
+import { mapGetters, mapState } from "vuex";
+import { pathOr } from "ramda";
+import moment from "moment";
 
-import DatasetActivityPanelDropdown from '../DatasetActivityPanelDropdown/DatasetActivityPanelDropdown.vue'
-import DatasetActivityDetail from '../DatasetActivityDetail/DatasetActivityDetail.vue'
-import DatasetActivityMetadataLabel from '../DatasetActivityMetadataLabel/DatasetActivityMetadataLabel.vue'
-import DatasetActivityDescriptionDialog from '../DatasetActivityDescriptionDialog/DatasetActivityDescriptionDialog.vue'
-import Avatar from '../../../shared/avatar/Avatar.vue'
+import DatasetActivityPanelDropdown from "../DatasetActivityPanelDropdown/DatasetActivityPanelDropdown.vue";
+import DatasetActivityDetail from "../DatasetActivityDetail/DatasetActivityDetail.vue";
+import DatasetActivityMetadataLabel from "../DatasetActivityMetadataLabel/DatasetActivityMetadataLabel.vue";
+import DatasetActivityDescriptionDialog from "../DatasetActivityDescriptionDialog/DatasetActivityDescriptionDialog.vue";
+import Avatar from "../../../shared/avatar/Avatar.vue";
 
-import formatDateRange from '../../../../mixins/format-date/index'
-import Request from '../../../../mixins/request/index'
-import RenderPermissionsMixin from '../RenderPermissionsMixin'
+import formatDateRange from "../../../../mixins/format-date/index";
+import Request from "../../../../mixins/request/index";
+import RenderPermissionsMixin from "../RenderPermissionsMixin";
 
-import { ChangelogMessage, PublicationStatus } from '../../../../utils/constants'
+import {
+  ChangelogMessage,
+  PublicationStatus,
+} from "../../../../utils/constants";
 
-  export default {
-    name: 'DatasetActivityPanel',
-    components: {
-      Avatar,
-      DatasetActivityPanelDropdown,
-      DatasetActivityDetail,
-      DatasetActivityMetadataLabel,
-      DatasetActivityDescriptionDialog
+export default {
+  name: "DatasetActivityPanel",
+  components: {
+    Avatar,
+    DatasetActivityPanelDropdown,
+    DatasetActivityDetail,
+    DatasetActivityMetadataLabel,
+    DatasetActivityDescriptionDialog,
+  },
+  mixins: [formatDateRange, Request, RenderPermissionsMixin],
+  props: {
+    event: {
+      type: Object,
+      default: () => {},
     },
-    mixins: [
-      formatDateRange,
-      Request,
-      RenderPermissionsMixin
-    ],
-    props: {
-      event: {
-        type: Object,
-        default: () => {}
-      },
-      previousEvent: {
-        type: Object,
-        default: () => {}
-      },
+    previousEvent: {
+      type: Object,
+      default: () => {},
     },
-    data() {
-      return {
-        ChangelogMessage,
-        PublicationStatus,
-        detailsVal: 'Show details'
+  },
+  data() {
+    return {
+      ChangelogMessage,
+      PublicationStatus,
+      detailsVal: "Show details",
+    };
+  },
+  computed: {
+    ...mapGetters(["getOrgMemberByIntId"]),
+    ...mapState(["config", "dataset"]),
+
+    /**
+     * Checks if dataset has publication link and was successfully
+     * published to Discover
+     */
+    wasPublished: function () {
+      return (
+        this.dataset.publication &&
+        this.dataset.publication.status !== this.PublicationStatus.FAILED
+      );
+    },
+
+    /**
+     * Returns discover link
+     * @returns {String}
+     */
+    discoverLink: function () {
+      if (!this.wasPublished) {
+        return "";
       }
+      return this.config.environment === "prod"
+        ? `https://discover.pennsieve.io/datasets/${this.publishedId}`
+        : `https://discover.pennsieve.net/datasets/${this.publishedId}`;
     },
-     computed: {
-      ...mapGetters(['getOrgMemberByIntId']),
-      ...mapState(['config', 'userToken', 'dataset']),
 
-      /**
-       * Checks if dataset has publication link and was successfully
-       * published to Discover
-       */
-      wasPublished: function() {
-        return this.dataset.publication && this.dataset.publication.status !== this.PublicationStatus.FAILED
-      },
+    /**
+     * Get dataset int id
+     * @returns {Number}
+     */
+    publishedId: function () {
+      return pathOr(0, ["publication", "publishedDataset", "id"], this.dataset);
+    },
 
-      /**
-       * Returns discover link
-       * @returns {String}
-       */
-       discoverLink: function() {
-         if (!this.wasPublished) {
-           return ''
-         }
-         return this.config.environment === 'prod' ? `https://discover.pennsieve.io/datasets/${this.publishedId}` : `https://discover.pennsieve.net/datasets/${this.publishedId}`
-       },
+    /**
+     * Date group heading
+     * @returns {String}
+     */
+    dateGroupHeading: function () {
+      const startDate = moment(this.event.timeRange.start);
+      const previousDate = pathOr(
+        "",
+        ["timeRange", "start"],
+        this.previousEvent
+      );
 
-      /**
-       * Get dataset int id
-       * @returns {Number}
-       */
-      publishedId: function() {
-        return pathOr(0, ['publication', 'publishedDataset', 'id'], this.dataset)
-      },
+      return startDate.isSame(previousDate, "month")
+        ? ""
+        : startDate.format("MMMM YYYY");
+    },
 
-      /**
-       * Date group heading
-       * @returns {String}
-       */
-      dateGroupHeading: function() {
-        const startDate = moment(this.event.timeRange.start)
-        const previousDate = pathOr('', ['timeRange', 'start'], this.previousEvent)
+    /**
+     * Checks if changelog item is a metadata update so as not to
+     * render the dropdown
+     * @returns {Boolean}
+     */
+    isMetadataUpdate: function () {
+      const metaEvents = Object.keys(ChangelogMessage.METADATA_UPDATE);
+      return metaEvents.includes(this.event.eventType);
+    },
 
-        return startDate.isSame(previousDate, 'month')
-           ? ''
-           : startDate.format('MMMM YYYY')
-      },
-
-      /**
-       * Checks if changelog item is a metadata update so as not to
-       * render the dropdown
-       * @returns {Boolean}
-       */
-      isMetadataUpdate: function() {
-        const metaEvents = Object.keys(ChangelogMessage.METADATA_UPDATE)
-        return metaEvents.includes(this.event.eventType)
-      },
-
-      /**
-       * Populates list of names for tooltip if userlist exceeds three users
-       * for a particular changelog item
-       * @returns {String}
-       */
-      populateUserList: function() {
-        let userList = []
-        if (this.event.userIds.length > 3) {
-          this.event.userIds.slice(3, this.event.userIds.length).forEach(idx => {
-            userList.push(this.fullName(idx))
-          })
-        }
-        if (userList.length > 1) {
-          return userList.toString()
-        }
-        return userList.join(', ')
-      },
-
-      /**
-       * Grabs the total count of event items
-       * @returns {Number}
-       */
-      totalCount: function() {
-        return this.event.totalCount
-      },
-
-      /**
-       * Count to be displayed next to changelog item
-       * @TODO will be used when generating count and plural/singular descriptions
-       * @returns {Number}
-       */
-      displayCount: function() {
-        return this.totalCount > 1 ? this.totalCount : ''
+    /**
+     * Populates list of names for tooltip if userlist exceeds three users
+     * for a particular changelog item
+     * @returns {String}
+     */
+    populateUserList: function () {
+      let userList = [];
+      if (this.event.userIds.length > 3) {
+        this.event.userIds
+          .slice(3, this.event.userIds.length)
+          .forEach((idx) => {
+            userList.push(this.fullName(idx));
+          });
       }
+      if (userList.length > 1) {
+        return userList.toString();
+      }
+      return userList.join(", ");
     },
 
-    methods: {
-      renderPermissionsActivity: function() {
+    /**
+     * Grabs the total count of event items
+     * @returns {Number}
+     */
+    totalCount: function () {
+      return this.event.totalCount;
+    },
+
+    /**
+     * Count to be displayed next to changelog item
+     * @TODO will be used when generating count and plural/singular descriptions
+     * @returns {Number}
+     */
+    displayCount: function () {
+      return this.totalCount > 1 ? this.totalCount : "";
+    },
+  },
+
+  methods: {
+    renderPermissionsActivity: function () {
+      return this.totalCount > 1
+        ? "Permissions changed"
+        : this.renderPermissionDetail(this.event.event);
+    },
+
+    /**
+     * Renders activity based on event type
+     * @param {String} eventType
+     * @returns {String}
+     */
+    renderActivityType: function (eventType) {
+      if (this.ChangelogMessage.PUBLISHING.hasOwnProperty(eventType)) {
+        const publishing = this.ChangelogMessage.PUBLISHING;
+        return publishing[eventType];
+      } else if (
+        typeof this.ChangelogMessage[eventType] === "object" &&
+        this.ChangelogMessage[eventType] !== null
+      ) {
         return this.totalCount > 1
-          ? 'Permissions changed'
-          : this.renderPermissionDetail(this.event.event)
-      },
-
-      /**
-       * Renders activity based on event type
-       * @param {String} eventType
-       * @returns {String}
-       */
-      renderActivityType: function(eventType) {
-        if (this.ChangelogMessage.PUBLISHING.hasOwnProperty(eventType)) {
-          const publishing = this.ChangelogMessage.PUBLISHING
-          return publishing[eventType]
-        } else if (typeof this.ChangelogMessage[eventType] === 'object' && this.ChangelogMessage[eventType] !== null) {
-          return this.totalCount > 1
-            ? `${this.totalCount} ${this.ChangelogMessage[this.event.eventType].plural}`
-            : this.ChangelogMessage[this.event.eventType].singular
-        } else {
-          // user permissions
-          return this.renderPermissionsActivity()
-        }
-      },
-
-      /**
-       * Indicator label for publishing changlog items
-       * @param {String} eventType
-       * @returns {Boolean}
-       */
-      isPublishingChange: function(eventType) {
-        const publishing = this.ChangelogMessage.PUBLISHING
-        return publishing.hasOwnProperty(eventType)
-      },
-
-      /**
-       * Grabs the full name of a user
-       * @param {Number} id
-       * @returns {String}
-       */
-      fullName: function(id) {
-        const user = this.getOrgMemberByIntId(id)
-        return `${user.firstName} ${user.lastName}`
-      },
-
-      /**
-       * Should show metadata changes if specific
-       * metadata changes
-       * @param {String} eventType
-       * @returns {Boolean}
-       */
-      hideMetadataDetails: function(eventType) {
-        const metadataChanges = ['ADD_TAG', 'REMOVE_TAGS', 'UPDATE_LICENSE', 'UPDATE_README']
-        return metadataChanges.includes(eventType)
+          ? `${this.totalCount} ${
+              this.ChangelogMessage[this.event.eventType].plural
+            }`
+          : this.ChangelogMessage[this.event.eventType].singular;
+      } else {
+        // user permissions
+        return this.renderPermissionsActivity();
       }
-    }
-    }
+    },
+
+    /**
+     * Indicator label for publishing changlog items
+     * @param {String} eventType
+     * @returns {Boolean}
+     */
+    isPublishingChange: function (eventType) {
+      const publishing = this.ChangelogMessage.PUBLISHING;
+      return publishing.hasOwnProperty(eventType);
+    },
+
+    /**
+     * Grabs the full name of a user
+     * @param {Number} id
+     * @returns {String}
+     */
+    fullName: function (id) {
+      const user = this.getOrgMemberByIntId(id);
+      return `${user.firstName} ${user.lastName}`;
+    },
+
+    /**
+     * Should show metadata changes if specific
+     * metadata changes
+     * @param {String} eventType
+     * @returns {Boolean}
+     */
+    hideMetadataDetails: function (eventType) {
+      const metadataChanges = [
+        "ADD_TAG",
+        "REMOVE_TAGS",
+        "UPDATE_LICENSE",
+        "UPDATE_README",
+      ];
+      return metadataChanges.includes(eventType);
+    },
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@import "../../../../assets/_variables.scss";
 .dataset-activity-panel {
   p {
     color: $gray_6;
@@ -408,7 +428,6 @@ import { ChangelogMessage, PublicationStatus } from '../../../../utils/constants
           &:nth-child(3) {
             z-index: 0;
           }
-
         }
       }
     }
@@ -429,7 +448,6 @@ import { ChangelogMessage, PublicationStatus } from '../../../../utils/constants
   .avatar-circle {
     border: solid 2px white;
     font-size: 12.2px;
-
   }
 }
 .label-publishing {

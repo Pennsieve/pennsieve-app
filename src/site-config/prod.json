@@ -1,4 +1,5 @@
 {
+  "app_domain": "pennsieve.io",
   "apiUrl": "https://api.pennsieve.io",
   "api2Url": "https://api2.pennsieve.io",
   "zipitUrl": "https://api.pennsieve.io/zipit",
@@ -35,5 +36,6 @@
     "appId": "33f0678ef1a028da5b9f",
     "region": "us2"
   },
+  "GitHubAppUrl": "https://github.com/apps/pennsieve/installations/new",
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG"
 }

@@ -3,7 +3,8 @@
     class="timeseries-annotation-modal"
     ref="annotation-modal"
     :title="dialogTitle"
-    :open="visible"
+    :modelValue="visible"
+    @update:modelValue="visible = $event"
     @close="close"
     @closed="onClosed">
 
@@ -113,7 +114,7 @@ import IconSelection from "../../icons/IconSelection.vue";
 import { defineAsyncComponent } from 'vue'
 
 export default {
-  name: 'TsAnnotationDialog',
+  name: 'TsAnnotationModal',
 
   components: {
     IconSelection,

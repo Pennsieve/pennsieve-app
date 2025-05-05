@@ -72,10 +72,8 @@
         <button
           class="btn-icon"
           @click="togglePlayback()">
-<!--          <svg-icon-->
-<!--            :name="iconPlay"-->
-<!--            height="12"-->
-<!--            width="18"/>-->
+            <component :is="iconPlay" :height="12"
+            :width="18"/>
         </button>
       </el-tooltip>
       <el-tooltip
@@ -84,7 +82,7 @@
         <button
           class="btn-icon"
           @click="nextAnnotation()">
-          <IconNextAnnotationLeftFacing
+          <IconNextAnnotationRightFacing
             name="next-annotation-right-facing"
             :height="12"
             :width="18"/>
@@ -152,11 +150,18 @@
     import IconTimescale from "../../icons/IconTimeschale.vue";
     import IconPreviousPage from "../../icons/IconPreviousPage.vue";
     import IconNextAnnotationLeftFacing from "../../icons/IconNextAnnotationLeftFacing.vue";
+    import IconNextAnnotationRightFacing from "@/components/icons/IconNextAnnotationRightFacing.vue";
     import IconNextPage from "../../icons/IconNextPage.vue";
     import IconStopwatch from "../../icons/IconStopwatch.vue";
+    import IconControllerPlay from "@/components/icons/IconControllerPlay.vue";
+    import IconControllerPause from "@/components/icons/IconControllerPause.vue";
     export default {
         name: 'TimeseriesViewerToolbar',
-      components: {IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
+      components: {
+        IconNextAnnotationRightFacing,
+        IconControllerPlay,
+        IconControllerPause,
+        IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
       computed: {
           iconPlay: function() {
             if(this.isPlaying === true) {
@@ -281,10 +286,9 @@
             }
 
             this.intervalTimer = setTimeout(this.intervalTimerFnc, this.intervalPeriod);
-
-          },
-          stopPlay: function() {
-            this.isPlaying = false
+            },
+            stopPlay: function() {
+              this.isPlaying = false
             this.intervalPeriod = 150;
             clearInterval(this.intervalTimer);
           }
@@ -294,37 +298,48 @@
 </script>
 
 <style lang="scss" scoped>
-    @import '../../../assets/_variables.scss';
+  @import '../../../assets/_variables.scss';
 
-    .timeseries-viewer-toolbar {
-        border-top: 1px solid #DADADA;
-        background: #F7F7F7;
-        display: flex;
-        padding: 8px 0;
-        width: 100%;
-        justify-content: space-between;
-        align-items: center;
-    }
+  .timeseries-viewer-toolbar {
+      border-top: 1px solid #DADADA;
+      background: #F7F7F7;
+      display: flex;
+      padding: 8px 0;
+      width: 100%;
+      justify-content: space-between;
+      align-items: center;
+  }
 
-    .btn-icon {
-      color: $gray_4;
-      margin-left: 8px;
-      margin-right: 2px;
-      &:last-child {
-        margin-right:8px;
-      }
-      &.selected, &:hover, &[focused] {
-        color: $app-primary-color;
-      }
-      &[disabled] {
-        color: $gray_2;
-      }
+  .btn-icon {
+    color: $gray_4;
+    margin-left: 8px;
+    margin-right: 2px;
+    &:last-child {
+      margin-right:8px;
     }
-    .playSelect {
-      width: 70px;
-      margin-right: 8px;
+    &.selected, &:hover, &[focused] {
+      color: $app-primary-color;
     }
+    &[disabled] {
+      color: $gray_2;
+    }
+  }
+  .playSelect {
+    width: 70px;
+    margin-right: 8px;
+  }
+  #right-controls {
+    display: flex;
+    align-items: center;
+    height: 42px;
+  }
 
+</style>
+
+<style lang="scss">
+  .playSelect .el-input__inner {
+    padding: 8px 4px;
+  }
 </style>
 
 

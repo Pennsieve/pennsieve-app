@@ -1,7 +1,5 @@
 <template>
-  <bf-stage
-    element-loading-background="transparent"
-  >
+  <bf-stage element-loading-background="transparent">
     <template #actions>
       <div class="actions-wrapper">
         <form
@@ -23,115 +21,105 @@
                 color="#71747c"
               />
             </template>
-
           </el-input>
         </form>
 
         <div class="button-wrapper">
-          <bf-button
-            class="primary"
-            @click="$router.push(publisherTeamRoute)"
-          >
-            {{ activeOrganization.isAdmin ? 'Manage Publishers' : 'View Publishers' }}
+          <bf-button class="primary" @click="$router.push(publisherTeamRoute)">
+            {{
+              activeOrganization.isAdmin
+                ? "Manage Publishers"
+                : "View Publishers"
+            }}
           </bf-button>
         </div>
-
       </div>
-
     </template>
 
-  <div>
+    <div>
+      <p v-if="hasDatasets" class="mb-24">
+        {{ searchHeading }}
+      </p>
 
-    <p
-      v-if="hasDatasets"
-      class="mb-24"
-    >
-      {{ searchHeading }}
-    </p>
-
-    <div class="dataset-list-controls mb-16">
-      <div class="dataset-list-controls-menus">
-        <pagination-page-menu
-          class="mr-24"
-          pagination-item-label="Datasets"
-          :page-size="publishingSearchParams.limit"
-          @update-page-size="onPageLimitChange"
-        />
-
-        <dataset-sort-menu
-          class="mr-24"
-          :order-by="publishingSearchParams.orderBy"
-          @select="onDatasetSortSelect"
-        />
-
-        <button
-          class="button-icon small icon-sort"
-          @click="setSortDir"
-        >
-          <IconSort
-            :class="[ sortIconDirection === 'down' ? 'svg-flip' : '' ]"
-            color="currentColor"
-            :dir="sortIconDirection"
-            :height="20"
-            :width="20"
+      <div class="dataset-list-controls mb-16">
+        <div class="dataset-list-controls-menus">
+          <pagination-page-menu
+            class="mr-24"
+            pagination-item-label="Datasets"
+            :page-size="publishingSearchParams.limit"
+            @update-page-size="onPageLimitChange"
           />
 
-        </button>
-      </div>
+          <dataset-sort-menu
+            class="mr-24"
+            :order-by="publishingSearchParams.orderBy"
+            @select="onDatasetSortSelect"
+          />
 
-      <el-pagination
-        :page-size="publishingSearchParams.limit"
-        :pager-count="5"
-        :current-page="curPage"
-        layout="prev, pager, next"
-        :total="publishingSearchParams.totalCount"
-        @current-change="onPaginationPageChange"
-      />
-    </div>
-    <div
-      v-loading="isLoadingDatasets"
-      element-loading-background="#FBFBFD"
-    >
-      <div
-        v-if="hasDatasets && isLoadingDatasetsError === false"
-        class="dataset-list-item-wrap"
-      >
-        <published-dataset-list-item
-          v-for="dataset in datasets"
-          :key="generateKey(dataset)"
-          :dataset="dataset"
-          @publish-dataset="publishDataset"
+          <button class="button-icon small icon-sort" @click="setSortDir">
+            <IconSort
+              :class="[sortIconDirection === 'down' ? 'svg-flip' : '']"
+              color="currentColor"
+              :dir="sortIconDirection"
+              :height="20"
+              :width="20"
+            />
+          </button>
+        </div>
+
+        <el-pagination
+          :page-size="publishingSearchParams.limit"
+          :pager-count="5"
+          :current-page="curPage"
+          layout="prev, pager, next"
+          :total="publishingSearchParams.totalCount"
+          @current-change="onPaginationPageChange"
         />
       </div>
-
-
-      <bf-empty-page-state v-if="!hasDatasets">
-        No datasets found
-      </bf-empty-page-state>
+      <div v-loading="isLoadingDatasets" element-loading-background="#FBFBFD">
+        <div
+          v-if="hasDatasets && isLoadingDatasetsError === false"
+          class="dataset-list-item-wrap"
+        >
+          <published-dataset-list-item
+            v-for="dataset in datasets"
+            :key="generateKey(dataset)"
+            :dataset="dataset"
+            @publish-dataset="publishDataset"
+          />
+        </div>
+        <bf-empty-page-state v-if="!hasDatasets">
+          No datasets found
+        </bf-empty-page-state>
+      </div>
     </div>
-  </div>
   </bf-stage>
 </template>
 
 <script>
-import { mapActions, mapGetters, mapState } from 'vuex'
-import { pathOr } from 'ramda'
+import { mapActions, mapGetters, mapState } from "vuex";
+import { pathOr } from "ramda";
 
-import PublishedDatasetListItem from '../PublishedDatasetListItem/PublishedDatasetListItem.vue'
-import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
-import DatasetSortMenu from '../../datasets/DatasetSortMenu/DatasetSortMenu.vue'
-import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
+import PublishedDatasetListItem from "../PublishedDatasetListItem/PublishedDatasetListItem.vue";
+import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import DatasetSortMenu from "../../datasets/DatasetSortMenu/DatasetSortMenu.vue";
+import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMenu.vue";
 
-import Request from '../../../mixins/request/index'
-import DatasetPublishedData from '../../../mixins/dataset-published-data'
+import Request from "../../../mixins/request/index";
+import DatasetPublishedData from "../../../mixins/dataset-published-data";
 
-import toQueryParams from '../../../utils/toQueryParams.js'
-import { PublicationStatus} from '../../../utils/constants'
+import toQueryParams from "../../../utils/toQueryParams.js";
+import { PublicationStatus } from "../../../utils/constants";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import {
+  useHandleXhrError,
+  useSendXhr,
+} from "@/mixins/request/request_composable";
 
 export default {
-  name: 'PublishingDatasetsList',
+  name: "PublishingDatasetsList",
 
   components: {
     IconSort,
@@ -139,62 +127,49 @@ export default {
     BfEmptyPageState,
     DatasetSortMenu,
     PaginationPageMenu,
-    PublishedDatasetListItem
+    PublishedDatasetListItem,
   },
 
-  mixins: [
-    DatasetPublishedData,
-    Request
-  ],
+  mixins: [DatasetPublishedData, Request],
 
   props: {
     publicationStatus: {
       type: Array,
       default: () => {
-        return ['requested']
+        return ["requested"];
       },
-    }
+    },
   },
 
   data() {
     return {
       isLoadingDatasetsError: false,
-      searchQuery: ''
-    }
+      searchQuery: "",
+    };
   },
 
   watch: {
-    '$route': function() {
-      this.clearSearchParams()
-        .then(() => {
-          this.fetchDatasets()
-        })
-    }
+    $route: function () {
+      this.clearSearchParams().then(() => {
+        this.fetchDatasets();
+      });
+    },
   },
 
   computed: {
-    ...mapGetters([
-      'publisherTeam',
-    ]),
-    ...mapState([
-      'config',
-      'userToken',
-      'activeOrganization'
+    ...mapGetters(["publisherTeam"]),
+    ...mapState(["config", "activeOrganization"]),
+
+    ...mapState("publishingModule", [
+      "publishingSearchParams",
+      "isLoadingDatasets",
     ]),
 
-    ...mapState('publishingModule', [
-      'publishingSearchParams',
-      'isLoadingDatasets'
-    ]),
+    ...mapGetters("publishingModule", ["getTotalCount", "getDatasets"]),
 
-    ...mapGetters('publishingModule', [
-      'getTotalCount',
-      'getDatasets'
-    ]),
-
-    publisherTeamRoute: function() {
-      if (!this.$route.params || !this.publisherTeam) return ''
-      return `/${this.$route.params.orgId}/teams/${this.publisherTeam.id}`
+    publisherTeamRoute: function () {
+      if (!this.$route.params || !this.publisherTeam) return "";
+      return `/${this.$route.params.orgId}/teams/${this.publisherTeam.id}`;
     },
 
     /**
@@ -203,40 +178,42 @@ export default {
      * which is a combination of REQUESTED, ACCEPTED, and FAILED
      * @returns {String}
      */
-    includedPublicationStatuses: function() {
-      const [head, ...tail] = this.publicationStatus
-      return this.publicationStatus.includes(PublicationStatus.REQUESTED) ? PublicationStatus.REQUESTED : head
+    includedPublicationStatuses: function () {
+      const [head, ...tail] = this.publicationStatus;
+      return this.publicationStatus.includes(PublicationStatus.REQUESTED)
+        ? PublicationStatus.REQUESTED
+        : head;
     },
 
     /**
      * Compute the datasets by the includedPublicationStatuses
      * @returns {Array}
      */
-    datasets: function() {
-      return this.getDatasets(this.$route.name)
+    datasets: function () {
+      return this.getDatasets(this.$route.name);
     },
 
     /**
      * Compute endpoint URL to get datasets
      * @return {String}
      */
-    getDatasetsUrl: function() {
-      const queryParams = toQueryParams({
-        publicationStatus: this.publicationStatus,
-        publicationType: this.publicationType,
-        api_key: this.userToken,
-        includeBannerUrl: true,
-        includePublishStatus: true,
-        ...this.datasetSearchParams
-      })
+    getDatasetsUrl: function () {
+      useGetToken().then((token) => {
+        const queryParams = toQueryParams({
+          publicationStatus: this.publicationStatus,
+          publicationType: this.publicationType,
+          api_key: token,
+          includeBannerUrl: true,
+          includePublishStatus: true,
+          ...this.datasetSearchParams,
+        });
 
-      return this.userToken
-        ? `${this.config.apiUrl}/datasets/paginated?${queryParams}`
-        : ''
+        return `${this.config.apiUrl}/datasets/paginated?${queryParams}`;
+      });
     },
 
-    hasDatasets: function() {
-      return this.datasets.length > 0
+    hasDatasets: function () {
+      return this.datasets.length > 0;
     },
 
     /**
@@ -244,7 +221,10 @@ export default {
      * @returns {Number}
      */
     curPage: function () {
-      return this.publishingSearchParams.offset / this.publishingSearchParams.limit + 1
+      return (
+        this.publishingSearchParams.offset / this.publishingSearchParams.limit +
+        1
+      );
     },
 
     /**
@@ -252,7 +232,9 @@ export default {
      * @returns {String}
      */
     sortIconDirection: function () {
-      return this.publishingSearchParams.orderDirection === 'Asc' ? 'up' : 'down'
+      return this.publishingSearchParams.orderDirection === "Asc"
+        ? "up"
+        : "down";
     },
 
     /**
@@ -260,22 +242,19 @@ export default {
      * @returns {String}
      */
     searchHeading: function () {
-      const start = this.publishingSearchParams.offset + 1
-      const pageRange = this.publishingSearchParams.limit * this.curPage
-      const end = pageRange < this.publishingSearchParams.totalCount
-        ? pageRange
-        : this.publishingSearchParams.totalCount
-      const query = this.publishingSearchParams.query
+      const start = this.publishingSearchParams.offset + 1;
+      const pageRange = this.publishingSearchParams.limit * this.curPage;
+      const end =
+        pageRange < this.publishingSearchParams.totalCount
+          ? pageRange
+          : this.publishingSearchParams.totalCount;
+      const query = this.publishingSearchParams.query;
 
-      let searchHeading = `Displaying ${start}-${end} of ${this.publishingSearchParams.totalCount} results`
+      let searchHeading = `Displaying ${start}-${end} of ${this.publishingSearchParams.totalCount} results`;
 
-      return query === ''
-        ? searchHeading
-        : `${searchHeading} for “${query}”`
+      return query === "" ? searchHeading : `${searchHeading} for “${query}”`;
     },
   },
-
-
 
   // beforeRouteEnter: function(to, from, next) {
   //   next(vm => {
@@ -284,79 +263,82 @@ export default {
   //   })
   // },
 
-  mounted(){
-    this.clearSearchParams()
-      .then(() => {
-        this.fetchDatasets()
-      })
+  mounted() {
+    this.clearSearchParams().then(() => {
+      this.fetchDatasets();
+    });
   },
 
   methods: {
-    ...mapActions('publishingModule', [
-      'updateDatasets',
-      'updatePublishingTotalCount',
-      'updatePublishingSearchOrderDirection',
-      'updatePublishingSearchLimit',
-      'updatePublishingSearchQuery',
-      'updatePublishingSearchOrderBy',
-      'updatePublishingOffset',
-      'fetchDatasets',
-      'clearSearchParams'
+    ...mapActions("publishingModule", [
+      "updateDatasets",
+      "updatePublishingTotalCount",
+      "updatePublishingSearchOrderDirection",
+      "updatePublishingSearchLimit",
+      "updatePublishingSearchQuery",
+      "updatePublishingSearchOrderBy",
+      "updatePublishingOffset",
+      "fetchDatasets",
+      "clearSearchParams",
     ]),
-
-
 
     /**
      * Publish dataset
      * @param {String} id
      */
-    publishDataset: function(id) {
-      this.sendXhr(`${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${this.userToken}&publicationType=publication`, {
-        method: 'POST'
-      })
+    publishDataset: function (id) {
+      useGetToken()
+        .then((token) => {
+          return useSendXhr(
+            `${this.config.apiUrl}/datasets/${id}/publication/accept?api_key=${token}&publicationType=publication`,
+            {
+              method: "POST",
+            }
+          );
+        })
+        .catch(useHandleXhrError);
     },
 
     /**
      * Set sort direction
      */
-    setSortDir: function() {
-      const orderDirection = this.publishingSearchParams.orderDirection === 'Asc'
-        ? 'Desc'
-        : 'Asc'
+    setSortDir: function () {
+      const orderDirection =
+        this.publishingSearchParams.orderDirection === "Asc" ? "Desc" : "Asc";
 
-      this.updatePublishingSearchOrderDirection(orderDirection)
+      this.updatePublishingSearchOrderDirection(orderDirection);
     },
 
     /**
      * Update offset
      * @param {Number} page
      */
-    onPaginationPageChange: function(page) {
-      const offset = (page - 1) * this.publishingSearchParams.limit
-      this.updatePublishingOffset(offset)
+    onPaginationPageChange: function (page) {
+      const offset = (page - 1) * this.publishingSearchParams.limit;
+      this.updatePublishingOffset(offset);
     },
 
     /**
      * Update dataset sort
      * @param {Object} selection
      */
-    onDatasetSortSelect: function(selection) {
-      this.updatePublishingSearchOrderBy(selection.value)
+    onDatasetSortSelect: function (selection) {
+      this.updatePublishingSearchOrderBy(selection.value);
     },
 
     /**
      * Update search query and execute the search
      */
-    searchDatasetsByQuery: function(){
-      this.updatePublishingSearchQuery(this.searchQuery)
+    searchDatasetsByQuery: function () {
+      this.updatePublishingSearchQuery(this.searchQuery);
     },
 
     /**
      * Update the page limit
      * @param {Number} pageSize
      */
-    onPageLimitChange: function(pageSize) {
-      this.updatePublishingSearchLimit(pageSize)
+    onPageLimitChange: function (pageSize) {
+      this.updatePublishingSearchLimit(pageSize);
     },
 
     /**
@@ -366,18 +348,17 @@ export default {
      * have permissions to the dataset)
      * @returns {String}
      */
-    generateKey: function(dataset) {
-      const datasetId = pathOr('', ['content', 'intId'], dataset) || dataset.sourceDatasetId
-      return datasetId
-    }
-  }
-}
+    generateKey: function (dataset) {
+      const datasetId =
+        pathOr("", ["content", "intId"], dataset) || dataset.sourceDatasetId;
+      return datasetId;
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
-
-
+@import "../../../assets/_variables.scss";
 
 .actions-wrapper {
   display: flex;
@@ -399,7 +380,7 @@ export default {
   display: flex;
   flex-wrap: wrap;
   .el-dropdown {
-    flex-shrink: 0
+    flex-shrink: 0;
   }
 }
 .dataset-search-form {

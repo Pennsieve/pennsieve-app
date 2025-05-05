@@ -143,6 +143,8 @@ import Request from '../../../mixins/request'
 import { getUnitDisplayName } from '../../../mixins/data-type/utils'
 import IconTrash from "../../icons/IconTrash.vue";
 import IconFilterFilled from "../../icons/IconFilterFilled.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 /**
  * Transform properties to add a `label` and `value` object
@@ -273,7 +275,6 @@ export default {
     ...mapState([
       'activeOrganization',
       'config',
-      'userToken'
     ]),
     ...mapState('metadataModule',[
       'filterParams'
@@ -524,22 +525,26 @@ export default {
         ? `${baseUrl}?datasetId=${this.filter.datasetIntId}`
         : baseUrl
 
-      this.sendXhr(url, {
-        header: {
-          'Authorization': `Bearer ${this.userToken}`
-        }
-      })
-        .then(response => {
-          const properties = transformProperties(response)
 
-          this.properties = [
-            {
-              label: 'Properties',
-              items: properties
+      useGetToken()
+        .then(token => {
+          return useSendXhr(url, {
+            header: {
+              'Authorization': `Bearer ${token}`
             }
-          ]
+          })
+            .then(response => {
+              const properties = transformProperties(response)
+
+              this.properties = [
+                {
+                  label: 'Properties',
+                  items: properties
+                }
+              ]
+            })
         })
-        .catch(this.handleXhrError.bind(this))
+        .catch(useHandleXhrError)
         .finally(() => {
           // Set properties loading state
           this.isLoadingProperties = false
@@ -651,21 +656,26 @@ export default {
         property: this.filter.property
       }
 
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.userToken}`
-        },
-        body: JSON.stringify(queryBody)
-      })
+      return useGetToken()
+        .then(async token => {
+          return fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(queryBody)
+          })
+            .then(resp => {
+              return resp.json()
+                .then(json => {
+                  this.valueSuggestions = json.values
+                })
+            })
+        })
+        .finally(this.isLoadingValueSuggestions = false)
+        .catch(useHandleXhrError)
 
-      if (resp.ok) {
-        const response = await resp.json()
-        this.valueSuggestions = response.values
-      }
-
-      this.isLoadingValueSuggestions = false
     },
 
 

@@ -154,6 +154,8 @@ import IconDiscussion from "../../icons/IconDiscussion.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
 import IconMouseCursor from "../../icons/IconMouseCursor.vue";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 
 export default {
@@ -195,7 +197,6 @@ export default {
     ...mapState([
       'config',
       'dataset',
-      'userToken',
       'profile',
       'activeOrganization',
       'bulkEditingChannels'
@@ -213,17 +214,7 @@ export default {
       return pathOr('file', ['content','name'], this.activeViewer)
     },
 
-    /**
-     * Compute the GET file URL
-     * @returns {String}
-     */
-    fileUrl: function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      if (apiUrl && this.userToken) {
-        const id = pathOr('', ['params', 'fileId'], this.$route)
-        return `${apiUrl}/packages/${id}?api_key=${this.userToken}`
-      }
-    },
+
     /**
      * Compute if left and right toolbars should be visible
      * @returns {Boolean}
@@ -251,17 +242,6 @@ export default {
     }
   },
   watch: {
-    /**
-      * Trigger API request when URL is changed
-      */
-    fileUrl: {
-      handler: function(url) {
-        if (url) {
-          this.getFile()
-        }
-      },
-      immediate: true
-    },
 
     /**
      * Trigger montage error dialog to open for PackageCannotBeMontaged error type
@@ -280,6 +260,7 @@ export default {
   mounted: function() {
     EventBus.$on('active-viewer-action', this.onActiveViewerAction.bind(this))
     EventBus.$on('data-changed', this.onDataChanged.bind(this))
+    this.getFile()
   },
   beforeDestroy() {
     EventBus.$off('active-viewer-action', this.onActiveViewerAction.bind(this))
@@ -325,50 +306,49 @@ export default {
     * Get file data to send to bf-viewer
     */
     getFile: function() {
-      if (!this.fileUrl) {
-        return
-      }
-      this.isPackageLoading = true
-      this.sendXhr(this.fileUrl)
-      .then(response => {
-        this.openViewer(response)
-        this.isPackageLoading = false
-        // Get the dataset info if not already available
-        const datasetId = path(['content', 'datasetId'], response)
-        const existingDatasetId = pathOr('', ['content', 'id'], this.dataset)
-        if (datasetId && datasetId !== existingDatasetId) {
-          this.fetchDataset(datasetId)
-        }
-      })
-      .catch(response => {
-        this.handleXhrError(response)
-      })
+
+      useGetToken()
+        .then(token => {
+          this.isPackageLoading = true
+          const id = pathOr('', ['params', 'fileId'], this.$route)
+          const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`
+
+          return useSendXhr(url)
+            .then(response => {
+              this.openViewer(response)
+              this.isPackageLoading = false
+              // Get the dataset info if not already available
+              const datasetId = path(['content', 'datasetId'], response)
+              const existingDatasetId = pathOr('', ['content', 'id'], this.dataset)
+              if (datasetId && datasetId !== existingDatasetId) {
+                this.fetchDataset(datasetId)
+              }
+            })
+        })
+        .catch(useHandleXhrError)
     },
     fetchDataset: function(id) {
-      const url = `${this.config.apiUrl}/datasets/${id}?api_key=${this.userToken}`
-      this.sendXhr(url)
-        .then(response => {
-          this.$store.dispatch('updateDataset', response)
-          EventBus.$emit('get-file-proxy-id')
-          this.getUserRole()
+      useGetToken()
+        .then(async token => {
+          const url = `${this.config.apiUrl}/datasets/${id}?api_key=${token}`
+          return this.sendXhr(url)
+            .then(async response => {
+              this.$store.dispatch('updateDataset', response)
+              EventBus.$emit('get-file-proxy-id')
+
+              const datasetId = pathOr(0, ['content', 'id'], this.dataset)
+              const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${token}`
+              return this.sendXhr(url)
+                .then(response => {
+                  this.setDatasetRole(response)
+                })
+            })
         })
         .catch(response => {
           this.handleXhrError(response)
         })
     },
-    /**
-     * Get user's role
-     * @returns {Promise}
-     */
-    getUserRole: function() {
-      const datasetId = pathOr(0, ['content', 'id'], this.dataset)
-      const url = `${this.config.apiUrl}/datasets/${datasetId}/role?api_key=${this.userToken}`
-      return this.sendXhr(url)
-      .then(response => {
-        this.setDatasetRole(response)
-      })
-      .catch(this.handleXhrError.bind(this))
-    },
+
     /**
      * Compute palette class
      * @param {String} eventName
