@@ -11,14 +11,52 @@
         @submit.native.prevent="updateOrg('orgSettingsForm')"
       >
         <el-form-item
-          label="Organization Name"
+          label="Workspace Name"
           prop="orgName"
         >
-          <el-input
-            v-model="ruleForm.orgName"
-            class="org-name"
-            :disabled="!hasAdminRights"
-          />
+          <div class="name-container">
+            <p class="name-info">
+              The name of the workspace can be changed. This does not change the id of the workspace.
+            </p>
+            <el-input
+              v-model="ruleForm.orgName"
+              class="org-name"
+              :disabled="!hasAdminRights"
+            />
+          </div>
+
+        </el-form-item>
+        <el-form-item
+          label="Workspace Colors"
+          prop="colorTheme"
+        >
+          <div class="color-container">
+            <p class="color-info">
+              You can select two colors to create a color-scheme for the workspace. These colors are used to customize the appearance of the web-application.
+            </p>
+
+            <div class="color-picker-container">
+              <div class="color-picker">
+                <div class="color-info">
+                  Color 1:
+                </div>
+                <div class="color-selector">
+                  <el-color-picker :disabled="!hasAdminRights" v-model="ruleForm.colorTheme[1]" />
+                </div>
+              </div>
+              <div class="color-picker">
+                <div class="color-info">
+                  Color 2:
+                </div>
+                <div class="color-selector">
+                  <el-color-picker  :disabled="!hasAdminRights" v-model="ruleForm.colorTheme[0]" />
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+
         </el-form-item>
         <bf-button
           v-if="hasAdminRights"
@@ -121,9 +159,13 @@ export default {
       storageNumber: 0,
       storageUnit: 'B',
       ruleForm: {
-        orgName: ''
+        orgName: '',
+        colorTheme: ''
       },
       rules: {
+        colorTheme: [
+          { required: true, message: 'Please provide a color palette', trigger: 'false' }
+        ],
         orgName: [
           { required: true, message: 'Please provide a name', trigger: 'false' }
         ]
@@ -189,7 +231,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['updateOrgDatasetStatuses']),
+    ...mapActions(['updateOrgDatasetStatuses', 'updateWorkspaceColors']),
 
 
     /**
@@ -235,6 +277,12 @@ export default {
       this.storageUnit = defaultTo('B', last(formattedStorage))
 
       this.ruleForm.orgName = pathOr('', ['organization', 'name'], org)
+
+      const colorTheme = pathOr({}, ['organization', 'colorTheme'], org)
+      this.ruleForm.colorTheme = [null, null]
+      for (const [key, value] of Object.entries(colorTheme)) {
+        this.ruleForm.colorTheme = [key, value]
+      }
     },
     /**
      * Handles key-pressed event
@@ -261,13 +309,28 @@ export default {
       useGetToken()
         .then(token => {
           const url = `${this.config.apiUrl}/organizations/${this.activeOrganization.organization.id}?api_key=${token}`
+          let colorTheme
+          if (this.ruleForm.colorTheme[0] == null || this.ruleForm.colorTheme[1] == null) {
+            colorTheme = null
+          } else {
+            colorTheme = {}
+            colorTheme[this.ruleForm.colorTheme[0]] = this.ruleForm.colorTheme[1]
+          }
+
           return useSendXhr(url, {
             method: 'PUT',
             body: {
-              name: this.ruleForm.orgName
+              name: this.ruleForm.orgName,
+              colorTheme: colorTheme
             }
           })
             .then(() => {
+
+              this.updateWorkspaceColors( {
+                [this.ruleForm.colorTheme[0]]: this.ruleForm.colorTheme[1],
+              })
+
+
               EventBus.$emit('toast', {
                 detail: {
                   type: 'MESSAGE',
@@ -322,6 +385,47 @@ export default {
 
 <style lang="scss" scoped>
 @import '../../assets/variables.scss';
+
+.name-container {
+  display: flex;
+  flex-direction: column;
+
+  .name-info {
+    max-width: 500px;
+    color: $gray_4;
+  }
+}
+
+
+.color-container {
+  display: flex;
+  flex-direction: column;
+
+  .color-info {
+    max-width: 500px;
+    color: $gray_4;
+  }
+
+  .color-picker-container {
+    display: flex;
+    flex-direction: column;
+
+    .color-picker {
+      display: flex;
+      flex-direction: row;
+
+      .color-info {
+        color: $purple_3;
+      }
+
+      .color-selector {
+        padding: 0 8px;
+      }
+    }
+
+  }
+}
+
 
 .org-name {
   max-width: 330px;

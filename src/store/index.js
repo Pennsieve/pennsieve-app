@@ -602,6 +602,10 @@ export const mutations = {
       UPDATE_GITHUB_PROFILE(state, githubProfile) {
         state.gitHubProfile = githubProfile;
       },
+
+      UPDATE_COLORS(state, colorMap) {
+        state.activeOrganization.organization.colorTheme = colorMap
+      }
     }
 
 export const actions = {
@@ -645,6 +649,8 @@ export const actions = {
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
+
+  updateWorkspaceColors: ({commit}, evt) => commit("UPDATE_COLORS", evt),
 
   clearState: ({ commit }) => {
     commit("CLEAR_STATE");
