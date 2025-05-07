@@ -5,7 +5,7 @@
         <el-select
           ref="select"
           v-model="permissionForm.item"
-          class="mr-16 select-member"
+          class="mr-16"
           clearable
           @clear="clearForm"
           required
@@ -110,7 +110,7 @@
         <el-select
           ref="permissionSelect"
           v-model="permissionForm.role"
-          class="mr-16"
+          class="mr-16 select-permission-input"
           placeholder="Select Permission"
           required
         >
@@ -126,6 +126,7 @@
           :disabled="isFormInvalid || hasFeature('sandbox_org_feature')"
           :processing="processing"
           @click="submit"
+          class="add-permission-button"
         >
           Add
         </bf-button>
@@ -463,8 +464,13 @@
 <style lang="scss" scoped>
   @import '../../../../assets/_variables.scss';
 
-  .select-member {
-    flex: 1;
+  .select-permission-input {
+    width: 300px;
+  }
+
+  .add-permission-button {
+    min-width: unset;
+    width: 150px;
   }
 
   .form-wrapper {
