@@ -340,11 +340,9 @@
     padding: 8px 4px;
   }
 
-  .timeseries-viewer-toolbar {
-    .el-input-number {
-      span {
-        height: 20px; // since el-input__inner has height of 40px from _el-input.scss
-      }
+  .timeseries-viewer-toolbar .el-input-number.is-controls-right {
+   .el-input-number__decrease, .el-input-number__increase {
+      height: 20px; // since el-input__inner has height of 40px from _el-input.scss
     }
   }
 </style>
