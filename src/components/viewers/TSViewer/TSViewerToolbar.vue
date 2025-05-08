@@ -20,7 +20,6 @@
         :precision="1"
         :step="5"
         :max="this.constants['MAXDURATION']"
-        size="small"
         controls-position="right">
       </el-input-number>
 
@@ -339,6 +338,14 @@
 <style lang="scss">
   .playSelect .el-input__inner {
     padding: 8px 4px;
+  }
+
+  .timeseries-viewer-toolbar {
+    .el-input-number {
+      span {
+        height: 20px; // since el-input__inner has height of 40px from _el-input.scss
+      }
+    }
   }
 </style>
 
