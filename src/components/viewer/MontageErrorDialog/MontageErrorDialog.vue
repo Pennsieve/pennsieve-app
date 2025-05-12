@@ -95,4 +95,10 @@ export default {
     margin: 0 auto 8px;
   }
 }
+
+.dialog-simple-buttons {
+  button {
+    cursor: pointer;
+  }
+}
 </style>
