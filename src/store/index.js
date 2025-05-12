@@ -102,7 +102,6 @@ const initialState = () => ({
   totalUploadSize: 0,
   bfTermsOfServiceVersion: "",
   environment: site.environment,
-  viewerMontageScheme: "NOT_MONTAGED",
   bulkEditingChannels: false,
   orgDatasetStatuses: [],
   searchModalVisible: false,
