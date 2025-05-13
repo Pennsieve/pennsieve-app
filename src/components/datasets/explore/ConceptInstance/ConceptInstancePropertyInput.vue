@@ -500,9 +500,6 @@
         left: 10px;
         color: $gray_4;
       }
-      .el-input-number .el-input__inner {
-        text-align: left;
-      }
 
     }
     .icon-remove-button {

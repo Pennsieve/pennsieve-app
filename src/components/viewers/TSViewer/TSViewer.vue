@@ -185,7 +185,8 @@
                 'activeViewer',
                 'viewerChannels',
                 'viewerSidePanelOpen',
-                'viewerAnnotations'
+                'viewerAnnotations',
+                'viewerMontageScheme'
             ]),
 
             _cpStyleLabels: function(height, nrVisCh) {
@@ -462,7 +463,7 @@
 
             },
             getChannelId: function(channel) {
-                const isViewingMontage = this.$store.state.viewerMontageScheme !== 'NOT_MONTAGED'
+                const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 let list = []
                 if (isViewingMontage) {

@@ -11,12 +11,10 @@
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
-import IconWarningCircle from "../../icons/IconWarningCircle.vue";
 
 export default {
   name: "DeleteApplicationDialog",
   components: {
-    IconWarningCircle,
     BfDialogHeader,
     DialogBody,
     BfButton,

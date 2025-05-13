@@ -20,7 +20,6 @@
         :precision="1"
         :step="5"
         :max="this.constants['MAXDURATION']"
-        size="small"
         controls-position="right">
       </el-input-number>
 
@@ -155,6 +154,7 @@
     import IconStopwatch from "../../icons/IconStopwatch.vue";
     import IconControllerPlay from "@/components/icons/IconControllerPlay.vue";
     import IconControllerPause from "@/components/icons/IconControllerPause.vue";
+    import {mapState} from 'vuex'
     export default {
         name: 'TimeseriesViewerToolbar',
       components: {
@@ -179,7 +179,10 @@
             set: function (newValue) {
               this.$emit('updateDuration', newValue)
             }
-          }
+          },
+          ...mapState('viewerModule', [
+                'viewerMontageScheme'
+            ]),
         },
         props: {
            constants: Object,
@@ -231,7 +234,7 @@
             }
         },
         mounted: function () {
-          this.selectedMontage = 'NOT_MONTAGED'
+          this.selectedMontage = this.viewerMontageScheme
           this.selectedPlaySpeed = 1
         },
         methods: {
@@ -292,7 +295,12 @@
             this.intervalPeriod = 150;
             clearInterval(this.intervalTimer);
           }
+        },
+        watch: {
+          viewerMontageScheme(newVal) {
+          this.selectedMontage = newVal
         }
+}
     }
 
 </script>
@@ -339,6 +347,12 @@
 <style lang="scss">
   .playSelect .el-input__inner {
     padding: 8px 4px;
+  }
+
+  .timeseries-viewer-toolbar .el-input-number.is-controls-right {
+   .el-input-number__decrease, .el-input-number__increase {
+      height: 20px; // since el-input__inner has height of 40px from _el-input.scss
+    }
   }
 </style>
 
