@@ -112,12 +112,11 @@
           :side-panel-view="viewerSidePanelView"
         />
       </div>
-
-      <!--    <montage-error-dialog-->
-      <!--      :is-open="isMontageDialogOpen"-->
-      <!--      :viewer-errors="viewerErrors"-->
-      <!--      @close="onMontageDialogClose"-->
-      <!--    />-->
+         <montage-error-dialog
+           :is-open="isMontageDialogOpen"
+           :viewer-errors="viewerErrors"
+           @close="onMontageDialogClose"
+         />
     </div>
   </div>
 
