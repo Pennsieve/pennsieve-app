@@ -298,7 +298,7 @@ export default {
       return useGetToken().then((token) => {
         const baseUrl = "datasets";
         const id = this.datasetId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=1000`;
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=500`; // BE caps limit at 500 even if this is set higher
       });
     },
     /**
