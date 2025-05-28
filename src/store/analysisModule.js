@@ -14,7 +14,7 @@ const initialState = () => ({
     /*
       In the selectedFilesForAnalysis obj files are grouped by parentId
       where key is parentId, and value is an array of files that share a parentID.
-      For files in the root directory, they key is the string 'root'.
+      For files in the root directory, their key is the string 'root'.
       Example: { root: [{...file1}, {...file2}, {...file3}], parentId: [{}, {}] }
       This is to support multi-level file selection.
     */
