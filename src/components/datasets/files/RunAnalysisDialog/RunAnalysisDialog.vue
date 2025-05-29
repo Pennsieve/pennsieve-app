@@ -330,7 +330,7 @@ export default {
 
       useGetToken()
         .then(async (token) => {
-          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
+          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=500`;
           return this.sendXhr(url).then((response) => {
             this.files = [...response.children];
 
