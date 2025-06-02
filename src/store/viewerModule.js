@@ -32,7 +32,8 @@ const initialState = () => ({
   //TODO make strings enum constants
   viewerSidePanelView: viewerSidePanelTypes.INFO_PANEL,
   viewerActiveTool: viewerToolTypes.POINTER,
-  viewerMontageScheme: 'NOT_MONTAGED'
+  viewerMontageScheme: 'NOT_MONTAGED',
+  customMontageMap: []
 })
 
 export const state = initialState()
@@ -196,6 +197,10 @@ export const mutations = {
   SET_VIEWER_MONTAGE_SCHEME (state, data) {
     state.viewerMontageScheme = data
   },
+
+  SET_CUSTOM_MONTAGE_MAP (state, data) {
+    state.customMontageMap = data
+  },
 }
 
 export const actions = {
@@ -274,6 +279,10 @@ export const actions = {
     commit('SET_VIEWER_ERRORS', evt),
   setViewerMontageScheme: ({commit}, evt) =>
     commit('SET_VIEWER_MONTAGE_SCHEME', evt),
+  setCustomMontageMap: ({commit}, evt) => {
+    commit('SET_VIEWER_MONTAGE_SCHEME', evt.montageScheme)
+    commit('SET_CUSTOM_MONTAGE_MAP', JSON.parse(evt.customMontageMap))
+  },
 }
 
 export const getters = {

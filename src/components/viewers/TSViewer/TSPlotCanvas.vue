@@ -65,7 +65,8 @@
             ...mapState('viewerModule', [
                 'activeViewer',
                 'viewerChannels',
-                'viewerMontageScheme'
+                'viewerMontageScheme',
+                'customMontageMap'
             ]),
 
             canvasWidth: function() {
@@ -1443,7 +1444,11 @@
             },
             sendMontageMessage: function (value) {
                 if (this._websocket && this._websocket.readyState === 1) {
-                    const payload = { montage: value, packageId: this.activeViewer.content.id }
+
+
+                  const payload = { montage: value, packageId: this.activeViewer.content.id, montageMap: this.customMontageMap }
+
+                  // const payload = { montage: value, packageId: this.activeViewer.content.id }
                     this._websocket.send(JSON.stringify(payload))
                 } else {
                     this.async(() => {this.sendMontageMessage(value)}, 500)
