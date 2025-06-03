@@ -29,10 +29,7 @@
         <button
           class="btn-icon"
           @click="toggleVerticalZoom()">
-<!--          <svg-icon-->
-<!--            name="blackfynn-amplitude-zoom"-->
-<!--            height="20"-->
-<!--            width="20"/>-->
+
         </button>
       </el-tooltip>
 
@@ -142,6 +139,8 @@
 
     </div>
 
+    <TSCustomMontageDialog :visible="montageDialogVisible" @close="closeMontageDialog"/>
+
   </div>
 </template>
 
@@ -154,6 +153,7 @@
     import IconStopwatch from "../../icons/IconStopwatch.vue";
     import IconControllerPlay from "@/components/icons/IconControllerPlay.vue";
     import IconControllerPause from "@/components/icons/IconControllerPause.vue";
+    import TSCustomMontageDialog from "./TSCustomMontageDialog.vue";
     import {mapState} from 'vuex'
     export default {
         name: 'TimeseriesViewerToolbar',
@@ -161,6 +161,7 @@
         IconNextAnnotationRightFacing,
         IconControllerPlay,
         IconControllerPause,
+        TSCustomMontageDialog,
         IconStopwatch, IconNextPage, IconNextAnnotationLeftFacing, IconPreviousPage, IconTimescale},
       computed: {
           iconPlay: function() {
@@ -191,6 +192,7 @@
         },
         data: function () {
             return {
+              montageDialogVisible: false,
               showVertZoom: true,
               showTimeZoom: true,
               showPlaybackSpeed: true,
@@ -208,6 +210,9 @@
               }, {
                 value: 'BIPOLAR_TRANSVERSE',
                 label: 'Transverse Montage'
+              }, {
+                value: 'CUSTOM_MONTAGE',
+                label: 'Custom Montage'
               }],
               selectedMontage: '',
               playSpeedOptions: [{
@@ -238,8 +243,15 @@
           this.selectedPlaySpeed = 1
         },
         methods: {
+          closeMontageDialog: function() {
+            this.montageDialogVisible = false
+          },
           updateMontageScheme: function (value) {
-            this.$store.dispatch('viewerModule/setViewerMontageScheme', value)
+            if (value === 'CUSTOM_MONTAGE') {
+              this.montageDialogVisible = true
+            } else {
+              this.$store.dispatch('viewerModule/setViewerMontageScheme', value)
+            }
           },
           updatePlaybackSpeed: function (value) {
           },
