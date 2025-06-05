@@ -205,7 +205,7 @@ export default {
       files: [],
       ancestorList: [],
       offset: 0,
-      limit: 100,
+      limit: 500,
       tableResultsTotalCount: 0,
       targetDirectory: "",
       name: "",
@@ -298,7 +298,7 @@ export default {
       return useGetToken().then((token) => {
         const baseUrl = "datasets";
         const id = this.datasetId;
-        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=500`; // BE caps limit at 500 even if this is set higher
+        return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       });
     },
     /**
@@ -330,7 +330,7 @@ export default {
 
       useGetToken()
         .then(async (token) => {
-          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=500`; // BE caps limit at 500 even if this is set higher
+          const url = `${this.config.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
           return this.sendXhr(url).then((response) => {
             this.files = [...response.children];
 
@@ -668,7 +668,7 @@ export default {
           if (this.ancestorList.length === 0) {
             url = await this.getFilesUrl();
           } else {
-            url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=500`;
+            url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
           }
 
           return this.sendXhr(url).then((response) => {
