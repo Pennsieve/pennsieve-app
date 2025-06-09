@@ -1,0 +1,215 @@
+<script setup>
+
+import bfButton from "@/components/shared/bf-button/BfButton.vue";
+import IconPlus from "@/components/icons/IconPlus.vue";
+import {useStore} from "vuex";
+import {computed, ref} from "vue";
+import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
+import IconXCircle from "@/components/icons/IconXCircle.vue";
+import TsCreateMontageDialog from "@/components/viewers/TSViewer/TsCreateMontageDialog.vue";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog/ConfirmationDialog.vue";
+import toQueryParams from "@/utils/toQueryParams";
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
+
+const store = useStore();
+const emit = defineEmits(["open-new-montage"]);
+
+
+const workspaceMontages = computed(() => {
+  return store.getters["viewerModule/workspaceMontages"];
+});
+
+const props = defineProps({
+  windowHeight: {
+    type: Number,
+    default: 0,
+  },
+})
+
+const selectedMontageName = computed(() => store.state.viewerModule.viewerMontageScheme)
+
+const expandedMontages = computed( () => {
+  const defaultMontage = {
+    name: "NOT_MONTAGED",
+    displayName: "As Recorded",
+    channelPairs: []
+  }
+
+  const wsMontages = store.getters["viewerModule/workspaceMontages"]
+  if (wsMontages.length > 1) {
+    return [defaultMontage, ...wsMontages]
+  } else {
+    return [defaultMontage]
+  }
+
+})
+
+const createMontageDialogVisible = ref(false)
+
+function createMontage() {
+  store.dispatch('viewerModule/setViewerMontageScheme', "NOT_MONTAGED").then(() => {
+    createMontageDialogVisible.value = true
+
+  })
+}
+
+function closeCreateMontageDialog() {
+  createMontageDialogVisible.value = false
+}
+
+function onMontageSelected(montageName) {
+  store.dispatch('viewerModule/setViewerMontageScheme', montageName)
+}
+
+function deleteMontage(item){
+  deleteMontageItem.value = item
+  confirmationDialogVisible.value = true
+}
+
+const confirmationDialogVisible = ref(false)
+
+function doDeleteMontage(evt) {
+  console.log('hello' + evt)
+  confirmationDialogVisible.value = false
+
+  const endpoint = `${store.state.config.api2Url}/timeseries/montages`;
+  const queryParams = toQueryParams({
+    organization_id: store.state.activeOrganization.organization.id,
+    montage_name: evt.resource.name,
+  })
+
+  const url = `${endpoint}?${queryParams}`
+
+  return useGetToken().then((token) => {
+    useSendXhr(url, {
+      method: "DELETE",
+      header: {
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(() => {
+      console.log('SUCCESS DELETE MONTAGE')
+      confirmationDialogVisible.value = false
+    });
+  });
+
+}
+
+const deleteMontageItem = ref({})
+
+</script>
+
+
+<template>
+  <div class="palette-montages">
+    <div class="montages-heading">
+      <div class="controls">
+
+          <bf-button @click="createMontage">
+            Create New Montage
+          </bf-button>
+      </div>
+    </div>
+
+    <div id="montageWrap">
+      <montage-accordion
+        v-for="montage in expandedMontages"
+        :ref="`accordion-${montage.name}`"
+        :key="montage.name"
+        :title="montage.displayName"
+        :selected="montage.name === selectedMontageName"
+        :window-height="windowHeight"
+        :nr-layers="workspaceMontages.length"
+        @selectItem="onMontageSelected(montage.name)"
+        icon="blackfynn:chevron-down-small"
+      >
+        <template #operations>
+          <div v-if="montage.name === selectedMontageName" class="icon-wrapper">
+            <IconXCircle stroke="#808fad" fill="#808fad" class="active-indicator"/>
+          </div>
+        </template>
+        <template #items>
+          <div>
+            <div class="delete-container">
+              <button @click="deleteMontage(montage)">
+                delete montage
+              </button>
+            </div>
+
+            <div v-for="pair in montage.channelPairs" class="pair-info">
+              <div>
+                {{pair.name}}
+              </div>
+              <div>
+                {{pair.channels[0]}} - {{pair.channels[1]}}
+              </div>
+
+            </div>
+
+          </div>
+        </template>
+
+      </montage-accordion>
+
+    </div>
+
+    <ts-create-montage-dialog :visible="createMontageDialogVisible" @close="closeCreateMontageDialog"/>
+
+    <confirmation-dialog
+      :dialog-visible="confirmationDialogVisible"
+      action="Delete"
+      action-message="Are you sure you want to delete the montage?"
+      :resource="deleteMontageItem"
+      warning-message="This will delete the montage and cannot be undone."
+      confirm-action-label="Delete"
+      cancel-action-label="Cancel"
+      @close="confirmationDialogVisible = false"
+      @confirmed="doDeleteMontage"
+    />
+
+  </div>
+</template>
+
+<style lang="scss" scoped>
+@import '../../../../assets/_variables.scss';
+
+.pair-info {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: white;
+  border-bottom: 1px solid $gray_0;
+}
+
+.palette-montages {
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.montages-heading {
+  align-items: center;
+  background: #f7f7f7;
+  border-bottom: solid 1px $gray_2;
+  display: flex;
+  padding: 8px;
+}
+
+.icon-wrapper {
+  display: flex;
+  .active-indicator {
+    padding: 0 8px;
+  }
+}
+
+.delete-container{
+  background: white;
+  border-bottom: 1px solid $gray_0;
+  display: flex;
+  justify-content: end;
+  height: 25px;
+}
+
+
+</style>

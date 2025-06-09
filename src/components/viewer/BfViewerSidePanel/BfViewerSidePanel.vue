@@ -24,6 +24,12 @@
       :window-height="window_height"
     />
 
+    <palette-montages
+      v-if="sidePanelView === viewerSidePanelTypes.MONTAGES"
+      :ref="viewerSidePanelTypes.MONTAGES"
+      :window-height="window_height"
+    />
+
     <palette-navigator v-show="sidePanelView === 'navigator'" />
   </div>
 </template>
@@ -41,11 +47,13 @@ import PaletteInfo from '../palettes/PaletteInfo/PaletteInfo.vue'
 
 import { viewerSidePanelTypes } from '../../../utils/constants'
 import EventBus from '../../../utils/event-bus'
+import PaletteMontages from "@/components/viewer/palettes/Montages/PaletteMontages.vue";
 
 export default {
   name: 'BfViewerSidePanel',
 
   components: {
+    PaletteMontages,
     PaletteAnnotations,
     PaletteNavigator,
     PaletteChannels,

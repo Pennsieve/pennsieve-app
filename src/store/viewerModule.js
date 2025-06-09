@@ -1,5 +1,20 @@
-import { mergeRight,propOr, propEq, findIndex, flatten, compose, pluck, pathOr, includes, remove, find } from 'ramda'
+import {
+  mergeRight,
+  propOr,
+  propEq,
+  findIndex,
+  flatten,
+  compose,
+  pluck,
+  pathOr,
+  includes,
+  remove,
+  find,
+  map, otherwise
+} from 'ramda'
 import { viewerSidePanelTypes, viewerToolTypes } from '../utils/constants'
+import {useGetToken} from "@/composables/useGetToken";
+import toQueryParams from "@/utils/toQueryParams";
 
 const getLayerIndex = (key, data, viewerAnnotations) => {
   const layerId = propOr('', key, data)
@@ -33,7 +48,8 @@ const initialState = () => ({
   viewerSidePanelView: viewerSidePanelTypes.INFO_PANEL,
   viewerActiveTool: viewerToolTypes.POINTER,
   viewerMontageScheme: 'NOT_MONTAGED',
-  customMontageMap: []
+  customMontageMap: [],
+  workspaceMontages: [],
 })
 
 export const state = initialState()
@@ -201,6 +217,9 @@ export const mutations = {
   SET_CUSTOM_MONTAGE_MAP (state, data) {
     state.customMontageMap = data
   },
+  SET_WORKSPACE_MONTAGES (state, data) {
+    state.workspaceMontages = data
+  }
 }
 
 export const actions = {
@@ -283,9 +302,44 @@ export const actions = {
     commit('SET_VIEWER_MONTAGE_SCHEME', evt.montageScheme)
     commit('SET_CUSTOM_MONTAGE_MAP', JSON.parse(evt.customMontageMap))
   },
+  fetchWorkspaceMontages: async ({commit, rootState}, evt) => {
+    try {
+      let endpoint = `${rootState.config.api2Url}/timeseries/montages`
+      const token = await useGetToken()
+
+      const queryParams = toQueryParams({
+        organization_id: rootState.activeOrganization.organization.id
+      })
+
+      const url = `${endpoint}?${queryParams}`
+
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + token)
+      myHeaders.append('Accept', 'application/json')
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: myHeaders
+      })
+
+      if (resp.ok) {
+        const montages = await resp.json()
+        commit('SET_WORKSPACE_MONTAGES', montages.montages)
+        return montages.montages
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  }
+
 }
 
 export const getters = {
+  workspaceMontages: state => {
+    return state.workspaceMontages
+  },
   viewerSelectedChannels: state => {
     return state.viewerChannels.filter(channel => {
       return channel.selected
@@ -300,6 +354,22 @@ export const getters = {
     pluck('annotations')
   )(state.viewerAnnotations),
 
+  getMontageMessageByName: state => (montageName) => {
+
+    switch (montageName) {
+      case "NOT_MONTAGED":
+        return "NOT_MONTAGED"
+      default:
+        const m = find(propEq('name', montageName))(state.workspaceMontages)
+        const channelPairs = m.channelPairs.map(r => {
+          return r.channels
+        })
+
+        return channelPairs
+    }
+
+  },
+
   /**
    * MPP stands for Microns per Pixel
    * This is used to get the density of the slide
@@ -312,6 +382,8 @@ export const getters = {
     find(propEq('category', 'Blackfynn')),
     propOr([{}], 'properties')
   )(state.activeViewer)
+
+
 }
 
 const viewerModule = {

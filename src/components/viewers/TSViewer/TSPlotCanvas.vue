@@ -17,7 +17,8 @@
 </template>
 <script>
     import {
-        mapState
+        mapState,
+      mapGetters
     } from 'vuex'
 
     import {
@@ -57,12 +58,17 @@
                 this.requestedPages.clear();
             },
             viewerMontageScheme: function () {
-                this.sendMontageMessage(this.viewerMontageScheme)
+              const message = this.getMontageMessageByName(this.viewerMontageScheme)
+
+
+              this.sendMontageMessage(message)
             }
 
         },
         computed: {
-            ...mapState('viewerModule', [
+          ...mapGetters('viewerModule', ['getMontageMessageByName']),
+
+          ...mapState('viewerModule', [
                 'activeViewer',
                 'viewerChannels',
                 'viewerMontageScheme',
@@ -1444,11 +1450,16 @@
             },
             sendMontageMessage: function (value) {
                 if (this._websocket && this._websocket.readyState === 1) {
+                  console.log(value)
+                  let payload
+                  switch (value) {
+                    case "NOT_MONTAGED":
+                      payload = {montage: "NOT_MONTAGED", packageId: this.activeViewer.content.id }
+                      break
+                    default:
+                      payload = {montage: "CUSTOM_MONTAGE", packageId: this.activeViewer.content.id, montageMap:value }
 
-
-                  const payload = { montage: value, packageId: this.activeViewer.content.id, montageMap: this.customMontageMap }
-
-                  // const payload = { montage: value, packageId: this.activeViewer.content.id }
+                  }
                     this._websocket.send(JSON.stringify(payload))
                 } else {
                     this.async(() => {this.sendMontageMessage(value)}, 500)
