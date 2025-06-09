@@ -265,7 +265,7 @@
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
-import { pathOr, propOr, defaultTo } from "ramda";
+import { pathOr, propOr } from "ramda";
 
 import DataUseAgreementSignDialog from "./DataUseAgreementSignDialog/DataUseAgreementSignDialog.vue";
 import RejectRequestDialog from "./RejectRequestDialog/RejectRequestDialog.vue";
@@ -426,30 +426,6 @@ export default {
      */
     isReleaseRequestEnabled: function () {
       return this.isEmbargo && !this.isRequested && !this.isAccepted;
-    },
-    /**
-     * Compute published data
-     * @returns {Object}
-     */
-    publishedData: function () {
-      const dataset = defaultTo({}, this.dataset);
-      const datasetIntId = path(["content", "intId"], dataset);
-      return this.getPublishedDataByIntId(datasetIntId);
-    },
-    /**
-     * Compute link for dataset on discover
-     * @returns {String}
-     */
-    discoverLink: function () {
-      const publishedDatasetId = propOr(
-        1,
-        "publishedDatasetId",
-        this.publishedData
-      );
-
-      return this.config.environment === "prod"
-        ? `https://discover.pennsieve.io/datasets/${publishedDatasetId}`
-        : `https://discover.pennsieve.net/datasets/${publishedDatasetId}`;
     },
   },
 
