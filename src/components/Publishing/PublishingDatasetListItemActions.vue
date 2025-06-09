@@ -265,7 +265,7 @@
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
-import { pathOr, propOr } from "ramda";
+import { pathOr, propOr, defaultTo } from "ramda";
 
 import DataUseAgreementSignDialog from "./DataUseAgreementSignDialog/DataUseAgreementSignDialog.vue";
 import RejectRequestDialog from "./RejectRequestDialog/RejectRequestDialog.vue";
@@ -274,7 +274,6 @@ import DatasetPublishedData from "../../mixins/dataset-published-data";
 import Request from "../../mixins/request";
 
 import EventBus from "../../utils/event-bus.js";
-import { all, defaultTo, path, pathOr, propOr } from "ramda";
 import {
   PublicationTabsStatuses,
   PublicationTabs,
