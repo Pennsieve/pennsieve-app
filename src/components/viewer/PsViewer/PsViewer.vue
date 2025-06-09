@@ -149,6 +149,7 @@ import IconAnnotation from "../../icons/IconAnnotation.vue";
 import IconCompass from "../../icons/IconCompass.vue";
 import IconChannel from "../../icons/IconChannel.vue";
 import IconInfo from "../../icons/IconInfo.vue";
+import IconLink from "@/components/icons/IconLink.vue";
 import IconDiscussion from "../../icons/IconDiscussion.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
@@ -171,6 +172,7 @@ export default {
     ViewerToolbar,
     // MontageErrorDialog
     IconHand,
+    IconLink,
     IconDashedAnnotation,
     IconPencil,
     IconRuler,

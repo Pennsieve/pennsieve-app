@@ -5,7 +5,8 @@ export const viewerSidePanelTypes = Object.freeze({
   DISCUSSION: 'discussion',
   FILE_BROWSER: 'fileBrowser',
   ANNOTATIONS: 'annotations',
-  CHANNELS: 'channels'
+  CHANNELS: 'channels',
+  MONTAGES: 'montages',
 })
 export const viewerToolTypes = Object.freeze({
   PAN: 'pan',

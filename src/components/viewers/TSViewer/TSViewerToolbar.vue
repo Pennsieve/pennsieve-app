@@ -98,18 +98,18 @@
       </el-tooltip>
     </div>
     <div id="right-controls">
-      <el-tooltip
-        placement="top-end"
-        content="Montaging Controls">
-        <el-select v-model="selectedMontage" placeholder="Select" size="small" @change="updateMontageScheme">
-          <el-option
-            v-for="item in montageOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value">
-          </el-option>
-        </el-select>
-      </el-tooltip>
+<!--      <el-tooltip-->
+<!--        placement="top-end"-->
+<!--        content="Montaging Controls">-->
+<!--        <el-select v-model="selectedMontage" placeholder="Select" size="small" @change="updateMontageScheme">-->
+<!--          <el-option-->
+<!--            v-for="item in montageOptions"-->
+<!--            :key="item.value"-->
+<!--            :label="item.label"-->
+<!--            :value="item.value">-->
+<!--          </el-option>-->
+<!--        </el-select>-->
+<!--      </el-tooltip>-->
 
       <el-tooltip
         placement="top-end"

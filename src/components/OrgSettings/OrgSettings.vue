@@ -3,7 +3,7 @@
       slot="stage"
       element-loading-background="transparent"
     >
-      <el-form
+      `<el-form
         ref="orgSettingsForm"
         label-position="top"
         :model="ruleForm"
@@ -25,7 +25,7 @@
             />
           </div>
 
-        </el-form-item>
+        </el-form-item>`
         <el-form-item
           label="Workspace Colors"
           prop="colorTheme"
