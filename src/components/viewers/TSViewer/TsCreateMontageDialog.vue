@@ -133,6 +133,8 @@ function submitMontage() {
         },
       }).then(() => {
         console.log('SUCCESS')
+        store.dispatch('viewerModule/fetchWorkspaceMontages')
+        emit('close')
       });
     });
 

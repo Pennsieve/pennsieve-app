@@ -90,6 +90,8 @@ function doDeleteMontage(evt) {
     }).then(() => {
       console.log('SUCCESS DELETE MONTAGE')
       confirmationDialogVisible.value = false
+    }).then(() => {
+      store.dispatch('viewerModule/fetchWorkspaceMontages')
     });
   });
 
