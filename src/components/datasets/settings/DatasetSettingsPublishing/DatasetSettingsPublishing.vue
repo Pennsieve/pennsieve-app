@@ -255,7 +255,7 @@ export default {
      */
     publishedData: function () {
       const dataset = defaultTo({}, this.dataset);
-      const datasetIntId = path(["publishedDataset", "id"], dataset);
+      const datasetIntId = path(["content", "intId"], dataset);
       return this.getPublishedDataByIntId(datasetIntId);
     },
 
@@ -293,8 +293,6 @@ export default {
         this.isPublisherRole = member.isPublisher;
       }
     });
-
-    console.log("this.dataset", this.dataset);
   },
 
   methods: {
