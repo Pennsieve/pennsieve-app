@@ -427,6 +427,25 @@ export default {
     isReleaseRequestEnabled: function () {
       return this.isEmbargo && !this.isRequested && !this.isAccepted;
     },
+    /**
+     * Returns discover link
+     * @returns {String}
+     */
+    discoverLink: function () {
+      if (!this.wasPublished) {
+        return "";
+      }
+      return this.config.environment === "prod"
+        ? `https://discover.pennsieve.io/datasets/${this.publishedId}`
+        : `https://discover.pennsieve.net/datasets/${this.publishedId}`;
+    },
+    /**
+     * Get dataset int id
+     * @returns {Number}
+     */
+    publishedId: function () {
+      return pathOr(0, ["publication", "publishedDataset", "id"], this.dataset);
+    },
   },
 
   watch: {
