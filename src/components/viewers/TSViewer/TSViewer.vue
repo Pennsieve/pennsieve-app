@@ -25,7 +25,7 @@
       >
         <div
           v-for="item in viewerChannels"
-          :key="item.label"
+          :key="item.displayName"
         >
           <div
             v-if="item.visible"
@@ -34,7 +34,7 @@
             @tap="onLabelTap"
           >
             <div class="labelDiv">
-              {{ item.label }}
+              {{ item.displayName }}
             </div>
             <div
               class="chLabelIndWrap"
@@ -108,6 +108,7 @@
      @createUpdateAnnotation="onCreateUpdateAnnotation"
    />
 
+
 <!--    <timeseries-annotation-layer-modal-->
 <!--      ref="layerModal"-->
 <!--      :annotation-layer-window-open="annotationLayerWindowOpen"-->
@@ -128,7 +129,7 @@
 
 <script>
     import {
-        mapState
+        mapState, mapActions
     } from 'vuex'
 
     import {
@@ -148,13 +149,14 @@
         name: 'TimeseriesViewer',
 
         components:{
-            'timeseries-scrubber': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue')),
-            'timeseries-viewer-canvas': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerCanvas.vue')),
-            'timeseries-viewer-toolbar': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerToolbar.vue')),
-            'timeseries-filter-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue')),
-            'timeseries-annotation-layer-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerLayerWindow.vue')),
-            'ts-annotation-delete-dialog': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue')),
-            'timeseries-annotation-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
+          'ts-create-montage-dialog': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TsCreateMontageDialog.vue')),
+          'timeseries-scrubber': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue')),
+          'timeseries-viewer-canvas': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerCanvas.vue')),
+          'timeseries-viewer-toolbar': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerToolbar.vue')),
+          'timeseries-filter-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue')),
+          'timeseries-annotation-layer-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerLayerWindow.vue')),
+          'ts-annotation-delete-dialog': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue')),
+          'timeseries-annotation-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
         },
 
         mixins: [
@@ -260,6 +262,8 @@
 
             const toolbarOffset = this.isPreview? 0 : 100
 
+            // Fetch the workspace montages
+            this.fetchWorkspaceMontages()
 
             this.window_height = hhh - toolbarOffset;
             this.window_width = this.$refs.ts_viewer.offsetWidth
@@ -278,6 +282,9 @@
         },
 
         methods: {
+          ...mapActions( 'viewerModule', [
+              'fetchWorkspaceMontages',
+            ]),
             openEditAnnotationDialog: function(annotation) {
               this.$store.dispatch('viewerModule/setActiveAnnotation', annotation).then(() =>{
                 this.$refs.viewerCanvas.renderAnnotationCanvas()

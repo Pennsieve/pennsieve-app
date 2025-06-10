@@ -58,7 +58,8 @@ export default {
           ],
           icon: 'icon-dashed-annotation',
           tooltip: 'Annotate'
-        }
+        },
+
       ],
 
       /**
@@ -99,6 +100,14 @@ export default {
           ],
           icon: 'IconChannel',
           tooltip: 'Channels'
+        },
+        {
+          eventName: 'montages',
+          packages: [
+            'TimeSeries'
+          ],
+          icon: 'icon-link',
+          tooltip: 'Montages'
         }
       ],
       /**

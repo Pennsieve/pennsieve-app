@@ -5,6 +5,10 @@
   background-color: white;
 }
 
+.el-input__wrapper.is-focus {
+  border-color: $purple_3;
+}
+
 
 .no-shadow {
   .el-input__wrapper {
@@ -16,6 +20,7 @@
 
 .el-input__inner {
   height: 40px;
+  font-weight: 300;
 }
 
 .el-textarea__inner {
