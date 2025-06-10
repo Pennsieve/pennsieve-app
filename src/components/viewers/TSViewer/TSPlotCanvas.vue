@@ -1737,7 +1737,6 @@
             // If we have a montage selected, find the channel and return the displayName for the montaged channel.
             getDisplayName: function(channel1, channel2, montageName) {
               const curMontage = find(propEq( 'name',montageName), this.workspaceMontages)
-              debugger
               for (let ch in curMontage.channelPairs) {
                 if (curMontage.channelPairs[ch].channels[0] === channel1 && curMontage.channelPairs[ch].channels[1] === channel2) {
                   return curMontage.channelPairs[ch].name
