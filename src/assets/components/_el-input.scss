@@ -5,6 +5,10 @@
   background-color: white;
 }
 
+.el-input__wrapper.is-focus {
+  border-color: $purple_3;
+}
+
 
 .no-shadow {
   .el-input__wrapper {

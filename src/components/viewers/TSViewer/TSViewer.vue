@@ -25,7 +25,7 @@
       >
         <div
           v-for="item in viewerChannels"
-          :key="item.label"
+          :key="item.displayName"
         >
           <div
             v-if="item.visible"
@@ -34,7 +34,7 @@
             @tap="onLabelTap"
           >
             <div class="labelDiv">
-              {{ item.label }}
+              {{ item.displayName }}
             </div>
             <div
               class="chLabelIndWrap"

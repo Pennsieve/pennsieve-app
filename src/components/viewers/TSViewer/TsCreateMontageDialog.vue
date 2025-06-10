@@ -30,14 +30,15 @@ function handleDragStart(event, itemData) {
 
 function handleDrop(event, targetContainer) {
   const itemData = JSON.parse(event.dataTransfer.getData('application/json'))
-  console.log(itemData)
-
   targetContainer.value = itemData
+
+  draftChannelPairName.value = containerOne.value.value?.label + "-" + containerTwo.value.value?.label
 
 }
 
 let containerOne = ref({})
 let containerTwo = ref({})
+let draftChannelPairName = ref("")
 
 // FORM DATA
 const submitMontageForm = ref({
@@ -65,7 +66,7 @@ const montageRules = ref({
 
 function addMontagePair() {
   submitMontageForm.value.channelPairs.push({
-    name: containerOne.value.value.label + "-" + containerTwo.value.value.label,
+    name: draftChannelPairName.value,
     channels: [containerOne.value, containerTwo.value]
   })
   containerOne.value = {}
@@ -106,10 +107,10 @@ function submitMontage() {
     let channels = []
     const pairs = submitMontageForm.value.channelPairs
     for (let p in pairs) {
-      var pair = {
-        name: pairs[p].channels[0].value.label + '-' + pairs[p].channels[1].value.label,
+      const pair = {
+        name: pairs[p].name,
         channels: [pairs[p].channels[0].value.label, pairs[p].channels[1].value.label]
-      }
+      };
       channels.push(pair)
     }
 
@@ -225,6 +226,12 @@ function cancel() {
                       {{containerTwo.value?.label}}
                     </div>
                   </div>
+                  as
+                  <el-input
+                    v-model="draftChannelPairName"
+                    class="montage-name"
+                    placeholder="Display as..."
+                  />
                   <bf-button @click="addMontagePair"> Add</bf-button>
                   <bf-button @click="clearMontageInput" class="flex">
                     <template #prefix>
@@ -283,6 +290,10 @@ function cancel() {
   color: $gray_4;
   font-weight: 300;
 
+}
+
+.montage-name{
+  --el-input-focus-border-color: #808fad;
 }
 
 .create-montage-dialog {
@@ -375,6 +386,7 @@ function cancel() {
             padding: 3px;
             color: $purple_3;
             font-weight: 300;
+            --el-input-focus-border-color: red;
           }
         }
       }

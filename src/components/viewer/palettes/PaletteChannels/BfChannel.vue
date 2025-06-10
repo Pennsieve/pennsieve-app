@@ -327,7 +327,7 @@
        * Update viewer channels state in Vuex
        */
       updateViewerChannels: function() {
-        const label = this.newLabel.split(/[ _-]/, 3)
+        const label = this.newLabel.split("<->", 3)
         const label_prefix = label[0];
         let label_value = ( (label.length > 1) ? parseFloat(label[1]) : 0);
         label_value = ( (isNaN(label_value) ? label[1] : label_value));

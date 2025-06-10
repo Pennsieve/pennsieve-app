@@ -32,7 +32,8 @@
         map,
         take,
         sortBy,
-        prop
+        prop,
+        find
     } from 'ramda'
 
     import protobuf from 'protobufjs'
@@ -72,7 +73,9 @@
                 'activeViewer',
                 'viewerChannels',
                 'viewerMontageScheme',
-                'customMontageMap'
+                'customMontageMap',
+                'workspaceMontages',
+                'viewerMontageScheme'
             ]),
 
             canvasWidth: function() {
@@ -394,6 +397,7 @@
                         const curChannel = {
                             id: curId,
                             label: curC.name,
+                            displayName: curC.displayName,
                             type: curC.channelType,
                             segments: [],
                             start: curC.start,
@@ -404,7 +408,7 @@
                             virtualId: curC.virtualId
                         };
 
-                        const label = curChannel.label.split(/[ _-]/, 3)
+                        const label = curChannel.label.split("<->", 3)
                         const label_prefix = label[0];
                         let label_value = ( (label.length > 1) ? parseFloat(label[1]) : 0);
                         label_value = ( (isNaN(label_value) ? label[1] : label_value));
@@ -413,6 +417,7 @@
                             id: curChannel.id,                          // id of channel
                             type: curChannel.type,                      // Type of channel (CONTINUOUS, UNIT)
                             label: curChannel.label,                    // Label of channel
+                            displayName: curChannel.displayName,        // what we render in the viewer
                             label_split: label,                         // array of label segments
                             label_prefix: label_prefix,                 // prefix for label
                             label_value: label_value,                   // value for label
@@ -1513,11 +1518,21 @@
                   const baseChannels = this.activeViewer.channels
                   const virtualChannels = data.channelDetails.map(({ id, name }) => {
                     const baseChannel = baseChannels.find(ch => (ch.content.id === id))
+
+                    // Replace marker for montage by '-'. The montage marker is used by server to parse channel names
+                    // when montaged. TODO: there is probably a cleaner way of doing this.
+                    let displayName = name
+                    if (this.viewerMontageScheme !== 'NOT_MONTAGED') {
+                      const channelArr = name.split("<->", 2)
+                      displayName = this.getDisplayName(channelArr[0], channelArr[1], this.viewerMontageScheme)
+                    }
+
                     const content = {
                       id,
                       name,
                       channelType: baseChannel.content.channelType,
                       label: name,
+                      displayName: displayName,
                       unit: baseChannel.content.unit,
                       rate: baseChannel.content.rate,
                       start: baseChannel.content.start,
@@ -1718,6 +1733,18 @@
               });
 
               myReader.readAsArrayBuffer(msg.data);
+            },
+            // If we have a montage selected, find the channel and return the displayName for the montaged channel.
+            getDisplayName: function(channel1, channel2, montageName) {
+              const curMontage = find(propEq( 'name',montageName), this.workspaceMontages)
+              debugger
+              for (let ch in curMontage.channelPairs) {
+                if (curMontage.channelPairs[ch].channels[0] === channel1 && curMontage.channelPairs[ch].channels[1] === channel2) {
+                  return curMontage.channelPairs[ch].name
+                }
+              }
+              return channel1 + "-" + channel2
+
             },
             sendFilterMessage: function(msg) {
               if (this._websocket && this._websocket.readyState === 1) {
