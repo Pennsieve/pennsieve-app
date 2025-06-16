@@ -17,6 +17,7 @@ export default {
     publishedData: function() {
       const dataset = defaultTo({}, this.dataset)
       const datasetIntId = path(['content', 'intId'], dataset) || dataset.sourceDatasetId
+    
       return this.getPublishedDataByIntId(datasetIntId)
     },
 
@@ -50,7 +51,7 @@ export default {
      * @returns {String}
      */
     discoverLink: function() {
-      const publishedDatasetId =  propOr(1, 'publishedDatasetId', this.publishedData)
+      const publishedDatasetId =  propOr(1, 'id', this.publishedData)
       return this.config.environment === 'prod'
         ? `https://discover.pennsieve.io/datasets/${publishedDatasetId}`
         : `https://discover.pennsieve.net/datasets/${publishedDatasetId}`

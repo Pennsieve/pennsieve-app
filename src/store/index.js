@@ -966,10 +966,12 @@ export const getters = {
           },
   getDatasetRole: (state) => () => state.datasetRole,
   getPublishedDataByIntId: (state) => (id) => {
-    return R.defaultTo(
+
+    const index = R.defaultTo(
         {},
-        find(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets)
-    );
+        R.findIndex(R.propEq("sourceDatasetId", id), state.publishingModule.published.datasets))
+
+    return state.publishingModule.published.datasets[index]
   },
   getPublishedDataIndexByIntId: (state) => (id) => {
     return R.defaultTo(
