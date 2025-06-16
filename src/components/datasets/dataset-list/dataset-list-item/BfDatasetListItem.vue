@@ -27,7 +27,7 @@
                 <p>
                   Published a copy on
                   <strong>{{ publishedDate }}</strong>
-                  <a :href="discoverLink" target="_blank"> View on Discover </a>
+                  <a :href="discoverLink" target="_blank">View on Discover</a>
                 </p>
               </template>
 

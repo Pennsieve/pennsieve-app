@@ -7,7 +7,6 @@ import {useHandleXhrError} from "../../../mixins/request/request_composable"
  */
 const fetchRecords = async (instance: ModelRecordsComponentInstance): Promise<void> => {
 
-  debugger
   if (!instance.modelRecordsUrl) return Promise.resolve()
 
   instance.resultsLoading = true
