@@ -633,20 +633,7 @@
             },
             // Getting data from cache and queue new reqeusts from server
             requestData: function(showChannels, start, duration ) {
-
-                // If number of requestedpages is getting to big, reset websocket connection
-
-                // TODO: BRING BACK
-                // if (this.requestedPages.size > 20 ) {
-                //     clearTimeout(this.preFetchTime);
-                //     this.aSyncPreRequests = [];
-                //     this.reRequestPages();
-                //     this.openWebsocket();
-                //     return;
-                // }
-
-
-                // Init asnch requests for viewport pages
+                // Init async requests for viewport pages
                 this.aSyncRequests = [];
 
                 // If we rerender the same viewport (as data comes in) --> don't change prefetch
@@ -894,7 +881,7 @@
                                 { count: nrChannels,
                                     counter: channelCounter,
                                     subPageCount: NaN,
-                                    ts: (Date.now() + 550),
+                                    ts: Date.now(),
                                     inViewport: curRequest.isInViewport} );
 
                         } else {
@@ -1396,40 +1383,6 @@
                 const avg = sum / data.length;
                 return avg;
             },
-            // Get all pages that are partially returned and re-request
-            reRequestPages: function() {
-
-                const requestPages = [];
-                this.requestedPages.forEach(function(value, key) {
-                // Only rerequest pages where we already have partial return
-                    if (!isNaN(value.subPageCount)) {
-
-                        // only include channels with partial return
-                        const channels = [];
-                        value.counter.forEach(function(count, chId) {
-                            if (!isNaN(count) && count > 0) {
-                                channels.push(chId)
-                            }
-                        })
-
-                        if (channels.length > 0) {
-                            requestPages.push({
-                                channels: channels,
-                                start: key,
-                                duration: this.pageSize,
-                                isInViewport: true,
-                                pixelWidth: this.rsPeriod
-                            });
-                        }
-                    }
-                }, this);
-
-                // clear requestedPages
-                this.requestedPages.clear();
-
-                this.catchUpRequestPages = requestPages;
-            },
-
 
             // _________________
             // WEBSOCKET METHODS
@@ -1478,6 +1431,15 @@
             _onWebsocketFinalClose: function(e) {
             },
             _onWebsocketOpen: function(e) {
+
+                console.log('WebSocket connection opened');
+                // setInterval(() => {
+                //   if (this._websocket.readyState === WebSocket.OPEN) {
+                //     this._websocket.send('ping');
+                //   }
+                // }, 30000); // Send a ping every 30 seconds
+
+
                 if (this.initWebsocket) {
                     let chIds = [];
                     for (let i=0; i<this.viewerChannels.length; i++) {
@@ -1823,32 +1785,38 @@
                         // array of channel IDs
                     if (requestedPage) {
 
-                        // Update time
-                        requestedPage.ts = Date.now();
+                      // Remove requested pages that have timestamps before the current page
+                      // Assume they have been dropped by the server
+                      this.requestedPages.forEach((value, key) => {
 
-                        let countForChannel = requestedPage.counter.get(obj.data.chId);
-                        if (isNaN(countForChannel)) {
-                            countForChannel = obj.nrResponses -1;
-                            requestedPage.counter.set(obj.data.chId, countForChannel);
-                            requestedPage.subPageCount = countForChannel;
-                        } else {
-                            countForChannel = countForChannel - 1;
-                            requestedPage.counter.set(obj.data.chId, countForChannel);
+                        if (value.ts < requestedPage.ts && key !== obj.data.pageStart) {
+                          this.requestedPages.delete(key);
                         }
+                      }, this);
 
-                        if (countForChannel === 0) {
-                            let isComplete = true;
-                            for (let value2 of requestedPage.counter.values()) {
-                                if (value2 > 0 || isNaN(value2)) {
-                                    isComplete = false;
-                                    break;
-                                }
-                            }
-                            if (isComplete) {
-                                this.requestedPages.delete(obj.data.pageStart);
-                            }
+                      let countForChannel = requestedPage.counter.get(obj.data.chId);
+                      if (isNaN(countForChannel)) {
+                          countForChannel = obj.nrResponses -1;
+                          requestedPage.counter.set(obj.data.chId, countForChannel);
+                          requestedPage.subPageCount = countForChannel;
+                      } else {
+                          countForChannel = countForChannel - 1;
+                          requestedPage.counter.set(obj.data.chId, countForChannel);
+                      }
 
-                        }
+                      if (countForChannel === 0) {
+                          let isComplete = true;
+                          for (let value2 of requestedPage.counter.values()) {
+                              if (value2 > 0 || isNaN(value2)) {
+                                  isComplete = false;
+                                  break;
+                              }
+                          }
+                          if (isComplete) {
+                              this.requestedPages.delete(obj.data.pageStart);
+                          }
+
+                      }
 
                     }
 
