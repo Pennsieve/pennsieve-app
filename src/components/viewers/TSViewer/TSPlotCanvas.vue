@@ -1256,6 +1256,14 @@
                                         ctx.stroke();
                                     }
 
+                                    // Now draw a line through the max values.
+                                    // This ensures the traces are visible at all time.
+                                    ctx.beginPath();
+                                    for (let i = startIndex; i < (endIndex+1); i++) {
+                                      ctx.lineTo(xVec[i], yVec[i]);
+                                    }
+                                    ctx.stroke();
+
                                 } else {
                                     if(block===0) {
                                         ctx.beginPath();
