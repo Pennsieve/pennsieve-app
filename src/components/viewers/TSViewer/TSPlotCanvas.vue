@@ -1785,15 +1785,6 @@
                         // array of channel IDs
                     if (requestedPage) {
 
-                      // Remove requested pages that have timestamps before the current page
-                      // Assume they have been dropped by the server
-                      this.requestedPages.forEach((value, key) => {
-
-                        if (value.ts < requestedPage.ts && key !== obj.data.pageStart) {
-                          this.requestedPages.delete(key);
-                        }
-                      }, this);
-
                       let countForChannel = requestedPage.counter.get(obj.data.chId);
                       if (isNaN(countForChannel)) {
                           countForChannel = obj.nrResponses -1;
@@ -1806,13 +1797,31 @@
 
                       if (countForChannel === 0) {
                           let isComplete = true;
-                          for (let value2 of requestedPage.counter.values()) {
+                          for (const [key, value2] of Object.entries(requestedPage.counter)) {
                               if (value2 > 0 || isNaN(value2)) {
                                   isComplete = false;
                                   break;
                               }
                           }
                           if (isComplete) {
+                            console.log('Got all messages for timeblock')
+                            // Remove requested pages that have timestamps before the current page
+                            // Assume they have been dropped by the server
+                            this.requestedPages.forEach((value, key) => {
+                              let hasStarted = false
+                              for (const [key, v] of Object.entries(value.counter)) {
+                                if (v > 0 ) {
+                                  hasStarted = true;
+                                  break;
+                                }
+                              }
+
+                              if (value.ts < requestedPage.ts && key !== obj.data.pageStart && !hasStarted) {
+                                console.log('assume dropped message')
+                                this.requestedPages.delete(key);
+                              }
+                            }, this);
+
                               this.requestedPages.delete(obj.data.pageStart);
                           }
 
