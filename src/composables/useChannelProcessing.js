@@ -1,0 +1,513 @@
+// @/composables/useChannelProcessing.js
+import { computed, reactive, ref, watch, readonly } from 'vue'
+import { head, propOr, findIndex, propEq } from 'ramda'
+
+export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspaceMontages) => {
+    // Processing state
+    const processingStats = reactive({
+        totalChannels: 0,
+        processedChannels: 0,
+        montageChannels: 0,
+        errors: 0,
+        lastProcessingTime: 0
+    })
+
+    // Channel cache for performance
+    const channelCache = ref(new Map())
+    const montageCache = ref(new Map())
+
+    // Computed properties
+    const isViewingMontage = computed(() =>
+        viewerMontageScheme.value !== 'NOT_MONTAGED'
+    )
+
+    const currentMontage = computed(() => {
+        if (!isViewingMontage.value || !workspaceMontages.value) {
+            return null
+        }
+        return workspaceMontages.value.find(m => m.name === viewerMontageScheme.value)
+    })
+
+    const montageChannelPairs = computed(() => {
+        return currentMontage.value?.channelPairs || {}
+    })
+
+    // Clear caches when montage changes
+    watch(viewerMontageScheme, () => {
+        channelCache.value.clear()
+        montageCache.value.clear()
+    })
+
+    /**
+     * Extract channel ID from channel object
+     * Handles montage channel IDs by removing montage suffixes
+     */
+    const getChannelId = (channel) => {
+        if (!channel) return ''
+
+        let id = propOr('', 'id', channel)
+
+        // Handle montage IDs - remove channel name suffix for montaged channels
+        if (isViewingMontage.value && typeof id === 'string') {
+            const parts = id.split('_')
+            id = parts.length > 1 ? head(parts) : id
+        }
+
+        return id
+    }
+
+    /**
+     * Get clean channel identifier without montage modifications
+     */
+    const getRawChannelId = (channel) => {
+        return propOr('', 'id', channel)
+    }
+
+    /**
+     * Generate display name for montaged channels
+     * Falls back to simple concatenation if montage definition not found
+     */
+    const getDisplayName = (channel1, channel2, montageName = null) => {
+        const montageToUse = montageName || viewerMontageScheme.value
+
+        // Check cache first
+        const cacheKey = `${channel1}_${channel2}_${montageToUse}`
+        if (montageCache.value.has(cacheKey)) {
+            return montageCache.value.get(cacheKey)
+        }
+
+        let displayName = `${channel1}-${channel2}` // Default fallback
+
+        if (montageToUse !== 'NOT_MONTAGED') {
+            const montage = workspaceMontages.value?.find(m => m.name === montageToUse)
+
+            if (montage?.channelPairs) {
+                // Search through channel pairs for matching channels
+                for (const pairKey of Object.keys(montage.channelPairs)) {
+                    const pair = montage.channelPairs[pairKey]
+
+                    if (pair.channels?.length === 2 &&
+                        pair.channels[0] === channel1 &&
+                        pair.channels[1] === channel2) {
+                        displayName = pair.name || displayName
+                        break
+                    }
+                }
+            }
+        }
+
+        // Cache the result
+        montageCache.value.set(cacheKey, displayName)
+        return displayName
+    }
+
+    /**
+     * Process channel details from WebSocket into virtual channel objects
+     */
+    const processChannelData = (channelDetails) => {
+        if (!Array.isArray(channelDetails)) {
+            console.warn('Invalid channel details provided:', channelDetails)
+            return []
+        }
+
+        const startTime = performance.now()
+        processingStats.totalChannels = channelDetails.length
+        processingStats.processedChannels = 0
+        processingStats.errors = 0
+
+        const virtualChannels = channelDetails.map(({ id, name }) => {
+            try {
+                const baseChannel = findBaseChannel(id)
+                if (!baseChannel) {
+                    console.warn(`Base channel not found for ID: ${id}`)
+                    processingStats.errors++
+                    return null
+                }
+
+                const virtualChannel = createVirtualChannel(id, name, baseChannel)
+                processingStats.processedChannels++
+
+                if (isViewingMontage.value) {
+                    processingStats.montageChannels++
+                }
+
+                return virtualChannel
+            } catch (error) {
+                console.error(`Error processing channel ${id}:`, error)
+                processingStats.errors++
+                return null
+            }
+        }).filter(Boolean)
+
+        processingStats.lastProcessingTime = performance.now() - startTime
+        return virtualChannels
+    }
+
+    /**
+     * Find base channel by ID from the provided base channels
+     */
+    const findBaseChannel = (channelId) => {
+        // Check cache first
+        if (channelCache.value.has(channelId)) {
+            return channelCache.value.get(channelId)
+        }
+
+        const baseChannel = baseChannels.value?.find(ch => ch.content?.id === channelId)
+
+        if (baseChannel) {
+            channelCache.value.set(channelId, baseChannel)
+        }
+
+        return baseChannel
+    }
+
+    /**
+     * Create virtual channel object from base channel and montage info
+     */
+    const createVirtualChannel = (id, name, baseChannel) => {
+        let displayName = name
+        let virtualId = `${id}_${name}`
+        let channelId = id
+
+        // Handle montage display names
+        if (isViewingMontage.value) {
+            const channelParts = name.split("<->", 2)
+
+            if (channelParts.length === 2) {
+                // This is a montaged channel with two electrode names
+                displayName = getDisplayName(channelParts[0], channelParts[1])
+            }
+
+            // For montages, use composite ID to ensure uniqueness
+            channelId = virtualId
+        }
+
+        const content = {
+            id: channelId,
+            name,
+            channelType: baseChannel.content.channelType,
+            label: name,
+            displayName,
+            unit: baseChannel.content.unit,
+            rate: baseChannel.content.rate,
+            start: baseChannel.content.start,
+            end: baseChannel.content.end,
+            virtualId,
+            // Additional metadata
+            montageScheme: isViewingMontage.value ? viewerMontageScheme.value : 'NOT_MONTAGED',
+            isMontaged: isViewingMontage.value,
+            baseChannelId: id
+        }
+
+        return {
+            content,
+            properties: baseChannel.properties || []
+        }
+    }
+
+    /**
+     * Create montage payload for WebSocket messages
+     */
+    const createMontagePayload = (montageScheme, packageId) => {
+        const scheme = montageScheme || viewerMontageScheme.value
+
+        switch (scheme) {
+            case 'NOT_MONTAGED':
+                return {
+                    montage: 'NOT_MONTAGED',
+                    packageId
+                }
+
+            default:
+                // Custom montage
+                const montageData = workspaceMontages.value?.find(m => m.name === scheme)
+
+                return {
+                    montage: 'CUSTOM_MONTAGE',
+                    packageId,
+                    montageMap: montageData || scheme,
+                    montageName: scheme
+                }
+        }
+    }
+
+    /**
+     * Validate channel configuration
+     */
+    const validateChannelConfig = (channelConfig) => {
+        const errors = []
+
+        if (!channelConfig) {
+            errors.push('Channel configuration is null or undefined')
+            return { isValid: false, errors }
+        }
+
+        // Required fields
+        const requiredFields = ['id', 'label', 'type', 'unit', 'rate']
+        for (const field of requiredFields) {
+            if (!channelConfig[field]) {
+                errors.push(`Missing required field: ${field}`)
+            }
+        }
+
+        // Validate data types
+        if (channelConfig.rate && (typeof channelConfig.rate !== 'number' || channelConfig.rate <= 0)) {
+            errors.push('Sample rate must be a positive number')
+        }
+
+        if (channelConfig.start && channelConfig.end && channelConfig.start >= channelConfig.end) {
+            errors.push('Channel start time must be less than end time')
+        }
+
+        // Validate channel type
+        const validTypes = ['CONTINUOUS', 'UNIT', 'Neural']
+        if (channelConfig.type && !validTypes.includes(channelConfig.type)) {
+            errors.push(`Invalid channel type: ${channelConfig.type}. Must be one of: ${validTypes.join(', ')}`)
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        }
+    }
+
+    /**
+     * Process and sort channel configurations
+     */
+    const sortChannelConfigurations = (channelConfigs) => {
+        return channelConfigs.sort((a, b) => {
+            const aLabel = a.label || ''
+            const bLabel = b.label || ''
+
+            // Split labels for smart sorting
+            const aParts = aLabel.split('<->', 3)
+            const bParts = bLabel.split('<->', 3)
+
+            // If either has more than 2 parts, fall back to string comparison
+            if (aParts.length > 2 || bParts.length > 2) {
+                return aLabel.localeCompare(bLabel)
+            }
+
+            const aPrefix = aParts[0] || ''
+            const bPrefix = bParts[0] || ''
+
+            // If prefixes are the same, sort by numeric value
+            if (aPrefix === bPrefix && aParts.length > 1 && bParts.length > 1) {
+                const aValue = parseFloat(aParts[1])
+                const bValue = parseFloat(bParts[1])
+
+                if (!isNaN(aValue) && !isNaN(bValue)) {
+                    return aValue - bValue
+                }
+
+                // If not numeric, sort as strings
+                return aParts[1].localeCompare(bParts[1])
+            }
+
+            // Sort by prefix
+            return aPrefix.localeCompare(bPrefix)
+        })
+    }
+
+    /**
+     * Create channel configuration object
+     */
+    const createChannelConfig = (virtualChannel, rank = 0) => {
+        const content = virtualChannel.content
+        const labelParts = content.label.split('<->', 3)
+        const labelPrefix = labelParts[0] || ''
+        const labelValue = labelParts.length > 1
+            ? (isNaN(parseFloat(labelParts[1])) ? labelParts[1] : parseFloat(labelParts[1]))
+            : 0
+
+        return {
+            id: content.id,
+            type: content.channelType,
+            label: content.label,
+            displayName: content.displayName,
+            labelParts,
+            labelPrefix,
+            labelValue,
+            dataSegments: [],
+            rank,
+            visible: true,
+            plotAgainst: null,
+            rowBaseline: null,
+            rowScale: 1,
+            rowAdjust: 0,
+            selected: false,
+            hover: false,
+            unit: content.unit,
+            sf: content.rate,
+            filter: {},
+            hideFilter: true,
+            isEditing: false,
+            virtualId: content.virtualId,
+            montageScheme: content.montageScheme || 'NOT_MONTAGED',
+            isMontaged: content.isMontaged || false,
+            baseChannelId: content.baseChannelId || content.id
+        }
+    }
+
+    /**
+     * Filter channels based on criteria
+     */
+    const filterChannels = (channels, criteria = {}) => {
+        const {
+            channelType = null,
+            visible = null,
+            montageScheme = null,
+            labelPattern = null,
+            sampleRate = null
+        } = criteria
+
+        return channels.filter(channel => {
+            // Filter by channel type
+            if (channelType && channel.type !== channelType) {
+                return false
+            }
+
+            // Filter by visibility
+            if (visible !== null && channel.visible !== visible) {
+                return false
+            }
+
+            // Filter by montage scheme
+            if (montageScheme && channel.montageScheme !== montageScheme) {
+                return false
+            }
+
+            // Filter by label pattern (regex)
+            if (labelPattern) {
+                const regex = new RegExp(labelPattern, 'i')
+                if (!regex.test(channel.label)) {
+                    return false
+                }
+            }
+
+            // Filter by sample rate
+            if (sampleRate && channel.sf !== sampleRate) {
+                return false
+            }
+
+            return true
+        })
+    }
+
+    /**
+     * Group channels by various criteria
+     */
+    const groupChannels = (channels, groupBy = 'type') => {
+        const groups = {}
+
+        channels.forEach(channel => {
+            let groupKey
+
+            switch (groupBy) {
+                case 'type':
+                    groupKey = channel.type
+                    break
+                case 'montage':
+                    groupKey = channel.montageScheme || 'NOT_MONTAGED'
+                    break
+                case 'prefix':
+                    groupKey = channel.labelPrefix
+                    break
+                case 'sampleRate':
+                    groupKey = channel.sf
+                    break
+                case 'unit':
+                    groupKey = channel.unit
+                    break
+                default:
+                    groupKey = 'all'
+            }
+
+            if (!groups[groupKey]) {
+                groups[groupKey] = []
+            }
+            groups[groupKey].push(channel)
+        })
+
+        return groups
+    }
+
+    /**
+     * Get channel processing statistics
+     */
+    const getProcessingStats = () => ({
+        ...processingStats,
+        cacheSize: channelCache.value.size,
+        montageCacheSize: montageCache.value.size,
+        isViewingMontage: isViewingMontage.value,
+        currentMontageScheme: viewerMontageScheme.value,
+        availableMontages: workspaceMontages.value?.map(m => m.name) || []
+    })
+
+    /**
+     * Clear all caches
+     */
+    const clearCaches = () => {
+        channelCache.value.clear()
+        montageCache.value.clear()
+
+        // Reset stats
+        Object.assign(processingStats, {
+            totalChannels: 0,
+            processedChannels: 0,
+            montageChannels: 0,
+            errors: 0,
+            lastProcessingTime: 0
+        })
+    }
+
+    /**
+     * Batch process multiple channel operations
+     */
+    const batchProcessChannels = async (operations) => {
+        const results = []
+
+        for (const operation of operations) {
+            try {
+                const result = await operation()
+                results.push({ success: true, result })
+            } catch (error) {
+                results.push({ success: false, error: error.message })
+                processingStats.errors++
+            }
+        }
+
+        return results
+    }
+
+    return {
+        // State
+        processingStats: readonly(processingStats),
+        isViewingMontage,
+        currentMontage,
+        montageChannelPairs,
+
+        // Core processing methods
+        getChannelId,
+        getRawChannelId,
+        getDisplayName,
+        processChannelData,
+        createMontagePayload,
+
+        // Channel configuration
+        createChannelConfig,
+        validateChannelConfig,
+        sortChannelConfigurations,
+
+        // Utility methods
+        filterChannels,
+        groupChannels,
+        findBaseChannel,
+        createVirtualChannel,
+
+        // Management
+        getProcessingStats,
+        clearCaches,
+        batchProcessChannels
+    }
+}

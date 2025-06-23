@@ -2,7 +2,7 @@
   <div class="timeseries-viewer-canvas">
 
     <div id="canvasWrapper">
-      <timeseries-plot-canvas
+      <TSPlotCanvas2
         ref="plotCanvas"
         :c-width="cWidth"
         :c-height="cHeight"
@@ -38,7 +38,7 @@
           />
         </template>
 
-      </timeseries-plot-canvas>
+      </TSPlotCanvas2>
 
       <canvas
         id="cursorArea"
@@ -100,13 +100,16 @@
     import ViewerActiveTool from '@/mixins/viewer-active-tool'
     import Request from '@/mixins/request'
     import { defineAsyncComponent } from 'vue'
+    import { mapState as mapPiniaState } from 'pinia';
+    import TSPlotCanvas2 from "@/components/viewers/TSViewer/TSPlotCanvas2.vue";
+import {useViewerStore} from "@/stores/viewerStore";
 
 
     export default {
         name: 'TimeseriesViewerCanvas',
 
         components:{
-            'timeseries-plot-canvas':defineAsyncComponent( () => import('@/components/viewers/TSViewer/TSPlotCanvas.vue')),
+          TSPlotCanvas2,
             'timeseries-annotation-canvas': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationCanvas.vue'))
         },
 
@@ -135,10 +138,10 @@
             ]),
             ...mapState('viewerModule', [
               'activeViewer',
-              'viewerChannels',
               'viewerActiveTool',
               'viewerAnnotations'
             ]),
+            ...mapPiniaState(useViewerStore, ['viewerChannels']),
             pHeight: function() {
                 return this.cHeight -20;
             },
@@ -188,11 +191,11 @@
                     this.$refs.plotCanvas.throttledDataRender()
                 })
             },
-            viewerChannels: function () {
-                this.$nextTick(() => {
-                    this.renderAll()
-                })
-            },
+            // viewerChannels: function () {
+            //     this.$nextTick(() => {
+            //         this.renderAll()
+            //     })
+            // },
             pointerMode: function () {
 
               this.$refs.iArea.removeAttribute('col_resize');

@@ -879,6 +879,7 @@
                                 pixelWidth: curRequest.pixelWidth,
                                 virtualChannels
                             };
+
                             const reqJson = JSON.stringify(req);
                             ws.send(reqJson);
 

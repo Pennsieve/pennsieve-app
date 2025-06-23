@@ -24,7 +24,7 @@
         ref="channelLabels"
       >
         <div
-          v-for="item in viewerChannels"
+          v-for="item in viewerStore.viewerChannels"
           :key="item.displayName"
         >
           <div
@@ -144,6 +144,9 @@
     import Request from '@/mixins/request'
     import TsAnnotation from '@/mixins/ts-annotation'
     import { defineAsyncComponent } from 'vue'
+    import {useViewerStore} from "@/stores/viewerStore";
+    import { mapStores } from 'pinia'
+
 
     export default {
         name: 'TimeseriesViewer',
@@ -180,12 +183,12 @@
         },
 
         computed: {
+            ...mapStores(useViewerStore),
             ...mapState([
                 'config',
             ]),
             ...mapState('viewerModule', [
                 'activeViewer',
-                'viewerChannels',
                 'viewerSidePanelOpen',
                 'viewerAnnotations',
                 'viewerMontageScheme'
@@ -203,7 +206,7 @@
                 return hide;
             },
             nrVisChannels: function() {
-                this.viewerChannels.reduce((accumulator, currentValue) => {
+                this.viewerStore.viewerChannels.reduce((accumulator, currentValue) => {
                   if(currentValue.visible) {
                     return accumulator + 1
                   }
@@ -225,7 +228,7 @@
                       ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
                       MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
                       PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
-                      PREFETCHPAGES: 2,           // Number of pages to read ahead of view.
+                      PREFETCHPAGES: 3,           // Number of pages to read ahead of view.
                       LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
                       USEMEDIAN: false,           // Use Median instead of mean for centering channels
                       CURSOROFFSET: 5,            // Offset of cursor canvas
@@ -251,11 +254,13 @@
                 annotationLayerWindowOpen: false,
                 annotationDelete: null,
                 isTsAnnotationDeleteDialogVisible: false,
+                viewerStore: useViewerStore()
             }
         },
 
         mounted: function () {
             //
+            this.viewerStore.setActiveViewer(this.activeViewer)
             this.initChannels()
             var style = window.getComputedStyle(document.getElementById("ts_viewer"), null);
             const hhh = parseInt(style.getPropertyValue('height'));
@@ -375,53 +380,52 @@
 
             },
             onPageBack: function() {
-              //TODO: Update logic to track gap over all channels
+              console.log('Page forward triggered from toolbar')
 
-              let setStart = this.start - (3*this.duration)/4
-              let channelOneSegments = this.viewerChannels[0].dataSegments
+              // Calculate new start position (go back by current duration)
+              const newStart = Math.max(
+                this.start - (3/4)*this.duration,
+                this.ts_start
+              )
 
-              let i = 0;
-              for(let segment in channelOneSegments) {
-                if (channelOneSegments[segment] > setStart) {
-                  break
-                }
-                i++
-              }
+              this.updateStart(newStart)
 
-              // If new page completely in gap --> set start to next timestamp with data
-              if(i % 2 == 0) {
-                setStart = channelOneSegments[i-1] - 0.5*this.duration
-              }
+              // Trigger re-render
+              this.$nextTick(() => {
+                this.$refs.viewerCanvas?.renderAll()
+              })
 
-              this.start = setStart
             },
-            onPageForward: function() {
+          onPageForward: function() {
+            console.log('Page forward triggered from toolbar')
 
-                //TODO: Update logic to track gap over all channels
-                let setStart = this.start + (3*this.duration)/4
-                let channelOneSegments = this.viewerChannels[0].dataSegments
+            // Calculate new start position
+            const newStart = Math.min(
+              this.start + (3/4)*this.duration,
+              this.ts_end - this.duration
+            )
 
-                let i = 0;
-                for(let segment in channelOneSegments) {
-                  if (channelOneSegments[segment] > setStart) {
-                    break
-                  }
-                  i++
-                }
+            console.log(`Moving from ${this.start} to ${newStart}`)
 
-                // If new page completely in gap --> set start to next timestamp with data
-                if(i % 2 == 0) {
-                  setStart = channelOneSegments[i] - 0.5*this.duration
-                }
+            // Update start position
+            this.updateStart(newStart)
 
-                this.start = setStart
-            },
+            // Force canvas to invalidate cache and fetch new data
+            this.$nextTick(() => {
+              if (this.$refs.viewerCanvas?.invalidate) {
+                this.$refs.viewerCanvas.invalidate()
+              }
+              if (this.$refs.viewerCanvas?.renderAll) {
+                this.$refs.viewerCanvas.renderAll()
+              }
+            })
+          },
             selectAnnotation: function(payload) {
               let rsPeriod = this.$refs.viewerCanvas.rsPeriod
               this.updateStart(payload.annotation.start - ((this.cursorLoc*this.cWidth - this.constants['CURSOROFFSET']) * rsPeriod))
             },
             selectChannel: function(payload) {
-              const _channels = this.viewerChannels.map(channel => {
+              const _channels = this.viewerStore.viewerChannels.map(channel => {
                 const selected = channel.selected
 
                 if (payload['append'] === false) {
