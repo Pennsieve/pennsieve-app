@@ -372,6 +372,10 @@
                 return pixelRatio * (sz + offset);
             },
             getChannelId: function(channel) {
+                return propOr('', 'id', channel)
+            },
+            getServerId: function(channel) {
+                const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 return id
             },
@@ -400,10 +404,21 @@
                             sampleFreq: curC.rate,
                             unit: curC.unit,
                             gaps: [], //channels[ic].gaps
-                            virtualId: curC.virtualId
+                            virtualId: curC.virtualId,
+                            serverId: this.getServerId(curC),
+                            dataSegments: [],
                         };
 
-                        console.log("curc" + curChannel)
+                      for (let i = 0; i < channelConfig.length; i++) {
+                        const config = channelConfig[i];
+                        const originalChannel = chObjects[i];
+
+                        // Copy segment data from the original channel data
+                        if (originalChannel.start && originalChannel.end) {
+                          config.dataSegments = [originalChannel.start, originalChannel.end];
+                        }
+                      }
+
                         const label = curChannel.label.split("<->", 3)
                         console.log("label: "+label)
 
@@ -440,7 +455,6 @@
                         chObjects.push(curChannel);
                     }
 
-                    console.log(channelConfig)
                     // channelConfig.sort(function(a, b) {
                     //
                     //     // If split into more than 2 segments, just sort on entire string
@@ -867,7 +881,7 @@
                         if (ws && ws.readyState === 1) {
 
                             const virtualChannels = curRequest.channels.map(channel => {
-                                return { id: channel.id, name: channel.label, }
+                                return { id: channel.serverId, name: channel.label, }
                             })
 
                             const req = {
@@ -1276,6 +1290,7 @@
                                     for (let i = startIndex; i < (endIndex+1); i++) {
                                       ctx.lineTo(xVec[i], yVec[i]);
                                     }
+
                                     ctx.stroke();
 
 
@@ -1528,14 +1543,19 @@
                 if (data.channelDetails) {
                   const baseChannels = this.activeViewer.channels
                   const virtualChannels = data.channelDetails.map(({ id, name }) => {
-                    const baseChannel = baseChannels.find(ch => (ch.content.id === id))
+                    console.log(id + ":" +name)
 
                     // Replace marker for montage by '-'. The montage marker is used by server to parse channel names
                     // when montaged. TODO: there is probably a cleaner way of doing this.
                     let displayName = name
+                    let baseChannel = NaN
                     if (this.viewerMontageScheme !== 'NOT_MONTAGED') {
                       const channelArr = name.split("<->", 2)
+                      baseChannel = baseChannels.find(ch => (ch.content.id === id && ch.content.name === channelArr[0]))
                       displayName = this.getDisplayName(channelArr[0], channelArr[1], this.viewerMontageScheme)
+                      console.log(baseChannel)
+                    } else {
+                      baseChannel = baseChannels.find(ch => (ch.content.id === id))
                     }
 
                     const content = {

@@ -263,597 +263,619 @@
         },
 
         methods: {
-            resetFocusedAnnotation: function() {
-              this.$refs.annCanvas.resetFocusedAnnotation()
-            },
-            createAnnotationLayer: function(newLayer) {
-                this.$refs.annCanvas.createAnnotationLayer(newLayer)
-            },
-            getNextAnnotation: function() {
-                let cursorOffset = (this.cursorLoc*this.cWidth - this.constants['CURSOROFFSET']) * this.rsPeriod
-                let nextAnn = this.$refs.annCanvas.findNextAnnotation(this.start + cursorOffset)
-                return nextAnn.start - cursorOffset
-            },
-            getPreviousAnnotation: function() {
-                let cursorOffset = (this.cursorLoc*this.cWidth - this.constants['CURSOROFFSET']) * this.rsPeriod
-                let nextAnn = this.$refs.annCanvas.findPreviousAnnotation(this.start + cursorOffset)
-                return nextAnn.start - cursorOffset
-            },
-            onUpdateAnnotation: function(annotation) {
-              this.$emit('updateAnnotation', annotation)
-            },
-            onCloseAnnotationLayerWindow: function() {
-                this.$emit('closeAnnotationLayerWindow')
-            },
-            onAnnotationsReceived: function() {
-                this.renderAll(100)
-            },
-            onAnnLayersInitialized: function() {
-                this.$emit('annLayersInitialized')
-            },
-            setGlobalZoom: function(value) {
-                this.$emit('setGlobalZoom', value)
-            },
-            channelsInitialized: function() {
-                this.$emit('channelsInitialized')
-            },
-            _onMouseWheel: function(e) {
-                e.stopPropagation();
-                e.preventDefault();
+          resetFocusedAnnotation: function () {
+            this.$refs.annCanvas.resetFocusedAnnotation()
+          },
+          createAnnotationLayer: function (newLayer) {
+            this.$refs.annCanvas.createAnnotationLayer(newLayer)
+          },
+          getNextAnnotation: function () {
+            let cursorOffset = (this.cursorLoc * this.cWidth - this.constants['CURSOROFFSET']) * this.rsPeriod
+            let nextAnn = this.$refs.annCanvas.findNextAnnotation(this.start + cursorOffset)
+            return nextAnn.start - cursorOffset
+          },
+          getPreviousAnnotation: function () {
+            let cursorOffset = (this.cursorLoc * this.cWidth - this.constants['CURSOROFFSET']) * this.rsPeriod
+            let nextAnn = this.$refs.annCanvas.findPreviousAnnotation(this.start + cursorOffset)
+            return nextAnn.start - cursorOffset
+          },
+          onUpdateAnnotation: function (annotation) {
+            this.$emit('updateAnnotation', annotation)
+          },
+          onCloseAnnotationLayerWindow: function () {
+            this.$emit('closeAnnotationLayerWindow')
+          },
+          onAnnotationsReceived: function () {
+            this.renderAll(100)
+          },
+          onAnnLayersInitialized: function () {
+            this.$emit('annLayersInitialized')
+          },
+          setGlobalZoom: function (value) {
+            this.$emit('setGlobalZoom', value)
+          },
+          channelsInitialized: function () {
+            this.$emit('channelsInitialized')
+          },
+          _onMouseWheel: function (e) {
+            e.stopPropagation();
+            e.preventDefault();
 
-                if(e.shiftKey) {
-                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                        if (e.deltaY >0) {
-                            this.$emit('setDuration', this.duration*1.1 )
-                        } else {
-                            this.$emit('setDuration', this.duration/1.1 )
-                        }
-                    }
-                }else{
-                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                        if (e.deltaY > 0 ) {
-                            this.$emit('setGlobalZoom',this.globalZoomMult*1.2);
-                        } else {
-                            this.$emit('setGlobalZoom',this.globalZoomMult/1.2);
-                        }
-                    }
-
-
-
-                }
-            },
-            _onMouseUp: function(e) {
-
-                this.resizeClicked = false;
-                this.mouseDown = false;
-
-                switch (this.pointerMode) {
-                  case 'pointer':
-                    this.clearICanvas()
-                    const append = e.metaKey;
-                    const yEnd = e.clientY - this.$refs.iArea.getBoundingClientRect().top
-                    const yStart = this.startDragCoord.y - this.$refs.iArea.getBoundingClientRect().top
-
-                    const channels = this.viewerChannels.map(channel => {
-                        if (append === false) {
-                            channel.selected = false
-                        }
-                        if( (channel.rowBaseline > yStart && channel.rowBaseline < yEnd) ||
-                                (channel.rowBaseline < yStart && channel.rowBaseline > yEnd)) {
-                                    channel.selected = true
-                        }
-
-                        return channel
-                        })
-
-                    this.$store.dispatch('viewerModule/setChannels', channels)
-                    break
-                  case 'annSelect':
-                    this.clearICanvas()
-                    this.$refs.annCanvas.selectFocusedAnn()
-                    break
-                  case 'annotate':
-                    let curLIndex = null;
-                    for (let i=0; i<this.viewerAnnotations.length; i++) {
-                      if (this.viewerAnnotations[i].selected) {
-                        curLIndex = i;
-                        break;
-                      }
-                    }
-
-                    // No layers
-                    if (curLIndex === null) {
-                      return;
-                    }
-
-                    const selectedChannels = this.$store.getters['viewerModule/viewerSelectedChannels']
-                    const allChannels = selectedChannels.length === this.viewerChannels.length || selectedChannels.length === 0
-
-                    const duration = (e.clientX - this.startDragCoord.x) * this.rsPeriod
-                    const startTime = this.startDragTimeStamp + ( (this.startDragCoord.x - this.$refs.iArea.getBoundingClientRect().left) * this.rsPeriod)
-
-                    const newAnn = {
-                      name: '',
-                      id: null,
-                      label: this.defaultLabels[this.labelSelect],
-                      description: '',
-                      start: startTime,
-                      duration: duration,
-                      end: startTime + duration,
-                      cStart: null,
-                      cEnd: null,
-                      selected: true,
-                      channelIds: selectedChannels,
-                      allChannels: allChannels,
-                      layer_id: this.viewerAnnotations[curLIndex].id,
-                      userId: null
-                    };
-
-                    this.$store.dispatch('viewerModule/setActiveAnnotation', newAnn)
-
-                    this.$emit("addAnnotation", startTime, duration, allChannels, this.defaultLabels[this.labelSelect], '', this.viewerAnnotations[curLIndex] )
-                    break;
-                  case 'annResize-left':
-                  case 'annResize-right':
-                    this.$refs.annCanvas.onMouseUp()
-                }
-            },
-            clearICanvas: function() {
-              const iCanvas = this.$refs.iArea;
-              const ctx = iCanvas.getContext('2d');
-              ctx.clearRect(0, 0, this.cWidth, this.cHeight);
-            },
-            _onMouseDown: function(evt) {
-                this.mouseDown = true;
-                this.startDragTimeStamp = this.start
-                const cCoord = this.$refs.iArea.getBoundingClientRect();
-                this.startDragCoord.x = evt.clientX
-                this.startDragCoord.y = evt.clientY
-
-                switch(this.pointerMode) {
-                    case 'annResize-left':
-                    case 'annResize-right':
-                        this.resizeClicked = true
-                        this.$refs.annCanvas.onMouseDown(evt.clientX - cCoord.left, evt.clientY - cCoord.top)
-                        break;
-                }
-            },
-            _onMouseOut: function(e) {
-                this.mouseDown = false;
-            },
-            _onMouseEnter: function(e) {
-                if (e.buttons === 1) {
-                    this.mouseDown = true;
+            if (e.shiftKey) {
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                if (e.deltaY > 0) {
+                  this.$emit('setDuration', this.duration * 1.1)
                 } else {
-                    this.mouseDown = false;
+                  this.$emit('setDuration', this.duration / 1.1)
                 }
-
-            },
-            _onMouseMove: function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const cCoord = this.$refs.iArea.getBoundingClientRect();
-                const mY = e.clientY - cCoord.top;
-                const mX = e.clientX - cCoord.left;
-
-                switch (this.viewerActiveTool) {
-                    case 'pan':
-                        if( this.mouseDown){
-                            // Update StartTime and get new data
-                            const setStart = this.startDragTimeStamp - ((e.clientX-this.startDragCoord.x) * this.rsPeriod);
-                            this.$emit('setStart', setStart)
-                        } else {
-                          this.pointerMode = this.$refs.annCanvas.onMouseMove(mX,mY, this.pointerMode, this.mouseDown)
-                        }
-
-                        break;
-                    case 'pointer':
-                        if( this.mouseDown){
-                            this.renderSelectBox(e.clientX, e.clientY);
-                        } else {
-                          this.pointerMode = this.$refs.annCanvas.onMouseMove(mX,mY, this.pointerMode , this.mouseDown)
-                        }
-
-                        break;
-                    case 'annotate':
-                      if( this.mouseDown && this.pointerMode == 'annotate') {
-                        this.renderAnnotationBox(e.clientX)
-                      } else if (this.mouseDown && ['annResize-left', 'annResize-right'].includes(this.pointerMode))  {
-                        this.pointerMode = this.$refs.annCanvas.onMouseMove(mX,mY, this.pointerMode, this.mouseDown)
-                        this.renderAll()
-                      } else {
-                        this.pointerMode = this.$refs.annCanvas.onMouseMove(mX,mY, this.pointerMode, this.mouseDown)
-                      }
-
-                      break;
+              }
+            } else {
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                if (e.deltaY > 0) {
+                  this.$emit('setGlobalZoom', this.globalZoomMult * 1.2);
+                } else {
+                  this.$emit('setGlobalZoom', this.globalZoomMult / 1.2);
                 }
-            },
-            resize: function() {
-                this.updateRsPeriod(this.cWidth, this.duration)
-                this.renderAll(25)
+              }
 
-            },
-            updateRsPeriod: function(w, d) {
-                const oldRs = this.rsPeriod;
-                const newPeriod = (d / w);
-                if (newPeriod !== oldRs) {
-                    this.invalidateCache = true;
-                    this.lastRsUpdate = Date.now();
-                    this.rsPeriod = newPeriod;
-                    this.pageSize = Math.floor(this.duration / this.constants['PAGESIZEDIVIDER']);
-                }
-            },
-            _cpCanvasScaler: function(sz, pixelRatio, offset) {
-                return pixelRatio * (sz + offset);
-            },
-            renderAll: function(delay, requestLeadingEdge = true) {
-                if (!this.renderFnc || delay !== this.renderThrottle || this.requestLeadingEdge !== requestLeadingEdge) {
-                    this.renderFnc = this.throttle(this._renderAll, delay, {leading: requestLeadingEdge} );
-                    this.renderThrottle = delay;
-                    this.requestLeadingEdge = requestLeadingEdge;
-                }
-                this.renderFnc(this);
-            },
-            // Returns a function, that, when invoked, will only be triggered at most once
-            // during a given window of time. Normally, the throttled function will run
-            // as much as it can, without ever going more than once per `wait` duration;
-            // but if you'd like to disable the execution on the leading edge, pass
-            // `{leading: false}`. To disable execution on the trailing edge, ditto.
-            throttle: function(func, wait, options) {
-                let context;
-                let args;
-                let result;
-                let timeout = null;
-                let previous = 0;
-                if (!options) options = {};
-                const later = function() {
-                    previous = options.leading === false ? 0 : Date.now();
-                    timeout = null;
-                    result = func.apply(context, args);
-                    if (!timeout) context = args = null;
-                };
-                return function() {
-                    const now = Date.now();
-                    if (!previous && options.leading === false) previous = now;
-                    const remaining = wait - (now - previous);
-                    context = this;
-                    args = arguments;
-                    if (remaining <= 0 || remaining > wait) {
-                    if (timeout) {
-                        clearTimeout(timeout);
-                        timeout = null;
-                    }
-                    previous = now;
-                    result = func.apply(context, args);
-                    if (!timeout) context = args = null;
-                    } else if (!timeout && options.trailing !== false) {
-                    timeout = setTimeout(later, remaining);
-                    }
-                    return result;
-                };
-            },
-            renderAnnotationCanvas: function() {
-              this.clearICanvas()
-              this.$refs.annCanvas.render()
-            },
-            _renderAll: function() {
-                this.$nextTick(() => {
-                    this._renderAxis();
-                    this._renderCursor();
-                    this.$refs.plotCanvas.renderAll()
-                    this.$refs.annCanvas.render()
+
+            }
+          },
+          _onMouseUp: function (e) {
+
+            this.resizeClicked = false;
+            this.mouseDown = false;
+
+            switch (this.pointerMode) {
+              case 'pointer':
+                this.clearICanvas()
+                const append = e.metaKey;
+                const yEnd = e.clientY - this.$refs.iArea.getBoundingClientRect().top
+                const yStart = this.startDragCoord.y - this.$refs.iArea.getBoundingClientRect().top
+
+                const channels = this.viewerChannels.map(channel => {
+                  if (append === false) {
+                    channel.selected = false
+                  }
+                  if ((channel.rowBaseline > yStart && channel.rowBaseline < yEnd) ||
+                    (channel.rowBaseline < yStart && channel.rowBaseline > yEnd)) {
+                    channel.selected = true
+                  }
+
+                  return channel
                 })
 
-            },
-           // Render the X and Y axis, and time ticks
-            _renderAxis: function() {
-                const pa = this.$refs.axisArea;
-                const ctx = pa.getContext('2d');
-                ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-
-                // clear canvas
-                ctx.clearRect(0, 0, this.cWidth, this.cHeight);
-                ctx.stroke();
-                // render side/bottom line
-                ctx.beginPath();
-                ctx.lineWidth = 1;
-                ctx.moveTo(this.constants.XOFFSET+0.5, 0.5);
-                ctx.lineTo(this.constants.XOFFSET+0.5, (this.pHeight +0.5));
-                ctx.lineTo(this.cWidth+0.5, (this.pHeight+0.5));
-                ctx.stroke();
-
-                // Render y-ticks
-                let tickOffset = (((this.pHeight/(2*this.nrVisibleChannels))+0.5)<<1)>>1;
-                ctx.lineWidth=0.5;
-                for (let i = 0; i< this.nrVisibleChannels; i++) {
-
-                    ctx.beginPath();
-                    ctx.moveTo(this.constants.XOFFSET - 2, tickOffset);
-                    ctx.lineTo(this.constants.XOFFSET + 2, tickOffset);
-                    ctx.stroke();
-                    tickOffset += this.pHeight/this.nrVisibleChannels;
+                this.$store.dispatch('viewerModule/setChannels', channels)
+                break
+              case 'annSelect':
+                this.clearICanvas()
+                this.$refs.annCanvas.selectFocusedAnn()
+                break
+              case 'annotate':
+                let curLIndex = null;
+                for (let i = 0; i < this.viewerAnnotations.length; i++) {
+                  if (this.viewerAnnotations[i].selected) {
+                    curLIndex = i;
+                    break;
+                  }
                 }
 
-
-                // --- --- --- --- ---
-                // Render x-ticks
-                const gridSpacing = this.constants['XGRIDSPACING'] * Math.ceil(this.duration / 100000000);
-                const nrGridLines = Math.ceil(this.duration / gridSpacing) + 1;
-                const labelDecimator = Math.ceil( this.constants['NRPXPERLABEL'] / (gridSpacing / this.rsPeriod));
-                let curXLabelIdx = 1;
-
-                // XLOC1 is time to first timeIndicator line
-                const xLoc1 = (gridSpacing - (this.start % gridSpacing) ) % gridSpacing;
-
-                // Iterate over all potential time-lines
-                for(let i = 0; i < nrGridLines; i++) {
-
-                    // actual time of the timeline = canvas start time + xLoc1 time
-                    let realX = this.start + xLoc1 + i * gridSpacing;
-                    if (realX > this.tsEnd) {
-                        break;
-                    }
-
-                    // curLoc is pixel coordinates of realX
-                    const realOffset = realX - this.start;
-                    const curLoc = ( this.constants['XOFFSET'] + (realOffset / this.rsPeriod) );
-                    const roundedCurLoc = Math.round(curLoc);
-
-                    if (roundedCurLoc > 1) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.lineWidth=0.5;
-                        ctx.strokeStyle='rgb(235,235,235)';
-                        ctx.moveTo(roundedCurLoc + 0.5, 0.5);
-                        ctx.lineTo(roundedCurLoc+ 0.5, this.pHeight -0.5);
-                        ctx.stroke();
-                        ctx.restore();
-
-                        // Render X-Label when appropriate
-                        const test = (((realX / gridSpacing) + gridSpacing / 10) % labelDecimator) |0;
-                        if( test === 1 || labelDecimator === 1 ) {
-
-                            ctx.beginPath();
-                            ctx.lineWidth = 1;
-                            ctx.moveTo(roundedCurLoc+ 0.5, this.pHeight - 3);
-                            ctx.lineTo(roundedCurLoc+ 0.5, this.pHeight + 3);
-                            ctx.stroke();
-
-                            const d = new Date(realX/1000);
-                            ctx.font = '12px sans-serif';
-                            ctx.fillStyle = 'rgb(150,150,150)';
-                            ctx.fillText(this.getUTCTimeString(d), roundedCurLoc - 20.5, this.cHeight-0.2);
-
-                            curXLabelIdx = curXLabelIdx + 1;
-                        }
-                    }
+                // No layers
+                if (curLIndex === null) {
+                  return;
                 }
-            },
-            // Render the selection box on click-drag using point for selecting channels
-            renderSelectBox: function(curX, curY) {
-                const iCanvas = this.$refs.iArea;
-                const ctx = iCanvas.getContext('2d');
-                ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
-                ctx.clearRect(0, 0, this.cWidth, this.cHeight);
+                const selectedChannels = this.$store.getters['viewerModule/viewerSelectedChannels']
+                const allChannels = selectedChannels.length === this.viewerChannels.length || selectedChannels.length === 0
 
-                ctx.beginPath();
-                ctx.lineWidth=2;
-                ctx.strokeStyle='#295eff';
-                ctx.setLineDash([5, 5, 15, 5]);
+                const duration = (e.clientX - this.startDragCoord.x) * this.rsPeriod
+                const startTime = this.startDragTimeStamp + ((this.startDragCoord.x - this.$refs.iArea.getBoundingClientRect().left) * this.rsPeriod)
 
-                const xStart = curX - iCanvas.getBoundingClientRect().left;
-                const yStart = curY - iCanvas.getBoundingClientRect().top;
+                const newAnn = {
+                  name: '',
+                  id: null,
+                  label: this.defaultLabels[this.labelSelect],
+                  description: '',
+                  start: startTime,
+                  duration: duration,
+                  end: startTime + duration,
+                  cStart: null,
+                  cEnd: null,
+                  selected: true,
+                  channelIds: selectedChannels,
+                  allChannels: allChannels,
+                  layer_id: this.viewerAnnotations[curLIndex].id,
+                  userId: null
+                };
 
-                ctx.rect(xStart, yStart, -curX+this.startDragCoord.x, -curY+this.startDragCoord.y);
-                ctx.stroke();
-            },
-            _renderCursor: function() {
-                // --- --- --- --- ---
-                // Render cursor
+                this.$store.dispatch('viewerModule/setActiveAnnotation', newAnn)
 
-                const pa = this.$refs.cursorArea;
-                const ctx = pa.getContext('2d');
-                ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-                ctx.clearRect(0, 0, (this.cWidth + this.constants['CURSOROFFSET']), this.cHeight);
+                this.$emit("addAnnotation", startTime, duration, allChannels, this.defaultLabels[this.labelSelect], '', this.viewerAnnotations[curLIndex])
+                break;
+              case 'annResize-left':
+              case 'annResize-right':
+                this.$refs.annCanvas.onMouseUp()
+            }
+          },
+          clearICanvas: function () {
+            const iCanvas = this.$refs.iArea;
+            const ctx = iCanvas.getContext('2d');
+            ctx.clearRect(0, 0, this.cWidth, this.cHeight);
+          },
+          _onMouseDown: function (evt) {
+            this.mouseDown = true;
+            this.startDragTimeStamp = this.start
+            const cCoord = this.$refs.iArea.getBoundingClientRect();
+            this.startDragCoord.x = evt.clientX
+            this.startDragCoord.y = evt.clientY
 
-                ctx.save()
-                ctx.beginPath();
-                ctx.fillStyle = 'red';
-                const cCursorLoc = this.cursorLoc * this.cWidth
-                if (cCursorLoc > this.constants['CURSOROFFSET']) {
-                    ctx.strokeStyle = 'red';
-                    ctx.moveTo(cCursorLoc, 0);
-                    ctx.lineTo(cCursorLoc, this.pHeight);
-                    ctx.stroke();
+            switch (this.pointerMode) {
+              case 'annResize-left':
+              case 'annResize-right':
+                this.resizeClicked = true
+                this.$refs.annCanvas.onMouseDown(evt.clientX - cCoord.left, evt.clientY - cCoord.top)
+                break;
+            }
+          },
+          _onMouseOut: function (e) {
+            this.mouseDown = false;
+          },
+          _onMouseEnter: function (e) {
+            if (e.buttons === 1) {
+              this.mouseDown = true;
+            } else {
+              this.mouseDown = false;
+            }
+
+          },
+          _onMouseMove: function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const cCoord = this.$refs.iArea.getBoundingClientRect();
+            const mY = e.clientY - cCoord.top;
+            const mX = e.clientX - cCoord.left;
+
+            switch (this.viewerActiveTool) {
+              case 'pan':
+                if (this.mouseDown) {
+                  // Update StartTime and get new data
+                  const setStart = this.startDragTimeStamp - ((e.clientX - this.startDragCoord.x) * this.rsPeriod);
+                  this.$emit('setStart', setStart)
                 } else {
-                    ctx.moveTo(cCursorLoc, this.pHeight);
+                  this.pointerMode = this.$refs.annCanvas.onMouseMove(mX, mY, this.pointerMode, this.mouseDown)
                 }
 
-                ctx.beginPath();
-                ctx.lineTo(cCursorLoc - 5, this.pHeight + 8);
-                ctx.lineTo(cCursorLoc + 5, this.pHeight + 8);
-                ctx.lineTo(cCursorLoc, this.pHeight );
-                ctx.fill();
+                break;
+              case 'pointer':
+                if (this.mouseDown) {
+                  this.renderSelectBox(e.clientX, e.clientY);
+                } else {
+                  this.pointerMode = this.$refs.annCanvas.onMouseMove(mX, mY, this.pointerMode, this.mouseDown)
+                }
 
+                break;
+              case 'annotate':
+                if (this.mouseDown && this.pointerMode == 'annotate') {
+                  this.renderAnnotationBox(e.clientX)
+                } else if (this.mouseDown && ['annResize-left', 'annResize-right'].includes(this.pointerMode)) {
+                  this.pointerMode = this.$refs.annCanvas.onMouseMove(mX, mY, this.pointerMode, this.mouseDown)
+                  this.renderAll()
+                } else {
+                  this.pointerMode = this.$refs.annCanvas.onMouseMove(mX, mY, this.pointerMode, this.mouseDown)
+                }
+
+                break;
+            }
+          },
+          resize: function () {
+            this.updateRsPeriod(this.cWidth, this.duration)
+            this.renderAll(25)
+
+          },
+          updateRsPeriod: function (w, d) {
+            const oldRs = this.rsPeriod;
+            const newPeriod = (d / w);
+            if (newPeriod !== oldRs) {
+              this.invalidateCache = true;
+              this.lastRsUpdate = Date.now();
+              this.rsPeriod = newPeriod;
+              this.pageSize = Math.floor(this.duration / this.constants['PAGESIZEDIVIDER']);
+            }
+          },
+          _cpCanvasScaler: function (sz, pixelRatio, offset) {
+            return pixelRatio * (sz + offset);
+          },
+          renderAll: function (delay, requestLeadingEdge = true) {
+            if (!this.renderFnc || delay !== this.renderThrottle || this.requestLeadingEdge !== requestLeadingEdge) {
+              this.renderFnc = this.throttle(this._renderAll, delay, {leading: requestLeadingEdge});
+              this.renderThrottle = delay;
+              this.requestLeadingEdge = requestLeadingEdge;
+            }
+            this.renderFnc(this);
+          },
+          // Returns a function, that, when invoked, will only be triggered at most once
+          // during a given window of time. Normally, the throttled function will run
+          // as much as it can, without ever going more than once per `wait` duration;
+          // but if you'd like to disable the execution on the leading edge, pass
+          // `{leading: false}`. To disable execution on the trailing edge, ditto.
+          throttle: function (func, wait, options) {
+            let context;
+            let args;
+            let result;
+            let timeout = null;
+            let previous = 0;
+            if (!options) options = {};
+            const later = function () {
+              previous = options.leading === false ? 0 : Date.now();
+              timeout = null;
+              result = func.apply(context, args);
+              if (!timeout) context = args = null;
+            };
+            return function () {
+              const now = Date.now();
+              if (!previous && options.leading === false) previous = now;
+              const remaining = wait - (now - previous);
+              context = this;
+              args = arguments;
+              if (remaining <= 0 || remaining > wait) {
+                if (timeout) {
+                  clearTimeout(timeout);
+                  timeout = null;
+                }
+                previous = now;
+                result = func.apply(context, args);
+                if (!timeout) context = args = null;
+              } else if (!timeout && options.trailing !== false) {
+                timeout = setTimeout(later, remaining);
+              }
+              return result;
+            };
+          },
+          renderAnnotationCanvas: function () {
+            this.clearICanvas()
+            this.$refs.annCanvas.render()
+          },
+          _renderAll: function () {
+            this.$nextTick(() => {
+              this._renderAxis();
+              this._renderCursor();
+              this.$refs.plotCanvas.renderAll()
+              this.$refs.annCanvas.render()
+            })
+
+          },
+          // Render the X and Y axis, and time ticks
+          _renderAxis: function () {
+            const pa = this.$refs.axisArea;
+            const ctx = pa.getContext('2d');
+            ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+
+            // clear canvas
+            ctx.clearRect(0, 0, this.cWidth, this.cHeight);
+            ctx.stroke();
+            // render side/bottom line
+            ctx.beginPath();
+            ctx.lineWidth = 1;
+            ctx.moveTo(this.constants.XOFFSET + 0.5, 0.5);
+            ctx.lineTo(this.constants.XOFFSET + 0.5, (this.pHeight + 0.5));
+            ctx.lineTo(this.cWidth + 0.5, (this.pHeight + 0.5));
+            ctx.stroke();
+
+            // Render y-ticks
+            let tickOffset = (((this.pHeight / (2 * this.nrVisibleChannels)) + 0.5) << 1) >> 1;
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < this.nrVisibleChannels; i++) {
+
+              ctx.beginPath();
+              ctx.moveTo(this.constants.XOFFSET - 2, tickOffset);
+              ctx.lineTo(this.constants.XOFFSET + 2, tickOffset);
+              ctx.stroke();
+              tickOffset += this.pHeight / this.nrVisibleChannels;
+            }
+
+
+            // --- --- --- --- ---
+            // Render x-ticks
+            const gridSpacing = this.constants['XGRIDSPACING'] * Math.ceil(this.duration / 100000000);
+            const nrGridLines = Math.ceil(this.duration / gridSpacing) + 1;
+            const labelDecimator = Math.ceil(this.constants['NRPXPERLABEL'] / (gridSpacing / this.rsPeriod));
+            let curXLabelIdx = 1;
+
+            // XLOC1 is time to first timeIndicator line
+            const xLoc1 = (gridSpacing - (this.start % gridSpacing)) % gridSpacing;
+
+            // Iterate over all potential time-lines
+            for (let i = 0; i < nrGridLines; i++) {
+
+              // actual time of the timeline = canvas start time + xLoc1 time
+              let realX = this.start + xLoc1 + i * gridSpacing;
+              if (realX > this.tsEnd) {
+                break;
+              }
+
+              // curLoc is pixel coordinates of realX
+              const realOffset = realX - this.start;
+              const curLoc = (this.constants['XOFFSET'] + (realOffset / this.rsPeriod));
+              const roundedCurLoc = Math.round(curLoc);
+
+              if (roundedCurLoc > 1) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.lineWidth = 0.5;
+                ctx.strokeStyle = 'rgb(235,235,235)';
+                ctx.moveTo(roundedCurLoc + 0.5, 0.5);
+                ctx.lineTo(roundedCurLoc + 0.5, this.pHeight - 0.5);
+                ctx.stroke();
                 ctx.restore();
-            },
-            // Render an annotation during dragging mouse while creating annotation
-            renderAnnotationBox: function(curX) {
-              const iCanvas = this.$refs.iArea
-              const ctx = iCanvas.getContext('2d');
-              ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+
+                // Render X-Label when appropriate
+                const test = (((realX / gridSpacing) + gridSpacing / 10) % labelDecimator) | 0;
+                if (test === 1 || labelDecimator === 1) {
+
+                  ctx.beginPath();
+                  ctx.lineWidth = 1;
+                  ctx.moveTo(roundedCurLoc + 0.5, this.pHeight - 3);
+                  ctx.lineTo(roundedCurLoc + 0.5, this.pHeight + 3);
+                  ctx.stroke();
+
+                  const d = new Date(realX / 1000);
+                  ctx.font = '12px sans-serif';
+                  ctx.fillStyle = 'rgb(150,150,150)';
+                  ctx.fillText(this.getUTCTimeString(d), roundedCurLoc - 20.5, this.cHeight - 0.2);
+
+                  curXLabelIdx = curXLabelIdx + 1;
+                }
+              }
+            }
+          },
+          // Render the selection box on click-drag using point for selecting channels
+          renderSelectBox: function (curX, curY) {
+            const iCanvas = this.$refs.iArea;
+            const ctx = iCanvas.getContext('2d');
+            ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+
+            ctx.clearRect(0, 0, this.cWidth, this.cHeight);
+
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#295eff';
+            ctx.setLineDash([5, 5, 15, 5]);
+
+            const xStart = curX - iCanvas.getBoundingClientRect().left;
+            const yStart = curY - iCanvas.getBoundingClientRect().top;
+
+            ctx.rect(xStart, yStart, -curX + this.startDragCoord.x, -curY + this.startDragCoord.y);
+            ctx.stroke();
+          },
+          _renderCursor: function () {
+            // --- --- --- --- ---
+            // Render cursor
+
+            const pa = this.$refs.cursorArea;
+            const ctx = pa.getContext('2d');
+            ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+            ctx.clearRect(0, 0, (this.cWidth + this.constants['CURSOROFFSET']), this.cHeight);
+
+            ctx.save()
+            ctx.beginPath();
+            ctx.fillStyle = 'red';
+            const cCursorLoc = this.cursorLoc * this.cWidth
+            if (cCursorLoc > this.constants['CURSOROFFSET']) {
+              ctx.strokeStyle = 'red';
+              ctx.moveTo(cCursorLoc, 0);
+              ctx.lineTo(cCursorLoc, this.pHeight);
+              ctx.stroke();
+            } else {
+              ctx.moveTo(cCursorLoc, this.pHeight);
+            }
+
+            ctx.beginPath();
+            ctx.lineTo(cCursorLoc - 5, this.pHeight + 8);
+            ctx.lineTo(cCursorLoc + 5, this.pHeight + 8);
+            ctx.lineTo(cCursorLoc, this.pHeight);
+            ctx.fill();
+
+            ctx.restore();
+          },
+          // Render an annotation during dragging mouse while creating annotation
+          renderAnnotationBox: function (curX) {
+            const iCanvas = this.$refs.iArea
+            const ctx = iCanvas.getContext('2d');
+            ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
 
-              const annotationHeight = this.constants['ANNOTATIONLABELHEIGHT'];
-              const halfAnnotationHeight = (annotationHeight/2) |0;
+            const annotationHeight = this.constants['ANNOTATIONLABELHEIGHT'];
+            const halfAnnotationHeight = (annotationHeight / 2) | 0;
 
-              // Find active layer
-              let curLIndex = null;
-              for (let i=0; i<this.viewerAnnotations.length; i++) {
-                if (this.viewerAnnotations[i].selected) {
-                  curLIndex = i;
-                  break;
+            // Find active layer
+            let curLIndex = null;
+            for (let i = 0; i < this.viewerAnnotations.length; i++) {
+              if (this.viewerAnnotations[i].selected) {
+                curLIndex = i;
+                break;
+              }
+            }
+
+            // No active Layers
+            if (curLIndex === null) {
+              return;
+            }
+
+            ctx.save();
+            ctx.clearRect(0, 0, this.cWidth, this.cHeight);
+            ctx.lineWidth = 1;
+
+            // Determine if the user is adding annotation to specific channels
+            const selectedChannels = this.$store.getters['viewerModule/viewerSelectedChannels']
+            const allChannels = selectedChannels.length === this.viewerChannels.length || selectedChannels.length === 0
+
+            const xStart = curX - iCanvas.getBoundingClientRect().left;
+            const dx = -curX + this.startDragCoord.x
+
+            if (allChannels) {
+              ctx.fillStyle = 'rgba(0,0,0,0.1)';
+              ctx.fillRect(xStart, 0, dx, this.pHeight);
+
+              ctx.fillStyle = this.viewerAnnotations[curLIndex].color;
+              ctx.strokeStyle = ctx.fillStyle;
+
+              let lblStart = xStart - 1;
+              let lblEnd = dx + 2;
+              if (dx < 0) {
+                lblStart = xStart + 1;
+                lblEnd = dx - 2;
+              }
+
+              ctx.fillRect(lblStart, 0, lblEnd, annotationHeight);
+
+              ctx.setLineDash([5, 5, 5, 5]);
+              ctx.beginPath();
+              ctx.moveTo(xStart, annotationHeight);
+              ctx.lineTo(xStart, this.pHeight);
+              ctx.stroke();
+
+              ctx.beginPath();
+              ctx.moveTo(xStart + dx, annotationHeight);
+              ctx.lineTo(xStart + dx, this.pHeight);
+              ctx.stroke();
+            } else {
+
+              let minOffset = this.cHeight | 0;
+              let maxOffset = 0;
+              const channelConfig = this.viewerChannels;
+
+              ctx.fillStyle = this.viewerAnnotations[curLIndex].color;
+              ctx.strokeStyle = ctx.fillStyle;
+
+              let lblStart = xStart - 1;
+              let lblEnd = dx + 2;
+              if (dx < 0) {
+                lblStart = xStart + 1;
+                lblEnd = dx - 2;
+              }
+
+              for (let ch = 0; ch < channelConfig.length; ch++) {
+                const curChannelView = channelConfig[ch];
+                if (curChannelView.selected && curChannelView.visible) {
+                  const channelOffset = curChannelView.rowBaseline | 0;
+                  if (channelOffset < minOffset) {
+                    minOffset = channelOffset;
+                  }
+                  if (channelOffset > maxOffset) {
+                    maxOffset = channelOffset;
+                  }
+
+                  ctx.fillRect(lblStart, channelOffset - halfAnnotationHeight, lblEnd, annotationHeight);
+
                 }
               }
 
-              // No active Layers
-              if (curLIndex === null) {
+              ctx.fillStyle = 'rgba(0,0,0,0.1)';
+              ctx.setLineDash([5, 5, 5, 5]);
+
+              ctx.fillRect(xStart - 1, minOffset + halfAnnotationHeight,
+                dx + 2, maxOffset - minOffset - annotationHeight);
+              ctx.beginPath();
+              ctx.moveTo(xStart, minOffset + halfAnnotationHeight);
+              ctx.lineTo(xStart, maxOffset - halfAnnotationHeight);
+              ctx.moveTo(xStart + dx, minOffset + halfAnnotationHeight);
+              ctx.lineTo(xStart + dx, maxOffset - halfAnnotationHeight);
+              ctx.stroke();
+
+
+            }
+            ctx.restore();
+          },
+          getScreenPixelRatio: function () {
+            let ctx = this.$refs.iArea.getContext('2d');
+            let dpr = window.devicePixelRatio || 1
+            let bsr = ctx.webkitBackingStorePixelRatio ||
+              ctx.mozBackingStorePixelRatio ||
+              ctx.msBackingStorePixelRatio ||
+              ctx.oBackingStorePixelRatio ||
+              ctx.backingStorePixelRatio || 1;
+
+            return dpr / bsr;
+          },
+          getUTCTimeString: function (d) {
+            return (('0' + d.getUTCHours()).slice(-2) + ':' +
+              ('0' + d.getUTCMinutes()).slice(-2) + ':' + ('0' + d.getUTCSeconds()).slice(-2));
+          },
+          setFilters: function (payload) {
+            let input0 = parseFloat(payload.input0)
+            let input1 = parseFloat(payload.input1)
+
+            // Convert virtual channel IDs to server IDs for montaged channels
+            const serverChannelIds = payload.selChannels.map(channelId => {
+              const channel = find(propEq('id', channelId), this.viewerChannels);
+              if (channel && this.viewerMontageScheme !== 'NOT_MONTAGED') {
+                // Extract base channel ID from virtual ID (remove channel name part)
+                const idParts = channelId.split('_');
+                return idParts.length > 1 ? idParts[0] : channelId;
+              }
+              return channelId;
+            });
+
+            let message = {};
+            switch (payload.filterType) {
+              case 'clear':
+                message = {'channelFiltersToClear': serverChannelIds}; // ← Use serverChannelIds
+                break;
+              case 'bandpass':
+                let bp_center = (input0 + input1) / 2;
+                let bp_width = Math.abs((input1 - input0) / 2)
+                message = {
+                  'filter': payload.filterType,
+                  'filterParameters': [4, bp_center, bp_width],
+                  'channels': serverChannelIds
+                }; // ← Use serverChannelIds
+                break;
+              case 'highpass':
+                message = {'filter': payload.filterType, 'filterParameters': [4, input0], 'channels': serverChannelIds}; // ← Use serverChannelIds
+                break;
+              case 'lowpass':
+                message = {'filter': payload.filterType, 'filterParameters': [4, input0], 'channels': serverChannelIds}; // ← Use serverChannelIds
+                break;
+              case 'bandstop':
+                let bs_width = 10;
+                const bs_center = payload.notchFreq;
+                message = {
+                  'filter': payload.filterType,
+                  'filterParameters': [4, bs_center, bs_width],
+                  'channels': serverChannelIds
+                }; // ← Use serverChannelIds
+                break;
+              default:
                 return;
-              }
+            }
 
-              ctx.save();
-              ctx.clearRect(0, 0, this.cWidth, this.cHeight);
-              ctx.lineWidth = 1;
+            this.$refs.plotCanvas.sendFilterMessage(message)
 
-              // Determine if the user is adding annotation to specific channels
-              const selectedChannels = this.$store.getters['viewerModule/viewerSelectedChannels']
-              const allChannels = selectedChannels.length === this.viewerChannels.length || selectedChannels.length === 0
+            // Keep the rest of the method the same - use original virtual IDs for local state
+            for (let i = 0; i < payload.selChannels.length; i++) {
+              let channelId = payload.selChannels[i]
+              let channel = find(propEq('id', channelId), this.viewerChannels)
 
-              const xStart = curX - iCanvas.getBoundingClientRect().left;
-              const dx = -curX + this.startDragCoord.x
-
-              if (allChannels) {
-                ctx.fillStyle = 'rgba(0,0,0,0.1)';
-                ctx.fillRect(xStart, 0, dx, this.pHeight);
-
-                ctx.fillStyle = this.viewerAnnotations[curLIndex].color;
-                ctx.strokeStyle = ctx.fillStyle;
-
-                let lblStart = xStart -1;
-                let lblEnd = dx +2;
-                if (dx < 0) {
-                  lblStart = xStart +1;
-                  lblEnd = dx-2;
-                }
-
-                ctx.fillRect(lblStart, 0, lblEnd, annotationHeight);
-
-                ctx.setLineDash([5, 5, 5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(xStart, annotationHeight);
-                ctx.lineTo(xStart, this.pHeight );
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.moveTo(xStart+dx, annotationHeight);
-                ctx.lineTo(xStart+dx, this.pHeight );
-                ctx.stroke();
+              if (payload.filterType === 'clear') {
+                channel.filter = {}
               } else {
-
-                let minOffset = this.cHeight | 0;
-                let maxOffset = 0;
-                const channelConfig = this.viewerChannels;
-
-                ctx.fillStyle = this.viewerAnnotations[curLIndex].color;
-                ctx.strokeStyle=ctx.fillStyle;
-
-                let lblStart = xStart -1;
-                let lblEnd = dx +2;
-                if (dx < 0) {
-                  lblStart = xStart +1;
-                  lblEnd = dx-2;
+                channel.filter = {
+                  type: payload.filterType,
+                  input0: input0,
+                  input1: input1,
+                  notchFreq: payload.notchFreq
                 }
-
-                for (let ch=0; ch< channelConfig.length; ch++) {
-                  const curChannelView = channelConfig[ch];
-                  if(curChannelView.selected && curChannelView.visible) {
-                    const channelOffset = curChannelView.rowBaseline |0;
-                    if (channelOffset < minOffset) { minOffset = channelOffset; }
-                    if (channelOffset > maxOffset) { maxOffset = channelOffset; }
-
-                    ctx.fillRect(lblStart, channelOffset - halfAnnotationHeight, lblEnd, annotationHeight);
-
-                  }
-                }
-
-                ctx.fillStyle = 'rgba(0,0,0,0.1)';
-                ctx.setLineDash([5, 5, 5, 5]);
-
-                ctx.fillRect(xStart -1, minOffset+halfAnnotationHeight,
-                  dx +2, maxOffset-minOffset -annotationHeight);
-                ctx.beginPath();
-                ctx.moveTo(xStart, minOffset +halfAnnotationHeight);
-                ctx.lineTo(xStart, maxOffset-halfAnnotationHeight );
-                ctx.moveTo(xStart+dx, minOffset +halfAnnotationHeight);
-                ctx.lineTo(xStart+dx, maxOffset -halfAnnotationHeight);
-                ctx.stroke();
-
-
               }
-              ctx.restore();
-            },
-            getScreenPixelRatio: function() {
-                let ctx = this.$refs.iArea.getContext('2d');
-                let dpr = window.devicePixelRatio || 1
-                let bsr = ctx.webkitBackingStorePixelRatio ||
-                ctx.mozBackingStorePixelRatio ||
-                ctx.msBackingStorePixelRatio ||
-                ctx.oBackingStorePixelRatio ||
-                ctx.backingStorePixelRatio || 1;
+              this.$store.dispatch('viewerModule/updateChannel', channel)
+            }
 
-                return dpr / bsr;
-            },
-            getUTCTimeString: function(d) {
-                return ( ('0' + d.getUTCHours()).slice(-2) + ':' +
-                    ('0' + d.getUTCMinutes()).slice(-2) + ':' + ('0' + d.getUTCSeconds()).slice(-2) );
-            },
-            setFilters: function(payload) {
-
-                  let input0 = parseFloat(payload.input0)
-                  let input1 = parseFloat(payload.input1)
-                  let message = {};
-                      switch (payload.filterType) {
-                          case 'clear':
-                              message = {'channelFiltersToClear':payload.selChannels};
-                              break;
-                          case 'bandpass':
-                              let bp_center = (input0 + input1) / 2;
-                              let bp_width = Math.abs( (input1 - input0) / 2 )
-                              message = {'filter':payload.filterType, 'filterParameters': [4, bp_center, bp_width], 'channels':payload.selChannels};
-                              break;
-                          case 'highpass':
-                              message = {'filter':payload.filterType, 'filterParameters': [4, input0], 'channels':payload.selChannels};
-                              break;
-                          case 'lowpass':
-                              message = {'filter':payload.filterType, 'filterParameters': [4, input0], 'channels':payload.selChannels};
-                              break;
-                          case 'bandstop':
-                              let bs_width = 10;
-                              const bs_center = payload.notchFreq;
-                              message = {'filter':payload.filterType, 'filterParameters': [4, bs_center, bs_width], 'channels':payload.selChannels};
-                              break;
-                          default:
-                              return;
-                      }
-
-                  this.$refs.plotCanvas.sendFilterMessage(message)
-
-                  for (let i=0; i<payload.selChannels.length; i++) {
-                      let channelId = payload.selChannels[i]
-                      let channel = find(propEq('id', channelId), this.viewerChannels)
-
-                      if (payload.filterType === 'clear') {
-                          channel.filter = {}
-                      } else {
-                          channel.filter = {
-                              type: payload.filterType,
-                              input0: input0,
-                              input1: input1,
-                              notchFreq: payload.notchFreq
-                          }
-                      }
-                      this.$store.dispatch('viewerModule/updateChannel', channel)
-                  }
-
-                  this.$refs.plotCanvas.invalidate();
-                  this.renderAll();
-
-              }
-
-
+            this.$refs.plotCanvas.invalidate();
+            this.renderAll();
           }
+
+
+        }
 
     }
 
