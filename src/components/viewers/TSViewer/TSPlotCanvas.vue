@@ -377,18 +377,13 @@
             getServerId: function(channel) {
                 const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
-                let list = []
-                if (isViewingMontage) {
-                    list = id.split('_')
-                    id = list.length ? head(list) : id // remove channel name from id
-                }
                 return id
             },
             initChannels: function(channels) {
-
                 if (!channels) {
                     channels = this.activeViewer.channels
                 }
+
                 const chObjects = [];
                 if (channels.length > 0) {
 
@@ -396,6 +391,7 @@
 
                     for (let ic=0; ic<channels.length; ic++) {
                         const curC = channels[ic].content;
+                        console.log(curC)
                         const curId = this.getChannelId(curC)
                         const curChannel = {
                             id: curId,
@@ -424,10 +420,13 @@
                       }
 
                         const label = curChannel.label.split("<->", 3)
+                        console.log("label: "+label)
+
                         const label_prefix = label[0];
                         let label_value = ( (label.length > 1) ? parseFloat(label[1]) : 0);
                         label_value = ( (isNaN(label_value) ? label[1] : label_value));
 
+                        console.log("label_ alue" +label_value)
                         channelConfig.push({
                             id: curChannel.id,                          // id of channel
                             type: curChannel.type,                      // Type of channel (CONTINUOUS, UNIT)
@@ -452,7 +451,7 @@
                             isEditing: false,
                             virtualId: curChannel.virtualId
                         });
-
+                        console.log(curChannel.label)
                         chObjects.push(curChannel);
                     }
 
@@ -1293,6 +1292,7 @@
                                     }
 
                                     ctx.stroke();
+
 
 
                                 } else {
