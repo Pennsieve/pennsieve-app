@@ -83,10 +83,13 @@ export const useCanvasRenderer = () => {
                 const blurHeight = Math.min(Math.round((viewport.cHeight / viewData.channels.length) - 2), 10)
 
                 for (let i = 0; i < curChannelView.dataSegments.length; i += 2) {
+
                     if (curChannelView.dataSegments[i + 1] < startT) {
+                        console.log('skipping something')
                         continue
                     }
                     if (curChannelView.dataSegments[i] > (startT + viewport.duration)) {
+                        console.log('breaking something')
                         break
                     }
                     let xPos1 = Math.floor((((xOffset + (curChannelView.dataSegments[i] - startT) / (rsP)))))
@@ -129,9 +132,12 @@ export const useCanvasRenderer = () => {
                 let realSamplePeriod = 1000000 * (1 / curChannelView.sf)
 
                 for (let block = 0; block < nrBlocks; block++) {
+                    console.log("segment: " + block + " out of " + nrBlocks)
+
                     const curBlock = curChannelData.blocks[block]
 
                     if (curBlock.nrPoints === 0) {
+                        console.log('zero points')
                         continue
                     }
 
@@ -147,14 +153,17 @@ export const useCanvasRenderer = () => {
                     ctxb.clearRect(Math.floor(xVec[startIndex]), Math.floor(curChannelView.rowBaseline - blurHeight / 2), Math.ceil(xVec[endIndex] - xVec[startIndex] + 2), blurHeight + 1)
 
                     // Render based on type
+                    console.log(curBlock.type)
                     switch (curBlock.type) {
                         case 'Continuous':
                         case 'realtime':
+                            console.log(curBlock.isMinMax)
                             if (curBlock.isMinMax) {
                                 if ((curBlock.samplePeriod / realSamplePeriod) < 3) {
                                     doPolFill = false
                                 }
 
+                                console.log(block)
                                 if (doPolFill) {
                                     ctx.beginPath()
 
@@ -204,6 +213,7 @@ export const useCanvasRenderer = () => {
 
 
                             } else {
+                                debugger
                                 if (block === 0) {
                                     ctx.beginPath()
                                     ctx.moveTo(xVec[startIndex], yVec[startIndex])
@@ -314,7 +324,6 @@ export const useCanvasRenderer = () => {
                 }
 
                 for (let iSegm = 0; iSegm < segmLength; iSegm++) {
-                    console.log("Number of segments: - " + iSegm +  " - " + segmLength)
                     const curSeg = channelData.blocks[iSegm]
 
                     // Find startIndex viewPort

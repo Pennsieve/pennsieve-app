@@ -276,7 +276,7 @@ export const useTimeSeriesData = () => {
                         }
                     }
                 } else {
-                    console.log('❓ No requestedPage found for pageStart:', obj.data.pageStart)
+                    // console.log('❓ No requestedPage found for pageStart:', obj.data.pageStart)
                 }
 
                 // Add data to cache
