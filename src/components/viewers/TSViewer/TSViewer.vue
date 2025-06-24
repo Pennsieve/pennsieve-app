@@ -374,48 +374,26 @@
                 })
 
             },
-            onPageBack: function() {
-              //TODO: Update logic to track gap over all channels
+          onPageBack: function() {
+            let setStart = this.start - (3*this.duration)/4;
 
-              let setStart = this.start - (3*this.duration)/4
-              let channelOneSegments = this.viewerChannels[0].dataSegments
+            // Simple bounds checking
+            if (setStart < this.ts_start) {
+              setStart = this.ts_start;
+            }
 
-              let i = 0;
-              for(let segment in channelOneSegments) {
-                if (channelOneSegments[segment] > setStart) {
-                  break
-                }
-                i++
-              }
+            this.start = setStart;
+          },
+          onPageForward: function() {
+            let setStart = this.start + (3*this.duration)/4;
 
-              // If new page completely in gap --> set start to next timestamp with data
-              if(i % 2 == 0) {
-                setStart = channelOneSegments[i-1] - 0.5*this.duration
-              }
+            // Simple bounds checking
+            if (setStart > this.ts_end - this.duration) {
+              setStart = this.ts_end - this.duration;
+            }
 
-              this.start = setStart
-            },
-            onPageForward: function() {
-
-                //TODO: Update logic to track gap over all channels
-                let setStart = this.start + (3*this.duration)/4
-                let channelOneSegments = this.viewerChannels[0].dataSegments
-
-                let i = 0;
-                for(let segment in channelOneSegments) {
-                  if (channelOneSegments[segment] > setStart) {
-                    break
-                  }
-                  i++
-                }
-
-                // If new page completely in gap --> set start to next timestamp with data
-                if(i % 2 == 0) {
-                  setStart = channelOneSegments[i] - 0.5*this.duration
-                }
-
-                this.start = setStart
-            },
+            this.start = setStart;
+          },
             selectAnnotation: function(payload) {
               let rsPeriod = this.$refs.viewerCanvas.rsPeriod
               this.updateStart(payload.annotation.start - ((this.cursorLoc*this.cWidth - this.constants['CURSOROFFSET']) * rsPeriod))

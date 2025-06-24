@@ -372,6 +372,9 @@
                 return pixelRatio * (sz + offset);
             },
             getChannelId: function(channel) {
+                return propOr('', 'id', channel)
+            },
+            getServerId: function(channel) {
                 const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
                 let list = []
@@ -405,8 +408,20 @@
                             sampleFreq: curC.rate,
                             unit: curC.unit,
                             gaps: [], //channels[ic].gaps
-                            virtualId: curC.virtualId
+                            virtualId: curC.virtualId,
+                            serverId: this.getServerId(curC),
+                            dataSegments: [],
                         };
+
+                      for (let i = 0; i < channelConfig.length; i++) {
+                        const config = channelConfig[i];
+                        const originalChannel = chObjects[i];
+
+                        // Copy segment data from the original channel data
+                        if (originalChannel.start && originalChannel.end) {
+                          config.dataSegments = [originalChannel.start, originalChannel.end];
+                        }
+                      }
 
                         const label = curChannel.label.split("<->", 3)
                         const label_prefix = label[0];
@@ -441,26 +456,26 @@
                         chObjects.push(curChannel);
                     }
 
-                    channelConfig.sort(function(a, b) {
-
-                        // If split into more than 2 segments, just sort on entire string
-                        if (a.label_split.length > 2 || b.label_split.length > 2) {
-                            return (a.label > b.label) ? 1 : ((b.label > a.label) ? -1 : 0);
-                        }
-
-                        // If prefix is similar, sort on value
-                        if (a.label_prefix === b.label_prefix) {
-                            return (a.label_value > b.label_value) ? 1 : ((b.label_value > a.label_value) ? -1 : 0);
-                        }
-
-                        // Sort on prefix
-                        return (a.label_prefix > b.label_prefix) ? 1 : ((b.label_prefix > a.label_prefix) ? -1 : 0);
-                    } );
+                    // channelConfig.sort(function(a, b) {
+                    //
+                    //     // If split into more than 2 segments, just sort on entire string
+                    //     if (a.label_split.length > 2 || b.label_split.length > 2) {
+                    //         return (a.label > b.label) ? 1 : ((b.label > a.label) ? -1 : 0);
+                    //     }
+                    //
+                    //     // If prefix is similar, sort on value
+                    //     if (a.label_prefix === b.label_prefix) {
+                    //         return (a.label_value > b.label_value) ? 1 : ((b.label_value > a.label_value) ? -1 : 0);
+                    //     }
+                    //
+                    //     // Sort on prefix
+                    //     return (a.label_prefix > b.label_prefix) ? 1 : ((b.label_prefix > a.label_prefix) ? -1 : 0);
+                    // } );
 
                     // Update rank on sorted channels
-                    for (let i = 0; i < channelConfig.length; i++) {
-                        channelConfig[i].rank = i;
-                    }
+                    // for (let i = 0; i < channelConfig.length; i++) {
+                    //     channelConfig[i].rank = i;
+                    // }
 
                     this.$store.dispatch('viewerModule/setChannels', channelConfig)
                     this.$emit('channelsInitialized')
@@ -867,7 +882,7 @@
                         if (ws && ws.readyState === 1) {
 
                             const virtualChannels = curRequest.channels.map(channel => {
-                                return { id: channel.id, name: channel.label, }
+                                return { id: channel.serverId, name: channel.label, }
                             })
 
                             const req = {
@@ -1269,6 +1284,17 @@
                                         ctx.stroke();
                                     }
 
+
+                                    ctx.beginPath();
+                                    ctx.moveTo(xVec[startIndex], yVec[startIndex]);
+
+                                    for (let i = startIndex; i < (endIndex+1); i++) {
+                                      ctx.lineTo(xVec[i], yVec[i]);
+                                    }
+
+                                    ctx.stroke();
+
+
                                 } else {
                                     if(block===0) {
                                         ctx.beginPath();
@@ -1517,14 +1543,19 @@
                 if (data.channelDetails) {
                   const baseChannels = this.activeViewer.channels
                   const virtualChannels = data.channelDetails.map(({ id, name }) => {
-                    const baseChannel = baseChannels.find(ch => (ch.content.id === id))
+                    console.log(id + ":" +name)
 
                     // Replace marker for montage by '-'. The montage marker is used by server to parse channel names
                     // when montaged. TODO: there is probably a cleaner way of doing this.
                     let displayName = name
+                    let baseChannel = NaN
                     if (this.viewerMontageScheme !== 'NOT_MONTAGED') {
                       const channelArr = name.split("<->", 2)
+                      baseChannel = baseChannels.find(ch => (ch.content.id === id && ch.content.name === channelArr[0]))
                       displayName = this.getDisplayName(channelArr[0], channelArr[1], this.viewerMontageScheme)
+                      console.log(baseChannel)
+                    } else {
+                      baseChannel = baseChannels.find(ch => (ch.content.id === id))
                     }
 
                     const content = {
