@@ -372,20 +372,14 @@
                 return pixelRatio * (sz + offset);
             },
             getChannelId: function(channel) {
-                const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
                 let id = propOr('', 'id', channel)
-                let list = []
-                if (isViewingMontage) {
-                    list = id.split('_')
-                    id = list.length ? head(list) : id // remove channel name from id
-                }
                 return id
             },
             initChannels: function(channels) {
-
                 if (!channels) {
                     channels = this.activeViewer.channels
                 }
+
                 const chObjects = [];
                 if (channels.length > 0) {
 
@@ -393,6 +387,7 @@
 
                     for (let ic=0; ic<channels.length; ic++) {
                         const curC = channels[ic].content;
+                        console.log(curC)
                         const curId = this.getChannelId(curC)
                         const curChannel = {
                             id: curId,
@@ -408,11 +403,15 @@
                             virtualId: curC.virtualId
                         };
 
+                        console.log("curc" + curChannel)
                         const label = curChannel.label.split("<->", 3)
+                        console.log("label: "+label)
+
                         const label_prefix = label[0];
                         let label_value = ( (label.length > 1) ? parseFloat(label[1]) : 0);
                         label_value = ( (isNaN(label_value) ? label[1] : label_value));
 
+                        console.log("label_ alue" +label_value)
                         channelConfig.push({
                             id: curChannel.id,                          // id of channel
                             type: curChannel.type,                      // Type of channel (CONTINUOUS, UNIT)
@@ -437,30 +436,31 @@
                             isEditing: false,
                             virtualId: curChannel.virtualId
                         });
-
+                        console.log(curChannel.label)
                         chObjects.push(curChannel);
                     }
 
-                    channelConfig.sort(function(a, b) {
-
-                        // If split into more than 2 segments, just sort on entire string
-                        if (a.label_split.length > 2 || b.label_split.length > 2) {
-                            return (a.label > b.label) ? 1 : ((b.label > a.label) ? -1 : 0);
-                        }
-
-                        // If prefix is similar, sort on value
-                        if (a.label_prefix === b.label_prefix) {
-                            return (a.label_value > b.label_value) ? 1 : ((b.label_value > a.label_value) ? -1 : 0);
-                        }
-
-                        // Sort on prefix
-                        return (a.label_prefix > b.label_prefix) ? 1 : ((b.label_prefix > a.label_prefix) ? -1 : 0);
-                    } );
+                    console.log(channelConfig)
+                    // channelConfig.sort(function(a, b) {
+                    //
+                    //     // If split into more than 2 segments, just sort on entire string
+                    //     if (a.label_split.length > 2 || b.label_split.length > 2) {
+                    //         return (a.label > b.label) ? 1 : ((b.label > a.label) ? -1 : 0);
+                    //     }
+                    //
+                    //     // If prefix is similar, sort on value
+                    //     if (a.label_prefix === b.label_prefix) {
+                    //         return (a.label_value > b.label_value) ? 1 : ((b.label_value > a.label_value) ? -1 : 0);
+                    //     }
+                    //
+                    //     // Sort on prefix
+                    //     return (a.label_prefix > b.label_prefix) ? 1 : ((b.label_prefix > a.label_prefix) ? -1 : 0);
+                    // } );
 
                     // Update rank on sorted channels
-                    for (let i = 0; i < channelConfig.length; i++) {
-                        channelConfig[i].rank = i;
-                    }
+                    // for (let i = 0; i < channelConfig.length; i++) {
+                    //     channelConfig[i].rank = i;
+                    // }
 
                     this.$store.dispatch('viewerModule/setChannels', channelConfig)
                     this.$emit('channelsInitialized')
@@ -1268,6 +1268,17 @@
                                         }
                                         ctx.stroke();
                                     }
+
+
+                                    ctx.beginPath();
+                                    ctx.moveTo(xVec[startIndex], yVec[startIndex]);
+
+                                    for (let i = startIndex; i < (endIndex+1); i++) {
+                                      ctx.lineTo(xVec[i], yVec[i]);
+                                    }
+                                    ctx.stroke();
+
+
 
                                 } else {
                                     if(block===0) {
