@@ -91,7 +91,6 @@ export default {
       'setCustomMontageMap',
     ]),
     submitForm: function() {
-      console.log('asdsad')
       this.$store.dispatch('viewerModule/setCustomMontageMap', {montageScheme:'CUSTOM_MONTAGE', customMontageMap: this.montageString})
       this.$emit('close')
     },

@@ -806,14 +806,13 @@
             let input0 = parseFloat(payload.input0)
             let input1 = parseFloat(payload.input1)
 
-            // Convert virtual channel IDs to server IDs for montaged channels
             const serverChannelIds = payload.selChannels.map(channelId => {
-              const channel = find(propEq('id', channelId), this.viewerChannels);
-              if (channel && this.viewerMontageScheme !== 'NOT_MONTAGED') {
-                // Extract base channel ID from virtual ID (remove channel name part)
-                const idParts = channelId.split('_');
-                return idParts.length > 1 ? idParts[0] : channelId;
-              }
+              // const channel = find(propEq('id', channelId), this.viewerChannels);
+              // if (channel && this.viewerMontageScheme !== 'NOT_MONTAGED') {
+              //   // Extract base channel ID from virtual ID (remove channel name part)
+              //   const idParts = channelId.split('_');
+              //   return idParts.length > 1 ? idParts[0] : channelId;
+              // }
               return channelId;
             });
 
