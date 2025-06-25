@@ -4,9 +4,9 @@
       <template #description>
         <div class="description">
           <p>
-            The pennsieve platform allows users to register applications to
-            allow users to expand the functionality of the platform through
-            custom actions and webhooks.
+            Pennsieve Analytics enables users to integrate custom applications
+            that extend platform capabilities through specialized actions and
+            webhook integrations.
           </p>
           <hr />
         </div>
