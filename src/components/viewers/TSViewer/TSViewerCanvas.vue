@@ -823,7 +823,7 @@
                 break;
               case 'bandpass':
                 let bp_center = (input0 + input1) / 2;
-                let bp_width = Math.abs((input1 - input0) / 2)
+                let bp_width = Math.abs(input1 - input0)
                 message = {
                   'filter': payload.filterType,
                   'filterParameters': [4, bp_center, bp_width],
