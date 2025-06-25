@@ -391,7 +391,6 @@
 
                     for (let ic=0; ic<channels.length; ic++) {
                         const curC = channels[ic].content;
-                        console.log(curC)
                         const curId = this.getChannelId(curC)
                         const curChannel = {
                             id: curId,
@@ -420,13 +419,11 @@
                       }
 
                         const label = curChannel.label.split("<->", 3)
-                        console.log("label: "+label)
 
                         const label_prefix = label[0];
                         let label_value = ( (label.length > 1) ? parseFloat(label[1]) : 0);
                         label_value = ( (isNaN(label_value) ? label[1] : label_value));
 
-                        console.log("label_ alue" +label_value)
                         channelConfig.push({
                             id: curChannel.id,                          // id of channel
                             type: curChannel.type,                      // Type of channel (CONTINUOUS, UNIT)
@@ -451,7 +448,6 @@
                             isEditing: false,
                             virtualId: curChannel.virtualId
                         });
-                        console.log(curChannel.label)
                         chObjects.push(curChannel);
                     }
 
@@ -1481,7 +1477,6 @@
             },
             sendMontageMessage: function (value) {
                 if (this._websocket && this._websocket.readyState === 1) {
-                  console.log(value)
                   let payload
                   switch (value) {
                     case "NOT_MONTAGED":
@@ -1536,6 +1531,7 @@
 
                 try {
                   data = JSON.parse(msg.data)
+
                 } catch (e) {
                   this.$store.dispatch('viewerModule/setViewerErrors', { error: 'JSON Parse Error' })
                 }
@@ -1543,7 +1539,6 @@
                 if (data.channelDetails) {
                   const baseChannels = this.activeViewer.channels
                   const virtualChannels = data.channelDetails.map(({ id, name }) => {
-                    console.log(id + ":" +name)
 
                     // Replace marker for montage by '-'. The montage marker is used by server to parse channel names
                     // when montaged. TODO: there is probably a cleaner way of doing this.
@@ -1553,7 +1548,6 @@
                       const channelArr = name.split("<->", 2)
                       baseChannel = baseChannels.find(ch => (ch.content.id === id && ch.content.name === channelArr[0]))
                       displayName = this.getDisplayName(channelArr[0], channelArr[1], this.viewerMontageScheme)
-                      console.log(baseChannel)
                     } else {
                       baseChannel = baseChannels.find(ch => (ch.content.id === id))
                     }
