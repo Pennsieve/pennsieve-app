@@ -274,7 +274,6 @@ export const useWebSocket = () => {
                     nrValidPoints: nrValidPoints,
                     name: segment.channelName,
                     label: segment.channelName,
-                    virtualId: `${segment.source}_${segment.channelName}`
                 }
 
                 if (segm.nrPoints > 0) {
@@ -370,7 +369,7 @@ export const useWebSocket = () => {
         send,
         sendMontageMessage,
         sendFilterMessage,
-        sendDumpBufferRequest,  // ← Add this line
+        sendDumpBufferRequest,
         disconnect,
         setClearChannelsCallback,
         setPackageId,

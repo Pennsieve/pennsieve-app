@@ -43,6 +43,27 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
      */
     const getChannelId = (channel) => {
         if (!channel) return ''
+        // Use the id field (which is unique for client-side)
+        return propOr('', 'id', channel)
+    }
+
+    const getServerChannelId = (channel) => {
+        if (!channel) return ''
+        return propOr('', 'serverId', channel) || propOr('', 'id', channel)
+    }
+
+    /**
+     * Get clean channel identifier without montage modifications
+     */
+    const getRawChannelId = (channel) => {
+        return propOr('', 'id', channel)
+    }
+    /**
+     * Get base channel identifier (strips montage suffix)
+     * Use this for grouping/display purposes only
+     */
+    const getBaseChannelId = (channel) => {
+        if (!channel) return ''
 
         let id = propOr('', 'id', channel)
 
@@ -53,13 +74,6 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
         }
 
         return id
-    }
-
-    /**
-     * Get clean channel identifier without montage modifications
-     */
-    const getRawChannelId = (channel) => {
-        return propOr('', 'id', channel)
     }
 
     /**
@@ -165,24 +179,26 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
      */
     const createVirtualChannel = (id, name, baseChannel) => {
         let displayName = name
-        let virtualId = `${id}_${name}`
-        let channelId = id
 
-        // Handle montage display names
+        // serverId is what server provided (the 'id' parameter)
+        const serverId = id
+
+        // For client-side, create unique id
+        let uniqueId = id  // Default to server ID
+
         if (isViewingMontage.value) {
-            const channelParts = name.split("<->", 2)
+            // Create unique client-side ID for montaged channels
+            uniqueId = `${id}_${name}`
 
+            const channelParts = name.split("<->", 2)
             if (channelParts.length === 2) {
-                // This is a montaged channel with two electrode names
                 displayName = getDisplayName(channelParts[0], channelParts[1])
             }
-
-            // For montages, use composite ID to ensure uniqueness
-            channelId = virtualId
         }
 
         const content = {
-            id: channelId,
+            id: uniqueId,            // ✅ Unique for client-side operations
+            serverId: serverId,      // ✅ What server provided/expects
             name,
             channelType: baseChannel.content.channelType,
             label: name,
@@ -191,11 +207,10 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
             rate: baseChannel.content.rate,
             start: baseChannel.content.start,
             end: baseChannel.content.end,
-            virtualId,
             // Additional metadata
             montageScheme: isViewingMontage.value ? viewerMontageScheme.value : 'NOT_MONTAGED',
             isMontaged: isViewingMontage.value,
-            baseChannelId: id
+            baseChannelId: id  // Keep reference for debugging
         }
 
         return {
@@ -326,6 +341,7 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
 
         return {
             id: content.id,
+            serverId: content.serverId,
             type: content.channelType,
             label: content.label,
             displayName: content.displayName,
@@ -346,10 +362,9 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
             filter: {},
             hideFilter: true,
             isEditing: false,
-            virtualId: content.virtualId,
             montageScheme: content.montageScheme || 'NOT_MONTAGED',
             isMontaged: content.isMontaged || false,
-            baseChannelId: content.baseChannelId || content.id
+            baseChannelId: content.baseChannelId  // For debugging/reference
         }
     }
 
@@ -493,6 +508,8 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
 
         // Core processing methods
         getChannelId,
+        getBaseChannelId,
+        getServerChannelId,
         getRawChannelId,
         getDisplayName,
         processChannelData,

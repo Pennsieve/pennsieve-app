@@ -285,8 +285,12 @@ export const useDataRequests = () => {
 
                 const ws = websocket
                 if (ws && ws.readyState === 1) {
+                    // ✅ FIX: Use virtualId for server requests
                     const virtualChannels = curRequest.channels.map(channel => {
-                        return { id: channel.id, name: channel.label }
+                        return {
+                            id: channel.serverId || channel.id,  // Server expects serverId
+                            name: channel.label
+                        }
                     })
 
                     const req = {
@@ -302,11 +306,10 @@ export const useDataRequests = () => {
                     const reqJson = JSON.stringify(req)
                     ws.send(reqJson)
 
-                    // ChannelCounter tracks expected packages
                     const nrChannels = curRequest.channels.length
                     const channelCounter = new Map()
                     for (let j = 0; j < nrChannels; j++) {
-                        const channelId = curRequest.channels[j].id  // Use ID string
+                        const channelId = curRequest.channels[j].id  // Use unique client id
                         channelCounter.set(channelId, NaN)
                     }
 
@@ -314,7 +317,7 @@ export const useDataRequests = () => {
                         count: nrChannels,
                         counter: channelCounter,
                         subPageCount: NaN,
-                        ts: (Date.now() + 550),
+                        ts: Date.now(),
                         inViewport: curRequest.isInViewport
                     })
                 } else {

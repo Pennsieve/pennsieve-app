@@ -303,13 +303,28 @@ const generateAndProcessRequests = async () => {
   }
 
   const showChannels = chData.value.filter(channel => {
-    const channelConfig = viewerChannels.value.find(config => config.id === getChannelId(channel))
+    const channelConfig = viewerChannels.value.find(config =>
+      config.id === channel.id  // Direct id comparison (both are unique)
+    )
     return channelConfig && channelConfig.visible
   })
 
   const currentRsPeriod = computedRsPeriod.value
-  const currentRequestedSamplePeriod = Math.ceil(currentRsPeriod)
 
+  const requests = generatePoints(
+    showChannels,
+    props.start,
+    props.duration,
+    viewData,
+    requestedPages.value,
+    props.constants,
+    currentRsPeriod,
+    props.ts_end,
+    segmIndexOf,
+    getChannelId
+  )
+
+  const currentRequestedSamplePeriod = Math.ceil(currentRsPeriod)
   let shouldDumpBuffer = false
   let dumpReason = ''
 
@@ -371,18 +386,7 @@ const generateAndProcessRequests = async () => {
   lastRequestStart.value = props.start
   lastRequestDuration.value = props.duration
 
-  const requests = generatePoints(
-    showChannels,
-    props.start,
-    props.duration,
-    viewData,
-    requestedPages.value,
-    props.constants,
-    currentRsPeriod,
-    props.ts_end,
-    segmIndexOf,
-    getChannelId
-  )
+
 
   const userToken = await useGetToken()
 

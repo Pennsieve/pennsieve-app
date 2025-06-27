@@ -92,8 +92,10 @@ export const useTimeSeriesData = () => {
             for (let ic = 0; ic < channels.length; ic++) {
                 const curC = channels[ic].content
                 const curId = getChannelIdFn ? getChannelIdFn(curC) : curC.id
+
                 const curChannel = {
                     id: curId,
+                    serverId: curC.serverId,
                     label: curC.name,
                     displayName: curC.displayName,
                     type: curC.channelType,
@@ -103,7 +105,6 @@ export const useTimeSeriesData = () => {
                     sampleFreq: curC.rate,
                     unit: curC.unit,
                     gaps: [],
-                    virtualId: curC.virtualId,
                     dataSegments: []
                 }
 
@@ -114,6 +115,7 @@ export const useTimeSeriesData = () => {
 
                 channelConfig.push({
                     id: curChannel.id,
+                    serverId: curChannel.serverId,
                     type: curChannel.type,
                     label: curChannel.label,
                     displayName: curChannel.displayName,
@@ -134,7 +136,6 @@ export const useTimeSeriesData = () => {
                     filter: {},
                     hideFilter: true,
                     isEditing: false,
-                    virtualId: curChannel.virtualId
                 })
 
                 chObjects.push(curChannel)
@@ -165,20 +166,39 @@ export const useTimeSeriesData = () => {
 
     // Data callback (from original)
     const dataCallback = (obj) => {
-
-
-        // Autoscale counter logic
-        if (autoScale.value > 0) {
-            autoScale.value--
-        }
-
-        // Find channel for object in chData
         let curChData = null
+        const serverResponseId = obj.data.chId || obj.data.source
+        const serverResponseName = obj.data.label || obj.data.name
+
+        // ✅ ROBUST MATCHING: Try multiple strategies
         for (let ch = 0; ch < chData.value.length; ch++) {
-            if (chData.value[ch].label === obj.data.label) {
-                curChData = chData.value[ch]
+            const channel = chData.value[ch]
+
+            // Strategy 1: serverId + name (preferred)
+            if (channel.serverId === serverResponseId && channel.label === serverResponseName) {
+                curChData = channel
                 break
             }
+
+            // Strategy 3: id + name (fallback)
+            if (channel.id === serverResponseId && channel.label === serverResponseName) {
+                curChData = channel
+                break
+            }
+
+            // Strategy 4: name only (last resort for non-montaged)
+            if (channel.label === serverResponseName) {
+                curChData = channel
+                break
+            }
+        }
+
+        if (!curChData) {
+            console.warn('No matching channel found for data:', {
+                id: serverResponseId,
+                name: serverResponseName
+            })
+            return
         }
 
         // Process based on type
@@ -207,59 +227,34 @@ export const useTimeSeriesData = () => {
                 // Remove from requested pages
                 let requestedPage = requestedPages.value.get(obj.data.pageStart)
                 if (requestedPage) {
-                    // console.log('📦 Processing response:', {
-                    //     pageStart: obj.data.pageStart,
-                    //     chId: obj.data.chId,
-                    //     label: obj.data.label,
-                    //     nrResponses: obj.nrResponses,
-                    //     currentCounters: Object.fromEntries(requestedPage.counter),
-                    //     requestedPages_size: requestedPages.value.size
-                    // })
-
-                    let countForChannel = requestedPage.counter.get(obj.data.chId)
+                    let countForChannel = requestedPage.counter.get(curChData.id)
 
                     if (isNaN(countForChannel)) {
-                        // First response - initialize properly
                         countForChannel = obj.nrResponses
-                        requestedPage.counter.set(obj.data.chId, countForChannel)
-
-                        // Decrement for this response
+                        requestedPage.counter.set(curChData.id, countForChannel)
                         countForChannel = countForChannel - 1
-                        requestedPage.counter.set(obj.data.chId, countForChannel)
-                        // console.log('✅ First response - set to:', countForChannel)
+                        requestedPage.counter.set(curChData.id, countForChannel)
                     } else if (countForChannel > 0) {
-                        // Only decrement if positive
                         countForChannel = countForChannel - 1
-                        requestedPage.counter.set(obj.data.chId, countForChannel)
-                        // console.log('📉 Decremented to:', countForChannel)
+                        requestedPage.counter.set(curChData.id, countForChannel)
                     } else {
-                        // console.warn('⚠️ Ignoring extra response - already complete')
-                        return
+                        return  // Already complete
                     }
 
                     if (countForChannel === 0) {
                         let isComplete = true
-                        let pendingChannels = []
-
                         for (let [chId, count] of requestedPage.counter.entries()) {
                             if (count > 0 || isNaN(count)) {
                                 isComplete = false
-                                pendingChannels.push({ chId, count })
+                                break
                             }
                         }
 
-                        // console.log('🔍 Completion check for page', obj.data.pageStart, ':', {
-                        //     isComplete,
-                        //     pendingChannels,
-                        //     allCounters: Object.fromEntries(requestedPage.counter)
-                        // })
-
                         if (isComplete) {
-                            // console.log('✅ DELETING completed page:', obj.data.pageStart)
                             requestedPages.value.delete(obj.data.pageStart)
-                            // console.log('📊 requestedPages.size after cleanup:', requestedPages.value.size)
                         }
                     }
+
                 } else {
                     // console.log('❓ No requestedPage found for pageStart:', obj.data.pageStart)
                 }
