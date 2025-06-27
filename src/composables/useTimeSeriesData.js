@@ -177,7 +177,7 @@ export const useTimeSeriesData = () => {
         )
 
         if (curChData) {
-            console.log('✅ EXACT MATCH found:', curChData.id)
+            // console.log('✅ EXACT MATCH found:', curChData.id)
         } else {
             // ❌ REJECT serverId-only matches for safety
             console.error('❌ NO EXACT MATCH - rejecting to prevent data corruption:', {
@@ -234,11 +234,11 @@ export const useTimeSeriesData = () => {
                         countForChannel = countForChannel - 1
                         requestedPage.counter.set(curChData.id, countForChannel)
 
-                        console.log('📊 Updated counter for channel:', {
-                            channelId: curChData.id,
-                            pageStart: obj.data.pageStart,
-                            newCount: countForChannel
-                        })
+                        // console.log('📊 Updated counter for channel:', {
+                        //     channelId: curChData.id,
+                        //     pageStart: obj.data.pageStart,
+                        //     newCount: countForChannel
+                        // })
                     }
 
                     // Check if page is complete
@@ -253,10 +253,10 @@ export const useTimeSeriesData = () => {
 
                         if (isComplete) {
                             requestedPages.value.delete(obj.data.pageStart)
-                            console.log('✅ Page completed and removed:', {
-                                pageStart: obj.data.pageStart,
-                                remainingPages: requestedPages.value.size
-                            })
+                            // console.log('✅ Page completed and removed:', {
+                            //     pageStart: obj.data.pageStart,
+                            //     remainingPages: requestedPages.value.size
+                            // })
                         }
                     }
                 }
@@ -270,11 +270,11 @@ export const useTimeSeriesData = () => {
                         return 0
                     })
 
-                    console.log('📈 Added data to cache:', {
-                        channelId: curChData.id,
-                        pageStart: obj.data.pageStart,
-                        nrPoints: obj.data.nrPoints
-                    })
+                    // console.log('📈 Added data to cache:', {
+                    //     channelId: curChData.id,
+                    //     pageStart: obj.data.pageStart,
+                    //     nrPoints: obj.data.nrPoints
+                    // })
                 }
                 break
 

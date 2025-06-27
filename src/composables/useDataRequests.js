@@ -13,10 +13,6 @@ export const useDataRequests = () => {
     const prevStart = ref(0)
     const prevDuration = ref(0)
 
-    // Configuration from original
-    const prefetchDelay = 100
-    const maxRequestedPages = 20
-
     // Prefetch function from original
     let preFetchRequestFnc = null
 
@@ -28,22 +24,22 @@ export const useDataRequests = () => {
                 const maxPendingPages = 5 // Increased from 3
                 const currentPendingSize = requestedPagesRef.value?.size || 0
 
-                console.log('🔍 Prefetch check:', {
-                    pendingRequests: nrPending,
-                    currentPendingPages: currentPendingSize,
-                    maxAllowed: maxPendingPages,
-                    nextRequest: aSyncPreRequests.value[0]
-                })
+                // console.log('🔍 Prefetch check:', {
+                //     pendingRequests: nrPending,
+                //     currentPendingPages: currentPendingSize,
+                //     maxAllowed: maxPendingPages,
+                //     nextRequest: aSyncPreRequests.value[0]
+                // })
 
                 if (currentPendingSize < maxPendingPages) {
-                    console.log('🚀 Starting prefetch request:', {
-                        start: aSyncPreRequests.value[0].start,
-                        channels: aSyncPreRequests.value[0].channels.map(ch => ({
-                            id: ch.id,
-                            serverId: ch.serverId,
-                            label: ch.label
-                        }))
-                    })
+                    // console.log('🚀 Starting prefetch request:', {
+                    //     start: aSyncPreRequests.value[0].start,
+                    //     channels: aSyncPreRequests.value[0].channels.map(ch => ({
+                    //         id: ch.id,
+                    //         serverId: ch.serverId,
+                    //         label: ch.label
+                    //     }))
+                    // })
 
                     const success = requestDataFromServer([aSyncPreRequests.value[0]])
                     if (success) {
@@ -184,7 +180,7 @@ export const useDataRequests = () => {
                     let isViewPage = curSegm.startTs < start + duration
 
                     segmOffset += 1
-                    curTime = curSegm.pageEnd
+                    curTime += pageSize
 
                     // Only add to viewData if segment is not a prefetch page
                     if (isViewPage) {
@@ -301,20 +297,20 @@ export const useDataRequests = () => {
 
         const datasetEndTime = ts_end
 
-        console.log('📤 Processing requests:', {
-            count: requests.length,
-            requests: requests.map(req => ({
-                start: req.start,
-                duration: req.duration,
-                isInViewport: req.isInViewport,
-                channelCount: req.channels.length,
-                channels: req.channels.map(ch => ({
-                    id: ch.id,
-                    serverId: ch.serverId,
-                    label: ch.label
-                }))
-            }))
-        })
+        // console.log('📤 Processing requests:', {
+        //     count: requests.length,
+        //     requests: requests.map(req => ({
+        //         start: req.start,
+        //         duration: req.duration,
+        //         isInViewport: req.isInViewport,
+        //         channelCount: req.channels.length,
+        //         channels: req.channels.map(ch => ({
+        //             id: ch.id,
+        //             serverId: ch.serverId,
+        //             label: ch.label
+        //         }))
+        //     }))
+        // })
 
         for (let i = 0; i < requests.length; i++) {
             let curRequest
@@ -339,11 +335,11 @@ export const useDataRequests = () => {
                     const serverChannelId = channel.serverId || channel.id
                     const channelName = channel.label || channel.name
 
-                    console.log('🔗 Mapping channel for request:', {
-                        clientId: channel.id,
-                        serverId: serverChannelId,
-                        label: channelName
-                    })
+                    // console.log('🔗 Mapping channel for request:', {
+                    //     clientId: channel.id,
+                    //     serverId: serverChannelId,
+                    //     label: channelName
+                    // })
 
                     return {
                         id: serverChannelId,  // Server expects serverId
@@ -361,13 +357,13 @@ export const useDataRequests = () => {
                     virtualChannels
                 }
 
-                console.log('📡 Sending WebSocket request:', {
-                    startTime: req.startTime,
-                    endTime: req.endTime,
-                    isInViewport: curRequest.isInViewport,
-                    virtualChannels: req.virtualChannels,
-                    pixelWidth: req.pixelWidth
-                })
+                // console.log('📡 Sending WebSocket request:', {
+                //     startTime: req.startTime,
+                //     endTime: req.endTime,
+                //     isInViewport: curRequest.isInViewport,
+                //     virtualChannels: req.virtualChannels,
+                //     pixelWidth: req.pixelWidth
+                // })
 
                 const reqJson = JSON.stringify(req)
                 ws.send(reqJson)
@@ -396,12 +392,12 @@ export const useDataRequests = () => {
 
                 requestedPages.set(curRequest.start, requestInfo)
 
-                console.log('✅ Request tracked:', {
-                    pageStart: curRequest.start,
-                    channelCount: nrChannels,
-                    isInViewport: curRequest.isInViewport,
-                    totalTrackedPages: requestedPages.size
-                })
+                // console.log('✅ Request tracked:', {
+                //     pageStart: curRequest.start,
+                //     channelCount: nrChannels,
+                //     isInViewport: curRequest.isInViewport,
+                //     totalTrackedPages: requestedPages.size
+                // })
             } else {
                 console.error('❌ WebSocket not ready for sending requests:', {
                     readyState: ws?.readyState,

@@ -128,12 +128,12 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
         processingStats.processedChannels = 0
         processingStats.errors = 0
 
-        console.log('🔄 Processing channel data:', {
-            totalChannels: channelDetails.length,
-            isViewingMontage: isViewingMontage.value,
-            montageScheme: viewerMontageScheme.value,
-            channelDetails: channelDetails.map(ch => ({ id: ch.id, name: ch.name }))
-        })
+        // console.log('🔄 Processing channel data:', {
+        //     totalChannels: channelDetails.length,
+        //     isViewingMontage: isViewingMontage.value,
+        //     montageScheme: viewerMontageScheme.value,
+        //     channelDetails: channelDetails.map(ch => ({ id: ch.id, name: ch.name }))
+        // })
 
         const virtualChannels = channelDetails.map(({ id, name }) => {
             try {
@@ -149,14 +149,14 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
                 const virtualChannel = createVirtualChannel(id, name, baseChannel)
                 processingStats.processedChannels++
 
-                console.log('✅ Created virtual channel:', {
-                    serverId: id,
-                    serverName: name,
-                    clientId: virtualChannel.content.id,
-                    clientLabel: virtualChannel.content.label,
-                    displayName: virtualChannel.content.displayName,
-                    isMontaged: virtualChannel.content.isMontaged
-                })
+                // console.log('✅ Created virtual channel:', {
+                //     serverId: id,
+                //     serverName: name,
+                //     clientId: virtualChannel.content.id,
+                //     clientLabel: virtualChannel.content.label,
+                //     displayName: virtualChannel.content.displayName,
+                //     isMontaged: virtualChannel.content.isMontaged
+                // })
 
                 if (isViewingMontage.value) {
                     processingStats.montageChannels++
@@ -172,18 +172,18 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
 
         processingStats.lastProcessingTime = performance.now() - startTime
 
-        console.log('📊 Channel processing complete:', {
-            processed: processingStats.processedChannels,
-            errors: processingStats.errors,
-            montageChannels: processingStats.montageChannels,
-            processingTime: processingStats.lastProcessingTime.toFixed(2) + 'ms',
-            resultChannels: virtualChannels.map(ch => ({
-                id: ch.content.id,
-                serverId: ch.content.serverId,
-                label: ch.content.label,
-                displayName: ch.content.displayName
-            }))
-        })
+        // console.log('📊 Channel processing complete:', {
+        //     processed: processingStats.processedChannels,
+        //     errors: processingStats.errors,
+        //     montageChannels: processingStats.montageChannels,
+        //     processingTime: processingStats.lastProcessingTime.toFixed(2) + 'ms',
+        //     resultChannels: virtualChannels.map(ch => ({
+        //         id: ch.content.id,
+        //         serverId: ch.content.serverId,
+        //         label: ch.content.label,
+        //         displayName: ch.content.displayName
+        //     }))
+        // })
 
         return virtualChannels
     }

@@ -134,8 +134,6 @@ import {
 import { useStore } from 'vuex'
 import { storeToRefs } from 'pinia'
 import {
-  head,
-  pathOr,
   propOr,
   isEmpty
 } from 'ramda'
@@ -170,7 +168,6 @@ const {
   updateAnnotation,
   removeAnnotation,
   getChannelId: getChannelIdFromAnnotation,
-  sortAnns
 } = useTsAnnotation()
 
 // Template refs

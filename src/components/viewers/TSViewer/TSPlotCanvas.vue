@@ -71,13 +71,11 @@ const {
     connectionStatus,
     openWebsocket,
     send,
-    sendMontageMessage,
     sendFilterMessage,
     sendDumpBufferRequest,
     disconnect,
     setClearChannelsCallback,
     setPackageId,
-    setUseMedian,
     onSegment,
     onEvent,
     onChannelDetails,
@@ -103,7 +101,6 @@ const {
   viewData,
   channelsReady,
   autoScale,
-  pageSize,
   initChannels,
   dataCallback,
   invalidate,
@@ -122,9 +119,7 @@ const {
   generatePoints,
   requestDataFromServer,
   startPrefetching,
-  stopPrefetching,
   clearRequests,
-  getViewportRequests
 } = useDataRequests()
 
 // Initialize channel processing composable with baseChannels
@@ -133,10 +128,6 @@ const {
   processChannelData,
   createMontagePayload
 } = useChannelProcessing(baseChannels, viewerMontageScheme, workspaceMontages, activeViewer)
-
-// Component state
-const renderCounter = ref(0)
-const lastDataRender = ref(null)
 
 const prefetchStats = ref({
   totalRequests: 0,
@@ -330,7 +321,7 @@ const monitorPrefetchActivity = () => {
       }))
     }
 
-    console.log('📊 Prefetch Monitor:', stats)
+    // console.log('📊 Prefetch Monitor:', stats)
 
     // Check for stuck requests (older than 10 seconds)
     const stuckRequests = stats.requestedPages.filter(page => page.age > 10000)
@@ -448,7 +439,7 @@ const generateAndProcessRequests = async () => {
   const userToken = await useGetToken()
 
   if (requests.asyncRequests.length > 0) {
-    console.log('📤 Making requests with currentRequestedSamplePeriod:', currentRequestedSamplePeriod)
+    // console.log('📤 Making requests with currentRequestedSamplePeriod:', currentRequestedSamplePeriod)
     const success = requestDataFromServer(
       requests.asyncRequests,
       0,
@@ -563,15 +554,15 @@ onSegment((segmentData) => {
   const isOutsideViewport = segmentData.pageStart >= (props.start + props.duration)
 
   if (isOutsideViewport) {
-    console.log('📦 Prefetch data received:', {
-      pageStart: segmentData.pageStart,
-      channelId: segmentData.data?.chId || segmentData.data?.source,
-      channelName: segmentData.data?.label || segmentData.data?.name,
-      type: segmentData.type,
-      nrPoints: segmentData.data?.nrPoints,
-      viewportStart: props.start,
-      viewportEnd: props.start + props.duration
-    })
+    // console.log('📦 Prefetch data received:', {
+    //   pageStart: segmentData.pageStart,
+    //   channelId: segmentData.data?.chId || segmentData.data?.source,
+    //   channelName: segmentData.data?.label || segmentData.data?.name,
+    //   type: segmentData.type,
+    //   nrPoints: segmentData.data?.nrPoints,
+    //   viewportStart: props.start,
+    //   viewportEnd: props.start + props.duration
+    // })
 
     prefetchStats.value.totalRequests++
     if (viewerMontageScheme.value !== 'NOT_MONTAGED') {
@@ -582,15 +573,15 @@ onSegment((segmentData) => {
   }
 
   // 🔄 EXISTING LOGIC (unchanged)
-  console.log('✅ SEGMENT RECEIVED:', {
-    pageStart: segmentData.pageStart,
-    type: segmentData.type,
-    channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
-    channelName: segmentData.data?.label || segmentData.data?.name,
-    nrPoints: segmentData.data?.nrPoints,
-    startTs: segmentData.data?.startTs,
-    hasValidation: typeof isDataCurrentForViewport === 'function'
-  })
+  // console.log('✅ SEGMENT RECEIVED:', {
+  //   pageStart: segmentData.pageStart,
+  //   type: segmentData.type,
+  //   channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
+  //   channelName: segmentData.data?.label || segmentData.data?.name,
+  //   nrPoints: segmentData.data?.nrPoints,
+  //   startTs: segmentData.data?.startTs,
+  //   hasValidation: typeof isDataCurrentForViewport === 'function'
+  // })
 
   dataCallback(segmentData)
 
@@ -698,18 +689,18 @@ onMounted(async () => {
 
   monitorPrefetchActivity()
 
-  console.log('🚀 TSPlotCanvas mounted with config:', {
-    activeViewerId: activeViewer.value?.content?.id,
-    initialMontage: viewerMontageScheme.value,
-    baseChannelCount: baseChannels.value?.length || 0,
-    viewport: {
-      start: props.start,
-      duration: props.duration,
-      width: props.cWidth,
-      height: props.cHeight,
-      rsPeriod: props.rsPeriod
-    }
-  })
+  // console.log('🚀 TSPlotCanvas mounted with config:', {
+  //   activeViewerId: activeViewer.value?.content?.id,
+  //   initialMontage: viewerMontageScheme.value,
+  //   baseChannelCount: baseChannels.value?.length || 0,
+  //   viewport: {
+  //     start: props.start,
+  //     duration: props.duration,
+  //     width: props.cWidth,
+  //     height: props.cHeight,
+  //     rsPeriod: props.rsPeriod
+  //   }
+  // })
 })
 
 onUnmounted(() => {
