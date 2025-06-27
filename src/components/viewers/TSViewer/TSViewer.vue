@@ -505,7 +505,6 @@
                 this.cWidth = (this.window_width - labelDiv.clientWidth - 16);
                 this.cHeight = (this.window_height - 40);
 
-                console.log(this.cWidth)
             },
             _computeLabelInfo: function(item, globalZoomMult, rowscale) {
                 const n = ( ( (this.constants['DEFAULTDPI'] * window.devicePixelRatio)/(globalZoomMult * rowscale) )/25.4).toFixed(1);

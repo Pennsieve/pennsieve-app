@@ -132,7 +132,6 @@ export const useCanvasRenderer = () => {
                 let realSamplePeriod = 1000000 * (1 / curChannelView.sf)
 
                 for (let block = 0; block < nrBlocks; block++) {
-                    console.log("segment: " + block + " out of " + nrBlocks)
 
                     const curBlock = curChannelData.blocks[block]
 
@@ -153,17 +152,14 @@ export const useCanvasRenderer = () => {
                     ctxb.clearRect(Math.floor(xVec[startIndex]), Math.floor(curChannelView.rowBaseline - blurHeight / 2), Math.ceil(xVec[endIndex] - xVec[startIndex] + 2), blurHeight + 1)
 
                     // Render based on type
-                    console.log(curBlock.type)
                     switch (curBlock.type) {
                         case 'Continuous':
                         case 'realtime':
-                            console.log(curBlock.isMinMax)
                             if (curBlock.isMinMax) {
                                 if ((curBlock.samplePeriod / realSamplePeriod) < 3) {
                                     doPolFill = false
                                 }
 
-                                console.log(block)
                                 if (doPolFill) {
                                     ctx.beginPath()
 
@@ -213,7 +209,6 @@ export const useCanvasRenderer = () => {
 
 
                             } else {
-                                debugger
                                 if (block === 0) {
                                     ctx.beginPath()
                                     ctx.moveTo(xVec[startIndex], yVec[startIndex])

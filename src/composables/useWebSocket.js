@@ -349,6 +349,21 @@ export const useWebSocket = () => {
     const setPackageId = (id) => { packageId = id }
     const setUseMedian = (value) => { useMedian = value }
 
+    const sendDumpBufferRequest = () => {
+        if (websocket.value && websocket.value.readyState === 1) {
+            const message = {
+                command: 'dumpBuffer',
+                packageId: packageId
+            }
+            websocket.value.send(JSON.stringify(message))
+            console.log('🗑️ Sent dump buffer request')
+            return true
+        }
+        console.warn('⚠️ Cannot send dump buffer request - WebSocket not connected')
+        return false
+    }
+
+// Then update the return statement to include it:
     return {
         websocket: readonly(websocket),
         connectionStatus: readonly(connectionStatus),
@@ -356,6 +371,7 @@ export const useWebSocket = () => {
         send,
         sendMontageMessage,
         sendFilterMessage,
+        sendDumpBufferRequest,  // ← Add this line
         disconnect,
         setClearChannelsCallback,
         setPackageId,

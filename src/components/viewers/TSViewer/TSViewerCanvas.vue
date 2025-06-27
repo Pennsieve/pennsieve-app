@@ -2,7 +2,7 @@
   <div class="timeseries-viewer-canvas">
 
     <div id="canvasWrapper">
-      <TSPlotCanvas2
+      <TSPlotCanvas
         ref="plotCanvas"
         :c-width="cWidth"
         :c-height="cHeight"
@@ -38,7 +38,7 @@
           />
         </template>
 
-      </TSPlotCanvas2>
+      </TSPlotCanvas>
 
       <canvas
         id="cursorArea"
@@ -101,7 +101,7 @@
     import Request from '@/mixins/request'
     import { defineAsyncComponent } from 'vue'
     import { mapState as mapPiniaState } from 'pinia';
-    import TSPlotCanvas2 from "@/components/viewers/TSViewer/TSPlotCanvas2.vue";
+    import TSPlotCanvas from "@/components/viewers/TSViewer/TSPlotCanvas.vue";
 import {useViewerStore} from "@/stores/viewerStore";
 
 
@@ -109,7 +109,7 @@ import {useViewerStore} from "@/stores/viewerStore";
         name: 'TimeseriesViewerCanvas',
 
         components:{
-          TSPlotCanvas2,
+          TSPlotCanvas,
             'timeseries-annotation-canvas': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationCanvas.vue'))
         },
 

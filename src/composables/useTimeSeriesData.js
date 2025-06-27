@@ -15,6 +15,7 @@ export const useTimeSeriesData = () => {
     const channelsReady = ref(false)
     const autoScale = ref(0)
     const globalGaps = ref(null)
+    const currentRequestedSamplePeriod = ref(1)
 
     // Configuration from original
     const pageSize = 15000000
@@ -352,6 +353,18 @@ export const useTimeSeriesData = () => {
         return avg
     }
 
+    const updateCurrentRequestedSamplePeriod = (rsPeriod) => {
+        currentRequestedSamplePeriod.value = Math.ceil(rsPeriod)
+    }
+
+// Check if data is current for the viewport (simple implementation)
+    const isDataCurrentForViewport = (segmentData) => {
+        // Simple validation - you can make this more sophisticated
+        // For now, just check if the data has a valid timestamp
+        return segmentData && segmentData.startTs && segmentData.startTs > 0
+    }
+
+
     return {
         // State
         chData,
@@ -364,6 +377,7 @@ export const useTimeSeriesData = () => {
         // Constants
         pageSize,
         prefetchPages,
+        currentRequestedSamplePeriod,
 
         // Methods
         initChannels,
@@ -372,6 +386,8 @@ export const useTimeSeriesData = () => {
         invalidate,
         autoScaleViewData,
         segmIndexOf,
+        updateCurrentRequestedSamplePeriod,
+        isDataCurrentForViewport,
 
         // Helpers
         standardDeviation,
