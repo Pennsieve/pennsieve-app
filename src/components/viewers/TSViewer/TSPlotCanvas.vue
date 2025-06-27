@@ -93,7 +93,8 @@ const {
 // Define pixelRatio directly in main component to avoid dependency issues
 const pixelRatio = ref(1)
 
-// ✅ ENHANCED: Initialize with requestedSamplePeriod validation support
+const isDumpingBuffer = ref(false)
+
 const {
   chData,
   requestedPages,
@@ -170,7 +171,7 @@ const computedRsPeriod = computed(() => {
   // Calculate from viewport as fallback
   if (viewport.duration > 0 && viewport.cWidth > 0) {
     const calculated = viewport.duration / viewport.cWidth
-    console.log('📐 Calculated rsPeriod locally:', calculated)
+    // console.log('📐 Calculated rsPeriod locally:', calculated)
     return calculated
   }
 
@@ -197,13 +198,13 @@ watch(connectionStatus, (newStatus, oldStatus) => {
 watch(computedRsPeriod, (newRsPeriod) => {
   if (newRsPeriod > 0) {
     updateCurrentRequestedSamplePeriod(newRsPeriod)
-    console.log('🎯 Updated requestedSamplePeriod validation for rsPeriod:', newRsPeriod)
+    // console.log('🎯 Updated requestedSamplePeriod validation for rsPeriod:', newRsPeriod)
   }
 }, { immediate: true })
 
 // Main methods (from original) - Define these first before throttled functions
 const renderDataInternal = () => {
-  console.log('🎨 renderDataInternal ENTRY')
+  // console.log('🎨 renderDataInternal ENTRY')
 
   try {
     if (!channelsReady.value) {
@@ -211,25 +212,25 @@ const renderDataInternal = () => {
       return
     }
 
-    console.log('📊 Render state check:', {
-      channelsReady: channelsReady.value,
-      viewDataChannelsCount: viewData.channels.length,
-      viewerChannelsCount: viewerChannels.value?.length || 0,
-      pixelRatio: pixelRatio.value
-    })
+    // console.log('📊 Render state check:', {
+    //   channelsReady: channelsReady.value,
+    //   viewDataChannelsCount: viewData.channels.length,
+    //   viewerChannelsCount: viewerChannels.value?.length || 0,
+    //   pixelRatio: pixelRatio.value
+    // })
 
     // Update visible channel count
     viewport.nrVisibleChannels = viewerChannels.value?.reduce((count, ch) => {
       return ch.visible ? count + 1 : count
     }, 0) || 0
 
-    console.log('👁️ Visible channels:', viewport.nrVisibleChannels)
+    // console.log('👁️ Visible channels:', viewport.nrVisibleChannels)
 
     // Check what data is available for rendering
     let totalDataBlocks = 0
     let channelsWithData = 0
 
-    console.log('📋 Checking viewData.channels:')
+    // console.log('📋 Checking viewData.channels:')
     viewData.channels.forEach((ch, idx) => {
       const blocks = ch.blocks || []
       const dataPoints = blocks.reduce((sum, b) => sum + (b.nrPoints || 0), 0)
@@ -238,44 +239,44 @@ const renderDataInternal = () => {
         channelsWithData++
         totalDataBlocks += blocks.length
 
-        console.log(`  📊 Channel ${idx} (${ch.id}):`, {
-          blocks: blocks.length,
-          dataPoints: dataPoints,
-          blockTypes: blocks.map(b => b.type),
-          firstBlockRange: blocks[0] ? { start: blocks[0].startTs, points: blocks[0].nrPoints } : null
-        })
+        // console.log(`  📊 Channel ${idx} (${ch.id}):`, {
+        //   blocks: blocks.length,
+        //   dataPoints: dataPoints,
+        //   blockTypes: blocks.map(b => b.type),
+        //   firstBlockRange: blocks[0] ? { start: blocks[0].startTs, points: blocks[0].nrPoints } : null
+        // })
       } else {
-        console.log(`  ⚠️ Channel ${idx} (${ch.id}): NO DATA`)
+        // console.log(`  ⚠️ Channel ${idx} (${ch.id}): NO DATA`)
       }
     })
 
-    console.log('📈 RENDER SUMMARY:', {
-      totalChannelsWithData: channelsWithData,
-      totalDataBlocks: totalDataBlocks,
-      viewport: {
-        start: viewport.start,
-        duration: viewport.duration,
-        width: viewport.cWidth,
-        height: viewport.cHeight,
-        nrVisibleChannels: viewport.nrVisibleChannels
-      }
-    })
+    // console.log('📈 RENDER SUMMARY:', {
+    //   totalChannelsWithData: channelsWithData,
+    //   totalDataBlocks: totalDataBlocks,
+    //   viewport: {
+    //     start: viewport.start,
+    //     duration: viewport.duration,
+    //     width: viewport.cWidth,
+    //     height: viewport.cHeight,
+    //     nrVisibleChannels: viewport.nrVisibleChannels
+    //   }
+    // })
 
     if (channelsWithData === 0) {
-      console.warn('❌ NO DATA TO RENDER - all channels empty')
+      // console.warn('❌ NO DATA TO RENDER - all channels empty')
       return
     }
 
-    console.log('🖼️ Checking canvas refs:', {
-      plotCanvasRef: !!plotCanvasRef.value,
-      blurCanvasRef: !!blurCanvasRef.value
-    })
+    // console.log('🖼️ Checking canvas refs:', {
+    //   plotCanvasRef: !!plotCanvasRef.value,
+    //   blurCanvasRef: !!blurCanvasRef.value
+    // })
 
-    console.log('✅ CALLING renderData with:', {
-      channelsWithData: channelsWithData,
-      constantsKeys: Object.keys(props.constants),
-      globalZoomMult: props.globalZoomMult
-    })
+    // console.log('✅ CALLING renderData with:', {
+    //   channelsWithData: channelsWithData,
+    //   constantsKeys: Object.keys(props.constants),
+    //   globalZoomMult: props.globalZoomMult
+    // })
 
     renderData(
       viewData,
@@ -286,7 +287,7 @@ const renderDataInternal = () => {
       pixelRatio.value
     )
 
-    console.log('🎨 RENDER COMPLETE')
+    // console.log('🎨 RENDER COMPLETE')
 
   } catch (error) {
     console.error('💥 ERROR in renderDataInternal:', error)
@@ -339,20 +340,31 @@ const generateAndProcessRequests = async () => {
     dumpReason = `High stale data rate: ${staleDataCounter.value} consecutive stale segments`
   }
 
-  if (shouldDumpBuffer) {
+  // ✅ RACE CONDITION PROTECTION: Only one dump at a time
+  if (shouldDumpBuffer && !isDumpingBuffer.value) {
+    isDumpingBuffer.value = true
     console.log('🚨 Dumping server buffer before new requests:', dumpReason)
 
-    if (sendDumpBufferRequest()) {
-      // Clear client state after successful dump
-      requestedPages.value.clear()
-      clearRequests()
-      staleDataCounter.value = 0
+    try {
+      if (sendDumpBufferRequest()) {
+        // Clear client state after successful dump
+        requestedPages.value.clear()
+        clearRequests()
+        staleDataCounter.value = 0
 
-      // Brief delay to let server process dump request
-      await new Promise(resolve => setTimeout(resolve, 50))
+        // Brief delay to let server process dump request
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    } finally {
+      isDumpingBuffer.value = false
     }
+  } else if (shouldDumpBuffer && isDumpingBuffer.value) {
+    // Another dump is already in progress, skip this one
+    console.log('⏭️ Skipping duplicate dump request (already in progress)')
+    return
   }
 
+  // Update state tracking
   lastRequestedSamplePeriod.value = currentRequestedSamplePeriod
   lastRequestStart.value = props.start
   lastRequestDuration.value = props.duration
@@ -398,15 +410,15 @@ const renderAll = () => {
 }
 
 const renderDataOnMessage = () => {
-  console.log('🔄 renderDataOnMessage called')
+  // console.log('🔄 renderDataOnMessage called')
   generateAndProcessRequests()
 
   if (autoScale.value === 0) {
     autoScale.value--
-    console.log('🎯 Triggering auto scale')
+    // console.log('🎯 Triggering auto scale')
     handleAutoScale()
   } else {
-    console.log('🎨 Calling renderDataInternal')
+    // console.log('🎨 Calling renderDataInternal')
     renderDataInternal()
   }
 }
@@ -425,7 +437,7 @@ const throttledDataRender = createThrottle(() => renderAll(), 50)
 
 // Watchers (from original)
 watch(() => props.rsPeriod, (newRsPeriod, oldRsPeriod) => {
-  console.log('🔄 rsPeriod prop changed:', { old: oldRsPeriod, new: newRsPeriod })
+  // console.log('🔄 rsPeriod prop changed:', { old: oldRsPeriod, new: newRsPeriod })
 
   if (newRsPeriod > 0) {
     updateCurrentRequestedSamplePeriod(newRsPeriod)
@@ -433,15 +445,15 @@ watch(() => props.rsPeriod, (newRsPeriod, oldRsPeriod) => {
 
   invalidate()
   requestedPages.value.clear()
-  console.log('✅ rsPeriod change - cleared caches and updated requestedSamplePeriod validation')
+  // console.log('✅ rsPeriod change - cleared caches and updated requestedSamplePeriod validation')
 })
 
 watch(() => props.duration, (newDuration, oldDuration) => {
-  console.log('🔄 Duration changed:', { old: oldDuration, new: newDuration })
+  // console.log('🔄 Duration changed:', { old: oldDuration, new: newDuration })
 
   // Only clear caches, don't reject responses
   invalidate()  // This clears chData segments + viewData blocks
-  console.log('✅ Duration change - invalidated data caches only')
+  // console.log('✅ Duration change - invalidated data caches only')
 })
 
 watch(() => viewerMontageScheme.value, (newScheme) => {
@@ -462,44 +474,44 @@ watch(() => [props.start, props.duration, props.cWidth, props.cHeight, props.rsP
 
 // WebSocket event handlers
 onSegment((segmentData) => {
-  console.log('✅ SEGMENT RECEIVED:', {
-    pageStart: segmentData.pageStart,
-    type: segmentData.type,
-    channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
-    channelName: segmentData.data?.label || segmentData.data?.name,
-    nrPoints: segmentData.data?.nrPoints,
-    startTs: segmentData.data?.startTs,
-    hasValidation: typeof isDataCurrentForViewport === 'function'
-  })
+  // console.log('✅ SEGMENT RECEIVED:', {
+  //   pageStart: segmentData.pageStart,
+  //   type: segmentData.type,
+  //   channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
+  //   channelName: segmentData.data?.label || segmentData.data?.name,
+  //   nrPoints: segmentData.data?.nrPoints,
+  //   startTs: segmentData.data?.startTs,
+  //   hasValidation: typeof isDataCurrentForViewport === 'function'
+  // })
 
   // ADD THESE LINES:
-  console.log('🔍 Validation check...')
-  console.log('📞 Calling dataCallback with:', segmentData.type)
+  // console.log('🔍 Validation check...')
+  // console.log('📞 Calling dataCallback with:', segmentData.type)
 
   dataCallback(segmentData)
 
-  console.log('✅ dataCallback completed')
+  // console.log('✅ dataCallback completed')
 
   // Check if returned page falls in viewport
   if (segmentData.pageStart < (props.start + props.duration)) {
-    console.log('🎯 Segment in viewport - triggering render')
+    // console.log('🎯 Segment in viewport - triggering render')
     throttledGetRenderData()
   } else {
-    console.log('📦 Segment outside viewport (prefetch)')
+    // console.log('📦 Segment outside viewport (prefetch)')
   }
 })
 
 onEvent((eventData) => {
-  console.log('✅ REQUEST SUCCESS - Received event:', {
-    pageStart: eventData.pageStart,
-    channelId: eventData.data.chId || eventData.data.source,
-    dataType: eventData.type,
-    nrResponses: eventData.nrResponses
-  })
+  // console.log('✅ REQUEST SUCCESS - Received event:', {
+  //   pageStart: eventData.pageStart,
+  //   channelId: eventData.data.chId || eventData.data.source,
+  //   dataType: eventData.type,
+  //   nrResponses: eventData.nrResponses
+  // })
 
   if (!isDataCurrentForViewport(eventData.data)) {
     staleDataCounter.value++
-    console.log(`🗑️ Discarding stale event (${staleDataCounter.value}/5)`)
+    // console.log(`🗑️ Discarding stale event (${staleDataCounter.value}/5)`)
     return
   }
 
@@ -507,20 +519,20 @@ onEvent((eventData) => {
   dataCallback(eventData)
 
   if (eventData.pageStart < (props.start + props.duration)) {
-    console.log('🎯 Event in viewport - triggering render')
+    // console.log('🎯 Event in viewport - triggering render')
     throttledGetRenderData()
   }
 })
 
 onChannelDetails((channelDetails) => {
-  console.log('📡 RECEIVED CHANNEL DETAILS:', {
-    channelCount: channelDetails.length,
-    channels: channelDetails.map(ch => ({
-      id: ch.content?.id,
-      name: ch.content?.name,
-      type: ch.content?.channelType
-    }))
-  })
+  // console.log('📡 RECEIVED CHANNEL DETAILS:', {
+  //   channelCount: channelDetails.length,
+  //   channels: channelDetails.map(ch => ({
+  //     id: ch.content?.id,
+  //     name: ch.content?.name,
+  //     type: ch.content?.channelType
+  //   }))
+  // })
 
   // Remove the extra baseChannels parameter - it's already available in the composable
   const virtualChannels = processChannelData(channelDetails)
@@ -544,7 +556,7 @@ onMounted(async () => {
 
   const initialRsPeriod = computedRsPeriod.value
   updateCurrentRequestedSamplePeriod(initialRsPeriod)
-  console.log('🚀 Initialized requestedSamplePeriod validation with rsPeriod:', initialRsPeriod)
+  // console.log('🚀 Initialized requestedSamplePeriod validation with rsPeriod:', initialRsPeriod)
 
   // Configure WebSocket
   setPackageId(activeViewer.value?.content?.id)
@@ -609,7 +621,7 @@ defineExpose({
   requestedPages,
   chData,
   viewerChannels,
-  currentRequestedSamplePeriod // ✅ NEW: Expose for debugging
+  currentRequestedSamplePeriod
 })
 </script>
 

@@ -356,7 +356,7 @@ export const useWebSocket = () => {
                 packageId: packageId
             }
             websocket.value.send(JSON.stringify(message))
-            console.log('🗑️ Sent dump buffer request')
+            // console.log('🗑️ Sent dump buffer request')
             return true
         }
         console.warn('⚠️ Cannot send dump buffer request - WebSocket not connected')
