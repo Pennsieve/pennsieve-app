@@ -24,15 +24,45 @@ export const useDataRequests = () => {
         preFetchRequestFnc = function() {
             const nrPending = aSyncPreRequests.value.length
             if (nrPending > 0) {
-                // ✅ Use the passed ref
-                if (requestedPagesRef.value && requestedPagesRef.value.size < 3) {
-                    console.log('🚀 Starting prefetch request')
-                    requestDataFromServer([aSyncPreRequests.value[0]])
-                    aSyncPreRequests.value.splice(0, 1)
+                // ✅ More lenient prefetch blocking for montaged channels
+                const maxPendingPages = 5 // Increased from 3
+                const currentPendingSize = requestedPagesRef.value?.size || 0
+
+                console.log('🔍 Prefetch check:', {
+                    pendingRequests: nrPending,
+                    currentPendingPages: currentPendingSize,
+                    maxAllowed: maxPendingPages,
+                    nextRequest: aSyncPreRequests.value[0]
+                })
+
+                if (currentPendingSize < maxPendingPages) {
+                    console.log('🚀 Starting prefetch request:', {
+                        start: aSyncPreRequests.value[0].start,
+                        channels: aSyncPreRequests.value[0].channels.map(ch => ({
+                            id: ch.id,
+                            serverId: ch.serverId,
+                            label: ch.label
+                        }))
+                    })
+
+                    const success = requestDataFromServer([aSyncPreRequests.value[0]])
+                    if (success) {
+                        aSyncPreRequests.value.splice(0, 1)
+                    } else {
+                        console.warn('❌ Prefetch request failed')
+                        // Stop prefetching if requests are failing
+                        clearInterval(prefetchTimer.value)
+                        isPrefetching.value = false
+                    }
                 } else {
-                    console.log('🚫 Prefetch blocked - requestedPages.size:', requestedPagesRef.value?.size || 'undefined')
+                    console.log('🚫 Prefetch blocked - too many pending pages:', {
+                        current: currentPendingSize,
+                        max: maxPendingPages,
+                        pendingPageStarts: Array.from(requestedPagesRef.value?.keys() || [])
+                    })
                 }
             } else {
+                console.log('✅ No more prefetch requests, stopping prefetch timer')
                 clearInterval(prefetchTimer.value)
                 isPrefetching.value = false
             }
@@ -264,68 +294,124 @@ export const useDataRequests = () => {
 
     // Request data from server (from original) - now accepts ts_end as parameter
     const requestDataFromServer = (requests, firstRequest = 0, websocket, userToken, activeViewer, rsPeriod, requestedPages, ts_end) => {
-        if (requests.length > 0) {
-            const datasetEndTime = ts_end
-
-            for (let i = 0; i < requests.length; i++) {
-                let curRequest
-                if (i === 0) {
-                    curRequest = requests[firstRequest]
-                } else if (i === firstRequest) {
-                    curRequest = requests[0]
-                } else {
-                    curRequest = requests[i]
-                }
-
-                // Check for last block
-                let requestEndTime = curRequest.start + curRequest.duration
-                if (requestEndTime > datasetEndTime) {
-                    requestEndTime = datasetEndTime
-                }
-
-                const ws = websocket
-                if (ws && ws.readyState === 1) {
-                    // ✅ FIX: Use virtualId for server requests
-                    const virtualChannels = curRequest.channels.map(channel => {
-                        return {
-                            id: channel.serverId || channel.id,  // Server expects serverId
-                            name: channel.label
-                        }
-                    })
-
-                    const req = {
-                        session: userToken,
-                        minMax: true,
-                        startTime: curRequest.start,
-                        endTime: requestEndTime,
-                        packageId: activeViewer.content.id,
-                        pixelWidth: curRequest.pixelWidth,
-                        virtualChannels
-                    }
-
-                    const reqJson = JSON.stringify(req)
-                    ws.send(reqJson)
-
-                    const nrChannels = curRequest.channels.length
-                    const channelCounter = new Map()
-                    for (let j = 0; j < nrChannels; j++) {
-                        const channelId = curRequest.channels[j].id  // Use unique client id
-                        channelCounter.set(channelId, NaN)
-                    }
-
-                    requestedPages.set(curRequest.start, {
-                        count: nrChannels,
-                        counter: channelCounter,
-                        subPageCount: NaN,
-                        ts: Date.now(),
-                        inViewport: curRequest.isInViewport
-                    })
-                } else {
-                    return false
-                }
-            }
-            aSyncRequests.value = []
+        if (requests.length === 0) {
+            console.log('⚠️ No requests to send')
+            return false
         }
+
+        const datasetEndTime = ts_end
+
+        console.log('📤 Processing requests:', {
+            count: requests.length,
+            requests: requests.map(req => ({
+                start: req.start,
+                duration: req.duration,
+                isInViewport: req.isInViewport,
+                channelCount: req.channels.length,
+                channels: req.channels.map(ch => ({
+                    id: ch.id,
+                    serverId: ch.serverId,
+                    label: ch.label
+                }))
+            }))
+        })
+
+        for (let i = 0; i < requests.length; i++) {
+            let curRequest
+            if (i === 0) {
+                curRequest = requests[firstRequest]
+            } else if (i === firstRequest) {
+                curRequest = requests[0]
+            } else {
+                curRequest = requests[i]
+            }
+
+            // Check for last block
+            let requestEndTime = curRequest.start + curRequest.duration
+            if (requestEndTime > datasetEndTime) {
+                requestEndTime = datasetEndTime
+            }
+
+            const ws = websocket
+            if (ws && ws.readyState === 1) {
+                // ✅ ENHANCED: Better virtual channel mapping for montaged channels
+                const virtualChannels = curRequest.channels.map(channel => {
+                    const serverChannelId = channel.serverId || channel.id
+                    const channelName = channel.label || channel.name
+
+                    console.log('🔗 Mapping channel for request:', {
+                        clientId: channel.id,
+                        serverId: serverChannelId,
+                        label: channelName
+                    })
+
+                    return {
+                        id: serverChannelId,  // Server expects serverId
+                        name: channelName
+                    }
+                })
+
+                const req = {
+                    session: userToken,
+                    minMax: true,
+                    startTime: curRequest.start,
+                    endTime: requestEndTime,
+                    packageId: activeViewer.content.id,
+                    pixelWidth: curRequest.pixelWidth,
+                    virtualChannels
+                }
+
+                console.log('📡 Sending WebSocket request:', {
+                    startTime: req.startTime,
+                    endTime: req.endTime,
+                    isInViewport: curRequest.isInViewport,
+                    virtualChannels: req.virtualChannels,
+                    pixelWidth: req.pixelWidth
+                })
+
+                const reqJson = JSON.stringify(req)
+                ws.send(reqJson)
+
+                // Track the request with client channel IDs
+                const nrChannels = curRequest.channels.length
+                const channelCounter = new Map()
+                for (let j = 0; j < nrChannels; j++) {
+                    const channelId = curRequest.channels[j].id  // Use unique client id
+                    channelCounter.set(channelId, NaN)
+                }
+
+                const requestInfo = {
+                    count: nrChannels,
+                    counter: channelCounter,
+                    subPageCount: NaN,
+                    ts: Date.now(),
+                    inViewport: curRequest.isInViewport,
+                    // Add debug info
+                    channels: curRequest.channels.map(ch => ({
+                        id: ch.id,
+                        serverId: ch.serverId,
+                        label: ch.label
+                    }))
+                }
+
+                requestedPages.set(curRequest.start, requestInfo)
+
+                console.log('✅ Request tracked:', {
+                    pageStart: curRequest.start,
+                    channelCount: nrChannels,
+                    isInViewport: curRequest.isInViewport,
+                    totalTrackedPages: requestedPages.size
+                })
+            } else {
+                console.error('❌ WebSocket not ready for sending requests:', {
+                    readyState: ws?.readyState,
+                    wsExists: !!ws
+                })
+                return false
+            }
+        }
+
+        aSyncRequests.value = []
         return true
     }
 
@@ -350,11 +436,19 @@ export const useDataRequests = () => {
 
     // Clear all requests
     const clearRequests = () => {
+        const oldAsyncCount = aSyncRequests.value.length
+        const oldPreCount = aSyncPreRequests.value.length
+
         aSyncRequests.value = []
         aSyncPreRequests.value = []
         prevStart.value = 0
         prevDuration.value = 0
         stopPrefetching()
+
+        console.log('🧹 Cleared requests:', {
+            asyncRequests: oldAsyncCount,
+            preRequests: oldPreCount
+        })
     }
 
     // Get viewport requests

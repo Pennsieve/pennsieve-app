@@ -138,6 +138,16 @@ const {
 const renderCounter = ref(0)
 const lastDataRender = ref(null)
 
+const prefetchStats = ref({
+  totalRequests: 0,
+  successfulRequests: 0,
+  failedRequests: 0,
+  montageRequests: 0,
+  singleChannelRequests: 0,
+  lastPrefetchTime: null,
+  averageResponseTime: 0
+})
+
 const lastRequestedSamplePeriod = ref(null)
 const lastRequestStart = ref(null)
 const lastRequestDuration = ref(null)
@@ -295,6 +305,53 @@ const renderDataInternal = () => {
     console.error('💥 ERROR in renderDataInternal:', error)
     console.error('💥 Stack trace:', error.stack)
   }
+}
+
+const monitorPrefetchActivity = () => {
+  const interval = setInterval(() => {
+    if (!channelsReady.value) return
+
+    const stats = {
+      timestamp: new Date().toISOString(),
+      requestedPagesSize: requestedPages.value.size,
+      isPrefetching: isPrefetching.value,
+      pendingAsyncRequests: aSyncRequests.value.length,
+      pendingPreRequests: aSyncPreRequests.value.length,
+      currentMontage: viewerMontageScheme.value,
+      channelCount: viewerChannels.value?.length || 0,
+      visibleChannelCount: viewerChannels.value?.filter(ch => ch.visible).length || 0,
+      connectionStatus: connectionStatus.value,
+      requestedPages: Array.from(requestedPages.value.entries()).map(([pageStart, info]) => ({
+        pageStart,
+        channelCount: info.count,
+        inViewport: info.inViewport,
+        age: Date.now() - info.ts,
+        channels: info.channels?.map(ch => ch.id) || Array.from(info.counter.keys())
+      }))
+    }
+
+    console.log('📊 Prefetch Monitor:', stats)
+
+    // Check for stuck requests (older than 10 seconds)
+    const stuckRequests = stats.requestedPages.filter(page => page.age > 10000)
+    if (stuckRequests.length > 0) {
+      console.warn('⚠️ Detected stuck requests:', stuckRequests)
+    }
+
+    // Check if prefetch is blocked
+    if (stats.pendingPreRequests > 0 && !stats.isPrefetching) {
+      console.warn('⚠️ Prefetch is blocked with pending requests:', {
+        pendingPreRequests: stats.pendingPreRequests,
+        requestedPagesSize: stats.requestedPagesSize
+      })
+    }
+
+  }, 5000) // Log every 5 seconds
+
+  // Clear interval on unmount
+  onUnmounted(() => {
+    clearInterval(interval)
+  })
 }
 
 const generateAndProcessRequests = async () => {
@@ -464,14 +521,28 @@ watch(() => props.duration, (newDuration, oldDuration) => {
 
 watch(() => viewerMontageScheme.value, (newScheme) => {
   if (websocket.value && websocket.value.readyState === 1) {
+    console.log('🔄 Montage changing to:', newScheme)
+
+    // Clear all pending requests and data
+    requestedPages.value.clear()
+    clearRequests()
+    invalidate()
+
+    // Reset stale data tracking
+    staleDataCounter.value = 0
+    lastRequestedSamplePeriod.value = null
+    lastRequestStart.value = null
+    lastRequestDuration.value = null
+
+    // Clear channels to force re-initialization
+    channelsReady.value = false
+
     // Create the proper payload using createMontagePayload
     const montagePayload = createMontagePayload(newScheme)
-
     console.log('📡 Sending montage payload:', montagePayload)
 
     if (montagePayload) {
-      // Use send() directly instead of sendMontageMessage()
-      send(montagePayload) // ✅ This sends the proper format
+      send(montagePayload)
     }
   }
 })
@@ -488,30 +559,44 @@ watch(() => [props.start, props.duration, props.cWidth, props.cHeight, props.rsP
 
 // WebSocket event handlers
 onSegment((segmentData) => {
-  // console.log('✅ SEGMENT RECEIVED:', {
-  //   pageStart: segmentData.pageStart,
-  //   type: segmentData.type,
-  //   channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
-  //   channelName: segmentData.data?.label || segmentData.data?.name,
-  //   nrPoints: segmentData.data?.nrPoints,
-  //   startTs: segmentData.data?.startTs,
-  //   hasValidation: typeof isDataCurrentForViewport === 'function'
-  // })
+  // 🔍 ADD MONITORING LOGIC HERE (before existing logic)
+  const isOutsideViewport = segmentData.pageStart >= (props.start + props.duration)
 
-  // ADD THESE LINES:
-  // console.log('🔍 Validation check...')
-  // console.log('📞 Calling dataCallback with:', segmentData.type)
+  if (isOutsideViewport) {
+    console.log('📦 Prefetch data received:', {
+      pageStart: segmentData.pageStart,
+      channelId: segmentData.data?.chId || segmentData.data?.source,
+      channelName: segmentData.data?.label || segmentData.data?.name,
+      type: segmentData.type,
+      nrPoints: segmentData.data?.nrPoints,
+      viewportStart: props.start,
+      viewportEnd: props.start + props.duration
+    })
+
+    prefetchStats.value.totalRequests++
+    if (viewerMontageScheme.value !== 'NOT_MONTAGED') {
+      prefetchStats.value.montageRequests++
+    } else {
+      prefetchStats.value.singleChannelRequests++
+    }
+  }
+
+  // 🔄 EXISTING LOGIC (unchanged)
+  console.log('✅ SEGMENT RECEIVED:', {
+    pageStart: segmentData.pageStart,
+    type: segmentData.type,
+    channelId: segmentData.data?.chId || segmentData.data?.source || segmentData.data?.id,
+    channelName: segmentData.data?.label || segmentData.data?.name,
+    nrPoints: segmentData.data?.nrPoints,
+    startTs: segmentData.data?.startTs,
+    hasValidation: typeof isDataCurrentForViewport === 'function'
+  })
 
   dataCallback(segmentData)
 
-  // console.log('✅ dataCallback completed')
-
   // Check if returned page falls in viewport
   if (segmentData.pageStart < (props.start + props.duration)) {
-    // console.log('🎯 Segment in viewport - triggering render')
     throttledGetRenderData()
-  } else {
-    // console.log('📦 Segment outside viewport (prefetch)')
   }
 })
 
@@ -610,6 +695,21 @@ onMounted(async () => {
       userToken,
     )
   }
+
+  monitorPrefetchActivity()
+
+  console.log('🚀 TSPlotCanvas mounted with config:', {
+    activeViewerId: activeViewer.value?.content?.id,
+    initialMontage: viewerMontageScheme.value,
+    baseChannelCount: baseChannels.value?.length || 0,
+    viewport: {
+      start: props.start,
+      duration: props.duration,
+      width: props.cWidth,
+      height: props.cHeight,
+      rsPeriod: props.rsPeriod
+    }
+  })
 })
 
 onUnmounted(() => {

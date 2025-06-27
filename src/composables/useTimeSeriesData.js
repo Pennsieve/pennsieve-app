@@ -170,38 +170,33 @@ export const useTimeSeriesData = () => {
         const serverResponseId = obj.data.chId || obj.data.source
         const serverResponseName = obj.data.label || obj.data.name
 
-        // ✅ ROBUST MATCHING: Try multiple strategies
-        for (let ch = 0; ch < chData.value.length; ch++) {
-            const channel = chData.value[ch]
+        // ✅ ROBUST MATCHING: Find exact match first (serverId + label)
+        curChData = chData.value.find(channel =>
+            channel.serverId === serverResponseId &&
+            channel.label === serverResponseName
+        )
 
-            // Strategy 1: serverId + name (preferred)
-            if (channel.serverId === serverResponseId && channel.label === serverResponseName) {
-                curChData = channel
-                break
-            }
-
-            // Strategy 3: id + name (fallback)
-            if (channel.id === serverResponseId && channel.label === serverResponseName) {
-                curChData = channel
-                break
-            }
-
-            // Strategy 4: name only (last resort for non-montaged)
-            if (channel.label === serverResponseName) {
-                curChData = channel
-                break
-            }
-        }
-
-        if (!curChData) {
-            console.warn('No matching channel found for data:', {
-                id: serverResponseId,
-                name: serverResponseName
+        if (curChData) {
+            console.log('✅ EXACT MATCH found:', curChData.id)
+        } else {
+            // ❌ REJECT serverId-only matches for safety
+            console.error('❌ NO EXACT MATCH - rejecting to prevent data corruption:', {
+                serverResponseId,
+                serverResponseName,
+                availableChannels: chData.value.map(ch => ({
+                    id: ch.id,
+                    serverId: ch.serverId,
+                    label: ch.label,
+                    matches: {
+                        serverId: ch.serverId === serverResponseId,
+                        label: ch.label === serverResponseName
+                    }
+                }))
             })
-            return
+            return // 🚨 STOP here to prevent wrong data attribution
         }
 
-        // Process based on type
+        // ✅ PROCESS THE DATA (existing logic)
         switch (obj.type) {
             case 'gap':
             case 'Neural':
@@ -209,6 +204,7 @@ export const useTimeSeriesData = () => {
                 // Check if data already exists
                 let addData = false
                 let curSegments = curChData && curChData.segments
+
                 if (curSegments && obj.type !== 'gap') {
                     addData = true
                     if (curSegments.length > 0) {
@@ -224,23 +220,28 @@ export const useTimeSeriesData = () => {
                     }
                 }
 
-                // Remove from requested pages
+                // ✅ CRITICAL: Update request counter for the CORRECT channel
                 let requestedPage = requestedPages.value.get(obj.data.pageStart)
                 if (requestedPage) {
                     let countForChannel = requestedPage.counter.get(curChData.id)
 
                     if (isNaN(countForChannel)) {
-                        countForChannel = obj.nrResponses
+                        countForChannel = obj.nrResponses || 1
                         requestedPage.counter.set(curChData.id, countForChannel)
-                        countForChannel = countForChannel - 1
-                        requestedPage.counter.set(curChData.id, countForChannel)
-                    } else if (countForChannel > 0) {
-                        countForChannel = countForChannel - 1
-                        requestedPage.counter.set(curChData.id, countForChannel)
-                    } else {
-                        return  // Already complete
                     }
 
+                    if (countForChannel > 0) {
+                        countForChannel = countForChannel - 1
+                        requestedPage.counter.set(curChData.id, countForChannel)
+
+                        console.log('📊 Updated counter for channel:', {
+                            channelId: curChData.id,
+                            pageStart: obj.data.pageStart,
+                            newCount: countForChannel
+                        })
+                    }
+
+                    // Check if page is complete
                     if (countForChannel === 0) {
                         let isComplete = true
                         for (let [chId, count] of requestedPage.counter.entries()) {
@@ -252,20 +253,27 @@ export const useTimeSeriesData = () => {
 
                         if (isComplete) {
                             requestedPages.value.delete(obj.data.pageStart)
+                            console.log('✅ Page completed and removed:', {
+                                pageStart: obj.data.pageStart,
+                                remainingPages: requestedPages.value.size
+                            })
                         }
                     }
-
-                } else {
-                    // console.log('❓ No requestedPage found for pageStart:', obj.data.pageStart)
                 }
 
                 // Add data to cache
                 if (addData) {
                     curSegments.push(obj.data)
-                    curSegments.sort(function Comparator(a, b) {
+                    curSegments.sort((a, b) => {
                         if (a.startTs < b.startTs) return -1
                         if (a.startTs > b.startTs) return 1
                         return 0
+                    })
+
+                    console.log('📈 Added data to cache:', {
+                        channelId: curChData.id,
+                        pageStart: obj.data.pageStart,
+                        nrPoints: obj.data.nrPoints
                     })
                 }
                 break
