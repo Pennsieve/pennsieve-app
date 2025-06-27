@@ -1,7 +1,6 @@
 <script setup>
 
 import bfButton from "@/components/shared/bf-button/BfButton.vue";
-import IconPlus from "@/components/icons/IconPlus.vue";
 import {useStore} from "vuex";
 import {computed, ref} from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
@@ -11,14 +10,22 @@ import ConfirmationDialog from "@/components/shared/ConfirmationDialog/Confirmat
 import toQueryParams from "@/utils/toQueryParams";
 import {useGetToken} from "@/composables/useGetToken";
 import {useSendXhr} from "@/mixins/request/request_composable";
+import { useViewerStore } from '@/stores/tsviewer'
+
+const viewerStore = useViewerStore()
+
+const workspaceMontages = computed(() => {
+  return viewerStore.workspaceMontages // or however it's structured in Pinia
+});
+
+const selectedMontageName = computed(() => viewerStore.viewerMontageScheme)
+
+function onMontageSelected(montageName) {
+  viewerStore.setViewerMontageScheme(montageName) // Use Pinia action
+}
 
 const store = useStore();
 const emit = defineEmits(["open-new-montage"]);
-
-
-const workspaceMontages = computed(() => {
-  return store.getters["viewerModule/workspaceMontages"];
-});
 
 const props = defineProps({
   windowHeight: {
@@ -27,7 +34,6 @@ const props = defineProps({
   },
 })
 
-const selectedMontageName = computed(() => store.state.viewerModule.viewerMontageScheme)
 
 const expandedMontages = computed( () => {
   const defaultMontage = {
@@ -58,10 +64,6 @@ function closeCreateMontageDialog() {
   createMontageDialogVisible.value = false
 }
 
-function onMontageSelected(montageName) {
-  store.dispatch('viewerModule/setViewerMontageScheme', montageName)
-}
-
 function deleteMontage(item){
   deleteMontageItem.value = item
   confirmationDialogVisible.value = true
@@ -70,7 +72,6 @@ function deleteMontage(item){
 const confirmationDialogVisible = ref(false)
 
 function doDeleteMontage(evt) {
-  console.log('hello' + evt)
   confirmationDialogVisible.value = false
 
   const endpoint = `${store.state.config.api2Url}/timeseries/montages`;

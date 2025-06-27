@@ -130,7 +130,7 @@ export const useDataRequests = () => {
             }
 
             // Iterate over blocks in viewport
-            let endRequestTime = start + duration + (constants.PREFETCHPAGES || 3) * pageSize
+            let endRequestTime = start + duration + constants.PREFETCHPAGES * pageSize
             if (endRequestTime > ts_end) {
                 endRequestTime = ts_end
             }

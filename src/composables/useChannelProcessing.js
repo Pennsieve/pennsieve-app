@@ -2,8 +2,7 @@
 import { computed, reactive, ref, watch, readonly } from 'vue'
 import { head, propOr, findIndex, propEq } from 'ramda'
 
-export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspaceMontages) => {
-    // Processing state
+export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspaceMontages, activeViewer) => {    // Processing state
     const processingStats = reactive({
         totalChannels: 0,
         processedChannels: 0,
@@ -208,26 +207,31 @@ export const useChannelProcessing = (baseChannels, viewerMontageScheme, workspac
     /**
      * Create montage payload for WebSocket messages
      */
-    const createMontagePayload = (montageScheme, packageId) => {
-        const scheme = montageScheme || viewerMontageScheme.value
+    const createMontagePayload = (montageSchemeName) => {
+        // Handle the default "NOT_MONTAGED" case
+        if (montageSchemeName === "NOT_MONTAGED") {
+            return {
+                montage: "NOT_MONTAGED",
+                packageId: activeViewer.value?.content?.id,
+                montageMap: []
+            }
+        }
 
-        switch (scheme) {
-            case 'NOT_MONTAGED':
-                return {
-                    montage: 'NOT_MONTAGED',
-                    packageId
-                }
+        // Find the selected montage by name
+        const selectedMontage = workspaceMontages.value.find(m => m.name === montageSchemeName)
 
-            default:
-                // Custom montage
-                const montageData = workspaceMontages.value?.find(m => m.name === scheme)
+        if (!selectedMontage) {
+            console.warn('Montage not found:', montageSchemeName)
+            return null
+        }
 
-                return {
-                    montage: 'CUSTOM_MONTAGE',
-                    packageId,
-                    montageMap: montageData || scheme,
-                    montageName: scheme
-                }
+        // Convert channelPairs to the array format the server expects
+        const montageMap = selectedMontage.channelPairs.map(pair => pair.channels)
+
+        return {
+            montage: "CUSTOM_MONTAGE",
+            packageId: activeViewer.value?.content?.id,
+            montageMap: montageMap
         }
     }
 

@@ -2,11 +2,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as site from "@/site-config/site.json";
+import {useGetToken} from "@/composables/useGetToken";
+import toQueryParams from "@/utils/toQueryParams";
 
-export const useViewerStore = defineStore('useViewerStore', () => {
-    // State (from original Vuex state)
-    const config = ref(site)
-    const activeViewer = ref(null)
+import vuexStore from '../store/index'  // Assuming your Vuex store is exported from vuexStore.js
+
+export const useViewerStore = defineStore('tsviewer', () => {
+
     const viewerChannels = ref([])
     const viewerMontageScheme = ref('NOT_MONTAGED')
     const customMontageMap = ref({})
@@ -19,11 +21,6 @@ export const useViewerStore = defineStore('useViewerStore', () => {
             return workspaceMontages.value.find(montage => montage.name === name)
         }
     })
-
-    // Actions (from original Vuex actions)
-    const setActiveViewer = (viewer) => {
-        activeViewer.value = viewer
-    }
 
     const setChannels = (channels) => {
         viewerChannels.value = channels
@@ -66,7 +63,6 @@ export const useViewerStore = defineStore('useViewerStore', () => {
 
     // Reset all state
     const resetViewer = () => {
-        activeViewer.value = null
         viewerChannels.value = []
         viewerMontageScheme.value = 'NOT_MONTAGED'
         customMontageMap.value = {}
@@ -74,21 +70,50 @@ export const useViewerStore = defineStore('useViewerStore', () => {
         viewerErrors.value = null
     }
 
+    const fetchWorkspaceMontages = async () => {
+        try {
+            let endpoint = `${site.api2Url}/timeseries/montages`
+            const token = await useGetToken()
+
+            const queryParams = toQueryParams({
+                organization_id: vuexStore.getters.activeOrganization.organization.id
+            })
+
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+
+            if (resp.ok) {
+                const montages = await resp.json()
+                setWorkspaceMontages(montages)
+                return montages.montages
+            } else {
+                return Promise.reject(resp)
+            }
+        } catch (err) {
+            return Promise.reject(err)
+        }
+    }
+
     return {
         // State
-        activeViewer,
         viewerChannels,
         viewerMontageScheme,
         customMontageMap,
         workspaceMontages,
         viewerErrors,
-        config,
 
         // Getters
         getMontageMessageByName,
 
         // Actions
-        setActiveViewer,
         setChannels,
         setViewerMontageScheme,
         setCustomMontageMap,
@@ -98,46 +123,7 @@ export const useViewerStore = defineStore('useViewerStore', () => {
         updateChannelVisibility,
         updateChannelSelection,
         updateChannelFilter,
-        resetViewer
+        resetViewer,
+        fetchWorkspaceMontages
     }
 })
-
-// For backward compatibility with existing Vuex usage
-export const createViewerStoreCompat = () => {
-    const store = viewerStore()
-
-    return {
-        state: {
-            viewerModule: {
-                get activeViewer() { return store.activeViewer },
-                get viewerChannels() { return store.viewerChannels },
-                get viewerMontageScheme() { return store.viewerMontageScheme },
-                get customMontageMap() { return store.customMontageMap },
-                get workspaceMontages() { return store.workspaceMontages },
-                get viewerErrors() { return store.viewerErrors }
-            }
-        },
-
-        dispatch: (action, payload) => {
-            switch (action) {
-                case 'viewerModule/setChannels':
-                    store.setChannels(payload)
-                    break
-                case 'viewerModule/setViewerErrors':
-                    store.setViewerErrors(payload)
-                    break
-                case 'viewerModule/setViewerMontageScheme':
-                    store.setViewerMontageScheme(payload)
-                    break
-                case 'viewerModule/setActiveViewer':
-                    store.setActiveViewer(payload)
-                    break
-                case 'viewerModule/setWorkspaceMontages':
-                    store.setWorkspaceMontages(payload)
-                    break
-                default:
-                    console.warn(`Unknown action: ${action}`)
-            }
-        }
-    }
-}

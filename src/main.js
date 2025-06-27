@@ -27,7 +27,7 @@ import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
-import { useViewerStore } from '@/stores/viewerStore'
+import { useViewerStore } from '@/stores/tsviewer'
 
 
 
@@ -39,14 +39,14 @@ cognitoUserPoolsTokenProvider.setKeyValueStorage(
         }
     ));
 
-const pinia = createPinia()
 
 const app = createApp(App)
 
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
-app.use(pinia)
+
+app.use(createPinia())
 
 
 //Import Dashboard
@@ -69,10 +69,6 @@ app.use(VueReCaptcha, {
         }
     },
   })
-
-// Initialize the store so it shows up in devtools immediately
-const viewerStore = useViewerStore()
-console.log('Viewer store initialized:', viewerStore)
 
 app.use(router);
 

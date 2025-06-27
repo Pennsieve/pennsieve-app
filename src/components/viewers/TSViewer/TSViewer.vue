@@ -4,7 +4,7 @@
     ref="ts_viewer"
     :class="[ isPreview ? 'timeseries-viewer preview' : 'timeseries-viewer' ]"
   >
-    <timeseries-scrubber
+    <TimeseriesScrubber
       ref="scrubber"
       :ts_start="ts_start"
       :ts_end="ts_end"
@@ -18,13 +18,13 @@
     />
 
     <div id="channelCanvas">
-<!--       Channel labels-->
+      <!--       Channel labels-->
       <div
         id="channelLabels"
         ref="channelLabels"
       >
         <div
-          v-for="item in viewerStore.viewerChannels"
+          v-for="item in viewerChannels"
           :key="item.displayName"
         >
           <div
@@ -52,8 +52,8 @@
         </div>
       </div>
 
-<!--       Timeseries viewport-->
-      <timeseries-viewer-canvas
+      <!--       Timeseries viewport-->
+      <TimeseriesViewerCanvas
         ref="viewerCanvas"
         :window_height="window_height"
         :window_width="window_width"
@@ -66,6 +66,8 @@
         :ts-end="ts_end"
         :cursor-loc="cursorLoc"
         :global-zoom-mult="globalZoomMult"
+        :active-viewer="activeViewer"
+        :config="config"
         @setStart="updateStart"
         @setCursor="setCursor"
         @setGlobalZoom="setGlobalZoom"
@@ -78,7 +80,7 @@
       />
     </div>
 
-    <timeseries-viewer-toolbar
+    <TimeseriesViewerToolbar
       v-if="!isPreview"
       :constants="constants"
       :duration="duration"
@@ -93,560 +95,602 @@
       @setStart="updateStart"
     />
 
-   <timeseries-filter-modal
-     ref="filterWindow"
-     :visible="filterWindowOpen"
-     @update:visible="filterWindowOpen = $event"
-     @closeWindow="onCloseFilterWindow"
-   />
+    <TimeseriesFilterModal
+      ref="filterWindow"
+      :visible="filterWindowOpen"
+      @update:visible="filterWindowOpen = $event"
+      @closeWindow="onCloseFilterWindow"
+    />
 
-<timeseries-annotation-modal
-     ref="annotationModal"
-     :visible="annotationWindowOpen"
-     @update:visible="annotationWindowOpen = $event"
-     @closeWindow="onCloseAnnotationWindow"
-     @createUpdateAnnotation="onCreateUpdateAnnotation"
-   />
+    <TimeseriesAnnotationModal
+      ref="annotationModal"
+      :visible="annotationWindowOpen"
+      @update:visible="annotationWindowOpen = $event"
+      @closeWindow="onCloseAnnotationWindow"
+      @createUpdateAnnotation="onCreateUpdateAnnotation"
+    />
 
-
-<!--    <timeseries-annotation-layer-modal-->
-<!--      ref="layerModal"-->
-<!--      :annotation-layer-window-open="annotationLayerWindowOpen"-->
-<!--      @closeWindow="onCloseAnnotationLayerWindow"-->
-<!--      @createLayer="onCreateAnnotationLayer"-->
-<!--    />-->
-
-   <ts-annotation-delete-dialog
+    <TsAnnotationDeleteDialog
       :visible="isTsAnnotationDeleteDialogVisible"
       :delete-annotation="annotationDelete"
       @update:visible="isTsAnnotationDeleteDialogVisible = $event"
       @delete="deleteAnnotation"
     />
 
-
   </div>
 </template>
 
-<script>
-    import {
-        mapState, mapActions
-    } from 'vuex'
+<script setup>
+import {
+  ref,
+  reactive,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  defineAsyncComponent
+} from 'vue'
+import { useStore } from 'vuex'
+import { storeToRefs } from 'pinia'
+import {
+  head,
+  pathOr,
+  propOr,
+  isEmpty
+} from 'ramda'
 
-    import {
-        head,
-        pathOr,
-        propOr,
-        isEmpty
-    } from 'ramda'
+import { useViewerStore } from "@/stores/tsviewer"
+import { useTsAnnotation } from "@/composables/useTsAnnotation"
 
-    import { nextTick } from 'vue';
-    import ViewerActiveTool from '@/mixins/viewer-active-tool'
-    import Request from '@/mixins/request'
-    import TsAnnotation from '@/mixins/ts-annotation'
-    import { defineAsyncComponent } from 'vue'
-    import {useViewerStore} from "@/stores/viewerStore";
-    import { mapStores } from 'pinia'
+// Component imports (required for <script setup>)
+const TimeseriesScrubber = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue'))
+const TimeseriesViewerCanvas = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerCanvas.vue'))
+const TimeseriesViewerToolbar = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerToolbar.vue'))
+const TimeseriesFilterModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue'))
+const TimeseriesAnnotationModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
+const TsAnnotationDeleteDialog = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue'))
 
+// Define props
+const props = defineProps({
+  isPreview: {
+    type: Boolean,
+    default: false
+  }
+})
 
-    export default {
-        name: 'TimeseriesViewer',
+// Store setup
+const store = useStore()
+const viewerStore = useViewerStore()
+const { viewerChannels } = storeToRefs(viewerStore)
 
-        components:{
-          'ts-create-montage-dialog': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TsCreateMontageDialog.vue')),
-          'timeseries-scrubber': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue')),
-          'timeseries-viewer-canvas': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerCanvas.vue')),
-          'timeseries-viewer-toolbar': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerToolbar.vue')),
-          'timeseries-filter-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue')),
-          'timeseries-annotation-layer-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSViewerLayerWindow.vue')),
-          'ts-annotation-delete-dialog': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue')),
-          'timeseries-annotation-modal': defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
-        },
+// TsAnnotation composable setup
+const {
+  addAnnotation,
+  updateAnnotation,
+  removeAnnotation,
+  getChannelId: getChannelIdFromAnnotation,
+  sortAnns
+} = useTsAnnotation()
 
-        mixins: [
-            Request,
-            ViewerActiveTool,
-            TsAnnotation,
-        ],
-        watch: {
-            viewerSidePanelOpen: {
-                handler: function() {
-                    this.onResize()
-                },
-                immediate: true
-            },
-        },
-        props: {
-          isPreview: {
-            type: Boolean,
-            default: false
-          }
-        },
+// Template refs
+const ts_viewer = ref(null)
+const scrubber = ref(null)
+const channelLabels = ref(null)
+const viewerCanvas = ref(null)
+const filterWindow = ref(null)
+const annotationModal = ref(null)
 
-        computed: {
-            ...mapStores(useViewerStore),
-            ...mapState([
-                'config',
-            ]),
-            ...mapState('viewerModule', [
-                'activeViewer',
-                'viewerSidePanelOpen',
-                'viewerAnnotations',
-                'viewerMontageScheme'
-            ]),
+// Reactive data
+const constants = reactive({
+  TIMEUNIT: 'microSeconds',   // Basis for time
+  XOFFSET: 0,                 // X-offset of graph in canvas
+  XGRIDSPACING: 1000000,      // Time in microseconds between vertical lines
+  NRPXPERLABEL: 150,          // Number of pixels per label on x-axis
+  USEREALTIME: true,          // If true than interpret timepoints as UTC microseconds.
+  DEFAULTDPI: 96,             // Default pixels per inch
+  ANNOTATIONLABELHEIGHT: 20,  // Height of annotation label
+  ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
+  MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
+  PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
+  PREFETCHPAGES: 3,           // Number of pages to read ahead of view.
+  LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
+  USEMEDIAN: false,           // Use Median instead of mean for centering channels
+  CURSOROFFSET: 5,            // Offset of cursor canvas
+  SEGMENTSPAN: 1209600000000, // One week of gap-data is returned per request.
+  MAXRECURSION: 20,           // Maximum recursion depth of gap-data requests (max 2 years)
+  MAXDURATION: 600000000,     // Maximum duration window (5min)
+  INITDURATION: 15000000      // Initial duration window  (15sec)
+})
 
-            _cpStyleLabels: function(height, nrVisCh) {
-              const h = Math.max(1, Math.min(12, (height)/nrVisCh-2));
-              return 'font-size:' + h + 'px; height:' + h + 'px';
-            },
-            hideLabelInfo: function() {
-                let hide = false;
-                if (this.cHeight/this.nrVisChannels < 30) {
-                    hide = true;
-                }
-                return hide;
-            },
-            nrVisChannels: function() {
-                this.viewerStore.viewerChannels.reduce((accumulator, currentValue) => {
-                  if(currentValue.visible) {
-                    return accumulator + 1
-                  }
-                  return accumulator
-                }, 0)
-            },
+const ts_start = ref(null)
+const ts_end = ref(null)
+const window_height = ref(0)
+const window_width = ref(0)
+const start = ref(0)                // Start Timestamp of viewer in microseconds
+const duration = ref(0)            // Length of data in viewer in microseconds (ignore gaps)
+const cWidth = ref(0)
+const cHeight = ref(0)
+const labelWidth = ref(0)
+const globalZoomMult = ref(1)
+const cursorLoc = ref(1/10)
+const filterWindowOpen = ref(false)
+const annotationWindowOpen = ref(false)
+const annotationLayerWindowOpen = ref(false)
+const annotationDelete = ref(null)
+const isTsAnnotationDeleteDialogVisible = ref(false)
 
-        },
-        data: function () {
-            return {
-                constants: {
-                      TIMEUNIT: 'microSeconds',   // Basis for time
-                      XOFFSET: 0,                 // X-offset of graph in canvas
-                      XGRIDSPACING: 1000000,      // Time in microseconds between vertical lines
-                      NRPXPERLABEL: 150,          // Number of pixels per label on x-axis
-                      USEREALTIME: true,          // If true than interpret timepoints as UTC microseconds.
-                      DEFAULTDPI: 96,             // Default pixels per inch
-                      ANNOTATIONLABELHEIGHT: 20,  // Height of annotation label
-                      ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
-                      MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
-                      PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
-                      PREFETCHPAGES: 3,           // Number of pages to read ahead of view.
-                      LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
-                      USEMEDIAN: false,           // Use Median instead of mean for centering channels
-                      CURSOROFFSET: 5,            // Offset of cursor canvas
-                      SEGMENTSPAN: 1209600000000, // One week of gap-data is returned per request.
-                      MAXRECURSION: 20,           // Maximum recursion depth of gap-data requests (max 2 years)
-                      MAXDURATION: 600000000,     // Maximum duration window (5min)
-                      INITDURATION: 15000000      // Initial duration window  (15sec)
-                  },
-                summary: {},
-                ts_start: null,
-                ts_end: null,
-                window_height: 0,
-                window_width:0,
-                start:0,                // Start Timestamp of viewer in microseconds
-                duration: 0,            // Length of data in viewer in microseconds (ignore gaps)
-                cWidth: 0,
-                cHeight: 0,
-                labelWidth:0,
-                globalZoomMult: 1,
-                cursorLoc: 1/10,
-                filterWindowOpen: false,
-                annotationWindowOpen: false,
-                annotationLayerWindowOpen: false,
-                annotationDelete: null,
-                isTsAnnotationDeleteDialogVisible: false,
-                viewerStore: useViewerStore()
-            }
-        },
+// Computed properties
+const activeViewer = computed(() => store.state.viewerModule.activeViewer)
+const viewerSidePanelOpen = computed(() => store.state.viewerModule.viewerSidePanelOpen)
+const viewerAnnotations = computed(() => store.state.viewerModule.viewerAnnotations)
+const viewerMontageScheme = computed(() => store.state.viewerModule.viewerMontageScheme)
+const config = computed(() => store.state.config)
 
-        mounted: function () {
-            //
-            this.viewerStore.setActiveViewer(this.activeViewer)
-            this.initChannels()
-            var style = window.getComputedStyle(document.getElementById("ts_viewer"), null);
-            const hhh = parseInt(style.getPropertyValue('height'));
+const hideLabelInfo = computed(() => {
+  let hide = false
+  if (cHeight.value / nrVisChannels.value < 30) {
+    hide = true
+  }
+  return hide
+})
 
-            const toolbarOffset = this.isPreview? 0 : 100
+const nrVisChannels = computed(() => {
+  return viewerChannels.value.reduce((accumulator, currentValue) => {
+    if (currentValue.visible) {
+      return accumulator + 1
+    }
+    return accumulator
+  }, 0)
+})
 
-            // Fetch the workspace montages
-            this.fetchWorkspaceMontages()
+const _cpStyleLabels = computed(() => {
+  return (height, nrVisCh) => {
+    const h = Math.max(1, Math.min(12, height / nrVisCh - 2))
+    return 'font-size:' + h + 'px; height:' + h + 'px'
+  }
+})
 
-            this.window_height = hhh - toolbarOffset;
-            this.window_width = this.$refs.ts_viewer.offsetWidth
-            window.addEventListener('resize', this.onResize)
+// Methods that need to be defined early (used in watchers)
+const onResize = async (event) => {
+  console.log('onresize...')
+  if (!ts_viewer.value) {
+    return
+  }
 
-            const labelDiv = this.$refs.channelLabels
-            this.labelWidth = labelDiv.clientWidth
-            this.cWidth = (this.window_width - labelDiv.clientWidth - 5 - 10)
-            this.cHeight = (this.window_height - 88)
-            this.duration = this.constants['INITDURATION']
+  const element = document.getElementById("ts_viewer")
+  if (!element) {
+    return
+  }
 
-        },
+  var style = window.getComputedStyle(element, null)
+  const hhh = parseInt(style.getPropertyValue('height'))
 
-        beforeUnmount() {
-            window.removeEventListener('resize', this.onResize)
-        },
+  const toolbarOffset = props.isPreview ? 0 : 100
 
-        methods: {
-          ...mapActions( 'viewerModule', [
-              'fetchWorkspaceMontages',
-            ]),
-            openEditAnnotationDialog: function(annotation) {
-              this.$store.dispatch('viewerModule/setActiveAnnotation', annotation).then(() =>{
-                this.$refs.viewerCanvas.renderAnnotationCanvas()
-                this.annotationWindowOpen = true
-              })
-            },
-            onUpdateAnnotation: function(annotation) {
-              this.openEditAnnotationDialog(annotation)
-            },
-            onCreateUpdateAnnotation: function(annotation) {
-              this.annotationWindowOpen = false
-              if (annotation.id) {
-                this.updateAnnotation()
-              } else {
-                this.addAnnotation()
-              }
-            },
-            onAnnotationUpdated: function() {
-              this.$refs.viewerCanvas.renderAnnotationCanvas()
-            },
-            onOpenAnnotationWindow: function() {
-              this.annotationWindowOpen = true
-            },
-            confirmDeleteAnnotation: function(annotation) {
-              this.annotationDelete = annotation
-              this.isTsAnnotationDeleteDialogVisible = true
-            },
-            deleteAnnotation: function(annotation) {
-              this.isTsAnnotationDeleteDialogVisible = false
-              this.removeAnnotation(annotation)
-            },
-            onAnnotationDeleted: function() {
-              this.$refs.viewerCanvas.renderAnnotationCanvas()
-            },
-            onAddAnnotation: function (start, duration, onAll, label, description, layer) {
-              this.addAnnotation(start, duration, onAll, label, description, layer)
-            },
-            onAnnotationCreated: function() {
-              this.$refs.viewerCanvas.renderAnnotationCanvas()
-            },
-            onCreateAnnotationLayer: function (newLayer) {
-                this.$refs.viewerCanvas.createAnnotationLayer(newLayer)
-            },
-            onCloseAnnotationLayerWindow: function() {
-              this.annotationLayerWindowOpen = false
-            },
-            onCloseAnnotationWindow: function() {
-              this.$refs.viewerCanvas.resetFocusedAnnotation()
-              this.$refs.viewerCanvas.renderAnnotationCanvas()
-              this.annotationWindowOpen = false
-            },
-            onCloseFilterWindow: function() {
-                this.filterWindowOpen = false
-            },
-            onLabelTap: function(e) {
-                e.stopPropagation();
-                e.preventDefault();
+  window_height.value = hhh - toolbarOffset
 
-                const append = e.detail.sourceEvent.metaKey;
-                this.selectChannel({channelId: e.currentTarget.dataset.id, append:append});
-                this.$refs.viewerCanvas.renderAll()
-            },
-            onNextAnnotation: function () {
-                this.start  = this.$refs.viewerCanvas.getNextAnnotation()
-            },
-            onPreviousAnnotation: function () {
-                this.start  = this.$refs.viewerCanvas.getPreviousAnnotation()
-            },
-            onUpdateDuration: function(value) {
-                this.setDuration(value * 1e6)
-            },
-            onIncrementZoom: function () {
-                this.globalZoomMult = this.globalZoomMult * 1.25
-            },
-            onDecrementZoom: function () {
-                this.globalZoomMult = this.globalZoomMult * 0.8
-            },
-            onAnnLayersInitialized: function () {
-                this.$refs.scrubber.getAnnotations()
-            },
-            onChannelsInitialized: function () {
-                this.$refs.scrubber.initSegmentSpans()
+  await nextTick()
+  window_width.value = ts_viewer.value.offsetWidth
 
-                // Resize the canvas as label length likely changed
-                this.$nextTick(() => {
-                    this.onResize()
-                })
+  const labelDiv = channelLabels.value
+  if (!labelDiv) {
+    return
+  }
 
-            },
-            onPageBack: function() {
-              console.log('Page forward triggered from toolbar')
+  labelWidth.value = labelDiv.clientWidth
+  cWidth.value = (window_width.value - labelDiv.clientWidth - 16)
+  cHeight.value = (window_height.value - 40)
+}
 
-              // Calculate new start position (go back by current duration)
-              const newStart = Math.max(
-                this.start - (3/4)*this.duration,
-                this.ts_start
-              )
+// Watchers
+watch(viewerSidePanelOpen, () => {
+  // Only call onResize if component is mounted and elements exist
+  if (ts_viewer.value) {
+    onResize()
+  }
+}, { immediate: false }) // Changed from immediate: true to avoid early execution
 
-              this.updateStart(newStart)
+// Methods
+const fetchWorkspaceMontages = async () => {
+  return viewerStore.fetchWorkspaceMontages()
+}
 
-              // Trigger re-render
-              this.$nextTick(() => {
-                this.$refs.viewerCanvas?.renderAll()
-              })
+const openEditAnnotationDialog = (annotation) => {
+  store.dispatch('viewerModule/setActiveAnnotation', annotation).then(() => {
+    viewerCanvas.value.renderAnnotationCanvas()
+    annotationWindowOpen.value = true
+  })
+}
 
-            },
-          onPageForward: function() {
-            console.log('Page forward triggered from toolbar')
+const onUpdateAnnotation = (annotation) => {
+  openEditAnnotationDialog(annotation)
+}
 
-            // Calculate new start position
-            const newStart = Math.min(
-              this.start + (3/4)*this.duration,
-              this.ts_end - this.duration
-            )
+const onCreateUpdateAnnotation = async (annotation) => {
+  annotationWindowOpen.value = false
+  try {
+    if (annotation.id) {
+      await updateAnnotation()
+      onAnnotationUpdated()
+    } else {
+      await addAnnotation()
+      onAnnotationCreated()
+    }
+  } catch (error) {
+    console.error('Error creating/updating annotation:', error)
+    // Could emit an error event or show a notification here
+  }
+}
 
-            console.log(`Moving from ${this.start} to ${newStart}`)
+const onAnnotationUpdated = () => {
+  viewerCanvas.value.renderAnnotationCanvas()
+}
 
-            // Update start position
-            this.updateStart(newStart)
+const onOpenAnnotationWindow = () => {
+  annotationWindowOpen.value = true
+}
 
-            // Force canvas to invalidate cache and fetch new data
-            this.$nextTick(() => {
-              if (this.$refs.viewerCanvas?.invalidate) {
-                this.$refs.viewerCanvas.invalidate()
-              }
-              if (this.$refs.viewerCanvas?.renderAll) {
-                this.$refs.viewerCanvas.renderAll()
-              }
-            })
-          },
-            selectAnnotation: function(payload) {
-              let rsPeriod = this.$refs.viewerCanvas.rsPeriod
-              this.updateStart(payload.annotation.start - ((this.cursorLoc*this.cWidth - this.constants['CURSOROFFSET']) * rsPeriod))
-            },
-            selectChannel: function(payload) {
-              const _channels = this.viewerStore.viewerChannels.map(channel => {
-                const selected = channel.selected
+const confirmDeleteAnnotation = (annotation) => {
+  annotationDelete.value = annotation
+  isTsAnnotationDeleteDialogVisible.value = true
+}
 
-                if (payload['append'] === false) {
-                  channel.selected = false
-                }
+const deleteAnnotation = async (annotation) => {
+  isTsAnnotationDeleteDialogVisible.value = false
+  try {
+    await removeAnnotation(annotation)
+    onAnnotationDeleted()
+  } catch (error) {
+    console.error('Error deleting annotation:', error)
+    // Could emit an error event or show a notification here
+  }
+}
 
-                if (payload['channelId'] === channel.id) {
-                  channel.selected = !selected
-                }
+const onAnnotationDeleted = () => {
+  viewerCanvas.value.renderAnnotationCanvas()
+}
 
-                return channel
-              })
+const onAddAnnotation = (start, duration, onAll, label, description, layer) => {
+  addAnnotation(start, duration, onAll, label, description, layer)
+}
 
-              this.$store.dispatch('viewerModule/setChannels', _channels)
+const onAnnotationCreated = () => {
+  viewerCanvas.value.renderAnnotationCanvas()
+}
 
-            },
-            selectChannels: function(ids, append) {
-                const channels = this.viewerChannels.map(channel => {
-                    if (append === false) {
-                        channel.selected = false
-                    }
-                    if( channel.id in ids) {
-                        channel.selected = true
-                    }
-                    return channel
-                })
+const onCreateAnnotationLayer = (newLayer) => {
+  viewerCanvas.value.createAnnotationLayer(newLayer)
+}
 
-                this.$store.dispatch('viewerModule/setChannels', channels)
-            },
-            updateStart: function(value) {
-                this.start = value
-            },
-            setCursor: function(value) {
-                // set the cursor location as a fraction of the width of the canvas
-                this.cursorLoc = value
-            },
-            setGlobalZoom: function(value) {
-                this.globalZoomMult = value
-            },
-            setDuration: function(value) {
-                if (value > this.constants['MAXDURATION']) {
-                    this.duration = this.constants['MAXDURATION']
-                } else {
-                    this.duration = value
-                }
+const onCloseAnnotationLayerWindow = () => {
+  annotationLayerWindowOpen.value = false
+}
 
-            },
-            getChannelId: function(channel) {
-                const isViewingMontage = this.viewerMontageScheme !== 'NOT_MONTAGED'
-                let id = propOr('', 'id', channel)
-                let list = []
-                if (isViewingMontage) {
-                    list = id.split('_')
-                    id = list.length ? head(list) : id // remove channel name from id
-                }
-                return id
-            },
-            async onResize(event) {
-              console.log('onresize...')
-                if (this.$refs.ts_viewer === undefined) {
-                    return
-                }
+const onCloseAnnotationWindow = () => {
+  viewerCanvas.value.resetFocusedAnnotation()
+  viewerCanvas.value.renderAnnotationCanvas()
+  annotationWindowOpen.value = false
+}
 
-              var style = window.getComputedStyle(document.getElementById("ts_viewer"), null);
-              const hhh = parseInt(style.getPropertyValue('height'));
+const onCloseFilterWindow = () => {
+  filterWindowOpen.value = false
+}
 
-              const toolbarOffset = this.isPreview? 0 : 100
+const onLabelTap = (e) => {
+  e.stopPropagation()
+  e.preventDefault()
 
-              this.window_height = hhh - toolbarOffset;
+  const append = e.detail.sourceEvent.metaKey
+  selectChannel({ channelId: e.currentTarget.dataset.id, append: append })
+  viewerCanvas.value.renderAll()
+}
 
-                // this.window_height = window.innerHeight - 100;
-                await nextTick();
-                this.window_width = this.$refs.ts_viewer.offsetWidth
+const onNextAnnotation = () => {
+  start.value = viewerCanvas.value.getNextAnnotation()
+}
 
-                const labelDiv = this.$refs.channelLabels;
-                this.labelWidth = labelDiv.clientWidth
-                this.cWidth = (this.window_width - labelDiv.clientWidth - 16);
-                this.cHeight = (this.window_height - 40);
+const onPreviousAnnotation = () => {
+  start.value = viewerCanvas.value.getPreviousAnnotation()
+}
 
-            },
-            _computeLabelInfo: function(item, globalZoomMult, rowscale) {
-                const n = ( ( (this.constants['DEFAULTDPI'] * window.devicePixelRatio)/(globalZoomMult * rowscale) )/25.4).toFixed(1);
-                return n+ ' ' + item.unit + '/mm'
-            },
-            initChannels: function() {
-                const channels = this.activeViewer.channels
-                if (channels.length > 0) {
-                    // Find Global start and end
-                    this.ts_start = channels[0].content.start
-                    this.ts_end = channels[0].content.end
-                    for (let ic = 1; ic<channels.length; ic++) {
-                        const spanStart = this.ts
-                        const spanEnd = pathOr(0, ['span', 'end', this.summary])
-                        if (channels[ic].content.start < this.ts_start) {
-                            this.ts_start = channels[ic].content.start
-                        }
-                        if (channels[ic].content.end > this.ts_end) {
-                            this.ts_end = channels[ic].content.end
-                        }
-                    }
+const onUpdateDuration = (value) => {
+  setDuration(value * 1e6)
+}
 
-                    this.start = this.ts_start
-                }
-            },
-            openLayerWindow: function(payload) {
-              const layerModal = this.$refs.layerModal
-              layerModal.isCreating = payload.isCreating
+const onIncrementZoom = () => {
+  globalZoomMult.value = globalZoomMult.value * 1.25
+}
 
-              if (!payload.isCreating) {
-                layerModal.layer = payload.layer
-              } else {
-                layerModal.layer = {}
-                // layerModal.setColorByIndex(this.viewerAnnotations.length % layerModal.colorOptions.length)
-              }
+const onDecrementZoom = () => {
+  globalZoomMult.value = globalZoomMult.value * 0.8
+}
 
-              this.annotationLayerWindowOpen = true
-            },
-            openFilterWindow: function(payload) {
+const onAnnLayersInitialized = () => {
+  scrubber.value.getAnnotations()
+}
 
-                const channels = propOr([], 'channels', payload);
-                const filter = propOr('', 'filter', payload);
-                const filterWindow = this.$refs.filterWindow;
-                filterWindow.onChannels = channels;
+const onChannelsInitialized = () => {
+  scrubber.value.initSegmentSpans()
 
-                if (!isEmpty(filter)) {
-                    filterWindow.input0 = filter.input0;
-                    filterWindow.input1 = filter.input1;
-                    // TODO: commenting the following code, 'filterWindow' does not seem to have '_filters' or '_notchValues' properties, review and add the following if needed
-                    // for (let i=0; i<._filters.length; i++) {
-                    //     if (filterWindow._filters[i].value === filter.type) {
-                    //         filterWindow.selectedFilter = filter.type;
-                    //         break;
-                    //     }
-                    // }
+  // Resize the canvas as label length likely changed
+  nextTick(() => {
+    onResize()
+  })
+}
 
-                    // for (let i=0; i<filterWindow._notchValues?.length; i++) {
-                    //     if (filterWindow._notchValues[i].value === filter.notchFreq) {
-                    //         filterWindow.selectedNotch = filter.notchFreq;
-                    //         break;
-                    //     }
-                    // }
-                } else {
-                    filterWindow.input0 = NaN;
-                    filterWindow.input1 = NaN;
-                    filterWindow.selectedFilter = null;
-                    filterWindow.selectedNotch = null;
-                }
-                this.filterWindowOpen = true
-            },
-            setTimeseriesFilters: function(payload) {
-                this.$refs.viewerCanvas.setFilters(payload)
-            }
+const onPageBack = () => {
+  console.log('Page forward triggered from toolbar')
 
-        }
+  // Calculate new start position (go back by current duration)
+  const newStart = Math.max(
+    start.value - (3/4) * duration.value,
+    ts_start.value
+  )
 
+  updateStart(newStart)
+
+  // Trigger re-render
+  nextTick(() => {
+    viewerCanvas.value?.renderAll()
+  })
+}
+
+const onPageForward = () => {
+  console.log('Page forward triggered from toolbar')
+
+  // Calculate new start position
+  const newStart = Math.min(
+    start.value + (3/4) * duration.value,
+    ts_end.value - duration.value
+  )
+
+  console.log(`Moving from ${start.value} to ${newStart}`)
+
+  // Update start position
+  updateStart(newStart)
+
+  // Force canvas to invalidate cache and fetch new data
+  nextTick(() => {
+    if (viewerCanvas.value?.invalidate) {
+      viewerCanvas.value.invalidate()
+    }
+    if (viewerCanvas.value?.renderAll) {
+      viewerCanvas.value.renderAll()
+    }
+  })
+}
+
+const selectAnnotation = (payload) => {
+  let rsPeriod = viewerCanvas.value.rsPeriod
+  updateStart(payload.annotation.start - ((cursorLoc.value * cWidth.value - constants.CURSOROFFSET) * rsPeriod))
+}
+
+const selectChannel = (payload) => {
+  const _channels = viewerChannels.value.map(channel => {
+    const selected = channel.selected
+
+    if (payload.append === false) {
+      channel.selected = false
     }
 
+    if (payload.channelId === channel.id) {
+      channel.selected = !selected
+    }
+
+    return channel
+  })
+
+  viewerStore.setChannels(_channels)
+}
+
+const selectChannels = (ids, append) => {
+  const channels = viewerChannels.value.map(channel => {
+    if (append === false) {
+      channel.selected = false
+    }
+    if (channel.id in ids) {
+      channel.selected = true
+    }
+    return channel
+  })
+
+  viewerStore.setChannels(channels)
+}
+
+const updateStart = (value) => {
+  start.value = value
+}
+
+const setCursor = (value) => {
+  // set the cursor location as a fraction of the width of the canvas
+  cursorLoc.value = value
+}
+
+const setGlobalZoom = (value) => {
+  globalZoomMult.value = value
+}
+
+const setDuration = (value) => {
+  if (value > constants.MAXDURATION) {
+    duration.value = constants.MAXDURATION
+  } else {
+    duration.value = value
+  }
+}
+
+const getChannelId = (channel) => {
+  // Use the method from the TsAnnotation composable
+  return getChannelIdFromAnnotation(channel)
+}
+
+const _computeLabelInfo = (item, globalZoomMult, rowscale) => {
+  const n = (((constants.DEFAULTDPI * window.devicePixelRatio) / (globalZoomMult * rowscale)) / 25.4).toFixed(1)
+  return n + ' ' + item.unit + '/mm'
+}
+
+const initChannels = () => {
+  const channels = activeViewer.value.channels
+  if (channels.length > 0) {
+    // Find Global start and end
+    ts_start.value = channels[0].content.start
+    ts_end.value = channels[0].content.end
+    for (let ic = 1; ic < channels.length; ic++) {
+      if (channels[ic].content.start < ts_start.value) {
+        ts_start.value = channels[ic].content.start
+      }
+      if (channels[ic].content.end > ts_end.value) {
+        ts_end.value = channels[ic].content.end
+      }
+    }
+
+    start.value = ts_start.value
+  }
+}
+
+const openLayerWindow = (payload) => {
+  // Note: layerModal component not found in template - this might need to be added
+  // or this function might be unused
+  console.warn('openLayerWindow called but layerModal ref not found in template')
+  annotationLayerWindowOpen.value = true
+}
+
+const openFilterWindow = (payload) => {
+  const channels = propOr([], 'channels', payload)
+  const filter = propOr('', 'filter', payload)
+  const filterWindowRef = filterWindow.value
+  filterWindowRef.onChannels = channels
+
+  if (!isEmpty(filter)) {
+    filterWindowRef.input0 = filter.input0
+    filterWindowRef.input1 = filter.input1
+  } else {
+    filterWindowRef.input0 = NaN
+    filterWindowRef.input1 = NaN
+    filterWindowRef.selectedFilter = null
+    filterWindowRef.selectedNotch = null
+  }
+  filterWindowOpen.value = true
+}
+
+const setTimeseriesFilters = (payload) => {
+  viewerCanvas.value.setFilters(payload)
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  initChannels()
+
+  const element = document.getElementById("ts_viewer")
+  if (!element) {
+    console.warn('ts_viewer element not found')
+    return
+  }
+
+  var style = window.getComputedStyle(element, null)
+  const hhh = parseInt(style.getPropertyValue('height'))
+
+  const toolbarOffset = props.isPreview ? 0 : 100
+
+  // Fetch the workspace montages
+  fetchWorkspaceMontages()
+
+  window_height.value = hhh - toolbarOffset
+  if (ts_viewer.value) {
+    window_width.value = ts_viewer.value.offsetWidth
+  }
+  window.addEventListener('resize', onResize)
+
+  const labelDiv = channelLabels.value
+  if (labelDiv) {
+    labelWidth.value = labelDiv.clientWidth
+    cWidth.value = (window_width.value - labelDiv.clientWidth - 5 - 10)
+    cHeight.value = (window_height.value - 88)
+  }
+  duration.value = constants.INITDURATION
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+})
+
+// Expose methods that might be called from parent components
+defineExpose({
+  openEditAnnotationDialog,
+  confirmDeleteAnnotation,
+  selectAnnotation,
+  selectChannel,
+  selectChannels,
+  openLayerWindow,
+  openFilterWindow,
+  setTimeseriesFilters
+})
 </script>
 
 <style lang="scss" scoped>
-    @import '../../../assets/_variables.scss';
+@import '../../../assets/_variables.scss';
 
-    .timeseries-viewer {
-        display: flex;
-        height: 100%;
-        flex-direction: column;
+.timeseries-viewer {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
 
-        &.preview {
-          height: 600px;
-          border: 2px solid $gray_3;
+  &.preview {
+    height: 600px;
+    border: 2px solid $gray_3;
+  }
+}
 
-        }
-    }
+#channelCanvas {
+  display: flex;
+  background-color: white;
+  flex: 1;
+}
 
-    #channelCanvas {
-        display: flex;
-        background-color: white;
-        flex: 1;
-    }
+#channelLabels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  line-height: normal;
+  margin-bottom: 32px;
+  min-width: 75px;
+}
 
-    #channelLabels {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        line-height: normal;
-        margin-bottom: 32px;
-        min-width: 75px;
-    }
+.chLabelWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
 
-    .chLabelWrap {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
+.chLabelIndWrap {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  width: 100%;
+  color: #3c54a4;
+}
 
-    }
-    .chLabelIndWrap {
-        position: relative;
-        display: flex;
-        flex-direction: row;
-        justify-content: space-around;
-        width: 100%;
-        color: #3c54a4;
-    }
-    .chLabelInd {
-        font-size: 0.6em;
-        min-width: 70px;
-        color: rgb(150,150,150);
-        text-align: right;
-        white-space: nowrap;
-    }
-    .labelDiv[selected] {
-        color:#295eff; /*#ff9800;/*#358855;*/
-    }
-    .chLabelIndWrap[selected]{
-        color:#295eff; /*#ff9800; /*#358855;*/
-    }
-    .labelDiv {
-        align-self: flex-end;
-        white-space: nowrap;
-        color: var(--neuron);
-    }
+.chLabelInd {
+  font-size: 0.6em;
+  min-width: 70px;
+  color: rgb(150,150,150);
+  text-align: right;
+  white-space: nowrap;
+}
 
+.labelDiv[selected] {
+  color:#295eff;
+}
+
+.chLabelIndWrap[selected]{
+  color:#295eff;
+}
+
+.labelDiv {
+  align-self: flex-end;
+  white-space: nowrap;
+  color: var(--neuron);
+}
 </style>

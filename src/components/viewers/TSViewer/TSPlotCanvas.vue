@@ -25,7 +25,7 @@
 <script setup>
 import { computed, watch, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useViewerStore } from '@/stores/viewerStore'
+import { useViewerStore } from '@/stores/tsviewer'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useCanvasRenderer } from '@/composables/useCanvasRenderer'
 import { useTimeSeriesData } from '@/composables/useTimeSeriesData'
@@ -44,42 +44,44 @@ const props = defineProps({
   rsPeriod: { type: Number, required: true },
   ts_start: { type: Number, required: true },
   ts_end: { type: Number, required: true },
-  globalZoomMult: { type: Number, required: true }
+  globalZoomMult: { type: Number, required: true },
+  activeViewer: { type: Object, required: true },
+  config: { type: Object, required: true }
 })
 
 // Emits (from original)
 const emit = defineEmits(['channelsInitialized', 'setGlobalZoom'])
 
+
+const config = computed(() => props.config || {})
+const activeViewer = computed( () => props.activeViewer || {})
+const baseChannels = computed(() => activeViewer.value?.channels || [])
+
 // Pinia Store
 const viewerStore = useViewerStore()
 const {
-  activeViewer,
   viewerChannels,
   viewerMontageScheme,
   workspaceMontages,
-  config
 } = storeToRefs(viewerStore)
-
-// Base channels computed property
-const baseChannels = computed(() => activeViewer.value?.channels || [])
 
 // Initialize composables
 const {
   websocket,
-  connectionStatus,
-  openWebsocket,
-  send,
-  sendMontageMessage,
-  sendFilterMessage,
-  sendDumpBufferRequest,
-  disconnect,
-  setClearChannelsCallback,
-  setPackageId,
-  setUseMedian,
-  onSegment,
-  onEvent,
-  onChannelDetails,
-  onError
+    connectionStatus,
+    openWebsocket,
+    send,
+    sendMontageMessage,
+    sendFilterMessage,
+    sendDumpBufferRequest,
+    disconnect,
+    setClearChannelsCallback,
+    setPackageId,
+    setUseMedian,
+    onSegment,
+    onEvent,
+    onChannelDetails,
+    onError
 } = useWebSocket()
 
 const {
@@ -130,7 +132,7 @@ const {
   getChannelId,
   processChannelData,
   createMontagePayload
-} = useChannelProcessing(baseChannels, viewerMontageScheme, workspaceMontages)
+} = useChannelProcessing(baseChannels, viewerMontageScheme, workspaceMontages, activeViewer)
 
 // Component state
 const renderCounter = ref(0)
@@ -458,7 +460,15 @@ watch(() => props.duration, (newDuration, oldDuration) => {
 
 watch(() => viewerMontageScheme.value, (newScheme) => {
   if (websocket.value && websocket.value.readyState === 1) {
-    sendMontageMessage(newScheme)
+    // Create the proper payload using createMontagePayload
+    const montagePayload = createMontagePayload(newScheme)
+
+    console.log('📡 Sending montage payload:', montagePayload)
+
+    if (montagePayload) {
+      // Use send() directly instead of sendMontageMessage()
+      send(montagePayload) // ✅ This sends the proper format
+    }
   }
 })
 
@@ -617,6 +627,7 @@ defineExpose({
   renderAll,
   invalidate,
   throttledDataRender,
+  sendFilterMessage,
   viewData,
   requestedPages,
   chData,

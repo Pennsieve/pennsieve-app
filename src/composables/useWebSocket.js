@@ -352,8 +352,7 @@ export const useWebSocket = () => {
     const sendDumpBufferRequest = () => {
         if (websocket.value && websocket.value.readyState === 1) {
             const message = {
-                command: 'dumpBuffer',
-                packageId: packageId
+                requestType: 'DumpBufferRequest',
             }
             websocket.value.send(JSON.stringify(message))
             // console.log('🗑️ Sent dump buffer request')
