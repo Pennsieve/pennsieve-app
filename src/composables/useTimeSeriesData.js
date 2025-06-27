@@ -1,5 +1,6 @@
 // @/composables/useTimeSeriesData.js
-import { ref, reactive, computed } from 'vue'
+import {reactive, ref} from 'vue'
+import {propOr} from "ramda";
 
 export const useTimeSeriesData = () => {
     // Data structures from original
@@ -102,7 +103,8 @@ export const useTimeSeriesData = () => {
                     sampleFreq: curC.rate,
                     unit: curC.unit,
                     gaps: [],
-                    virtualId: curC.virtualId
+                    virtualId: curC.virtualId,
+                    dataSegments: []
                 }
 
                 const label = curChannel.label.split("<->", 3)
@@ -136,24 +138,6 @@ export const useTimeSeriesData = () => {
                 })
 
                 chObjects.push(curChannel)
-            }
-
-            // Sort channels (original logic)
-            channelConfig.sort(function(a, b) {
-                if (a.label_split.length > 2 || b.label_split.length > 2) {
-                    return (a.label > b.label) ? 1 : ((b.label > a.label) ? -1 : 0)
-                }
-
-                if (a.label_prefix === b.label_prefix) {
-                    return (a.label_value > b.label_value) ? 1 : ((b.label_value > a.label_value) ? -1 : 0)
-                }
-
-                return (a.label_prefix > b.label_prefix) ? 1 : ((b.label_prefix > a.label_prefix) ? -1 : 0)
-            })
-
-            // Update rank on sorted channels
-            for (let i = 0; i < channelConfig.length; i++) {
-                channelConfig[i].rank = i
             }
 
             // Return channelConfig to be set in store by caller

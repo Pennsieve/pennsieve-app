@@ -91,9 +91,9 @@ export const useViewerStore = defineStore('tsviewer', () => {
             })
 
             if (resp.ok) {
-                const montages = await resp.json()
-                setWorkspaceMontages(montages)
-                return montages.montages
+                const montageResponse = await resp.json()
+                setWorkspaceMontages(montageResponse.montages)
+                return montageResponse.montages
             } else {
                 return Promise.reject(resp)
             }
