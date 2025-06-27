@@ -760,18 +760,38 @@ export default {
             }
           })
             .then(response => {
-              if (response.ok) {
-                this.setDatasetDescriptionEtag(response.headers.get('etag'))
-                this.setDatasetDescription(markdown).finally(() => {
-                  this.isSavingMarkdownDescription = false
-                  this.isEditingMarkdownDescription
-                    = false
-                })
-              } else if (response.status === 412) {
+              this.setDatasetDescriptionEtag(response.headers.get('etag'))
+              this.setDatasetDescription(markdown).finally(() => {
+                this.isSavingMarkdownDescription = false
+                this.isEditingMarkdownDescription
+                  = false
+              })
+            }).catch((errResponse) => {
+              // TODO: backend not returning 412 for stale updates
+              if (errResponse.status === 412) {
+                EventBus.$emit("ajaxError", {
+                  detail: {
+                    msg: "The resource was modified by someone else. Please refresh the page and try again.",
+                    type: "error",
+                    showClose: true,
+                    duration: 10000
+                  },
+                });
                 this.isSavingMarkdownDescription = false
                 this.staleUpdateDialogVisible = true
-              } else {
-                throw response
+              } else if (errResponse.status === 403) {
+                this.isSavingMarkdownDescription = false
+                EventBus.$emit("ajaxError", {
+                  detail: {
+                    msg: "You do not have permission to edit this dataset. Please contact the dataset owner or an administrator.",
+                    type: "error", 
+                    showClose: true,
+                    duration: 10000
+                  },
+                });
+              }
+              else {
+                throw errResponse
               }
             })
         })
