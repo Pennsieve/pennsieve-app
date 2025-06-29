@@ -911,7 +911,8 @@ defineExpose({
   getNextAnnotation,
   getPreviousAnnotation,
   setFilters,
-  setActiveTool
+  setActiveTool,
+  renderAll
 })
 </script>
 

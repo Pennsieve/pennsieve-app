@@ -24,29 +24,25 @@
         ref="channelLabels"
       >
         <div
-          v-for="item in viewerChannels"
+          v-for="item in visibleChannels"
           :key="item.displayName"
+          class="chLabelWrap"
+          :data-id="item.id"
+          @tap="onLabelTap"
         >
+          <div :class="[item.selected? 'labelDiv selected': 'labelDiv' ]" >
+            {{ item.displayName }}
+          </div>
           <div
-            v-if="item.visible"
-            class="chLabelWrap"
-            :data-id="item.id"
-            @tap="onLabelTap"
+            class="chLabelIndWrap"
+            :hidden="hideLabelInfo"
+            :class="[ item.selected? 'selected': '']"
           >
-            <div class="labelDiv">
-              {{ item.displayName }}
-            </div>
             <div
-              class="chLabelIndWrap"
+              class="chLabelInd"
               :hidden="hideLabelInfo"
-              :class="[ item.selected? 'selected': '']"
             >
-              <div
-                class="chLabelInd"
-                :hidden="hideLabelInfo"
-              >
-                {{ _computeLabelInfo(item, globalZoomMult, item.rowScale) }}
-              </div>
+              {{ _computeLabelInfo(item, globalZoomMult, item.rowScale) }}
             </div>
           </div>
         </div>
@@ -160,7 +156,7 @@ const props = defineProps({
 // Store setup
 const store = useStore()
 const viewerStore = useViewerStore()
-const { viewerChannels } = storeToRefs(viewerStore)
+const { viewerChannels, needsRerender } = storeToRefs(viewerStore)
 
 // TsAnnotation composable setup
 const {
@@ -224,6 +220,17 @@ const viewerAnnotations = computed(() => store.state.viewerModule.viewerAnnotati
 const viewerMontageScheme = computed(() => store.state.viewerModule.viewerMontageScheme)
 const config = computed(() => store.state.config)
 
+const reactiveViewerChannels = computed(() => {
+  return viewerChannels.value.map(channel => ({
+    ...channel,
+    selected: Boolean(channel.selected)
+  }))
+})
+
+const visibleChannels = computed(() => {
+  return reactiveViewerChannels.value.filter(channel => channel.visible)
+})
+
 const hideLabelInfo = computed(() => {
   let hide = false
   if (cHeight.value / nrVisChannels.value < 30) {
@@ -233,12 +240,7 @@ const hideLabelInfo = computed(() => {
 })
 
 const nrVisChannels = computed(() => {
-  return viewerChannels.value.reduce((accumulator, currentValue) => {
-    if (currentValue.visible) {
-      return accumulator + 1
-    }
-    return accumulator
-  }, 0)
+  return visibleChannels.value.length
 })
 
 const _cpStyleLabels = computed(() => {
@@ -288,6 +290,20 @@ watch(viewerSidePanelOpen, () => {
   }
 }, { immediate: false }) // Changed from immediate: true to avoid early execution
 
+// Watch for changes in number of visible channels
+watch(nrVisChannels, (newCount, oldCount) => {
+  if (oldCount !== undefined && newCount !== oldCount) {
+    console.log(`Number of visible channels changed from ${oldCount} to ${newCount}`)
+    // Add a small delay to ensure DOM has updated
+    setTimeout(() => {
+      onResize()
+      if (viewerCanvas.value?.renderAll) {
+        viewerCanvas.value.renderAll()
+      }
+    }, 20)
+  }
+})
+
 // Methods
 const fetchWorkspaceMontages = async () => {
   return viewerStore.fetchWorkspaceMontages()
@@ -299,6 +315,32 @@ const openEditAnnotationDialog = (annotation) => {
     annotationWindowOpen.value = true
   })
 }
+
+watch(needsRerender, (renderData) => {
+  if (renderData) {
+    console.log(`TSViewer: Re-rendering due to: ${renderData.cause} (${renderData.timestamp})`)
+
+    nextTick(() => {
+      // If channels visibility changed, we need to recalculate layout
+      if (renderData.cause === 'channel-visibility') {
+        // Add a small delay to ensure DOM has fully updated after v-if changes
+        setTimeout(() => {
+          onResize()
+          // Re-render after layout recalculation
+          if (viewerCanvas.value?.renderAll) {
+            viewerCanvas.value.renderAll()
+          }
+        }, 10)
+      } else {
+        if (viewerCanvas.value?.renderAll) {
+          viewerCanvas.value.renderAll()
+        }
+      }
+    })
+
+    viewerStore.resetRerenderTrigger(null)
+  }
+}, { deep: true })
 
 const onUpdateAnnotation = (annotation) => {
   openEditAnnotationDialog(annotation)
@@ -677,12 +719,19 @@ defineExpose({
   white-space: nowrap;
 }
 
-.labelDiv[selected] {
-  color:#295eff;
+.labelDiv {
+  align-self: flex-end;
+  white-space: nowrap;
+  color: var(--neuron);
+
+  &.selected {
+    color: $orange_1 !important; /* Red color for selected channel labels */
+    font-weight: 600; /* Make selected labels slightly bolder */
+  }
 }
 
 .chLabelIndWrap[selected]{
-  color:#295eff;
+  color:$purple_2;
 }
 
 .labelDiv {

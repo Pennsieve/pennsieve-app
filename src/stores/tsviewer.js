@@ -14,6 +14,8 @@ export const useViewerStore = defineStore('tsviewer', () => {
     const customMontageMap = ref({})
     const workspaceMontages = ref([])
     const viewerErrors = ref(null)
+    const selectedChannel = ref(null) // Add selectedChannel state
+    const needsRerender = ref(null)
 
     // Getters (from original Vuex getters)
     const getMontageMessageByName = computed(() => {
@@ -42,6 +44,14 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerErrors.value = errors
     }
 
+    const setSelectedChannel = (channelData) => {
+        selectedChannel.value = channelData
+    }
+
+    const setNeedsRerender = (renderData) => {
+        needsRerender.value = renderData
+    }
+
     const updateChannelProperty = (channelId, property, value) => {
         const channel = viewerChannels.value.find(ch => ch.id === channelId)
         if (channel) {
@@ -68,6 +78,7 @@ export const useViewerStore = defineStore('tsviewer', () => {
         customMontageMap.value = {}
         workspaceMontages.value = []
         viewerErrors.value = null
+        selectedChannel.value = null
     }
 
     const fetchWorkspaceMontages = async () => {
@@ -102,6 +113,17 @@ export const useViewerStore = defineStore('tsviewer', () => {
         }
     }
 
+    const triggerRerender = (cause) => {
+        setNeedsRerender({
+            timestamp: Date.now(),
+            cause: cause
+        })
+    }
+
+    const resetRerenderTrigger = () => {
+        needsRerender.value = null
+    }
+
     return {
         // State
         viewerChannels,
@@ -109,6 +131,8 @@ export const useViewerStore = defineStore('tsviewer', () => {
         customMontageMap,
         workspaceMontages,
         viewerErrors,
+        selectedChannel,
+        needsRerender,
 
         // Getters
         getMontageMessageByName,
@@ -119,11 +143,14 @@ export const useViewerStore = defineStore('tsviewer', () => {
         setCustomMontageMap,
         setWorkspaceMontages,
         setViewerErrors,
+        setSelectedChannel,
         updateChannelProperty,
         updateChannelVisibility,
         updateChannelSelection,
         updateChannelFilter,
         resetViewer,
-        fetchWorkspaceMontages
+        fetchWorkspaceMontages,
+        triggerRerender,
+        resetRerenderTrigger
     }
 })

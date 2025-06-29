@@ -118,10 +118,10 @@ export const useCanvasRenderer = () => {
                         ctx.fillStyle = 'rgba(39,96,255,0.60)'
                     }
                 } else if (curChannelView.selected) {
-                    ctx.strokeStyle = 'rgb(39,96,255)'
-                    ctx.fillStyle = 'rgb(39,96,255)'
+                    ctx.strokeStyle = 'rgb(249,162,58)'
+                    ctx.fillStyle = 'rgb(3249,162,58)'
                 } else if (channelType === 'Neural') {
-                    ctx.strokeStyle = 'rgb(120,120,120)'
+                    ctx.strokeStyle = 'rgb(249,162,58)'
                 } else {
                     ctx.strokeStyle = 'black'
                     ctx.fillStyle = 'black'
@@ -254,7 +254,10 @@ export const useCanvasRenderer = () => {
             return +(a.value > b.value) || +(a.value === b.value) - 1
         })
         const rankedIds = mapped.map(function(el) { return el.index })
-        const interChannelDist = pHeight / nrVisibleChannels
+
+        // Need to add 20px to pHeight as pHeight is calculated as => const pHeight = computed(() => props.cHeight - 20)
+        // and spacing of labels is based on cHeight
+        const interChannelDist = (pHeight + 20) / nrVisibleChannels
 
         let curIdx = 0
         for (let i = 0; i < rankedIds.length; i++) {

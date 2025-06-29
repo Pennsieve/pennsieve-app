@@ -511,6 +511,7 @@ watch(() => props.duration, (newDuration, oldDuration) => {
 })
 
 watch(() => viewerMontageScheme.value, (newScheme) => {
+
   if (websocket.value && websocket.value.readyState === 1) {
     console.log('🔄 Montage changing to:', newScheme)
 
