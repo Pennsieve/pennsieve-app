@@ -15,6 +15,7 @@
           @click.stop="openFilterMenu"
         >
           <IconFilterFilled
+            class="menu-item"
             :height="20"
             :width="20"
           />
@@ -28,6 +29,7 @@
       >
         <button @click="toggleAllVisibility">
           <IconEyeball
+            class="menu-item"
             :height="20"
             :width="20"
           />
@@ -239,14 +241,27 @@ const toggleAllVisibility = () => {
 const onChannelSelected = (selectionData) => {
   console.log('Channel selected:', selectionData)
 
+  // Find the clicked channel to check its current state
+  const clickedChannel = viewerChannels.value.find(ch => ch.id === selectionData.channelId)
+  const isCurrentlySelected = clickedChannel?.selected || false
+
   // 1. Update actual channel selection state
   const updatedChannels = viewerChannels.value.map(channel => {
     if (!selectionData.append) {
-      channel.selected = false
-    }
-
-    if (channel.id === selectionData.channelId) {
-      channel.selected = !selectionData.append ? true : !channel.selected
+      // Regular click behavior
+      if (channel.id === selectionData.channelId) {
+        // Toggle the clicked channel: if selected, deselect; if not selected, select
+        channel.selected = !isCurrentlySelected
+      } else if (!isCurrentlySelected) {
+        // Only deselect others if we're selecting the clicked channel
+        channel.selected = false
+      }
+      // If clicking on already selected channel to deselect it, leave others unchanged
+    } else {
+      // Cmd/Ctrl+click behavior (unchanged - toggle the clicked channel)
+      if (channel.id === selectionData.channelId) {
+        channel.selected = !channel.selected
+      }
     }
 
     return { ...channel }
@@ -448,6 +463,10 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 @import '../../../../assets/_variables.scss';
 
+
+.menu-item {
+  color: $purple_3
+}
 .palette-channels {
   background: #fff;
   display: flex;
@@ -458,12 +477,11 @@ onBeforeUnmount(() => {
 
 .channels-heading {
   align-items: center;
-  background: #f7f7f7;
-  border-bottom: solid 1px $gray_2;
+  background: $purple_0_7;
   box-sizing: border-box;
   display: flex;
   justify-content: flex-end;
-  min-height: 33px;
+  min-height: 42px;
   overflow: hidden;
   padding: 0 10px;
   width: 100%;

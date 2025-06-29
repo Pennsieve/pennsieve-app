@@ -70,21 +70,21 @@
       <div>{{ sampleFrequency }}</div>
     </div>
     <div class="channel-controls">
-      <el-tooltip
-        placement="top"
-        content="Edit"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="onEditChannel"
-        >
-          <IconPencil
-            :height="16"
-            :width="16"
-          />
-        </button>
-      </el-tooltip>
+<!--      <el-tooltip-->
+<!--        placement="top"-->
+<!--        content="Edit"-->
+<!--        :open-delay="300"-->
+<!--      >-->
+<!--        <button-->
+<!--          class="mr-8"-->
+<!--          @click="onEditChannel"-->
+<!--        >-->
+<!--          <IconPencil-->
+<!--            :height="16"-->
+<!--            :width="16"-->
+<!--          />-->
+<!--        </button>-->
+<!--      </el-tooltip>-->
       <el-tooltip
         placement="top"
         content="Filter"
@@ -329,7 +329,7 @@ const onRevert = () => {
 
 .bf-channel {
   background: white;
-  //border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid $gray_1;
   box-sizing: border-box;
   display: flex;
   padding: 4px 8px 4px 16px;
