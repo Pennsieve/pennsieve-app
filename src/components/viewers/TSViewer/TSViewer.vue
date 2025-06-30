@@ -71,7 +71,7 @@
         @channelsInitialized="onChannelsInitialized"
         @annLayersInitialized="onAnnLayersInitialized"
         @closeAnnotationLayerWindow="onCloseAnnotationLayerWindow"
-        @addAnnotation="onOpenAnnotationWindow"
+        @addAnnotation="onAddAnnotation"
         @updateAnnotation="onUpdateAnnotation"
       />
     </div>
@@ -347,18 +347,46 @@ const onUpdateAnnotation = (annotation) => {
 }
 
 const onCreateUpdateAnnotation = async (annotation) => {
+  console.log('📍 TSViewer: onCreateUpdateAnnotation received:', annotation)
+
+  if (!annotation || Object.keys(annotation).length === 0) {
+    console.error('🚨 TSViewer: Received empty annotation!')
+    return
+  }
+
+  // Validate required fields
+  if (!annotation.layer_id) {
+    console.error('🚨 TSViewer: annotation.layer_id is missing!', annotation)
+    return
+  }
+
   annotationWindowOpen.value = false
+
   try {
     if (annotation.id) {
-      await updateAnnotation()
+      // FIX: Pass annotation parameter to composable
+      console.log('📍 TSViewer: Updating annotation via composable')
+      await updateAnnotation(annotation)  // ✅ Pass the annotation!
       onAnnotationUpdated()
     } else {
-      await addAnnotation()
+      // FIX: Pass annotation parameter to composable
+      console.log('📍 TSViewer: Creating annotation via composable')
+      await addAnnotation(annotation)     // ✅ Pass the annotation!
       onAnnotationCreated()
     }
+
+    console.log('📍 TSViewer: Annotation operation completed successfully')
+
   } catch (error) {
-    console.error('Error creating/updating annotation:', error)
-    // Could emit an error event or show a notification here
+    console.error('📍 TSViewer: Error creating/updating annotation:', error)
+
+    // Show error to user (uncomment if you have toast system)
+    // EventBus.$emit('toast', {
+    //   detail: { msg: `Error: ${error.message}`, type: 'error' }
+    // })
+
+    // Re-open modal on error so user can retry
+    annotationWindowOpen.value = true
   }
 }
 
@@ -366,9 +394,9 @@ const onAnnotationUpdated = () => {
   viewerCanvas.value.renderAnnotationCanvas()
 }
 
-const onOpenAnnotationWindow = () => {
-  annotationWindowOpen.value = true
-}
+// const onOpenAnnotationWindow = () => {
+//   annotationWindowOpen.value = true
+// }
 
 const confirmDeleteAnnotation = (annotation) => {
   annotationDelete.value = annotation
@@ -378,11 +406,13 @@ const confirmDeleteAnnotation = (annotation) => {
 const deleteAnnotation = async (annotation) => {
   isTsAnnotationDeleteDialogVisible.value = false
   try {
+    // FIX: The composable now has better validation
     await removeAnnotation(annotation)
     onAnnotationDeleted()
+    console.log('📍 TSViewer: Annotation deleted successfully')
   } catch (error) {
-    console.error('Error deleting annotation:', error)
-    // Could emit an error event or show a notification here
+    console.error('📍 TSViewer: Error deleting annotation:', error)
+    // Show error to user
   }
 }
 
@@ -390,8 +420,47 @@ const onAnnotationDeleted = () => {
   viewerCanvas.value.renderAnnotationCanvas()
 }
 
-const onAddAnnotation = (start, duration, onAll, label, description, layer) => {
-  addAnnotation(start, duration, onAll, label, description, layer)
+const onAddAnnotation = (startTime, duration, allChannels, label, description, layer) => {
+  console.log('📍 TSViewer: onAddAnnotation called with:', {
+    startTime, duration, allChannels, label, description, layer
+  })
+
+  // Validate inputs
+  if (!layer || !layer.id) {
+    console.error('Invalid layer provided to onAddAnnotation:', layer)
+    return
+  }
+
+  // Get selected channels
+  const selectedChannels = store.getters['viewerModule/viewerSelectedChannels'] || []
+  const channelIds = allChannels ? [] : selectedChannels.map(ch => ch.id)
+
+  // Create the annotation object with proper structure
+  const annotation = {
+    id: null,
+    label: label || 'Event',
+    description: description || '',
+    start: Math.floor(startTime),
+    end: Math.floor(startTime + duration),
+    duration: Math.floor(duration),
+    channelIds: channelIds,
+    allChannels: allChannels,
+    layer_id: layer.id,
+    selected: true,
+    userId: null
+  }
+
+  console.log('📍 TSViewer: Created annotation object:', annotation)
+
+  // Set the annotation in the store
+  viewerStore.setActiveAnnotation(annotation)
+
+  // Verify it was set
+  console.log('📍 TSViewer: Store now contains:', viewerStore.activeAnnotation)
+
+  // Open the modal
+  annotationWindowOpen.value = true
+  console.log('📍 TSViewer: Modal opened with annotation data')
 }
 
 const onAnnotationCreated = () => {
@@ -503,6 +572,11 @@ const onPageForward = () => {
 const selectAnnotation = (payload) => {
   let rsPeriod = viewerCanvas.value.rsPeriod
   updateStart(payload.annotation.start - ((cursorLoc.value * cWidth.value - constants.CURSOROFFSET) * rsPeriod))
+
+  // Trigger re-render
+  nextTick(() => {
+    viewerCanvas.value?.renderAll()
+  })
 }
 
 const selectChannel = (payload) => {

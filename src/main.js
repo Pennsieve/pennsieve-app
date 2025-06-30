@@ -86,7 +86,8 @@ app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, 
     cluster: siteConfig.pusherConfig.region
 });
 
-const sessionRefreshThreshold = 300;
+const viewerStore = useViewerStore()
+
 
 // Top level routes allowList
 const topLevelRoutes = [

@@ -17,8 +17,8 @@
           </button>
         </el-tooltip>
       </div>
-        <div class="visibility">
-          <el-tooltip
+      <div class="visibility">
+        <el-tooltip
           placement="top"
           content="Hide all annotations"
           :popper-options="{ boundariesElement: 'window' }"
@@ -36,7 +36,7 @@
 
     <div id="annotationWrap">
       <accordion
-        v-for="layer in viewerAnnotations"
+        v-for="(layer, index) in viewerAnnotations"
         :ref="`accordion-${layer.id}`"
         :key="layer.id"
         :title="layer.name"
@@ -46,6 +46,7 @@
         icon="blackfynn:chevron-down-small"
         :border-color="layer.hexColor"
         :layer-id="layer.id"
+        :default-open="index === 0"
         @selectItem="onLayerSelected(layer.id)"
       >
         <template #operations>
@@ -57,7 +58,6 @@
             :can-crud-annotation="getPermission('editor')"
           />
         </template>
-
 
         <template #items>
           <div >
@@ -86,7 +86,10 @@
 </template>
 
 <script>
-import {mapActions, mapGetters, mapState} from 'vuex'
+import { computed } from 'vue'
+import { mapActions, mapGetters, mapState } from 'vuex'
+import { storeToRefs } from 'pinia'
+import { useViewerStore } from '@/stores/tsviewer'
 import {
   pathEq,
   propOr,
@@ -100,9 +103,9 @@ import ImportHref from '../../../../mixins/import-href'
 import Accordion from '../../../shared/Accordion/Accordion.vue'
 import AnnotationGroup from './AnnotationGroup.vue'
 import TsAnnotation from './TSAnnotation.vue'
-import IconPlus from "../../../icons/IconPlus.vue";
-import IconEyeball from "../../../icons/IconEyeball.vue";
-import ImageAnnotation from "./ImageAnnotation.vue";
+import IconPlus from "../../../icons/IconPlus.vue"
+import IconEyeball from "../../../icons/IconEyeball.vue"
+import ImageAnnotation from "./ImageAnnotation.vue"
 
 export default {
   name: 'PaletteAnnotations',
@@ -127,6 +130,17 @@ export default {
     ImportHref
   ],
 
+  setup() {
+    // Setup Pinia store
+    const viewerStore = useViewerStore()
+    const { viewerAnnotations } = storeToRefs(viewerStore)
+
+    return {
+      viewerStore,
+      viewerAnnotations
+    }
+  },
+
   data: function() {
     return {
       allVisible: true
@@ -135,7 +149,8 @@ export default {
 
   computed: {
     ...mapGetters(['getPermission']),
-    ...mapState('viewerModule', ['activeViewer', 'viewerAnnotations', 'activeAnnotation']),
+    // Keep Vuex for activeViewer and activeAnnotation if not yet migrated
+    ...mapState('viewerModule', ['activeViewer', 'activeAnnotation']),
 
     /**
      * Compute sorted layers and annotations
@@ -167,10 +182,8 @@ export default {
   },
 
   mounted: function() {
-
     // bf-annotation
     // this.importHref('/web-components/src/components/blackfynn/palettes/annotations/bf-annotation.html')
-
   },
 
   watch: {
@@ -183,7 +196,6 @@ export default {
 
   methods: {
     onLayerSelected: function(layer_id) {
-
       // Fold all layers except selected one.
       for (let [key, value] of Object.entries(this.$refs)) {
         if (/^accordion/.test(key) && value[0].layerId !== layer_id) {
@@ -191,8 +203,10 @@ export default {
         }
       }
 
-      this.$store.dispatch('viewerModule/setActiveAnnotationLayer', layer_id)
+      // FIX: Use Pinia store instead of Vuex
+      this.viewerStore.setActiveAnnotationLayer(layer_id)
     },
+
     /**
      * View annotation
      * Opens annotation palette, opens the layer for the annotation
@@ -200,11 +214,12 @@ export default {
      * @param {Number} id
      */
     viewAnnotation: function(id) {
-      const annotation = this.$store.getters['viewerModule/getAnnotationById'](id)
+      // FIX: Use Pinia store getter instead of Vuex
+      const annotation = this.viewerStore.getAnnotationById(id)
       const layerId = propOr('', 'layer_id', annotation)
-      if (layerId){
-        const layer = head(this.$refs[`accordion-${layerId}`])
 
+      if (layerId) {
+        const layer = head(this.$refs[`accordion-${layerId}`])
 
         this.onLayerSelected(layerId)
         layer.open = true
@@ -217,7 +232,6 @@ export default {
           }
         })
       }
-
     },
 
     /**
@@ -281,78 +295,78 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
+@import '../../../../assets/_variables.scss';
 
-  .palette-annotations {
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
+.palette-annotations {
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 
-  h3 {
-    margin: 15px 0;
-  }
+h3 {
+  margin: 15px 0;
+}
 
-  .annotations-heading {
-    align-items: center;
-    background: #f7f7f7;
-    border-bottom: solid 1px $gray_2;
-    display: flex;
-    min-height: 35px;
-    overflow: hidden;
-    width: 100%;
-    // @apply(--layout-horizontal);
-    // @apply(--layout-center);
-  }
+.annotations-heading {
+  align-items: center;
+  background: #f7f7f7;
+  border-bottom: solid 1px $gray_2;
+  display: flex;
+  min-height: 35px;
+  overflow: hidden;
+  width: 100%;
+  // @apply(--layout-horizontal);
+  // @apply(--layout-center);
+}
 
-  .controls {
-    flex: 1;
-    margin-left: 10px;
-  }
+.controls {
+  flex: 1;
+  margin-left: 10px;
+}
 
-  .controls .inner {
-    width: 100px;
-  }
+.controls .inner {
+  width: 100px;
+}
 
-  .controls .inner:hover {
-    cursor: pointer;
-  }
+.controls .inner:hover {
+  cursor: pointer;
+}
 
-  .visibility {
-    margin-right: 10px;
-    // @apply(--layout-flex-end);
-  }
+.visibility {
+  margin-right: 10px;
+  // @apply(--layout-flex-end);
+}
 
-  .annotation-control {
-    height: 20px;
-    width: 20px;
-    transition: color .15s linear;
-  }
+.annotation-control {
+  height: 20px;
+  width: 20px;
+  transition: color .15s linear;
+}
 
-  .annotation-control:hover {
-    cursor: pointer;
-  }
+.annotation-control:hover {
+  cursor: pointer;
+}
 
-  #annotationWrap {
-    height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    position: relative;
-  }
+#annotationWrap {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+}
 
-  [slot="title"] {
-    flex: 1;
-    height: 100%;
-  }
+[slot="title"] {
+  flex: 1;
+  height: 100%;
+}
 
-  iron-icon {
-    color: #9B9B9B;
-  }
-  iron-icon:hover, iron-icon[focused] {
-    color: $app-primary-color
-  }
-  .all-hidden {
-    color: #DADADA;
-  }
+iron-icon {
+  color: #9B9B9B;
+}
+iron-icon:hover, iron-icon[focused] {
+  color: $app-primary-color
+}
+.all-hidden {
+  color: #DADADA;
+}
 </style>
