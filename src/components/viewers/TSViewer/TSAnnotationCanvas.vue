@@ -59,7 +59,8 @@ const viewerStore = useViewerStore()
 const {
   viewerChannels,
   viewerAnnotations,
-  viewerMontageScheme
+  viewerMontageScheme,
+  getViewerActiveLayer
 } = storeToRefs(viewerStore)
 
 // Template refs
@@ -252,22 +253,34 @@ const getChannelId = (channel) => {
 
 // ANNOTATIONS
 const findNextAnnotation = (curTime) => {
-  let annLayer = viewerStore.getViewerActiveLayer()()
+  let annLayer = viewerStore.getViewerActiveLayer()
+  console.log(annLayer)
   const index = annIndexOf(annLayer.annotations, curTime, false)
 
+  console.log(index)
+
   if (index < annLayer.annotations.length) {
-    return annLayer.annotations[index + 1]
+    // If current time is before this annotation's start, this is the next annotation
+    if (annLayer.annotations[index].start > curTime) {
+      return annLayer.annotations[index]
+    }
+    // Otherwise, return the next annotation (or current if no next exists)
+    return annLayer.annotations[index + 1] || annLayer.annotations[index]
   } else {
     return annLayer.annotations[index]
   }
 }
 
 const findPreviousAnnotation = (curTime) => {
-  let annLayer = viewerStore.getViewerActiveLayer()()
+  let annLayer = viewerStore.getViewerActiveLayer()
   const index = annIndexOf(annLayer.annotations, curTime, true)
 
+  if (annLayer.annotations[index].start < curTime) {
+    return annLayer.annotations[index]
+  }
+
   if (index > 0) {
-    return annLayer.annotations[index - 1]
+    return annLayer.annotations[index -1 ]
   } else {
     return annLayer.annotations[index]
   }
