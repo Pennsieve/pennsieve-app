@@ -1,24 +1,22 @@
 <script setup>
-
 import bfButton from "@/components/shared/bf-button/BfButton.vue";
-import IconPlus from "@/components/icons/IconPlus.vue";
-import {useStore} from "vuex";
-import {computed, ref} from "vue";
+import { useStore } from "vuex";
+import { computed, ref } from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
 import IconXCircle from "@/components/icons/IconXCircle.vue";
 import TsCreateMontageDialog from "@/components/viewers/TSViewer/TsCreateMontageDialog.vue";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog/ConfirmationDialog.vue";
 import toQueryParams from "@/utils/toQueryParams";
-import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
+import { useViewerStore } from '@/stores/tsviewer'
 
-const store = useStore();
-const emit = defineEmits(["open-new-montage"]);
+// Store setup
+const viewerStore = useViewerStore()
+const store = useStore() // Keep for non-viewer related state like config and activeOrganization
 
-
-const workspaceMontages = computed(() => {
-  return store.getters["viewerModule/workspaceMontages"];
-});
+// Props and emits
+const emit = defineEmits(["open-new-montage"])
 
 const props = defineProps({
   windowHeight: {
@@ -27,53 +25,57 @@ const props = defineProps({
   },
 })
 
-const selectedMontageName = computed(() => store.state.viewerModule.viewerMontageScheme)
+// Reactive data
+const createMontageDialogVisible = ref(false)
+const confirmationDialogVisible = ref(false)
+const deleteMontageItem = ref({})
 
-const expandedMontages = computed( () => {
+// Computed properties - all using viewerStore now
+const workspaceMontages = computed(() => {
+  return viewerStore.workspaceMontages
+})
+
+const selectedMontageName = computed(() => viewerStore.viewerMontageScheme)
+
+const expandedMontages = computed(() => {
   const defaultMontage = {
     name: "NOT_MONTAGED",
     displayName: "As Recorded",
     channelPairs: []
   }
 
-  const wsMontages = store.getters["viewerModule/workspaceMontages"]
+  const wsMontages = viewerStore.workspaceMontages
   if (wsMontages.length > 1) {
     return [defaultMontage, ...wsMontages]
   } else {
     return [defaultMontage]
   }
-
 })
 
-const createMontageDialogVisible = ref(false)
+// Methods
+function onMontageSelected(montageName) {
+  console.log('select: ' + montageName)
+  viewerStore.setViewerMontageScheme(montageName)
+}
 
 function createMontage() {
-  store.dispatch('viewerModule/setViewerMontageScheme', "NOT_MONTAGED").then(() => {
-    createMontageDialogVisible.value = true
-
-  })
+  viewerStore.setViewerMontageScheme("NOT_MONTAGED")
+  createMontageDialogVisible.value = true
 }
 
 function closeCreateMontageDialog() {
   createMontageDialogVisible.value = false
 }
 
-function onMontageSelected(montageName) {
-  store.dispatch('viewerModule/setViewerMontageScheme', montageName)
-}
-
-function deleteMontage(item){
+function deleteMontage(item) {
   deleteMontageItem.value = item
   confirmationDialogVisible.value = true
 }
 
-const confirmationDialogVisible = ref(false)
-
-function doDeleteMontage(evt) {
-  console.log('hello' + evt)
+async function doDeleteMontage(evt) {
   confirmationDialogVisible.value = false
 
-  const endpoint = `${store.state.config.api2Url}/timeseries/montages`;
+  const endpoint = `${store.state.config.api2Url}/timeseries/montages`
   const queryParams = toQueryParams({
     organization_id: store.state.activeOrganization.organization.id,
     montage_name: evt.resource.name,
@@ -81,35 +83,34 @@ function doDeleteMontage(evt) {
 
   const url = `${endpoint}?${queryParams}`
 
-  return useGetToken().then((token) => {
-    useSendXhr(url, {
+  try {
+    const token = await useGetToken()
+    await useSendXhr(url, {
       method: "DELETE",
       header: {
         Authorization: `Bearer ${token}`,
       },
-    }).then(() => {
-      console.log('SUCCESS DELETE MONTAGE')
-      confirmationDialogVisible.value = false
-    }).then(() => {
-      store.dispatch('viewerModule/fetchWorkspaceMontages')
-    });
-  });
+    })
 
+    console.log('SUCCESS DELETE MONTAGE')
+    confirmationDialogVisible.value = false
+
+    // Fetch updated montages using viewerStore
+    await viewerStore.fetchWorkspaceMontages()
+  } catch (error) {
+    console.error('Error deleting montage:', error)
+    // Could add error handling/notification here
+  }
 }
-
-const deleteMontageItem = ref({})
-
 </script>
-
 
 <template>
   <div class="palette-montages">
     <div class="montages-heading">
       <div class="controls">
-
-          <bf-button @click="createMontage">
-            Create New Montage
-          </bf-button>
+        <bf-button @click="createMontage">
+          Create New Montage
+        </bf-button>
       </div>
     </div>
 
@@ -140,19 +141,15 @@ const deleteMontageItem = ref({})
 
             <div v-for="pair in montage.channelPairs" class="pair-info">
               <div>
-                {{pair.name}}
+                {{ pair.name }}
               </div>
               <div>
-                {{pair.channels[0]}} - {{pair.channels[1]}}
+                {{ pair.channels[0] }} - {{ pair.channels[1] }}
               </div>
-
             </div>
-
           </div>
         </template>
-
       </montage-accordion>
-
     </div>
 
     <ts-create-montage-dialog :visible="createMontageDialogVisible" @close="closeCreateMontageDialog"/>
@@ -168,7 +165,6 @@ const deleteMontageItem = ref({})
       @close="confirmationDialogVisible = false"
       @confirmed="doDeleteMontage"
     />
-
   </div>
 </template>
 
@@ -190,6 +186,7 @@ const deleteMontageItem = ref({})
   flex-direction: column;
   height: 100%;
 }
+
 .montages-heading {
   align-items: center;
   background: #f7f7f7;
@@ -212,6 +209,4 @@ const deleteMontageItem = ref({})
   justify-content: end;
   height: 25px;
 }
-
-
 </style>

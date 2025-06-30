@@ -51,13 +51,17 @@ export default {
     windowHeight: {
       type: Number,
       default: 0
+    },
+    defaultOpen: {
+      type: Boolean,
+      default: false
     }
   },
 
   data: function() {
     return {
       openOnLoad: false,
-      open: false
+      open: this.defaultOpen
     }
   },
 
@@ -102,15 +106,17 @@ export default {
     text-decoration: none;
     white-space: nowrap;
     overflow: scroll;
-    &:hover {
-      background: #fff;
-    }
   }
   .accordion-trigger {
+    background: white;
     align-items: center;
     border-bottom: solid 1px $gray_2;
     display: flex;
     flex-direction: row;
+
+    .toggle {
+      height: 42px
+    }
   }
   .toggle-icon {
     margin-right: 4px;
