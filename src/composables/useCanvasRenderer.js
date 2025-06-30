@@ -358,7 +358,7 @@ export const useCanvasRenderer = () => {
 
                     for (let iPoint = 0; iPoint < length; iPoint++) {
                         cXArray[iPoint] = (((xOffset + (XArray[iPoint] - startT) / rsp)))
-                        cYArray[iPoint] = (((rowBaseLine + (YArray[iPoint] - chDatCenterer) * curScale)))
+                        cYArray[iPoint] = (((rowBaseLine - (YArray[iPoint] - chDatCenterer) * curScale)))
 
                         if (curSeg.isMinMax) {
                             if (YArray[iPoint] === Y2Array[iPoint]) {
