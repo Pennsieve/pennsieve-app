@@ -98,9 +98,9 @@
               @click="togglePanel(palette)"
             >
 
-              <component :is="palette.icon"
-                         :height="20"
-                         :width="20"
+              <component  :is="palette.icon"
+                          :height="20"
+                          :width="20"
               />
 
             </button>

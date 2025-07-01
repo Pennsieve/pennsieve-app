@@ -319,6 +319,7 @@ watch(pointerMode, () => {
       iAreaEl.setAttribute('active', true)
       break
     case 'pan':
+    case 'pan':
       break
     case 'pointer':
     case 'annotate':
@@ -923,6 +924,10 @@ const renderAnnotationBox = (curX) => {
   ctx.restore()
 }
 
+const initViewerCanvas = () => {
+  plotCanvas.value?.initPlotCanvas()
+}
+
 const getScreenPixelRatio = () => {
   let ctx = iArea.value.getContext('2d')
   let dpr = window.devicePixelRatio || 1
@@ -1027,7 +1032,8 @@ defineExpose({
   setFilters,
   setActiveTool,
   renderAll,
-  renderAnnotationCanvas
+  renderAnnotationCanvas,
+  initViewerCanvas
 })
 </script>
 

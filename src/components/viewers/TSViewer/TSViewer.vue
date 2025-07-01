@@ -283,6 +283,19 @@ const onResize = async (event) => {
 }
 
 // Watchers
+watch( () => activeViewer.value, async (newValue, oldValue ) => {
+  console.log("Watching activeViewer --> old: " + oldValue + " new: " + newValue)
+  console.log(oldValue)
+  console.log(newValue)
+
+  if (newValue && newValue.channels && newValue.channels.length > 0) {
+    initTimeRange()
+  }
+
+  initCanvasRenderer()
+
+}, {immediate: false, deep: true})
+
 watch(viewerSidePanelOpen, () => {
   // Only call onResize if component is mounted and elements exist
   if (ts_viewer.value) {
@@ -642,12 +655,15 @@ const _computeLabelInfo = (item, globalZoomMult, rowscale) => {
   return n + ' ' + item.unit + '/mm'
 }
 
-const initChannels = () => {
-  const channels = activeViewer.value.channels
-  if (channels.length > 0) {
-    // Find Global start and end
+const initTimeRange = () => {
+  const channels = activeViewer.value?.channels
+  console.log('🔄 initTimeRange called with channels:', channels?.length || 0)
+
+  if (channels && channels.length > 0) {
+    // Find Global start and end from channel data
     ts_start.value = channels[0].content.start
     ts_end.value = channels[0].content.end
+
     for (let ic = 1; ic < channels.length; ic++) {
       if (channels[ic].content.start < ts_start.value) {
         ts_start.value = channels[ic].content.start
@@ -657,8 +673,28 @@ const initChannels = () => {
       }
     }
 
+    // Set the initial viewport to the actual data start time
+    const oldStart = start.value
     start.value = ts_start.value
+
+    console.log('📅 Time range initialized:', {
+      ts_start: ts_start.value,
+      ts_end: ts_end.value,
+      oldStart: oldStart,
+      newStart: start.value,
+      duration: duration.value,
+      startDate: new Date(ts_start.value / 1000).toISOString(),
+      endDate: new Date(ts_end.value / 1000).toISOString()
+    })
+  } else {
+    console.warn('⚠️ initTimeRange: No channels found in activeViewer')
   }
+}
+
+// In TSViewer.vue - replace the initChannels method
+
+const initChannels = () => {
+  initTimeRange()
 }
 
 const openLayerWindow = (payload) => {
@@ -688,6 +724,11 @@ const openFilterWindow = (payload) => {
 
 const setTimeseriesFilters = (payload) => {
   viewerCanvas.value.setFilters(payload)
+}
+
+const initCanvasRenderer = () => {
+  viewerCanvas.value?.initViewerCanvas()
+  viewerCanvas.value?.renderAll()
 }
 
 // Lifecycle hooks
@@ -721,6 +762,9 @@ onMounted(() => {
     cHeight.value = (window_height.value - 88)
   }
   duration.value = constants.INITDURATION
+
+  initCanvasRenderer()
+
 })
 
 onBeforeUnmount(() => {

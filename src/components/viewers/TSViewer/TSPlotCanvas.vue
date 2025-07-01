@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { computed, watch, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, watch, onMounted, onUnmounted, reactive, ref,nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useViewerStore } from '@/stores/tsviewer'
 import { useWebSocket } from '@/composables/useWebSocket'
@@ -34,7 +34,6 @@ import { useChannelProcessing } from '@/composables/useChannelProcessing'
 import { createThrottle } from '@/utils/throttle'
 import {useGetToken} from "@/composables/useGetToken";
 
-// Props (from original)
 const props = defineProps({
   cHeight: { type: Number, required: true },
   cWidth: { type: Number, required: true },
@@ -49,7 +48,6 @@ const props = defineProps({
   config: { type: Object, required: true }
 })
 
-// Emits (from original)
 const emit = defineEmits(['channelsInitialized', 'setGlobalZoom'])
 
 
@@ -184,18 +182,21 @@ const computedRsPeriod = computed(() => {
 })
 
 // ✅ NEW: Watch for WebSocket reconnection
-watch(connectionStatus, (newStatus, oldStatus) => {
-  if (newStatus === 'connected' && oldStatus === 'disconnected') {
-    console.log('🚨 WebSocket reconnected - clearing state for clean start')
-    requestedPages.value.clear()
-    clearRequests()
-    staleDataCounter.value = 0
-    lastRequestedSamplePeriod.value = null
-    lastRequestStart.value = null
-    lastRequestDuration.value = null
-    invalidate()
-  }
-})
+// watch(connectionStatus, (newStatus, oldStatus) => {
+//   if (newStatus === 'connected' && oldStatus === 'disconnected') {
+//     console.log('🚨 WebSocket reconnected - clearing state for clean start')
+//     requestedPages.value.clear()
+//     clearRequests()
+//     staleDataCounter.value = 0
+//     lastRequestedSamplePeriod.value = null
+//     lastRequestStart.value = null
+//     lastRequestDuration.value = null
+//     invalidate()
+//
+//     // Restart render
+//     renderAll()
+//   }
+// })
 
 // ✅ NEW: Watch for rsPeriod changes and update requestedSamplePeriod validation
 watch(computedRsPeriod, (newRsPeriod) => {
@@ -298,8 +299,9 @@ const renderDataInternal = () => {
   }
 }
 
+const PrefetchInterval = ref()
 const monitorPrefetchActivity = () => {
-  const interval = setInterval(() => {
+  PrefetchInterval.value = setInterval(() => {
     if (!channelsReady.value) return
 
     const stats = {
@@ -340,9 +342,9 @@ const monitorPrefetchActivity = () => {
   }, 5000) // Log every 5 seconds
 
   // Clear interval on unmount
-  onUnmounted(() => {
-    clearInterval(interval)
-  })
+  // onUnmounted(() => {
+  //   clearInterval(interval)
+  // })
 }
 
 const generateAndProcessRequests = async () => {
@@ -510,6 +512,70 @@ watch(() => props.duration, (newDuration, oldDuration) => {
   // console.log('✅ Duration change - invalidated data caches only')
 })
 
+// watch( () => activeViewer.value, async (newValue, oldValue ) => {
+//
+//
+//
+//   console.log("Watching activeViewer --> old: " + oldValue + " new: " + newValue)
+//   console.log(oldValue)
+//   console.log(newValue)
+//
+//   pixelRatio.value = 1
+//   initializeCanvases(pixelRatio.value)
+//
+//   const initialRsPeriod = computedRsPeriod.value
+//   updateCurrentRequestedSamplePeriod(initialRsPeriod)
+//   // console.log('🚀 Initialized requestedSamplePeriod validation with rsPeriod:', initialRsPeriod)
+//
+//   // Configure WebSocket
+//   setClearChannelsCallback(() => {
+//     if (viewerChannels.value?.length) {
+//       const chIds = viewerChannels.value.map(ch => ch.id)
+//       const message = { 'channelFiltersToClear': chIds }
+//       sendFilterMessage(message)
+//     }
+//   })
+//
+//   const userToken = await useGetToken()
+//
+//   // debugger
+//   // Open WebSocket connection
+//   console.log("Open websocket with id: " + newValue?.content.id + " from: " + oldValue?.content.id)
+//   if (newValue.content?.id) {
+//
+//     setTimeout(() => {
+//       openWebsocket(
+//         config.value.timeSeriesUrl,
+//         newValue.content.id,
+//         userToken,
+//       )
+//     }, 500);
+//
+//
+//   }
+//
+//   // Initialize prefetch function - create a wrapper that captures current values
+//   initializePrefetch(
+//     (requests) => {
+//       const currentRsPeriod = computedRsPeriod.value
+//       return requestDataFromServer(
+//         requests,
+//         0,
+//         websocket.value,
+//         userToken,
+//         newValue,
+//         currentRsPeriod,
+//         requestedPages.value,
+//         props.ts_end
+//       )
+//     },
+//     requestedPages
+//   )
+//
+//   monitorPrefetchActivity()
+//
+// }, {immediate: true, deep: true})
+
 watch(() => viewerMontageScheme.value, (newScheme) => {
 
   if (websocket.value && websocket.value.readyState === 1) {
@@ -640,17 +706,11 @@ onError((error) => {
   viewerStore.setViewerErrors(error)
 })
 
-// Lifecycle (from original mounted/unmounted logic)
-onMounted(async () => {
-  pixelRatio.value = 1
-  initializeCanvases(pixelRatio.value)
-
+const initPlotCanvas = async () => {
   const initialRsPeriod = computedRsPeriod.value
   updateCurrentRequestedSamplePeriod(initialRsPeriod)
-  // console.log('🚀 Initialized requestedSamplePeriod validation with rsPeriod:', initialRsPeriod)
 
   // Configure WebSocket
-  setPackageId(activeViewer.value?.content?.id)
   setClearChannelsCallback(() => {
     if (viewerChannels.value?.length) {
       const chIds = viewerChannels.value.map(ch => ch.id)
@@ -679,35 +739,59 @@ onMounted(async () => {
     requestedPages
   )
 
-  // Open WebSocket connection
+  // ✅ FIX: Wait for WebSocket connection before proceeding
   if (activeViewer.value?.content?.id) {
-    openWebsocket(
-      config.value.timeSeriesUrl,
-      activeViewer.value.content.id,
-      userToken,
-    )
+    try {
+      console.log('🔄 Opening WebSocket connection for package:', activeViewer.value.content.id)
+
+      // Make sure this waits for the connection to complete
+      await openWebsocket(
+        config.value.timeSeriesUrl,
+        activeViewer.value.content.id,
+        userToken,
+      )
+
+      console.log('✅ WebSocket connection established')
+
+      // Only start monitoring after successful connection
+      monitorPrefetchActivity()
+
+    } catch (error) {
+      console.error('❌ Failed to establish WebSocket connection:', error)
+      // Handle connection failure gracefully
+      return
+    }
   }
 
-  monitorPrefetchActivity()
+  console.log('🚀 TSPlotCanvas mounted with config:', {
+    activeViewerId: activeViewer.value?.content?.id,
+    initialMontage: viewerMontageScheme.value,
+    baseChannelCount: baseChannels.value?.length || 0,
+    viewport: {
+      start: props.start,
+      duration: props.duration,
+      width: props.cWidth,
+      height: props.cHeight,
+      rsPeriod: props.rsPeriod
+    }
+  })
+}
+// Lifecycle (from original mounted/unmounted logic)
+onMounted(async () => {
+  pixelRatio.value = 1
+  initializeCanvases(pixelRatio.value)
 
-  // console.log('🚀 TSPlotCanvas mounted with config:', {
-  //   activeViewerId: activeViewer.value?.content?.id,
-  //   initialMontage: viewerMontageScheme.value,
-  //   baseChannelCount: baseChannels.value?.length || 0,
-  //   viewport: {
-  //     start: props.start,
-  //     duration: props.duration,
-  //     width: props.cWidth,
-  //     height: props.cHeight,
-  //     rsPeriod: props.rsPeriod
-  //   }
-  // })
+  initPlotCanvas()
 })
 
 onUnmounted(() => {
+
+  clearInterval(PrefetchInterval.value)
+
   if (requestedPages.value.size > 0) {
     sendDumpBufferRequest()
   }
+  viewerStore.resetViewer()
   clearRequests()
   disconnect()
   if (throttledGetRenderData.cancel) {
@@ -728,7 +812,8 @@ defineExpose({
   requestedPages,
   chData,
   viewerChannels,
-  currentRequestedSamplePeriod
+  currentRequestedSamplePeriod,
+  initPlotCanvas
 })
 </script>
 
