@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import {ref, computed, onMounted, nextTick, watch} from 'vue'
 import { useStore } from 'vuex'
 import { useViewerStore } from '@/stores/tsviewer'
 import { storeToRefs } from 'pinia'
@@ -1075,6 +1075,25 @@ const selectFocusedAnn = () => {
     render()
   })
 }
+
+watch( () => activeViewer.value, async (newValue, oldValue ) => {
+
+  useGetToken()
+    .then(token => {
+      const url = `${config.value.apiUrl}/timeseries/${newValue.content.id}/layers?api_key=${token}`
+      return useSendXhr(url)
+        .then(resp => {
+          _getLayerResponse(resp)
+            .then(() => {
+              checkAnnotationRange(props.start, props.start + props.duration)
+            })
+        })
+    }).catch(useHandleXhrError)
+
+})
+
+
+
 
 // Lifecycle
 onMounted(() => {

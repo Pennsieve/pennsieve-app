@@ -138,6 +138,8 @@ import {
 
 import { useViewerStore } from "@/stores/tsviewer"
 import { useTsAnnotation } from "@/composables/useTsAnnotation"
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 // Component imports (required for <script setup>)
 const TimeseriesScrubber = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSScrubber.vue'))
@@ -188,7 +190,7 @@ const constants = reactive({
   ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
   MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
   PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
-  PREFETCHPAGES: 3,           // Number of pages to read ahead of view.
+  PREFETCHPAGES: 5,           // Number of pages to read ahead of view.
   LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
   USEMEDIAN: false,           // Use Median instead of mean for centering channels
   CURSOROFFSET: 5,            // Offset of cursor canvas
@@ -286,15 +288,26 @@ const onResize = async (event) => {
 
 // Watchers
 watch( () => activeViewer.value, async (newValue, oldValue ) => {
-  console.log("Watching activeViewer --> old: " + oldValue + " new: " + newValue)
-  console.log(oldValue)
-  console.log(newValue)
+
+  if (scrubber.value?.resetComponentState) {
+    scrubber.value.resetComponentState()
+  }
+
 
   if (newValue && newValue.channels && newValue.channels.length > 0) {
     initTimeRange()
   }
 
   initCanvasRenderer()
+
+  await nextTick()
+
+  if (scrubber.value?.initSegmentSpans) {
+    scrubber.value.initSegmentSpans()
+  }
+  if (scrubber.value?.getAnnotations) {
+    scrubber.value.getAnnotations()
+  }
 
 }, {immediate: false, deep: true})
 
@@ -319,7 +332,6 @@ watch(nrVisChannels, (newCount, oldCount) => {
   }
 })
 
-// Methods
 const fetchWorkspaceMontages = async () => {
   return viewerStore.fetchWorkspaceMontages()
 }
@@ -534,12 +546,13 @@ const onAnnLayersInitialized = () => {
 }
 
 const onChannelsInitialized = () => {
-  scrubber.value.initSegmentSpans()
-
-  // Resize the canvas as label length likely changed
-  nextTick(() => {
-    onResize()
-  })
+  // console.log('update scrubber')
+  // scrubber.value.initSegmentSpans()
+  //
+  // // Resize the canvas as label length likely changed
+  // nextTick(() => {
+  //   onResize()
+  // })
 }
 
 const onPageBack = () => {
