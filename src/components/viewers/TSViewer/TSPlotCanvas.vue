@@ -329,6 +329,7 @@ const monitorPrefetchActivity = () => {
     const stuckRequests = stats.requestedPages.filter(page => page.age > 10000)
     if (stuckRequests.length > 0) {
       console.warn('⚠️ Detected stuck requests:', stuckRequests)
+
     }
 
     // Check if prefetch is blocked
