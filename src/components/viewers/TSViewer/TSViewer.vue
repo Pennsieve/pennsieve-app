@@ -14,6 +14,8 @@
       :start="start"
       :duration="duration"
       :constants="constants"
+      :config="config"
+      :active-viewer="activeViewer"
       @setStart="updateStart"
     />
 
