@@ -62,6 +62,7 @@
         :ts-end="tsEnd"
         :pointer-mode="pointerMode"
         :viewer-active-tool="viewerActiveTool"
+        :active-viewer="activeViewer"
         @annLayersInitialized="onAnnLayersInitialized"
         @annotationsReceived="onAnnotationsReceived"
         @closeAnnotationLayerWindow="onCloseAnnotationLayerWindow"
@@ -299,6 +300,7 @@ watch(viewerAnnotations, (annotations) => {
 }, { immediate: true })
 
 watch(pointerMode, () => {
+  console.log(pointerMode)
   const iAreaEl = iArea.value
   if (!iAreaEl) return
 

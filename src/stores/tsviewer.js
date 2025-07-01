@@ -10,6 +10,7 @@ import vuexStore from '../store/index'  // Assuming your Vuex store is exported 
 
 export const useViewerStore = defineStore('tsviewer', () => {
 
+    const config = site
     const viewerChannels = ref([])
     const viewerMontageScheme = ref('NOT_MONTAGED')
     const customMontageMap = ref({})
@@ -343,6 +344,7 @@ export const useViewerStore = defineStore('tsviewer', () => {
         activeAnnotationLayer,
         activeAnnotation,
         viewerActiveTool,
+        config,
 
         // Getters
         getMontageMessageByName,
