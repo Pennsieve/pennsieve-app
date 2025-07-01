@@ -79,40 +79,152 @@ export const useWebSocket = () => {
     let onChannelDetailsHandler = null
     let onErrorHandler = null
 
+    let clearChannelsCallback = null
+    let packageId = null
+
     // Configuration - can be set from outside
     let useMedian = false
 
-    const openWebsocket = (timeSeriesUrl, packageId, userToken) => {
-        if (websocket.value && (websocket.value.readyState === 0 || websocket.value.readyState === 1)) {
-            return
-        }
+    // ✅ FIX: Add connection promise tracking
+    let connectionPromise = null
 
-        useGetToken()
-            .then(token => {
-                const url = timeSeriesUrl + '?session=' + (userToken || token) + '&package=' + packageId
-                websocket.value = new WebSocket(url)
-                websocket.value.onopen = onWebsocketOpen
-                websocket.value.onclose = onWebsocketClose
-                websocket.value.onmessage = onWebsocketMessage
-            })
-            .catch(console.log)
+    // ✅ FIX: Helper function to wait for WebSocket to close
+    const waitForWebSocketToClose = (ws, timeout = 2000) => {
+        return new Promise((resolve) => {
+            if (!ws || ws.readyState === WebSocket.CLOSED) {
+                resolve()
+                return
+            }
+
+            const startTime = Date.now()
+            const checkState = () => {
+                if (ws.readyState === WebSocket.CLOSED || Date.now() - startTime > timeout) {
+                    resolve()
+                } else {
+                    setTimeout(checkState, 50)
+                }
+            }
+
+            checkState()
+        })
     }
 
-    let clearChannelsCallback = null
-    let packageId = null
+    // ✅ FIX: Improved disconnect function
+    const disconnect = async () => {
+        if (websocket.value) {
+            const ws = websocket.value
+            console.log('🔌 Disconnecting WebSocket (state:', ws.readyState, ')')
+            websocket.value = null
+            connectionStatus.value = 'disconnected'
+
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                ws.close()
+                // Wait for WebSocket to actually close
+                await waitForWebSocketToClose(ws)
+            }
+        }
+
+        // Reset connection promise
+        connectionPromise = null
+    }
+
+    // ✅ FIX: Improved openWebsocket function
+    const openWebsocket = async (timeSeriesUrl, pkgId, userToken) => {
+        // If there's already a connection in progress, wait for it
+        if (connectionPromise) {
+            console.log('🔄 Waiting for previous connection to finish...')
+            await connectionPromise
+        }
+
+        // ✅ FIX: Handle all WebSocket states, including CLOSING
+        if (websocket.value) {
+            const currentState = websocket.value.readyState
+
+            if (currentState === WebSocket.CONNECTING ||
+                currentState === WebSocket.OPEN ||
+                currentState === WebSocket.CLOSING) {
+
+                console.log(`🔄 Disconnecting existing WebSocket (state: ${currentState})`)
+                await disconnect()
+
+                // ✅ FIX: Add a small delay to ensure clean disconnection
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+        }
+
+        console.log('setting packageId to: ' + pkgId)
+        packageId = pkgId
+
+        // ✅ FIX: Reset initWebsocket flag for new connections
+        initWebsocket.value = true
+
+        // ✅ FIX: Create connection promise to prevent race conditions
+        connectionPromise = new Promise(async (resolve, reject) => {
+            try {
+                const token = userToken || await useGetToken()
+                const url = timeSeriesUrl + '?session=' + token + '&package=' + packageId
+
+                const ws = new WebSocket(url)
+                websocket.value = ws
+
+                ws.onopen = () => {
+                    console.log('🔗 WebSocket opened for package:', packageId)
+                    onWebsocketOpen()
+                    resolve(ws)
+                }
+
+                ws.onclose = () => {
+                    console.log('🔌 WebSocket closed for package:', packageId)
+                    onWebsocketClose()
+                    resolve(null)
+                }
+
+                ws.onmessage = onWebsocketMessage
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error)
+                    connectionStatus.value = 'disconnected'
+                    reject(error)
+                }
+
+                // ✅ FIX: Add timeout for connection
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        ws.close()
+                        reject(new Error('WebSocket connection timeout'))
+                    }
+                }, 10000) // 10 second timeout
+
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error)
+                reject(error)
+            }
+        })
+
+        try {
+            await connectionPromise
+        } catch (error) {
+            console.error('WebSocket connection failed:', error)
+            connectionPromise = null
+        }
+    }
 
     const onWebsocketOpen = () => {
         connectionStatus.value = 'connected'
 
         if (initWebsocket.value) {
+            console.log('📡 Sending initialization messages for package:', packageId)
+
             // Clear filters on initial connection
             if (clearChannelsCallback) {
+                console.log('🧹 Clearing channel filters')
                 clearChannelsCallback()
             }
 
             // Clear montage
             if (packageId) {
                 const payload = { montage: 'NOT_MONTAGED', packageId: packageId }
+                console.log('🎛️ Sending montage reset:', payload)
                 websocket.value.send(JSON.stringify(payload))
             }
             initWebsocket.value = false
@@ -120,6 +232,7 @@ export const useWebSocket = () => {
     }
 
     const onWebsocketClose = () => {
+        console.log('📡 WebSocket connection closed')
         connectionStatus.value = 'disconnected'
         // Don't auto-reconnect here - let the component handle it
     }
@@ -325,12 +438,16 @@ export const useWebSocket = () => {
         }
     }
 
-    const disconnect = () => {
-        if (websocket.value) {
-            websocket.value.close()
-            websocket.value = null
+    const sendDumpBufferRequest = () => {
+        if (websocket.value && websocket.value.readyState === 1) {
+            const message = {
+                requestType: 'DumpBufferRequest',
+            }
+            websocket.value.send(JSON.stringify(message))
+            return true
         }
-        connectionStatus.value = 'disconnected'
+        console.warn('⚠️ Cannot send dump buffer request - WebSocket not connected')
+        return false
     }
 
     // Event handler setters
@@ -339,8 +456,9 @@ export const useWebSocket = () => {
     const onChannelDetails = (handler) => { onChannelDetailsHandler = handler }
     const onError = (handler) => { onErrorHandler = handler }
 
-    onUnmounted(() => {
-        disconnect()
+    // ✅ FIX: Improved cleanup
+    onUnmounted(async () => {
+        await disconnect()
     })
 
     // Configuration setters
@@ -348,20 +466,6 @@ export const useWebSocket = () => {
     const setPackageId = (id) => { packageId = id }
     const setUseMedian = (value) => { useMedian = value }
 
-    const sendDumpBufferRequest = () => {
-        if (websocket.value && websocket.value.readyState === 1) {
-            const message = {
-                requestType: 'DumpBufferRequest',
-            }
-            websocket.value.send(JSON.stringify(message))
-            // console.log('🗑️ Sent dump buffer request')
-            return true
-        }
-        console.warn('⚠️ Cannot send dump buffer request - WebSocket not connected')
-        return false
-    }
-
-// Then update the return statement to include it:
     return {
         websocket: readonly(websocket),
         connectionStatus: readonly(connectionStatus),
