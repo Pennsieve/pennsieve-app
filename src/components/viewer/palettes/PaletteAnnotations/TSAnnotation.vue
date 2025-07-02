@@ -174,18 +174,19 @@ export default {
 @import '../../../../assets/_variables.scss';
 
 .ts-annotation {
-  background: $gray_0;
+  background: $white;
   border-bottom: 1px solid $gray_2;
   box-sizing: border-box;
   display: flex;
   padding: 3px 8px 3px 16px;
+  color: $purple_2;
 
   &.selected {
     background-color: $purple_tint;
   }
 
   &:hover {
-    background: white;
+    background: $gray_0;
   }
 
   &:not(.visible) {
@@ -225,7 +226,7 @@ h2 {
 }
 
 .selected {
-  color: $purple_1
+  color: $purple_3
 }
 
 button {

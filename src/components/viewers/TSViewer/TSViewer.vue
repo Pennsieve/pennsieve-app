@@ -115,6 +115,13 @@
       @delete="deleteAnnotation"
     />
 
+    <TsViewerLayerWindow
+      :visible="annotationLayerWindowOpen"
+      @close-window="onCloseAnnotationLayerWindow"
+      @create-layer="onCreateAnnotationLayer"
+    />
+
+
   </div>
 </template>
 
@@ -144,7 +151,7 @@ const TimeseriesViewerToolbar = defineAsyncComponent(() => import('@/components/
 const TimeseriesFilterModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue'))
 const TimeseriesAnnotationModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
 const TsAnnotationDeleteDialog = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue'))
-
+const TsViewerLayerWindow = defineAsyncComponent( () => import('@/components/viewers/TSViewer/TSViewerLayerWindow.vue'))
 // Constants
 const constants = {
   TIMEUNIT: 'microSeconds',   // Basis for time
@@ -692,9 +699,6 @@ const initChannels = () => {
 }
 
 const openLayerWindow = (payload) => {
-  // Note: layerModal component not found in template - this might need to be added
-  // or this function might be unused
-  console.warn('openLayerWindow called but layerModal ref not found in template')
   annotationLayerWindowOpen.value = true
 }
 

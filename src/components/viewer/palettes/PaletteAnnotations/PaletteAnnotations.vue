@@ -8,13 +8,13 @@
           :popper-options="{ boundariesElement: 'window' }"
           :open-delay="300"
         >
-          <button @click="createLayer">
+          <bf-button @click="createLayer">
             <IconPlus
-              :height="20"
-              :width="20"
+              :height="12"
+              :width="12"
             />
             New Layer
-          </button>
+          </bf-button>
         </el-tooltip>
       </div>
       <div class="visibility">
@@ -106,11 +106,13 @@ import TsAnnotation from './TSAnnotation.vue'
 import IconPlus from "../../../icons/IconPlus.vue"
 import IconEyeball from "../../../icons/IconEyeball.vue"
 import ImageAnnotation from "./ImageAnnotation.vue"
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 export default {
   name: 'PaletteAnnotations',
 
   components: {
+    BfButton,
     IconEyeball,
     IconPlus,
     Accordion,
@@ -310,19 +312,16 @@ h3 {
 
 .annotations-heading {
   align-items: center;
-  background: #f7f7f7;
+  background: $purple_0_7;
   border-bottom: solid 1px $gray_2;
   display: flex;
-  min-height: 35px;
   overflow: hidden;
-  width: 100%;
-  // @apply(--layout-horizontal);
-  // @apply(--layout-center);
+  padding: 8px;
+
 }
 
 .controls {
   flex: 1;
-  margin-left: 10px;
 }
 
 .controls .inner {
@@ -334,8 +333,6 @@ h3 {
 }
 
 .visibility {
-  margin-right: 10px;
-  // @apply(--layout-flex-end);
 }
 
 .annotation-control {

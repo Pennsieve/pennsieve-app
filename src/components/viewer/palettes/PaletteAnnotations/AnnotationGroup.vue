@@ -13,115 +13,12 @@
       </button>
     </el-tooltip>
   </div>
-      <!-- inline editing -->
-      <!-- <div
-        v-if="channel.isEditing && !bulkEditingChannels"
-        class="channel-input-wrapper"
-      >
-        <el-input v-model="newLabel" />
-        <el-tooltip
-          placement="top"
-          content="Save"
-          :open-delay="300"
-        >
-          <button @click="saveChanges">
-            <svg-icon
-              name="icon-check"
-              height="16"
-              width="16"
-            />
-          </button>
-        </el-tooltip>
-        <el-tooltip
-          placement="top"
-          content="Cancel"
-          :open-delay="300"
-        >
-          <button @click="cancelChanges">
-            <svg-icon
-              name="icon-remove"
-              height="8"
-              width="8"
-            />
-          </button>
-        </el-tooltip>
-      </div> -->
-      <!-- bulk editing -->
-      <!-- <div
-        v-if="channel.isEditing && bulkEditingChannels"
-        class="channel-input-wrapper"
-      >
-        <el-input v-model="newLabel" />
-        <a
-          v-if="hasLabelChanged"
-          href="#"
-          class="revert"
-          @click.prevent="onRevert"
-        >
-          Revert
-        </a>
-      </div>
-      <div>{{ sampleFrequency }}</div>
-    </div>
-    <div class="channel-controls">
-      <el-tooltip
-        placement="top"
-        content="Edit"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="onEditChannel"
-        >
-          <svg-icon
-            name="icon-pencil"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-      <el-tooltip
-        placement="top"
-        content="Filter"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="openFilterMenu"
-        >
-          <svg-icon
-            name="icon-filter-filled"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-      <el-tooltip
-        placement="top"
-        content="Hide"
-        :open-delay="300"
-      >
-        <button @click="toggleChannel">
-          <svg-icon
-            name="icon-eyeball"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-    </div> -->
-<!-- </div> -->
+
 </template>
 
 <script>
-  import { propOr, pathOr, find, propEq } from 'ramda'
   import { mapState, mapActions } from 'vuex'
-  import EventBus from '../../../../utils/event-bus'
   import Request from '../../../../mixins/request'
-
-  import {
-    isEmpty
-  } from 'ramda'
   import IconEyeball from "../../../icons/IconEyeball.vue";
 
   export default {

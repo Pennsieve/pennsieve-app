@@ -84,7 +84,8 @@ const {
   blurCanvasRef,
   initializeCanvases,
   renderData,
-  cpCanvasScaler
+  cpCanvasScaler,
+  computeChannelViews
 } = useCanvasRenderer()
 
 // Define pixelRatio directly in main component to avoid dependency issues
