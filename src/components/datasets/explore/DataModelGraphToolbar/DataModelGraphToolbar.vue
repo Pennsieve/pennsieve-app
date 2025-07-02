@@ -4,7 +4,7 @@
       placement="top"
       content="Center and Fit to Screen"
       :popper-options="popperOptions"
-      :open-delay="300"
+      :show-after="300"
     >
       <button
         @click="$emit('center')"
@@ -20,7 +20,7 @@
       placement="top"
       content="Zoom Out"
       :popper-options="popperOptions"
-      :open-delay="300"
+      :show-after="300"
     >
       <button
         @click="$emit('zoom-out')"
@@ -36,7 +36,7 @@
       placement="top"
       content="Zoom In"
       :popper-options="popperOptions"
-      :open-delay="300"
+      :show-after="300"
     >
       <button
         @click="$emit('zoom-in')"
@@ -51,7 +51,7 @@
       placement="top"
       content="Fullscreen"
       :popper-options="popperOptions"
-      :open-delay="300"
+      :show-after="300"
     >
       <button
         v-if="!isFullscreen"
