@@ -3,7 +3,7 @@
 import { computed } from 'vue'
 import { useStore } from 'vuex'
 import { storeToRefs } from 'pinia'
-import { useSendXhr, useHandleXhrError } from '@/mixins/request/request_composable'
+import { useHandleXhrError } from '@/mixins/request/request_composable'
 import { useGetToken } from '@/composables/useGetToken'
 import { useViewerStore } from '@/stores/tsviewer' // Import Pinia store
 
@@ -17,10 +17,6 @@ export function useTsAnnotation() {
     const viewerSidePanelOpen = computed(() => store.state.viewerModule.viewerSidePanelOpen)
     const activeAnnotation = computed(() => store.state.viewerModule.activeAnnotation)
     const config = computed(() => store.state.config)
-
-    // Use Pinia for these:
-    // viewerChannels - now from Pinia via storeToRefs
-    // viewerAnnotations - now from Pinia via storeToRefs
 
     // Helper function to get channel ID
     const getChannelId = (channel) => {
