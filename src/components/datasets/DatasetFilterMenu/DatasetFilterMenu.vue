@@ -60,7 +60,7 @@
               trigger="hover"
               :offset="-8"
               transition=""
-              :show-after="100"
+              :open-delay="100"
               :visible-arrow="false"
             >
 
@@ -126,7 +126,7 @@
               trigger="hover"
               :offset="-8"
               transition=""
-              :show-after="100"
+              :open-delay="100"
               :visible-arrow="false"
             >
 

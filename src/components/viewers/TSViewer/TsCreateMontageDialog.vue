@@ -2,19 +2,15 @@
 
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import {useStore} from "vuex";
-import {ref, computed} from "vue";
+import {ref} from "vue";
 import { VueDraggableNext } from 'vue-draggable-next'
 import IconXCircle from "@/components/icons/IconXCircle.vue";
 import IconTrash from "@/components/icons/IconTrash.vue";
 import {useGetToken} from "@/composables/useGetToken";
 import toQueryParams from "@/utils/toQueryParams";
 import {useSendXhr} from "@/mixins/request/request_composable";
-import { useViewerStore } from '@/stores/tsviewer'
 
-// Stores
-const store = useStore(); // Keep for config and activeOrganization
-const viewerStore = useViewerStore(); // Use for viewer-related data
-
+const store = useStore();
 const emit = defineEmits('close')
 
 const props = defineProps({
@@ -26,9 +22,6 @@ const props = defineProps({
 
 const montageFormRef = ref()
 const montageList = ref()
-
-// Computed property to get channels from viewerStore
-const viewerChannels = computed(() => viewerStore.viewerChannels)
 
 // DRAG AND DROP
 function handleDragStart(event, itemData) {
@@ -85,7 +78,7 @@ function selectChannelPair(evt) {
 }
 
 function removeMontagePair(index) {
-  submitMontageForm.value.channelPairs.splice(index,1)
+ submitMontageForm.value.channelPairs.splice(index,1)
 }
 
 function clearMontageInput() {
@@ -140,17 +133,19 @@ function submitMontage() {
         },
       }).then(() => {
         console.log('SUCCESS')
-        // Use viewerStore instead of Vuex for fetching workspace montages
-        viewerStore.fetchWorkspaceMontages()
+        store.dispatch('viewerModule/fetchWorkspaceMontages')
         emit('close')
       });
     });
 
   });
 
+
+
 }
 
 const selectedPair = ref({})
+
 
 function cancel() {
   emit('close')
@@ -196,7 +191,7 @@ function cancel() {
           </el-form-item>
 
           <div class="channel-selector-container">
-            <div v-for="ch in viewerChannels" :key="ch.id">
+            <div v-for="ch in store.state.viewerModule.viewerChannels">
               <div class="channel" draggable="true" v-on:dragstart="handleDragStart($event, ch)">
                 {{ch.label}}
               </div>
@@ -261,7 +256,7 @@ function cancel() {
 
             <div class="montage-pair-list">
               <vue-draggable-next class="draggable" :list="submitMontageForm.channelPairs" tag="transition-group" item-key="id"  @change="log">
-                <div v-for="(pair, index) in submitMontageForm.channelPairs" :key="index">
+                <div v-for="(pair, index) in submitMontageForm.channelPairs">
                   <div class="pair" @click="selectChannelPair(pair)" :class="[ selectedPair?.name === pair.name ? 'selected' : '' ]">
                     <div >{{pair.name}}</div>
                     <button class="action" @click="removeMontagePair(index)"><icon-x-circle stroke="#808fad" fill="#e5e5e5" :height="20" :width="20"/></button>

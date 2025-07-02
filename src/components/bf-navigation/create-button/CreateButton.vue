@@ -94,7 +94,7 @@
                     width="300"
                     trigger="hover"
                     :offset="0"
-                    :show-after="100"
+                    :open-delay="100"
                     :show-arrow="false"
                     @hide="onRecordMenuHide"
                   >

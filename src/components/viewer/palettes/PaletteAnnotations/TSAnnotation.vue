@@ -8,28 +8,28 @@
   >
     <div class="annotation-info">
       <div>{{ annotation.label }}</div>
-      <div>{{ startTime }}</div>
+      <div> {{startTime}}</div>
     </div>
     <div class="annotation-controls">
-<!--      <el-tooltip-->
-<!--        placement="top"-->
-<!--        content="Edit"-->
-<!--        :show-after="300"-->
-<!--      >-->
-<!--        <button-->
-<!--          class="mr-8"-->
-<!--          @click="onEditChannel"-->
-<!--        >-->
-<!--          <IconPencil-->
-<!--            :height="16"-->
-<!--            :width="16"-->
-<!--          />-->
-<!--        </button>-->
-<!--      </el-tooltip>-->
+      <el-tooltip
+        placement="top"
+        content="Edit"
+        :open-delay="300"
+      >
+        <button
+          class="mr-8"
+          @click="onEditChannel"
+        >
+          <IconPencil
+            :height="16"
+            :width="16"
+          />
+        </button>
+      </el-tooltip>
       <el-tooltip
         placement="top"
         content="Delete"
-        :show-after="300"
+        :open-delay="300"
       >
         <button
           class="mr-8"
@@ -46,23 +46,18 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
-import { storeToRefs } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+import { mapState, mapActions } from 'vuex'
 import EventBus from '../../../../utils/event-bus'
 import Request from '../../../../mixins/request'
-import IconPencil from "../../../icons/IconPencil.vue"
-import IconDelete from "../../../icons/IconDelete.vue"
+import IconPencil from "../../../icons/IconPencil.vue";
+import IconDelete from "../../../icons/IconDelete.vue";
 
 export default {
   name: 'TsAnnotation',
-
-  components: {
-    IconDelete,
-    IconPencil
-  },
-
-  mixins: [Request],
+  components: {IconDelete, IconPencil},
+  mixins: [
+    Request
+  ],
 
   props: {
     annotation: {
@@ -73,38 +68,26 @@ export default {
     }
   },
 
-  setup() {
-    // Setup Pinia store
-    const viewerStore = useViewerStore()
-    const { activeAnnotation } = storeToRefs(viewerStore)
-
+  data: function() {
     return {
-      viewerStore,
-      activeAnnotation // Now from Pinia instead of Vuex
     }
   },
 
-  data: function() {
-    return {}
-  },
-
   computed: {
-    // Keep activeViewer from Vuex if not migrated yet, remove activeAnnotation since it's now from Pinia
-    ...mapState('viewerModule', ['activeViewer']),
-    ...mapState(['config']),
-
+    ...mapState('viewerModule', ['activeViewer', 'activeAnnotation']),
+    ...mapState([
+      'config',
+    ]),
     isSelected: function() {
-      // Can use either the annotation's selected property or compare with activeAnnotation
-      return this.annotation.selected ||
-        (this.activeAnnotation && this.activeAnnotation.id === this.annotation.id)
+      return this.annotation.selected
     },
-
     startTime: function() {
-      return this.getUTCDateString(this.annotation.start) + ' ' + this.getUTCTimeString(this.annotation.start)
+        return this.getUTCDateString(this.annotation.start) + ' ' + this.getUTCTimeString(this.annotation.start);
     }
   },
 
   methods: {
+
     onEditChannel: function() {
       EventBus.$emit('active-viewer-action', {
         method: 'openEditAnnotationDialog',
@@ -114,7 +97,7 @@ export default {
 
     deleteAnnotation: function(evt) {
       const forceDelete = evt.metaKey
-      if (forceDelete) {
+      if (forceDelete){
         EventBus.$emit('active-viewer-action', {
           method: 'deleteAnnotation',
           payload: this.annotation
@@ -128,36 +111,32 @@ export default {
           }
         })
       }
+
+
     },
 
     getUTCDateString: function(d) {
-      if (d > 0) {
-        d = new Date(d / 1000)
-        return d.toDateString()
+      if(d > 0) {
+        d = new Date(d/1000);
+        return ( d.toDateString() );
       } else {
-        return 'unknown'
+        return 'unknown';
       }
     },
-
     getUTCTimeString: function(d) {
-      if (d > 0) {
-        d = d / 1000
-        d = new Date(d)
-        return (
-          ('0' + d.getUTCHours()).slice(-2) + ':' +
-          ('0' + d.getUTCMinutes()).slice(-2) + ':' +
-          ('0' + d.getUTCSeconds()).slice(-2)
-        )
+      if(d > 0) {
+        d = d / 1000;
+        d = new Date(d);
+        return ( ('0' + d.getUTCHours()).slice(-2) + ':' +
+          ('0' + d.getUTCMinutes()).slice(-2) + ':' + ('0' + d.getUTCSeconds()).slice(-2) );
       }
     },
-
     /**
      * When click on Annotation,
      * Jump to annotation in viewer
      */
     onAnnotationSelect: function() {
-      // FIX: Use Pinia store instead of Vuex dispatch
-      this.viewerStore.setActiveAnnotation(this.annotation)
+      this.$store.dispatch('viewerModule/setActiveAnnotation', this.annotation)
 
       EventBus.$emit('active-viewer-action', {
         method: 'selectAnnotation',
@@ -174,21 +153,17 @@ export default {
 @import '../../../../assets/_variables.scss';
 
 .ts-annotation {
-  background: $white;
+  background: $gray_0;
   border-bottom: 1px solid $gray_2;
   box-sizing: border-box;
   display: flex;
   padding: 3px 8px 3px 16px;
-  color: $purple_2;
-
-  &.selected {
+  & .selected {
     background-color: $purple_tint;
   }
-
   &:hover {
-    background: $gray_0;
+    background: white;
   }
-
   &:not(.visible) {
     .channel-info {
       opacity: .4
@@ -197,20 +172,19 @@ export default {
       color: $gray_4;
     }
   }
+
 }
 
 .annotation-info {
+  //color: $gray_4;
   flex: 1;
 }
-
 .annotation-controls {
   align-items: center;
   display: none;
-
   .ts-annotation:hover & {
     display: flex;
   }
-
   .ts-annotation.editing & {
     display: none;
   }
@@ -224,14 +198,13 @@ h2 {
   font-size: 13px;
   margin-bottom: 2px;
 }
-
 .selected {
-  color: $purple_3
+  color: $purple_1
 }
-
 button {
   &:hover, &:focus {
     color: $app-primary-color;
   }
 }
 </style>
+

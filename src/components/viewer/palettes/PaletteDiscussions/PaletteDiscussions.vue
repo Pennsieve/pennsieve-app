@@ -3,13 +3,6 @@
     v-loading="isLoading"
     class="palette-discussions"
   >
-    <div class="action-buttons">
-      <bf-button @click="openReadmeModal">
-        Open Dataset Description
-      </bf-button>
-    </div>
-
-
     <discussion-add-comment
       ref="addComment"
       :annotation-id.sync="annotationId"
@@ -45,9 +38,6 @@
       class="mentions-overlay"
       @click="overlayIsVisible = false"
     />
-
-    <ReadmeModal :visible="readmeModalVisible" :active-viewer="activeViewer" @close-window="closeReadmeModal"/>
-
   </div>
 </template>
 
@@ -70,25 +60,14 @@
   import ImportHref from '../../../../mixins/import-href'
   import Sorter from '../../../../mixins/sorter'
   import {useGetToken} from "@/composables/useGetToken";
-  import ReadmeModal from "@/components/shared/ReadmeModal/ReadmeModal.vue";
-  import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
   export default {
     name: 'PaletteDiscussions',
 
     components: {
-      BfButton,
-      ReadmeModal,
       BfDiscussion,
       DiscussionAddComment,
       ViewerSidePanelEmptyState
-    },
-
-    props: {
-      activeViewer: {
-        type: Object,
-        default: ()=>{},
-      }
     },
 
     mixins: [
@@ -99,14 +78,13 @@
 
     data() {
       return {
-        readmeModalVisible: false,
         overlayIsVisible: false,
         annotationId: null
       }
     },
 
     computed: {
-      ...mapState('viewerModule', ['viewerSidePanelView', 'viewerDiscussions']),
+      ...mapState('viewerModule', ['activeViewer', 'viewerSidePanelView', 'viewerDiscussions']),
       ...mapState(['config']),
 
       /**
@@ -171,12 +149,6 @@
     methods: {
       ...mapActions('viewerModule', ['setDiscussions', 'removeDiscussion']),
 
-      closeReadmeModal: function() {
-        this.readmeModalVisible = false
-      },
-      openReadmeModal: function() {
-        this.readmeModalVisible = true
-      },
       /**
        * Get discussions and set state
        */
@@ -209,15 +181,7 @@
   }
 </script>
 
-<style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
-
-
-.action-buttons {
-  display: flex;
-  padding: 4px;
-  background: $purple_0_7
-}
+<style scoped>
   .palette-discussions {
     display: flex;
     flex-direction: column;
