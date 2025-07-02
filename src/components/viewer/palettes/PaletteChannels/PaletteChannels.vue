@@ -12,7 +12,7 @@
           placement="top"
           content="Filter all channels"
           :popper-options="{ boundariesElement: 'window' }"
-          :open-delay="300"
+          :show-after="300"
         >
           <button
             class="mr-8"
@@ -29,7 +29,7 @@
           placement="top"
           :content="toggleVisibilityString"
           :popper-options="{ boundariesElement: 'window' }"
-          :open-delay="300"
+          :show-after="300"
         >
           <button @click="toggleAllVisibility">
             <IconEyeball

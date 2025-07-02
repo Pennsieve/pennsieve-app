@@ -11,25 +11,25 @@
       <div>{{ startTime }}</div>
     </div>
     <div class="annotation-controls">
-      <el-tooltip
-        placement="top"
-        content="Edit"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="onEditChannel"
-        >
-          <IconPencil
-            :height="16"
-            :width="16"
-          />
-        </button>
-      </el-tooltip>
+<!--      <el-tooltip-->
+<!--        placement="top"-->
+<!--        content="Edit"-->
+<!--        :show-after="300"-->
+<!--      >-->
+<!--        <button-->
+<!--          class="mr-8"-->
+<!--          @click="onEditChannel"-->
+<!--        >-->
+<!--          <IconPencil-->
+<!--            :height="16"-->
+<!--            :width="16"-->
+<!--          />-->
+<!--        </button>-->
+<!--      </el-tooltip>-->
       <el-tooltip
         placement="top"
         content="Delete"
-        :open-delay="300"
+        :show-after="300"
       >
         <button
           class="mr-8"

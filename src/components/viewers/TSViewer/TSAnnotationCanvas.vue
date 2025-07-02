@@ -10,12 +10,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import { useAnnotationData } from '@/composables/useAnnotationData'
 import { useAnnotationRendering } from '@/composables/useAnnotationRendering'
 import { useAnnotationInteraction } from '@/composables/useAnnotationInteraction'
 import { useAnnotationLayers } from '@/composables/useAnnotationLayers'
 import { canvasScaler } from '@/utils/annotationUtils'
+import EventBus from '@/utils/event-bus'
 
 // Define props
 const props = defineProps({
@@ -144,6 +145,13 @@ onMounted(async () => {
     viewerActiveTool: props.viewerActiveTool
   })
 
+  EventBus.$on('active-viewer-action', (action) => {
+    if (action.method === 'renderCanvas') {
+      console.log('Re-rendering canvas due to layer visibility change')
+      renderCanvas()
+    }
+  })
+
   try {
     await loadLayers(props.activeViewer, emit)
     await checkAnnotationRange(
@@ -156,6 +164,10 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error initializing annotations:', error)
   }
+})
+
+onUnmounted(() => {
+  EventBus.$off('active-viewer-action')
 })
 
 // Expose methods for parent component

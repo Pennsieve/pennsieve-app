@@ -294,6 +294,7 @@ export function useAnnotationRendering() {
                 // FIX: Use a more robust approach to find annotations in viewport
                 // Instead of relying on annIndexOf which might be buggy, use simple filtering
                 const annotationsInViewport = curLayer.annotations.filter(ann => {
+
                     const annStart = ann.start
                     const annEnd = ann.end || (ann.start + (ann.duration || 0))
 
