@@ -272,26 +272,59 @@ export function useAnnotationRendering() {
         // Clear render array
         renderAnn.value = []
 
+        // FIX: Ensure we have a valid viewport duration before proceeding
+        const viewportDuration = props.duration && props.duration > 0 ? props.duration : 15000000 // 15 seconds fallback
+        const viewportStart = props.start || 0
+        const viewportEnd = viewportStart + viewportDuration
+
+        console.log('🎨 Annotation render debug:', {
+            start: viewportStart,
+            duration: viewportDuration,
+            end: viewportEnd,
+            layerCount: viewerAnnotations.value?.length || 0,
+            totalAnnotations: viewerAnnotations.value?.reduce((sum, layer) => sum + (layer.annotations?.length || 0), 0) || 0
+        })
+
         // Populate render array from visible layers
         for (const curLayer of viewerAnnotations.value) {
             if (curLayer.visible && curLayer.annotations?.length > 0) {
-                const lastIndex = annIndexOf(curLayer.annotations, props.start + props.duration, false, 0, false)
-                const priorAnns = curLayer.annotations.slice(0, lastIndex + 1)
+                console.log(`🔍 Processing layer "${curLayer.name}" with ${curLayer.annotations.length} annotations`)
 
-                // Sort by end time
-                priorAnns.sort((a, b) => {
-                    const aEnd = a.start + a.duration
-                    const bEnd = b.start + b.duration
-                    return aEnd - bEnd
+                // FIX: Use a more robust approach to find annotations in viewport
+                // Instead of relying on annIndexOf which might be buggy, use simple filtering
+                const annotationsInViewport = curLayer.annotations.filter(ann => {
+                    const annStart = ann.start
+                    const annEnd = ann.end || (ann.start + (ann.duration || 0))
+
+                    // Include annotation if it overlaps with viewport at all
+                    const overlaps = (annStart < viewportEnd) && (annEnd > viewportStart)
+
+                    if (overlaps) {
+                        console.log(`  ✅ Including annotation "${ann.label}": ${annStart} - ${annEnd}`)
+                    }
+
+                    return overlaps
                 })
 
-                // Find annotations in viewport
-                const first = annIndexOf(priorAnns, props.start, true, 0, true)
-                renderAnn.value.push(...priorAnns.slice(first))
+                console.log(`  📊 Found ${annotationsInViewport.length} annotations in viewport`)
+
+                if (annotationsInViewport.length > 0) {
+                    // Sort by start time for consistent rendering order
+                    annotationsInViewport.sort((a, b) => a.start - b.start)
+                    renderAnn.value.push(...annotationsInViewport)
+                }
             }
         }
 
-        // Sort and compute render options
+        console.log(`🎯 Total annotations to render: ${renderAnn.value.length}`)
+
+        // Only proceed if we have annotations to render
+        if (renderAnn.value.length === 0) {
+            console.log('⚠️ No annotations found in viewport')
+            return
+        }
+
+        // Sort all annotations by start time
         sortAnnotations(renderAnn.value)
         computeRenderOptions(renderAnn.value, props)
 
@@ -303,6 +336,8 @@ export function useAnnotationRendering() {
         if (focusedAnn.value) {
             renderAnnotationLabels(ctxLb, [focusedAnn.value], props, false, props.pointerMode, props.viewerActiveTool)
         }
+
+        console.log(`✅ Rendered ${renderAnn.value.length} annotations successfully`)
     }
 
     return {

@@ -443,7 +443,7 @@ const onAddAnnotation = (startTime, duration, allChannels, label, description, l
   }
 
   // Get selected channels
-  const selectedChannels = store.getters['viewerModule/viewerSelectedChannels'] || []
+  const selectedChannels = viewerStore.viewerSelectedChannels || []
   const channelIds = allChannels ? [] : selectedChannels.map(ch => ch.id)
 
   // Create the annotation object with proper structure

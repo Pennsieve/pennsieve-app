@@ -111,6 +111,7 @@
         <bf-viewer-side-panel
           :side-panel-open="viewerSidePanelOpen"
           :side-panel-view="viewerSidePanelView"
+          :active-viewer="activeViewer"
         />
       </div>
     </div>

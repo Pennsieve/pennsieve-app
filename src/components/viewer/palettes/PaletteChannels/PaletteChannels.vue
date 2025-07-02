@@ -4,37 +4,43 @@
       class="channels-heading"
       :class="{ 'all-visible': allVisible }"
     >
-      <el-tooltip
-        placement="top"
-        content="Filter all channels"
-        :popper-options="{ boundariesElement: 'window' }"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click.stop="openFilterMenu"
+      <div class="left">
+        {{ selectedString }}
+      </div>
+      <div class="right">
+        <el-tooltip
+          placement="top"
+          content="Filter all channels"
+          :popper-options="{ boundariesElement: 'window' }"
+          :open-delay="300"
         >
-          <IconFilterFilled
-            class="menu-item"
-            :height="20"
-            :width="20"
-          />
-        </button>
-      </el-tooltip>
-      <el-tooltip
-        placement="top"
-        content="Hide all channels"
-        :popper-options="{ boundariesElement: 'window' }"
-        :open-delay="300"
-      >
-        <button @click="toggleAllVisibility">
-          <IconEyeball
-            class="menu-item"
-            :height="20"
-            :width="20"
-          />
-        </button>
-      </el-tooltip>
+          <button
+            class="mr-8"
+            @click.stop="openFilterMenu"
+          >
+            <IconFilterFilled
+              class="menu-item"
+              :height="20"
+              :width="20"
+            />
+          </button>
+        </el-tooltip>
+        <el-tooltip
+          placement="top"
+          :content="toggleVisibilityString"
+          :popper-options="{ boundariesElement: 'window' }"
+          :open-delay="300"
+        >
+          <button @click="toggleAllVisibility">
+            <IconEyeball
+              class="menu-item"
+              :height="20"
+              :width="20"
+            />
+          </button>
+        </el-tooltip>
+      </div>
+
     </div>
 
     <div class="channel-wrap">
@@ -48,53 +54,12 @@
         :window-height="windowHeight"
         :default-open="index === 0"
       >
-        <el-tooltip
-          placement="top"
-          content="Edit channel-labels"
-          :popper-options="{ boundariesElement: 'window' }"
-          :open-delay="300"
-        >
-          <template #content>
-            <button
-              class="btn-toggle-channel"
-              :class="{ visible: !computeIsHidden(channelType) }"
-              @click="toggleBulkEdit(channelType)"
-            >
-              <IconPencil
-                :height="20"
-                :width="20"
-              />
-            </button>
-          </template>
-        </el-tooltip>
-
-        <el-tooltip
-          placement="top"
-          content="Hide channels"
-          :popper-options="{ boundariesElement: 'window' }"
-          :open-delay="300"
-        >
-          <template #content>
-            <button
-              class="btn-toggle-channel"
-              :class="{ visible: !computeIsHidden(channelType) }"
-              @click="toggleGroupVisibility(channelType)"
-            >
-              <IconEyeball
-                :height="20"
-                :width="20"
-              />
-            </button>
-          </template>
-        </el-tooltip>
-
         <template #items>
           <div>
             <bf-channel
               v-for="channel in getChannelsByType(channelType)"
               :key="channel.id"
               :channel="channel"
-              @update-channel-label="updateChannelLabel"
               @channel-selected="onChannelSelected"
               @channel-visibility-toggled="onChannelVisibilityToggled"
             />
@@ -103,23 +68,6 @@
       </accordion>
     </div>
 
-    <div
-      v-if="bulkEditingChannels"
-      class="save-changes-wrapper"
-    >
-      <bf-button
-        class="secondary compact cancel-bulk-editing"
-        @click="onCancel"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        class="primary compact save-changes"
-        @click="onSaveChanges"
-      >
-        Save All Changes
-      </bf-button>
-    </div>
   </div>
 </template>
 
@@ -156,11 +104,14 @@ const props = defineProps({
   windowHeight: {
     type: Number,
     default: 0
+  },
+  activeViewer: {
+    type: Object,
+    default: ()=>{},
   }
 })
 
 // Stores
-const vuexStore = useStore()
 const viewerStore = useViewerStore()
 const { viewerChannels } = storeToRefs(viewerStore)
 
@@ -171,14 +122,29 @@ const channelColorMap = ref({
 })
 
 const allVisible = ref(true)
-const hiddenGroups = ref([])
-const isSavingChanges = ref(false)
 
-// Computed properties from Vuex store
-const activeViewer = computed(() => vuexStore.state.viewerModule.activeViewer)
-const viewerSidePanelView = computed(() => vuexStore.state.viewerModule.viewerSidePanelView)
-const bulkEditingChannels = computed(() => vuexStore.state.bulkEditingChannels)
-const config = computed(() => vuexStore.state.config)
+const toggleVisibilityString = computed( () => {
+  if (numberSelectedChannels.value > 0 ){
+    return "Toggle Selected Channels"
+  } else {
+    return "Toggle All Channels"
+  }
+})
+const selectedString = computed(() => {
+
+  if (numberSelectedChannels.value > 0 ){
+    const isOne = numberSelectedChannels.value === 1? " ": "s "
+    return numberSelectedChannels.value + " channel" + isOne + "selected"
+  } else {
+    return " "
+  }
+})
+
+const numberSelectedChannels = computed( () => {
+  return viewerChannels.value.filter(channel => {
+    return propEq('selected', true, channel)
+  }).length
+})
 
 // Local computed properties
 const sortedChannels = computed(() => {
@@ -209,33 +175,27 @@ const returnSort = (sortBy, list, dir) => {
   return sorted
 }
 
-// Request mixin function (converted to local function)
-const handleXhrError = (error) => {
-  // Implementation from the Request mixin
-  console.error('XHR Error:', error)
-  // Add appropriate error handling logic here
-}
 
 // Methods
-const updateChannelLabel = (channel) => {
-  const id = propOr(0, 'id', channel)
-  // get channel by id
-  const channelIdx = findIndex(propEq('id', id), sortedChannels.value)
-  // update channel
-  const newChannel = sortedChannels.value[channelIdx]
-  newChannel.label = channel.label
-  // update list
-  //TODO this mutation should be handled in vuex to keep things consistent
-  viewerChannels.value.splice(channelIdx, 1, newChannel)
-}
-
 const toggleAllVisibility = () => {
   allVisible.value = !allVisible.value
-  let updatedChannels = viewerChannels.value
-  for (let ch in updatedChannels) {
-    updatedChannels[ch].visible = allVisible.value
-    updateChannel(updatedChannels[ch], ch)
+  if (numberSelectedChannels.value > 0 ){
+    let channels = viewerChannels.value
+    for (let ch in channels) {
+      if (channels[ch].selected) {
+        channels[ch].visible = allVisible.value
+      }
+
+
+    }
+  } else {
+    let updatedChannels = viewerChannels.value
+    for (let ch in updatedChannels) {
+      updatedChannels[ch].visible = allVisible.value
+    }
   }
+
+
 }
 
 const onChannelSelected = (selectionData) => {
@@ -267,10 +227,7 @@ const onChannelSelected = (selectionData) => {
     return { ...channel }
   })
 
-  // 2. Update store with new selection state
-  viewerStore.setChannels(updatedChannels)
-
-  // 3. Trigger TSViewer re-render
+  // 2. Trigger TSViewer re-render
   viewerStore.triggerRerender({
     cause: 'channel-selection'
   })
@@ -287,36 +244,12 @@ const onChannelVisibilityToggled = (visibilityData) => {
     return { ...channel }
   })
 
-  // 2. Update store with new visibility state
-  viewerStore.setChannels(updatedChannels)
-
-  // 3. Trigger TSViewer re-render
+  // 2. Trigger TSViewer re-render
   viewerStore.triggerRerender({
     cause: 'channel-visibility'
   })
 }
 
-const computeIsHidden = (channelType) => {
-  return includes(channelType, hiddenGroups.value)
-}
-
-const toggleGroupVisibility = (channelType) => {
-  const isHidden = includes(channelType, hiddenGroups.value)
-
-  if (isHidden) {
-    hiddenGroups.value = without(channelType, hiddenGroups.value)
-  } else {
-    hiddenGroups.value.push(channelType)
-  }
-
-  EventBus.$emit('active-viewer-action', {
-    method: 'toggleGroupVisibility',
-    payload: {
-      channelType: channelType,
-      visible: isHidden
-    }
-  })
-}
 
 const getChannelsByType = (type) => {
   return sortedChannels.value.filter(channel => pathEq(['content', 'channelType'], type))
@@ -342,120 +275,15 @@ const openFilterMenu = () => {
   })
 }
 
-const toggleBulkEdit = (channelType) => {
-  // Note: In Composition API, template refs need to be handled differently
-  // You would need to create refs for each accordion and access them properly
-  // For now, commenting out the accordion logic until proper ref handling is implemented
-
-  // const accordion = pathOr(null, [`accordion-${channelType}`, 0], refs)
-  // if (!accordion) {
-  //   return
-  // }
-  // if (!accordion.open) {
-  //   accordion.toggle()
-  // }
-
-  setBulkEditingChannels(!bulkEditingChannels.value)
-    .then(() => {
-      const channels = viewerChannels.value.map(channel => {
-        // short circuit if bulk editing and channel is in edit state
-        if (bulkEditingChannels.value && channel.isEditing) {
-          return channel
-        }
-        channel.isEditing = !channel.isEditing
-        return channel
-      })
-      viewerStore.setChannels(channels)
-    })
-}
-
-const onSaveChanges = async () => {
-  const channels = sortedChannels.value.map(channel => {
-    return {
-      rate: propOr(0, 'sf', channel),
-      name: channel.label,
-      channelType: channel.type,
-      id: channel.id,
-      properties: pathOr([], [0, 'properties'], channel),
-      end: pathOr(0, ['dataSegments', 1], channel),
-      unit: channel.unit,
-      lastAnnotation: propOr(0, 'lastAnnotation', channel),
-      start: pathOr(0, ['dataSegments', 0], channel)
-    }
-  })
-
-  try {
-    const token = await useGetToken()
-    const timeseriesId = pathOr('', ['content', 'id'], activeViewer.value)
-    const url = `${config.value.apiUrl}/timeseries/${timeseriesId}/channels?api_key=${token}`
-
-    await useSendXhr(url, {
-      method: 'PUT',
-      body: channels
-    })
-
-    isSavingChanges.value = false
-
-    // update channels in vuex
-    const updatedChannels = sortedChannels.value.map(channel => {
-      channel.isEditing = false
-      return channel
-    })
-
-    viewerStore.setChannels(updatedChannels)
-
-    // re-render canvas
-    // TODO move to vuex
-    EventBus.$emit('active-viewer-action', {
-      method: 'updateChannels'
-    })
-
-    // display success message
-    EventBus.$emit('toast', {
-      detail: {
-        type: 'success',
-        msg: 'Your changes have been saved.'
-      }
-    })
-  } catch (err) {
-    isSavingChanges.value = false
-    handleXhrError(err)
-
-    EventBus.$emit('toast', {
-      detail: {
-        type: 'error',
-        msg: 'There was an error saving changes.'
-      }
-    })
-  } finally {
-    setBulkEditingChannels(false)
-  }
-}
-
-const onCancel = () => {
-  toggleBulkEdit('CONTINUOUS')
-}
-
 const reset = () => {
   const channels = viewerChannels.value.map(channel => {
-    channel.isEditing = false
     return channel
   })
   viewerStore.setChannels(channels)
 }
 
-// Vuex actions (since some are still in Vuex)
-const updateChannel = (channel, index) => {
-  return vuexStore.dispatch('viewerModule/updateChannel', channel)
-}
-
-const setBulkEditingChannels = (value) => {
-  return vuexStore.dispatch('setBulkEditingChannels', value)
-}
-
 // Lifecycle
 onBeforeUnmount(() => {
-  setBulkEditingChannels(false)
   reset()
 })
 </script>
@@ -480,11 +308,16 @@ onBeforeUnmount(() => {
   background: $purple_0_7;
   box-sizing: border-box;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   min-height: 42px;
   overflow: hidden;
   padding: 0 10px;
   width: 100%;
+
+  .left {
+    font-weight: 300;
+    color: $purple_3;
+  }
 
   &.all-visible {
     button {
@@ -534,10 +367,6 @@ button {
   padding: 16px;
   width: 100%;
   box-sizing: border-box;
-
-  .cancel-bulk-editing {
-    margin-right: 16px;
-  }
 
   .save-changes {
     &:hover, &:focus {

@@ -436,6 +436,8 @@ const _onMouseUp = (e) => {
       })
 
       viewerStore.setChannels(channels)
+      renderAll()
+
       break
 
     case 'annSelect':
