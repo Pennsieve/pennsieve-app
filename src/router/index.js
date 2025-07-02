@@ -1,10 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
-import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
-import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
-import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
-import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
-import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
 
 import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
