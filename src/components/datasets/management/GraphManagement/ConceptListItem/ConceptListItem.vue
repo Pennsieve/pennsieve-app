@@ -13,7 +13,7 @@
         <el-tooltip
           placement="top"
           :content="concept.displayName"
-          :show-after="300"
+          :open-delay="300"
         >
           <router-link
             :to="{

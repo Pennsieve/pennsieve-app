@@ -1,22 +1,24 @@
 <script setup>
+
 import bfButton from "@/components/shared/bf-button/BfButton.vue";
-import { useStore } from "vuex";
-import { computed, ref } from "vue";
+import IconPlus from "@/components/icons/IconPlus.vue";
+import {useStore} from "vuex";
+import {computed, ref} from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
 import IconXCircle from "@/components/icons/IconXCircle.vue";
 import TsCreateMontageDialog from "@/components/viewers/TSViewer/TsCreateMontageDialog.vue";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog/ConfirmationDialog.vue";
 import toQueryParams from "@/utils/toQueryParams";
-import { useGetToken } from "@/composables/useGetToken";
-import { useSendXhr } from "@/mixins/request/request_composable";
-import { useViewerStore } from '@/stores/tsviewer'
+import {useGetToken} from "@/composables/useGetToken";
+import {useSendXhr} from "@/mixins/request/request_composable";
 
-// Store setup
-const viewerStore = useViewerStore()
-const store = useStore() // Keep for non-viewer related state like config and activeOrganization
+const store = useStore();
+const emit = defineEmits(["open-new-montage"]);
 
-// Props and emits
-const emit = defineEmits(["open-new-montage"])
+
+const workspaceMontages = computed(() => {
+  return store.getters["viewerModule/workspaceMontages"];
+});
 
 const props = defineProps({
   windowHeight: {
@@ -25,57 +27,53 @@ const props = defineProps({
   },
 })
 
-// Reactive data
-const createMontageDialogVisible = ref(false)
-const confirmationDialogVisible = ref(false)
-const deleteMontageItem = ref({})
+const selectedMontageName = computed(() => store.state.viewerModule.viewerMontageScheme)
 
-// Computed properties - all using viewerStore now
-const workspaceMontages = computed(() => {
-  return viewerStore.workspaceMontages
-})
-
-const selectedMontageName = computed(() => viewerStore.viewerMontageScheme)
-
-const expandedMontages = computed(() => {
+const expandedMontages = computed( () => {
   const defaultMontage = {
     name: "NOT_MONTAGED",
     displayName: "As Recorded",
     channelPairs: []
   }
 
-  const wsMontages = viewerStore.workspaceMontages
+  const wsMontages = store.getters["viewerModule/workspaceMontages"]
   if (wsMontages.length > 1) {
     return [defaultMontage, ...wsMontages]
   } else {
     return [defaultMontage]
   }
+
 })
 
-// Methods
-function onMontageSelected(montageName) {
-  console.log('select: ' + montageName)
-  viewerStore.setViewerMontageScheme(montageName)
-}
+const createMontageDialogVisible = ref(false)
 
 function createMontage() {
-  viewerStore.setViewerMontageScheme("NOT_MONTAGED")
-  createMontageDialogVisible.value = true
+  store.dispatch('viewerModule/setViewerMontageScheme', "NOT_MONTAGED").then(() => {
+    createMontageDialogVisible.value = true
+
+  })
 }
 
 function closeCreateMontageDialog() {
   createMontageDialogVisible.value = false
 }
 
-function deleteMontage(item) {
+function onMontageSelected(montageName) {
+  store.dispatch('viewerModule/setViewerMontageScheme', montageName)
+}
+
+function deleteMontage(item){
   deleteMontageItem.value = item
   confirmationDialogVisible.value = true
 }
 
-async function doDeleteMontage(evt) {
+const confirmationDialogVisible = ref(false)
+
+function doDeleteMontage(evt) {
+  console.log('hello' + evt)
   confirmationDialogVisible.value = false
 
-  const endpoint = `${store.state.config.api2Url}/timeseries/montages`
+  const endpoint = `${store.state.config.api2Url}/timeseries/montages`;
   const queryParams = toQueryParams({
     organization_id: store.state.activeOrganization.organization.id,
     montage_name: evt.resource.name,
@@ -83,34 +81,35 @@ async function doDeleteMontage(evt) {
 
   const url = `${endpoint}?${queryParams}`
 
-  try {
-    const token = await useGetToken()
-    await useSendXhr(url, {
+  return useGetToken().then((token) => {
+    useSendXhr(url, {
       method: "DELETE",
       header: {
         Authorization: `Bearer ${token}`,
       },
-    })
+    }).then(() => {
+      console.log('SUCCESS DELETE MONTAGE')
+      confirmationDialogVisible.value = false
+    }).then(() => {
+      store.dispatch('viewerModule/fetchWorkspaceMontages')
+    });
+  });
 
-    console.log('SUCCESS DELETE MONTAGE')
-    confirmationDialogVisible.value = false
-
-    // Fetch updated montages using viewerStore
-    await viewerStore.fetchWorkspaceMontages()
-  } catch (error) {
-    console.error('Error deleting montage:', error)
-    // Could add error handling/notification here
-  }
 }
+
+const deleteMontageItem = ref({})
+
 </script>
+
 
 <template>
   <div class="palette-montages">
     <div class="montages-heading">
       <div class="controls">
-        <bf-button @click="createMontage">
-          Create New Montage
-        </bf-button>
+
+          <bf-button @click="createMontage">
+            Create New Montage
+          </bf-button>
       </div>
     </div>
 
@@ -132,7 +131,7 @@ async function doDeleteMontage(evt) {
           </div>
         </template>
         <template #items>
-          <div v-if="montage.name !== 'NOT_MONTAGED'">
+          <div>
             <div class="delete-container">
               <button @click="deleteMontage(montage)">
                 delete montage
@@ -141,16 +140,19 @@ async function doDeleteMontage(evt) {
 
             <div v-for="pair in montage.channelPairs" class="pair-info">
               <div>
-                {{ pair.name }}
+                {{pair.name}}
               </div>
               <div>
-                {{ pair.channels[0] }} - {{ pair.channels[1] }}
+                {{pair.channels[0]}} - {{pair.channels[1]}}
               </div>
-            </div>
-          </div>
 
+            </div>
+
+          </div>
         </template>
+
       </montage-accordion>
+
     </div>
 
     <ts-create-montage-dialog :visible="createMontageDialogVisible" @close="closeCreateMontageDialog"/>
@@ -166,6 +168,7 @@ async function doDeleteMontage(evt) {
       @close="confirmationDialogVisible = false"
       @confirmed="doDeleteMontage"
     />
+
   </div>
 </template>
 
@@ -187,10 +190,9 @@ async function doDeleteMontage(evt) {
   flex-direction: column;
   height: 100%;
 }
-
 .montages-heading {
   align-items: center;
-  background: $purple_0_7;
+  background: #f7f7f7;
   border-bottom: solid 1px $gray_2;
   display: flex;
   padding: 8px;
@@ -210,4 +212,6 @@ async function doDeleteMontage(evt) {
   justify-content: end;
   height: 25px;
 }
+
+
 </style>

@@ -2,11 +2,10 @@
   <div class="viewer-pane" v-if="cmpViewer">
     <component
       :is="cmpViewer"
-      :is-preview="isPreview"
+      :isPreview="isPreview"
       ref="viewer"
       :idx="0"
       :pkg="pkg"
-      :side-panel-open="sidePanelOpen"
     />
   </div>
 </template>
@@ -66,10 +65,6 @@ export default {
       type: Object,
       default: () => {},
     },
-    sidePanelOpen: {
-      type: Boolean,
-      default: false,
-    }
   },
 
   data: function () {
@@ -82,7 +77,7 @@ export default {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
-          this.loadViewer(pkg);
+          this.loadViewer();
         }
       },
       immediate: true,
@@ -111,7 +106,7 @@ export default {
     /**
      * loads appropriate viewer based on package type
      */
-    loadViewer: function (activeViewer) {
+    loadViewer: function () {
 
       // Reset viewers
       this.cmpViewer = "";
@@ -120,8 +115,8 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      const viewerType = this.checkViewerType(activeViewer);
-      if(this.isTimeseriesPackageUnprocessed(activeViewer)) {
+      const viewerType = this.checkViewerType(this.pkg);
+      if(this.isTimeseriesPackageUnprocessed(this.pkg)) {
         this.loadVueViewer("UnknownViewer");
       } else {
         this.loadVueViewer(viewerType);
