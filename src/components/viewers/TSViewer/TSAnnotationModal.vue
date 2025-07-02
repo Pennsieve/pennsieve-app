@@ -3,8 +3,8 @@
     class="timeseries-annotation-modal"
     ref="annotation-modal"
     :title="dialogTitle"
-    :modelValue="localVisible"
-    @update:modelValue="value => { localVisible = value; if (!value) emit('closeWindow') }"
+    :modelValue="visible"
+    @update:modelValue="visible = $event"
     @close="close"
     @closed="onClosed">
 
@@ -25,8 +25,8 @@
           v-model="selectedRange"
           class = "date-time-picker"
           :type="datePickerType"
-          format="YYYY-MM-DD HH:mm:ss"
-          value-format="x"
+          format="yyyy-MM-DD hh:mm:ss"
+          format-value="timestamp"
           range-separator="To"
           start-placeholder="Start date/time"
           end-placeholder="End date/time">
@@ -104,226 +104,207 @@
   </el-dialog>
 </template>
 
-<script setup>
-import { ref, computed, watch, defineAsyncComponent } from 'vue'
-import { propOr } from 'ramda'
-import { useViewerStore } from '@/stores/tsviewer.js'
-import { storeToRefs } from 'pinia'
-import IconSelection from "../../icons/IconSelection.vue"
+<script>
+import {
+  propOr
+} from 'ramda'
 
-// Async component imports
-const BfButton = defineAsyncComponent(() => import('@/components/shared/bf-button/BfButton.vue'))
+import {mapState} from "vuex";
+import IconSelection from "../../icons/IconSelection.vue";
+import { defineAsyncComponent } from 'vue'
 
-// Define props
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  }
-})
+export default {
+  name: 'TsAnnotationModal',
 
-const localVisible = ref(false)
+  components: {
+    IconSelection,
+    'bf-button': defineAsyncComponent(() => import('@/components/shared/bf-button/BfButton.vue'))
+  },
 
-watch(() => props.visible, (newValue) => {
-  localVisible.value = newValue
-
-  if (!newValue) return
-
-  // Convert microseconds to milliseconds for JavaScript Date
-  // Assuming annotation times are stored in microseconds
-  const startMs = activeAnnotation.value.start / 1000
-  const endMs = activeAnnotation.value.end / 1000
-
-  initialTimeRange.value = {
-    start: activeAnnotation.value.start,
-    end: activeAnnotation.value.end
-  }
-
-  if (activeAnnotation.value.duration == 0) {
-    hasRangeValue.value = false
-    selectedRange.value = startMs
-  } else {
-    hasRangeValue.value = true
-    selectedRange.value = [startMs, endMs]
-  }
-}, { immediate: true })
-
-
-// Define emits
-const emit = defineEmits(['closeWindow', 'createUpdateAnnotation'])
-
-// Pinia store setup
-const viewerStore = useViewerStore()
-const {
-  activeAnnotation,
-  viewerChannels,
-  viewerAnnotations
-} = storeToRefs(viewerStore)
-
-// Template refs
-const annotationModal = ref(null)
-const input = ref(null)
-
-// Reactive data
-const isProcessing = ref(false)
-const selectedRange = ref(null)
-const initialTimeRange = ref({
-  start: 0,
-  end: 0
-})
-const hasRangeValue = ref(true)
-
-const defaultLabels = ref([
-  { value: 'Event', label: 'Event' },
-  { value: 'Artifact', label: 'Artifact' },
-  { value: 'Seizure', label: 'Seizure' },
-  { value: 'Mark', label: 'Mark' },
-  { value: 'Stim On', label: 'Stim On' },
-  { value: 'Stim Off', label: 'Stim Off' },
-  { value: 'Start', label: 'Start' },
-  { value: 'Stop', label: 'Stop' }
-])
-
-// Computed properties
-const dialogTitle = computed(() => {
-  return activeAnnotation.value.id ? "Edit Annotation" : "Create Annotation"
-})
-
-const actionButtonText = computed(() => {
-  return activeAnnotation.value.id ? "Update" : "Create"
-})
-
-const datePickerType = computed(() => {
-  return hasRangeValue.value ? 'datetimerange' : 'datetime'
-})
-
-const channelSelectionStr = computed(() => {
-  let str = ""
-  if (activeAnnotation.value.allChannels) {
-    str = "Adding to all channels"
-  } else if (propOr([], 'channelIds', activeAnnotation.value).length == 1) {
-    str = "Adding to single channel"
-  } else {
-    str = `Adding to ${propOr([], 'channelIds', activeAnnotation.value).length} channels`
-  }
-  return str
-})
-
-// Watchers
-watch(() => props.visible, (newValue) => {
-  if (!newValue) return
-
-  // Convert microseconds to milliseconds for JavaScript Date
-  // Assuming annotation times are stored in microseconds
-  const startMs = activeAnnotation.value.start / 1000
-  const endMs = activeAnnotation.value.end / 1000
-
-  initialTimeRange.value = {
-    start: activeAnnotation.value.start,
-    end: activeAnnotation.value.end
-  }
-
-  if (activeAnnotation.value.duration == 0) {
-    hasRangeValue.value = false
-    selectedRange.value = startMs
-  } else {
-    hasRangeValue.value = true
-    selectedRange.value = [startMs, endMs]
-  }
-})
-
-watch(hasRangeValue, (value) => {
-  // Convert microseconds to milliseconds for the date picker
-  const startMs = activeAnnotation.value.start / 1000
-  const endMs = activeAnnotation.value.end / 1000
-
-  if (value) {
-    // Range mode: set array of start and end times
-    selectedRange.value = [startMs, endMs]
-  } else {
-    // Single point mode: set duration to 0 and use start time
-    activeAnnotation.value.duration = 0
-    selectedRange.value = startMs
-  }
-})
-
-// Methods
-const submitForm = () => {
-  // Validate inputs before proceeding
-  if (!activeAnnotation.value.layer_id) {
-    console.error('No layer selected for annotation')
-    return
-  }
-
-  if (!selectedRange.value) {
-    console.error('No time range selected for annotation')
-    return
-  }
-
-  // Update active annotation object
-  if (hasRangeValue.value) {
-    // Convert milliseconds back to microseconds
-    // selectedRange is [startMs, endMs] in range mode
-    if (Array.isArray(selectedRange.value) && selectedRange.value.length >= 2) {
-      activeAnnotation.value.start = selectedRange.value[0] * 1000
-      activeAnnotation.value.end = selectedRange.value[1] * 1000
-      activeAnnotation.value.duration = activeAnnotation.value.end - activeAnnotation.value.start
-    } else {
-      console.error('Invalid range value for range mode:', selectedRange.value)
-      return
+  props: {
+    visible: {
+      type: Boolean,
+      default: false
     }
-  } else {
-    // Convert milliseconds back to microseconds
-    // selectedRange is a single timestamp in single point mode
-    if (typeof selectedRange.value === 'number') {
-      activeAnnotation.value.start = selectedRange.value * 1000
-      activeAnnotation.value.end = selectedRange.value * 1000
-      activeAnnotation.value.duration = 0
-    } else {
-      console.error('Invalid range value for point mode:', selectedRange.value)
-      return
+  },
+
+  data: function () {
+    return {
+      isProcessing: false,
+      selectedRange: {},
+      initialTimeRage: {
+        start: 0,
+        end: 0
+      },
+      hasRangeValue: true,
+      defaultEventTime: '',
+      defaultEventDate: '',
+      defaultLabels: [{
+        value: 'Event',
+        label: 'Event'
+      }, {
+        value: 'Artifact',
+        label: 'Artifact'
+      }, {
+        value: 'Seizure',
+        label: 'Seizure'
+      }, {
+        value: 'Mark',
+        label: 'Mark'
+      }, {
+        value: 'Stim On',
+        label: 'Stim On'
+      }, {
+        value: 'Stim Off',
+        label: 'Stim Off'
+      }, {
+        value: 'Start',
+        label: 'Start'
+      }, {
+        value: 'Stop',
+        label: 'Stop'
+      }],
+    }
+  },
+  mounted() {
+  },
+  computed: {
+    ...mapState('viewerModule', [
+      'activeAnnotation',
+      'activeViewer',
+      'viewerChannels',
+      'viewerActiveTool',
+      'viewerAnnotations'
+    ]),
+    dialogTitle: function() {
+      if (this.activeAnnotation.id) {
+        return "Edit Annotation"
+      } else {
+        return "Create Annotation"
+      }
+    },
+    actionButtonText: function() {
+      if (this.activeAnnotation.id) {
+        return "Update"
+      } else {
+        return "Create"
+      }
+    },
+    datePickerType: function() {
+      return this.hasRangeValue ? 'datetimerange' : 'datetime'
+    },
+    channelSelectionStr: function() {
+      let str = ""
+      if (this.activeAnnotation.allChannels) {
+        str = "Adding to all channels"
+      } else if (propOr(true,'channelIds',this.activeAnnotation).length == 1) {
+        str = "Adding to single channel"
+      } else {
+        str = `Adding to ${propOr(1,'channelIds',this.activeAnnotation).length} channels`
+      }
+      return str
+    }
+
+  },
+  watch: {
+    visible: function() {
+      // Offset dates with local timezone such that datepicker
+      // matches GMT
+
+      this.tzOffset = new Date(this.activeAnnotation.start/1000).getTimezoneOffset() * 60000000
+
+      const startWithOffset = this.activeAnnotation.start + this.tzOffset
+      const endWithOffset = this.activeAnnotation.end + this.tzOffset
+
+      this.selectedLayer = this.activeAnnotation.layer_id
+      this.selectedType = this.activeAnnotation.label
+      this.initialTimeRage = {
+        start: this.activeAnnotation.start,
+        end: this.activeAnnotation.end
+      }
+      this.defaultEventTime = startWithOffset / 1000
+      this.defaultEventDate = endWithOffset / 1000
+
+      if (this.activeAnnotation.duration == 0) {
+        this.hasRangeValue = false
+        this.selectedRange = startWithOffset / 1000
+      } else {
+        this.hasRangeValue = true
+        this.selectedRange = [
+          startWithOffset / 1000,
+          endWithOffset / 1000
+        ]
+      }
+
+    },
+    hasRangeValue: function(value) {
+
+      this.tzOffsett = new Date(this.activeAnnotation.start/1000).getTimezoneOffset() * 60000000
+
+      const startWithOffset = this.activeAnnotation.start + this.tzOffset
+      const endWithOffset = this.activeAnnotation.end + this.tzOffset
+
+      if (value) {
+        this.selectedRange = [
+          startWithOffset / 1000,
+          endWithOffset / 1000
+        ]
+      } else {
+        this.activeAnnotation.duration = 0;
+        this.selectedRange = startWithOffset / 1000
+      }
+
+    }
+  },
+
+  methods: {
+    submitForm: function() {
+      // update active annotation object
+      this.activeAnnotation.label = this.activeAnnotation.label
+      if (this.hasRangeValue) {
+        this.activeAnnotation.start = this.selectedRange[0] * 1000 - this.tzOffset
+        this.activeAnnotation.end = this.selectedRange[1] * 1000 - this.tzOffset
+        this.activeAnnotation.duration =  this.activeAnnotation.end - this.activeAnnotation.start
+      } else {
+        this.activeAnnotation.start = this.selectedRange * 1000 - this.tzOffset
+        this.activeAnnotation.end = this.selectedRange * 1000 - this.tzOffset
+        this.activeAnnotation.duration = 0
+      }
+      this.$store.dispatch('viewerModule/setActiveAnnotation', this.activeAnnotation)
+
+      this.$emit('createUpdateAnnotation', this.activeAnnotation)
+    },
+    /**
+     * Emit event to update the synced property
+     */
+    close: function() {
+      this.$emit('closeWindow')
+    },
+
+    /**
+     * Callback after the dialog has closed
+     * Reset dialog
+     */
+    onClosed: function() {
+      this.isProcessing = false
+    },
+    getUTCDateString: function(d) {
+      if(d > 0) {
+        d = new Date(d/1000);
+        return ( d.toDateString() );
+      } else {
+        return 'unknown';
+      }
+    },
+    getUTCTimeString: function(d) {
+      if(d > 0) {
+        d = d / 1000;
+        d = new Date(d);
+        return ( ('0' + d.getUTCHours()).slice(-2) + ':' +
+          ('0' + d.getUTCMinutes()).slice(-2) + ':' + ('0' + d.getUTCSeconds()).slice(-2) );
+      }
     }
   }
-
-  // Use Pinia store instead of Vuex dispatch
-  viewerStore.setActiveAnnotation(activeAnnotation.value)
-  emit('createUpdateAnnotation', activeAnnotation.value)
-
-  // Close the modal
-  close()
-}
-
-const close = () => {
-  localVisible.value = false
-  emit('closeWindow')
-}
-
-const onClosed = () => {
-  isProcessing.value = false
-}
-
-const getUTCDateString = (d) => {
-  if(d > 0) {
-    d = new Date(d/1000);
-    return ( d.toDateString() );
-  } else {
-    return 'unknown';
-  }
-}
-
-const getUTCTimeString = (d) => {
-  if(d > 0) {
-    d = d / 1000;
-    d = new Date(d);
-    return ( ('0' + d.getUTCHours()).slice(-2) + ':' +
-      ('0' + d.getUTCMinutes()).slice(-2) + ':' + ('0' + d.getUTCSeconds()).slice(-2) );
-  }
-}
-
-// Register components
-const components = {
-  IconSelection,
-  'bf-button': BfButton
 }
 </script>
 

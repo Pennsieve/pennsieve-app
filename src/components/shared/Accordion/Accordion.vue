@@ -1,6 +1,6 @@
 <template>
   <div
-    :class="{ accordion: true, 'selected': selected }"
+    class="accordion"
     :style="{maxHeight:`${annotationHeight}`}">
     <div class="accordion-trigger">
       <a
@@ -51,17 +51,13 @@ export default {
     windowHeight: {
       type: Number,
       default: 0
-    },
-    defaultOpen: {
-      type: Boolean,
-      default: false
     }
   },
 
   data: function() {
     return {
       openOnLoad: false,
-      open: this.defaultOpen
+      open: false
     }
   },
 
@@ -106,9 +102,8 @@ export default {
     text-decoration: none;
     white-space: nowrap;
     overflow: scroll;
-
-    &.selected {
-      background: $purple_tint;
+    &:hover {
+      background: #fff;
     }
   }
   .accordion-trigger {
@@ -116,10 +111,6 @@ export default {
     border-bottom: solid 1px $gray_2;
     display: flex;
     flex-direction: row;
-
-    .toggle {
-      height: 42px
-    }
   }
   .toggle-icon {
     margin-right: 4px;
