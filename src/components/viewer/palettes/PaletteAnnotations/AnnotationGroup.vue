@@ -2,237 +2,176 @@
   <div class="controls-icons">
     <el-tooltip
       placement="top"
-      content="Hide"
-      :open-delay="300"
+      :content="layer.visible === false ? 'Show' : 'Hide'"
+      :show-after="300"
     >
       <button @click="onToggleVisibility">
         <IconEyeball
           :height="16"
           :width="16"
+          :class="{ 'layer-hidden': layer.visible === false }"
         />
       </button>
     </el-tooltip>
   </div>
-      <!-- inline editing -->
-      <!-- <div
-        v-if="channel.isEditing && !bulkEditingChannels"
-        class="channel-input-wrapper"
-      >
-        <el-input v-model="newLabel" />
-        <el-tooltip
-          placement="top"
-          content="Save"
-          :open-delay="300"
-        >
-          <button @click="saveChanges">
-            <svg-icon
-              name="icon-check"
-              height="16"
-              width="16"
-            />
-          </button>
-        </el-tooltip>
-        <el-tooltip
-          placement="top"
-          content="Cancel"
-          :open-delay="300"
-        >
-          <button @click="cancelChanges">
-            <svg-icon
-              name="icon-remove"
-              height="8"
-              width="8"
-            />
-          </button>
-        </el-tooltip>
-      </div> -->
-      <!-- bulk editing -->
-      <!-- <div
-        v-if="channel.isEditing && bulkEditingChannels"
-        class="channel-input-wrapper"
-      >
-        <el-input v-model="newLabel" />
-        <a
-          v-if="hasLabelChanged"
-          href="#"
-          class="revert"
-          @click.prevent="onRevert"
-        >
-          Revert
-        </a>
-      </div>
-      <div>{{ sampleFrequency }}</div>
-    </div>
-    <div class="channel-controls">
-      <el-tooltip
-        placement="top"
-        content="Edit"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="onEditChannel"
-        >
-          <svg-icon
-            name="icon-pencil"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-      <el-tooltip
-        placement="top"
-        content="Filter"
-        :open-delay="300"
-      >
-        <button
-          class="mr-8"
-          @click="openFilterMenu"
-        >
-          <svg-icon
-            name="icon-filter-filled"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-      <el-tooltip
-        placement="top"
-        content="Hide"
-        :open-delay="300"
-      >
-        <button @click="toggleChannel">
-          <svg-icon
-            name="icon-eyeball"
-            height="16"
-            width="16"
-          />
-        </button>
-      </el-tooltip>
-    </div> -->
-<!-- </div> -->
 </template>
 
 <script>
-  import { propOr, pathOr, find, propEq } from 'ramda'
-  import { mapState, mapActions } from 'vuex'
-  import EventBus from '../../../../utils/event-bus'
-  import Request from '../../../../mixins/request'
+import { mapState, mapActions } from 'vuex'
+import { useAnnotationLayers } from '@/composables/useAnnotationLayers'
+import Request from '../../../../mixins/request'
+import IconEyeball from "../../../icons/IconEyeball.vue";
 
-  import {
-    isEmpty
-  } from 'ramda'
-  import IconEyeball from "../../../icons/IconEyeball.vue";
+export default {
+  name: 'AnnotationGroup',
+  components: {IconEyeball},
+  mixins: [
+    Request
+  ],
 
-  export default {
-    name: 'AnnotationGroup',
-    components: {IconEyeball},
-    mixins: [
-      Request
-    ],
-
-    props: {
-      layer: {
-        type: Object,
-        default: function() {
+  props: {
+    layer: {
+      type: Object,
+      default: function() {
         return {}
-        }
-      },
-      hide_title: {
-        type: Boolean,
-        default: true
-      },
-      orig_label: {
-        type: String,
-        default: ""
-      },
-      can_crud_annotation: {
-        type: Boolean,
-        default: false
       }
     },
+    hide_title: {
+      type: Boolean,
+      default: true
+    },
+    orig_label: {
+      type: String,
+      default: ""
+    },
+    can_crud_annotation: {
+      type: Boolean,
+      default: false
+    }
+  },
 
-    data: function() {
-      return {
-        newLabel: ''
-      }
+  setup() {
+    const { updateLayerVisibility } = useAnnotationLayers()
+    return {
+      updateLayerVisibility
+    }
+  },
+
+  data: function() {
+    return {
+      newLabel: ''
+    }
+  },
+
+  computed: {
+    ...mapState('viewerModule', ['activeViewer']),
+    ...mapState([
+      'config',
+      'bulkEditingChannels'
+    ]),
+  },
+
+  methods: {
+    onToggleVisibility: function(event) {
+      event.preventDefault()
+      event.stopPropagation()
+
+      // Toggle the layer visibility
+      const newVisibility = !(this.layer.visible === false ? false : true)
+      console.log(`Toggling layer ${this.layer.id} visibility to:`, newVisibility)
+
+      this.updateLayerVisibility(this.layer.id, newVisibility)
+
+      // Also emit an event to trigger canvas re-render
+      this.$emit('visibility-changed', {
+        layerId: this.layer.id,
+        visible: newVisibility
+      })
     },
 
-    computed: {
-      ...mapState('viewerModule', ['activeViewer']),
-      ...mapState([
-        'config',
-        'bulkEditingChannels'
-      ]),
+    // Method for the bulk toggle in PaletteAnnotations
+    toggleLayer: function(visible) {
+      console.log(`[AnnotationGroup] Bulk toggling layer ${this.layer.id} (${this.layer.name}) visibility to:`, visible)
 
-    },
-    methods: {
-      onToggleVisibility: function(event) {
-        event.preventDefault()
-        event.stopPropagation()
+      try {
+        this.updateLayerVisibility(this.layer.id, visible)
+        console.log(`[AnnotationGroup] Successfully updated layer ${this.layer.id} visibility`)
+
+        this.$emit('visibility-changed', {
+          layerId: this.layer.id,
+          visible: visible
+        })
+      } catch (error) {
+        console.error(`[AnnotationGroup] Error updating layer ${this.layer.id} visibility:`, error)
       }
     }
   }
+}
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
+@import '../../../../assets/_variables.scss';
 
-  .controls-icons {
-    padding-right: 8px;
+.controls-icons {
+  padding-right: 8px;
+}
 
+// Add visual indication for hidden layers
+.layer-hidden {
+  opacity: 0.4;
+  color: #9b9b9b !important;
+}
+
+.bf-channel {
+  background: #F7F7F7;
+  border-bottom: 1px solid $gray_6;
+  box-sizing: border-box;
+  display: flex;
+  padding: 3px 8px 3px 16px;
+  &:hover {
+    background: #fff;
   }
+  &:not(.visible) {
+    .channel-info {
+      opacity: .4
+    }
+    .svg-icon {
+      color: #9b9b9b;
+    }
+  }
+}
 
-  .bf-channel {
-    background: #F7F7F7;
-    border-bottom: 1px solid $gray_6;
-    box-sizing: border-box;
+.channel-info {
+  color: $gray_3;
+  flex: 1;
+}
+.channel-controls {
+  align-items: center;
+  display: none;
+  .bf-channel:hover & {
     display: flex;
-    padding: 3px 8px 3px 16px;
-    &:hover {
-      background: #fff;
-    }
-    &:not(.visible) {
-      .channel-info {
-        opacity: .4
-      }
-      .svg-icon {
-        color: #9b9b9b;
-      }
-    }
   }
-
-  .channel-info {
-    color: $gray_3;
-    flex: 1;
-  }
-  .channel-controls {
-    align-items: center;
+  .bf-channel.editing & {
     display: none;
-    .bf-channel:hover & {
-      display: flex;
-    }
-    .bf-channel.editing & {
-      display: none;
-    }
-
-    button {
-      color: #000;
-    }
   }
 
-  h2 {
-    font-size: 13px;
-    margin-bottom: 2px;
-  }
-  .selected {
-      color: $purple_2
-    }
   button {
-    &:hover, &:focus {
-      color: $app-primary-color;
-    }
+    color: #000;
   }
+}
+
+h2 {
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.selected {
+  color: $purple_2
+}
+button {
+  &:hover, &:focus {
+    color: $app-primary-color;
+  }
+}
 </style>
 
 <style lang="scss">

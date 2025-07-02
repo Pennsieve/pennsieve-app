@@ -4,7 +4,7 @@
     placement="right"
     :content="label"
     :disabled="!condensed"
-    :open-delay="200"
+    :show-after="200"
   >
 
     <router-link :class="itemClass" :to="link" :style="styleObject">

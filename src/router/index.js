@@ -324,7 +324,7 @@ const router = createRouter({
           path: ':datasetId/files',
           components: {
             stageHeader: SecondaryPageHeaderFiles,
-            stage: DatasetFilesView
+            stage: DatasetFilesView 
           },
           props: {
             stage: true,

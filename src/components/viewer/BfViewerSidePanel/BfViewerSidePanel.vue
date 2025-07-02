@@ -10,6 +10,7 @@
     <palette-discussions
       v-show="sidePanelView === viewerSidePanelTypes.DISCUSSION "
       :ref="viewerSidePanelTypes.DISCUSSION"
+      :active-viewer="activeViewer"
     />
 
     <palette-annotations
@@ -22,6 +23,7 @@
       v-if="sidePanelView === viewerSidePanelTypes.CHANNELS"
       :ref="viewerSidePanelTypes.CHANNELS"
       :window-height="window_height"
+      :active-viewer="activeViewer"
     />
 
     <palette-montages
@@ -72,6 +74,10 @@ export default {
     sidePanelView: {
       type: String,
       default: ''
+    },
+    activeViewer: {
+      type: Object,
+      default: () => {},
     }
   },
 
