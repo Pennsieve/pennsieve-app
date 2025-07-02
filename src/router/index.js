@@ -26,6 +26,11 @@ const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
 const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
+const DatasetActivityView = () => import('./Dataset/DatasetActivityView.vue');
+const DatasetPermissionsView = () => import('./Dataset/DatasetPermissionsView.vue');
+const DatasetMetadataHeader = () => import('./Dataset/DatasetMetadataHeader.vue');
+const DatasetMetadataView = () => import('./Dataset/DatasetMetadataView.vue');
+const DatasetMetadataModelsView = () => import('./Dataset/DatasetMetadataModelsView.vue');
 
 const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeader.vue')
 const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
