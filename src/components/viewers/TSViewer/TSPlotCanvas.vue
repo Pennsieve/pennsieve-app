@@ -73,7 +73,6 @@ const {
     sendDumpBufferRequest,
     disconnect,
     setClearChannelsCallback,
-    setPackageId,
     onSegment,
     onEvent,
     onChannelDetails,
@@ -85,7 +84,8 @@ const {
   blurCanvasRef,
   initializeCanvases,
   renderData,
-  cpCanvasScaler
+  cpCanvasScaler,
+  computeChannelViews
 } = useCanvasRenderer()
 
 // Define pixelRatio directly in main component to avoid dependency issues
@@ -180,23 +180,6 @@ const computedRsPeriod = computed(() => {
   console.warn('⚠️ Using fallback rsPeriod = 1')
   return 1
 })
-
-// ✅ NEW: Watch for WebSocket reconnection
-// watch(connectionStatus, (newStatus, oldStatus) => {
-//   if (newStatus === 'connected' && oldStatus === 'disconnected') {
-//     console.log('🚨 WebSocket reconnected - clearing state for clean start')
-//     requestedPages.value.clear()
-//     clearRequests()
-//     staleDataCounter.value = 0
-//     lastRequestedSamplePeriod.value = null
-//     lastRequestStart.value = null
-//     lastRequestDuration.value = null
-//     invalidate()
-//
-//     // Restart render
-//     renderAll()
-//   }
-// })
 
 // ✅ NEW: Watch for rsPeriod changes and update requestedSamplePeriod validation
 watch(computedRsPeriod, (newRsPeriod) => {
@@ -513,70 +496,6 @@ watch(() => props.duration, (newDuration, oldDuration) => {
   // console.log('✅ Duration change - invalidated data caches only')
 })
 
-// watch( () => activeViewer.value, async (newValue, oldValue ) => {
-//
-//
-//
-//   console.log("Watching activeViewer --> old: " + oldValue + " new: " + newValue)
-//   console.log(oldValue)
-//   console.log(newValue)
-//
-//   pixelRatio.value = 1
-//   initializeCanvases(pixelRatio.value)
-//
-//   const initialRsPeriod = computedRsPeriod.value
-//   updateCurrentRequestedSamplePeriod(initialRsPeriod)
-//   // console.log('🚀 Initialized requestedSamplePeriod validation with rsPeriod:', initialRsPeriod)
-//
-//   // Configure WebSocket
-//   setClearChannelsCallback(() => {
-//     if (viewerChannels.value?.length) {
-//       const chIds = viewerChannels.value.map(ch => ch.id)
-//       const message = { 'channelFiltersToClear': chIds }
-//       sendFilterMessage(message)
-//     }
-//   })
-//
-//   const userToken = await useGetToken()
-//
-//   // debugger
-//   // Open WebSocket connection
-//   console.log("Open websocket with id: " + newValue?.content.id + " from: " + oldValue?.content.id)
-//   if (newValue.content?.id) {
-//
-//     setTimeout(() => {
-//       openWebsocket(
-//         config.value.timeSeriesUrl,
-//         newValue.content.id,
-//         userToken,
-//       )
-//     }, 500);
-//
-//
-//   }
-//
-//   // Initialize prefetch function - create a wrapper that captures current values
-//   initializePrefetch(
-//     (requests) => {
-//       const currentRsPeriod = computedRsPeriod.value
-//       return requestDataFromServer(
-//         requests,
-//         0,
-//         websocket.value,
-//         userToken,
-//         newValue,
-//         currentRsPeriod,
-//         requestedPages.value,
-//         props.ts_end
-//       )
-//     },
-//     requestedPages
-//   )
-//
-//   monitorPrefetchActivity()
-//
-// }, {immediate: true, deep: true})
-
 watch(() => viewerMontageScheme.value, (newScheme) => {
 
   if (websocket.value && websocket.value.readyState === 1) {
@@ -740,7 +659,6 @@ const initPlotCanvas = async () => {
     requestedPages
   )
 
-  // ✅ FIX: Wait for WebSocket connection before proceeding
   if (activeViewer.value?.content?.id) {
     try {
       console.log('🔄 Opening WebSocket connection for package:', activeViewer.value.content.id)

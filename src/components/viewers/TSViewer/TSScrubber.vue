@@ -76,6 +76,7 @@ const patternCnvs = ref(null)
 const annotations = ref([])
 const segmentSpans = ref([])
 const segments = ref([])
+const isInitializing = ref(false)
 
 // Additional mouse tracking data
 const clickX = ref(0)
@@ -137,7 +138,107 @@ watch(() => props.cWidth, () => {
   render()
 })
 
-// Methods
+// Watch for changes in activeViewer (package switching)
+watch(() => props.activeViewer, (newViewer, oldViewer) => {
+  if (newViewer && newViewer !== oldViewer) {
+    console.log('TSScrubber: ActiveViewer changed, resetting component state')
+    isInitializing.value = true
+    resetComponentState()
+
+    // Re-initialize if we have valid data
+    if (newViewer.content?.id) {
+      nextTick(() => {
+        // Only fetch annotations immediately (doesn't need channels)
+        getAnnotations()
+
+        // Wait for channels to be populated before initializing segments
+        // This will be handled by the viewerChannels watcher
+        isInitializing.value = false
+      })
+    } else {
+      isInitializing.value = false
+    }
+  }
+}, { deep: true })
+
+// Watch for changes in viewer channels (only if not currently initializing)
+watch(() => viewerStore.viewerChannels, (newChannels, oldChannels) => {
+  if (newChannels && newChannels.length > 0 && !isInitializing.value) {
+    // Check if this is a significant change (different count or package switch)
+    const hasSignificantChange = !oldChannels ||
+      newChannels.length !== oldChannels.length ||
+      (newChannels[0]?.id !== oldChannels[0]?.id)
+
+    if (hasSignificantChange) {
+      console.log('TSScrubber: Viewer channels changed, re-initializing segments')
+      resetSegmentState()
+      nextTick(() => {
+        initSegmentSpans()
+      })
+    }
+  }
+}, { deep: true })
+
+// Watch for changes in viewer annotations (only if not currently initializing)
+watch(() => viewerStore.viewerAnnotations, (newAnnotations, oldAnnotations) => {
+  if (newAnnotations && newAnnotations !== oldAnnotations && !isInitializing.value) {
+    console.log('TSScrubber: Viewer annotations changed independently, re-fetching annotations')
+    nextTick(() => {
+      getAnnotations()
+    })
+  } else if (newAnnotations && newAnnotations.length > 0 && !oldAnnotations && props.activeViewer?.content?.id) {
+    // Special case: annotation layers just became available and we have an active viewer
+    console.log('TSScrubber: Annotation layers now available, fetching annotations')
+    nextTick(() => {
+      getAnnotations()
+    })
+  }
+}, { deep: true })
+
+// Helper methods for state management
+const resetComponentState = () => {
+  console.log('TSScrubber: Resetting component state')
+
+  // Reset annotation data
+  annotations.value = []
+
+  // Reset segment data
+  resetSegmentState()
+
+  // Reset mouse/interaction state
+  mouseDown.value = false
+  hoverTxt.value = ''
+  pointerMode.value = 'point'
+
+  // Clear any existing renders
+  clearCanvases()
+}
+
+const resetSegmentState = () => {
+  console.log('TSScrubber: Resetting segment state')
+
+  // Reset segments array
+  segments.value = new Array(5000)
+  segments.value = segments.value.fill(0, 0, 4999)
+
+  // Reset segment spans
+  segmentSpans.value = []
+}
+
+const clearCanvases = () => {
+  // Clear all canvases
+  nextTick(() => {
+    const canvases = [segmentsCanvas.value, annotationCanvas.value, iCanvas.value]
+    canvases.forEach(canvas => {
+      if (canvas) {
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+        }
+      }
+    })
+  })
+}
 const _cpCanvasScaler = (sz, pixelRatio, offset) => {
   return pixelRatio * (sz + offset)
 }
@@ -173,12 +274,12 @@ const getUTCDateString = (d, s, c) => {
 }
 
 // Mouse Interactions
-const _onTap = (e) => {
-  const cCoord = iCanvas.value.getBoundingClientRect()
-  const cClickOffset = e.clientX - cCoord.left
-  const realStart = (cClickOffset / scrubberCWidth.value) * (props.ts_end - props.ts_start)
-  emit('setStart', realStart + props.ts_start)
-}
+// const _onTap = (e) => {
+//   const cCoord = iCanvas.value.getBoundingClientRect()
+//   const cClickOffset = e.clientX - cCoord.left
+//   const realStart = (cClickOffset / scrubberCWidth.value) * (props.ts_end - props.ts_start)
+//   emit('setStart', realStart + props.ts_start)
+// }
 
 const _onMouseMove = (e) => {
   if (!mouseDown.value) {
@@ -224,9 +325,13 @@ const _onMouseUp = () => {
 const _onMouseDown = (e) => {
   mouseDown.value = true
   const cCoord = iCanvas.value.getBoundingClientRect()
-  const cClickOffset = e.detail.x - cCoord.left
+  const cClickOffset = e.clientX - cCoord.left
   clickX.value = e.clientX
-  startDragTime.value = props.start
+
+
+  const realStart = (cClickOffset / scrubberCWidth.value) * (props.ts_end - props.ts_start)
+  emit('setStart', realStart + props.ts_start)
+  startDragTime.value = realStart + props.ts_start
 }
 
 const _onMouseEnter = () => {
@@ -243,9 +348,31 @@ const pageInGap = (startEpoch, pageSize) => {
 }
 
 const initSegmentSpans = () => {
+  // Validate that we have the required data before making API calls
+  if (!viewerStore.viewerChannels || viewerStore.viewerChannels.length === 0) {
+    console.warn('TSScrubber: Cannot init segment spans - no viewer channels available')
+    return
+  }
+
+  if (!props.ts_start || !props.ts_end) {
+    console.warn('TSScrubber: Cannot init segment spans - invalid time range')
+    return
+  }
+
+  if (!props.config?.timeSeriesApi) {
+    console.warn('TSScrubber: Cannot init segment spans - no timeSeriesApi configured')
+    return
+  }
+
+  console.log(`TSScrubber: Initializing segment spans for ${viewerStore.viewerChannels.length} channels`)
+
+  // Reset segment state before fetching new data
+  resetSegmentState()
+
   // GET SEGMENTS AND GAPS
   const fetchSpan = Math.min(props.constants['SEGMENTSPAN'], (props.ts_end - props.ts_start))
   const vChans = viewerStore.viewerChannels
+
   for (let i = 0; i < vChans.length; i++) {
     _requestSegmentSpan(vChans[i].id, i, props.ts_start, (props.ts_start + fetchSpan), 0)
   }
@@ -254,11 +381,29 @@ const initSegmentSpans = () => {
 const _requestSegmentSpan = async (channel, channelIdx, start, end, ix) => {
   const max_recursion = props.constants['MAXRECURSION']
 
+  // Validate inputs before making API call
+  if (!props.config?.timeSeriesApi) {
+    console.warn('TSScrubber: Cannot request segment span - no timeSeriesApi configured')
+    return
+  }
+
+  if (!channel) {
+    console.warn('TSScrubber: Cannot request segment span - no channel ID provided')
+    return
+  }
+
   try {
     const token = await useGetToken()
     const url = `${props.config.timeSeriesApi}/ts/retrieve/segments?session=${token}&channel=${channel}&start=${start}&end=${end}`
 
+    console.log(`TSScrubber: Fetching segments for channel ${channel} (${channelIdx})`)
     const resp = await useSendXhr(url)
+
+    // Validate that we still have the same channels (user might have switched packages)
+    if (!viewerStore.viewerChannels[channelIdx] || viewerStore.viewerChannels[channelIdx].id !== channel) {
+      console.warn('TSScrubber: Channel mismatch detected, ignoring segment response (likely package switched)')
+      return
+    }
 
     // Parse response into vector
     let vector = new Array(resp.length * 2)
@@ -302,6 +447,13 @@ const _requestSegmentSpan = async (channel, channelIdx, start, end, ix) => {
     // remove first value if there is overlap with previous request
     let firstValue = vector[0]
     let chConfig = viewerStore.viewerChannels[channelIdx]
+
+    // Double-check that the channel still exists and matches
+    if (!chConfig || chConfig.id !== channel) {
+      console.warn('TSScrubber: Channel configuration mismatch, skipping update')
+      return
+    }
+
     if (firstValue < chConfig.dataSegments[chConfig.dataSegments.length - 1]) {
       vector.shift()
       vector.shift()
@@ -320,26 +472,61 @@ const _requestSegmentSpan = async (channel, channelIdx, start, end, ix) => {
       renderSegments()
     }
   } catch (err) {
+    console.error(`TSScrubber: Error fetching segments for channel ${channel}:`, err)
     useHandleXhrError(err)
   }
 }
 
 const getAnnotations = async () => {
+  // Store the viewer ID at the start to check consistency later
+  const currentViewerId = props.activeViewer?.content?.id
+
+  // Validate that we have the required data before making API call
+  if (!currentViewerId) {
+    console.warn('TSScrubber: Cannot get annotations - no active viewer ID')
+    annotations.value = []
+    return
+  }
+
+  if (!props.config?.apiUrl) {
+    console.warn('TSScrubber: Cannot get annotations - no API URL configured')
+    annotations.value = []
+    return
+  }
+
+  if (!viewerStore.viewerAnnotations || viewerStore.viewerAnnotations.length === 0) {
+    console.log('TSScrubber: No annotation layers available, skipping annotation fetch')
+    annotations.value = []
+    render()
+    return
+  }
+
   try {
     const token = await useGetToken()
     const layerIds = map(obj => obj.id, viewerStore.viewerAnnotations)
     const endTime = props.ts_end
-    const baseUrl = `${props.config.apiUrl}/timeseries/${props.activeViewer.content.id}/annotations/window`
+    const baseUrl = `${props.config.apiUrl}/timeseries/${currentViewerId}/annotations/window`
     let url = baseUrl + `?api_key=${token}&aggregation=count&start=${props.ts_start}&end=${props.ts_end}&period=${period.value}&mergePeriods=true`
+
     for (let i in layerIds) {
       url = url + `&layerIds=${layerIds[i]}`
     }
 
+    console.log(`TSScrubber: Fetching annotations for viewer ${currentViewerId}`)
     const resp = await useSendXhr(url)
-    annotations.value = resp
-    render()
+
+    // Double-check that we're still on the same viewer (async operations can be overtaken)
+    if (props.activeViewer?.content?.id === currentViewerId) {
+      annotations.value = resp
+      render()
+    } else {
+      console.log('TSScrubber: Ignoring annotation response - viewer changed during fetch')
+    }
   } catch (err) {
+    console.error('TSScrubber: Error fetching annotations:', err)
+    annotations.value = []
     useHandleXhrError(err)
+    render() // Still render even if annotations failed
   }
 }
 
@@ -535,7 +722,10 @@ defineExpose({
   render,
   renderViewPort,
   renderSegments,
-  renderTimelimeLine
+  renderTimelimeLine,
+  resetComponentState,
+  resetSegmentState,
+  clearCanvases
 })
 </script>
 

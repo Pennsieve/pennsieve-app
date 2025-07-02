@@ -80,6 +80,7 @@
         <viewer-pane v-else
                      ref="viewerPane"
                      :pkg="activeViewer"
+                     :side-panel-open="viewerSidePanelOpen"
         />
 
         <viewer-toolbar
@@ -110,13 +111,9 @@
         <bf-viewer-side-panel
           :side-panel-open="viewerSidePanelOpen"
           :side-panel-view="viewerSidePanelView"
+          :active-viewer="activeViewer"
         />
       </div>
-         <montage-error-dialog
-           :is-open="isMontageDialogOpen"
-           :viewer-errors="viewerErrors"
-           @close="onMontageDialogClose"
-         />
     </div>
   </div>
 
@@ -129,13 +126,10 @@ import { propOr, pathOr, path, defaultTo, prop, find, propEq } from 'ramda'
 
 import ViewerToolsPalettes from '../ViewerToolsPalettes'
 import ViewerPane from '../ViewerPane/ViewerPane.vue'
-// import BfHeader from '../../bf-header/BfHeader.vue'
 import BfViewerSidePanel from '../BfViewerSidePanel/BfViewerSidePanel.vue'
 import ViewerToolbar from '../ViewerToolbar/ViewerToolbar.vue'
-// import MontageErrorDialog from '../MontageErrorDialog/MontageErrorDialog.vue'
 
 import Request from '../../../mixins/request'
-import ConfirmChanges from '../../../mixins/confirm-changes'
 import EventBus from '../../../utils/event-bus'
 import { viewerSidePanelTypes, viewerToolTypes } from '@/utils/constants'
 import IconNeural from "../../icons/IconNeural.vue";
@@ -168,9 +162,7 @@ export default {
     ViewerPane,
     BfStage,
     BfViewerSidePanel,
-    // BfHeader,
     ViewerToolbar,
-    // MontageErrorDialog
     IconHand,
     IconLink,
     IconDashedAnnotation,
@@ -186,12 +178,10 @@ export default {
   mixins: [
     Request,
     ViewerToolsPalettes,
-    ConfirmChanges
   ],
   data: function() {
     return {
       isPackageLoading: false,
-      isMontageDialogOpen: false
     }
   },
   computed: {
@@ -208,7 +198,6 @@ export default {
       'viewerSidePanelView',
       'viewerActiveTool',
       'viewerErrors',
-      'viewerMontageScheme'
     ]),
 
     packageName: function() {
@@ -242,33 +231,19 @@ export default {
       return propOr('', 'error', this.viewerErrors)
     }
   },
-  watch: {
 
-    /**
-     * Trigger montage error dialog to open for PackageCannotBeMontaged error type
-     */
-    viewerErrorType: {
-      handler: function(error) {
-        if (error === 'PackageCannotBeMontaged') {
-          this.isMontageDialogOpen = true
-        }
-      }
-    }
-  },
   /**
    * Vue lifecycle method
    */
   mounted: function() {
     EventBus.$on('active-viewer-action', this.onActiveViewerAction.bind(this))
-    EventBus.$on('data-changed', this.onDataChanged.bind(this))
     this.getFile()
   },
   beforeDestroy() {
     EventBus.$off('active-viewer-action', this.onActiveViewerAction.bind(this))
-    EventBus.$off('data-changed', this.onDataChanged.bind(this))
   },
   methods: {
-    ...mapActions('viewerModule', ['openViewer', 'setSidePanel', 'closeViewer', 'setActiveTool', 'setViewerErrors', 'setViewerMontageScheme']),
+    ...mapActions('viewerModule', ['openViewer', 'setSidePanel', 'closeViewer', 'setActiveTool', 'setViewerErrors']),
     ...mapActions(['setDatasetRole']),
 
     /**
@@ -379,43 +354,6 @@ export default {
       })
     },
 
-    /**
-     * Handle montage error dialog close event
-     */
-    onMontageDialogClose: function() {
-      this.isMontageDialogOpen = false
-      this.setViewerMontageScheme('NOT_MONTAGED')
-      this.setViewerErrors({})
-    },
-
-    /**
-     * Handle fetch montage scheme event
-     */
-    onFetchMontageScheme: function() {
-      this.isMontageDialogOpen = false
-      this.onActiveViewerAction({
-        method: 'fetchMontageScheme',
-        payload: {
-          detail: {
-            montage: this.viewerMontageScheme
-          }
-        }
-      })
-    },
-
-    /**
-     * Listen for data changes and modify the list that keeps track of changes
-     * changedProperties Array is defined in ConfirmChanges mixin
-     * @param {Object} prop
-     */
-    onDataChanged: function(prop) {
-      const index = this.changedProperties.indexOf(prop.id)
-      if (index >= 0) {
-        this.changedProperties.splice(index, 1)
-      } else {
-        this.changedProperties.push(prop.id)
-      }
-    },
 
     /**
      * Handle loss changes confirmation

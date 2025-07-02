@@ -10,12 +10,12 @@ import vuexStore from '../store/index'  // Assuming your Vuex store is exported 
 
 export const useViewerStore = defineStore('tsviewer', () => {
 
+    const config = site
     const viewerChannels = ref([])
     const viewerMontageScheme = ref('NOT_MONTAGED')
     const customMontageMap = ref({})
     const workspaceMontages = ref([])
     const viewerErrors = ref(null)
-    const selectedChannel = ref(null)
     const needsRerender = ref(null)
 
     // Annotation-related state
@@ -97,9 +97,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerErrors.value = errors
     }
 
-    const setSelectedChannel = (channelData) => {
-        selectedChannel.value = channelData
-    }
 
     const setNeedsRerender = (renderData) => {
         needsRerender.value = renderData
@@ -280,7 +277,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         customMontageMap.value = {}
         workspaceMontages.value = []
         viewerErrors.value = null
-        selectedChannel.value = null
         viewerAnnotations.value = []
         activeAnnotationLayer.value = {}
         activeAnnotation.value = {}
@@ -337,12 +333,12 @@ export const useViewerStore = defineStore('tsviewer', () => {
         customMontageMap,
         workspaceMontages,
         viewerErrors,
-        selectedChannel,
         needsRerender,
         viewerAnnotations,
         activeAnnotationLayer,
         activeAnnotation,
         viewerActiveTool,
+        config,
 
         // Getters
         getMontageMessageByName,
@@ -356,7 +352,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         setCustomMontageMap,
         setWorkspaceMontages,
         setViewerErrors,
-        setSelectedChannel,
         setAnnotations,
         setActiveAnnotationLayer,
         setActiveAnnotation,

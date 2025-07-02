@@ -30,7 +30,7 @@
         <el-tooltip
           placement="top"
           content="Save"
-          :open-delay="300"
+          :show-after="300"
         >
           <button @click="saveChanges">
             <IconCheck
@@ -42,7 +42,7 @@
         <el-tooltip
           placement="top"
           content="Cancel"
-          :open-delay="300"
+          :show-after="300"
         >
           <button @click="cancelChanges">
             <IconRemove
@@ -88,7 +88,7 @@
       <el-tooltip
         placement="top"
         content="Filter"
-        :open-delay="300"
+        :show-after="300"
       >
         <button
           class="mr-8"
@@ -103,7 +103,7 @@
       <el-tooltip
         placement="top"
         content="Hide"
-        :open-delay="300"
+        :show-after="300"
       >
         <button @click="toggleChannel">
           <IconEyeball

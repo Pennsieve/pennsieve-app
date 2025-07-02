@@ -115,13 +115,19 @@
       @delete="deleteAnnotation"
     />
 
+    <TsViewerLayerWindow
+      :visible="annotationLayerWindowOpen"
+      @close-window="onCloseAnnotationLayerWindow"
+      @create-layer="onCreateAnnotationLayer"
+    />
+
+
   </div>
 </template>
 
 <script setup>
 import {
   ref,
-  reactive,
   computed,
   watch,
   nextTick,
@@ -129,7 +135,6 @@ import {
   onBeforeUnmount,
   defineAsyncComponent
 } from 'vue'
-import { useStore } from 'vuex'
 import { storeToRefs } from 'pinia'
 import {
   propOr,
@@ -146,17 +151,46 @@ const TimeseriesViewerToolbar = defineAsyncComponent(() => import('@/components/
 const TimeseriesFilterModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSFilterModal.vue'))
 const TimeseriesAnnotationModal = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationModal.vue'))
 const TsAnnotationDeleteDialog = defineAsyncComponent(() => import('@/components/viewers/TSViewer/TSAnnotationDeleteDialog/TsAnnotationDeleteDialog.vue'))
+const TsViewerLayerWindow = defineAsyncComponent( () => import('@/components/viewers/TSViewer/TSViewerLayerWindow.vue'))
+// Constants
+const constants = {
+  TIMEUNIT: 'microSeconds',   // Basis for time
+  XOFFSET: 0,                 // X-offset of graph in canvas
+  XGRIDSPACING: 1000000,      // Time in microseconds between vertical lines
+  NRPXPERLABEL: 150,          // Number of pixels per label on x-axis
+  USEREALTIME: true,          // If true than interpret timepoints as UTC microseconds.
+  DEFAULTDPI: 96,             // Default pixels per inch
+  ANNOTATIONLABELHEIGHT: 20,  // Height of annotation label
+  ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
+  MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
+  PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
+  PREFETCHPAGES: 5,           // Number of pages to read ahead of view.
+  LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
+  USEMEDIAN: false,           // Use Median instead of mean for centering channels
+  CURSOROFFSET: 5,            // Offset of cursor canvas
+  SEGMENTSPAN: 1209600000000, // One week of gap-data is returned per request.
+  MAXRECURSION: 20,           // Maximum recursion depth of gap-data requests (max 2 years)
+  MAXDURATION: 600000000,     // Maximum duration window (5min)
+  INITDURATION: 15000000      // Initial duration window  (15sec)
+}
 
 // Define props
 const props = defineProps({
+  pkg: {
+    type: Object,
+    default: () => {},
+  },
   isPreview: {
     type: Boolean,
     default: false
-  }
+  },
+  sidePanelOpen: {
+    type: Boolean,
+    default: false
+  },
 })
 
 // Store setup
-const store = useStore()
 const viewerStore = useViewerStore()
 const { viewerChannels, needsRerender } = storeToRefs(viewerStore)
 
@@ -176,28 +210,8 @@ const viewerCanvas = ref(null)
 const filterWindow = ref(null)
 const annotationModal = ref(null)
 
-// Reactive data
-const constants = reactive({
-  TIMEUNIT: 'microSeconds',   // Basis for time
-  XOFFSET: 0,                 // X-offset of graph in canvas
-  XGRIDSPACING: 1000000,      // Time in microseconds between vertical lines
-  NRPXPERLABEL: 150,          // Number of pixels per label on x-axis
-  USEREALTIME: true,          // If true than interpret timepoints as UTC microseconds.
-  DEFAULTDPI: 96,             // Default pixels per inch
-  ANNOTATIONLABELHEIGHT: 20,  // Height of annotation label
-  ROUNDDATAPIXELS: false,     // If true, canvas point will be rounded to integer pixels for faster render (faster)
-  MINMAXPOLYGON: true,        // If true, then polygon is rendered thru minMax values, otherwise vertical lines (faster)
-  PAGESIZEDIVIDER: 0.5,       // Number of pages that span the current canvas.
-  PREFETCHPAGES: 3,           // Number of pages to read ahead of view.
-  LIMITANNFETCH: 500,         // Maximum number of annotations that are fetched per request
-  USEMEDIAN: false,           // Use Median instead of mean for centering channels
-  CURSOROFFSET: 5,            // Offset of cursor canvas
-  SEGMENTSPAN: 1209600000000, // One week of gap-data is returned per request.
-  MAXRECURSION: 20,           // Maximum recursion depth of gap-data requests (max 2 years)
-  MAXDURATION: 600000000,     // Maximum duration window (5min)
-  INITDURATION: 15000000      // Initial duration window  (15sec)
-})
 
+// Reactive
 const ts_start = ref(null)
 const ts_end = ref(null)
 const window_height = ref(0)
@@ -216,11 +230,9 @@ const annotationDelete = ref(null)
 const isTsAnnotationDeleteDialogVisible = ref(false)
 
 // Computed properties
-const activeViewer = computed(() => store.state.viewerModule.activeViewer)
-const viewerSidePanelOpen = computed(() => store.state.viewerModule.viewerSidePanelOpen)
-const viewerAnnotations = computed(() => store.state.viewerModule.viewerAnnotations)
-const viewerMontageScheme = computed(() => store.state.viewerModule.viewerMontageScheme)
-const config = computed(() => store.state.config)
+const activeViewer = computed(() => props.pkg)
+const viewerSidePanelOpen = computed(() => props.sidePanelOpen)
+const config = computed(() => viewerStore.config)
 
 const reactiveViewerChannels = computed(() => {
   return viewerChannels.value.map(channel => ({
@@ -245,15 +257,8 @@ const nrVisChannels = computed(() => {
   return visibleChannels.value.length
 })
 
-const _cpStyleLabels = computed(() => {
-  return (height, nrVisCh) => {
-    const h = Math.max(1, Math.min(12, height / nrVisCh - 2))
-    return 'font-size:' + h + 'px; height:' + h + 'px'
-  }
-})
-
 // Methods that need to be defined early (used in watchers)
-const onResize = async (event) => {
+const onResize = async () => {
   console.log('onresize...')
   if (!ts_viewer.value) {
     return
@@ -264,7 +269,7 @@ const onResize = async (event) => {
     return
   }
 
-  var style = window.getComputedStyle(element, null)
+  const style = window.getComputedStyle(element, null);
   const hhh = parseInt(style.getPropertyValue('height'))
 
   const toolbarOffset = props.isPreview ? 0 : 100
@@ -286,9 +291,10 @@ const onResize = async (event) => {
 
 // Watchers
 watch( () => activeViewer.value, async (newValue, oldValue ) => {
-  console.log("Watching activeViewer --> old: " + oldValue + " new: " + newValue)
-  console.log(oldValue)
-  console.log(newValue)
+
+  if (scrubber.value?.resetComponentState) {
+    scrubber.value.resetComponentState()
+  }
 
   if (newValue && newValue.channels && newValue.channels.length > 0) {
     initTimeRange()
@@ -296,14 +302,25 @@ watch( () => activeViewer.value, async (newValue, oldValue ) => {
 
   initCanvasRenderer()
 
+  await nextTick()
+
+  if (scrubber.value?.initSegmentSpans) {
+    scrubber.value.initSegmentSpans()
+  }
+  if (scrubber.value?.getAnnotations) {
+    scrubber.value.getAnnotations()
+  }
+
 }, {immediate: false, deep: true})
+
+
 
 watch(viewerSidePanelOpen, () => {
   // Only call onResize if component is mounted and elements exist
   if (ts_viewer.value) {
     onResize()
   }
-}, { immediate: false }) // Changed from immediate: true to avoid early execution
+}, { immediate: false })
 
 // Watch for changes in number of visible channels
 watch(nrVisChannels, (newCount, oldCount) => {
@@ -318,11 +335,6 @@ watch(nrVisChannels, (newCount, oldCount) => {
     }, 20)
   }
 })
-
-// Methods
-const fetchWorkspaceMontages = async () => {
-  return viewerStore.fetchWorkspaceMontages()
-}
 
 const openEditAnnotationDialog = (annotation) => {
   store.dispatch('viewerModule/setActiveAnnotation', annotation).then(() => {
@@ -395,11 +407,6 @@ const onCreateUpdateAnnotation = async (annotation) => {
   } catch (error) {
     console.error('📍 TSViewer: Error creating/updating annotation:', error)
 
-    // Show error to user (uncomment if you have toast system)
-    // EventBus.$emit('toast', {
-    //   detail: { msg: `Error: ${error.message}`, type: 'error' }
-    // })
-
     // Re-open modal on error so user can retry
     annotationWindowOpen.value = true
   }
@@ -408,10 +415,6 @@ const onCreateUpdateAnnotation = async (annotation) => {
 const onAnnotationUpdated = () => {
   viewerCanvas.value.renderAnnotationCanvas()
 }
-
-// const onOpenAnnotationWindow = () => {
-//   annotationWindowOpen.value = true
-// }
 
 const confirmDeleteAnnotation = (annotation) => {
   annotationDelete.value = annotation
@@ -447,7 +450,7 @@ const onAddAnnotation = (startTime, duration, allChannels, label, description, l
   }
 
   // Get selected channels
-  const selectedChannels = store.getters['viewerModule/viewerSelectedChannels'] || []
+  const selectedChannels = viewerStore.viewerSelectedChannels || []
   const channelIds = allChannels ? [] : selectedChannels.map(ch => ch.id)
 
   // Create the annotation object with proper structure
@@ -534,12 +537,8 @@ const onAnnLayersInitialized = () => {
 }
 
 const onChannelsInitialized = () => {
-  scrubber.value.initSegmentSpans()
+  // console.log('update scrubber')
 
-  // Resize the canvas as label length likely changed
-  nextTick(() => {
-    onResize()
-  })
 }
 
 const onPageBack = () => {
@@ -700,9 +699,6 @@ const initChannels = () => {
 }
 
 const openLayerWindow = (payload) => {
-  // Note: layerModal component not found in template - this might need to be added
-  // or this function might be unused
-  console.warn('openLayerWindow called but layerModal ref not found in template')
   annotationLayerWindowOpen.value = true
 }
 
@@ -749,7 +745,7 @@ onMounted(() => {
   const toolbarOffset = props.isPreview ? 0 : 100
 
   // Fetch the workspace montages
-  fetchWorkspaceMontages()
+  viewerStore.fetchWorkspaceMontages()
 
   window_height.value = hhh - toolbarOffset
   if (ts_viewer.value) {

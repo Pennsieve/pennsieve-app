@@ -1,6 +1,6 @@
 <template>
   <div
-    class="accordion"
+    :class="{ accordion: true, 'selected': selected }"
     :style="{maxHeight:`${annotationHeight}`}">
     <div class="accordion-trigger">
       <a
@@ -106,9 +106,12 @@ export default {
     text-decoration: none;
     white-space: nowrap;
     overflow: scroll;
+
+    &.selected {
+      background: $purple_tint;
+    }
   }
   .accordion-trigger {
-    background: white;
     align-items: center;
     border-bottom: solid 1px $gray_2;
     display: flex;

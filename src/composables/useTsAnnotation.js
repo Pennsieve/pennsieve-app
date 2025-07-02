@@ -3,7 +3,7 @@
 import { computed } from 'vue'
 import { useStore } from 'vuex'
 import { storeToRefs } from 'pinia'
-import { useSendXhr, useHandleXhrError } from '@/mixins/request/request_composable'
+import { useHandleXhrError } from '@/mixins/request/request_composable'
 import { useGetToken } from '@/composables/useGetToken'
 import { useViewerStore } from '@/stores/tsviewer' // Import Pinia store
 
@@ -17,10 +17,6 @@ export function useTsAnnotation() {
     const viewerSidePanelOpen = computed(() => store.state.viewerModule.viewerSidePanelOpen)
     const activeAnnotation = computed(() => store.state.viewerModule.activeAnnotation)
     const config = computed(() => store.state.config)
-
-    // Use Pinia for these:
-    // viewerChannels - now from Pinia via storeToRefs
-    // viewerAnnotations - now from Pinia via storeToRefs
 
     // Helper function to get channel ID
     const getChannelId = (channel) => {
@@ -91,15 +87,14 @@ export function useTsAnnotation() {
         })
 
         if (annotationData.allChannels) {
-            // When allChannels is true, include ALL visible channel IDs
+            // When allChannels is true, include all channels (even if they are currently not visible)
             console.log('🔧 useTsAnnotation: allChannels=true, adding all visible channels')
-            for (let ch = 0; ch < viewerChannels.value.length; ch++) {
-                const curChannelView = viewerChannels.value[ch] // Now from Pinia
-                if (curChannelView.visible) {  // Add all visible channels
-                    const id = getChannelId(curChannelView)
-                    channelIds.push(id)
-                    console.log('🔧 useTsAnnotation: Added channel ID:', id)
-                }
+            const allChannels = activeViewer.value.channels
+            for (let ch = 0; ch < allChannels.length; ch++) {
+                const curChannel = allChannels[ch] // Now from Pinia
+                const id = curChannel.content.id
+                channelIds.push(id)
+                console.log('🔧 useTsAnnotation: Added channel ID:', id)
             }
         } else if (annotationData.channelIds && Array.isArray(annotationData.channelIds) && annotationData.channelIds.length > 0) {
             // Use provided channelIds if they exist and are not empty
