@@ -82,7 +82,6 @@ function addMontagePair() {
 
 function selectChannelPair(evt) {
   selectedPair.value = evt
-  console.log(evt)
 }
 
 function removeMontagePair(index) {
