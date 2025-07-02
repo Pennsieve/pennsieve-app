@@ -54,7 +54,6 @@ export function useAnnotationRendering() {
                             channelOffset = curChannelView.rowBaseline | 0
                             if (channelOffset < curAnn.minOffset) curAnn.minOffset = channelOffset
                             if (channelOffset > curAnn.maxOffset) curAnn.maxOffset = channelOffset
-                            console.log(channelOffset)
                             curAnn.allOffsets.push(channelOffset)
                             break
                         }

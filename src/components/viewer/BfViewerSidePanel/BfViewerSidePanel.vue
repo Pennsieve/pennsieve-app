@@ -10,6 +10,7 @@
     <palette-discussions
       v-show="sidePanelView === viewerSidePanelTypes.DISCUSSION "
       :ref="viewerSidePanelTypes.DISCUSSION"
+      :active-viewer="activeViewer"
     />
 
     <palette-annotations

@@ -132,7 +132,7 @@ async function doDeleteMontage(evt) {
           </div>
         </template>
         <template #items>
-          <div>
+          <div v-if="montage.name !== 'NOT_MONTAGED'">
             <div class="delete-container">
               <button @click="deleteMontage(montage)">
                 delete montage
@@ -148,6 +148,7 @@ async function doDeleteMontage(evt) {
               </div>
             </div>
           </div>
+
         </template>
       </montage-accordion>
     </div>
@@ -189,7 +190,7 @@ async function doDeleteMontage(evt) {
 
 .montages-heading {
   align-items: center;
-  background: #f7f7f7;
+  background: $purple_0_7;
   border-bottom: solid 1px $gray_2;
   display: flex;
   padding: 8px;
