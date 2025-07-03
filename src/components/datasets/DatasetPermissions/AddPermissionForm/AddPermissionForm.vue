@@ -11,12 +11,10 @@
           required
           filterable
           allow-create
-          :default-first-option="true"
           value-key="id"
           placeholder="Find individuals, teams, or enter email address..."
           popper-class="add-permission-form-dropdown"
           :no-match-text="`Can't find '${searchText}'`"
-          @visible-change="setDisplayValue"
           @change="onChange"
         >
           <template #prefix>
@@ -34,10 +32,10 @@
               class="add-permission-form-option"
               :label="externalPerson.email"
               :value="{
-            type: 'email',
-            id: externalPerson.id,
-            label: externalPerson.email
-          }"
+                        type: 'email',
+                        id: externalPerson.id,
+                        label: externalPerson.email
+                      }"
             >
               <div class="name">
                 <!-- eslint-disable-next-line --><!-- highlight sanitizes -->
@@ -51,10 +49,10 @@
               class="add-permission-form-option"
               :label="`Everyone at ${organizationName}`"
               :value="{
-            type: 'organizations',
-            id: organizationId,
-            label: `Everyone at ${organizationName}`
-          }"
+                        type: 'organizations',
+                        id: organizationId,
+                        label: `Everyone at ${organizationName}`
+                      }"
             >
               <div class="name">
                 <!-- eslint-disable-next-line --><!-- highlight sanitizes -->
@@ -70,10 +68,10 @@
               class="add-permission-form-option"
               :label="`${fullName(item)} ${item.email}`"
               :value="{
-            type: 'users',
-            id: item.id,
-            label: fullName(item)
-          }"
+                        type: 'users',
+                        id: item.id,
+                        label: fullName(item)
+                      }"
             >
               <div class="name">
                 <!-- eslint-disable-next-line --><!-- highlight sanitizes -->
@@ -427,9 +425,6 @@
           this.externalProvided = false
           this.externalPerson = {}
         }
-        this.$nextTick(() => {
-          this.$refs.permissionSelect.focus()
-        })
       },
 
       clearForm: function() {
