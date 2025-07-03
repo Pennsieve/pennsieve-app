@@ -234,20 +234,28 @@
 
     data() {
       return {
-        permissionForm: Object.assign({}, defaultForm),
+        permissionForm: {
+                        item: {
+                          id: '',
+                          label: '',
+                          type: ''
+                        },
+                        role: '',
+                        message: ''
+                      },
         searchText: '',
         roles: [
           {
             label: 'Can Manage',
-            value: 'manager'
+            value: 'Manager'
           },
           {
             label: 'Can Edit',
-            value: 'editor'
+            value: 'Editor'
           },
           {
             label: 'Can View',
-            value: 'viewer'
+            value: 'Viewer'
           }
         ],
         confirmDialogVisible: false,
@@ -397,7 +405,7 @@
        * Reset form
        */
       reset: function() {
-        this.permissionForm = Object.assign({}, defaultForm)
+        this.permissionForm = structuredClone(defaultForm)
       },
 
       /**
