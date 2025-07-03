@@ -435,7 +435,6 @@ export default {
           this.updateOrgMembers(members)
         })
       })
-    },})
     },
     getPublishersUrl: async function() {
 
