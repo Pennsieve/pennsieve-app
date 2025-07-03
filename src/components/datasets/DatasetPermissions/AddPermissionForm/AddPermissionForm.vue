@@ -369,14 +369,6 @@ const onCloseConfirmRoleDialog = () => {
   confirmDialogVisible.value = false
 }
 
-const onSelectFocus = () => {
-  // Handle focus if needed
-}
-
-const onSelectBlur = () => {
-  // Handle blur if needed
-}
-
 // Watch for search text changes with debouncing to prevent excessive updates
 const debouncedSearchText = ref('')
 
@@ -401,10 +393,6 @@ watch(
 )
 
 // Lifecycle
-onMounted(() => {
-  // Any initialization logic
-})
-
 onUnmounted(() => {
   // Clean up timeout
   if (searchTimeout) {
