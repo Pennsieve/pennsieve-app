@@ -81,7 +81,7 @@
       :current-role="role"
       :member-name="fullName"
       @confirm="updateRole"
-      @close="closeDialog"
+      @close-dialog="closeDialog"
     />
   </div>
 </template>

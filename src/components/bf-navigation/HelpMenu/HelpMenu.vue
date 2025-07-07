@@ -7,7 +7,7 @@
       placement="right-end"
       trigger="hover"
       transition=""
-      :open-delay="200"
+      :show-after="200"
       :width="260"
       :visible-arrow="false"
     >

@@ -26,6 +26,10 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import {installDashboard} from 'sparc-dashboard-beta';
+import { createPinia } from 'pinia'
+import { useViewerStore } from '@/stores/tsviewer'
+
+
 
 Amplify.configure(AWSConfig)
 
@@ -35,11 +39,15 @@ cognitoUserPoolsTokenProvider.setKeyValueStorage(
         }
     ));
 
+
 const app = createApp(App)
 
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
+
+app.use(createPinia())
+
 
 //Import Dashboard
 import ElementPlus from 'element-plus';
@@ -78,7 +86,8 @@ app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, 
     cluster: siteConfig.pusherConfig.region
 });
 
-const sessionRefreshThreshold = 300;
+const viewerStore = useViewerStore()
+
 
 // Top level routes allowList
 const topLevelRoutes = [
