@@ -1,10 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
-import DatasetActivityView from "./Dataset/DatasetActivityView.vue";
-import DatasetPermissionsView from "./Dataset/DatasetPermissionsView.vue";
-import DatasetMetadataHeader from "./Dataset/DatasetMetadataHeader.vue";
-import DatasetMetadataView from "./Dataset/DatasetMetadataView.vue";
-import DatasetMetadataModelsView from "./Dataset/DatasetMetadataModelsView.vue";
 
 import NotFound from './not-found/NotFound.vue'
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
@@ -26,6 +21,11 @@ const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
 const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
 const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
+const DatasetActivityView = () => import('./Dataset/DatasetActivityView.vue');
+const DatasetPermissionsView = () => import('./Dataset/DatasetPermissionsView.vue');
+const DatasetMetadataHeader = () => import('./Dataset/DatasetMetadataHeader.vue');
+const DatasetMetadataView = () => import('./Dataset/DatasetMetadataView.vue');
+const DatasetMetadataModelsView = () => import('./Dataset/DatasetMetadataModelsView.vue');
 
 const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeader.vue')
 const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
@@ -324,7 +324,7 @@ const router = createRouter({
           path: ':datasetId/files',
           components: {
             stageHeader: SecondaryPageHeaderFiles,
-            stage: DatasetFilesView
+            stage: DatasetFilesView 
           },
           props: {
             stage: true,

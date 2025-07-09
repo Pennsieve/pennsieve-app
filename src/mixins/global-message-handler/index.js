@@ -436,27 +436,6 @@ export default {
         })
       })
     },
-    /**
-     * Generates teams GET url
-     */
-    getTeamsUrl: async function() {
-      const userToken = await useGetToken()
-      if (!this.activeOrgId) {
-        return
-      }
-      return `${this.config.apiUrl}/organizations/${this.activeOrgId}/teams?api_key=${userToken}`
-    },
-    /**
-     * Retrieves all teams of an organization
-     */
-    getTeams: function() {
-      return this.getTeamsUrl()
-          .then((url) => {
-            return this.sendXhr(url)})
-          .then(async (r) => {
-            this.updateTeams(r)
-          })
-    },
     getPublishersUrl: async function() {
 
       useGetToken().then( (token) => {
