@@ -43,7 +43,9 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isEpilepsyScience = orgId === "N:organization:f921dd34-f0f3-417a-bbe6-23f71020146f";
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience;
+   const isReJoinProd = orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f";
+
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd;
 }
 
 export function isEnabledForAllDevOrgs(url) {
