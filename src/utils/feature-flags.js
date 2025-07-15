@@ -18,6 +18,8 @@ export function isEnabledForTestOrgs(orgId) {
 }
 
 export function isEnabledForSpecificOrgs(orgId) {
+
+    const isTranslationalNeuroinformatics = orgId === 'N:organization:02f4662e-ca43-4eea-9f23-0c10e89df8ef'
     const isImmuneHealthProd =
     orgId ===
     "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2";
@@ -29,7 +31,6 @@ export function isEnabledForSpecificOrgs(orgId) {
     const isHackathonProd = 
     orgId === "N:organization:388563ac-49b5-4fc1-b6b0-2fba767e54b0";
  
-
    const isSPARCProd = 
    orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0";
 
@@ -45,7 +46,7 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isReJoinProd = orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f";
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd;
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics;
 }
 
 export function isEnabledForAllDevOrgs(url) {
