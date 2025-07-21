@@ -325,8 +325,6 @@ export default {
       }
 
       this.file = file;
-      this.fileId = file.content.id;
-      this.fileName = file.content.name;
 
       useGetToken()
         .then(async (token) => {
@@ -335,16 +333,25 @@ export default {
             this.files = [...response.children];
 
             if (file.content.packageType === "Collection") {
-              //If we click on a folder, we want to add that folder to the ancestors list
-              if (this.fileId && this.fileName) {
-                this.ancestorList.push({
-                  content: {
-                    id: this.fileId,
-                    name: this.fileName,
-                  },
-                });
-              }
+              // Prepare the new ancestor
+              const newAncestor =
+                this.fileId && this.fileName
+                  ? {
+                      content: { id: this.fileId, name: this.fileName },
+                    }
+                  : null;
+
+              // Update file first
               this.file = file;
+
+              // Then update ancestor list if needed
+              if (
+                newAncestor &&
+                !this.ancestorList.some((a) => a.content.id === this.fileId)
+              ) {
+                this.ancestorList = [...this.ancestorList, newAncestor];
+              }
+
               this.navigateToFile(this.fileId);
             }
           });
