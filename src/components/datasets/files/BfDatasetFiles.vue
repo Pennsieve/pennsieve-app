@@ -282,7 +282,7 @@ export default {
           name: "",
         },
       },
-      ancestors: null,
+      ancestors: [],
       files: [],
       sortedFiles: [],
       selectedFiles: [],
