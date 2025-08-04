@@ -1,6 +1,8 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+// import ElementPlus from 'unplugin-element-plus/vite'
+
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
@@ -14,8 +16,18 @@ export default defineConfig({
   preview: {
     port: 3000,
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use "./src/styles/index.scss" as *;`,
+      },
+    },
+  },
   plugins: [
     vue(),
+    // ElementPlus({
+    //   useSource: true,
+    // }),
     AutoImport({
       resolvers: [ElementPlusResolver()],
     }),
@@ -36,13 +48,7 @@ export default defineConfig({
       target: "esnext",
     },
   },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        additionalData: `@use "./src/assets/element-variables.scss" as *;`,
-      },
-    },
-  },
+
   test: {
     // enable jest-like global test APIs
     globals: true,

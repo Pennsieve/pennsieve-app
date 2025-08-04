@@ -13,7 +13,7 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme' as *;
 
   .viewer-toolbar {
     align-items: center;

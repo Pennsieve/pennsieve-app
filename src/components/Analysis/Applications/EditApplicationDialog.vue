@@ -162,7 +162,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .dialog-body {
   display: flex;

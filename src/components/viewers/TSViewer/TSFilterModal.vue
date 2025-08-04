@@ -227,7 +227,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme' as *;
 
 .timeseries-filter-modal {
   display: block;

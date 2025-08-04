@@ -115,10 +115,10 @@ export default {
 
 
 <style scoped lang="scss">
-@import '../../../../assets/variables';
+@use '../../../../styles/theme';
 
 .member-col {
-  color: $gray_4;
+  color: theme.$gray_4;
   al
 
   &.menu {

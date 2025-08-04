@@ -146,11 +146,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../assets/variables.scss";
+@use "../../../styles/theme";
 
 .viewer-pane,
 .viewer-wrap {
-  background: $gray_1;
+  background: theme.$gray_1;
   display: flex;
   flex: 1;
   flex-direction: column;

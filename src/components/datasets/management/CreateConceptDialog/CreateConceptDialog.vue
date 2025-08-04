@@ -1,80 +1,80 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    class="add-concept-dialog"
-    :show-close="false"
-    @open="autoFocus"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="New Metadata Model"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @open="autoFocus"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          title="New Metadata Model"
+        />
+      </template>
 
-    <dialog-body>
-      <el-form
-        ref="conceptForm"
-        :model="concept"
-        :rules="rules"
-        label-position="top"
-        @submit.native.prevent="createconcept"
-        @keyup.enter.native="createConcept"
-      >
-        <template #default>
-          <el-form-item prop="displayName" >
-            <template #label>
-              Display Name <span class="label-helper">
-              required
-            </span>
-            </template>
-            <el-input
-              v-model="concept.displayName"
-              placeholder="For example Name, Type, Species"
-              autofocus
-            />
-          </el-form-item>
+      <dialog-body>
+        <el-form
+          ref="conceptForm"
+          :model="concept"
+          :rules="rules"
+          label-position="top"
+          @submit.native.prevent="createConcept"
+          @keyup.enter.native="createConcept"
+        >
+          <template #default>
+            <el-form-item prop="displayName" >
+              <template #label>
+                Display Name <span class="label-helper">
+                required
+              </span>
+              </template>
+              <el-input
+                v-model="concept.displayName"
+                placeholder="For example Name, Type, Species"
+                autofocus
+              />
+            </el-form-item>
 
-          <el-form-item prop="name">
-            <template #label>
-              Model Identifier <span class="label-helper">
-              generated from name
-            </span>
-            </template>
-            <el-input
-              v-model="concept.name"
-            />
-          </el-form-item>
-        </template>
+            <el-form-item prop="name">
+              <template #label>
+                Model Identifier <span class="label-helper">
+                generated from name
+              </span>
+              </template>
+              <el-input
+                v-model="concept.name"
+              />
+            </el-form-item>
+          </template>
 
-      </el-form>
-    </dialog-body>
+        </el-form>
+      </dialog-body>
 
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        :processing="processing"
-        processing-text="Creating Your Model"
-        @click="createConcept"
-      >
-        Create Model
-      </bf-button>
-    </template>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          :processing="processing"
+          processing-text="Creating Your Model"
+          @click="createConcept"
+        >
+          Create Model
+        </bf-button>
+      </template>
 
-  </el-dialog>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
   import snakeCase from 'lodash.snakecase'
-  import { propOr } from 'ramda'
   import { mapGetters, mapActions, mapState } from 'vuex'
 
   import BfButton from '../../../shared/bf-button/BfButton.vue'
@@ -261,6 +261,9 @@
 </script>
 
 <style lang="scss" scoped>
+  @use "../../../../styles/theme";
+  @use '../../../../styles/element/dialog';
+
   .button-spinner {
     height: 20px;
     margin: -3px 8px -3px 0;

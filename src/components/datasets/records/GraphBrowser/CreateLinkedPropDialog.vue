@@ -304,7 +304,7 @@ function postLinkedPropertyChanges() {
 </template>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 h1 {
   font-size: 14px;
@@ -331,7 +331,7 @@ h1 {
  }
 
 .info-panel {
-  background: $purple_tint;
+  background: theme.$purple_tint;
   padding: 8px 100px 8px 8px ;
 }
 
@@ -339,7 +339,7 @@ li {
   margin: 16px 0;
 
   b {
-    color: $purple_3;
+    color: theme.$purple_3;
   }
 }
 

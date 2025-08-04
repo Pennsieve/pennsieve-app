@@ -568,19 +568,20 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@use '../../../styles/theme';
+@use '../../../styles/element/input';
 
 .settings-wrapper {
   height:100%;
 }
 
 .flex-heading {
-  color: $white;
+  color: theme.$white;
   margin-bottom: 8px;
 }
 
 .bf-dataset-settings {
-  background: $white;
+  background: theme.$white;
 }
 
 .el-form-item,
@@ -619,25 +620,22 @@ hr {
 }
 
 .sharing-blurb {
-  color: $gray_4;
+  color: theme.$gray_4;
   margin-top: 11px;
   height: 16px;
   font-weight: normal;
   font-size: 14px;
 }
-</style>
 
-<style scoped lang="scss">
-@import '../../../assets/_variables.scss';
 .bf-dataset-settings {
   .el-checkbox__input.is-checked + .el-checkbox__label {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 
 .delete-title {
   font-size: 14px;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin-top: 20px;
 }
 

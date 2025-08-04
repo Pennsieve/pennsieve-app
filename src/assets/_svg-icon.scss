@@ -1,4 +1,4 @@
-@import './_variables.scss';
+@use '../styles/theme';
 
 .svg-icon {
   display: inline-block;
@@ -35,11 +35,11 @@
 
 .tools {
   cursor: pointer;
-  color: $gray_4;
+  color: theme.$gray_4;
   margin-left: 8px;
 
   &:hover, &:focus, &:active {
-    color: $purple_1;
+    color: theme.$purple_1;
   }
 }
 

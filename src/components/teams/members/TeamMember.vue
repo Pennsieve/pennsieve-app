@@ -90,7 +90,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/variables';
+@use '../../../styles/theme';
 
 .team-member {
   padding: 8px 0

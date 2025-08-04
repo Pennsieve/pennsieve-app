@@ -1,0 +1,58 @@
+$purple_tint: #e6e9ef;
+$purple_0_7: #b3bcce;
+$purple_1: #808fad;
+$purple_2: #4d628c;
+$purple_3: #011F5B;
+
+$red_1: #F25641;
+$red_2: #C14D49;
+$red_tint: #FEEEEC;
+
+$orange_1: #F9A23A;
+$orange_tint: #FEF6EB;
+
+$green_1: #17bb62;
+$green_2: #14a758;
+
+$black: #000000;
+$white: #ffffff;
+$gray_0: #F2F2F2;
+$gray_1: #F7F7F7;
+$gray_2: #e5e5e5;
+$gray_3: #CCCCCC;
+$gray_4: #999999;
+$gray_5: #4d4d4d;
+$gray_6: #333333;
+
+$notification_green: #357940;
+$notification_yellow: #FAD749;
+
+$status_purple: #6D48CE;
+$status_teal: #08B3AF;
+$status_green: #17BB62;
+$status_yellow: #FFB000;
+$status_orange: #F67325;
+$status_red: #E94B4B;
+$status_pink: #DE38B3;
+$status_brown: #835800;
+
+// Aliases
+$default-primary-color: $purple_3;
+$primary-color: $default-primary-color;
+$app-primary-color: $purple_3;
+$app-secondary-color: $black;
+$success-color: $green_1;
+
+$info-color: $purple_2;
+$error-color: $red_2;
+$input-placeholder-text: $gray_1;
+$link-color: $app-primary-color;
+$link-color-hover: $gray_4;
+$settings-nav-background: $gray_1;
+$delete-button-background: $red_1;
+$disabled-radio-button-text-color: $gray_4;
+$disabled-radio-button-border-color: $gray_3;
+$disabled-radio-button-background-color: $gray_1;
+$text-color: $gray_5;
+
+$system-font: 'Roboto', sans-serif;

@@ -1,4 +1,4 @@
-@import '../_variables.scss';
+@use '../../styles/theme';
 
 .el-radio {
   &.right-radio {
@@ -12,7 +12,7 @@
 }
 
 .el-radio__inner {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
 }
 
 .el-radio__input.is-checked + .el-radio__label {

@@ -684,7 +684,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 .table-container {
   overflow-y: scroll;
@@ -703,7 +703,7 @@ export default {
 
 .lds-ring {
   /* change color here */
-  color: #1c4c5b;
+  color: theme.$purple_2;
 }
 .lds-ring,
 .lds-ring div {
@@ -745,7 +745,7 @@ export default {
   }
 }
 .warning-message-div {
-  color: red;
+  color: theme.$red_2;
   margin: 3px;
 }
 </style>

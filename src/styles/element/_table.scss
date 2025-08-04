@@ -1,0 +1,107 @@
+@use '../theme';
+@use './checkbox';
+// EL-TABLE STYLES
+
+:deep(.el-table) {
+  --el-table-border-color: theme.$gray_5;
+  --el-table-border: theme.$gray_5;
+  --el-table-header-text-color: #{theme.$purple_3};
+  --el-table-header-bg-color: #{theme.$purple_tint};
+  --el-table-bg-color: theme.$purple_2;
+  --el-table-tr-bg-color: theme.$purple_3;
+  --el-table-current-row-bg-color: theme.$purple_3;
+
+  .cell {
+    white-space: nowrap;
+    max-height: 24px;
+  }
+}
+
+:deep(.el-table td.el-table__cell) {
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-bottom: 1px solid theme.$gray_2;
+}
+
+:deep(.el-table th.el-table__cell.is-leaf) {
+  border-bottom: 1px solid theme.$gray_3;
+  border-left-color: transparent;
+  font-weight: 300;
+}
+
+:deep(.el-table .ascending .sort-caret.ascending) {
+  border-bottom-color: theme.$purple_2;
+}
+:deep(.el-table .descending .sort-caret.descending) {
+  border-top-color: theme.$purple_2;
+}
+
+// BF-TABLE STYLES
+:deep(.bf-table) {
+  border: 1px solid theme.$gray_2;
+  border-radius: 2px 2px 0 0;
+  overflow: scroll;
+
+
+  .bf-table-header, thead {
+    padding: 16px;
+  }
+
+  .th-non-sortable,
+  button {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    text-transform: capitalize;
+    color: theme.$gray_4;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 14px;
+
+    &button.sort-active, &button:hover {
+      color: theme.$app-primary-color;
+
+      .sort-icon {
+        opacity: 1;
+      }
+    }
+
+    .label {
+      padding-left: 0;
+    }
+
+    &.overflow {
+      width: 100%;
+
+      .label {
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+  }
+
+  .svg-icon.sort-icon {
+    height: 5px;
+    opacity: .5;
+    min-width: 8px;
+  }
+
+  .bf-table-row, .bf-table-header {
+    border-bottom: 1px solid theme.$gray_2
+  }
+
+  .bf-table-header {
+    background-color: theme.$gray_1;
+  }
+
+  .bf-table-row {
+    background: theme.$white;
+    padding: 8px 16px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}

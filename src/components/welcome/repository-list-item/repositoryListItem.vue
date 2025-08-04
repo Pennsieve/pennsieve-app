@@ -113,7 +113,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme' as *;
 
 .logo-wrapper {
   justify-content: flex-end;

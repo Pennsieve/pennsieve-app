@@ -97,12 +97,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme";
 
 .directory-explorer {
   display: flex;
   height: 300px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
 
   h4 {
@@ -111,7 +111,7 @@ export default {
   }
 
   &__tree {
-    border-right: 1px solid $gray_2;
+    border-right: 1px solid theme.$gray_2;
     width: 40%;
     overflow: scroll;
   }
@@ -119,7 +119,7 @@ export default {
   &__metadata-viewer {
     width: 60%;
     overflow: scroll;
-    background-color: $gray_1;
+    background-color: theme.$gray_1;
   }
 
   &__metadata-viewer {
@@ -128,13 +128,13 @@ export default {
   }
 
   &__content-border {
-    border: solid 1px $gray_2;
+    border: solid 1px theme.$gray_2;
     border-radius: 3px;
     min-height: 25px;
   }
 
   &__data-index {
-    background: $gray_2;
+    background: theme.$gray_2;
     padding: 4px 8px;
   }
 

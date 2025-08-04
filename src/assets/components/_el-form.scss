@@ -1,4 +1,4 @@
-@import '../_variables.scss';
+@use '../../styles/theme';
 
 .el-form-item {
   margin-bottom: 16px;
@@ -7,15 +7,14 @@
   }
 }
 .el-form-item__error {
-  color: $error-color;
+  color: theme.$error-color;
   margin-bottom: 8px;
   top:0;
-  //padding-top: 8px;
   position: relative;
 }
 
 .el-form-item__label {
-  color: $text-color;
+  color: theme.$text-color;
   font-weight: 500;
   line-height: 16px;
   margin-bottom: 8px;
@@ -29,13 +28,13 @@
   }
 }
 .label-helper {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-size: 12px;
   font-weight: 400;
 }
 
 a.label-helper {
-  color: $purple_2;
+  color: theme.$purple_2;
   margin-left: 4px;
 }
 .label-flex {

@@ -388,7 +388,7 @@ onNodeClick(({ node }) => {
 </style>
 
 <style lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .modified-stage {
   margin: 0;
@@ -420,7 +420,7 @@ onNodeClick(({ node }) => {
   position: absolute;
   top: 7%;
   left: 6%;
-  background-color: $gray_1;
+  background-color: theme.$gray_1;
   width: fit-content;
   padding: 10px;
   z-index: 1;
@@ -441,7 +441,7 @@ onNodeClick(({ node }) => {
 }
 
 .vue-flow__node.green-node {
-  border: 2px solid $status_green;
+  border: 2px solid theme.$status_green;
 }
 
 .vue-flow__node.red-node {
@@ -468,7 +468,7 @@ onNodeClick(({ node }) => {
     box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
   }
   50% {
-    border-color: $status_green;
+    border-color: theme.$status_green;
     box-shadow: 0 0 15px rgba(0, 255, 128, 0.6);
   }
   100% {
@@ -478,23 +478,23 @@ onNodeClick(({ node }) => {
 }
 
 .vue-flow__node.selected {
-  background-color: $gray_2;
+  background-color: theme.$gray_2;
 }
 
 .vue-flow__node {
   &:hover {
-    background-color: $gray_2;
+    background-color: theme.$gray_2;
   }
 }
 
 .activity-monitor {
   .el-dialog__title {
-    color: $white;
+    color: theme.$white;
     font-weight: 500;
   }
 
   span {
-    color: $purple_2;
+    color: theme.$purple_2;
   }
 }
 </style>

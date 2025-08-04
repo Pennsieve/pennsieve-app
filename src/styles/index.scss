@@ -1,0 +1,47 @@
+@use "theme";
+@forward 'element-plus/theme-chalk/src/common/var.scss' with (
+  $colors: (
+    'white': theme.$white,
+    'black': theme.$black,
+    'primary': (
+      'base': theme.$purple_3,
+    ),
+    'success': (
+      'base': theme.$green_1,
+    ),
+    'warning': (
+      'base': theme.$orange_1,
+    ),
+    'danger': (
+      'base': theme.$red_1,
+    ),
+    'error': (
+      'base': theme.$red_2,
+    ),
+    'info': (
+      'base': theme.$gray_4,
+    ),
+  ),
+  $text-color: (
+    'primary': theme.$gray_6,
+    'regular': theme.$gray_5,
+    'secondary': theme.$gray_5,
+    'placeholder': theme.$gray_4,
+    'disabled': theme.$gray_4,
+  ),
+  $message:(
+    'close-icon-color': theme.$white,
+  ),
+  $table:(
+   'header-bg-color': theme.$gray_3,
+   'border': 1px solid theme.$gray_3,
+  ),
+  $popover:(
+    'padding': 0,
+  ),
+  $dropdown:(
+    'menuItem-hover-color': theme.$purple_3,
+    'menuItem-hover-fill': theme.$purple_tint,
+  )
+);
+

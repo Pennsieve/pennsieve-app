@@ -103,7 +103,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .text-area-wrapper {
   width: 100%;
@@ -113,7 +113,7 @@ export default {
   .el-form-item {
     .el-form-item__label {
       font-weight: 500;
-      color: $gray_5;
+      color: theme.$gray_5;
     }
   }
 

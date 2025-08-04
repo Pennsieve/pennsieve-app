@@ -1,10 +1,10 @@
-@import '../_variables.scss';
+@use '../../styles/theme';
 
 .el-message {
-  background: $info-color;
+  background: theme.$info-color;
   border: none;
   box-shadow: 0 0 1px rgba(0,0,0,.2), 0 0 5px rgba(0,0,0,.2);
-  color: $white;
+  color: theme.$white;
   top: 8px;
   width: 480px;
   padding: 8px 16px;
@@ -21,26 +21,26 @@
     width: auto;
   }
   &.el-message--success {
-    background: $success-color
+    background: theme.$success-color
   }
   &.el-message--error {
-    background: $error-color
+    background: theme.$error-color
   }
   &.el-message--message {
-    background: $info-color
+    background: theme.$info-color
   }
   .icon-message, .el-message__icon {
     display: none;
   }
 }
 .el-message__content {
-  color: $white !important;
+  color: theme.$white !important;
   font-size: 13px;
   font-weight: 500;
   line-height: 16px;
 }
 .el-message__closeBtn {
-  color: $white;
+  color: theme.$white;
   &:hover {
     color: $white;
     opacity: .7

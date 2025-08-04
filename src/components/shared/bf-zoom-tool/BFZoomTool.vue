@@ -146,7 +146,7 @@
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@use '../../../styles/theme';
 
   #digitalZoomMsg {
     font-size: 11px;

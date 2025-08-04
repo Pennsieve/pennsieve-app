@@ -605,6 +605,7 @@
 </script>
 
 <style scoped lang="scss">
+@use '../../../styles/element/table';
 
   .dataset-permissions {
     background: #fff;

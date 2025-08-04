@@ -288,7 +288,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .timeseries-viewer-toolbar {
   border-top: 1px solid #DADADA;
@@ -301,17 +301,17 @@ onMounted(() => {
 }
 
 .btn-icon {
-  color: $gray_4;
+  color: theme.$gray_4;
   margin-left: 8px;
   margin-right: 2px;
   &:last-child {
     margin-right: 8px;
   }
   &.selected, &:hover, &[focused] {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
   &[disabled] {
-    color: $gray_2;
+    color: theme.$gray_2;
   }
 }
 

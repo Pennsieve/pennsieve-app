@@ -280,7 +280,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .add-member-input {
   width:100%
@@ -295,7 +295,7 @@ export default {
     justify-content: center;
 
     .search-icon {
-      color: $gray_4;
+      color: theme.$gray_4;
     }
   }
 
@@ -303,7 +303,7 @@ export default {
     box-sizing: border-box;
     margin-top: 8px;
     padding: 8px;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     border-radius: 3px;
     height: 200px;
     overflow-x: hidden;
@@ -323,11 +323,11 @@ export default {
   }
 
   .team-icon {
-    color: $purple_1;
+    color: theme.$purple_1;
   }
 
   .collaborators-icon {
-    color: $purple_1;
+    color: theme.$purple_1;
   }
 
   .el-dialog__body {
@@ -355,16 +355,16 @@ export default {
         padding: 8px;
 
         .email {
-          color: $gray_6;
+          color: theme.$gray_6;
         }
 
         &:hover {
           cursor: pointer;
-          color: $white;
-          background: $purple_1;
+          color: theme.$white;
+          background: theme.$purple_1;
 
           .email {
-            color: $white;
+            color: theme.$white;
           }
         }
       }

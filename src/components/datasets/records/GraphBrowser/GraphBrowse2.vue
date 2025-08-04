@@ -522,7 +522,6 @@ async function onDeleteModel() {
 
 <style lang="sass">
 
-
 /* these are necessary styles for vue flow */
 @import '@vue-flow/core/dist/style.css'
 
@@ -534,7 +533,9 @@ async function onDeleteModel() {
 </style>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
+@use '../../../../styles/element/dialog';
+
 
 .modified-stage {
   margin: 0;
@@ -564,11 +565,11 @@ async function onDeleteModel() {
 
 .btn-toggle-model-details {
   align-items: center;
-  background: $gray_1;
-  border-left: 1px solid $gray_2;
-  border-right: 1px solid $gray_2;
-  border-top: 1px solid $gray_2;
-  border-bottom: 1px solid $gray_2;
+  background: theme.$gray_1;
+  border-left: 1px solid theme.$gray_2;
+  border-right: 1px solid theme.$gray_2;
+  border-top: 1px solid theme.$gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
   height: 48px;
@@ -580,8 +581,8 @@ async function onDeleteModel() {
 }
 .btn-toggle-models-list {
   align-items: center;
-  background: $gray_1;
-  border: 1px solid $gray_2;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
   height: 48px;
@@ -593,7 +594,7 @@ async function onDeleteModel() {
 
   &.selected {
     &:after {
-      background: $gray_1;
+      background: theme.$gray_1;
       content: "";
       height: 100%;
       pointer-events: none;

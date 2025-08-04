@@ -8,11 +8,6 @@
       class="icon-close"
       @click="onClose"
     >
-<!--      <svg-icon-->
-<!--        icon="icon-remove"-->
-<!--        height="12"-->
-<!--        width="12"-->
-<!--      />-->
     </button>
     <slot name="tabs" />
   </div>
@@ -41,14 +36,14 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .bf-dialog-header {
     align-items: center;
     display: flex;
     position: relative;
     .icon-close {
-      color: $gray_4;
+      color: theme.$gray_4;
       cursor: pointer;
     }
   }
@@ -61,7 +56,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: $white
+    color: theme.$white
 
   }
   .tabs {

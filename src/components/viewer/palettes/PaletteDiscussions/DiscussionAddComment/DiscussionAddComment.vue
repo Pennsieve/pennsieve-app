@@ -427,7 +427,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
 
   .discussion-add-comment {
     border-top: 1px solid $gray_2;
@@ -476,7 +476,7 @@
   }
 </style>
 <style lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
 
   .discussion-mention {
     color: $app-primary-color;

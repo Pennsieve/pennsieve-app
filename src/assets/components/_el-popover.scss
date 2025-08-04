@@ -1,4 +1,4 @@
-@import '../_variables.scss';
+@use '../../styles/theme';
 
 $arrowWidth: 8px; // Multiplied by 2 because applied to left and right
 $arrowHeight: 12px;
@@ -21,7 +21,7 @@ $arrowHeight: 12px;
   bottom: -$arrowHeight;
   left: 50%;
   margin-right: calc(var($arrowWidth) / 2)px;
-  border-top-color: $gray_2;
+  border-top-color: theme.$gray_2;
   border-bottom-width: 0;
 }
 .el-popper[x-placement^="top"] .popper__arrow::after {
@@ -41,7 +41,7 @@ $arrowHeight: 12px;
   left: 50%;
   margin-right: calc(var($arrowWidth) / 2);
   border-top-width: 0;
-  border-bottom-color: $gray_2;
+  border-bottom-color: theme.$gray_2;
 }
 .el-popper[x-placement^="bottom"] .popper__arrow::after {
   top: 1px;
@@ -56,7 +56,7 @@ $arrowHeight: 12px;
   top: 50%;
   left: -$arrowWidth;
   margin-bottom: calc(var($arrowHeight) / 2);
-  border-right-color: $gray_2;
+  border-right-color: theme.$gray_2;
   border-left-width: 0;
 }
 .el-popper[x-placement^="right"] .popper__arrow::after {
@@ -73,7 +73,7 @@ $arrowHeight: 12px;
   right: -$arrowWidth;
   margin-bottom: calc(var($arrowHeight) / 2);
   border-right-width: 0;
-  border-left-color: $gray_2;
+  border-left-color: theme.$gray_2;
 }
 .el-popper[x-placement^="left"] .popper__arrow::after {
   right: 1px;
@@ -83,7 +83,7 @@ $arrowHeight: 12px;
   border-left-color: #fff;
 }
 .el-popover, .el-dropdown-menu {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 3px;
   box-shadow: 0 0 10px 0 rgba(189,189,189,0.3);
   min-width: 200px;

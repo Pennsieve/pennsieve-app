@@ -43,10 +43,10 @@
 </template>
 
 <style scoped lang="scss">
-@import '../../../assets/variables.scss';
+@use '../../../styles/theme';
 
 .team-icon {
-  color: $purple_1;
+  color: theme.$purple_1;
 }
 
 .dialog-simple-buttons {

@@ -1203,10 +1203,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
+@use "../../../styles/spacing";
+@use "../../../styles/element/dialog";
 
 .bf-stage-file {
-  //height: calc(100vh - 180px);
   height: 100%;
 }
 .loading-spinner-container {
@@ -1224,7 +1225,6 @@ export default {
   overflow-y: scroll;
   display: block;
   margin-top: 1px;
-  //border: 1px solid $gray_2;
   max-height: calc(100vh - 200px);
 }
 
@@ -1238,13 +1238,13 @@ export default {
 
 .actions-item {
   margin-left: 0px;
-  color: $gray_6;
+  color: theme.$gray_6;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
   &:hover {
-    color: $purple_1;
+    color: theme.$purple_1;
   }
 }
 
@@ -1255,14 +1255,6 @@ export default {
 .dropdown-button {
   margin-top: 8px;
 }
-
-//.bf-stage-content {
-//  display: flex;
-//  flex-direction: row;
-//  padding-top: 0px;
-//  flex-direction: column;
-//  overflow: auto;
-//}
 
 .file-meta-wrapper {
   position: relative;

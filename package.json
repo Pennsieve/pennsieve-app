@@ -14,9 +14,6 @@
     "build-dev": "npm run site-config-dev && npm run build",
     "build-production": "npm run site-config-prod && npm run build"
   },
-  "overrides": {
-    "element-plus": "2.3.9"
-  },
   "dependencies": {
     "@aws-sdk/client-cognito-identity": "^3.499.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.499.0",

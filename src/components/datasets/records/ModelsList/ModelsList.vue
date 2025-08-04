@@ -203,16 +203,17 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
+@use '../../../../styles/element/input';
 
 :deep(.models-list.scrolling-list.input-wrap) {
   padding: 0 0 0 16px;
 }
 
 .el-input__inner {
-  background: $gray_1;
+  background: theme.$gray_1;
   border: none;
-  border-bottom: 1px solid $gray_3;
+  border-bottom: 1px solid theme.$gray_3;
   border-radius: 0;
   padding-left: 32px;
 }
@@ -240,7 +241,7 @@ export default {
 }
 
 .models-list-wrap {
-  background: $gray_1;
+  background: theme.$gray_1;
   padding: 16px;
 }
 .model-group {
@@ -262,7 +263,7 @@ export default {
   min-width: 20px;
 }
 .icon-search {
-  color: $app-primary-color;
+  color: theme.$app-primary-color;
 }
 .empty-concepts {
   img {
