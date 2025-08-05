@@ -193,7 +193,7 @@ export const actions = {
       let datasetId = rootState.dataset.content.id
 
 
-      const url = `${rootState.config.api2Url}/metadata/query?dataset_id=${datasetId}`
+      const url = `${rootState.config.api2Url}/metadata_legacy/query?dataset_id=${datasetId}`
 
       let filters = state.filterParams.filter(value => {
         return value.value !== ''
