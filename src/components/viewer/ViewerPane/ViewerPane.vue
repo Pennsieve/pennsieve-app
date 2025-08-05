@@ -18,6 +18,7 @@ import { defineAsyncComponent } from "vue";
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
+import {UMAP} from "pennsieve-visualization"
 
 export default {
   name: "ViewerPane",
@@ -50,9 +51,7 @@ export default {
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
-    UMAPViewer: defineAsyncComponent( () =>
-      import ("../../viewers/UmapViewer/wrapper.vue")
-    ),
+    UMAPViewer: UMAP
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
