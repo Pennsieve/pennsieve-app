@@ -301,7 +301,6 @@ export default {
 
 <style scoped lang="scss">
 @use '../../../../styles/theme';
-//@import '../../../../assets/_icon-item-colors.scss';
 
 
 .no-link-name {

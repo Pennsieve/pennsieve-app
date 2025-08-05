@@ -23,13 +23,13 @@ export default {
   line-height: 16px;
   padding: 2px 11px;
   &.green {
-    background: #9fe2be;
+    background: theme.$green_1;
   }
   &.yellow {
     background: theme.$status_yellow;
   }
   &.red {
-    background: $red_1;
+    background: theme.$red_1;
     color: #fff;
   }
   &.blue {

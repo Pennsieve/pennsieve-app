@@ -121,7 +121,7 @@ h1 {
 }
 
 .trash-icon {
-  color: theme.$color-error
+  color: theme.$error-color
 }
 
 </style>

@@ -517,7 +517,7 @@ Need to reach into packages list instead of pulling stuff from url
 };
 </script>
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .undelete-warning-text {
   margin-left: 5px;
@@ -546,7 +546,7 @@ Need to reach into packages list instead of pulling stuff from url
 }
 
 .bf-upload-body {
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   border-radius: 5px;
 }
 

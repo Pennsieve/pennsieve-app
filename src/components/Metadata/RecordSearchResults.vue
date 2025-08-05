@@ -635,18 +635,18 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../assets/_variables.scss';
+@use '../../styles/theme';
 
 h3 {
   font-size: 16px;
   font-weight: normal;
   letter-spacing: 0.5px;
-  color: $gray_6;
+  color: theme.$gray_6;
 }
 
 .actions-item {
   display: flex;
-  color: $purple_3;
+  color: theme.$purple_3;
   margin-bottom: 8px;
 }
 
@@ -656,7 +656,7 @@ h3 {
     font-weight: normal;
     letter-spacing: 0.44px;
     line-height: 32px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-top: -14px;
   }
 }
@@ -670,7 +670,7 @@ h3 {
     font-weight: normal;
     letter-spacing: 0px;
     line-height: 0px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-right: 11px;
     margin-top: 7px;
   }
@@ -691,7 +691,7 @@ h3 {
   align-items: center;
 
    .el-dropdown-text-link:not(:hover, :active) {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 
@@ -709,20 +709,20 @@ h3 {
   height: 32px;
   padding-top: 8px;
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   font-weight: 500;
 }
 
  .el-radio-button__orig-radio:checked + .el-radio-button__inner {
-  background-color: $purple_3;
-  border-color: $purple_3;
+  background-color: theme.$purple_3;
+  border-color: theme.$purple_3;
   color: white;
 }
 
  .el-radio-button__orig-radio:disabled + .el-radio-button__inner {
-  color: $disabled-radio-button-text-color;
-  border-color: $disabled-radio-button-border-color;
-  background-color: $disabled-radio-button-background-color;
+  color: theme.$disabled-radio-button-text-color;
+  border-color: theme.$disabled-radio-button-border-color;
+  background-color: theme.$disabled-radio-button-background-color;
 }
 
  .header-select-wrapper {
@@ -731,7 +731,7 @@ h3 {
  }
 
 .model-title {
-  color: $purple_2;
+  color: theme.$purple_2;
   text-decoration: none;
   &:hover, &:focus {
     outline: none;

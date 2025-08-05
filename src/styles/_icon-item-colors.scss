@@ -1,0 +1,23 @@
+@use '../styles/theme';
+
+.icon-item {
+  color: theme.$orange_1;
+}
+.icon-item.folder, .icon-item.folder-special, .icon-item.folder-shared {
+  color: theme.$gray_4;
+}
+.icon-item.text {
+  color: theme.$gray_1;
+}
+.icon-item.image {
+  color: theme.$notification_green;
+}
+.icon-item.video {
+  color: theme.$red_1;
+}
+.icon-item.pdf {
+  color: theme.$orange_1;
+}
+.icon-item.timeseries, .icon-item.tabular {
+  color: theme.$purple_1;
+}

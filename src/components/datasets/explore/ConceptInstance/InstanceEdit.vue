@@ -1900,7 +1900,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme";
+@use '../../../../styles/theme';
 
 .buttons {
   .action-button {
