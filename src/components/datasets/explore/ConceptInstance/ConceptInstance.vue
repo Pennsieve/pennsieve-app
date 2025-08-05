@@ -2347,9 +2347,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
-@import '../../../../assets/_icon-item-colors.scss';
-@import '../../../../assets/components/_uploader-empty-state.scss';
+@use "../../../../styles/theme";
+@use '../../../../styles/icon-item-colors';
+@use '../../../../styles/uploader-empty-state';
 
 
 .model-name{
@@ -2357,13 +2357,6 @@ export default {
   color: white;
   font-weight: 300;
 }
-
-</style>
-
-<style lang="scss">
-@import '../../../../assets/_variables.scss';
-@import '../../../../assets/_icon-item-colors.scss';
-@import '../../../../assets/components/_uploader-empty-state.scss';
 
 
 .static-prop-section{
@@ -2376,11 +2369,11 @@ export default {
     padding: 0;
   }
   .highlight-property {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-weight: 500;
   }
   &.editing {
-    background: $gray_1;
+    background: theme.$gray_1;
 
     h2 {
       margin-bottom: 4px;
@@ -2421,7 +2414,7 @@ export default {
     .table-info,
     .table-actions {
       align-items: center;
-      color: $purple_1;
+      color: theme.$purple_1;
       display: flex;
       line-height: initial;
       font-size: 12px;
@@ -2429,12 +2422,12 @@ export default {
     }
     .table-info {
       .selected-files {
-        color: $gray_6;
+        color: theme.$gray_6;
         margin-right: 16px;
       }
 
       .selected-source-files {
-        color: $gray_6;
+        color: theme.$gray_6;
       }
     }
     &.row-is-selected {
@@ -2448,7 +2441,7 @@ export default {
     display: flex;
     flex: 1;
     h2 {
-      color: $purple_1;
+      color: theme.$purple_1;
       flex: 1;
       font-size: 20px;
       font-weight: 600;
@@ -2514,7 +2507,7 @@ export default {
 
 .file-list {
   padding: 0 16px;
-  background: $gray_0;
+  background: theme.$gray_0;
   margin-bottom: 16px;
 }
 
@@ -2523,8 +2516,8 @@ export default {
 }
 
 .relationships-empty-state {
-  background: $purple_tint;
-  border: 1px dashed $purple_1;
+  background: theme.$purple_tint;
+  border: 1px dashed theme.$purple_1;
   height: 214px;
   display: flex;
 
@@ -2535,7 +2528,7 @@ export default {
     padding: 8px;
 
     .relationship-inner-text {
-      color: $gray_4;
+      color: theme.$gray_4;
       margin-bottom: 16px;
     }
 
@@ -2559,11 +2552,11 @@ export default {
     }
   }
   button {
-    color: $gray_4;
+    color: theme.$gray_4;
     display: none;
     margin-left: 8px;
     &:hover {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
     }
   }
 }
@@ -2573,7 +2566,7 @@ export default {
   }
 
   .instance-type {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-weight: 600;
   text-transform: capitalize;
 }

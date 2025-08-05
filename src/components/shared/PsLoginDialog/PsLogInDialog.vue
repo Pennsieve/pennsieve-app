@@ -623,7 +623,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 
 .dialog-container {
@@ -729,7 +729,7 @@ export default {
 
 .option-divider {
   margin-bottom: 16px;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 .password-reset-height {
@@ -742,8 +742,8 @@ export default {
 }
 </style>
 <style lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 .ps-login-dialog .el-dialog__close{
-    color:$purple_3!important;
+    color: theme.$purple_3!important;
     }
 </style>

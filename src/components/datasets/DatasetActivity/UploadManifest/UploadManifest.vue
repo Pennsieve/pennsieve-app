@@ -258,10 +258,11 @@ export default {
 
 
 <style scoped lang="scss">
-@import '../../../../assets/variables';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dropdown';
 
 .member-col {
-  color: $gray_5;
+  color: theme.$gray_5;
 
   &.menu {
     display: flex;

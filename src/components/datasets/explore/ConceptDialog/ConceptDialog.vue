@@ -1,40 +1,43 @@
 <template>
-  <el-dialog
-    class="concept-dialog simple"
-    :show-close="false"
-    :visible="visible"
-    @close="closeDialog"
-  >
-    <bf-dialog-header slot="title" />
+  <div>
+    <el-dialog
+      class="concept-dialog simple"
+      :show-close="false"
+      :visible="visible"
+      @close="closeDialog"
+    >
+      <bf-dialog-header slot="title" />
 
-    <dialog-body>
-      <slot />
-      <div class="dialog-simple-buttons">
-        <template v-if="failed">
-          <bf-button
-            class="secondary"
-            @click="closeDialog"
-          >
-            Close
-          </bf-button>
-        </template>
-        <template v-else>
-          <bf-button
-            class="secondary"
-            @click="closeDialog"
-          >
-            Cancel
-          </bf-button>
-          <bf-button
-            :class="primaryBtnClass"
-            @click="emitEvents"
-          >
-            {{ confirmText }}
-          </bf-button>
-        </template>
-      </div>
-    </dialog-body>
-  </el-dialog>
+      <dialog-body>
+        <slot />
+        <div class="dialog-simple-buttons">
+          <template v-if="failed">
+            <bf-button
+              class="secondary"
+              @click="closeDialog"
+            >
+              Close
+            </bf-button>
+          </template>
+          <template v-else>
+            <bf-button
+              class="secondary"
+              @click="closeDialog"
+            >
+              Cancel
+            </bf-button>
+            <bf-button
+              :class="primaryBtnClass"
+              @click="emitEvents"
+            >
+              {{ confirmText }}
+            </bf-button>
+          </template>
+        </div>
+      </dialog-body>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -118,7 +121,8 @@ export default {
 </script>
 
 <style lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
 
 .concept-dialog {
   .dialog-body {

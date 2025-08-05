@@ -54,55 +54,59 @@ function onDeleteRelationship() {
 </script>
 
 <template>
-  <el-dialog
+  <div>
+    <el-dialog
 
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
-  >
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
 
-    <template #header>
-      <bf-dialog-header
-        title="Delete property"
-      />
-    </template>
+      <template #header>
+        <bf-dialog-header
+          title="Delete property"
+        />
+      </template>
 
-    <div class="dialog-main">
-      <IconTrash
-        class="trash-icon"
-        :height="32"
-        :width="32"
-      />
+      <div class="dialog-main">
+        <IconTrash
+          class="trash-icon"
+          :height="32"
+          :width="32"
+        />
 
-      <h3>Delete {{ link.property.displayName }}?</h3>
-      <p>Are you sure you want to delete the relationship from the model?</p>
+        <h3>Delete {{ link.property.displayName }}?</h3>
+        <p>Are you sure you want to delete the relationship from the model?</p>
 
-    </div>
+      </div>
 
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        processing-text="Deleting"
-        @click="onDeleteRelationship"
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          processing-text="Deleting"
+          @click="onDeleteRelationship"
 
-      >
-        Delete
+        >
+          Delete
 
-      </bf-button>
-    </template>
+        </bf-button>
+      </template>
 
-  </el-dialog>
+    </el-dialog>
+  </div>
+
 </template>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
 
 h1 {
   font-size: 14px;
@@ -119,7 +123,7 @@ h1 {
 }
 
 .trash-icon {
-  color: $color-error
+  color: theme.$error-color
 }
 
 </style>

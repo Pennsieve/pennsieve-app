@@ -402,7 +402,8 @@ export default {
 }
 </script>
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
+
 .dataset-list-controls {
   align-items: center;
   display: flex;

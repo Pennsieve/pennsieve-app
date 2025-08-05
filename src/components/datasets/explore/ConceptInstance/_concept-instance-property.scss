@@ -1,4 +1,4 @@
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .concept-instance-property {
   box-sizing: border-box;
@@ -19,7 +19,7 @@
     }
   }
   .name {
-    color: $gray_6;
+    color: theme.$gray_6;
     //font-weight: 500;
     position: relative;
   }
@@ -50,10 +50,10 @@
     top: 0;
   }
   .button-edit {
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-left: 8px;
     &:hover {
-      color: $app-primary-color
+      color: theme.$app-primary-color
     }
   }
 }

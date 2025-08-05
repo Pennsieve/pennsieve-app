@@ -42,13 +42,11 @@
 import {
   mapActions,
 } from 'vuex'
-// import PsSwitch from '../../../shared/PsSwitch/PsSwitch.vue'
 
 export default {
   name: 'IntegrationItemSmall',
 
   components: {
-    // PsSwitch
   },
 
   props: {
@@ -99,7 +97,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .integration-menu {
   width: 24px;
@@ -110,25 +108,25 @@ export default {
 }
 
 .integration-item-small {
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   margin: 0 0 16px 0;
 }
 .integration-title {
   font-size: 12px;
   margin-bottom: 8px;
   font-weight: 500;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 .intergration-type {
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
   font-size: 12px;
 }
 
 .integration-description {
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   max-width: 500px;
 }
 

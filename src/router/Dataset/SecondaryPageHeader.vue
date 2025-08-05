@@ -91,18 +91,18 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .flex-heading {
-  background-color: $purple_1;
+  background-color: theme.$purple_1;
 }
 
 .el-collapse-item__header {
-  background: $purple_2;
+  background: theme.$purple_2;
 }
 
 .link-to-files {
-  color: $white;
+  color: theme.$white;
   cursor: pointer;
 }
 </style>

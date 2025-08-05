@@ -456,7 +456,9 @@
 </script>
 
 <style lang="scss">
-  @import '../../../../assets/_variables.scss';
+  @use '../../../../styles/theme';
+  @use '../../../../styles/element/select';
+  @use '../../../../styles/element/input';
 
   .date-type {
     min-height: 44px;
@@ -498,7 +500,7 @@
       .col-unit-property {
         position: relative;
         left: 10px;
-        color: $gray_4;
+        color: theme.$gray_4;
       }
 
     }

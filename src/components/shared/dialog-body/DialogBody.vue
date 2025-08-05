@@ -21,7 +21,7 @@
 </template>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .dialog-body {
     align-items: center;
@@ -58,7 +58,7 @@
   }
 
   .dialog-body-heading {
-    color: $gray_5;
+    color: theme.$gray_5;
     font-weight: bold;
     line-height: 16px;
     margin-bottom: 8px;
@@ -76,7 +76,7 @@
   }
 
   .dialog-body-content {
-    color: $gray_5;
+    color: theme.$gray_5;
 	  line-height: 18px;
 	  width: 100%;
   }

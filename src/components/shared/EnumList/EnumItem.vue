@@ -65,17 +65,17 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/variables';
+  @use '../../../styles/theme';
 
   .enum-item {
     padding: 4px 8px;
   }
 
   .enum-item--name {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .remove {
-    color: $gray_2;
+    color: theme.$gray_2;
   }
 </style>

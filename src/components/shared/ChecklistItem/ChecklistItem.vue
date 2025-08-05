@@ -73,15 +73,15 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "./src/assets/_variables.scss";
+@use "./src/styles/theme";
 
 .checked {
-  color: $green_2;
+  color: theme.$green_2;
 }
 
 .dataset-discover-checklist-item {
   align-items: center;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
   display: flex;
   padding: 10px 16px;
   &:first-child {

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="el-dialog">
     <el-dialog
       class="dark-header"
       :show-close="false"
@@ -75,6 +75,7 @@
       :email="emailVal"
       @close-confirmation-dialog="onCloseConfirmationDialog"
     />
+
   </div>
 </template>
 
@@ -313,4 +314,14 @@ export default {
   }
 }
 </script>
+
+<style scoped lang="scss">
+@use '../../../styles/element/dialog';
+@use '../../../styles/theme';
+
+:deep(.el-dialog) {
+  --el-dialog-bg-color: red;
+}
+
+</style>
 

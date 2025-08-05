@@ -92,7 +92,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/variables';
+@use '../../../styles/theme';
 
 .team-info {
   display: flex;

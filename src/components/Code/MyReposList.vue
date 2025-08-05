@@ -116,7 +116,7 @@ function onChangeRepoTrackingDialogClose() {
 </template>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .pagination-container {
   display: flex;

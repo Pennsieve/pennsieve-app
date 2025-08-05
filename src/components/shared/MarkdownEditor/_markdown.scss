@@ -1,4 +1,4 @@
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 :deep(*) {
   h1,
@@ -67,7 +67,7 @@
     font-weight: normal;
     line-height: 24px;
     font-size: 16px;
-    border-left: 8px solid $purple_3;
+    border-left: 8px solid theme.$purple_3;
     margin-left: 0;
 
     p {
@@ -76,7 +76,7 @@
   }
 
   pre {
-    background-color: $gray_1;
+    background-color: theme.$gray_1;
     line-height: 24px;
     padding: 16px;
 

@@ -466,23 +466,56 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
-@import "./bf-navigation.scss";
-@import "./logo.scss";
+@use "../../styles/theme";
+@use "../../styles/navigation";
+
+.logo {
+  color: theme.$purple_1;
+  display: block;
+  fill: theme.$app-primary-color;
+  height: 24px;
+  width: 24px;
+  span {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+}
+
+.logo-wrap {
+  align-items: center;
+  display: flex;
+  height: 20px;
+  flex-direction: row;
+  padding: 0 20px;
+  justify-content: space-between;
+
+  .condensed & {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+.logo-arrow {
+  color: theme.$app-primary-color;
+  margin-left: 8px;
+}
+
+
 
 .menu-divider {
   margin: 8px;
-  color: $gray_6;
+  color: theme.$gray_6;
 }
 
 .bf-navigation {
-  color: $white;
+  color: theme.$white;
   z-index: 99;
-  background-image: linear-gradient(to top, $purple_2, $purple_1);
+  background-image: linear-gradient(to top, theme.$purple_2, theme.$purple_1);
 }
 .active-org {
   align-items: center;
-  color: $white;
+  color: theme.$white;
   display: flex;
   font-size: 12px;
   font-weight: 500;
@@ -498,8 +531,8 @@ export default {
   text-overflow: ellipsis;
 }
 .logo {
-  color: $white;
-  fill: $white;
+  color: theme.$white;
+  fill: theme.$white;
 }
 .I3H-logo {
   height: 30px;
@@ -513,7 +546,7 @@ export default {
   margin: 18px 0;
 }
 .logo-arrow {
-  color: $white;
+  color: theme.$white;
 }
 .slide-enter-active,
 .slide-leave-active {
@@ -525,17 +558,5 @@ export default {
 .slide-enter,
 .slide-leave-to {
   transform: translate3d(-100%, 0, 0);
-}
-</style>
-<style>
-#nav-publishing .icon-main {
-  height: 30px !important;
-  margin: 0 20px 0 -6px;
-  width: 30px !important;
-}
-#nav-integrations .icon-main {
-  height: 26px !important;
-  margin: 0 20px 0 -3px;
-  width: 26px !important;
 }
 </style>

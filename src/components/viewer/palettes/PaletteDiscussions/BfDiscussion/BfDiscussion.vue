@@ -146,7 +146,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
   .bf-discussion {
     border-bottom: 1px solid $gray_2;
     padding-top: 32px;
@@ -169,5 +169,5 @@
 </style>
 
 <style lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
 </style>

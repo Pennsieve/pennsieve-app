@@ -408,7 +408,8 @@ defineExpose({
 
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/select';
 
 .select-permission-input {
   width: 300px;
@@ -431,7 +432,7 @@ defineExpose({
 
   .external-user-message {
     margin: 16px 0 8px 0;
-    color: $purple_1;
+    color: theme.$purple_1;
     font-weight: 300;
   }
 }
@@ -471,16 +472,16 @@ defineExpose({
     &.hover,
     &.selected {
       cursor: pointer;
-      color: $white;
-      background: $purple_1;
+      color: theme.$white;
+      background: theme.$purple_1;
 
       .email {
-        color: $white;
+        color: theme.$white;
       }
     }
 
     .email {
-      color: $gray_6
+      color: theme.$gray_6
     }
   }
 }

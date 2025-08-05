@@ -1,0 +1,15 @@
+@use '../theme';
+
+:deep(.el-input) {
+  --el-input-height: 40px;
+  --el-input-inner-height: 40px;
+  --el-color-primary: #{theme.$purple_1};
+}
+
+:deep(.el-textarea) {
+  --el-input-text-color: #{theme.$gray_5};
+  --el-input-border: #{theme.$gray_5};
+  --el-input-hover-border: #{theme.$purple_1};
+  --el-input-focus-border: #{theme.$purple_1};
+  --el-input-focus-border-color: #{theme.$purple_1};
+}

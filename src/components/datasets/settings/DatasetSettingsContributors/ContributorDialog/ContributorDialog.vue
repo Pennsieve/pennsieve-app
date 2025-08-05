@@ -1,156 +1,158 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="close"
-    @closed="onClosed"
-    @open="onOpen"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        :title="dialogTitle"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="close"
+      @closed="onClosed"
+      @open="onOpen"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          :title="dialogTitle"
+        />
+      </template>
 
-    <dialog-body>
-      <el-form
-        ref="form"
-        label-position="top"
-        :model="form"
-        :rules="rules"
-        @keyup.enter.native="validateForm"
-      >
-        <el-row
-          class="mb-24"
-          :gutter="8"
+      <dialog-body>
+        <el-form
+          ref="form"
+          label-position="top"
+          :model="form"
+          :rules="rules"
+          @keyup.enter.native="validateForm"
         >
-          <el-col :span="18">
-            <el-form-item
-              class="mb-16"
-              prop="firstName"
-            >
-              <template #label>
-                First Name
-                <span class="label-helper">
+          <el-row
+            class="mb-24"
+            :gutter="8"
+          >
+            <el-col :span="18">
+              <el-form-item
+                class="mb-16"
+                prop="firstName"
+              >
+                <template #label>
+                  First Name
+                  <span class="label-helper">
                   required
                 </span>
-              </template>
-              <el-input
-                id="firstName"
-                v-model="form.firstName"
-                :disabled="!isExternal && isEditing"
-                autofocus
-                placeholder="Required"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item
-              class="mb-16"
-              prop="middleInitial"
-              label="Middle Initial"
+                </template>
+                <el-input
+                  id="firstName"
+                  v-model="form.firstName"
+                  :disabled="!isExternal && isEditing"
+                  autofocus
+                  placeholder="Required"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item
+                class="mb-16"
+                prop="middleInitial"
+                label="Middle Initial"
+              >
+                <el-input
+                  id="middleInitial"
+                  v-model="form.middleInitial"
+                  :maxlength="1"
+                  :disabled="!isExternal && isEditing"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col
+              v-if="!isExternal && isEditing"
+              :span="24"
             >
-              <el-input
-                id="middleInitial"
-                v-model="form.middleInitial"
-                :maxlength="1"
-                :disabled="!isExternal && isEditing"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col
-            v-if="!isExternal && isEditing"
-            :span="24"
+              <p>
+                First and last name can be changed in this user's profile.
+              </p>
+            </el-col>
+          </el-row>
+          <el-form-item
+            class="mb-16"
+            prop="lastName"
           >
+            <template #label>
+              Last Name
+              <span class="label-helper">
+              required
+            </span>
+            </template>
+            <el-input
+              id="lastName"
+              v-model="form.lastName"
+              :disabled="!isExternal && isEditing"
+              placeholder="Required"
+            />
+          </el-form-item>
+          <el-form-item
+            class="mb-16"
+            prop="email"
+          >
+            <template #label>
+              Email
+              <span class="label-helper">
+              required
+            </span>
+            </template>
+            <el-input
+              id="email"
+              v-model="form.email"
+              :disabled="!!contributor.email"
+              placeholder="Required"
+            />
             <p>
-              First and last name can be changed in this user's profile.
+              Email will be used to notify this contributor when a dataset is published and will not be shared publicly.
             </p>
-          </el-col>
-        </el-row>
-        <el-form-item
-          class="mb-16"
-          prop="lastName"
-        >
-          <template #label>
-            Last Name
-            <span class="label-helper">
-              required
-            </span>
-          </template>
-          <el-input
-            id="lastName"
-            v-model="form.lastName"
-            :disabled="!isExternal && isEditing"
-            placeholder="Required"
-          />
-        </el-form-item>
-        <el-form-item
-          class="mb-16"
-          prop="email"
-        >
-          <template #label>
-            Email
-            <span class="label-helper">
-              required
-            </span>
-          </template>
-          <el-input
-            id="email"
-            v-model="form.email"
-            :disabled="!!contributor.email"
-            placeholder="Required"
-          />
-          <p>
-            Email will be used to notify this contributor when a dataset is published and will not be shared publicly.
-          </p>
-        </el-form-item>
-        <el-form-item
-          class="mb-16"
-          prop="degree"
-        >
-          <template #label>
-            Degree
-          </template>
-          <degree-select v-model="form.degree" />
-        </el-form-item>
-        <el-form-item
-          class="mb-16"
-          prop="orcid"
-        >
-          <template #label>
-            ORCID iD
-            <span class="label-helper">
+          </el-form-item>
+          <el-form-item
+            class="mb-16"
+            prop="degree"
+          >
+            <template #label>
+              Degree
+            </template>
+            <degree-select v-model="form.degree" />
+          </el-form-item>
+          <el-form-item
+            class="mb-16"
+            prop="orcid"
+          >
+            <template #label>
+              ORCID iD
+              <span class="label-helper">
               optional
             </span>
-          </template>
-          <el-input
-            id="orcid"
-            v-model="form.orcid"
-            :disabled="isOrcidInputDisabled"
-            placeholder="Ex. 0000-0003-0837-7120"
-          />
-        </el-form-item>
-      </el-form>
-    </dialog-body>
+            </template>
+            <el-input
+              id="orcid"
+              v-model="form.orcid"
+              :disabled="isOrcidInputDisabled"
+              placeholder="Ex. 0000-0003-0837-7120"
+            />
+          </el-form-item>
+        </el-form>
+      </dialog-body>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="close"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        :processing="isProcessing"
-        :disabled="!canSubmit"
-        @click="validateForm"
-      >
-        {{ btnSubmitText }}
-      </bf-button>
-    </template>
-  </el-dialog>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="close"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          :processing="isProcessing"
+          :disabled="!canSubmit"
+          @click="validateForm"
+        >
+          {{ btnSubmitText }}
+        </bf-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
@@ -427,6 +429,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+
+@use '../../../../../styles/element/dialog';
+
 p {
   font-size: 12px;
   margin: 4px 0 0;

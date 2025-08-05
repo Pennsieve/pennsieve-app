@@ -705,7 +705,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .search-filter-content {
   display: flex;
@@ -722,7 +722,7 @@ export default {
   overflow: hidden;
   padding: 7px 14px;
   &.is-invalid {
-    border-color: $error-color
+    border-color: theme.$error-color
   }
   &:last-child {
     margin-right: 0;
@@ -732,9 +732,9 @@ export default {
   }
 }
 .btn-delete {
-  color: $gray_4;
+  color: theme.$gray_4;
   &:hover, &:focus {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
 }
 .search-filter-criteria-wrap {
@@ -755,7 +755,7 @@ export default {
       flex: 1;
       max-width: none;
       border: none;
-      border-bottom: 1px solid $gray_4;
+      border-bottom: 1px solid theme.$gray_4;
       padding: 4px 0 2px 4px;
     }
 
@@ -767,10 +767,10 @@ export default {
 
 }
 .msg-invalid {
-  color: $error-color
+  color: theme.$error-color
 }
 .placeholder {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-style: italic;
   pointer-events: none;
   position: absolute;

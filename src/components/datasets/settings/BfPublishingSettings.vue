@@ -434,9 +434,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 .bf-publishing-settings {
-  background: $white;
+  background: theme.$white;
   hr {
     margin: 32px 0 24px;
   }

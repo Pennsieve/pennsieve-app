@@ -71,6 +71,7 @@ export default {
     BfRafter,
     BfButton,
     ComputeNodesListItem,
+    CreateComputeNodeDialog,
   },
 
   props: {},
@@ -159,7 +160,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/variables";
+@use "../../../styles/theme";
+@use '../../../styles/element/dialog';
 
 .addIntegrationContainer {
   display: flex;

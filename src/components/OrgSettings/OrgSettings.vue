@@ -384,7 +384,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../assets/variables.scss';
+@use '../../styles/theme';
 
 .name-container {
   display: flex;
@@ -392,7 +392,7 @@ export default {
 
   .name-info {
     max-width: 500px;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -403,7 +403,7 @@ export default {
 
   .color-info {
     max-width: 500px;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 
   .color-picker-container {
@@ -415,7 +415,7 @@ export default {
       flex-direction: row;
 
       .color-info {
-        color: $purple_3;
+        color: theme.$purple_3;
       }
 
       .color-selector {
@@ -460,12 +460,12 @@ export default {
 }
 
 .divider {
-  background: $gray_2;
+  background: theme.$gray_2;
   height: 1px;
   margin: 50px 1px 40px 1px;
 }
 .storage-used {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-size: 12px;
   line-height: 14px;
 }
@@ -482,8 +482,8 @@ export default {
 }
 .storage-display-wrap {
   padding: 16px;
-  background: $white;
-  border: solid 1px $gray_2;
+  background: theme.$white;
+  border: solid 1px theme.$gray_2;
   border-radius: 5px;
   width: 296px;
   margin-bottom: 50px;
@@ -495,7 +495,7 @@ export default {
   margin-top: 50px;
 }
 p {
-  color: $gray_6;
+  color: theme.$gray_6;
   font-size: 14px;
   font-weight: normal;
   line-height: 18px;

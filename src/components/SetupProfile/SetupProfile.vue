@@ -414,12 +414,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .wrapper {
-  background: $white;
+  background: theme.$white;
   box-sizing: border-box;
-  color: $gray_4;
+  color: theme.$gray_4;
   max-width: 720px;
   min-height: 100vh;
   padding-bottom: 20px;
@@ -434,7 +434,7 @@ export default {
   }
 
   h2 {
-    color: $purple_3;
+    color: theme.$purple_3;
   }
 }
 
@@ -460,7 +460,7 @@ form {
 }
 
 .pw-is-valid-text {
-  color: #17bb62;
+  color: theme.$green_1;
   font-size: 13px;
   line-height: 1;
   padding: 13px 10px;
@@ -496,7 +496,7 @@ form {
 }
 
 h2 {
-  color: $purple_3;
+  color: theme.$purple_3;
   font-size: 20px;
   line-height: 24px;
   font-weight: 400;
@@ -530,7 +530,7 @@ a {
   display: flex;
   justify-content: space-between;
   .forgot-password {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
     flex: 1;
     margin-left: 16px;
     text-align: center;

@@ -220,12 +220,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .text {
   margin-bottom: 30px;
 }
 .error {
-  color: $error-color
+  color: theme.$error-color
 }
 </style>

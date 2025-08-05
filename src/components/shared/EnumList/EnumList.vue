@@ -211,7 +211,7 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/variables';
+  @use '../../../styles/theme';
 
   .enum-input {
     max-width: calc(100% - 0px);
@@ -233,7 +233,7 @@
   }
 
   .icon-wrapper {
-    background: $purple_1;
+    background: theme.$purple_1;
     border: solid 1px transparent;
     border-radius: 0 2px 2px 0;
     cursor: pointer;
@@ -251,7 +251,7 @@
     }
 
     &:hover {
-      background: $purple_3;
+      background: theme.$purple_3;
     }
   }
 </style>

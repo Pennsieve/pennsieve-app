@@ -126,7 +126,6 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
 
 .log-dialog {
   height: 80%;

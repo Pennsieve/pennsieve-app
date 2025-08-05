@@ -319,14 +319,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 .dataset-activity-panel {
   p {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .dataset-activity-panel-item {
-    border: solid 1px $gray_2;
+    border: solid 1px theme.$gray_2;
     padding: 16px 12px;
     @media (min-width: 1025px) {
       padding: 16px 24px;
@@ -349,7 +349,7 @@ export default {
           margin-left: 10px;
         }
         .disabled {
-          color: $purple_tint;
+          color: theme.$purple_tint;
           opacity: 0.5;
           text-decoration: none;
         }
@@ -373,7 +373,7 @@ export default {
         }
 
         p {
-          color: $gray_6;
+          color: theme.$gray_6;
           margin: 0 0 8px 0;
           width: 160px;
           display: flex;
@@ -385,7 +385,7 @@ export default {
         }
 
         .truncate-user-tooltip {
-          color: $gray_6;
+          color: theme.$gray_6;
           font-size: 14px;
           font-weight: normal;
           line-height: 16px;
@@ -451,9 +451,9 @@ export default {
   }
 }
 .label-publishing {
-  border: solid 1px $purple_1;
+  border: solid 1px theme.$purple_1;
   border-radius: 15px;
-  background-color: $purple_1;
+  background-color: theme.$purple_1;
   padding: 5px 13px;
   margin: 0 0 13px;
   font-size: 14px;

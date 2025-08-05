@@ -533,17 +533,17 @@ import { referenceTypeOptions } from '../../../../utils/constants'
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 .dataset-activity-detail {
    p {
     margin-bottom: -2px;
     font-size: 14px;
     line-height: 24px;
-    color: $gray_6;
+    color: theme.$gray_6;
    }
   &__parent-info {
     font-size: 12px;
-    color: $gray_6;
+    color: theme.$gray_6;
     font-weight: 400;
   }
   &__info {

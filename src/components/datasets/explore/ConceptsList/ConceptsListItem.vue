@@ -33,7 +33,6 @@
 import { propOr, prop } from "ramda";
 
 import HighlightText from "../../../../mixins/highlight-text";
-import EventBus from "../../../../utils/event-bus";
 import CheckOverflow from "../../../../mixins/check-overflow";
 
 const formatNumber = (number) => new Intl.NumberFormat("en-EN").format(number);
@@ -127,7 +126,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables";
+@use "../../../../styles/theme";
 
 .concepts-list-item {
   display: flex;
@@ -135,7 +134,7 @@ export default {
   justify-content: space-between;
 
   .concept-list-count {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 .model-name {

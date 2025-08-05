@@ -1114,7 +1114,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .remove-relationship {
   cursor: pointer;
@@ -1150,7 +1150,7 @@ export default {
   .el-collapse {
 
     .el-collapse-item__wrap {
-      border-bottom: solid 1px red;
+      border-bottom: solid 1px theme.$red_1;
     }
   }
 
@@ -1236,17 +1236,17 @@ export default {
 
   .empty-state-text {
     margin: 16px 0;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
 .relationship-title {
   align-items: center;
   display: flex;
-  color: $purple_2;
+  color: theme.$purple_2;
   h2 {
     font-family: 'roboto';
-    color: $purple_2;
+    color: theme.$purple_2;
     flex: 1;
     font-size: 18px;
     font-weight: 300;

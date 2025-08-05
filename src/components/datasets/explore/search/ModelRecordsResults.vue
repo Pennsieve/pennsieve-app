@@ -464,270 +464,9 @@ const datasetLocked = computed(() => {
   </div>
 </template>
 
-<!--<script>-->
-<!--import {mapGetters} from 'vuex'-->
-<!--import TableFunctions from '../../../../mixins/table-functions'-->
-<!--import FormatDate from '../../../../mixins/format-date'-->
-<!--import {defaultTo, find, head, path, propEq, propOr} from 'ramda'-->
-
-<!--import Logger from '@/mixins/logger'-->
-<!--import Request from '@/mixins/request'-->
-<!--import EncodeInternalFields from '@/mixins/encode-internal-fields'-->
-
-<!--import BfEmptyPageState from '../../../shared/bf-empty-page-state/BfEmptyPageState.vue'-->
-<!--import BfButton from '../../../shared/bf-button/BfButton.vue'-->
-
-<!--import EventBus from '../../../../utils/event-bus.js'-->
-<!--import PaginationPageMenu from "../../../shared/PaginationPageMenu/PaginationPageMenu.vue";-->
-<!--import IconDirectDownload from "../../../icons/IconDirectDownload.vue";-->
-<!--// import {Computed} from "@/typescript/lib/model-records/computed";-->
-<!--// import {Methods} from "@/typescript/lib/model-records/methods";-->
-
-<!--export default {-->
-<!--  name: 'ModelRecordsResults',-->
-
-<!--  components: {-->
-<!--    IconDirectDownload,-->
-<!--    BfEmptyPageState,-->
-<!--    BfButton,-->
-<!--    PaginationPageMenu-->
-<!--  },-->
-
-<!--  mixins: [-->
-<!--    TableFunctions,-->
-<!--    FormatDate,-->
-<!--    Logger,-->
-<!--    Request,-->
-<!--    EncodeInternalFields-->
-<!--  ],-->
-
-<!--  props: {-->
-<!--    concept: {-->
-<!--      type: Object,-->
-<!--      default: () => {}-->
-<!--    },-->
-<!--    defaultLimit: {-->
-<!--      type: Number,-->
-<!--      default: 50-->
-<!--    },-->
-<!--    hasRadioSelection: {-->
-<!--      type: Boolean,-->
-<!--      default: false-->
-<!--    },-->
-<!--    radioSelection: {-->
-<!--      type: String,-->
-<!--      default: ''-->
-<!--    },-->
-<!--    hasMultiSelect: {-->
-<!--      type: Boolean,-->
-<!--      default: false-->
-<!--    },-->
-<!--    selectedItemIds: {-->
-<!--      type: Set,-->
-<!--      default: () => new Set()-->
-<!--    }-->
-<!--  },-->
-
-<!--  data() {-->
-<!--    return {-->
-<!--      resultsLoading: true,-->
-<!--      displaySearchError: false,-->
-<!--      searchResults: [],-->
-<!--      formattedResults: [],-->
-<!--      sortedHeadings: [],-->
-<!--      proxyModel: {-->
-<!--        id: '',-->
-<!--        name: 'Files'-->
-<!--      },-->
-<!--      offset: 0,-->
-<!--      limit: this.defaultLimit,-->
-<!--      sortBy: 'createdAt',-->
-<!--      sortDirection: 'desc',-->
-<!--      headings: [],-->
-<!--      localRadioSelection: ''-->
-<!--    }-->
-<!--  },-->
-
-<!--  computed: {-->
-<!--    ...mapGetters([-->
-<!--      'getPermission',-->
-<!--      'dataset',-->
-<!--      'config',-->
-<!--      'filesProxyId',-->
-<!--      'hasFeature',-->
-<!--      'datasetLocked'-->
-<!--    ]),-->
-
-<!--    datasetId: function() {-->
-<!--      return Computed.datasetId(this.$route)-->
-<!--    },-->
-
-<!--    conceptId: function() {-->
-<!--      return Computed.conceptId(this.concept)-->
-<!--    },-->
-
-<!--    /**-->
-<!--     * Returns the concept name-->
-<!--     * @returns {String}-->
-<!--     */-->
-<!--    conceptName: function() {-->
-<!--      return Computed.conceptName(this.concept)-->
-<!--    },-->
-
-<!--    /**-->
-<!--     * Returns the number of records in that concept-->
-<!--     * @returns {Number}-->
-<!--     */-->
-<!--    recordCount: function() {-->
-<!--      return Computed.recordCount(this.concept)-->
-<!--    },-->
-
-<!--    propertyCount: function() {-->
-<!--      return Computed.propertyCount(this.concept)-->
-<!--    },-->
-
-<!--    nonSortableColumns: function() {-->
-<!--      return Computed.nonSortableColumns(this.searchResults)-->
-<!--    },-->
-
-<!--    modelRecordsUrl: function() {-->
-<!--      return Computed.modelRecordsUrl(this)-->
-<!--    },-->
-<!--  },-->
-
-<!--  watch: {-->
-
-<!--    searchResults: function(searchResults) {-->
-<!--      if (!searchResults) {-->
-<!--        return-->
-<!--      }-->
-
-<!--      this.formattedResults = this.formatSearchResults(searchResults)-->
-<!--      this.sortedHeadings = this.getHeadings(searchResults, ['dataType', 'createdAt'])-->
-<!--      this.$emit('search-results-changed', searchResults)-->
-<!--    },-->
-
-<!--    /**-->
-<!--     * initialize and re-fetch records when concept changes-->
-<!--     */-->
-<!--    concept: {-->
-<!--      handler: function() {-->
-<!--        this.offset = 0;-->
-<!--        this.limit = this.defaultLimit;-->
-<!--        this.fetchRecords()-->
-<!--      },-->
-<!--      immediate: true,-->
-<!--    },-->
-
-<!--    radioSelection: {-->
-<!--      handler: function(val) {-->
-<!--        this.localRadioSelection = val-->
-<!--      },-->
-<!--      immediate: true-->
-<!--    },-->
-
-<!--    localRadioSelection: {-->
-<!--      handler: function(val) {-->
-<!--        this.$emit('radio-selection', val)-->
-<!--      }-->
-<!--    },-->
-
-<!--    selectedItemIds: {-->
-<!--      /**-->
-<!--       * make sure the select all checkbox doesn't get out of sync-->
-<!--       * @param items {Set}-->
-<!--       */-->
-<!--      handler: function(items) {-->
-<!--        if (this.$refs.table && items.size === 0) {-->
-<!--          this.$refs.table.clearSelection()-->
-<!--        }-->
-<!--      },-->
-<!--      immediate: true-->
-<!--    }-->
-<!--  },-->
-
-<!--  methods: {-->
-<!--    /**-->
-<!--     * Executes search query by applying filters-->
-<!--     */-->
-<!--    fetchRecords: function() {-->
-<!--      console.log('trying to fetch records')-->
-<!--      Methods.fetchRecords(this)-->
-<!--    },-->
-
-<!--    /**-->
-<!--     * Gets file name key given a displayName-->
-<!--     * @param {String} displayName-->
-<!--     * @returns {String}-->
-<!--     */-->
-<!--    getFileName: function(displayName) {-->
-<!--      switch (displayName) {-->
-<!--        case 'Date Created':-->
-<!--          return 'createdAt'-->
-<!--        case 'Size':-->
-<!--          return 'storage'-->
-<!--        case 'Kind':-->
-<!--          return 'type'-->
-<!--        default:-->
-<!--          return 'name'-->
-<!--      }-->
-<!--    },-->
-
-<!--    /**-->
-<!--     * Gets the property name for the displayName-->
-<!--     * @param {String} displayName-->
-<!--     */-->
-<!--    getProperty: function(displayName) {-->
-<!--      const firstRow = defaultTo({}, head(this.searchResults))-->
-<!--      if (path(['content', 'name'], firstRow)) {-->
-<!--        return this.getFileName(displayName)-->
-<!--      }-->
-<!--      const values = propOr([], 'values', firstRow)-->
-<!--      if (values.length === 0) {-->
-<!--        return displayName-->
-<!--      }-->
-<!--      const propertyObj = find(propEq('displayName', displayName), values)-->
-<!--      const value = propOr('', 'name', propertyObj)-->
-<!--      if (displayName === 'Date Created') return 'createdAt'-->
-<!--      if (value){-->
-<!--        return value-->
-<!--      }-->
-<!--    },-->
-
-<!--    downloadRecordCsv: function() {-->
-<!--      EventBus.$emit('trigger-record-csv-download', { model: this.conceptName, datasets: [this.dataset.content.intId], filters: []})-->
-<!--    },-->
-
-<!--    multiSelectIsSelected: function(scope, selectedItemIds) {-->
-<!--      return selectedItemIds.has(scope.row.recordId)-->
-<!--    },-->
-
-<!--    onPaginationPageChange: function(page) {-->
-<!--      Methods.onPaginationPageChange(this, page)-->
-<!--    },-->
-
-<!--    onUpdateLimit: function(limit) {-->
-<!--      Methods.onUpdateLimit(this, limit)-->
-<!--    },-->
-
-<!--    onUpdateSort: function(sortBy) {-->
-<!--      Methods.onUpdateSort(this, sortBy)-->
-<!--    },-->
-
-<!--    onSelectAll: function(items) {-->
-<!--      this.$emit('select-all', items)-->
-<!--    },-->
-
-<!--    onSelectIndividual: function(value, item) {-->
-<!--      this.$emit('select-individual', value, item)-->
-<!--    },-->
-
-<!--  }-->
-<!--}-->
-<!--</script>-->
 
 <style lang="scss">
-@import "../../../../assets/variables";
+@use "../../../../styles/theme";
 
 .concept-search-results {
   .is-loading {
@@ -750,7 +489,7 @@ const datasetLocked = computed(() => {
   }
 
   .results-count {
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-right: 32px;
   }
 
@@ -770,7 +509,7 @@ const datasetLocked = computed(() => {
     }
 
     p {
-      color: $gray_4;
+      color: theme.$gray_4;
       font-size: 14px;
       line-height: 16px;
       margin: 6px 0;
@@ -807,7 +546,7 @@ const datasetLocked = computed(() => {
   align-items: center;
 
   .el-dropdown-text-link:not(:hover, :active) {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 

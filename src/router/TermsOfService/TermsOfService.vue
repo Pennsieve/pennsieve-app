@@ -276,12 +276,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .terms-of-service {
-  background: $white;
+  background: theme.$white;
   display: block;
-  color: $gray_4;
+  color: theme.$gray_4;
   min-height: 100vh;
 
   .container {
@@ -293,7 +293,7 @@ export default {
   }
 
   .agreement-wrap {
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     color: #000;
     font-size: 14px;
     line-height: 21px;

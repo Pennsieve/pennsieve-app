@@ -265,21 +265,22 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/variables';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
 
 :deep(.el-dialog__footer) {
   display: flex;
 }
 
 .member-col {
-  color: $gray_4;
+  color: theme.$gray_4;
 
   &.menu {
     display: flex;
     justify-content: flex-end;
   }
   button {
-    color: $gray_4;
+    color: theme.$gray_4;
     white-space: nowrap;
   }
 }
@@ -295,7 +296,7 @@ export default {
 	height: 40px;
 }
 .role {
-  font-family: $system-font;
+  font-family: theme.$system-font;
   text-transform: capitalize;
   font-size: 14px;
   font-weight: 300;
@@ -303,6 +304,6 @@ export default {
 }
 
   .member .el-spinner-inner .path {
-    stroke: $gray_4
+    stroke: theme.$gray_4
   }
 </style>

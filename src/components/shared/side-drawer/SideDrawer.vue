@@ -76,7 +76,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/variables';
+@use '../../../styles/theme';
 
 .drawer {
   background: #fff;
@@ -120,14 +120,14 @@ h1 {
   padding: 32px 16px 16px 16px;
 
   &.has-border {
-    border-bottom: solid 1px $gray_2;
+    border-bottom: solid 1px theme.$gray_2;
   }
 }
 
 .copy {
   font-size: 18px;
   line-height: 24px;
-  color: $gray_6;
+  color: theme.$gray_6;
 }
 
 .body {
@@ -138,7 +138,7 @@ h1 {
 }
 
 .footer {
-  border-top: solid 1px $gray_2;
+  border-top: solid 1px theme.$gray_2;
   height: 88px;
 
   .buttons {

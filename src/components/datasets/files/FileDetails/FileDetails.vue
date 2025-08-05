@@ -2884,9 +2884,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
-@import "../../../../assets/_icon-item-colors.scss";
-//@import '../../../../assets/components/_uploader-empty-state.scss';
+@use "../../../../styles/theme";
+@use "../../../../styles/_icon-item-colors";
 
 #file-name-header {
   font-size: 20px;
@@ -2900,15 +2899,9 @@ export default {
   color: white;
   font-weight: 300;
 }
-</style>
-
-<style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
-@import "../../../../assets/_icon-item-colors.scss";
-//@import '../../../../assets/components/_uploader-empty-state.scss';
 
 .highlight-property {
-  color: $gray_6;
+  color: theme.$gray_6;
   font-weight: 500;
 }
 
@@ -2923,7 +2916,7 @@ export default {
   }
 
   &.editing {
-    background: $gray_1;
+    background: theme.$gray_1;
 
     h2 {
       margin-bottom: 4px;
@@ -2966,7 +2959,7 @@ export default {
     .table-info,
     .table-actions {
       align-items: center;
-      color: $purple_1;
+      color: theme.$purple_1;
       display: flex;
       line-height: initial;
       font-size: 12px;
@@ -2974,12 +2967,12 @@ export default {
     }
     .table-info {
       .selected-files {
-        color: $gray_6;
+        color: theme.$gray_6;
         margin-right: 16px;
       }
 
       .selected-source-files {
-        color: $gray_6;
+        color: theme.$gray_6;
       }
     }
     &.row-is-selected {
@@ -2993,7 +2986,7 @@ export default {
     flex: 1;
     h2 {
       font-family: "roboto";
-      color: $purple_1;
+      color: theme.$purple_1;
       flex: 1;
       font-size: 20px;
       font-weight: 600;
@@ -3067,8 +3060,8 @@ export default {
     padding: 0;
   }
   .bf-upload-dropzone {
-    background: $purple_tint;
-    border: 1px dashed $purple_1;
+    background: theme.$purple_tint;
+    border: 1px dashed theme.$purple_1;
     height: 214px;
     padding: 0;
   }
@@ -3088,16 +3081,16 @@ export default {
     max-width: 500px;
 
     a {
-      color: $purple_1;
+      color: theme.$purple_1;
     }
 
     p {
       max-width: 450px;
       padding: 0 16px;
-      color: $gray_4;
+      color: theme.$gray_4;
 
       a {
-        color: $purple_1;
+        color: theme.$purple_1;
       }
     }
 
@@ -3115,13 +3108,13 @@ export default {
 
 .property-list {
   padding: 0 16px;
-  background: $gray_1;
+  background: theme.$gray_1;
   margin-bottom: 16px;
 }
 
 .relationships-empty-state {
-  background: $purple_tint;
-  border: 1px dashed $purple_1;
+  background: theme.$purple_tint;
+  border: 1px dashed theme.$purple_1;
   height: 214px;
   display: flex;
 
@@ -3132,7 +3125,7 @@ export default {
     padding: 8px;
 
     .relationship-inner-text {
-      color: $gray_4;
+      color: theme.$gray_4;
       margin-bottom: 16px;
     }
 
@@ -3156,11 +3149,11 @@ export default {
     }
   }
   button {
-    color: $gray_4;
+    color: theme.$gray_4;
     display: none;
     margin-left: 8px;
     &:hover {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
     }
   }
 }
@@ -3176,7 +3169,7 @@ export default {
 }
 
 .viewer-pane-wrap {
-  color: $purple_2;
+  color: theme.$purple_2;
   flex: 1;
   font-size: 12px;
   font-weight: 300;
@@ -3196,7 +3189,7 @@ export default {
 }
 
 .instance-type {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-weight: 600;
   text-transform: capitalize;
 }

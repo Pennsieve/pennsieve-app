@@ -74,7 +74,7 @@ export default  {
 </script>
 
 <style lang='scss' scoped>
-@import '../../assets/variables.scss';
+@use '../../styles/theme' as *;
 
   .unknown-viewer {
     box-sizing: border-box;

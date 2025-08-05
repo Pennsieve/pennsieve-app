@@ -1158,11 +1158,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/variables';
+@use '../../../../styles/theme';
 
 .model-name-heading {
   margin: 0 8px;
-  color: $gray_6;
+  color: theme.$gray_6;
 }
 
 .buttons {
@@ -1177,7 +1177,7 @@ export default {
 
 .bf-concept-managment {
   header {
-    background: $purple_1;
+    background: theme.$purple_1;
   }
 
   .back-to-concepts {

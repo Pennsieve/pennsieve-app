@@ -152,7 +152,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme' as *;
 
 .bf-viewer-side-panel{
   background: #f7f7f7;

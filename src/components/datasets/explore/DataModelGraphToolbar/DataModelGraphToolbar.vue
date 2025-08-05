@@ -114,13 +114,13 @@
 </script>
 
 <style scoped lang="scss">
-  @import './src/assets/_variables.scss';
+  @use '../../../../styles/theme';
+
 
   .graph-toolbar {
-    background: $gray_1;
-    border: 0.5px solid $gray_3;
+    background: theme.$gray_1;
+    border: 0.5px solid theme.$gray_3;
     border-radius: 2px;
-    //box-shadow: 3px 1px 11px 0 rgba(0,0,0,0.21);
     display: flex;
     left: 32px;
     position: absolute;
@@ -128,18 +128,17 @@
     z-index: 3;
     button {
       margin-top: 3px;
-      border-left: 1px solid $gray_2;
-      color: $purple_3;
+      border-left: 1px solid theme.$gray_2;
+      color: theme.$purple_3;
       padding: 6px;
-      //width: 33px;
       &:first-child {
         border: none;
       }
       &:hover {
-        background: $gray_2
+        background: theme.$gray_2
       }
       &:active {
-        color: $app-primary-color;
+        color: theme.$app-primary-color;
       }
     }
   }

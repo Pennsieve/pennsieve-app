@@ -146,7 +146,7 @@
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@use '../../../styles/theme';
 
   #digitalZoomMsg {
     font-size: 11px;
@@ -176,7 +176,7 @@
           width: 71px;
           height: 26px;
           margin-left: 7px;
-          color: $gray_6;
+          color: theme.$gray_6;
         }
         .fitToScreenIcon{
           margin-left: 45px;
@@ -195,9 +195,6 @@
     }
   }
 
-
-</style>
-<style lang="scss">
   .zoom-tool {
     .el-slider {
       width: 148px;

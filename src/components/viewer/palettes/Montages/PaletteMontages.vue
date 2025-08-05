@@ -170,7 +170,7 @@ async function doDeleteMontage(evt) {
 </template>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .pair-info {
   display: flex;
@@ -178,7 +178,7 @@ async function doDeleteMontage(evt) {
   justify-content: space-between;
   padding: 8px 16px;
   background: white;
-  border-bottom: 1px solid $gray_0;
+  border-bottom: 1px solid theme.$gray_0;
 }
 
 .palette-montages {
@@ -190,8 +190,8 @@ async function doDeleteMontage(evt) {
 
 .montages-heading {
   align-items: center;
-  background: $purple_0_7;
-  border-bottom: solid 1px $gray_2;
+  background: theme.$purple_0_7;
+  border-bottom: solid 1px theme.$gray_2;
   display: flex;
   padding: 8px;
 }
@@ -205,7 +205,7 @@ async function doDeleteMontage(evt) {
 
 .delete-container{
   background: white;
-  border-bottom: 1px solid $gray_0;
+  border-bottom: 1px solid theme.$gray_0;
   display: flex;
   justify-content: end;
   height: 25px;

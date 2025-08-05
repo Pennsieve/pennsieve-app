@@ -110,7 +110,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .controls-icons {
   padding-right: 8px;
@@ -124,7 +124,7 @@ export default {
 
 .bf-channel {
   background: #F7F7F7;
-  border-bottom: 1px solid $gray_6;
+  border-bottom: 1px solid theme.$gray_6;
   box-sizing: border-box;
   display: flex;
   padding: 3px 8px 3px 16px;
@@ -142,7 +142,7 @@ export default {
 }
 
 .channel-info {
-  color: $gray_3;
+  color: theme.$gray_3;
   flex: 1;
 }
 .channel-controls {
@@ -165,11 +165,11 @@ h2 {
   margin-bottom: 2px;
 }
 .selected {
-  color: $purple_2
+  color: theme.$purple_2
 }
 button {
   &:hover, &:focus {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
 }
 </style>

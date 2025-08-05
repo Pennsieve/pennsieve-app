@@ -98,7 +98,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .bf-stage {
     flex: 1;
@@ -106,7 +106,7 @@
     display: flex;
     flex-direction: column;
     &.editing {
-      background: $gray_1;
+      background: theme.$gray_1;
     }
   }
   .bf-stage-content {
@@ -132,7 +132,7 @@
     }
   }
   .bf-sidebar-wrap {
-    background-color: $white;
+    background-color: theme.$white;
     display: flex;
     min-height: 100%;
     .editing & {
@@ -144,7 +144,7 @@
     }
   }
   .stage-sidebar {
-    border-left: 1px solid $gray_2;
+    border-left: 1px solid theme.$gray_2;
     box-sizing: border-box;
     width: 360px;
     h2 {
@@ -162,7 +162,7 @@
     }
   }
   .sidebar-component {
-    border-top: 1px solid $gray_2;
+    border-top: 1px solid theme.$gray_2;
     &:first-child {
       border: none;
     }

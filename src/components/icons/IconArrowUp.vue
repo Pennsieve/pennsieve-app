@@ -37,7 +37,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
 
 .svg-flip {
   transform: rotate(180deg) scaleX(-1);

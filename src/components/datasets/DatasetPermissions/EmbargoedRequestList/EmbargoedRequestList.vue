@@ -125,10 +125,10 @@ import IconRemove from "../../../icons/IconRemove.vue";
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 .embargoed-request-list {
   .embargoed-request-list-item {
-    border-top: solid 1px $gray_2;
+    border-top: solid 1px theme.$gray_2;
     display: flex;
     justify-content: space-between;
     &__info {
@@ -140,7 +140,7 @@ import IconRemove from "../../../icons/IconRemove.vue";
         margin-bottom: 0;
       }
       &--email {
-        color: $gray_4;
+        color: theme.$gray_4;
         margin-bottom: 17px;
       }
     }
@@ -158,11 +158,11 @@ import IconRemove from "../../../icons/IconRemove.vue";
       margin-right: 25px;
     }
     &:last-child {
-      border-bottom: solid 1px $gray_2;
+      border-bottom: solid 1px theme.$gray_2;
     }
   }
   .svg-icon {
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 </style>

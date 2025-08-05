@@ -530,7 +530,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@use '../../../styles/theme' as *;
 
 .status-info {
   display: flex;

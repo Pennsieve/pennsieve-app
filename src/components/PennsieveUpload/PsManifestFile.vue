@@ -48,12 +48,12 @@ function removeItem() {
 
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@use '../../styles/theme';
 
 .manifest-file {
-  border-left: 1px solid $gray_2;
-  border-right: 1px solid $gray_2;
-  border-bottom:  1px solid $gray_2;
+  border-left: 1px solid theme.$gray_2;
+  border-right: 1px solid theme.$gray_2;
+  border-bottom:  1px solid theme.$gray_2;
   padding: 16px 16px;
   display: flex;
   flex-direction: row;
@@ -67,7 +67,7 @@ function removeItem() {
 
   .svg-icon {
     vertical-align: bottom;
-    color: $gray_4;
+    color: theme.$gray_4;
     padding: 0 0 0 16px;
   }
 
@@ -82,7 +82,7 @@ function removeItem() {
     cursor: pointer;
 
     &:hover {
-      color: $purple_3;
+      color: theme.$purple_3;
     }
   }
 }

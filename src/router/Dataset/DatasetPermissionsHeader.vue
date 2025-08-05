@@ -76,9 +76,9 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@use '../../styles/theme';
 
 .link-to-files {
-  color: $white;
+  color: theme.$white;
 }
 </style>

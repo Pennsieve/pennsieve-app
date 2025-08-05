@@ -71,7 +71,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .bf-footer {
   display: block;
@@ -96,7 +96,7 @@ export default {
     .learn-button {
       height: 48px;
       width: 130px;
-      border: 2px solid $gray_1;
+      border: 2px solid theme.$gray_1;
       border-radius: 3px;
       font-size: 16px;
       font-weight: 500;
@@ -105,35 +105,35 @@ export default {
       padding: 0;
 
       &:hover {
-        background-color: $purple_2;
-        border: 2px solid $purple_2;
+        background-color: theme.$purple_2;
+        border: 2px solid theme.$purple_2;
       }
 
       &:focus {
-        background-color: $purple_3;
-        border: 2px solid $purple_3;
+        background-color: theme.$purple_3;
+        border: 2px solid theme.$purple_3;
       }
 
       a {
-        color: $gray_1;
+        color: theme.$gray_1;
         text-decoration: none;
       }
     }
   }
 
   p {
-    color: $gray_1;
+    color: theme.$gray_1;
     font-size: 14px;
     line-height: 24px;
   }
 
   .footer-container {
     padding: 32px 0 48px;
-    background: $gray_4;
+    background: theme.$gray_4;
   }
 
   .footer-text {
-    color: $gray_1;
+    color: theme.$gray_1;
   }
 }
 
@@ -161,7 +161,7 @@ export default {
   }
 
   a {
-    color: $gray_1;
+    color: theme.$gray_1;
     font-size: 14px;
     line-height: 16px;
     padding: 0 4px;
@@ -171,7 +171,7 @@ export default {
     &:active,
     &:hover,
     &:focus {
-      color: $gray_2;
+      color: theme.$gray_2;
     }
     &:hover,
     &:focus {
@@ -181,10 +181,10 @@ export default {
 }
 
 a {
-  color: $gray_2;
+  color: theme.$gray_2;
 }
 
 a:hover {
-  color: $primary-color;
+  color: theme.$primary-color;
 }
 </style>

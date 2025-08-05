@@ -360,11 +360,11 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .add-image-wrap {
     align-items: center;
-    color: $gray_4;
+    color: theme.$gray_4;
     cursor: pointer;
     display: flex;
     font-size: 12px;
@@ -380,7 +380,7 @@
   }
 
   .cropper-wrap {
-    background: $gray_1;
+    background: theme.$gray_1;
     height: 476px;
     width: 476px;
   }

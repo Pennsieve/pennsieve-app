@@ -108,11 +108,11 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../assets/_variables';
+  @use '../../../styles/theme';
 
   .button-group .bf-button {
-    background-color: $gray_2;
-    border: 1px solid $gray_2;
+    background-color: theme.$gray_2;
+    border: 1px solid theme.$gray_2;
     border-left: none;
     height: 28px;
     padding: 4px;
@@ -122,7 +122,7 @@
       background: #f9f9f9;
     }
     &:first-child {
-      border-left: 1px solid $gray_2;
+      border-left: 1px solid theme.$gray_2;
       border-radius: 3px 0 0 3px;
     }
     &:last-child {
@@ -136,7 +136,7 @@
   }
 
   .icon {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 </style>
 

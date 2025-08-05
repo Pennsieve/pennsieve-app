@@ -186,17 +186,17 @@
 </script>
 
 <style lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme';
 
   .concept {
     padding: 16px 0;
-    border-top: 1px solid $gray_2;
+    border-top: 1px solid theme.$gray_2;
     &:first-child {
       border: none;
     }
   }
   .concept-info {
-    color: $gray_4;
+    color: theme.$gray_4;
     .info {
       color: #000;
       display: flex;
@@ -208,7 +208,7 @@
         white-space: nowrap;
       }
       .svg-icon {
-        color: $gray_4;
+        color: theme.$gray_4;
         margin-left: 8px;
       }
     }

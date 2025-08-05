@@ -1409,7 +1409,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .icon-item {
   height: 22px;
@@ -1423,9 +1423,7 @@ export default {
 #relationships-table {
   position: relative;
   min-height: 50px;
-  //transition-property: min-height;
-  //transition-duration: 0.5s;
-  //transition-timing-function: ease-in;
+
 
   .load-more {
     display: inline-block;
@@ -1445,7 +1443,7 @@ export default {
   .el-collapse {
 
     .el-collapse-item__wrap {
-      border-bottom: solid 1px red;
+      border-bottom: solid 1px theme.$red_1;
     }
   }
 
@@ -1531,7 +1529,7 @@ export default {
 
   .empty-state-text {
     margin: 16px 0;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -1569,10 +1567,10 @@ export default {
 .relationship-title {
   align-items: center;
   display: flex;
-  color: $purple_2;
+  color: theme.$purple_2;
   h2 {
     font-family: 'roboto';
-    color: $purple_2;
+    color: theme.$purple_2;
     flex: 1;
     font-size: 18px;
     font-weight: 300;
@@ -1587,15 +1585,14 @@ export default {
 }
 
 .source-file-table-results-count {
-  border-left: solid 1px $gray_2;
-  border-right: solid 1px $gray_2;
-  border-bottom: solid 1px $gray_2;
+  border-left: solid 1px theme.$gray_2;
+  border-right: solid 1px theme.$gray_2;
+  border-bottom: solid 1px theme.$gray_2;
   border-top: none;
-  padding: 13px 0;
-  padding-left: 17px;
-  background: $gray_1;
+  padding: 13px 0 13px 17px;
+  background: theme.$gray_1;
   font-weight: 500;
-  color: $gray_6;
+  color: theme.$gray_6;
   font-size: 13px;
   line-height: 23px;
   margin-top: -3px;
@@ -1603,7 +1600,7 @@ export default {
 }
 
 .source-file-table-skeleton-loader {
-  border-top: solid 1px $gray_2;
+  border-top: solid 1px theme.$gray_2;
   height: 45px;
 }
 
@@ -1613,13 +1610,12 @@ export default {
 }
 
 .icon-upload {
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .source-file-table-load-more {
   cursor: pointer;
-  border-top: solid 1px $gray_2;
-  //width: -webkit-fill-available;
+  border-top: solid 1px theme.$gray_2;
   padding-top: 11px;
   padding-bottom: 18px;
   display: flex;

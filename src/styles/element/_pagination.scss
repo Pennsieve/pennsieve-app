@@ -1,0 +1,13 @@
+@use '../theme';
+
+$height: 24px;
+
+.el-pagination {
+  --el-pagination-hover-color: #{theme.$orange_1};
+  --el-pagination-font-size: 14px;
+
+  //:deep(.el-pager li) {
+  //  background: tomato;
+  //}
+
+}

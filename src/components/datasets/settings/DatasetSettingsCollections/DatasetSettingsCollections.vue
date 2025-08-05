@@ -13,6 +13,7 @@
       filterable
       default-first-option
       allow-create
+      :multiple="false"
       no-data-text="Start typing to create a new collection"
       :disabled="datasetLocked"
       popper-class="bf-menu dataset-collections-input-options"
@@ -73,7 +74,7 @@ export default {
 
   data() {
     return {
-      inputCollection: '',
+      inputCollection: null,
       hasError: false
     }
   },
@@ -146,7 +147,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/select';
 
 .el-select {
   width: 100%;
@@ -160,16 +162,13 @@ export default {
   display: flex;
 }
 .error {
-  color: $error-color;
+  color: theme.$error-color;
 }
-</style>
-<style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
 
 .dataset-collections-input-options {
   .el-select-dropdown__item:not(.filtered-field) {
     align-items: center;
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
     display: flex;
     padding: 16px;
     text-decoration: underline;

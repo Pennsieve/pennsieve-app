@@ -128,7 +128,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/variables';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/select';
 
 .relationship-item {
   display: flex;

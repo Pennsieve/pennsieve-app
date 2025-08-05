@@ -301,11 +301,12 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
+@use '../../../styles/bfmenu';
 
 
 .icon-caret {
-  color: $purple_2;
+  color: theme.$purple_2;
 }
 
 .search-filter-criteria {
@@ -318,9 +319,9 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
 }
 .search-filter-criteria-select {
   align-items: center;
-  background: rgba($purple_1, .1);
+  background: rgba(theme.$purple_1, .1);
   border-radius: 12px;
-  color: $gray_6;
+  color: theme.$gray_6;
   cursor: pointer;
   display: flex;
   letter-spacing: 0.25px;
@@ -341,7 +342,7 @@ import IconArrowUp from "../../icons/IconArrowUp.vue";
 input {
   background: none;
   border: none;
-  color: $gray_6;
+  color: theme.$gray_6;
   flex: 1;
   font-size: inherit;
   line-height: inherit;
@@ -352,9 +353,9 @@ input {
 }
 .bf-menu-item .prefix {
   :not(:active) & {
-    color: $gray_4;
+    color: theme.$gray_4;
     strong {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
     }
   }
   strong {

@@ -1,0 +1,11 @@
+@use '../theme';
+
+:deep(.el-button) {
+  --el-button-text-color: #{theme.$purple_2};
+  --el-button-bg-color: #{theme.$purple_tint};
+  --el-button-border-color: #{theme.$purple_0_7};
+  --el-button-hover-text-color: #{theme.$gray_0};
+  --el-button-hover-bg-color: #{theme.$purple_2};
+  --el-button-hover-border-color: #{theme.$purple_1};
+  --el-button-active-text-color: #{theme.$gray_0};
+}

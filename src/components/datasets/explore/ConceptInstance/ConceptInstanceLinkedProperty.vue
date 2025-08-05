@@ -141,14 +141,15 @@
 </script>
 
 <style scoped lang="scss">
-  @import '_concept-instance-property';
+  @use '../../../../styles/theme';
+  @use '_concept-instance-property';
 
   .concept-instance-linked-property {
     .button-edit,
     .button-unlink {
-      color: $gray_4;
+      color: theme.$gray_4;
       &:hover {
-        color: $app-primary-color
+        color: theme.$app-primary-color
       }
     }
 

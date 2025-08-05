@@ -107,7 +107,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .table-container {
   min-width: 400px;
@@ -121,18 +121,18 @@ table {
 
 th,
 td {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   padding: 10px;
   text-align: left;
 }
 
 th {
-  background-color: $gray_2;
+  background-color: theme.$gray_2;
   font-weight: bold;
 }
 
 tr:nth-child(even) {
-  background-color: $gray_2;
+  background-color: theme.$gray_2;
 }
 
 .model-details {
@@ -147,16 +147,16 @@ tr:nth-child(even) {
 
 .label {
   font-weight: bold;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .value {
-  color: $black;
+  color: theme.$black;
   font-weight: normal;
 }
 .processor-item {
   font-weight: bold;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .processor-value {

@@ -607,11 +607,11 @@ export default {
 </script>
 
 <style lang="scss">
-@import "../../../../assets/variables";
+@use "../../../../styles/theme";
 
 .drawer {
   .el-table {
-    border: solid 1px $gray_2;
+    border: solid 1px theme.$gray_2;
 
     tr.el-table__row {
       background: #fff !important;
@@ -654,7 +654,7 @@ export default {
   .file-row {
     color: #000;
     height: 48px;
-    border-top: solid 1px $gray_2;
+    border-top: solid 1px theme.$gray_2;
 
     &.first {
       border-top: none;

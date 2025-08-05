@@ -226,7 +226,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../../assets/_variables.scss';
+  @use '../../../../styles/theme';
   .dialog-simple-buttons {
     display: flex;
     margin-top: 16px;
@@ -236,7 +236,7 @@
     }
   }
   .svg-icon {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
   .dialog-body {
     text-align: center

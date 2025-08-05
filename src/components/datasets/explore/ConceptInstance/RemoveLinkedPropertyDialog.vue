@@ -1,41 +1,44 @@
 <template>
-  <el-dialog
-    class="simple"
-    :visible="unlinkDialogVisible"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <bf-dialog-header slot="title" />
-    <dialog-body>
-      <svg-icon
-        slot="icon"
-        class="icon-unlink"
-        icon="icon-unlink"
-        height="32"
-        width="32"
-        color="#2760FF"
-      />
-      <h2 slot="heading">
-        Delete Linked Record?
-      </h2>
-      <p>Deleting linked records cannot be undone.</p>
-      <div class="dialog-simple-buttons">
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          :processing="isRemoving"
-          class="red"
-          @click="sendRequest"
-        >
-          Delete
-        </bf-button>
-      </div>
-    </dialog-body>
-  </el-dialog>
+  <div>
+    <el-dialog
+      class="simple"
+      :visible="unlinkDialogVisible"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <bf-dialog-header slot="title" />
+      <dialog-body>
+        <svg-icon
+          slot="icon"
+          class="icon-unlink"
+          icon="icon-unlink"
+          height="32"
+          width="32"
+          color="#2760FF"
+        />
+        <h2 slot="heading">
+          Delete Linked Record?
+        </h2>
+        <p>Deleting linked records cannot be undone.</p>
+        <div class="dialog-simple-buttons">
+          <bf-button
+            class="secondary"
+            @click="closeDialog"
+          >
+            Cancel
+          </bf-button>
+          <bf-button
+            :processing="isRemoving"
+            class="red"
+            @click="sendRequest"
+          >
+            Delete
+          </bf-button>
+        </div>
+      </dialog-body>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -172,15 +175,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
-@import '../../../../assets/_icon-item-colors.scss';
-
-
+@use '../../../../styles/theme';
+@use '../../../../styles/icon-item-colors';
+@use '../../../../styles/element/dialog';
 
 .dialog-body {
   text-align: center;
-
-
 
   .icon-unlink {
     margin-bottom: 8px;

@@ -638,7 +638,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 
 .selection-actions {
@@ -651,10 +651,10 @@ export default {
 .relationship-title {
   align-items: center;
   display: flex;
-  color: $purple_2;
+  color: theme.$purple_2;
   h2 {
     font-family: 'roboto';
-    color: $purple_2;
+    color: theme.$purple_2;
     flex: 1;
     font-size: 18px;
     font-weight: 300;

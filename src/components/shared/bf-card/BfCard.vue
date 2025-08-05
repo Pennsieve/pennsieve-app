@@ -132,12 +132,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/variables';
+@use '../../../styles/theme';
 
 .bf-card {
   align-items: center;
   background: #fff;
-  border: solid 1px $gray_2;
+  border: solid 1px theme.$gray_2;
   border-radius: 3px;
   box-sizing: border-box;
   display: flex;
@@ -152,7 +152,7 @@ export default {
   width: 276px;
 
   &:not(.disabled):hover {
-    background: $gray_1;
+    background: theme.$gray_1;
     cursor: pointer;
   }
 
@@ -215,7 +215,7 @@ export default {
     }
 
     &.active {
-      border: solid 1px $purple_1;
+      border: solid 1px theme.$purple_1;
 
       .bf-card--checkbox {
         display: block;
@@ -223,12 +223,12 @@ export default {
     }
 
     &.is-disabled {
-      background: $gray_1;
-      color: $gray_4;
+      background: theme.$gray_1;
+      color: theme.$gray_4;
       cursor: default;
 
       .bf-card--title {
-        color: $gray_4;
+        color: theme.$gray_4;
       }
 
       &:hover {

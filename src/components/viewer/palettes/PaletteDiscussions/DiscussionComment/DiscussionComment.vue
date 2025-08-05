@@ -238,7 +238,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
 
   .discussion-comment {
     font-size: 13px;
@@ -289,7 +289,7 @@
   }
 </style>
 <style lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme' as *;
 
   .discussion-comment {
     .mention {

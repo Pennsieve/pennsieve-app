@@ -1,23 +1,23 @@
-@import './_variables.scss';
+@use '../styles/theme';
 
 .icon-item {
-  color: $orange_1;
+  color: theme.$orange_1;
 }
 .icon-item.folder, .icon-item.folder-special, .icon-item.folder-shared {
-  color: $gray_4;
+  color: theme.$gray_4;
 }
 .icon-item.text {
-  color: $gray_1;
+  color: theme.$gray_1;
 }
 .icon-item.image {
-  color: $notification_green;
+  color: theme.$notification_green;
 }
 .icon-item.video {
-  color: $red_1;
+  color: theme.$red_1;
 }
 .icon-item.pdf {
-  color: $orange_1;
+  color: theme.$orange_1;
 }
 .icon-item.timeseries, .icon-item.tabular {
-  color: $purple_1;
+  color: theme.$purple_1;
 }

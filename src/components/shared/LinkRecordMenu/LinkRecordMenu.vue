@@ -189,10 +189,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @import 'src/assets/variables';
+  @use 'src/styles/theme';
 
   .existing-file-menu {
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
   }
   .empty-state {
     padding: 24px;

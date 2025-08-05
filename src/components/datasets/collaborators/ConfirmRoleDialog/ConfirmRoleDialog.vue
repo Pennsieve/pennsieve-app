@@ -1,37 +1,39 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="handleDialogUpdate"
-    :show-close="false"
-    @close="close"
-  >
-    <template #header>
-      <bf-dialog-header
-        title="Change Permissions"/>
-    </template>
-
-    <dialog-body>
-      <template #heading>
-        <h2>{{ dialogTitle }}</h2>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="handleDialogUpdate"
+      :show-close="false"
+      @close="close"
+    >
+      <template #header>
+        <bf-dialog-header
+          title="Change Permissions"/>
       </template>
 
-      <div v-html="dialogContent"></div>
-    </dialog-body>
+      <dialog-body>
+        <template #heading>
+          <h2>{{ dialogTitle }}</h2>
+        </template>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="close"
-      >
-        No
-      </bf-button>
-      <bf-button
-        @click="$emit('confirm')"
-      >
-        {{ btnSubmitCopy }}
-      </bf-button>
-    </template>
-  </el-dialog>
+        <div v-html="dialogContent"></div>
+      </dialog-body>
+
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="close"
+        >
+          No
+        </bf-button>
+        <bf-button
+          @click="$emit('confirm')"
+        >
+          {{ btnSubmitCopy }}
+        </bf-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup>
@@ -144,3 +146,8 @@ const close = () => {
   emit('close-dialog')
 }
 </script>
+
+<style scoped lang="scss">
+  @use '../../../../styles/element/dialog';
+</style>
+

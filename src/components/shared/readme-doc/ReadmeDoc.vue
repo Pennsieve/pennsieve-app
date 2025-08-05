@@ -108,17 +108,17 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .help-title-wrapper {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   padding: 8px;
-  background-color: $purple_tint;
+  background-color: theme.$purple_tint;
 
   .help-title {
-    color: $purple_3;
+    color: theme.$purple_3;
     font-size: 12pt;
     margin: 8px 0px;
 
@@ -132,12 +132,11 @@ export default {
 }
 
 .help-section {
-  //border: 1px solid $purple_tint;
   padding: 8px;
   border-radius: 4px;
 
   :deep(.header-scroll) {
-    color: $purple_2;
+    color: theme.$purple_2;
     font-weight: 500;
   ;
   }
@@ -167,11 +166,11 @@ export default {
 
       table {
         border-collapse:collapse;
-        border: 1px solid $gray_3;
+        border: 1px solid theme.$gray_3;
       }
 
       td {
-        border: 1px solid $gray_3;
+        border: 1px solid theme.$gray_3;
         padding: 8px;
       }
     }

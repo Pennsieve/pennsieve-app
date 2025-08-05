@@ -1,140 +1,143 @@
 <template>
-  <el-dialog
-    class="create-relationship-type-dialog"
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        :title="title"
-      />
-    </template>
+  <div>
+    <el-dialog
+      class="create-relationship-type-dialog"
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          :title="title"
+        />
+      </template>
 
 
-    <dialog-body>
-      <el-form
-        ref="form"
-        :model="relationship"
-        :rules="rules"
-        label-position="top"
-        @submit.native.prevent="createRelationshipType"
-      >
-        <el-form-item prop="originModel">
-          <template #label>
-            Originating Model <span class="label-helper">
+      <dialog-body>
+        <el-form
+          ref="form"
+          :model="relationship"
+          :rules="rules"
+          label-position="top"
+          @submit.native.prevent="createRelationshipType"
+        >
+          <el-form-item prop="originModel">
+            <template #label>
+              Originating Model <span class="label-helper">
               required
             </span>
-          </template>
-          <el-select
-            v-if="!editing"
-            v-model="relationship.originModel"
-            filterable
-            placeholder="Select an Origin Model"
-            autofocus
-            popper-class="bf-menu"
-            default-first-option
-          >
-            <el-option
-              v-for="concept in concepts"
-              :key="concept.id"
-              :label="concept.displayName"
-              :value="concept.name"
-            />
-          </el-select>
+            </template>
+            <el-select
+              v-if="!editing"
+              v-model="relationship.originModel"
+              filterable
+              placeholder="Select an Origin Model"
+              autofocus
+              popper-class="bf-menu"
+              default-first-option
+            >
+              <el-option
+                v-for="concept in concepts"
+                :key="concept.id"
+                :label="concept.displayName"
+                :value="concept.name"
+              />
+            </el-select>
 
-          <div
-            v-else
-            class="text-disabled icon"
-          >
-            <div class="value">
-              {{ relationship.originModelDisplayName }}
+            <div
+              v-else
+              class="text-disabled icon"
+            >
+              <div class="value">
+                {{ relationship.originModelDisplayName }}
+              </div>
+              <IconLockFilled
+                :height="20"
+                :width="20"
+              />
             </div>
-            <IconLockFilled
-              :height="20"
-              :width="20"
-            />
-          </div>
-        </el-form-item>
+          </el-form-item>
 
-        <el-form-item prop="relationshipName">
-          <template #label>
-            Relationship Name <span class="label-helper">
+          <el-form-item prop="relationshipName">
+            <template #label>
+              Relationship Name <span class="label-helper">
               required
             </span>
-          </template>
-          <relationship-input
-            ref="relationshipInput"
-            v-model="relationship.relationshipName"
-            :options="relationshipNames"
-            @input="setRelationship"
-          />
-        </el-form-item>
+            </template>
+            <relationship-input
+              ref="relationshipInput"
+              v-model="relationship.relationshipName"
+              :options="relationshipNames"
+              @input="setRelationship"
+            />
+          </el-form-item>
 
-        <el-form-item prop="destinationModel">
-          <template #label>
-            Destination Model <span class="label-helper">
+          <el-form-item prop="destinationModel">
+            <template #label>
+              Destination Model <span class="label-helper">
               required
             </span>
-          </template>
-          <el-select
-            v-if="!editing"
-            v-model="relationship.destinationModel"
-            filterable
-            placeholder="Select a Destination Model"
-            autofocus
-            popper-class="bf-menu"
-            default-first-option
-          >
-            <el-option
-              v-for="concept in concepts"
-              :key="concept.id"
-              :label="concept.displayName"
-              :value="concept.name"
-            />
-          </el-select>
+            </template>
+            <el-select
+              v-if="!editing"
+              v-model="relationship.destinationModel"
+              filterable
+              placeholder="Select a Destination Model"
+              autofocus
+              popper-class="bf-menu"
+              default-first-option
+            >
+              <el-option
+                v-for="concept in concepts"
+                :key="concept.id"
+                :label="concept.displayName"
+                :value="concept.name"
+              />
+            </el-select>
 
-          <div
-            v-else
-            class="text-disabled icon"
-          >
-            <div class="value">
-              {{ relationship.destinationModelDisplayName }}
+            <div
+              v-else
+              class="text-disabled icon"
+            >
+              <div class="value">
+                {{ relationship.destinationModelDisplayName }}
+              </div>
+              <IconLockFilled
+                :height="20"
+                :width="20"
+              />
             </div>
-            <IconLockFilled
-              :height="20"
-              :width="20"
-            />
-          </div>
-        </el-form-item>
-      </el-form>
-    </dialog-body>
+          </el-form-item>
+        </el-form>
+      </dialog-body>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        :disabled="createDisabled"
-        :processing="isCreating"
-        processing-text="Saving"
-        @click="createRelationshipType"
-      >
-        <template v-if="!editing">
-          Create
-        </template>
-        <template v-else>
-          Save
-        </template>
-      </bf-button>
-    </template>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          :disabled="createDisabled"
+          :processing="isCreating"
+          processing-text="Saving"
+          @click="createRelationshipType"
+        >
+          <template v-if="!editing">
+            Create
+          </template>
+          <template v-else>
+            Save
+          </template>
+        </bf-button>
+      </template>
 
-  </el-dialog>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -368,12 +371,15 @@
   }
 </script>
 <style scoped lang="scss">
-  @import '../../../../../assets/_variables.scss';
+  @use '../../../../../styles/theme';
+  @use '../../../../../styles/element/dialog';
+  @use '../../../../../styles/element/select';
+
 
 
   .text-disabled {
     width: 100%;
-    background-color: red;
+    background-color: theme.$red_1;
     display: flex;
     flex-direction: row;
     justify-content: space-between;

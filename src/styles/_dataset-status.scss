@@ -1,3 +1,5 @@
+@use "theme";
+
 .status-dot {
   height: 8px;
   width: 8px;
@@ -8,7 +10,7 @@
 }
 
 .settings-status-color {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-size: 14px;
   font-weight: normal;
   line-height: 18px;

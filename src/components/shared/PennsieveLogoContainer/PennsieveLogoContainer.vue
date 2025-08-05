@@ -127,14 +127,14 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .pennsieve-title {
   font-family: 'EB Garamond', serif;
   margin-left: 8px;
   width: 60%;
   font-size: 18px;
-  color: $purple_3;
+  color: theme.$purple_3;
 
   &.dark-background {
     color: white;
@@ -147,7 +147,7 @@ export default {
 }
 
 .penn-logo {
-  border-right: 1px solid $purple_3;
+  border-right: 1px solid theme.$purple_3;
   padding-right: 8px;
   width: 40%;
 
@@ -164,7 +164,7 @@ export default {
 .pennsieve-mark {
   padding-left: 4%;
   width: 46%;
-  color: $purple_3;
+  color: theme.$purple_3;
 
   &.dark-background {
     color: white;
@@ -175,7 +175,7 @@ export default {
   margin-left: 8px;
   margin-top: 4px;
   width: 60%;
-  color: $purple_3;
+  color: theme.$purple_3;
 
   &.dark-background {
     color: white;

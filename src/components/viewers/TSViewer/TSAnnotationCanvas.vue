@@ -187,7 +187,7 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@iuse '../../../styles/theme' as *;
 
 .timeseries-annotation-canvas {
   position: absolute;

@@ -1,9 +1,9 @@
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .concept-instance-static-property {
   box-sizing: border-box;
-  color: $gray_5;
-  border-top: 1px solid $gray_2;
+  color: theme.$gray_5;
+  border-top: 1px solid theme.$gray_2;
   min-height: 33px;
   padding: 6px;
   &:first-child {
@@ -52,10 +52,10 @@
     top: 0;
   }
   .button-edit {
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-left: 8px;
     &:hover {
-      color: $app-primary-color
+      color: theme.$app-primary-color
     }
   }
 }

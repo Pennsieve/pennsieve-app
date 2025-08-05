@@ -53,7 +53,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables';
+@use '../../../styles/theme';
 
 .owner-message {
  // background: rgba(233,237,246,0.2);

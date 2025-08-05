@@ -3,9 +3,7 @@ import { mount } from '@vue/test-utils'
 import CreateEditTeam from './CreateEditTeam.vue'
 import { actions, mutations, getters } from '../../../store'
 import EventBus from '../../../utils/event-bus'
-import flushPromises from 'flush-promises'
 import ElementPlus from 'element-plus'
-import { ref } from 'vue';
 
 const Event = {
   preventDefault: vi.fn(() => {})

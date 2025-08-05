@@ -247,7 +247,7 @@
 </script>
 
 <style lang="scss" scoped>
-    @import '../../../assets/_variables.scss';
+    @use '../../../styles/theme' as *;
 
     .color-option {
       display: flex;

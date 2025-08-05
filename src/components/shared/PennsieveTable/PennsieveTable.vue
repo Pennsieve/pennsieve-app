@@ -183,15 +183,15 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 
 .btn-action {
-  color: $purple_2;
+  color: theme.$purple_2;
 }
 .selection-menu-wrap {
   background: #e9edf6;
-  border: 1px solid $gray_2;
+  //border: 1px solid theme.$gray_2;
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   display: flex;

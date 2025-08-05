@@ -42,12 +42,12 @@ const props = defineProps({
 
 
 <style scoped lang="scss">
-@import '../../assets/_variables.scss';
+@use '../../styles/theme';
 
 .upload-file {
-  border-left: 1px solid $gray_2;
-  border-right: 1px solid $gray_2;
-  border-bottom:  1px solid $gray_2;
+  border-left: 1px solid theme.$gray_2;
+  border-right: 1px solid theme.$gray_2;
+  border-bottom:  1px solid theme.$gray_2;
   padding: 16px 16px;
   display: flex;
   flex-direction: row;
@@ -61,13 +61,13 @@ const props = defineProps({
 
     .status {
       margin-right: 8px;
-      color: $purple_3
+      color: theme.$purple_3
     }
   }
 
   .svg-icon {
     vertical-align: bottom;
-    color: $gray_4;
+    color: theme.$gray_4;
     padding: 0 0 0 16px;
   }
 
@@ -81,64 +81,5 @@ const props = defineProps({
   display: flex;
   flex-direction: row;
 }
-
-//.bf-progress-bar {
-//  background: transparent;
-//  height: 100%;
-//  left: 0;
-//  pointer-events: none;
-//  position: absolute;
-//  top: 0;
-//  width: 100%;
-//  z-index: -1;
-//  .bar {
-//    background: #F0F0F0;
-//  }
-//}
-
-//
-//.bf-upload-package {
-//  border: 1px solid $gray_2;
-//  border-top: none;
-//  &:first-child {
-//    border-top: 1px solid $gray_2;
-//  }
-//  .overflow &:last-child {
-//    border-bottom: none;
-//    border-top: none;
-//  }
-//  .overflow &:first-child {
-//    border-top: none;
-//  }
-//  &.is-uploading {
-//    .package-info {
-//      flex: 1;
-//    }
-//  }
-//  .svg-icon {
-//    height: 24px;
-//    width: 24px;
-//  }
-//  &.is-uploaded {
-//    background: #EFF1F3;
-//  }
-//  .path-info, .package-name {
-//    flex: 1;
-//    overflow: hidden;
-//    text-overflow: ellipsis;
-//    white-space: nowrap
-//  }
-//}
-//
-
-//
-//.bf-upload-package-wrap {
-//  align-items: center;
-//  display: flex;
-//  flex-direction: row;
-//  padding: 13px 10px 13px 20px;
-//  position: relative;
-//  z-index: 1;
-//}
 
 </style>

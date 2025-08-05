@@ -1,33 +1,36 @@
 <template>
-  <el-dialog
-    class="bf-delete-dialog simple"
-    :visible="visible"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <bf-dialog-header slot="title" />
+  <div>
+    <el-dialog
+      class="bf-delete-dialog simple"
+      :visible="visible"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <bf-dialog-header slot="title" />
 
-    <dialog-body>
-      <h2>Reject Request?</h2>
-      <p>Continuing will remove this request to access your dataset.</p>
-      <p>This action cannot be undone, but the user may re-request access.</p>
+      <dialog-body>
+        <h2>Reject Request?</h2>
+        <p>Continuing will remove this request to access your dataset.</p>
+        <p>This action cannot be undone, but the user may re-request access.</p>
 
-      <div class="dialog-simple-buttons">
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          class="primary"
-          @click="rejectRequest"
-        >
-          Submit
-        </bf-button>
-      </div>
-    </dialog-body>
-  </el-dialog>
+        <div class="dialog-simple-buttons">
+          <bf-button
+            class="secondary"
+            @click="closeDialog"
+          >
+            Cancel
+          </bf-button>
+          <bf-button
+            class="primary"
+            @click="rejectRequest"
+          >
+            Submit
+          </bf-button>
+        </div>
+      </dialog-body>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -71,7 +74,9 @@ import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
+
   .dialog-body {
     text-align: center;
     .simple & {
