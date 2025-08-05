@@ -83,6 +83,9 @@
       :constants="constants"
       :duration="duration"
       :start="start"
+      :global-zoom-mult="globalZoomMult"
+      @update:global-zoom-mult="globalZoomMult = $event"
+
       @pageBack="onPageBack"
       @pageForward="onPageForward"
       @incrementZoom="onIncrementZoom"
@@ -187,7 +190,7 @@ const props = defineProps({
   sidePanelOpen: {
     type: Boolean,
     default: false
-  },
+  }
 })
 
 // Store setup
@@ -536,8 +539,12 @@ const onAnnLayersInitialized = () => {
   scrubber.value.getAnnotations()
 }
 
+
 const onChannelsInitialized = () => {
-  // console.log('update scrubber')
+  console.log('Channels Initialized in TSViewer')
+
+  // Set Vertical Scale in toolbar based on first visible channel
+
 
 }
 
@@ -651,9 +658,12 @@ const getChannelId = (channel) => {
   return getChannelIdFromAnnotation(channel)
 }
 
+const verticalScale = (globalZoomMult, rowScale) =>{
+  return  (((constants.DEFAULTDPI * window.devicePixelRatio) / (globalZoomMult * rowScale)) / 25.4).toFixed(1)
+}
+
 const _computeLabelInfo = (item, globalZoomMult, rowscale) => {
-  const n = (((constants.DEFAULTDPI * window.devicePixelRatio) / (globalZoomMult * rowscale)) / 25.4).toFixed(1)
-  return n + ' ' + item.unit + '/mm'
+  return verticalScale(globalZoomMult, rowscale) + ' ' + item.unit + '/mm'
 }
 
 const initTimeRange = () => {

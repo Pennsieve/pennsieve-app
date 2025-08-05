@@ -374,7 +374,7 @@ onNodeClick(({ node }) => {
   </div>
 </template>
 
-<style lang="sass">
+<style lang="scss">
 
 /* this contains the default theme, these are optional styles */
 @use '../../../styles/vueflow_core'
@@ -383,7 +383,6 @@ onNodeClick(({ node }) => {
 /* these are necessary styles for vue flow */
 @import '@vue-flow/core/dist/style.css'
 @import '@vue-flow/minimap/dist/style.css'
-
 
 
 </style>

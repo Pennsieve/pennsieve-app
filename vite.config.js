@@ -48,7 +48,6 @@ export default defineConfig({
       target: "esnext",
     },
   },
-
   test: {
     // enable jest-like global test APIs
     globals: true,
