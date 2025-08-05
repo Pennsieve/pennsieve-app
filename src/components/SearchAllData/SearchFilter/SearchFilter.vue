@@ -631,7 +631,7 @@ export default {
     },
 
     async autocomplete (prefix) {
-      const url = `${this.config.api2Url}/metadata/query/autocomplete?dataset_id=${this.$route.params.datasetId}`
+      const url = `${this.config.api2Url}/metadata_legacy/query/autocomplete?dataset_id=${this.$route.params.datasetId}`
 
       let requestFilters = this.filterParams.filter(value => {
         return value.value != ''
