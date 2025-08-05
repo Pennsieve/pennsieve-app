@@ -352,7 +352,7 @@
     background: transparent;
     border: 1px dashed theme.$gray_2;
     box-sizing: border-box;
-    color: $gray_6;
+    color: theme.$gray_6;
     cursor: pointer;
     display: flex;
     height: 38px;

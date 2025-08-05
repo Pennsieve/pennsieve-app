@@ -135,7 +135,7 @@ h3 {
 
 }
 .selected {
-  color: $purple_1
+  color: theme.$purple_1
 }
 bf-annotation-group {
   flex: 0;

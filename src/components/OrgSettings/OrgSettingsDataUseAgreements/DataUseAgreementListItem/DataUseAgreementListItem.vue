@@ -109,7 +109,7 @@ export default {
 @use '../../../../styles/theme';
 
 p {
-  color: $gray_4;
+  color: theme.$gray_4;
 }
 button {
   align-items: center;

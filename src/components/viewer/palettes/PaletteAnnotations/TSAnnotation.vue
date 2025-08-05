@@ -193,8 +193,10 @@ export default {
     .channel-info {
       opacity: .4
     }
+
     .svg-icon {
       color: theme.$gray_4;
+    }
   }
 }
 

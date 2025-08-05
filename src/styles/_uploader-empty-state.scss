@@ -42,7 +42,7 @@
     opacity: 1;
   }
   &.condensed {
-    color: $gray_4;
+    color: theme.$gray_4;
     flex: none;
     padding: 13px;
     margin-bottom: 10px;
@@ -72,19 +72,19 @@
   }
   .dropzone-content {
     p {
-      color: $gray_4;
+      color: theme.$gray_4;
       line-height: 18px;
       margin: 0;
     }
     a {
-      color: $gray_4;
+      color: theme.$gray_4;
       text-decoration: underline;
       &:hover, &:focus {
-        color: $purple_1;
+        color: theme.$purple_1;
       }
     }
     a.choose-your-files {
-      color: $purple_1;
+      color: theme.$purple_1;
     }
   }
   h3 {
@@ -92,11 +92,11 @@
     font-weight: 400;
     margin: 0 0 10px;
     a {
-      color: $purple_1;
+      color: theme.$purple_1;
     }
   }
   .icon-upload {
-    color: $purple_1;
+    color: theme.$purple_1;
     height: 38px;
     width: 39px;
   }

@@ -97,7 +97,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @use '../../../styles/theme";
+  @use '../../../styles/theme';
 
   .accordion {
     background: theme.$gray_1;

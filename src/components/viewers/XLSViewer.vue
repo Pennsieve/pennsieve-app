@@ -129,7 +129,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../styles/theme' as *;
+@use '../../styles/theme' as *;
 
 th {
   text-align: left;
