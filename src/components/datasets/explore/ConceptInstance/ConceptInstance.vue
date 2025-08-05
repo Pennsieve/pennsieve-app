@@ -2348,8 +2348,8 @@ export default {
 
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
-@import '../../../../assets/_icon-item-colors.scss';
-@import '../../../../assets/components/_uploader-empty-state.scss';
+@use '../../../../styles/icon-item-colors';
+@use '../../../../styles/uploader-empty-state';
 
 
 .model-name{
@@ -2357,13 +2357,6 @@ export default {
   color: white;
   font-weight: 300;
 }
-
-</style>
-
-<style lang="scss">
-@use '../../../../styles/theme';
-@import '../../../../assets/_icon-item-colors.scss';
-@import '../../../../assets/components/_uploader-empty-state.scss';
 
 
 .static-prop-section{

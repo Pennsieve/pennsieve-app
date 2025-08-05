@@ -1,67 +1,70 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        title="Confirm Deletion"
-      />
-    </template>
-
-
-    <dialog-body>
-      <div class="warning-wrap">
-        <IconWarningCircle
-          :height="32"
-          :width="32"
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          title="Confirm Deletion"
         />
-        <h4 class="delete-title">
-          Deleting this Relationship Type will remove the links between records in your graph.
-        </h4>
-        <div class="warning-message">
-          Warning: This cannot be undone
+      </template>
+
+
+      <dialog-body>
+        <div class="warning-wrap">
+          <IconWarningCircle
+            :height="32"
+            :width="32"
+          />
+          <h4 class="delete-title">
+            Deleting this Relationship Type will remove the links between records in your graph.
+          </h4>
+          <div class="warning-message">
+            Warning: This cannot be undone
+          </div>
         </div>
-      </div>
-      <el-form
-        ref="deleteDatasetForm"
-        v-loading="isLoadingInstances"
-        @submit.native.prevent="onFormSubmit"
-      >
-        <el-form-item prop="checkBoxes">
-          <el-checkbox-group v-model="form.checkBoxes">
-            <el-checkbox
-              class="step-1"
-              name="type"
-            >
+        <el-form
+          ref="deleteDatasetForm"
+          v-loading="isLoadingInstances"
+          @submit.native.prevent="onFormSubmit"
+        >
+          <el-form-item prop="checkBoxes">
+            <el-checkbox-group v-model="form.checkBoxes">
+              <el-checkbox
+                class="step-1"
+                name="type"
+              >
               <span v-if="!isLoadingInstances">
                 {{ relationshipInstancesCount }} Relationships will be deleted
               </span>
-            </el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-      </el-form>
-    </dialog-body>
+              </el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+        </el-form>
+      </dialog-body>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        class="red"
-        :disabled="disabled"
-        @click="onFormSubmit"
-      >
-        Delete
-      </bf-button>
-    </template>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="red"
+          :disabled="disabled"
+          @click="onFormSubmit"
+        >
+          Delete
+        </bf-button>
+      </template>
 
-  </el-dialog>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -209,7 +212,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../../assets/_variables.scss';
+@use '../../../../../styles/theme';
+@use '../../../../../styles/element/dialog';
 
 .el-form {
   display: flex;
@@ -233,7 +237,7 @@ export default {
 }
 
 .svg-icon {
-  color: $red_1;
+  color: theme.$red_1;
 }
 
 .warning-wrap {
@@ -242,6 +246,6 @@ export default {
 }
 
 .warning-message {
-  color: $red_1;
+  color: theme.$red_1;
 }
 </style>

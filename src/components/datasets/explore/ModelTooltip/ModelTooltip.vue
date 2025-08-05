@@ -127,14 +127,14 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../../assets/_variables.scss';
+  @use '../../../../styles/theme';
 
   .prop-list {
     margin: 4px 0;
     .prop-wrapper {
       display: flex;
       .prop-name {
-        color: $purple_2;
+        color: theme.$purple_2;
         min-width: 120px;
       }
     }
@@ -148,11 +148,10 @@
   }
   .model-tooltip-wrap {
     padding: 8px;
-    background: $white;
-    border: 1px solid $gray_2;
+    background: theme.$white;
+    border: 1px solid theme.$gray_2;
     border-radius: 3px;
-    //box-shadow: 0 0 10px 0 rgba(189,189,189,0.3);
-    color: $gray_6;
+    color: theme.$gray_6;
     width: 291px;
   }
 
@@ -180,7 +179,7 @@
   }
   .model-name {
     align-items: center;
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
     display: flex;
     font-size: 14px;
     font-weight: 400;

@@ -175,15 +175,15 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 .embargoed-permissions {
-  background: $white;
+  background: theme.$white;
   &__empty-state {
-    border-top: solid 1px $gray_2;
+    border-top: solid 1px theme.$gray_2;
     p {
       margin-top: 22px;
       font-size: 14px;
-      color: $gray_4;
+      color: theme.$gray_4;
       font-style: italic;
       font-weight: 400;
       line-height: 16px;

@@ -2885,8 +2885,7 @@ export default {
 
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
-@import "../../../../assets/_icon-item-colors.scss";
-//@import '../../../../assets/components/_uploader-empty-state.scss';
+@use "../../../../styles/_icon-item-colors";
 
 #file-name-header {
   font-size: 20px;
@@ -2900,12 +2899,6 @@ export default {
   color: white;
   font-weight: 300;
 }
-</style>
-
-<style scoped lang="scss">
-@use "../../../../styles/theme";
-@import "../../../../assets/_icon-item-colors.scss";
-//@import '../../../../assets/components/_uploader-empty-state.scss';
 
 .highlight-property {
   color: theme.$gray_6;

@@ -141,7 +141,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import '_concept-instance-property';
+  @use '_concept-instance-property';
 
   .concept-instance-linked-property {
     .button-edit,

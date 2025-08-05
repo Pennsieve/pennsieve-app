@@ -106,7 +106,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 p {
   color: $gray_4;
@@ -120,7 +120,7 @@ button {
   padding: 16px 0;
 }
 .default-dot {
-  background: $green_1;
+  background: theme.$green_1;
   border-radius: 50%;
   height: 8px;
   margin-right: 4px;

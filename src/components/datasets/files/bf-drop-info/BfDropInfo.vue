@@ -71,7 +71,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
 </script>
 
 <style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 .no-pointer {
   pointer-events: none;
@@ -96,12 +96,12 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   }
 }
 .bf-drop-info-content {
-  background: $purple_1;
+  background: theme.$purple_1;
   border-radius: 5px;
   box-shadow: 0 2px 15px 0 rgba(0, 0, 0, 0.25),
     0 28px 41px 0 rgba(33, 43, 54, 0.2);
   box-sizing: border-box;
-  color: $white;
+  color: theme.$white;
   height: 440px;
   margin: 15vh auto 50px;
   overflow: hidden;
@@ -112,7 +112,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   z-index: 2;
 
   &.hover {
-    box-shadow: 0 2px 15px 0 $purple_2;
+    box-shadow: 0 2px 15px 0 theme.$purple_2;
   }
 }
 img,
@@ -135,7 +135,7 @@ p {
   max-width: 460px;
 }
 .circle {
-  background: $purple_2;
+  background: theme.$purple_2;
   border-radius: 50%;
   display: block;
   height: 193px;

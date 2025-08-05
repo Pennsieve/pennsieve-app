@@ -903,7 +903,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables';
+@use '../../../styles/theme';
 
 .flex-heading {
   display: flex;
@@ -924,10 +924,10 @@ h1 {
 .dataset-heading {
   display: flex;
   padding: 32px;
-  background: $purple_tint;
+  background: theme.$purple_tint;
 
   h1 {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-size: 24px;
     margin-bottom: 8px;
   }
@@ -943,7 +943,7 @@ h1 {
 .dataset-description {
   font-size: 16px;
   line-height: 24px;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 .dataset-heading-info {
@@ -955,10 +955,10 @@ h1 {
   font-weight: normal;
   line-height: 24px;
   font-weight: normal;
-  color: $gray_6;
+  color: theme.$gray_6;
 
   a {
-    color: $gray_6;
+    color: theme.$gray_6;
     text-decoration: underline;
   }
 }
@@ -966,7 +966,7 @@ h1 {
 .dataset-corresponding-contributor {
   display: flex;
   flex-direction: row;
-  color: $gray_6;
+  color: theme.$gray_6;
 
   p {
     margin-right: 7px;
@@ -974,10 +974,10 @@ h1 {
 }
 
 .dataset-info-stats {
-  background: $purple_1;
+  background: theme.$purple_1;
   color: white;
-  border-bottom: 1px solid $gray_2;
-  border-top: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
+  border-top: 1px solid theme.$gray_2;
   display: flex;
   padding: 16px 64px;
   justify-content: space-between;
@@ -993,7 +993,7 @@ h1 {
   align-items: center;
   display: flex;
   .svg-icon {
-    color: $white;
+    color: theme.$white;
     margin-right: 8px;
   }
 }
@@ -1002,7 +1002,7 @@ h1 {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  color: $gray_5;
+  color: theme.$gray_5;
   font-size: 14px;
   line-height: 24px;
   margin-bottom: 13px;

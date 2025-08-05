@@ -1,31 +1,34 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    class="fixed-width"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header slot="title" title="Change Tracking" />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      class="fixed-width"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Change Tracking" />
+      </template>
 
-    <dialog-body>
-       <p>Please confirm if you would like to update the tracking on this repo:</p>
-       <p>
-         <strong>{{repo.name}}</strong>
-       </p>
-    </dialog-body>
-    <!-- Buttons -->
-    <template #footer>
-      <bf-button v-if="startTrackingMode" @click="handleEnableTracking">
-        Enable Tracking
-      </bf-button>
-      <bf-button v-if="stopTrackingMode" @click="handleDisableTracking">
-        Disable Tracking
-      </bf-button>
-      <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
-    </template>
-  </el-dialog>
+      <dialog-body>
+        <p>Please confirm if you would like to update the tracking on this repo:</p>
+        <p>
+          <strong>{{repo.name}}</strong>
+        </p>
+      </dialog-body>
+      <!-- Buttons -->
+      <template #footer>
+        <bf-button v-if="startTrackingMode" @click="handleEnableTracking">
+          Enable Tracking
+        </bf-button>
+        <bf-button v-if="stopTrackingMode" @click="handleDisableTracking">
+          Disable Tracking
+        </bf-button>
+        <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
+      </template>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -157,7 +160,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../assets/theme";
+@use "../../styles/theme";
+@use '../../styles/element/dialog';
 
 .text-area-wrapper {
   width: 100%;

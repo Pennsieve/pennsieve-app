@@ -1,5 +1,5 @@
-@use '../../styles/theme';
-@import '../../assets/_icon-item-colors.scss';
+@use './theme';
+@use './icon-item-colors';
 
 .bf-upload-dropzone {
   align-items: center;

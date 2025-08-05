@@ -165,7 +165,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .integration-menu {
   width: 24px;
@@ -174,7 +174,7 @@ export default {
 .integration-list-item {
   width: 230px;
   height: 300px;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   //margin: 0 0 16px 0;
   margin: 0 8px 16px 8px;
   //padding:  16px 24px 8px 24px;
@@ -183,7 +183,7 @@ export default {
   flex-direction: column;
 }
 .info {
-  background: $purple_tint;
+  background: theme.$purple_tint;
   padding: 8px 16px;
   height: 64px;
   align-items: center;
@@ -197,7 +197,7 @@ export default {
 }
 
 .integration-type {
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
   font-size: 12px;
 }
@@ -208,7 +208,7 @@ export default {
 
 .integration-description {
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   min-height: 3em;
   max-width: 500px;
   margin: 0 8px;
@@ -224,12 +224,8 @@ export default {
 }
 
 .userIcon {
-  /* bottom: 0; */
   height: 100%;
-  /* right: 0; */
-  /* place-self: flex-end; */
   align-self: self-end;
-  /* flex-direction: column; */
   display: flex;
   flex-direction: column-reverse;
   margin: 8px;

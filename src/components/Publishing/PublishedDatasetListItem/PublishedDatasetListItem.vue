@@ -353,11 +353,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
-@import '../../../assets/_list-item.scss';
+@use '../../../styles/theme';
+@use '../../../styles/list-item';
 
 .list-item-status-wrapper {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-size: 12px;
   line-height: 18px;
   font-weight: normal;
