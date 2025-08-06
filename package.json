@@ -93,7 +93,7 @@
     "eslint": "^8.22.0",
     "eslint-plugin-vue": "^9.3.0",
     "happy-dom": "^12.10.3",
-    "msw": "^2.0.9",
+    "msw": "^2.10.4",
     "prettier": "^2.7.1",
     "sass": "^1.57.1",
     "unplugin-auto-import": "^0.16.6",
