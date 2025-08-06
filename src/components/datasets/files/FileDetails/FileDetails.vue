@@ -592,7 +592,6 @@ export default {
         this.checkViewerType(this.proxyRecord) !== "UnknownViewer" &&
         !this.isUploading &&
         this.getFileStatus !== "Failed" &&
-        this.getFileStatus !== "Unprocessed" &&
         this.computePackageType !== "Unknown" &&
         !this.displayDirectoryViewer &&
         this.fileType !== "External File"

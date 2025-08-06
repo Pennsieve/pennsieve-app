@@ -53,6 +53,9 @@ export default {
     UMAPViewer: defineAsyncComponent( () =>
       import ("../../viewers/UmapViewer/wrapper.vue")
     ),
+    NiiViewer: defineAsyncComponent( () =>
+      import ("../../viewers/NiiViewer/NiiViewerWrapper.vue")
+    )
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -82,6 +85,7 @@ export default {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
+          console.log(pkg)
           this.loadViewer(pkg);
         }
       },
@@ -121,6 +125,8 @@ export default {
       }
 
       const viewerType = this.checkViewerType(activeViewer);
+      console.log('Use viewerType: ' + viewerType)
+
       if(this.isTimeseriesPackageUnprocessed(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
