@@ -399,7 +399,7 @@ export default {
       ],
 
       whitelist: [
-          'go',
+        'go',
         'c#',
         'c++',
         'java',
@@ -454,7 +454,7 @@ export default {
         component = 'xls'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds']
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri']
       const vueViewerMap = {
         image: 'ImageViewer',
         pdf: 'PDFViewer',
@@ -465,7 +465,8 @@ export default {
         timeseries:'TimeseriesViewer',
         csv:'CSVViewer',
         xls: 'XLSViewer',
-        parquet_umap_viewer: 'UMAPViewer'
+        parquet_umap_viewer: 'UMAPViewer',
+        mri: 'NiiViewer',
       }
 
       // TODO: This currently picks the first of the viewers and should be replaced by more solid support

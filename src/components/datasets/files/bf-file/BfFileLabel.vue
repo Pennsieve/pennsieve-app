@@ -150,7 +150,10 @@ export default {
         packageProperties,
         'subtype'
       ).toLowerCase()
+
+      console.log('subtype is: ' + subtype)
       if (this.whitelist.indexOf(subtype) >= 0) {
+        console.log('yes to viewer')
         hasViewer = true
       }
 
@@ -237,9 +240,7 @@ export default {
      * @returns {Boolean}
      */
     shouldShowBtnOpenFilePackage: function() {
-      return this.packageType != 'Collection'
-        && this.hasViewer
-        && this.getFileState === ''
+      return this.packageType != 'Collection' && this.hasViewer
     },
 
     /**
