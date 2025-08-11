@@ -454,7 +454,7 @@ export default {
         component = 'xls'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri']
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular']
       const vueViewerMap = {
         image: ['ImageViewer'],
         pdf: ['PDFViewer'],
@@ -467,6 +467,7 @@ export default {
         xls: ['XLSViewer'],
         parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
         mri: ['NiiViewer'],
+        tabular: ['CSVViewer','DataExplorer'],
       }
 
       // TODO: This currently picks the first of the viewers and should be replaced by more solid support
@@ -486,7 +487,7 @@ export default {
         return vueViewerMap[component]
       } else{
         console.error('Error loading viewer')
-        return 'UnknownViewer'
+        return ['UnknownViewer']
       }
 
     }

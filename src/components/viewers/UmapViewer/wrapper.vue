@@ -36,7 +36,6 @@ import {pathOr} from "ramda";
 import {useGetToken} from "@/composables/useGetToken";
 import {asyncBufferFromUrl, parquetMetadata, parquetRead} from "hyparquet";
 import * as siteConfig from '@/site-config/site.json'
-import DbduckViewer from "@/components/viewers/UmapViewer/dbduckViewer.vue";
 
 
 const props = defineProps({
