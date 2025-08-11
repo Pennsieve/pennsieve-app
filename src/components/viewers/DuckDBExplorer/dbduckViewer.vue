@@ -215,31 +215,23 @@ const initDuckDB = async () => {
     // Import DuckDB-WASM from npm package
     const duckdb = await import('@duckdb/duckdb-wasm')
 
-    // Try different bundle approaches in order of preference
-    let bundle, worker, db_instance
-
-    try {
-      // Approach 1: Try JSDelivr bundles (best for production)
-      const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles()
-      bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES)
-      worker = await duckdb.createWorker(bundle.mainWorker)
-    } catch (e) {
-      console.log('JSDelivr bundles failed, trying manual approach...')
-
-      // Approach 2: Manual bundle configuration
-      const MANUAL_BUNDLES = {
-        mvp: {
-          mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-mvp.wasm',
-          mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-mvp.worker.js',
-        },
-        eh: {
-          mainModule: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-eh.wasm',
-          mainWorker: 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-eh.worker.js',
-        },
-      }
-      bundle = await duckdb.selectBundle(MANUAL_BUNDLES)
-      worker = new Worker(bundle.mainWorker)
+    // Use bundled assets from the public directory
+    const bundles = {
+      mvp: {
+        mainModule: '/static/duckdb/duckdb-mvp.wasm',
+        mainWorker: '/static/duckdb/duckdb-browser-mvp.worker.js',
+      },
+      eh: {
+        mainModule: '/static/duckdb/duckdb-eh.wasm',
+        mainWorker: '/static/duckdb/duckdb-browser-eh.worker.js',
+      },
     }
+
+    // Select appropriate bundle based on browser capabilities
+    const bundle = await duckdb.selectBundle(bundles)
+
+    // Create worker
+    const worker = new Worker(bundle.mainWorker)
 
     const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
 
