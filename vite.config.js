@@ -10,6 +10,10 @@ import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 export default defineConfig({
   server: {
     port: 3000,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin'
+    }
   },
   preview: {
     port: 3000,
@@ -32,6 +36,7 @@ export default defineConfig({
   },
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
+    exclude: ['@duckdb/duckdb-wasm'],
     esbuildOptions: {
       target: "esnext",
     },

@@ -60,6 +60,7 @@
     "pdfjs-dist": "^4.0.379",
     "pinia": "^3.0.3",
     "protobufjs": "^7.2.6",
+    "pusher-js": "^8.4.0",
     "ramda": "^0.28.0",
     "sparc-dashboard-beta": "^0.4.24",
     "striptags": "^3.2.0",
