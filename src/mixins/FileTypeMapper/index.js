@@ -456,17 +456,17 @@ export default {
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri']
       const vueViewerMap = {
-        image: 'ImageViewer',
-        pdf: 'PDFViewer',
-        text: 'TextViewer',
-        unknown:'UnknownViewer',
-        video:'VideoViewer',
-        slide:'SlideViewer',
-        timeseries:'TimeseriesViewer',
-        csv:'CSVViewer',
-        xls: 'XLSViewer',
-        parquet_umap_viewer: 'UMAPViewer',
-        mri: 'NiiViewer',
+        image: ['ImageViewer'],
+        pdf: ['PDFViewer'],
+        text: ['TextViewer'],
+        unknown:['UnknownViewer'],
+        video: ['VideoViewer'],
+        slide: ['SlideViewer'],
+        timeseries: ['TimeseriesViewer'],
+        csv: ['DataExplorer'],
+        xls: ['XLSViewer'],
+        parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
+        mri: ['NiiViewer'],
       }
 
       // TODO: This currently picks the first of the viewers and should be replaced by more solid support
