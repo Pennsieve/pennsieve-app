@@ -43,5 +43,9 @@
     'menuItem-hover-color': theme.$purple_3,
     'menuItem-hover-fill': theme.$purple_tint,
   ),
+  $dialog:(
+    'padding-primary': 0,
+    'bg-color': theme.$white,
+  ),
 );
 

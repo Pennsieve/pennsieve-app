@@ -39,7 +39,7 @@
       </div>
       <div v-show="shouldShow(2)">
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="preprocessorValue"
           placeholder="Select Preprocessor"
           @change="setSelectedPreprocessor(preprocessorValue)"
@@ -52,7 +52,7 @@
           ></el-option>
         </el-select>
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="processorValue"
           placeholder="Select Processor"
           @change="setSelectedProcessor(processorValue)"
@@ -65,7 +65,7 @@
           ></el-option>
         </el-select>
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="postprocessorValue"
           placeholder="Select Postprocessor"
           @change="setSelectedPostprocessor(postprocessorValue)"
