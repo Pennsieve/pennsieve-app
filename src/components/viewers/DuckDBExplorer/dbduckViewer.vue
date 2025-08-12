@@ -1,3 +1,4 @@
+<!-- dbduckViewer.vue - Updated with Element Plus pagination -->
 <template>
   <div class="dashboard-container">
     <header class="dashboard-header">
@@ -8,31 +9,6 @@
     </header>
 
     <div class="dashboard-content">
-
-<!--      &lt;!&ndash; CSV Options (only shown for CSV files) &ndash;&gt;-->
-<!--      <div class="form-group" v-if="props.fileType === 'csv'">-->
-<!--        <label>CSV Options:</label>-->
-<!--        <div class="csv-options">-->
-<!--          <label class="checkbox-label">-->
-<!--            <input type="checkbox" v-model="csvOptions.header" />-->
-<!--            First row contains headers-->
-<!--          </label>-->
-<!--          <label class="checkbox-label">-->
-<!--            <input type="checkbox" v-model="csvOptions.dynamicTyping" />-->
-<!--            Auto-detect data types-->
-<!--          </label>-->
-<!--          <div class="delimiter-group">-->
-<!--            <label for="delimiter">Delimiter:</label>-->
-<!--            <select id="delimiter" v-model="csvOptions.delimiter" class="delimiter-select">-->
-<!--              <option value=",">Comma (,)</option>-->
-<!--              <option value=";">Semicolon (;)</option>-->
-<!--              <option value="\t">Tab</option>-->
-<!--              <option value="|">Pipe (|)</option>-->
-<!--            </select>-->
-<!--          </div>-->
-<!--        </div>-->
-<!--      </div>-->
-
       <!-- Query Panel -->
       <div class="query-panel" v-if="isConnected">
         <h3>SQL Query</h3>
@@ -49,14 +25,13 @@
         </div>
         <textarea
           v-model="sqlQuery"
-          placeholder="SELECT * FROM my_data LIMIT 10;"
+          placeholder="SELECT * FROM data LIMIT 10;"
           class="query-textarea"
           rows="4"
         ></textarea>
         <bf-button
           @click="executeQuery"
           :disabled="isQueryRunning || !sqlQuery"
-          class="execute-btn"
         >
           {{ isQueryRunning ? 'Running...' : 'Execute Query' }}
         </bf-button>
@@ -66,12 +41,26 @@
       <div class="results-panel" v-if="queryResults">
         <h3>Results ({{ queryResults.length }} rows)</h3>
         <div class="results-controls">
-          <button @click="exportToCsv" class="export-btn">Export to CSV</button>
-          <select v-model="displayMode" class="display-mode">
-            <option value="table">Table View</option>
-            <option value="json">JSON View</option>
-          </select>
+          <div class="left-controls">
+            <bf-button class='secondary' @click="exportToCsv">Export to CSV</bf-button>
+
+          </div>
+          <div class="right-controls">
+            <el-pagination
+              v-if="displayMode === 'table' && totalPages > 1"
+              v-model:current-page="currentPage"
+              :page-size="itemsPerPage"
+              :total="queryResults.length"
+              layout="prev, pager, next"
+              @current-change="handlePageChange"
+              class="results-pagination"
+            />
+          </div>
         </div>
+        <div class="pagination-wrapper">
+
+        </div>
+
 
         <!-- Table View -->
         <div v-if="displayMode === 'table'" class="table-container">
@@ -90,25 +79,17 @@
             </tbody>
           </table>
 
-          <!-- Pagination -->
-          <div class="pagination" v-if="totalPages > 1">
-            <button
-              @click="currentPage--"
-              :disabled="currentPage === 1"
-              class="page-btn"
-            >
-              Previous
-            </button>
-            <span class="page-info">
-              Page {{ currentPage }} of {{ totalPages }}
-            </span>
-            <button
-              @click="currentPage++"
-              :disabled="currentPage === totalPages"
-              class="page-btn"
-            >
-              Next
-            </button>
+          <!-- Bottom Pagination for large datasets -->
+          <div v-if="totalPages > 1" class="bottom-pagination">
+            <el-pagination
+              v-model:current-page="currentPage"
+              :page-size="itemsPerPage"
+              :total="queryResults.length"
+              layout=" prev, pager, next"
+              :page-sizes="[25, 50, 100, 200, 500]"
+              @current-change="handlePageChange"
+              @size-change="handleSizeChange"
+            />
           </div>
         </div>
 
@@ -130,6 +111,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, defineProps, watch } from 'vue'
+import { useDuckDBStore } from '@/stores/duckdbStore'
 
 const props = defineProps({
   url: {
@@ -140,8 +122,19 @@ const props = defineProps({
     type: String,
     default: 'parquet',
     validator: (value) => ['parquet', 'csv'].includes(value)
+  },
+  viewerId: {
+    type: String,
+    default: () => `viewer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+  fileId: {
+    type: String,
+    default: null // Stable file identifier for reuse
   }
 })
+
+// Use DuckDB store
+const duckDBStore = useDuckDBStore()
 
 // CSV-specific state
 const csvOptions = ref({
@@ -151,27 +144,36 @@ const csvOptions = ref({
 })
 
 // Reactive state
-const isConnected = ref(false)
 const isLoading = ref(false)
 const isQueryRunning = ref(false)
-const s3Url = ref('')
+const s3Url = ref(props.url)
 const tableName = ref('my_data')
 const sqlQuery = ref('')
 const queryResults = ref(null)
 const error = ref('')
-const db = ref(null)
-const conn = ref(null)
 const displayMode = ref('table')
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
+const connectionId = ref(null)
 
-watch(() => props.url, (newValue, oldValue) => {
+// Watch for URL changes
+watch(() => props.url, (newValue) => {
   s3Url.value = newValue
+  if (newValue) {
+    loadFile()
+    executeQuery()
+  }
 })
 
 // Computed properties
+const isConnected = computed(() => {
+  return duckDBStore.isReady && connectionId.value && !isLoading.value
+})
+
 const statusText = computed(() => {
   if (isLoading.value) return 'Loading...'
+  if (duckDBStore.isInitializing) return 'Initializing...'
+  if (!duckDBStore.isReady) return 'Not Ready'
   if (isConnected.value) return 'Connected'
   return 'Not Connected'
 })
@@ -194,205 +196,144 @@ const paginatedResults = computed(() => {
 })
 
 const queryExamples = computed(() => {
-  const table = tableName.value || 'my_data'
   return [
-    { name: 'Show All', query: `SELECT * FROM ${table} LIMIT 100;` },
-    { name: 'Count Rows', query: `SELECT COUNT(*) as row_count FROM ${table};` },
+    { name: 'Show All', query: `SELECT * FROM data LIMIT 100;` },
+    { name: 'Count Rows', query: `SELECT COUNT(*) as row_count FROM data;` },
     { name: 'Group By', query: `SELECT
-    <variablle 1>, <variable 2>,
-    COUNT(*) as count
-FROM my_data
-GROUP BY <variablle 1>, <variable 2>
-ORDER BY <variablle 1>, <variable 2>;`},
-    { name: 'Describe', query: `DESCRIBE ${table};` },
-    { name: 'Sample', query: `SELECT * FROM ${table} USING SAMPLE 10;` }
+                                  column1, column2,
+                                  COUNT(*) as count
+                                FROM data
+                                GROUP BY column1, column2
+                                ORDER BY column1, column2
+                                LIMIT 20;`},
+    { name: 'Describe', query: `DESCRIBE data;` },
+    { name: 'Sample', query: `SELECT * FROM data USING SAMPLE 10;` },
+    { name: 'Columns', query: `PRAGMA table_info(data);` }
   ]
 })
 
-// Initialize DuckDB (fallback approach for development)
-const initDuckDB = async () => {
+// Debug info (can be removed in production)
+const debugInfo = computed(() => ({
+  viewerId: props.viewerId,
+  fileId: props.fileId,
+  connectionId: connectionId.value,
+  tableName: tableName.value,
+  isConnected: isConnected.value,
+  activeConnections: duckDBStore.activeConnectionCount,
+  hasActiveConnections: duckDBStore.hasActiveConnections
+}))
+
+// Initialize connection and load file
+const initialize = async () => {
   try {
-    // Import DuckDB-WASM from npm package
-    const duckdb = await import('@duckdb/duckdb-wasm')
+    // Create a connection for this viewer instance
+    const { connection, connectionId: connId } = await duckDBStore.createConnection(props.viewerId)
+    connectionId.value = connId
 
-    // Use bundled assets from the public directory
-    const bundles = {
-      mvp: {
-        mainModule: '/static/duckdb/duckdb-mvp.wasm',
-        mainWorker: '/static/duckdb/duckdb-browser-mvp.worker.js',
-      },
-      eh: {
-        mainModule: '/static/duckdb/duckdb-eh.wasm',
-        mainWorker: '/static/duckdb/duckdb-browser-eh.worker.js',
-      },
+    console.log(`Viewer ${props.viewerId} connected with connection ID: ${connId}`)
+
+    // Load file if URL is provided
+    if (s3Url.value) {
+      await loadFile()
+      executeQuery()
     }
-
-    // Select appropriate bundle based on browser capabilities
-    const bundle = await duckdb.selectBundle(bundles)
-
-    // Create worker
-    const worker = new Worker(bundle.mainWorker)
-
-    const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
-
-    db.value = new duckdb.AsyncDuckDB(logger, worker)
-    await db.value.instantiate(bundle.mainModule)
-
-    conn.value = await db.value.connect()
-
-    console.log('DuckDB initialized successfully')
-
-    loadFile()
-
   } catch (err) {
-    console.error('Failed to initialize DuckDB:', err)
-    error.value = `Failed to initialize DuckDB: ${err.message}.
-
-    Try adding these headers to your vite.config.js:
-    server: {
-      headers: {
-        'Cross-Origin-Embedder-Policy': 'require-corp',
-        'Cross-Origin-Opener-Policy': 'same-origin'
-      }
-    }`
+    console.error('Failed to initialize viewer:', err)
+    error.value = `Failed to initialize: ${err.message}`
   }
 }
 
-// Load file (auto-detects Parquet or CSV)
+// Load file using the store
 const loadFile = async () => {
-  if (!s3Url.value || !conn.value) {
-    error.value = 'Please provide a valid S3 URL and ensure DuckDB is initialized'
+  if (!s3Url.value) {
+    error.value = 'Please provide a valid S3 URL'
     return
   }
 
-  const fileType = props.fileType
+  console.log('Loading file:', s3Url.value)
+  console.log('Using stable file ID:', props.fileId)
+
+  // Check if file is already loaded using stable ID
+  const stableKey = props.fileId || s3Url.value
+  const existingFile = duckDBStore.getLoadedFile(stableKey)
+  if (existingFile && !existingFile.isLoading && !existingFile.error) {
+    tableName.value = existingFile.tableName
+    console.log(`File already loaded using stable key, reusing table: ${tableName.value}`)
+    setQuery(`SELECT * FROM data LIMIT 10;`)
+    return
+  }
 
   isLoading.value = true
   error.value = ''
 
   try {
-    if (fileType === 'csv') {
-      await loadCsvFile()
-    } else if (fileType === 'parquet') {
-      await loadParquetFile()
-    }
+    // Generate table name using stable ID if available
+    const tableId = props.fileId ? `file_${props.fileId}` : `data_${Date.now()}`
+
+    // Use store to load file (will be shared across all viewers with same fileId)
+    const loadedTableName = await duckDBStore.loadFile(
+      s3Url.value,
+      props.fileType,
+      tableId, // Stable table name
+      csvOptions.value,
+      props.viewerId, // Pass viewer ID for tracking
+      props.fileId // Pass stable file ID
+    )
+
+    tableName.value = loadedTableName
+    console.log(`File loaded as table: ${tableName.value}`)
+
+    // Auto-execute a sample query using "data"
+    setQuery(`SELECT * FROM data LIMIT 10;`)
+
   } catch (err) {
     console.error('Failed to load file:', err)
-    error.value = `Failed to load ${fileType} file: ${err.message}`
-    isConnected.value = false
+    error.value = `Failed to load ${props.fileType} file: ${err.message}`
   } finally {
     isLoading.value = false
   }
 }
 
-// Load CSV file from S3
-const loadCsvFile = async () => {
-  console.log('Downloading CSV file from S3...')
+// Query interceptor to replace "data" with actual table name
+const interceptQuery = (query) => {
+  if (!tableName.value || !query) return query
 
-  const response = await fetch(s3Url.value)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`)
+  console.log('Original query:', query)
+
+  // Replace "data" table references with actual table name
+  // This handles various SQL patterns:
+  // - FROM data
+  // - JOIN data
+  // - UPDATE data
+  // - INSERT INTO data
+  // - table_info(data)
+  const interceptedQuery = query
+    .replace(/\bFROM\s+data\b/gi, `FROM ${tableName.value}`)
+    .replace(/\bJOIN\s+data\b/gi, `JOIN ${tableName.value}`)
+    .replace(/\bUPDATE\s+data\b/gi, `UPDATE ${tableName.value}`)
+    .replace(/\bINSERT\s+INTO\s+data\b/gi, `INSERT INTO ${tableName.value}`)
+    .replace(/\bINTO\s+data\b/gi, `INTO ${tableName.value}`)
+    .replace(/\btable_info\(\s*data\s*\)/gi, `table_info(${tableName.value})`)
+    .replace(/\bDESCRIBE\s+data\b/gi, `DESCRIBE ${tableName.value}`)
+    .replace(/\bPRAGMA\s+table_info\(\s*data\s*\)/gi, `PRAGMA table_info(${tableName.value})`)
+
+  if (interceptedQuery !== query) {
+    console.log('Intercepted query:', interceptedQuery)
+    console.log(`Replaced "data" references with "${tableName.value}"`)
   }
 
-  const fileText = await response.text()
-  console.log(`Downloaded ${fileText.length} characters`)
-
-  // Create buffer and register with DuckDB
-  const blob = new Blob([fileText], { type: 'text/csv' })
-  const arrayBuffer = await blob.arrayBuffer()
-  const uint8Array = new Uint8Array(arrayBuffer)
-
-  const fileName = `${tableName.value}.csv`
-  await db.value.registerFileBuffer(fileName, uint8Array)
-
-  // Create table from CSV file using basic read_csv syntax
-  const createTableQuery = `
-    CREATE OR REPLACE TABLE ${tableName.value} AS
-    SELECT * FROM read_csv('${fileName}', header=${csvOptions.value.header}, delim='${csvOptions.value.delimiter}');
-  `
-
-  console.log('Executing query:', createTableQuery)
-  await conn.value.query(createTableQuery)
-
-  // Verify the table was created
-  const result = await conn.value.query(`SELECT COUNT(*) as count FROM ${tableName.value};`)
-  const rowCount = result.toArray()[0].count
-
-  isConnected.value = true
-  console.log(`Successfully loaded ${rowCount} rows from CSV file`)
-
-  // Auto-execute a sample query
-  setQuery(`SELECT * FROM ${tableName.value} LIMIT 10;`)
+  return interceptedQuery
 }
 
-// Load Parquet file from S3
-const loadParquetFile = async () => {
-  if (!s3Url.value || !conn.value) {
-    error.value = 'Please provide a valid S3 URL and ensure DuckDB is initialized'
+// Execute SQL query using store
+const executeQuery = async () => {
+  if (!sqlQuery.value || !connectionId.value) {
+    error.value = 'Please provide a valid SQL query'
     return
   }
 
-  isLoading.value = true
-  error.value = ''
-
-  try {
-    // Download the Parquet file from S3 using fetch
-    console.log('Downloading Parquet file from S3...')
-    const response = await fetch(s3Url.value)
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`)
-    }
-
-    const arrayBuffer = await response.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
-
-    console.log(`Downloaded ${uint8Array.length} bytes`)
-
-    // Register the file with DuckDB
-    await db.value.registerFileBuffer(`${tableName.value}.parquet`, uint8Array)
-
-    // Create table from the registered Parquet file
-    const createTableQuery = `
-      CREATE OR REPLACE TABLE ${tableName.value} AS
-      SELECT * FROM read_parquet('${tableName.value}.parquet');
-    `
-
-    await conn.value.query(createTableQuery)
-
-    // Verify the table was created
-    const result = await conn.value.query(`SELECT COUNT(*) as count FROM ${tableName.value};`)
-    const rowCount = result.toArray()[0].count
-
-    isConnected.value = true
-
-    console.log(`Successfully loaded ${rowCount} rows from Parquet file`)
-
-    // Auto-execute a sample query
-    setQuery(`SELECT * FROM ${tableName.value} LIMIT 10;`)
-
-  } catch (err) {
-    console.error('Failed to load Parquet file:', err)
-
-    // Provide more helpful error messages
-    let errorMsg = err.message
-    if (err.message.includes('CORS')) {
-      errorMsg += '\n\nThis might be a CORS issue. Make sure your S3 bucket allows cross-origin requests from your domain.'
-    } else if (err.message.includes('Failed to fetch')) {
-      errorMsg += '\n\nCheck that the presigned URL is valid and not expired.'
-    }
-
-    error.value = `Failed to load Parquet file: ${errorMsg}`
-    isConnected.value = false
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// Execute SQL query
-const executeQuery = async () => {
-  if (!sqlQuery.value || !conn.value) {
-    error.value = 'Please provide a valid SQL query'
+  if (!tableName.value) {
+    error.value = 'No data table loaded'
     return
   }
 
@@ -401,18 +342,11 @@ const executeQuery = async () => {
   currentPage.value = 1
 
   try {
-    const result = await conn.value.query(sqlQuery.value)
-    const rawResults = result.toArray()
+    // Intercept and transform the query
+    const transformedQuery = interceptQuery(sqlQuery.value.trim())
 
-    // Convert to plain JavaScript objects to avoid proxy issues
-    queryResults.value = rawResults.map(row => {
-      const plainRow = {}
-      for (const [key, value] of Object.entries(row)) {
-        plainRow[key] = value
-      }
-      return plainRow
-    })
-
+    console.log('Executing transformed query:', transformedQuery)
+    queryResults.value = await duckDBStore.executeQuery(transformedQuery, connectionId.value)
     console.log(`Query executed successfully, returned ${queryResults.value.length} rows`)
   } catch (err) {
     console.error('Query execution failed:', err)
@@ -421,6 +355,18 @@ const executeQuery = async () => {
   } finally {
     isQueryRunning.value = false
   }
+}
+
+// Pagination event handlers for Element Plus
+const handlePageChange = (page) => {
+  console.log('Page changed to:', page)
+  currentPage.value = page
+}
+
+const handleSizeChange = (newSize) => {
+  console.log('Page size changed to:', newSize)
+  itemsPerPage.value = newSize
+  currentPage.value = 1 // Reset to first page when changing size
 }
 
 // Set predefined query
@@ -470,29 +416,58 @@ const clearError = () => {
   error.value = ''
 }
 
+// Debug method (optional)
+const logDebugInfo = () => {
+  console.log('Viewer Debug Info:', debugInfo.value)
+  console.log('Store Connection Info:', duckDBStore.getConnectionInfo())
+  console.log('Store File Usage Info:', duckDBStore.getFileUsageInfo())
+}
+
 // Lifecycle hooks
-onMounted(() => {
-  initDuckDB()
+onMounted(async () => {
+  await initialize()
 })
 
-onUnmounted(() => {
-  if (conn.value) {
-    conn.value.close()
-  }
-  if (db.value) {
-    db.value.terminate()
+onUnmounted(async () => {
+  // Clean up this viewer's connection
+  if (connectionId.value) {
+    console.log(`Cleaning up viewer ${props.viewerId}...`)
+
+    const beforeCleanup = {
+      activeConnections: duckDBStore.activeConnectionCount,
+      loadedFiles: duckDBStore.loadedFiles.size
+    }
+
+    await duckDBStore.closeConnection(connectionId.value)
+
+    const afterCleanup = {
+      activeConnections: duckDBStore.activeConnectionCount,
+      loadedFiles: duckDBStore.loadedFiles.size
+    }
+
+    console.log(`Viewer ${props.viewerId} cleanup complete:`, {
+      beforeCleanup,
+      afterCleanup,
+      hasActiveConnections: duckDBStore.hasActiveConnections
+    })
+
+    // If this was the last viewer and you want automatic global cleanup:
+    // if (!duckDBStore.hasActiveConnections) {
+    //   console.log('Last viewer closed, performing global cleanup...')
+    //   await duckDBStore.performGlobalCleanup()
+    // }
   }
 })
 </script>
 
 <style scoped lang="scss">
+@import "../../../assets/variables.scss";
 
 .dashboard-container {
   display: flex;
   flex-direction: column;
   margin: 0 auto;
   padding: 20px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .dashboard-header {
@@ -522,7 +497,7 @@ onUnmounted(() => {
 }
 
 .status-indicator.connected {
-  background-color: #4caf50;
+  background-color: $green_2;
 }
 
 .dashboard-content {
@@ -534,11 +509,8 @@ onUnmounted(() => {
   background: white;
   width: inherit;
   border: 1px solid #ddd;
-  border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   overflow: scroll;
-
 }
 
 .config-panel h3, .query-panel h3, .results-panel h3, .error-panel h3 {
@@ -546,6 +518,35 @@ onUnmounted(() => {
   color: #333;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
+}
+
+.query-info {
+  background: #e8f4fd;
+  border: 1px solid #bee5eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 15px;
+}
+
+.query-info .info-text {
+  color: #0c5460;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pagination-wrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+}
+
+.query-info .info-text code {
+  background: #d1ecf1;
+  color: #0c5460;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
 }
 
 .form-group {
@@ -568,22 +569,27 @@ onUnmounted(() => {
   margin: 8px 0;
 }
 
+.query-textarea {
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 100px;
+}
+
 .url-input:focus, .table-input:focus, .query-textarea:focus {
   outline: none;
   border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
-//.load-btn, .execute-btn, .example-btn, .export-btn, .clear-error-btn, .page-btn {
-//  background: #2196f3;
-//  color: white;
-//  border: none;
-//  padding: 10px 20px;
-//  border-radius: 4px;
-//  cursor: pointer;
-//  font-size: 14px;
-//  transition: background-color 0.2s;
-//}
+.load-btn, .execute-btn, .example-btn, .export-btn, .clear-error-btn, .page-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
 
 .load-btn:hover, .execute-btn:hover, .export-btn:hover, .clear-error-btn:hover, .page-btn:hover {
   background: #1976d2;
@@ -625,6 +631,21 @@ onUnmounted(() => {
   margin-bottom: 15px;
 }
 
+.left-controls {
+  display: flex;
+  align-items: center;
+}
+
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.results-pagination {
+  margin-right: 20px;
+}
+
 .table-container {
   overflow-x: auto;
 }
@@ -652,12 +673,13 @@ onUnmounted(() => {
   background: #f5f5f5;
 }
 
-.pagination {
+.bottom-pagination {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 15px;
+  padding: 20px 0;
   margin-top: 20px;
+  border-top: 1px solid #e9ecef;
 }
 
 .page-info {
@@ -701,4 +723,61 @@ onUnmounted(() => {
 .clear-error-btn:hover {
   background: #d32f2f;
 }
+
+//// Element Plus pagination customization
+//:deep(.el-pagination) {
+//  --el-color-primary: #2196f3;
+//  --el-color-primary-light-3: rgba(33, 150, 243, 0.3);
+//
+//  .el-pagination__total {
+//    color: #666;
+//    font-weight: 500;
+//  }
+//
+//  .el-pagination__sizes .el-select .el-input__inner {
+//    border-color: #ddd;
+//    font-size: 14px;
+//  }
+//
+//  .el-pager li {
+//    background-color: #f8f9fa;
+//    border: 1px solid #ddd;
+//    color: #333;
+//
+//    &:hover {
+//      background-color: #e0e0e0;
+//    }
+//
+//    &.is-active {
+//      background-color: #2196f3;
+//      border-color: #2196f3;
+//      color: white;
+//    }
+//  }
+//
+//  .btn-prev, .btn-next {
+//    background-color: #f8f9fa;
+//    border: 1px solid #ddd;
+//    color: #333;
+//
+//    &:hover:not(:disabled) {
+//      background-color: #e0e0e0;
+//    }
+//
+//    &:disabled {
+//      background-color: #f5f5f5;
+//      border-color: #e9ecef;
+//      color: #ccc;
+//    }
+//  }
+//
+//  .el-pagination__jump {
+//    color: #666;
+//
+//    .el-input__inner {
+//      border-color: #ddd;
+//      text-align: center;
+//    }
+//  }
+//}
 </style>

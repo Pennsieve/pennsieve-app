@@ -340,29 +340,29 @@
     <!--        </el-collapse>-->
 
     <!-- Relationships Table Empty State -->
-    <div
-      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"
-      class="relationships-empty-state"
-    >
-      <div class="relationships-empty-state-inner">
-        <h3>Create Relationships</h3>
-        <div>
-          <p class="relationship-inner-text">
-            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other
-            objects in your graph by clicking the "Link to ..." button above.
-          </p>
-          <a
-            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"
-            target="_blank"
-          >
-            <bf-button class="primary learn-more"> Learn More </bf-button>
-          </a>
-          <div>
-            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>
-          </div>
-        </div>
-      </div>
-    </div>
+<!--    <div-->
+<!--      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"-->
+<!--      class="relationships-empty-state"-->
+<!--    >-->
+<!--      <div class="relationships-empty-state-inner">-->
+<!--        <h3>Create Relationships</h3>-->
+<!--        <div>-->
+<!--          <p class="relationship-inner-text">-->
+<!--            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other-->
+<!--            objects in your graph by clicking the "Link to ..." button above.-->
+<!--          </p>-->
+<!--          <a-->
+<!--            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"-->
+<!--            target="_blank"-->
+<!--          >-->
+<!--            <bf-button class="primary learn-more"> Learn More </bf-button>-->
+<!--          </a>-->
+<!--          <div>-->
+<!--            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
 
     <!-- BEGIN RELATIONSHIPS TABLE -->
     <template v-if="hasRelationships">
@@ -387,13 +387,13 @@
       </el-collapse>
     </template>
 
-    <add-relationship-drawer
-      ref="addRelationshipDrawer"
-      :relationship-types="relationshipTypes"
-      :record="proxyRecord.content"
-      :record-name="drawerOriginatingName"
-      :is-file="true"
-    />
+<!--    <add-relationship-drawer-->
+<!--      ref="addRelationshipDrawer"-->
+<!--      :relationship-types="relationshipTypes"-->
+<!--      :record="proxyRecord.content"-->
+<!--      :record-name="drawerOriginatingName"-->
+<!--      :is-file="true"-->
+<!--    />-->
 
     <div class="viewer-pane-wrap">
       <div class="header">
