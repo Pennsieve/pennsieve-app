@@ -1,7 +1,7 @@
-// DuckDBViewerWrapper.vue - Updated with stable file ID support
+// CSVViewerWrapper.vue - Updated with stable file ID support
 <template>
   <div class="app-container">
-    <dbduck-viewer
+    <c-s-v-viewer-d-d-b
       :url="presignedUrl"
       :file-type="fileType"
       :file-id="fileId"
@@ -14,7 +14,7 @@ import {defineProps, onMounted, ref, watch} from 'vue';
 import {pathOr} from "ramda";
 import {useGetToken} from "@/composables/useGetToken";
 import * as siteConfig from '@/site-config/site.json'
-import DbduckViewer from "./dbduckViewer.vue";
+import CSVViewerDDB from "@/components/viewers/CSVViewer/CSVViewerDDB.vue";
 
 const props = defineProps({
   pkg: {
@@ -24,7 +24,7 @@ const props = defineProps({
 })
 
 const viewAssets = ref([])
-const fileType = ref("parquet")
+const fileType = ref("csv")
 const presignedUrl = ref("")
 const fileId = ref("") // Add stable file ID
 

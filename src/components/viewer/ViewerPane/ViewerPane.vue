@@ -2,12 +2,21 @@
   <div class="viewer-pane" v-if="cmpViewer">
     <div class="viewer-btn-wrapper" v-if="availableViewers.length > 1">
       <div v-for="viewer in availableViewers">
-        <bf-button
+
+        <tag-pill
           :class="[viewer === this.cmpViewer ? 'active viewer-selector' : 'viewer-selector']"
-          :label=viewer
+          :indicator-color="viewer === this.cmpViewer? '#F9A23A': '#CCCCCC'"
+          :has-indicator="false"
+          :label=viewerNameMapper(viewer)
           @click="selectViewer(viewer)">
-          {{viewer}}
-        </bf-button>
+
+          <template #prefix>
+            <div class="icon-wrapper">
+              <icon-analysis/>
+
+            </div>
+          </template>
+        </tag-pill>
       </div>
 
     </div>
@@ -31,11 +40,13 @@ import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
+import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 
 export default {
   name: "ViewerPane",
 
   components: {
+    IconAnalysis,
     TagPill,
     BfButton,
     SlideViewer: defineAsyncComponent(() =>
@@ -59,9 +70,6 @@ export default {
     TimeseriesViewer: defineAsyncComponent(() =>
       import("../../viewers/TSViewer/TSViewer.vue")
     ),
-    CSVViewer: defineAsyncComponent(() =>
-      import("../../viewers/CSVViewer.vue")
-    ),
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
@@ -73,7 +81,10 @@ export default {
     ),
     DataExplorer: defineAsyncComponent( () =>
       import ("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
-    )
+    ),
+    CSVViewer: defineAsyncComponent(() =>
+      import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
+    ),
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -131,6 +142,18 @@ export default {
       }
     },
 
+    viewerNameMapper: function (viewer) {
+      console.log(viewer)
+      switch (viewer) {
+        case 'DataExplorer':
+          return 'Data Explorer'
+        case 'CSVViewer':
+          return 'CSV Viewer'
+        default:
+          return viewer
+      }
+    },
+
     selectViewer: function (evt) {
       console.log(evt)
       this.cmpViewer = evt
@@ -179,18 +202,16 @@ export default {
 @import "../../../assets/variables.scss";
 
 .viewer-selector {
-  margin: 8px;
-  height: 100%;
+  margin: 4px;
   padding: 4px;
   text-align: center;
   vertical-align: center;
   font-weight: 500;
-  color: $purple_2;
-  border-right: 4px;
+  color: $purple_3;
   border: 1px solid $gray_4;
   background: $purple_tint;
-  height: 24px;
-  min-width: 100px;
+  height: 32px;
+  min-width: 120px;
   align-content: center;
   cursor: pointer;
 }
@@ -208,6 +229,10 @@ export default {
   margin: 8px;
   display: flex;
   flex-direction: row;
-  gap: 8px;
+}
+
+.icon-wrapper{
+  display: flex;
+  margin-right: 4px;
 }
 </style>
