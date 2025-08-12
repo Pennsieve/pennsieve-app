@@ -126,11 +126,8 @@ function closeDialog() {
 </template>
 
 <style lang="scss" scoped>
+@use "../../../styles/theme";
 
-.log-dialog {
-  height: 80%;
-  width: 80%;
-}
 .icon-waiting {
   align-items: center;
   display: flex;
@@ -145,5 +142,7 @@ function closeDialog() {
   .log-table {
     height: 63vh;
   }
+  padding: 24px 32px;
+  background-color: theme.$white;
 }
 </style>

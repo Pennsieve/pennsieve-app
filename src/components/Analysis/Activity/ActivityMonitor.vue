@@ -375,16 +375,13 @@ onNodeClick(({ node }) => {
 </template>
 
 <style lang="scss">
-
 /* this contains the default theme, these are optional styles */
-@use '../../../styles/vueflow_core';
-@use '../../../styles/vueflow.css';
+@use "../../../styles/vueflow_core";
+@use "../../../styles/vueflow.css";
 
 /* these are necessary styles for vue flow */
-@import '@vue-flow/core/dist/style.css';
-@import '@vue-flow/minimap/dist/style.css';
-
-
+@import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/minimap/dist/style.css";
 </style>
 
 <style lang="scss">
@@ -484,17 +481,6 @@ onNodeClick(({ node }) => {
 .vue-flow__node {
   &:hover {
     background-color: theme.$gray_2;
-  }
-}
-
-.activity-monitor {
-  .el-dialog__title {
-    color: theme.$white;
-    font-weight: 500;
-  }
-
-  span {
-    color: theme.$purple_2;
   }
 }
 </style>
