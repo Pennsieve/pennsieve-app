@@ -94,11 +94,7 @@ function closeDialog() {
       @close="closeDialog"
     >
       <template #header>
-        <bf-dialog-header
-          class="light-background"
-          slot="title"
-          title="Activity Logs"
-        />
+        <bf-dialog-header slot="title" title="Activity Logs" />
       </template>
       <dialog-body class="activity-log-body">
         <div v-if="isLoading" class="icon-waiting mr-16">
