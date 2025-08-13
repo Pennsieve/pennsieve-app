@@ -169,6 +169,30 @@ export default {
       }
     }
   }
+  &.viewer-selector {
+    background: $purple_tint;
+    border: 1px solid $purple_0_7;
+    min-height: 40px;
+    margin: 0;
+    min-width: 140px;
+    &:not([disabled]) {
+      &:hover,
+      &:focus {
+        background: $purple_0_7;
+      }
+    }
+    &.active {
+      color: white;
+      background-color: $purple_1;
+      &:not([disabled]) {
+        &:active,
+        &:focus {
+          background: $purple_1;
+          color: white;
+        }
+      }
+    }
+  }
   &.green {
     background: theme.$green_1;
     &:not([disabled]) {

@@ -8,6 +8,7 @@
       class="indicator"
       :style="{ backgroundColor: indicatorColor }"
     />
+
     <slot name="prefix" />
     <p>
       {{ label }}

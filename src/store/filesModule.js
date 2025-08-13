@@ -59,7 +59,7 @@ export const actions = {
 
     const currentRoute = router.currentRoute.value
     const datasetId = currentRoute.params.datasetId
-    const endpoint = `${rootState.config.api2Url}/metadata/package`
+    const endpoint = `${rootState.config.api2Url}/metadata_legacy/package`
 
     const apiKey = await useGetToken()
     const queryParams = getPackageMetadataQueryParams(state.datasetManifestParams, datasetId, packageId)

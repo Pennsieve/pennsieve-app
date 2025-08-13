@@ -69,12 +69,15 @@ watch( () => pointData.value, () => {
   generateColorMaps();
 })
 
+const presignedUrl = ref("")
+
 onMounted(async () => {
   try {
     // get Viewer Assets
     await getViewerAssets()
-    let presignedUrl = await getFileUrl(viewAssets.value[0].content.id)
-    const res = await fetch(presignedUrl)
+    presignedUrl.value = await getFileUrl(viewAssets.value[0].content.id)
+    console.log(presignedUrl)
+    const res = await fetch(presignedUrl.value)
     const arrayBuffer = await res.arrayBuffer()
 
     await parquetRead({
@@ -120,6 +123,7 @@ async function getViewerAssets() {
 }
 
 async function getFileUrl(fileId) {
+
   const pkgId = pathOr('', ['content', 'id'], props.pkg)
   const token = await useGetToken()
   const url = `${siteConfig.apiUrl}/packages/${pkgId}/files/${fileId}?api_key=${token}`
@@ -218,7 +222,7 @@ function updateColorMap(data) {
 }
 </script>
 
-<style>
+<style scoped>
   .app-container {
     height: 90vh;
     position: relative;

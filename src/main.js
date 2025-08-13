@@ -29,7 +29,7 @@ import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
 import { useViewerStore } from '@/stores/tsviewer'
 
-
+import Pusher from 'pusher-js'
 
 Amplify.configure(AWSConfig)
 
