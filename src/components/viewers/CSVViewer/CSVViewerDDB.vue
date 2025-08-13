@@ -375,7 +375,7 @@ onUnmounted(async () => {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/variables.scss";
+@use "../../../styles/theme";
 
 .csv-viewer-container {
   max-width: 100%;
@@ -409,19 +409,19 @@ onUnmounted(async () => {
   border-radius: 20px;
   font-weight: 500;
   color: white;
-  background-color: $gray_4;
+  background-color: theme.$gray_4;
   font-size: 0.9rem;
 
   &.loading {
-    background-color: $gray_4;
+    background-color: theme.$gray_4;
   }
 
   &.connected {
-    background-color: $green_2;
+    background-color: theme.$green_2;
   }
 
   &.error {
-    background-color: $red_2;
+    background-color: theme.$red_2;
   }
 }
 

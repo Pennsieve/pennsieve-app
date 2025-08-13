@@ -212,7 +212,7 @@ export default {
   vertical-align: center;
   font-weight: 500;
   color: theme.$purple_3;
-  border: 1px solid $gray_4;
+  border: 1px solid theme.$gray_4;
   background: theme.$purple_tint;
   height: 32px;
   min-width: 120px;

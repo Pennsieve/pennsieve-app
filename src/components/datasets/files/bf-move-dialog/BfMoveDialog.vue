@@ -449,7 +449,7 @@ export default {
     font-size: 14pt;
     margin-bottom: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid $gray_3;
+    border-bottom: 1px solid theme.$gray_3;
   }
   #current-folder-name {
     overflow: hidden;
@@ -462,7 +462,7 @@ export default {
     padding: 0 8px;
     &:hover,
     &:focus {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
     }
   }
   #empty-state {
