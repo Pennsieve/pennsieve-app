@@ -2,23 +2,24 @@
   <div class="viewer-pane" v-if="cmpViewer">
     <div class="viewer-btn-wrapper" v-if="availableViewers.length > 1">
       <div v-for="viewer in availableViewers">
-
         <tag-pill
-          :class="[viewer === this.cmpViewer ? 'active viewer-selector' : 'viewer-selector']"
-          :indicator-color="viewer === this.cmpViewer? '#F9A23A': '#CCCCCC'"
+          :class="[
+            viewer === this.cmpViewer
+              ? 'active viewer-selector'
+              : 'viewer-selector',
+          ]"
+          :indicator-color="viewer === this.cmpViewer ? '#F9A23A' : '#CCCCCC'"
           :has-indicator="false"
-          :label=viewerNameMapper(viewer)
-          @click="selectViewer(viewer)">
-
+          :label="viewerNameMapper(viewer)"
+          @click="selectViewer(viewer)"
+        >
           <template #prefix>
             <div class="icon-wrapper">
-              <icon-analysis/>
-
+              <icon-analysis />
             </div>
           </template>
         </tag-pill>
       </div>
-
     </div>
     <component
       :is="cmpViewer"
@@ -73,14 +74,14 @@ export default {
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
-    UMAPViewer: defineAsyncComponent( () =>
-      import ("../../viewers/UmapViewer/wrapper.vue")
+    UMAPViewer: defineAsyncComponent(() =>
+      import("../../viewers/UmapViewer/wrapper.vue")
     ),
-    NiiViewer: defineAsyncComponent( () =>
-      import ("../../viewers/NiiViewer/NiiViewerWrapper.vue")
+    NiiViewer: defineAsyncComponent(() =>
+      import("../../viewers/NiiViewer/NiiViewerWrapper.vue")
     ),
-    DataExplorer: defineAsyncComponent( () =>
-      import ("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
+    DataExplorer: defineAsyncComponent(() =>
+      import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
     ),
     CSVViewer: defineAsyncComponent(() =>
       import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
@@ -101,7 +102,7 @@ export default {
     sidePanelOpen: {
       type: Boolean,
       default: false,
-    }
+    },
   },
 
   data: function () {
@@ -115,7 +116,7 @@ export default {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
-          console.log(pkg)
+          console.log(pkg);
           this.loadViewer(pkg);
         }
       },
@@ -143,27 +144,26 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
-      console.log(viewer)
+      console.log(viewer);
       switch (viewer) {
-        case 'DataExplorer':
-          return 'Data Explorer'
-        case 'CSVViewer':
-          return 'CSV Viewer'
+        case "DataExplorer":
+          return "Data Explorer";
+        case "CSVViewer":
+          return "CSV Viewer";
         default:
-          return viewer
+          return viewer;
       }
     },
 
     selectViewer: function (evt) {
-      console.log(evt)
-      this.cmpViewer = evt
+      console.log(evt);
+      this.cmpViewer = evt;
     },
 
     /**
      * loads appropriate viewer based on package type
      */
     loadViewer: function (activeViewer) {
-
       // Reset viewers
       this.cmpViewer = "";
       const viewerWrap = this.$refs.viewerWrap;
@@ -172,9 +172,9 @@ export default {
       }
 
       this.availableViewers = this.checkViewerType(activeViewer);
-      console.log('Use viewerType: ' + this.availableViewers)
+      console.log("Use viewerType: " + this.availableViewers);
 
-      if(this.isTimeseriesPackageUnprocessed(activeViewer)) {
+      if (this.isTimeseriesPackageUnprocessed(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
         this.loadVueViewer(this.availableViewers[0]);
@@ -190,10 +190,14 @@ export default {
     },
 
     isTimeseriesPackageUnprocessed: function (pkg) {
-      const isTimeseriesFile = pathOr('unknown', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries'
-      const isUnprocessed = pathOr('unknown', ['content', 'state'], pkg).toLowerCase() === "uploaded"
-      return (isTimeseriesFile && isUnprocessed)
-    }
+      const isTimeseriesFile =
+        pathOr("unknown", ["content", "packageType"], pkg).toLowerCase() ===
+        "timeseries";
+      const isUnprocessed =
+        pathOr("unknown", ["content", "state"], pkg).toLowerCase() ===
+        "uploaded";
+      return isTimeseriesFile && isUnprocessed;
+    },
   },
 };
 </script>
@@ -207,9 +211,9 @@ export default {
   text-align: center;
   vertical-align: center;
   font-weight: 500;
-  color: $purple_3;
+  color: theme.$purple_3;
   border: 1px solid $gray_4;
-  background: $purple_tint;
+  background: theme.$purple_tint;
   height: 32px;
   min-width: 120px;
   align-content: center;
@@ -231,7 +235,7 @@ export default {
   flex-direction: row;
 }
 
-.icon-wrapper{
+.icon-wrapper {
   display: flex;
   margin-right: 4px;
 }
