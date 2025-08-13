@@ -94,7 +94,11 @@ function closeDialog() {
       @close="closeDialog"
     >
       <template #header>
-        <bf-dialog-header slot="title" title="Activity Logs" />
+        <bf-dialog-header
+          class="light-background"
+          slot="title"
+          title="Activity Logs"
+        />
       </template>
       <dialog-body class="activity-log-body">
         <div v-if="isLoading" class="icon-waiting mr-16">
@@ -130,6 +134,7 @@ function closeDialog() {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 @use "../../../styles/element/dialog";
+@use "../../../styles/element/table";
 
 .icon-waiting {
   align-items: center;
