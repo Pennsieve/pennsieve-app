@@ -97,14 +97,14 @@ export default {
 }
 
 .repository-list-item {
-  border-bottom: 1px solid $gray_3;
+  border-bottom: 1px solid theme.$gray_3;
   background-color: white;
   display: flex;
   flex-direction: column;
   cursor: pointer;
 
   :hover {
-    background-color: $purple-tint;
+    background-color: theme.$purple-tint;
   }
 
   &:first-child {
@@ -118,18 +118,18 @@ export default {
 .repository-title {
   font-size: 16px;
   margin-bottom: 8px;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .repository-type {
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
   font-size: 12px;
 }
 
 .repository-description {
   font-size: 12px;
-  color: $gray_5;
+  color: theme.$gray_5;
   min-height: 3em;
   max-width: 650px;
 }
