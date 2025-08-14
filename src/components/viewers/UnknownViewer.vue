@@ -7,49 +7,49 @@
         height="auto"
         width="100"
         class="illustration"
-      >
+      />
 
       <h2>No preview available</h2>
 
-<!--      <p-->
-<!--        v-if="!failed"-->
-<!--        class="copy"-->
-<!--      >-->
-<!--        This package has failed to process.-->
-<!--      </p>-->
-<!--      <p-->
-<!--        v-else-->
-<!--        class="copy"-->
-<!--      >-->
-<!--        This package type is not supported.-->
-<!--      </p>-->
+      <!--      <p-->
+      <!--        v-if="!failed"-->
+      <!--        class="copy"-->
+      <!--      >-->
+      <!--        This package has failed to process.-->
+      <!--      </p>-->
+      <!--      <p-->
+      <!--        v-else-->
+      <!--        class="copy"-->
+      <!--      >-->
+      <!--        This package type is not supported.-->
+      <!--      </p>-->
 
-<!--      <bf-button-->
-<!--        class="primary"-->
-<!--        @click="downloadFile"-->
-<!--      >-->
-<!--        Download File-->
-<!--      </bf-button>-->
+      <!--      <bf-button-->
+      <!--        class="primary"-->
+      <!--        @click="downloadFile"-->
+      <!--      >-->
+      <!--        Download File-->
+      <!--      </bf-button>-->
     </div>
   </div>
 </template>
 
 <script>
-import { pathEq } from 'ramda'
+import { pathEq } from "ramda";
 
-import BfButton from '../shared/bf-button/BfButton.vue'
-import EventBus from '../../utils/event-bus'
+import BfButton from "../shared/bf-button/BfButton.vue";
+import EventBus from "../../utils/event-bus";
 
-export default  {
-  name: 'UnknownViewer',
+export default {
+  name: "UnknownViewer",
 
   components: {
-    BfButton
+    BfButton,
   },
 
   props: {
     pkg: Object,
-    idx: Number
+    idx: Number,
   },
 
   computed: {
@@ -57,8 +57,8 @@ export default  {
      * Confirms if package is in ERROR state
      * @returns {Boolean}
      */
-    failed: function() {
-      return pathEq(['content', 'state'], 'ERROR', this.pkg)
+    failed: function () {
+      return pathEq(["content", "state"], "ERROR", this.pkg);
     },
   },
 
@@ -66,41 +66,41 @@ export default  {
     /**
      * Fires an event to download original files
      */
-    downloadFile: function() {
-      EventBus.$emit('trigger-download', [this.pkg])
+    downloadFile: function () {
+      EventBus.$emit("trigger-download", [this.pkg]);
     },
-  }
-}
+  },
+};
 </script>
 
-<style lang='scss' scoped>
-@use '../../styles/theme' as *;
+<style lang="scss" scoped>
+@use "../../styles/theme";
 
-  .unknown-viewer {
-    box-sizing: border-box;
-    overflow: auto;
-    width: 100%;
-    height: 100%;
-  }
+.unknown-viewer {
+  box-sizing: border-box;
+  overflow: auto;
+  width: 100%;
+  height: 100%;
+}
 
-  .viewer {
-    padding: 15px;
-    text-align: center;
-  }
+.viewer {
+  padding: 15px;
+  text-align: center;
+}
 
-  .copy {
-    color: $gray_4;
-    margin: 0 0 20px 0;
-  }
+.copy {
+  color: theme.$gray_4;
+  margin: 0 0 20px 0;
+}
 
-  .illustration {
-    margin-top: 40px;
-  }
+.illustration {
+  margin-top: 40px;
+}
 
-  h2 {
-    line-height: 20px;
-    color: $purple_3;
-    margin: 20px 0;
-    font-weight: 300;
-  }
+h2 {
+  line-height: 20px;
+  color: theme.$purple_3;
+  margin: 20px 0;
+  font-weight: 300;
+}
 </style>
