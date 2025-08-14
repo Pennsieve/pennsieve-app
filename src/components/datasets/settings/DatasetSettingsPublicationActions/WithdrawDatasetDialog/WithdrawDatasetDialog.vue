@@ -66,7 +66,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../styles/theme";
+@use "../../../../../styles/theme";
+
 .dialog-body {
   .dialog-simple-buttons {
     margin-top: 40px;
