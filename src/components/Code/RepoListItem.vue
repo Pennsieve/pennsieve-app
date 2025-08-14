@@ -135,7 +135,7 @@
 </template>
 
 <script>
-import { Link } from "@element-plus/icons-vue";
+// import { Link } from "@element-plus/icons-vue";
 import { mapActions, mapGetters, mapState } from "vuex";
 import TagPill from "../shared/TagPill/TagPill.vue";
 import { find, propEq, propOr } from "ramda";
@@ -283,7 +283,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 .text-button {
   margin: 5px;
@@ -358,7 +358,7 @@ export default {
   box-shadow: --el-box-shadow-lighter;
 }
 .list-item:hover {
-  background-color: $purple_tint;
+  background-color: theme.$purple_tint;
 }
 .el-row {
   min-height: 40px;

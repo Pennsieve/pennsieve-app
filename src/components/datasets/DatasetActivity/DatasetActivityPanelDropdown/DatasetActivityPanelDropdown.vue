@@ -183,11 +183,12 @@ import {useGetToken} from "@/composables/useGetToken";
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+
 .dataset-activity-panel-dropdown {
   .dataset-activity-panel-dropdown-list {
     padding: 10px 16px;
-    border-bottom: solid 1px $gray_2;
+    border-bottom: solid 1px theme.$gray_2;
 
     &:last-child {
       border-bottom: none;
@@ -208,7 +209,7 @@ import {useGetToken} from "@/composables/useGetToken";
   }
 
   .svg-icon {
-    color: $purple_1;
+    color: theme.$purple_1;
     margin-right: 8px;
   }
 

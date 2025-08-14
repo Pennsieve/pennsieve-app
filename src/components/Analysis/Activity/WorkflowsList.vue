@@ -111,16 +111,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 :deep(.workflows-list.scrolling-list.input-wrap) {
   padding: 0 0 0 16px;
 }
 
 .el-input__inner {
-  background: $gray_1;
+  background: theme.$gray_1;
   border: none;
-  border-bottom: 1px solid $gray_3;
+  border-bottom: 1px solid theme.$gray_3;
   border-radius: 0;
   padding-left: 32px;
 }
@@ -154,7 +154,7 @@ export default {
 }
 
 .workflows-list-wrap {
-  background: $gray_1;
+  background: theme.$gray_1;
   padding: 16px;
 }
 .group-key {
@@ -163,7 +163,7 @@ export default {
   min-width: 20px;
 }
 .icon-search {
-  color: $app-primary-color;
+  color: theme.$app-primary-color;
 }
 .empty-concepts {
   img {
@@ -174,12 +174,12 @@ export default {
 
 .heading {
   margin: 15px;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .no-workflows {
   padding: 16px;
-  color: $gray_3;
+  color: theme.$gray_3;
   text-align: center;
 }
 </style>

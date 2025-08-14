@@ -1,119 +1,88 @@
 <template>
   <div class="repository-list-item" @click="openInfoPanel">
-
-    <el-row
-      type="flex"
-      align="middle"
-      class="info"
-    >
-      <el-col
-        :sm="16"
-      >
-        <el-row
-          type="flex"
-          align="middle"
-        >
-          <div class="repository-type" >
-            {{isPrivateStr}}
+    <el-row type="flex" align="middle" class="info">
+      <el-col :sm="16">
+        <el-row type="flex" align="middle">
+          <div class="repository-type">
+            {{ isPrivateStr }}
           </div>
-
         </el-row>
 
         <el-row>
-          <div class="repository-title" >
-            {{repository.displayName}}
+          <div class="repository-title">
+            {{ repository.displayName }}
           </div>
         </el-row>
         <el-row>
           <p class="repository-description">
-            {{repository.description}}
+            {{ repository.description }}
           </p>
         </el-row>
       </el-col>
-      <el-col
-        :sm="8">
-        <el-row
-          type="flex"
-          align="top"
-          class="logo-wrapper">
-          <img
-            :src=logoPath
-            class="logo"
-            alt="Logo for Pennsieve"
-          />
+      <el-col :sm="8">
+        <el-row type="flex" align="top" class="logo-wrapper">
+          <img :src="logoPath" class="logo" alt="Logo for Pennsieve" />
         </el-row>
-
       </el-col>
     </el-row>
-
   </div>
 </template>
 
 <script>
-
-import {
-  mapActions,
-} from 'vuex'
-import FormatDate from '../../../mixins/format-date'
-import Avatar from '../../shared/avatar/Avatar.vue'
+import { mapActions } from "vuex";
+import FormatDate from "../../../mixins/format-date";
+import Avatar from "../../shared/avatar/Avatar.vue";
 
 export default {
-  name: 'RepositoryListItem',
+  name: "RepositoryListItem",
 
   components: {
     Avatar,
   },
-  mixins: [
-    FormatDate,
-  ],
+  mixins: [FormatDate],
 
   props: {
     repository: {
       type: Object,
-      default: () => ({})
+      default: () => ({}),
     },
   },
 
   computed: {
-    isPrivateStr: function() {
+    isPrivateStr: function () {
       if (this.repository.isPublic) {
-        return "ACCEPTING DATASETS"
+        return "ACCEPTING DATASETS";
       }
-      return  "PRIVATE"
+      return "PRIVATE";
     },
-    logoPath: function() {
+    logoPath: function () {
       if (this.repository) {
-        return this.repository.logoFile
+        return this.repository.logoFile;
       }
-      return ""
-    }
+      return "";
+    },
   },
 
   data: function () {
-    return {
-    }
+    return {};
   },
-  mounted() {
-  },
-  watch: {
-  },
+  mounted() {},
+  watch: {},
   methods: {
-    ...mapActions('repositoryModule',[
-        'updateModalVisible',
-        'setSelectedRepo'
-      ]
-    ),
-    openInfoPanel: function(ev) {
-      this.setSelectedRepo(this.repository)
-      this.updateModalVisible(true)
-    }
-
-  }
-}
+    ...mapActions("repositoryModule", [
+      "updateModalVisible",
+      "setSelectedRepo",
+    ]),
+    openInfoPanel: function (ev) {
+      this.setSelectedRepo(this.repository);
+      this.updateModalVisible(true);
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use "../../../styles/theme";
 
 .logo-wrapper {
   justify-content: flex-end;
@@ -128,14 +97,14 @@ export default {
 }
 
 .repository-list-item {
-  border-bottom: 1px solid $gray_3;
+  border-bottom: 1px solid theme.$gray_3;
   background-color: white;
-  display:flex;
+  display: flex;
   flex-direction: column;
   cursor: pointer;
 
   :hover {
-    background-color: $purple-tint;
+    background-color: theme.$purple-tint;
   }
 
   &:first-child {
@@ -145,23 +114,22 @@ export default {
   .info {
     padding: 8px;
   }
-
 }
 .repository-title {
   font-size: 16px;
   margin-bottom: 8px;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .repository-type {
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
   font-size: 12px;
 }
 
 .repository-description {
   font-size: 12px;
-  color: $gray_5;
+  color: theme.$gray_5;
   min-height: 3em;
   max-width: 650px;
 }
@@ -169,5 +137,4 @@ export default {
 .list-item-col-spacer {
   padding-top: 32px;
 }
-
 </style>

@@ -362,7 +362,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 .sharing-info {
   color: #000;
@@ -377,7 +377,7 @@ export default {
   font-weight: 600;
   font-size: 14px;
   line-height: 16px;
-  color: $gray_6;
+  color: theme.$gray_6;
   &.publication {
     margin-top: 33px;
   }
@@ -418,7 +418,7 @@ export default {
 }
 
 #connect-orcid-button {
-  border: 1px solid #d3d3d3;
+  border: 1px solid theme.$gray_2;
   padding: 0.3em;
   background-color: #fff;
   border-radius: 8px;

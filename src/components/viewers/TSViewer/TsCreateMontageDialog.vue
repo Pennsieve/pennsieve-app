@@ -288,16 +288,16 @@ function cancel() {
 </template>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .form-item-desc {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-weight: 300;
 
 }
 
 .montage-name{
-  --el-input-focus-border-color: #808fad;
+  --el-input-focus-border-color: theme.$purple_1;
 }
 
 .create-montage-dialog {
@@ -313,7 +313,7 @@ function cancel() {
   .container {
     margin: 24px;
     flex: 1;
-    background: $gray_1;
+    background: theme.$gray_1;
     width: calc(100% - 48px);
     display: flex;
     flex-direction: column;
@@ -323,7 +323,7 @@ function cancel() {
 
 
     .header {
-      background: $purple_2;
+      background: theme.$purple_2;
       padding: 8px 16px;
       border-radius: 4px 4px 0 0 ;
 
@@ -335,7 +335,7 @@ function cancel() {
     }
 
     .footer {
-      border-top: 1px solid $gray_2;
+      border-top: 1px solid theme.$gray_2;
       padding: 16px;
       display: flex;
       gap: 16px;
@@ -344,8 +344,6 @@ function cancel() {
 
   .content {
     display: block;
-    //flex-direction: column;
-    //height: 100%;
     padding: 24px;
 
     overflow: auto;
@@ -357,9 +355,9 @@ function cancel() {
       flex-wrap: wrap;
 
       .channel {
-        border: 1px solid $purple_1;
+        border: 1px solid theme.$purple_1;
         padding: 4px 8px;
-        background: $purple_tint;
+        background: theme.$purple_tint;
       }
     }
     .montage-container {
@@ -372,15 +370,15 @@ function cancel() {
 
         .drop-box {
           background: white;
-          border: 1px dashed $purple_3;
+          border: 1px dashed theme.$purple_3;
           min-width: 150px;
-          color: $purple_3;
+          color: theme.$purple_3;
           padding: 0 8px;
 
           .default-input{
             text-align: left;
             padding: 3px;
-            color: $gray_3;
+            color: theme.$gray_3;
             font-weight: 300;
 
           }
@@ -388,7 +386,7 @@ function cancel() {
           .channel-input{
             text-align: left;
             padding: 3px;
-            color: $purple_3;
+            color: theme.$purple_3;
             font-weight: 300;
             --el-input-focus-border-color: red;
           }
@@ -413,14 +411,14 @@ function cancel() {
           flex-direction: row;
           justify-content: space-between;
           vertical-align: center;
-          color: $purple_3;
+          color: theme.$purple_3;
           padding: 4px 8px;
-          border: 1px solid $purple_tint;
+          border: 1px solid theme.$purple_tint;
           background: white;
 
           &.selected {
-            background: $purple_tint;
-            border: 1px solid $purple_2;
+            background: theme.$purple_tint;
+            border: 1px solid theme.$purple_2;
           }
 
           .action {

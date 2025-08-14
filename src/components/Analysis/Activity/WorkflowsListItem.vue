@@ -156,7 +156,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables";
+@use "../../../styles/theme";
 
 /* Common styles for the box */
 .box {
@@ -164,13 +164,13 @@ export default {
   align-items: center;
   padding: 10px;
   margin: 5px 0;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   border-radius: 5px;
   font-family: Arial, sans-serif;
   font-size: 14px;
   line-height: 1.4;
-  color: $black;
-  background-color: $white;
+  color: theme.$black;
+  background-color: theme.$white;
   width: 425px;
 
   button {
@@ -180,7 +180,7 @@ export default {
 
 .box {
   &:hover {
-    border: 2px solid $black;
+    border: 2px solid theme.$black;
   }
 }
 
@@ -193,41 +193,41 @@ export default {
   height: 30px;
   border-radius: 50%;
   font-size: 26px;
-  border-color: $status_green;
+  border-color: theme.$status_green;
 }
 
 .success {
-  color: $status_green;
+  color: theme.$status_green;
 }
 
 .failure {
-  color: $status_red;
+  color: theme.$status_red;
 }
 
 .completed {
-  color: $status_green;
+  color: theme.$status_green;
 }
 
 .neutral {
-  color: $gray_4;
+  color: theme.$gray_4;
 }
 
 .box.success .icon {
-  background-color: $white;
-  color: $status_green;
+  background-color: theme.$white;
+  color: theme.$status_green;
   box-sizing: border-box;
   font-weight: bold;
 }
 
 .box.completed .icon {
-  background-color: $gray_1;
-  color: $gray_4;
+  background-color: theme.$gray_1;
+  color: theme.$gray_4;
   box-sizing: border-box;
   font-weight: bold;
 }
 
 .selected {
-  border: 2px solid $black;
+  border: 2px solid theme.$black;
 }
 
 .text {
@@ -241,7 +241,7 @@ export default {
 
 .text .compute-node-name {
   font-style: italic;
-  color: $gray_4;
+  color: theme.$gray_4;
 }
 
 .concepts-list-item {
@@ -250,7 +250,7 @@ export default {
   justify-content: space-between;
 
   .concept-list-count {
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 

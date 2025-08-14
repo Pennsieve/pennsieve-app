@@ -1,6 +1,5 @@
 <template>
   <div class="bf-navigation-tertiary">
-<!--    <search-menu v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest" />-->
 
     <bf-navigation-item
       :link="{ name: 'user-overview', params: {orgId: activeOrganizationId} }"
@@ -19,24 +18,6 @@
 
     </bf-navigation-item>
 
-<!--    <bf-navigation-item-->
-<!--      :link="{ name: 'about-pennsieve', params: {orgId: activeOrganizationId} }"-->
-<!--      label="Help and Support"-->
-<!--      :condensed="primaryNavCondensed"-->
-<!--      :styleColor="navStyleColor"-->
-<!--    >-->
-<!--      <template #icon>-->
-<!--        <PennsieveMark-->
-<!--          :width="20"-->
-<!--          :height="20"-->
-<!--          color="currentColor"-->
-<!--        />-->
-<!--      </template>-->
-
-
-<!--    </bf-navigation-item>-->
-
-<!--    <help-menu :condensed="primaryNavCondensed" />-->
     <user-menu :style="{ backgroundColor: `${bkColor}` }"/>
   </div>
 </template>
@@ -121,7 +102,7 @@
 </script>
 
 <style lang="scss">
-  @import '../../assets/_variables.scss';
+  @use '../../styles/theme';
 
   .bf-navigation-tertiary {
     display: flex;
@@ -146,7 +127,7 @@
           margin-left: -8px;
         }
         .secondary & {
-          color: $gray_6;
+          color: theme.$gray_6;
         }
       }
     }

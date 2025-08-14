@@ -191,7 +191,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .margin-10 {
   margin: 10px;
@@ -204,7 +204,7 @@ export default {
 .flex-row {
   display: flex;
   justify-content: space-between;
-  background: $purple_tint;
+  background: theme.$purple_tint;
   padding: 8px 16px;
   height: 64px;
   align-items: center;
@@ -217,7 +217,7 @@ export default {
 .integration-list-item {
   width: 90%;
   height: 175px;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   margin: 0 8px 16px 8px;
   background-color: white;
   display: flex;
@@ -232,14 +232,14 @@ export default {
 }
 
 .compute-node-title {
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
   font-size: 18px;
   margin: 20px 0px;
 }
 
 .compute-node-account-info {
-  color: $gray_4;
+  color: theme.$gray_4;
   font-weight: 500;
   font-size: 18px;
 }
@@ -250,7 +250,7 @@ export default {
 
 .integration-description {
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   min-height: 3em;
   max-width: 500px;
   margin: 0 8px;

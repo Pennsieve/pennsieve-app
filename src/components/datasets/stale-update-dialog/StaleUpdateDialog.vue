@@ -1,46 +1,49 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="Dataset Change Detected"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          title="Dataset Change Detected"
+        />
+      </template>
 
-    <dialog-body class="confirm-stale-update-body">
-      <p>
-        A contributor has made changes to this page.  Before your changes can be saved, you must reload the page.
-      </p>
-      <div>
+      <dialog-body class="confirm-stale-update-body">
         <p>
-          <strong>
-            Please note, changes you made will not be saved.
-          </strong>
+          A contributor has made changes to this page.  Before your changes can be saved, you must reload the page.
         </p>
-      </div>
-    </dialog-body>
+        <div>
+          <p>
+            <strong>
+              Please note, changes you made will not be saved.
+            </strong>
+          </p>
+        </div>
+      </dialog-body>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        class="primary"
-        @click="onConfirmClick"
-      >
-        Reload Page
-      </bf-button>
-    </template>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="primary"
+          @click="onConfirmClick"
+        >
+          Reload Page
+        </bf-button>
+      </template>
 
-  </el-dialog>
+    </el-dialog>
+
+  </div>
 </template>
 
 <script>
@@ -82,10 +85,12 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables';
+  @use '../../../styles/theme';
+  @use '../../../styles/element/dialog';
+
   .confirm-stale-update-body {
     p {
-      color: $app-secondary-color
+      color: theme.$app-secondary-color
     }
   }
 </style>

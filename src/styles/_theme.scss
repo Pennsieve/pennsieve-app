@@ -56,15 +56,3 @@ $disabled-radio-button-background-color: $gray_1;
 $text-color: $gray_5;
 
 $system-font: 'Roboto', sans-serif;
-
-// Hide only visually, but have it available for screenreaders: h5bp.com
-.visuallyhidden {
-  border: 0;
-  clip: rect(0 0 0 0);
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  padding: 0;
-  position: absolute;
-  width: 1px;
-}

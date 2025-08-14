@@ -1,5 +1,4 @@
 <template>
-
   <div class="repoSelector">
     <el-dropdown
       class="drop-menu"
@@ -10,23 +9,15 @@
       <div class="button-wrapper">
         <div>
           <div class="mb-8">
-            <h2 class="mb-0">Submit To:
-              <img class="svg-icon"
-                :src="fileIcon('Asterisk', 'Asterisk')"
-              >
+            <h2 class="mb-0">
+              Submit To:
+              <img class="svg-icon" :src="fileIcon('Asterisk', 'Asterisk')" />
             </h2>
-
           </div>
           <div v-if="hasSelectedRepo" class="logo-wrapper">
-            <img
-              :src=logoPath
-              class="logo"
-              alt="Logo for Pennsieve"
-            />
+            <img :src="logoPath" class="logo" alt="Logo for Pennsieve" />
           </div>
-          <div v-else >
-            Select Repository...
-          </div>
+          <div v-else>Select Repository...</div>
         </div>
         <div>
           <i class="el-icon-arrow-down el-icon&#45;&#45;right"></i>
@@ -42,7 +33,7 @@
           <el-dropdown-item
             v-for="(repo, idx) in repositories"
             :key="repo.id"
-            :command=idx
+            :command="idx"
           >
             {{ repo.displayName }}
           </el-dropdown-item>
@@ -50,86 +41,67 @@
       </template>
     </el-dropdown>
   </div>
-
-
 </template>
 
-
-<script  >
-import {
-  mapState,
-  mapActions
-} from 'vuex'
-import { has } from 'ramda'
-import FileIcon from '../../../mixins/file-icon/index';
-
+<script>
+import { mapState, mapActions } from "vuex";
+import { has } from "ramda";
+import FileIcon from "../../../mixins/file-icon/index";
 
 export default {
   name: "RepoSelector",
-  mixins: [
-    FileIcon
-  ],
+  mixins: [FileIcon],
   props: {
     locked: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   computed: {
-    ...mapState('repositoryModule',[
-      'repositories',
-      'selectedRepoForRequest'
-    ]),
-    hasSelectedRepo: function() {
+    ...mapState("repositoryModule", ["repositories", "selectedRepoForRequest"]),
+    hasSelectedRepo: function () {
       if (this.selectedRepoForRequest) {
-        return has("displayName", this.selectedRepoForRequest)
+        return has("displayName", this.selectedRepoForRequest);
       }
-      return false
+      return false;
     },
-    logoPath: function() {
+    logoPath: function () {
       if (this.selectedRepoForRequest) {
-        return this.selectedRepoForRequest.logoFile
+        return this.selectedRepoForRequest.logoFile;
       }
-      return ""
+      return "";
     },
 
-    selectRepoStr: function() {
+    selectRepoStr: function () {
       if (this.selectedRepoForRequest.name) {
-        return this.selectedRepoForRequest.name
+        return this.selectedRepoForRequest.name;
       } else {
-        return "Select Repository..."
+        return "Select Repository...";
       }
-
-    }
+    },
   },
-  methods:{
-    ...mapActions('repositoryModule',[
-      'setSelectedRepo'
-    ]),
-    onSelect: function(cmd) {
-
-      this.setSelectedRepo(this.repositories[cmd] )
-    }
-  }
-}
-
-
+  methods: {
+    ...mapActions("repositoryModule", ["setSelectedRepo"]),
+    onSelect: function (cmd) {
+      this.setSelectedRepo(this.repositories[cmd]);
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use "../../../styles/theme";
 
 .drop-menu {
-  display:flex;
-  width:100%;
-
+  display: flex;
+  width: 100%;
 }
 .button-wrapper {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  width:100%;
-  padding:8px;
+  width: 100%;
+  padding: 8px;
 }
 
 .logo-wrapper {
@@ -141,7 +113,7 @@ export default {
 }
 
 .repoSelector {
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   min-width: 300px;
   height: 64px;
   margin: 8px 0;
@@ -152,7 +124,7 @@ export default {
   align-items: right;
 }
 
-.el-popper[x-placement^='bottom'] {
+.el-popper[x-placement^="bottom"] {
   margin-top: 5px;
   margin-left: -13px;
 }
@@ -164,13 +136,11 @@ h2 {
   font-weight: 500;
 }
 
-
 .svg-icon {
   position: absolute;
   width: 8px;
   height: 8px;
-  top: -0.25em; 
+  top: -0.25em;
   right: -0.9em;
 }
-
 </style>

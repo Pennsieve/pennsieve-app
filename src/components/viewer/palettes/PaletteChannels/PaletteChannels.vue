@@ -289,11 +289,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 
 .menu-item {
-  color: $purple_3
+  color: theme.$purple_3
 }
 .palette-channels {
   background: #fff;
@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
 
 .channels-heading {
   align-items: center;
-  background: $purple_0_7;
+  background: theme.$purple_0_7;
   box-sizing: border-box;
   display: flex;
   justify-content: space-between;
@@ -316,7 +316,7 @@ onBeforeUnmount(() => {
 
   .left {
     font-weight: 300;
-    color: $purple_3;
+    color: theme.$purple_3;
   }
 
   &.all-visible {
@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
   button {
     color: #9b9b9b;
     &:hover, &:focus {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
     }
   }
 }
@@ -338,7 +338,7 @@ button {
     color: #000
   }
   &:hover, &:focus {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
 }
 
@@ -360,7 +360,7 @@ button {
 }
 
 .save-changes-wrapper {
-  border-top: solid 1px $gray_2;
+  border-top: solid 1px theme.$gray_2;
   position: absolute;
   bottom: 0;
   background: white;

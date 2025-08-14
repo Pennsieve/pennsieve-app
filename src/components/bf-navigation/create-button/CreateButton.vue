@@ -447,7 +447,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
+  @use '../../../styles/bfmenu';
 
   .icon-action {
     display:flex;
@@ -465,7 +466,7 @@ export default {
     &:hover, &:focus, &.open {
       background: none;
       #create-button-icon {
-        color: $app-primary-color;
+        color: theme.$app-primary-color;
       }
     }
     .svg-icon.icon-arrow {
@@ -476,7 +477,7 @@ export default {
 
 
   #create-button-icon {
-    color: $gray_6;
+    color: theme.$gray_6;
     flex-shrink: 0;
     height: 28px;
     margin: -2px;
@@ -487,7 +488,7 @@ export default {
   }
 
   #create-button {
-    color: $gray_6;
+    color: theme.$gray_6;
     display: flex;
     width: 100%;
     display: flex;

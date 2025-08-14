@@ -559,10 +559,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 h2 {
-  color: $purple_3;
+  color: theme.$purple_3;
   margin-bottom: 4px;
   font-weight: 500;
 }
@@ -575,7 +575,7 @@ h2 {
 }
 
 .option-dot {
-  color: $purple_1;
+  color: theme.$purple_1;
 }
 
 .special_circle {
@@ -626,7 +626,7 @@ ul {
 }
 .model-name {
   align-items: center;
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   display: flex;
   font-size: 14px;
   font-weight: 400;
@@ -648,11 +648,11 @@ table {
   border-collapse: collapse;
 
   :hover {
-    background: $purple_tint;
+    background: theme.$purple_tint;
     cursor: pointer;
 
     &.selected {
-      background: $purple_tint;
+      background: theme.$purple_tint;
     }
   }
 }
@@ -668,8 +668,8 @@ table {
   margin-top: 24px;
   margin-bottom: 8px;
   align-items: center;
-  color: $purple_3;
-  background: $purple_tint;
+  color: theme.$purple_3;
+  background: theme.$purple_tint;
   padding: 4px;
 
   &.first {
@@ -683,12 +683,12 @@ table {
   justify-content: end;
   margin-bottom: 8px;
   align-items: end;
-  color: $purple_2;
+  color: theme.$purple_2;
   padding: 4px;
 }
 
 .add-button {
-  color: $purple_2;
+  color: theme.$purple_2;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -703,7 +703,7 @@ table {
 }
 
 .message {
-  color: $purple_2;
+  color: theme.$purple_2;
   margin: 8px;
 }
 
@@ -730,7 +730,7 @@ tr {
   }
 
   td:active {
-    color: $purple_2;
+    color: theme.$purple_2;
   }
 
   .empty-image {
@@ -739,7 +739,7 @@ tr {
   }
 
   .prop-name {
-    color: $purple_2;
+    color: theme.$purple_2;
     min-width: 80px;
     max-width: 110px;
     overflow: hidden;
@@ -750,7 +750,7 @@ tr {
     .prop-wrapper {
       display: flex;
       .prop-name {
-        color: $purple_2;
+        color: theme.$purple_2;
         min-width: 120px;
       }
     }

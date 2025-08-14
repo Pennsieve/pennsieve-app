@@ -203,7 +203,7 @@
 </script>
 
 <style scoped lang="scss">
-  @import './../../../assets/_variables';
+  @use './../../../styles/theme';
   option {
     color: #000;
     padding: 5px 3px;
@@ -222,7 +222,7 @@
       &:hover {
         background: transparent;
         .svg-icon {
-          color: $gray_6;
+          color: theme.$gray_6;
         }
       }
     }
@@ -231,7 +231,7 @@
     .inputWrap {
       position: relative;
       padding-bottom: 5px;
-      background: $white;
+      background: theme.$white;
       border: 1px solid #BDBDBD;
       border-radius: 3px;
       box-sizing: border-box;
@@ -288,7 +288,7 @@
 
   }
   .svg-icon {
-    color: $gray_6;
+    color: theme.$gray_6;
     height: 27px;
     margin-right: 5px;
     padding: 0;
@@ -298,7 +298,7 @@
 </style>
 
 <style lang="scss">
-  @import '../../../assets/_variables';
+  @use '../../../styles/theme';
 
   .popoverMenu.el-popover {
     margin-top: 3px;

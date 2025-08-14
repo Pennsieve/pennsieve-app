@@ -38,14 +38,14 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .tag-pill {
   align-items: center;
-  border: 1px solid $gray_4;
+  border: 1px solid theme.$gray_4;
   border-radius: 3px;
   box-sizing: border-box;
-  color: $gray_4;
+  color: theme.$gray_4;
   display: flex;
   font-size: 12px;
   line-height: 18px;
@@ -60,7 +60,7 @@ export default {
   }
 
   .indicator {
-    background-color: $gray_4;
+    background-color: theme.$gray_4;
     border-radius: 50%;
     flex-shrink: 0;
     height: 8px;

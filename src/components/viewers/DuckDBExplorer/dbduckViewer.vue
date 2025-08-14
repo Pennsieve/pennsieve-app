@@ -3,7 +3,10 @@
   <div class="dashboard-container">
     <header class="dashboard-header">
       <h1>Data Explorer</h1>
-      <div class="status-indicator" :class="{ connected: isConnected, loading: isLoading }">
+      <div
+        class="status-indicator"
+        :class="{ connected: isConnected, loading: isLoading }"
+      >
         {{ statusText }}
       </div>
     </header>
@@ -33,7 +36,7 @@
           @click="executeQuery"
           :disabled="isQueryRunning || !sqlQuery"
         >
-          {{ isQueryRunning ? 'Running...' : 'Execute Query' }}
+          {{ isQueryRunning ? "Running..." : "Execute Query" }}
         </bf-button>
       </div>
 
@@ -42,8 +45,9 @@
         <h3>Results ({{ queryResults.length }} rows)</h3>
         <div class="results-controls">
           <div class="left-controls">
-            <bf-button class='secondary' @click="exportToCsv">Export to CSV</bf-button>
-
+            <bf-button class="secondary" @click="exportToCsv"
+              >Export to CSV</bf-button
+            >
           </div>
           <div class="right-controls">
             <el-pagination
@@ -57,25 +61,24 @@
             />
           </div>
         </div>
-        <div class="pagination-wrapper">
-
-        </div>
-
+        <div class="pagination-wrapper"></div>
 
         <!-- Table View -->
         <div v-if="displayMode === 'table'" class="table-container">
           <table class="results-table">
             <thead>
-            <tr>
-              <th v-for="column in tableColumns" :key="column">{{ column }}</th>
-            </tr>
+              <tr>
+                <th v-for="column in tableColumns" :key="column">
+                  {{ column }}
+                </th>
+              </tr>
             </thead>
             <tbody>
-            <tr v-for="(row, index) in paginatedResults" :key="index">
-              <td v-for="column in tableColumns" :key="column">
-                {{ formatCellValue(row[column]) }}
-              </td>
-            </tr>
+              <tr v-for="(row, index) in paginatedResults" :key="index">
+                <td v-for="column in tableColumns" :key="column">
+                  {{ formatCellValue(row[column]) }}
+                </td>
+              </tr>
             </tbody>
           </table>
 
@@ -110,107 +113,119 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineProps, watch } from 'vue'
-import { useDuckDBStore } from '@/stores/duckdbStore'
+import { ref, computed, onMounted, onUnmounted, defineProps, watch } from "vue";
+import { useDuckDBStore } from "@/stores/duckdbStore";
 
 const props = defineProps({
   url: {
     type: String,
-    default: ''
+    default: "",
   },
   fileType: {
     type: String,
-    default: 'parquet',
-    validator: (value) => ['parquet', 'csv'].includes(value)
+    default: "parquet",
+    validator: (value) => ["parquet", "csv"].includes(value),
   },
   viewerId: {
     type: String,
-    default: () => `viewer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    default: () =>
+      `viewer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   },
   fileId: {
     type: String,
-    default: null // Stable file identifier for reuse
-  }
-})
+    default: null, // Stable file identifier for reuse
+  },
+});
 
 // Use DuckDB store
-const duckDBStore = useDuckDBStore()
+const duckDBStore = useDuckDBStore();
 
 // CSV-specific state
 const csvOptions = ref({
   header: true,
   dynamicTyping: true,
-  delimiter: ','
-})
+  delimiter: ",",
+});
 
 // Reactive state
-const isLoading = ref(false)
-const isQueryRunning = ref(false)
-const s3Url = ref(props.url)
-const tableName = ref('my_data')
-const sqlQuery = ref('')
-const queryResults = ref(null)
-const error = ref('')
-const displayMode = ref('table')
-const currentPage = ref(1)
-const itemsPerPage = ref(50)
-const connectionId = ref(null)
+const isLoading = ref(false);
+const isQueryRunning = ref(false);
+const s3Url = ref(props.url);
+const tableName = ref("my_data");
+const sqlQuery = ref("");
+const queryResults = ref(null);
+const error = ref("");
+const displayMode = ref("table");
+const currentPage = ref(1);
+const itemsPerPage = ref(50);
+const connectionId = ref(null);
 
 // Watch for URL changes
-watch(() => props.url, (newValue) => {
-  s3Url.value = newValue
-  if (newValue) {
-    loadFile()
-    executeQuery()
+watch(
+  () => props.url,
+  (newValue) => {
+    s3Url.value = newValue;
+    if (newValue) {
+      loadFile();
+      executeQuery();
+    }
   }
-})
+);
 
 // Computed properties
 const isConnected = computed(() => {
-  return duckDBStore.isReady && connectionId.value && !isLoading.value
-})
+  return duckDBStore.isReady && connectionId.value && !isLoading.value;
+});
 
 const statusText = computed(() => {
-  if (isLoading.value) return 'Loading...'
-  if (duckDBStore.isInitializing) return 'Initializing...'
-  if (!duckDBStore.isReady) return 'Not Ready'
-  if (isConnected.value) return 'Connected'
-  return 'Not Connected'
-})
+  if (isLoading.value) return "Loading...";
+  if (duckDBStore.isInitializing) return "Initializing...";
+  if (!duckDBStore.isReady) return "Not Ready";
+  if (isConnected.value) return "Connected";
+  return "Not Connected";
+});
 
 const tableColumns = computed(() => {
-  if (!queryResults.value || !Array.isArray(queryResults.value) || queryResults.value.length === 0) return []
-  return Object.keys(queryResults.value[0] || {})
-})
+  if (
+    !queryResults.value ||
+    !Array.isArray(queryResults.value) ||
+    queryResults.value.length === 0
+  )
+    return [];
+  return Object.keys(queryResults.value[0] || {});
+});
 
 const totalPages = computed(() => {
-  if (!queryResults.value || !Array.isArray(queryResults.value)) return 0
-  return Math.ceil(queryResults.value.length / itemsPerPage.value)
-})
+  if (!queryResults.value || !Array.isArray(queryResults.value)) return 0;
+  return Math.ceil(queryResults.value.length / itemsPerPage.value);
+});
 
 const paginatedResults = computed(() => {
-  if (!queryResults.value || !Array.isArray(queryResults.value)) return []
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return queryResults.value.slice(start, end)
-})
+  if (!queryResults.value || !Array.isArray(queryResults.value)) return [];
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return queryResults.value.slice(start, end);
+});
 
 const queryExamples = computed(() => {
   return [
-    { name: 'Show All', query: `SELECT * FROM data LIMIT 100;` },
-    { name: 'Count Rows', query: `SELECT COUNT(*) as row_count FROM data;` },
-    { name: 'Group By', query: `SELECT
+    { name: "Show All", query: `SELECT * FROM data LIMIT 100;` },
+    { name: "Count Rows", query: `SELECT COUNT(*) as row_count FROM data;` },
+    {
+      name: "Group By",
+      query: `SELECT
                                   column1, column2,
                                   COUNT(*) as count
                                 FROM data
                                 GROUP BY column1, column2
                                 ORDER BY column1, column2
-                                LIMIT 20;`},
-    { name: 'Describe', query: `DESCRIBE data;` },
-    { name: 'Sample', query: `SELECT * FROM data USING SAMPLE 10;` },
-    { name: 'Columns', query: `PRAGMA table_info(data);` }
-  ]
-})
+                                LIMIT 20;`,
+    },
+    { name: "Describe", query: `DESCRIBE data;` },
+    { name: "Sample", query: `SELECT * FROM data USING SAMPLE 10;` },
+    { name: "Columns", query: `PRAGMA table_info(data);` },
+  ];
+});
 
 // Debug info (can be removed in production)
 const debugInfo = computed(() => ({
@@ -220,55 +235,62 @@ const debugInfo = computed(() => ({
   tableName: tableName.value,
   isConnected: isConnected.value,
   activeConnections: duckDBStore.activeConnectionCount,
-  hasActiveConnections: duckDBStore.hasActiveConnections
-}))
+  hasActiveConnections: duckDBStore.hasActiveConnections,
+}));
 
 // Initialize connection and load file
 const initialize = async () => {
   try {
     // Create a connection for this viewer instance
-    const { connection, connectionId: connId } = await duckDBStore.createConnection(props.viewerId)
-    connectionId.value = connId
+    const { connection, connectionId: connId } =
+      await duckDBStore.createConnection(props.viewerId);
+    connectionId.value = connId;
 
-    console.log(`Viewer ${props.viewerId} connected with connection ID: ${connId}`)
+    console.log(
+      `Viewer ${props.viewerId} connected with connection ID: ${connId}`
+    );
 
     // Load file if URL is provided
     if (s3Url.value) {
-      await loadFile()
-      executeQuery()
+      await loadFile();
+      executeQuery();
     }
   } catch (err) {
-    console.error('Failed to initialize viewer:', err)
-    error.value = `Failed to initialize: ${err.message}`
+    console.error("Failed to initialize viewer:", err);
+    error.value = `Failed to initialize: ${err.message}`;
   }
-}
+};
 
 // Load file using the store
 const loadFile = async () => {
   if (!s3Url.value) {
-    error.value = 'Please provide a valid S3 URL'
-    return
+    error.value = "Please provide a valid S3 URL";
+    return;
   }
 
-  console.log('Loading file:', s3Url.value)
-  console.log('Using stable file ID:', props.fileId)
+  console.log("Loading file:", s3Url.value);
+  console.log("Using stable file ID:", props.fileId);
 
   // Check if file is already loaded using stable ID
-  const stableKey = props.fileId || s3Url.value
-  const existingFile = duckDBStore.getLoadedFile(stableKey)
+  const stableKey = props.fileId || s3Url.value;
+  const existingFile = duckDBStore.getLoadedFile(stableKey);
   if (existingFile && !existingFile.isLoading && !existingFile.error) {
-    tableName.value = existingFile.tableName
-    console.log(`File already loaded using stable key, reusing table: ${tableName.value}`)
-    setQuery(`SELECT * FROM data LIMIT 10;`)
-    return
+    tableName.value = existingFile.tableName;
+    console.log(
+      `File already loaded using stable key, reusing table: ${tableName.value}`
+    );
+    setQuery(`SELECT * FROM data LIMIT 10;`);
+    return;
   }
 
-  isLoading.value = true
-  error.value = ''
+  isLoading.value = true;
+  error.value = "";
 
   try {
     // Generate table name using stable ID if available
-    const tableId = props.fileId ? `file_${props.fileId}` : `data_${Date.now()}`
+    const tableId = props.fileId
+      ? `file_${props.fileId}`
+      : `data_${Date.now()}`;
 
     // Use store to load file (will be shared across all viewers with same fileId)
     const loadedTableName = await duckDBStore.loadFile(
@@ -278,27 +300,26 @@ const loadFile = async () => {
       csvOptions.value,
       props.viewerId, // Pass viewer ID for tracking
       props.fileId // Pass stable file ID
-    )
+    );
 
-    tableName.value = loadedTableName
-    console.log(`File loaded as table: ${tableName.value}`)
+    tableName.value = loadedTableName;
+    console.log(`File loaded as table: ${tableName.value}`);
 
     // Auto-execute a sample query using "data"
-    setQuery(`SELECT * FROM data LIMIT 10;`)
-
+    setQuery(`SELECT * FROM data LIMIT 10;`);
   } catch (err) {
-    console.error('Failed to load file:', err)
-    error.value = `Failed to load ${props.fileType} file: ${err.message}`
+    console.error("Failed to load file:", err);
+    error.value = `Failed to load ${props.fileType} file: ${err.message}`;
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 // Query interceptor to replace "data" with actual table name
 const interceptQuery = (query) => {
-  if (!tableName.value || !query) return query
+  if (!tableName.value || !query) return query;
 
-  console.log('Original query:', query)
+  console.log("Original query:", query);
 
   // Replace "data" table references with actual table name
   // This handles various SQL patterns:
@@ -315,141 +336,152 @@ const interceptQuery = (query) => {
     .replace(/\bINTO\s+data\b/gi, `INTO ${tableName.value}`)
     .replace(/\btable_info\(\s*data\s*\)/gi, `table_info(${tableName.value})`)
     .replace(/\bDESCRIBE\s+data\b/gi, `DESCRIBE ${tableName.value}`)
-    .replace(/\bPRAGMA\s+table_info\(\s*data\s*\)/gi, `PRAGMA table_info(${tableName.value})`)
+    .replace(
+      /\bPRAGMA\s+table_info\(\s*data\s*\)/gi,
+      `PRAGMA table_info(${tableName.value})`
+    );
 
   if (interceptedQuery !== query) {
-    console.log('Intercepted query:', interceptedQuery)
-    console.log(`Replaced "data" references with "${tableName.value}"`)
+    console.log("Intercepted query:", interceptedQuery);
+    console.log(`Replaced "data" references with "${tableName.value}"`);
   }
 
-  return interceptedQuery
-}
+  return interceptedQuery;
+};
 
 // Execute SQL query using store
 const executeQuery = async () => {
   if (!sqlQuery.value || !connectionId.value) {
-    error.value = 'Please provide a valid SQL query'
-    return
+    error.value = "Please provide a valid SQL query";
+    return;
   }
 
   if (!tableName.value) {
-    error.value = 'No data table loaded'
-    return
+    error.value = "No data table loaded";
+    return;
   }
 
-  isQueryRunning.value = true
-  error.value = ''
-  currentPage.value = 1
+  isQueryRunning.value = true;
+  error.value = "";
+  currentPage.value = 1;
 
   try {
     // Intercept and transform the query
-    const transformedQuery = interceptQuery(sqlQuery.value.trim())
+    const transformedQuery = interceptQuery(sqlQuery.value.trim());
 
-    console.log('Executing transformed query:', transformedQuery)
-    queryResults.value = await duckDBStore.executeQuery(transformedQuery, connectionId.value)
-    console.log(`Query executed successfully, returned ${queryResults.value.length} rows`)
+    console.log("Executing transformed query:", transformedQuery);
+    queryResults.value = await duckDBStore.executeQuery(
+      transformedQuery,
+      connectionId.value
+    );
+    console.log(
+      `Query executed successfully, returned ${queryResults.value.length} rows`
+    );
   } catch (err) {
-    console.error('Query execution failed:', err)
-    error.value = `Query execution failed: ${err.message}`
-    queryResults.value = null
+    console.error("Query execution failed:", err);
+    error.value = `Query execution failed: ${err.message}`;
+    queryResults.value = null;
   } finally {
-    isQueryRunning.value = false
+    isQueryRunning.value = false;
   }
-}
+};
 
 // Pagination event handlers for Element Plus
 const handlePageChange = (page) => {
-  console.log('Page changed to:', page)
-  currentPage.value = page
-}
+  console.log("Page changed to:", page);
+  currentPage.value = page;
+};
 
 const handleSizeChange = (newSize) => {
-  console.log('Page size changed to:', newSize)
-  itemsPerPage.value = newSize
-  currentPage.value = 1 // Reset to first page when changing size
-}
+  console.log("Page size changed to:", newSize);
+  itemsPerPage.value = newSize;
+  currentPage.value = 1; // Reset to first page when changing size
+};
 
 // Set predefined query
 const setQuery = (query) => {
-  sqlQuery.value = query
-}
+  sqlQuery.value = query;
+};
 
 // Format cell values for display
 const formatCellValue = (value) => {
-  if (value === null || value === undefined) return 'NULL'
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? value.toString() : value.toFixed(4)
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? value.toString() : value.toFixed(4);
   }
-  if (typeof value === 'string' && value.length > 100) {
-    return value.substring(0, 100) + '...'
+  if (typeof value === "string" && value.length > 100) {
+    return value.substring(0, 100) + "...";
   }
-  return value.toString()
-}
+  return value.toString();
+};
 
 // Export results to CSV
 const exportToCsv = () => {
-  if (!queryResults.value || queryResults.value.length === 0) return
+  if (!queryResults.value || queryResults.value.length === 0) return;
 
-  const headers = Object.keys(queryResults.value[0])
+  const headers = Object.keys(queryResults.value[0]);
   const csvContent = [
-    headers.join(','),
-    ...queryResults.value.map(row =>
-      headers.map(header => {
-        const value = row[header]
-        const stringValue = value === null || value === undefined ? '' : value.toString()
-        return stringValue.includes(',') ? `"${stringValue}"` : stringValue
-      }).join(',')
-    )
-  ].join('\n')
+    headers.join(","),
+    ...queryResults.value.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header];
+          const stringValue =
+            value === null || value === undefined ? "" : value.toString();
+          return stringValue.includes(",") ? `"${stringValue}"` : stringValue;
+        })
+        .join(",")
+    ),
+  ].join("\n");
 
-  const blob = new Blob([csvContent], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'query-results.csv'
-  link.click()
-  URL.revokeObjectURL(url)
-}
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "query-results.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 // Clear error
 const clearError = () => {
-  error.value = ''
-}
+  error.value = "";
+};
 
 // Debug method (optional)
 const logDebugInfo = () => {
-  console.log('Viewer Debug Info:', debugInfo.value)
-  console.log('Store Connection Info:', duckDBStore.getConnectionInfo())
-  console.log('Store File Usage Info:', duckDBStore.getFileUsageInfo())
-}
+  console.log("Viewer Debug Info:", debugInfo.value);
+  console.log("Store Connection Info:", duckDBStore.getConnectionInfo());
+  console.log("Store File Usage Info:", duckDBStore.getFileUsageInfo());
+};
 
 // Lifecycle hooks
 onMounted(async () => {
-  await initialize()
-})
+  await initialize();
+});
 
 onUnmounted(async () => {
   // Clean up this viewer's connection
   if (connectionId.value) {
-    console.log(`Cleaning up viewer ${props.viewerId}...`)
+    console.log(`Cleaning up viewer ${props.viewerId}...`);
 
     const beforeCleanup = {
       activeConnections: duckDBStore.activeConnectionCount,
-      loadedFiles: duckDBStore.loadedFiles.size
-    }
+      loadedFiles: duckDBStore.loadedFiles.size,
+    };
 
-    await duckDBStore.closeConnection(connectionId.value)
+    await duckDBStore.closeConnection(connectionId.value);
 
     const afterCleanup = {
       activeConnections: duckDBStore.activeConnectionCount,
-      loadedFiles: duckDBStore.loadedFiles.size
-    }
+      loadedFiles: duckDBStore.loadedFiles.size,
+    };
 
     console.log(`Viewer ${props.viewerId} cleanup complete:`, {
       beforeCleanup,
       afterCleanup,
-      hasActiveConnections: duckDBStore.hasActiveConnections
-    })
+      hasActiveConnections: duckDBStore.hasActiveConnections,
+    });
 
     // If this was the last viewer and you want automatic global cleanup:
     // if (!duckDBStore.hasActiveConnections) {
@@ -457,11 +489,11 @@ onUnmounted(async () => {
     //   await duckDBStore.performGlobalCleanup()
     // }
   }
-})
+});
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/variables.scss";
+@use "../../../styles/theme";
 
 .dashboard-container {
   display: flex;
@@ -497,7 +529,7 @@ onUnmounted(async () => {
 }
 
 .status-indicator.connected {
-  background-color: $green_2;
+  background-color: theme.$green_2;
 }
 
 .dashboard-content {
@@ -505,7 +537,10 @@ onUnmounted(async () => {
   gap: 25px;
 }
 
-.config-panel, .query-panel, .results-panel, .error-panel {
+.config-panel,
+.query-panel,
+.results-panel,
+.error-panel {
   background: white;
   width: inherit;
   border: 1px solid #ddd;
@@ -513,7 +548,10 @@ onUnmounted(async () => {
   overflow: scroll;
 }
 
-.config-panel h3, .query-panel h3, .results-panel h3, .error-panel h3 {
+.config-panel h3,
+.query-panel h3,
+.results-panel h3,
+.error-panel h3 {
   margin-top: 0;
   color: #333;
   border-bottom: 1px solid #eee;
@@ -545,7 +583,7 @@ onUnmounted(async () => {
   color: #0c5460;
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-weight: 600;
 }
 
@@ -560,7 +598,10 @@ onUnmounted(async () => {
   color: #555;
 }
 
-.url-input, .table-input, .query-textarea, .display-mode {
+.url-input,
+.table-input,
+.query-textarea,
+.display-mode {
   width: calc(100% - 16px);
   padding: 10px;
   border: 1px solid #ddd;
@@ -570,17 +611,24 @@ onUnmounted(async () => {
 }
 
 .query-textarea {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   resize: vertical;
   min-height: 100px;
 }
 
-.url-input:focus, .table-input:focus, .query-textarea:focus {
+.url-input:focus,
+.table-input:focus,
+.query-textarea:focus {
   outline: none;
   border-color: #2196f3;
 }
 
-.load-btn, .execute-btn, .example-btn, .export-btn, .clear-error-btn, .page-btn {
+.load-btn,
+.execute-btn,
+.example-btn,
+.export-btn,
+.clear-error-btn,
+.page-btn {
   background: #2196f3;
   color: white;
   border: none;
@@ -591,11 +639,17 @@ onUnmounted(async () => {
   transition: background-color 0.2s;
 }
 
-.load-btn:hover, .execute-btn:hover, .export-btn:hover, .clear-error-btn:hover, .page-btn:hover {
+.load-btn:hover,
+.execute-btn:hover,
+.export-btn:hover,
+.clear-error-btn:hover,
+.page-btn:hover {
   background: #1976d2;
 }
 
-.load-btn:disabled, .execute-btn:disabled, .page-btn:disabled {
+.load-btn:disabled,
+.execute-btn:disabled,
+.page-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
@@ -656,7 +710,8 @@ onUnmounted(async () => {
   font-size: 13px;
 }
 
-.results-table th, .results-table td {
+.results-table th,
+.results-table td {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;

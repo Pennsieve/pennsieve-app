@@ -26,15 +26,15 @@ import PennsieveLogoContainer from "../../components/shared/PennsieveLogoContain
 </script>
 
 <style scoped lang="scss">
-  @import '../../assets/_variables.scss';
+  @use '../../styles/theme';
 
 
 
   .welcome-wrapper {
-     background: $purple_1;
+     background: theme.$purple_1;
 
      .welcome-logo {
-        color: $purple_1;
+        color: theme.$purple_1;
         position: fixed;
         top: 20px;
         left: 20px;

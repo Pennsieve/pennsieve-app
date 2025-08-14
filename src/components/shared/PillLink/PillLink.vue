@@ -33,17 +33,17 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .pill-link {
-    background-color: $gray_2;
+    background-color: theme.$gray_2;
     border-radius: 3px;
-    color: $gray_6;
+    color: theme.$gray_6;
     display: block;
     font-size: 12px;
     padding: 8px 16px;
     &:hover, &:focus {
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
       text-decoration: none;
     }
     .suffix {

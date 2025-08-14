@@ -64,10 +64,10 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme' ;
 
   .bf-icon-waiting {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
     display: inline-block;
     height: 18px;
     width: 18px;

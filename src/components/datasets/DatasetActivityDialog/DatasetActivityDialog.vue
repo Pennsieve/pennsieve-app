@@ -1,64 +1,67 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="Activity Details"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          title="Activity Details"
+        />
+      </template>
 
 
-    <dialog-body ref="dialogBody">
-      <h3>{{ renderActivityType(event.eventType) }}</h3>
-      <ul class="member-list unstyled">
-        <li
-          v-for="(member, idx) in orgMembers"
-          :key="member.id"
-        >
-          {{ member.firstName }} {{ member.lastName }}
-          <span v-if="idx < orgMembers.length - 1">
+      <dialog-body ref="dialogBody">
+        <h3>{{ renderActivityType(event.eventType) }}</h3>
+        <ul class="member-list unstyled">
+          <li
+            v-for="(member, idx) in orgMembers"
+            :key="member.id"
+          >
+            {{ member.firstName }} {{ member.lastName }}
+            <span v-if="idx < orgMembers.length - 1">
             ,
           </span>
-        </li>
-      </ul>
-      <p>{{ formatDateRange(event.timeRange.start, event.timeRange.end) }}</p>
-      <div class="activity-list">
-        <div
-          v-for="eventDetail in activity.events"
-          :key="eventDetail.id"
-          class="dataset-activity-panel-dropdown-list"
-        >
-          <dataset-activity-detail
-            :event-detail="eventDetail"
-            :event="event"
-          />
+          </li>
+        </ul>
+        <p>{{ formatDateRange(event.timeRange.start, event.timeRange.end) }}</p>
+        <div class="activity-list">
+          <div
+            v-for="eventDetail in activity.events"
+            :key="eventDetail.id"
+            class="dataset-activity-panel-dropdown-list"
+          >
+            <dataset-activity-detail
+              :event-detail="eventDetail"
+              :event="event"
+            />
+          </div>
+          <a
+            v-if="activity.cursor"
+            href="#"
+            class="see-more-link"
+            @click.prevent="loadMoreEvents"
+          >
+            {{ btnLoadMoreText }}
+          </a>
         </div>
-        <a
-          v-if="activity.cursor"
-          href="#"
-          class="see-more-link"
-          @click.prevent="loadMoreEvents"
+      </dialog-body>
+
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
         >
-          {{ btnLoadMoreText }}
-        </a>
-      </div>
-    </dialog-body>
+          Close
+        </bf-button>
+      </template>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Close
-      </bf-button>
-    </template>
+    </el-dialog>
+  </div>
 
-  </el-dialog>
 </template>
 
 <script>
@@ -183,12 +186,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
+@use '../../../styles/element/dialog';
 
     .dataset-activity-panel-dropdown-list {
       padding-bottom: 10px;
       padding-top: 10px;
-      border-bottom: solid 1px $gray_2;
+      border-bottom: solid 1px theme.$gray_2;
 
       &:last-child {
         border-bottom: none;

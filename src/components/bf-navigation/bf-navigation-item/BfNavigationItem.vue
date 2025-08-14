@@ -107,13 +107,13 @@ export default {
 </script>
 
 <style lang="scss">
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .bf-navigation-item {
     align-items: center;
     background: transparent;
     box-sizing: border-box;
-    color: $gray_6;
+    color: theme.$gray_6;
     display: flex;
     font-weight: 500;
     overflow: hidden;
@@ -124,29 +124,29 @@ export default {
       margin-top: 0;
     }
     &:hover, &:focus {
-      background: $gray_1;
+      background: theme.$gray_1;
       outline: none;
       text-decoration: none;
-      color: $gray_6;
+      color: theme.$gray_6;
 
       .svg-icon {
-        color: $gray_2;
+        color: theme.$gray_2;
       }
     }
     &.router-link-active {
       background: transparent;
-      color: $purple_1;
+      color: theme.$purple_1;
 
       .svg-icon {
-        color: $purple_1;
+        color: theme.$purple_1;
       }
       &.secondary {
-      background: $purple_tint;
+      background: theme.$purple_tint;
       border-right: 4px solid;
     }
     }
     .svg-icon {
-      color: $gray_2;
+      color: theme.$gray_2;
     }
     &.disabled {
       pointer-events: none;
@@ -160,16 +160,16 @@ export default {
       }
     }
     .primary & {
-      color: $white;
+      color: theme.$white;
       &:hover, &:focus, &.active {
         background: var(--color-hover);
-        color: $white;
+        color: theme.$white;
         .svg-icon {
-          color: $white;
+          color: theme.$white;
         }
       }
       &.router-link-active {
-        background: $gray_1;
+        background: theme.$gray_1;
         color: var(--color-hover);
 
         .svg-icon {
@@ -177,7 +177,7 @@ export default {
         }
       }
       .svg-icon {
-        color: $gray_2;
+        color: theme.$gray_2;
       }
     }
     .icon-main {

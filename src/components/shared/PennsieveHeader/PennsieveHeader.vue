@@ -215,7 +215,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .pennsieve-header {
   align-items: end;
@@ -223,7 +223,7 @@ export default {
   box-sizing: border-box;
   display: flex;
   height: 72px;
-  background-color: $purple_3;
+  background-color: theme.$purple_3;
   padding-right: 20px;
   position: relative;
   width: 100%;
@@ -254,7 +254,7 @@ export default {
 #btn-home {
   height: 64px;
   width: 64px;
-  background-color: $purple_2;
+  background-color: theme.$purple_2;
 }
 .header-title {
   color: #ffffff;
@@ -296,7 +296,7 @@ export default {
 
 .dataset-search {
   @media (max-width: 48em) {
-    background: $purple_1;
+    background: theme.$purple_1;
     box-sizing: border-box;
     flex: 1;
     margin: 0;

@@ -5,7 +5,14 @@
     <header class="viewer-header">
       <h2>Tabular Data Viewer</h2>
       <div class="header-controls">
-        <div class="status-indicator" :class="{ connected: isConnected, loading: isLoading, error: hasError }">
+        <div
+          class="status-indicator"
+          :class="{
+            connected: isConnected,
+            loading: isLoading,
+            error: hasError,
+          }"
+        >
           {{ statusText }}
         </div>
       </div>
@@ -29,14 +36,18 @@
       <!-- Info Bar -->
       <div class="info-bar">
         <span class="row-count">
-          Showing {{ paginatedResults.length }} of {{ typeof totalRows === 'bigint' ? Number(totalRows) : totalRows }} rows
+          Showing {{ paginatedResults.length }} of
+          {{ typeof totalRows === "bigint" ? Number(totalRows) : totalRows }}
+          rows
         </span>
         <div class="info-bar-controls">
           <div class="top-pagination">
             <el-pagination
               v-model:current-page="currentPage"
               :page-size="pageSize"
-              :total="typeof totalRows === 'bigint' ? Number(totalRows) : totalRows"
+              :total="
+                typeof totalRows === 'bigint' ? Number(totalRows) : totalRows
+              "
               layout="prev, pager, next"
               @current-change="handlePageChange"
               hide-on-single-page
@@ -49,18 +60,18 @@
       <div class="table-container">
         <table class="data-table">
           <thead>
-          <tr>
-            <th v-for="column in tableColumns" :key="column">
-              {{ column }}
-            </th>
-          </tr>
+            <tr>
+              <th v-for="column in tableColumns" :key="column">
+                {{ column }}
+              </th>
+            </tr>
           </thead>
           <tbody>
-          <tr v-for="(row, index) in paginatedResults" :key="index">
-            <td v-for="column in tableColumns" :key="column">
-              {{ formatCellValue(row[column]) }}
-            </td>
-          </tr>
+            <tr v-for="(row, index) in paginatedResults" :key="index">
+              <td v-for="column in tableColumns" :key="column">
+                {{ formatCellValue(row[column]) }}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -69,238 +80,259 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useDuckDBStore } from '@/stores/duckdbStore'
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useDuckDBStore } from "@/stores/duckdbStore";
 
 const props = defineProps({
   url: {
     type: String,
-    required: true
+    required: true,
   },
   fileType: {
     type: String,
-    default: 'csv'
+    default: "csv",
   },
   rowsPerPage: {
     type: Number,
-    default: 25
+    default: 25,
   },
   autoLoad: {
     type: Boolean,
-    default: true
+    default: true,
   },
   fileId: {
     type: String,
-    default: null
-  }
-})
+    default: null,
+  },
+});
 
 // Store
-const duckDBStore = useDuckDBStore()
+const duckDBStore = useDuckDBStore();
 
 // State
-const isLoading = ref(false)
-const error = ref('')
-const connectionId = ref(null)
-const tableName = ref('')
-const queryResults = ref(null)
-const totalRows = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(props.rowsPerPage)
+const isLoading = ref(false);
+const error = ref("");
+const connectionId = ref(null);
+const tableName = ref("");
+const queryResults = ref(null);
+const totalRows = ref(0);
+const currentPage = ref(1);
+const pageSize = ref(props.rowsPerPage);
 
 // CSV options
 const csvOptions = ref({
   header: true,
-  delimiter: ','
-})
+  delimiter: ",",
+});
 
 // Computed
 const isConnected = computed(() => {
-  return duckDBStore.isReady && connectionId.value && !isLoading.value && !error.value
-})
+  return (
+    duckDBStore.isReady &&
+    connectionId.value &&
+    !isLoading.value &&
+    !error.value
+  );
+});
 
-const hasError = computed(() => !!error.value)
+const hasError = computed(() => !!error.value);
 
 const statusText = computed(() => {
-  if (isLoading.value) return 'Loading...'
-  if (error.value) return 'Error'
-  if (duckDBStore.isInitializing) return 'Initializing...'
-  if (!duckDBStore.isReady) return 'Not Ready'
+  if (isLoading.value) return "Loading...";
+  if (error.value) return "Error";
+  if (duckDBStore.isInitializing) return "Initializing...";
+  if (!duckDBStore.isReady) return "Not Ready";
   if (isConnected.value) {
-    return `Connected`
+    return `Connected`;
   }
-  return 'Not Connected'
-})
+  return "Not Connected";
+});
 
 const tableColumns = computed(() => {
-  if (!queryResults.value || !Array.isArray(queryResults.value) || queryResults.value.length === 0) {
-    return []
+  if (
+    !queryResults.value ||
+    !Array.isArray(queryResults.value) ||
+    queryResults.value.length === 0
+  ) {
+    return [];
   }
-  return Object.keys(queryResults.value[0] || {})
-})
+  return Object.keys(queryResults.value[0] || {});
+});
 
 const totalPages = computed(() => {
-  const totalRowsNum = typeof totalRows.value === 'bigint'
-    ? Number(totalRows.value)
-    : totalRows.value
-  return Math.ceil(totalRowsNum / pageSize.value)
-})
+  const totalRowsNum =
+    typeof totalRows.value === "bigint"
+      ? Number(totalRows.value)
+      : totalRows.value;
+  return Math.ceil(totalRowsNum / pageSize.value);
+});
 
 const paginatedResults = computed(() => {
   if (!queryResults.value || !Array.isArray(queryResults.value)) {
-    return []
+    return [];
   }
-  return queryResults.value
-})
+  return queryResults.value;
+});
 
 // Methods
 const initialize = async () => {
   try {
-    isLoading.value = true
-    error.value = ''
+    isLoading.value = true;
+    error.value = "";
 
-    console.log('Starting CSV viewer initialization...')
+    console.log("Starting CSV viewer initialization...");
 
     if (!duckDBStore.isReady) {
-      console.log('DuckDB not ready, initializing...')
-      await duckDBStore.initDuckDB()
+      console.log("DuckDB not ready, initializing...");
+      await duckDBStore.initDuckDB();
     }
 
-    const viewerId = `csv_viewer_${Date.now()}`
-    const { connection, connectionId: connId } = await duckDBStore.createConnection(viewerId)
-    connectionId.value = connId
+    const viewerId = `csv_viewer_${Date.now()}`;
+    const { connection, connectionId: connId } =
+      await duckDBStore.createConnection(viewerId);
+    connectionId.value = connId;
 
-    console.log(`CSV Viewer connected with ID: ${connId}`)
+    console.log(`CSV Viewer connected with ID: ${connId}`);
 
     if (props.autoLoad && props.url) {
-      await loadCSVFile()
+      await loadCSVFile();
     } else {
-      isLoading.value = false
+      isLoading.value = false;
     }
   } catch (err) {
-    console.error('Failed to initialize CSV viewer:', err)
-    error.value = `Failed to initialize: ${err.message}`
-    isLoading.value = false
+    console.error("Failed to initialize CSV viewer:", err);
+    error.value = `Failed to initialize: ${err.message}`;
+    isLoading.value = false;
   }
-}
+};
 
 const loadCSVFile = async () => {
   if (!props.url) {
-    error.value = 'No URL provided'
-    isLoading.value = false
-    return
+    error.value = "No URL provided";
+    isLoading.value = false;
+    return;
   }
 
-  console.log('Loading CSV file from URL:', props.url)
+  console.log("Loading CSV file from URL:", props.url);
 
   try {
-    const stableKey = props.fileId || props.url
-    const existingFile = duckDBStore.getLoadedFile(stableKey)
+    const stableKey = props.fileId || props.url;
+    const existingFile = duckDBStore.getLoadedFile(stableKey);
     if (existingFile && !existingFile.isLoading && !existingFile.error) {
-      console.log('File already loaded, reusing table:', existingFile.tableName)
-      tableName.value = existingFile.tableName
-      await getTotalRowCount()
-      await loadPage(1)
-      isLoading.value = false
-      return
+      console.log(
+        "File already loaded, reusing table:",
+        existingFile.tableName
+      );
+      tableName.value = existingFile.tableName;
+      await getTotalRowCount();
+      await loadPage(1);
+      isLoading.value = false;
+      return;
     }
 
-    const tableId = props.fileId ? `file_${props.fileId}` : `csv_data_${Date.now()}`
+    const tableId = props.fileId
+      ? `file_${props.fileId}`
+      : `csv_data_${Date.now()}`;
 
     tableName.value = await duckDBStore.loadFile(
       props.url,
-      'csv',
+      "csv",
       tableId,
       csvOptions.value,
       connectionId.value,
       props.fileId
-    )
+    );
 
-    console.log(`CSV loaded successfully as table: ${tableName.value}`)
+    console.log(`CSV loaded successfully as table: ${tableName.value}`);
 
-    await getTotalRowCount()
-    await loadPage(1)
-
+    await getTotalRowCount();
+    await loadPage(1);
   } catch (err) {
-    console.error('Failed to load CSV file:', err)
-    error.value = `Failed to load CSV: ${err.message}`
+    console.error("Failed to load CSV file:", err);
+    error.value = `Failed to load CSV: ${err.message}`;
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const getTotalRowCount = async () => {
   try {
-    const countQuery = `SELECT COUNT(*) as total_count FROM ${tableName.value}`
-    const result = await duckDBStore.executeQuery(countQuery, connectionId.value)
+    const countQuery = `SELECT COUNT(*) as total_count FROM ${tableName.value}`;
+    const result = await duckDBStore.executeQuery(
+      countQuery,
+      connectionId.value
+    );
 
-    const count = result[0]?.total_count || 0
-    totalRows.value = typeof count === 'bigint' ? Number(count) : count
+    const count = result[0]?.total_count || 0;
+    totalRows.value = typeof count === "bigint" ? Number(count) : count;
   } catch (err) {
-    console.error('Failed to get row count:', err)
-    totalRows.value = 0
-    throw err
+    console.error("Failed to get row count:", err);
+    totalRows.value = 0;
+    throw err;
   }
-}
+};
 
 const loadPage = async (page) => {
   if (!tableName.value || !connectionId.value) {
-    return
+    return;
   }
 
   try {
-    const offset = (page - 1) * pageSize.value
+    const offset = (page - 1) * pageSize.value;
     const query = `
       SELECT * FROM ${tableName.value}
       LIMIT ${pageSize.value}
       OFFSET ${offset}
-    `
+    `;
 
-    queryResults.value = await duckDBStore.executeQuery(query, connectionId.value)
-    currentPage.value = page
+    queryResults.value = await duckDBStore.executeQuery(
+      query,
+      connectionId.value
+    );
+    currentPage.value = page;
   } catch (err) {
-    console.error('Failed to load page:', err)
-    error.value = `Failed to load page: ${err.message}`
-    throw err
+    console.error("Failed to load page:", err);
+    error.value = `Failed to load page: ${err.message}`;
+    throw err;
   }
-}
+};
 
 const handlePageChange = async (page) => {
-  await loadPage(page)
-}
+  await loadPage(page);
+};
 
 const handleSizeChange = async (newSize) => {
-  pageSize.value = newSize
-  currentPage.value = 1
-  await loadPage(1)
-}
+  pageSize.value = newSize;
+  currentPage.value = 1;
+  await loadPage(1);
+};
 
 const formatCellValue = (value) => {
-  if (value === null || value === undefined) return 'NULL'
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? value.toString() : value.toFixed(4)
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? value.toString() : value.toFixed(4);
   }
-  if (typeof value === 'string' && value.length > 50) {
-    return value.substring(0, 50) + '...'
+  if (typeof value === "string" && value.length > 50) {
+    return value.substring(0, 50) + "...";
   }
-  return value.toString()
-}
+  return value.toString();
+};
 
 const retryLoad = async () => {
-  error.value = ''
-  await loadCSVFile()
-}
+  error.value = "";
+  await loadCSVFile();
+};
 
 const debugStatus = () => {
-  console.log('=== CSV Viewer Debug Info ===')
-  console.log('Props:', {
+  console.log("=== CSV Viewer Debug Info ===");
+  console.log("Props:", {
     url: props.url,
     fileType: props.fileType,
     rowsPerPage: props.rowsPerPage,
     autoLoad: props.autoLoad,
-    fileId: props.fileId
-  })
-  console.log('State:', {
+    fileId: props.fileId,
+  });
+  console.log("State:", {
     isLoading: isLoading.value,
     error: error.value,
     connectionId: connectionId.value,
@@ -309,38 +341,41 @@ const debugStatus = () => {
     currentPage: currentPage.value,
     pageSize: pageSize.value,
     hasResults: !!queryResults.value,
-    resultsLength: queryResults.value?.length
-  })
-  console.log('Store State:', {
+    resultsLength: queryResults.value?.length,
+  });
+  console.log("Store State:", {
     isReady: duckDBStore.isReady,
     isInitializing: duckDBStore.isInitializing,
     activeConnections: duckDBStore.activeConnectionCount,
-    loadedFilesCount: duckDBStore.loadedFiles.size
-  })
-}
+    loadedFilesCount: duckDBStore.loadedFiles.size,
+  });
+};
 
 // Watchers
-watch(() => props.url, async (newUrl) => {
-  if (newUrl && isConnected.value) {
-    await loadCSVFile()
+watch(
+  () => props.url,
+  async (newUrl) => {
+    if (newUrl && isConnected.value) {
+      await loadCSVFile();
+    }
   }
-})
+);
 
 // Lifecycle
 onMounted(async () => {
-  await initialize()
-})
+  await initialize();
+});
 
 onUnmounted(async () => {
   if (connectionId.value) {
-    console.log(`Cleaning up CSV viewer connection: ${connectionId.value}`)
-    await duckDBStore.closeConnection(connectionId.value)
+    console.log(`Cleaning up CSV viewer connection: ${connectionId.value}`);
+    await duckDBStore.closeConnection(connectionId.value);
   }
-})
+});
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/variables.scss";
+@use "../../../styles/theme";
 
 .csv-viewer-container {
   max-width: 100%;
@@ -374,19 +409,19 @@ onUnmounted(async () => {
   border-radius: 20px;
   font-weight: 500;
   color: white;
-  background-color: $gray_4;
+  background-color: theme.$gray_4;
   font-size: 0.9rem;
 
   &.loading {
-    background-color: $gray_4;
+    background-color: theme.$gray_4;
   }
 
   &.connected {
-    background-color: $green_2;
+    background-color: theme.$green_2;
   }
 
   &.error {
-    background-color: $red_2;
+    background-color: theme.$red_2;
   }
 }
 
@@ -409,8 +444,12 @@ onUnmounted(async () => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error-panel {
@@ -441,7 +480,7 @@ onUnmounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: $purple_tint;
+  background: theme.$purple_tint;
 
   .row-count {
     font-weight: 500;
@@ -486,17 +525,20 @@ onUnmounted(async () => {
   border-collapse: collapse;
   font-size: 14px;
 
-  th, td {
+  th,
+  td {
     border: 1px solid #ddd;
     padding: 12px 8px;
     text-align: left;
   }
 
-  th:first-child, td:first-child {
+  th:first-child,
+  td:first-child {
     border-left: 0;
   }
 
-  th:last-child, td:last-child {
+  th:last-child,
+  td:last-child {
     border-right: 0;
   }
 
@@ -526,7 +568,8 @@ onUnmounted(async () => {
   align-items: center;
 }
 
-.debug-btn, .retry-btn {
+.debug-btn,
+.retry-btn {
   background: #2196f3;
   color: white;
   border: none;

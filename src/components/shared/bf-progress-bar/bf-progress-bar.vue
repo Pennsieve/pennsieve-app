@@ -35,17 +35,17 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .ps-progress-bar {
-    background: $gray_1;
+    background: theme.$gray_1;
     border-radius: 3px;
     display: inline-block;
     height: 8px;
     overflow: hidden;
     width: 100%;
     .bar {
-      background: $green_1;
+      background: theme.$green_1;
       height: 100%;
       width: 0;
     }

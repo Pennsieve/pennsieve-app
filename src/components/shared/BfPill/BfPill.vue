@@ -11,29 +11,29 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .bf-pill {
   background: #f1f1f3;
   border-radius: 6px;
-  color: $gray_6;
+  color: theme.$gray_6;
   display: inline-block;
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
   padding: 2px 11px;
   &.green {
-    background: #9fe2be;
+    background: theme.$green_1;
   }
   &.yellow {
-    background: $status_yellow;
+    background: theme.$status_yellow;
   }
   &.red {
-    background: $red_1;
+    background: theme.$red_1;
     color: #fff;
   }
   &.blue {
-    background: $app-primary-color;
+    background: theme.$app-primary-color;
     color: #fff;
   }
 }

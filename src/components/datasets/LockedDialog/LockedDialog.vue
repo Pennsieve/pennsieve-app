@@ -67,7 +67,9 @@
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
+@use '../../../styles/element/dialog';
+
  .locked-dialog {
    .el-dialog__header {
       border-bottom: none;
@@ -75,7 +77,7 @@
     text-align: center;
     p {
       font-weight: normal;
-      color: $gray_6;
+      color: theme.$gray_6;
       padding: 8px 0;
     }
   }

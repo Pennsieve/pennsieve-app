@@ -123,11 +123,11 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .data-card {
     background: #fff;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     &.dark {
       border: none;
     }
@@ -146,7 +146,7 @@
       border-radius: 0 0 2px 2px;
     }
     .dark & {
-      border: 1px solid $gray_2;
+      border: 1px solid theme.$gray_2;
       border-top: none;
     }
     .scrollable & {
@@ -157,12 +157,12 @@
   }
   .title {
     align-items: center;
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
     display: flex;
     justify-content: space-between;
     padding: 16px;
     .dark & {
-      background: $gray_6;
+      background: theme.$gray_6;
       border-radius: 2px 2px 0 0;
       color: #fff;
     }
@@ -173,7 +173,7 @@
       background: #f9f9f9;
     }
     .purple & {
-      background: $purple_tint;
+      background: theme.$purple_tint;
     }
   }
   h2 {
@@ -184,13 +184,13 @@
   .expand-arrow {
     align-items: center;
     background: #f9f9f9;
-    border-top: 1px solid $gray_2;
+    border-top: 1px solid theme.$gray_2;
     display: flex;
     justify-content: center;
     padding: 12px 0;
     width: 100%;
     &:hover, &:focus {
-      background: $gray_2;
+      background: theme.$gray_2;
     }
   }
 
