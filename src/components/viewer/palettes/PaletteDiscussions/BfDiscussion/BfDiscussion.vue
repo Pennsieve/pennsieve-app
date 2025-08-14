@@ -152,5 +152,5 @@ export default {
 </style>
 
 <style lang="scss">
-@use "../../../../../styles/theme" as *;
+@use "../../../../../styles/theme";
 </style>

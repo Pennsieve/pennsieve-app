@@ -404,7 +404,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../../../styles/theme" as *;
+@use "../../../../../styles/theme";
 
 .discussion-add-comment {
   border-top: 1px solid $gray_2;
@@ -454,7 +454,7 @@ export default {
 }
 </style>
 <style lang="scss">
-@use "../../../../../styles/theme" as *;
+@use "../../../../../styles/theme";
 
 .discussion-mention {
   color: theme.$app-primary-color;
