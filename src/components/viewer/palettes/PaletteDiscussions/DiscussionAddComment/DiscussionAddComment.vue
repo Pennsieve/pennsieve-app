@@ -407,12 +407,12 @@ export default {
 @use "../../../../../styles/theme";
 
 .discussion-add-comment {
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
   position: relative;
   &.start-discussion {
     border-top: none;
     .discussion-add-comment-top {
-      border-bottom: 1px solid $gray_2;
+      border-bottom: 1px solid theme.$gray_2;
     }
   }
 }
