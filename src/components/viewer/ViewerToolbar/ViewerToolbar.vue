@@ -21,10 +21,10 @@ export default {
   padding: 10px;
   width: 20px;
   &.left {
-    border-right: 2px solid $gray_2;
+    border-right: 2px solid theme.$gray_2;
   }
   &.right {
-    border-left: 2px solid $gray_2;
+    border-left: 2px solid theme.$gray_2;
   }
 }
 </style>
