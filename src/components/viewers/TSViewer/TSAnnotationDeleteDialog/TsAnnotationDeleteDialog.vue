@@ -160,7 +160,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../../styles/theme" as *;
+@use "../../../../styles/theme";
 
 .mb-16 {
   color: theme.$red_1;

@@ -210,7 +210,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../../../styles/theme" as *;
+@use "../../../../../styles/theme";
 
 .discussion-comment {
   font-size: 13px;
@@ -261,7 +261,7 @@ ul.dot-list {
 }
 </style>
 <style lang="scss">
-@use "../../../../../styles/theme" as *;
+@use "../../../../../styles/theme";
 
 .discussion-comment {
   .mention {
