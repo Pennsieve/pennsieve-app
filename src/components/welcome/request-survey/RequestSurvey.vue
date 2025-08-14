@@ -557,7 +557,7 @@ export default {
 }
 
 .warning-message {
-  color: $red_1;
+  color: theme.$red_1;
 }
 
 .cta-hint {

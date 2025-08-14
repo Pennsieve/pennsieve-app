@@ -899,7 +899,7 @@ defineExpose({
 @use "../../../styles/theme";
 
 .timeseries-scrubber {
-  background: $white;
+  background: theme.$white;
   padding: 0px 8px 8px 8px;
 }
 
@@ -914,7 +914,7 @@ defineExpose({
 }
 
 #scrubber {
-  background: $white;
+  background: theme.$white;
   box-shadow: 0 0 0px 1px #c5c5c5 inset;
   box-sizing: border-box;
   position: relative;
