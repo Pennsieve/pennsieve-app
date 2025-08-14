@@ -113,7 +113,7 @@ export default {
 }
 
 .repoSelector {
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   min-width: 300px;
   height: 64px;
   margin: 8px 0;
