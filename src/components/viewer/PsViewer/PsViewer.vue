@@ -362,12 +362,12 @@ export default {
 .close-action {
   align-self: center;
   cursor: pointer;
-  color: $white;
+  color: theme.$white;
 }
 
 .file-info {
   align-self: center;
-  color: $white;
+  color: theme.$white;
 }
 
 .stage-actions {
@@ -394,7 +394,7 @@ export default {
   }
 }
 .btn-icon {
-  color: $gray_4;
+  color: theme.$gray_4;
   margin-top: 20px;
   &:first-child {
     margin: 0;
@@ -402,10 +402,10 @@ export default {
   &.selected,
   &:hover,
   &[focused] {
-    color: $app-primary-color;
+    color: theme.$app-primary-color;
   }
   &[disabled] {
-    color: $gray_2;
+    color: theme.$gray_2;
   }
 }
 </style>

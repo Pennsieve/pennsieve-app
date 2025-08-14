@@ -1204,7 +1204,7 @@ defineExpose({
 
 .timeseries-viewer-canvas {
   display: flex;
-  background-color: white;
+  background-color: theme.$white;
   flex: 1;
 }
 

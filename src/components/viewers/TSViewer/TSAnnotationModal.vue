@@ -380,7 +380,7 @@ const components = {
 }
 
 .mb-16 {
-  color: $red_1;
+  color: theme.$red_1;
 }
 
 h2 {

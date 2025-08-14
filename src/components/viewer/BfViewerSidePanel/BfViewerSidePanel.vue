@@ -144,10 +144,11 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+@use "../../../styles/element/dialog";
 
 .bf-viewer-side-panel {
   background: #f7f7f7;
-  border-left: 1px solid $gray_2;
+  border-left: 1px solid theme.$gray_2;
   height: 100%;
   flex-direction: column;
   width: 100%;

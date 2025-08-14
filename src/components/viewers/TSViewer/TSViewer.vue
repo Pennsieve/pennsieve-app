@@ -831,13 +831,13 @@ defineExpose({
 
   &.preview {
     height: 600px;
-    border: 2px solid $gray_3;
+    border: 2px solid theme.$gray_3;
   }
 }
 
 #channelCanvas {
   display: flex;
-  background-color: white;
+  background-color: theme.$white;
   flex: 1;
 }
 
@@ -880,13 +880,13 @@ defineExpose({
   color: var(--neuron);
 
   &.selected {
-    color: $orange_1 !important; /* Red color for selected channel labels */
+    color: theme.$orange_1 !important; /* Red color for selected channel labels */
     font-weight: 600; /* Make selected labels slightly bolder */
   }
 }
 
 .chLabelIndWrap[selected] {
-  color: $purple_2;
+  color: theme.$purple_2;
 }
 
 .labelDiv {
