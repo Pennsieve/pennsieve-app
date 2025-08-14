@@ -101,7 +101,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/variables';
 
   .copy-concept-id {
     p {
@@ -117,16 +117,16 @@ export default {
     align-items: center;
 
     .concept-id {
-      color: theme.$purple_2;
+      color: $purple_2;
       font-size: medium;
     }
 
     .copy-icon-button {
       height: 100%;
-      color: theme.$purple_3;
+      color: $purple_3;
 
       &:hover {
-        color: theme.$purple_2;
+        color: $purple_2;
       }
     }
   }

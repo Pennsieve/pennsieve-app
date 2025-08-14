@@ -1,46 +1,43 @@
 <template>
-  <div>
-    <el-dialog
-      class="light-header fixed-width simple"
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      :show-close="false"
-      @close="close"
-      @closed="onClosed"
-    >
+  <el-dialog
+    class="light-header fixed-width simple"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :show-close="false"
+    @close="close"
+    @closed="onClosed"
+  >
+    <dialog-body>
+      <IconWarningCircle
+        :height="32"
+        :width="32"
+        color="#F25641"
+      />
+      <h2>Delete integration?</h2>
+
       <dialog-body>
-        <IconWarningCircle
-          :height="32"
-          :width="32"
-          color="#F25641"
-        />
-        <h2>Delete integration?</h2>
-
-        <dialog-body>
-          <div class="api-key-message">
-            <p>Removing this integration will prevent any datasets within the workspace to invoke this integration and remove access for the integration to the datasets that enabled the integration. </p>
-          </div>
-        </dialog-body>
-
-        <div class="dialog-simple-buttons">
-          <bf-button
-            class="secondary"
-            @click="close"
-          >
-            Cancel
-          </bf-button>
-          <bf-button
-            class="red"
-            :processing="isProcessing"
-            @click="removeIntegration"
-          >
-            Delete
-          </bf-button>
+        <div class="api-key-message">
+          <p>Removing this integration will prevent any datasets within the workspace to invoke this integration and remove access for the integration to the datasets that enabled the integration. </p>
         </div>
       </dialog-body>
-    </el-dialog>
 
-  </div>
+      <div class="dialog-simple-buttons">
+        <bf-button
+          class="secondary"
+          @click="close"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="red"
+          :processing="isProcessing"
+          @click="removeIntegration"
+        >
+          Delete
+        </bf-button>
+      </div>
+    </dialog-body>
+  </el-dialog>
 </template>
 
 <script>
@@ -105,8 +102,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../styles/theme';
-@use '../../styles/element/dialog';
+@import '../../assets/_variables.scss';
 h2 {
   font-size: 14px;
 }

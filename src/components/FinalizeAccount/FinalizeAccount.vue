@@ -342,12 +342,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/_variables.scss";
 
 .wrapper {
-  background: theme.$white;
+  background: $white;
   box-sizing: border-box;
-  color: theme.$gray_4;
+  color: $gray_4;
   max-width: 720px;
   min-height: 100vh;
   padding-bottom: 20px;
@@ -383,7 +383,7 @@ form {
     display: flex;
     flex-direction: row;
     background: #ffffff;
-    border: 1px solid theme.$gray_2;
+    border: 1px solid #dadada;
     border-radius: 5px;
     box-sizing: border-box;
     font-size: 14px;
@@ -405,9 +405,9 @@ form {
       font-size: 13px;
       line-height: 1;
       padding: 13px 10px;
-      background: theme.$gray_2;
+      background: #fafafa;
       border-radius: 0 0 5px 5px;
-      border: solid 1px theme.$gray_2;
+      border: solid 1px #dadada;
       height: 15px;
       width: 94%;
       position: absolute;
@@ -418,13 +418,13 @@ form {
 }
 
 .pw-is-valid-text {
-  color: theme.$green_1;
+  color: #17bb62;
   font-size: 13px;
   line-height: 1;
   padding: 13px 10px;
-  background: theme.$gray_2;
+  background: #fafafa;
   border-radius: 0 0 5px 5px;
-  border: solid 1px theme.$gray_2;
+  border: solid 1px #dadada;
   height: 15px;
   width: 93.5%;
   position: relative;
@@ -439,7 +439,7 @@ form {
 }
 
 .helper {
-  color: theme.$gray_4;
+  color: #71747c;
   font-size: 13px;
   margin-top: 51px;
   margin-bottom: 15px;
@@ -461,7 +461,7 @@ h2 {
 }
 
 a {
-  color: theme.$gray_4;
+  color: #71747c;
   text-decoration: underline;
 }
 
@@ -487,7 +487,7 @@ a {
   display: flex;
   justify-content: space-between;
   .forgot-password {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
     flex: 1;
     margin-left: 16px;
     text-align: center;

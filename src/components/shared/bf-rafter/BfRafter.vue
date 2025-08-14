@@ -386,11 +386,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
-@use '../../../styles/dataset-status';
+@import '../../../assets/_variables.scss';
+@import '../../../assets/components/_dataset-status.scss';
 
 .link-back {
-  color: theme.$white;
+  color: $white;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -404,6 +404,7 @@ export default {
 }
 
 .rafter-inset {
+  //padding: 8px 32px 8px 32px;
   &.with-tabs {
     padding-bottom: 0px;
   }
@@ -412,7 +413,7 @@ export default {
 .bf-rafter {
   padding: 8px 32px 8px 32px;
   transition: 0.15s padding linear;
-  background: theme.$purple_1;
+  background: $purple_1;
   z-index: 5;
 
   &.overview {
@@ -422,7 +423,7 @@ export default {
 
     h1 {
       margin: 0;
-      color: theme.$gray_6;
+      color: $gray_6;
       font-size: 20px;
       &.flex-heading {
         align-items: center;
@@ -436,7 +437,7 @@ export default {
 
 
   .link-back {
-    color: theme.$gray_2;
+    color: $gray_2;
     font-size: 12px;
     cursor: pointer;
   }
@@ -444,7 +445,7 @@ export default {
 
 
   &.primary {
-    background: theme.$gray_1;
+    background: $gray_1;
     padding-top: 24px;
 
     &.white {
@@ -452,7 +453,7 @@ export default {
     }
     h1 {
       margin: 0;
-      color: theme.$purple_3;
+      color: $purple_3;
       font-size: 24px;
       &.flex-heading {
         align-items: center;
@@ -485,9 +486,9 @@ export default {
     }
   }
   .condensed & {
-    background: theme.$purple_1 ;
+    background: $purple_1 ;
     &.primary {
-      background: theme.$gray_1;
+      background: $gray_1;
     }
   }
   .row {
@@ -503,7 +504,7 @@ export default {
 }
 .bf-rafter-description {
   margin-top: 8px;
-  color: theme.$gray_5;
+  color: $gray_5;
   .condensed & {
     display: none;
   }
@@ -562,7 +563,7 @@ export default {
   width: 100%;
 
   :slotted(.header-scroll) {
-    color: theme.$purple_3;
+    color: $purple_3;
   }
   :slotted(h3) {
     color: red;
@@ -587,7 +588,7 @@ export default {
   position: relative;
 }
 .dataset-status {
-  color: theme.$gray_4;
+  color: $gray_4;
   font-size: 12px;
   font-weight: normal;
   overflow: hidden;
@@ -600,7 +601,7 @@ export default {
   display: flex;
   align-items: center;
   .dataset {
-    color: theme.$gray_4;
+    color: $gray_4;
     font-size: 12px;
   }
   .dataset-filter-dropdown {
@@ -613,9 +614,9 @@ export default {
   padding-left: 16px;
   padding-right: 10%;
   padding-top: 8px;
-  background-color: theme.$purple_tint;
+  background-color: $purple_tint;
   :deep(.header-scroll) {
-    color: theme.$purple_2
+    color: $purple_2
   }
   :deep(.magic-block-textarea) {
     p {
@@ -628,7 +629,7 @@ export default {
 
 .help-wrapper {
   background-color: white;
-  color: theme.$gray_6;
+  color: $gray_6;
   max-height: 0;
   transition: max-height 0.15s, padding-top 0.15s ease-out;
   overflow-y:scroll;

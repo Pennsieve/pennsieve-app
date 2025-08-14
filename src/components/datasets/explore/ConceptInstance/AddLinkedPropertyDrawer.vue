@@ -288,6 +288,7 @@ watch(searchResults.value, async(val, oldVal) => {
 
 
 <style lang="scss" scoped>
+@import '../../../../assets/variables';
 
 .search-results-wrap {
   flex: 1;

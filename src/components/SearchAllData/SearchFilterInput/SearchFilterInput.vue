@@ -497,15 +497,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
-
+@import '../../../assets/_variables.scss';
 input,
  .el-date-editor .el-input__inner {
   background: none;
-  border: 1px solid theme.$app-primary-color;
+  border: 1px solid $app-primary-color;
   border-radius: 0;
   box-sizing: border-box;
-  color: theme.$gray_6;
+  color: $gray_6;
   font-size: inherit;
   height: auto;
   line-height: inherit;

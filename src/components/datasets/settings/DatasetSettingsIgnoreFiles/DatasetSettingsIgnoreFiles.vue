@@ -113,8 +113,6 @@
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/element/input';
-
 p {
   color: #000;
 }

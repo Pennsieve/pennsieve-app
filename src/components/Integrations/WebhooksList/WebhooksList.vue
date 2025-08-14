@@ -258,8 +258,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
-@use "../../../styles/element/dialog";
+@import "../../../assets/variables";
 
 .addIntegrationContainer {
   display: flex;
@@ -301,7 +300,7 @@ export default {
   }
 
   p {
-    color: theme.$purple_3;
+    color: #71747c;
     font-size: 14px;
     line-height: 16px;
     text-align: center;

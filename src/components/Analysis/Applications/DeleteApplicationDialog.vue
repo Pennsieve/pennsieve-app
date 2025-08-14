@@ -34,7 +34,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../styles/theme";
+@import "../../../assets/_variables.scss";
 h2 {
   font-size: 14px;
 }

@@ -154,7 +154,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/variables";
 
 .description {
   max-width: 600px;

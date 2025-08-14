@@ -325,17 +325,17 @@ const onRevert = () => {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .bf-channel {
   background: white;
-  border-bottom: 1px solid theme.$gray_1;
+  border-bottom: 1px solid $gray_1;
   box-sizing: border-box;
   display: flex;
   padding: 4px 8px 4px 16px;
   //margin: 8px;
   &:hover {
-    background: theme.$purple_tint;
+    background: $purple_tint;
   }
   &:not(.visible) {
     .channel-info {
@@ -348,7 +348,7 @@ const onRevert = () => {
 }
 
 .channel-info {
-  color: theme.$gray_4;
+  color: $gray_4;
   flex: 1;
 }
 
@@ -373,12 +373,12 @@ h2 {
 }
 
 .selected {
-  color: theme.$orange_1
+  color: $orange_1
 }
 
 button {
   &:hover, &:focus {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
 }
 </style>

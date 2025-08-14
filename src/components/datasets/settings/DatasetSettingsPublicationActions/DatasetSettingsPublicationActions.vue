@@ -320,14 +320,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 h1{
   font-size: 16px;
   line-height: 16px;
   font-weight: 700;
 }
 h3 {
-  color: theme.$gray_6;
+  color: $gray_6;
   font-weight: 600;
   font-size: 14px;
   line-height: 16px;
@@ -341,7 +341,7 @@ p {
 .bf-button {
   margin-bottom: 32px;
   &.secondary {
-    border: solid 1px theme.$gray_2;
+    border: solid 1px $gray_2;
   }
 }
 

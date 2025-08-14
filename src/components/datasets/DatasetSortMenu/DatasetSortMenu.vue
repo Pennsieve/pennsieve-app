@@ -1,49 +1,46 @@
 <template>
-  <div>
-    <el-dropdown
-      trigger="click"
-      placement="bottom-start"
-      @command="$emit('select', $event)"
-      @visible-change="isMenuOpen = $event"
-    >
+  <el-dropdown
+    trigger="click"
+    placement="bottom-start"
+    @command="$emit('select', $event)"
+    @visible-change="isMenuOpen = $event"
+  >
 
-      <button class="dataset-filter-dropdown el-dropdown-link">
+    <button class="dataset-filter-dropdown el-dropdown-link">
       <span class="el-dropdown-text-link">
         {{ selectedLabel }}
       </span>
-        <IconArrowUp
-          class="ml-8 arrow-style"
-          :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
-          color="black"
-        />
+      <IconArrowUp
+        class="ml-8 arrow-style"
+        :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
+        color="black"
+      />
 
-      </button>
-      <template #dropdown>
-        <el-dropdown-menu
-          slot="dropdown"
-          class="bf-menu"
+    </button>
+    <template #dropdown>
+      <el-dropdown-menu
+        slot="dropdown"
+        class="bf-menu"
+      >
+        <el-dropdown-item
+          v-for="option in options"
+          :key="option.value"
+          class="icon-item"
+          :command="option"
         >
-          <el-dropdown-item
-            v-for="option in options"
-            :key="option.value"
-            class="icon-item"
-            :command="option"
-          >
-            {{ option.name }}
+          {{ option.name }}
 
-            <IconCheck
-              v-if="orderBy === option.value"
-              class="item-icon-check"
-              :width="20"
-              :height="20"
-              color="black"
-            />
-          </el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
-
-  </div>
+          <IconCheck
+            v-if="orderBy === option.value"
+            class="item-icon-check"
+            :width="20"
+            :height="20"
+            color="black"
+          />
+        </el-dropdown-item>
+      </el-dropdown-menu>
+    </template>
+  </el-dropdown>
 </template>
 
 <script>
@@ -107,6 +104,3 @@ export default {
   }
 }
 </script>
-<style scoped lang="scss">
-@use '../../../styles/element/dropdown';
-</style>

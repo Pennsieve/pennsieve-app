@@ -87,25 +87,25 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
+@import "../../../assets/_variables";
 
 .banner-wrapper {
-  background-color: theme.$purple_3;
+  background-color: $purple_3;
 }
 
 .banner {
-  background-color: theme.$purple_tint;
-  border: 1px solid theme.$purple_2;
+  background-color: $purple_tint;
+  border: 1px solid $purple_2;
   margin: 5px;
   padding: 8px 0 8px 0;
-  color: theme.$purple_2;
+  color: $purple_2;
   display: flex;
   font-weight: bold;
   justify-content: space-between;
   text-align: center;
 
   a {
-    color: theme.$purple_2;
+    color: $purple_2;
     text-decoration: underline;
   }
 }

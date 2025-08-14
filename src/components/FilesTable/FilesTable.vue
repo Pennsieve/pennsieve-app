@@ -478,8 +478,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../styles/theme";
-@use "../../styles/element/table";
+@import "../../assets/_variables.scss";
 
 .slim-checkbox {
   height: 8px;
@@ -491,6 +490,7 @@ export default {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
+  //border: 1px solid $gray_2;
   border-radius: 4px;
   &.undelete-modal {
     min-height: calc(100vh - 400px);
@@ -501,23 +501,23 @@ export default {
 .column-header {
 }
 
-//.el-table {
-//  width: 100%;
-//}
-//
-//.el-table--border {
-//  border: none;
-//}
-//
-//.el-table--border td {
-//  //border: none;
-//  border-right: 1px solid transparent;
-//}
-//
-//.el-table--border tr {
-//  border: none;
-//  //border-right: 1px solid transparent;
-//}
+.el-table {
+  width: 100%;
+}
+
+.el-table--border {
+  border: none;
+}
+
+.el-table--border td {
+  //border: none;
+  border-right: 1px solid transparent;
+}
+
+.el-table--border tr {
+  border: none;
+  //border-right: 1px solid transparent;
+}
 
 .btn-selection-action {
   align-items: center;
@@ -525,10 +525,10 @@ export default {
   font-size: 14px;
 }
 .link-file {
-  color: theme.$text-color;
+  color: $text-color;
   &:hover,
   &:focus {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
 }
 #check-all {
@@ -541,7 +541,7 @@ export default {
 }
 .selection-menu-wrap {
   background: #e9edf6;
-  //border: 1px solid theme.$gray_2;
+  border: 1px solid $gray_2;
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   display: flex;
@@ -558,36 +558,36 @@ export default {
   justify-content: flex-end;
   align-items: center;
 }
-//.el-table {
-//  border-radius: 4px;
-//  tr {
-//    transition: background-color 0.3s ease-in-out;
-//  }
-//  td,
-//  th {
-//    padding: 8px 0;
-//  }
-//
-//  .disable-select {
-//    pointer-events: none;
-//  }
-//
-//  .allow-file-navigation button {
-//    pointer-events: auto;
-//  }
-//
-//  .cell {
-//    padding-left: 16px;
-//    padding-right: 16px;
-//  }
-//
-//  .caret-wrapper {
-//    display: none;
-//  }
-//  .highlight {
-//    background-color: theme.$status_yellow;
-//  }
-//}
+.el-table {
+  border-radius: 4px;
+  tr {
+    transition: background-color 0.3s ease-in-out;
+  }
+  td,
+  th {
+    padding: 8px 0;
+  }
+
+  .disable-select {
+    pointer-events: none;
+  }
+
+  .allow-file-navigation button {
+    pointer-events: auto;
+  }
+
+  .cell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .caret-wrapper {
+    display: none;
+  }
+  .highlight {
+    background-color: $status_yellow;
+  }
+}
 .file-actions-wrap {
   display: flex;
   justify-content: flex-end;

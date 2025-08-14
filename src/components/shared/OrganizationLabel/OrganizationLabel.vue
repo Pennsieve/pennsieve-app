@@ -55,7 +55,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
+@import '../../../assets/variables';
 
 .organization-label {
   display: flex;

@@ -108,15 +108,15 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 .avatar-circle {
   position: relative;
   align-items: center;
-  background: theme.$app-primary-color;
+  background: $app-primary-color;
   border-radius: 50%;
   box-sizing: border-box;
-  color: theme.$white;
+  color: $white;
   display: inline-flex;
   font-weight: 600;
   height: 32px;

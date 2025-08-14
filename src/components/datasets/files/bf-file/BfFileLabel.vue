@@ -301,11 +301,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../../styles/theme';
+@import '../../../../assets/_icon-item-colors.scss';
 
 
 .no-link-name {
-  color: theme.$gray_6
+  color:$gray_6
 }
 
 .btn-open-file {
@@ -345,7 +345,7 @@ export default {
     &:hover,
     &:focus {
       cursor: pointer;
-      color: theme.$app-primary-color;
+      color: $app-primary-color;
       text-decoration: underline;
     }
   }
@@ -364,7 +364,7 @@ export default {
   line-height: 1;
   .btn-icon-viewer {
     align-items: center;
-    background: theme.$app-primary-color;
+    background: $app-primary-color;
     color: #fff;
     height: 24px;
     justify-content: center;
@@ -372,7 +372,7 @@ export default {
     width: 24px;
     &:hover,
     &:focus {
-      background: theme.$purple_3;
+      background: $purple_3;
     }
     &:hover {
       box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);

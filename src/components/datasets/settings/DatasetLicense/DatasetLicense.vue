@@ -72,9 +72,7 @@ import IconLicense from "../../../icons/IconLicense.vue";
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/select';
-
+@import '../../../../assets/_variables.scss';
 .dataset-license {
   max-width: 463px;
   .svg-icon {
@@ -86,7 +84,7 @@ import IconLicense from "../../../icons/IconLicense.vue";
   }
 
   .label-flex {
-    color: theme.$gray_6;
+    color: $gray_6;
     size: 14px;
     font-weight: 700;
     margin-bottom: 8px;

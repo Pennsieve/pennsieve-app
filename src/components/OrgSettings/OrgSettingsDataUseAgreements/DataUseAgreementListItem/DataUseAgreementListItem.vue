@@ -106,10 +106,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 p {
-  color: theme.$gray_4;
+  color: $gray_4;
 }
 button {
   align-items: center;
@@ -120,7 +120,7 @@ button {
   padding: 16px 0;
 }
 .default-dot {
-  background: theme.$green_1;
+  background: $green_1;
   border-radius: 50%;
   height: 8px;
   margin-right: 4px;

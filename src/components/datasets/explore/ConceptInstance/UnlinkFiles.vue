@@ -1,54 +1,51 @@
 <template>
-  <div>
-    <el-dialog
-      class="simple"
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      :show-close="false"
-      @close="closeDialog"
-    >
-      <template #header>
-        <bf-dialog-header
-          title="Remove Relationships"
+  <el-dialog
+    class="simple"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :show-close="false"
+    @close="closeDialog"
+  >
+    <template #header>
+      <bf-dialog-header
+        title="Remove Relationships"
+      />
+    </template>
+
+    <dialog-body>
+      <template #icon>
+        <IconGraph
+          class="icon-graph"
+          :height="32"
+          :width="32"
         />
       </template>
 
-      <dialog-body>
-        <template #icon>
-          <IconGraph
-            class="icon-graph"
-            :height="32"
-            :width="32"
-          />
-        </template>
-
-        <template #heading>
-          <h2>
-            {{ this.relationshipText }}
-          </h2>
-        </template>
-
-        <p>Deleting file links cannot be undone.</p>
-
-      </dialog-body>
-
-      <template #footer>
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          class="red"
-          @click="sendRequest"
-        >
-          Delete
-        </bf-button>
+      <template #heading>
+        <h2>
+          {{ this.relationshipText }}
+        </h2>
       </template>
-    </el-dialog>
 
-  </div>
+      <p>Deleting file links cannot be undone.</p>
+
+    </dialog-body>
+
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        class="red"
+        @click="sendRequest"
+      >
+        Delete
+      </bf-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
@@ -187,8 +184,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/icon-item-colors';
+@import '../../../../assets/_variables.scss';
+@import '../../../../assets/_icon-item-colors.scss';
 
 .dialog-body {
   text-align: center;

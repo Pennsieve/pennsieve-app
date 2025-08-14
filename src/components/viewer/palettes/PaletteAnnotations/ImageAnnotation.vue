@@ -120,16 +120,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .ts-annotation {
-  background: theme.$gray_0;
-  border-bottom: 1px solid theme.$gray_2;
+  background: $gray_0;
+  border-bottom: 1px solid $gray_2;
   box-sizing: border-box;
   display: flex;
   padding: 3px 8px 3px 16px;
   & .selected {
-    background-color: theme.$purple_tint;
+    background-color: $purple_tint;
   }
   &:hover {
     background: white;
@@ -139,7 +139,7 @@ export default {
       opacity: .4
     }
     .svg-icon {
-      color: theme.$gray_4;
+      color: $gray_4;
     }
   }
 
@@ -169,11 +169,11 @@ h2 {
   margin-bottom: 2px;
 }
 .selected {
-  color: theme.$purple_1
+  color: $purple_1
 }
 button {
   &:hover, &:focus {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
 }
 </style>

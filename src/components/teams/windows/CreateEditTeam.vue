@@ -1,4 +1,5 @@
 <template>
+  <div></div>
   <el-dialog
     :show-close="false"
     :modelValue="dialogVisible"
@@ -6,6 +7,7 @@
     @open="onOpen"
     @close="closeDialog"
   >
+
     <template #header>
       <bf-dialog-header
         :title="modalTitle"
@@ -55,17 +57,6 @@
   </el-dialog>
 </template>
 
-<style scoped lang="scss">
-@use '../../../styles/element/dialog';
-
-:deep( .el-dialog) {
-  background: red;
-
-}
-
-</style>
-
-
 <script>
 import { mapGetters } from 'vuex'
 import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
@@ -75,6 +66,7 @@ import Request from  '../../../mixins/request'
 import AutoFocus from '../../../mixins/auto-focus'
 import EventBus from '../../../utils/event-bus'
 import {  path, pathOr, pathEq } from 'ramda'
+import autoFocus from "../../../mixins/auto-focus";
 import {useGetToken} from "@/composables/useGetToken";
 
 export default {
@@ -159,6 +151,19 @@ export default {
       evt.preventDefault()
       this.createEditTeam('teamForm')
     },
+    // /**
+    //  * Handles open-edit-team and open-create-team events
+    //  * @param {Object} team
+    //  */
+    // onOpenTeam: function(team) {
+    //
+    //   const teamName = pathOr('', ['team', 'name'], team)
+    //   if (teamName.length > 0) {
+    //     this.isEditing = true
+    //     this.modalTitle = 'Update team'
+    //     this.ruleForm.name = teamName
+    //   }
+    // },
     /**
      * Verifies that team name is unique
      * @param {String} name
@@ -241,4 +246,3 @@ export default {
   }
 }
 </script>
-

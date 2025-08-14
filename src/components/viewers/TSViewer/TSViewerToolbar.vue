@@ -1,6 +1,17 @@
 <template>
   <div class="timeseries-viewer-toolbar">
     <div id="left-controls">
+      <el-tooltip
+        placement="top-end"
+        content="Toggle Time Zoom Controls">
+        <button
+          class="btn-icon"
+          @click="toggleTimeZoom()">
+          <IconTimescale
+            :height="20"
+            :width="20"/>
+        </button>
+      </el-tooltip>
 
       <el-input-number
         v-model="durationInSeconds"
@@ -9,25 +20,21 @@
         :step="5"
         :max="constants['MAXDURATION']"
         controls-position="right">
-
-        <template #suffix>
-          seconds
-        </template>
-
       </el-input-number>
 
+      <el-tooltip
+        placement="top-end"
+        content="Toggle Vertical Zoom Controls">
+        <button
+          class="btn-icon"
+          @click="toggleVerticalZoom()">
+        </button>
+      </el-tooltip>
 
-        <el-input-number
-          v-model="zoomMult"
-          :precision="2"
-          :step="5"
-          controls-position="right">
-
-          <template #suffix>
-            uV/mm
-          </template>
-        </el-input-number>
-
+      <el-button-group v-if="showVertZoom">
+        <el-button icon="el-icon-plus" size="small" @click="incrementZoom"></el-button>
+        <el-button icon="el-icon-minus" size="small" @click="decrementZoom"></el-button>
+      </el-button-group>
     </div>
 
     <div id="center-controls">
@@ -116,9 +123,6 @@
         </el-option>
       </el-select>
     </div>
-    <div>
-
-    </div>
 
   </div>
 </template>
@@ -147,21 +151,8 @@ const props = defineProps({
   start: {
     type: Number,
     required: true
-  },
-  globalZoomMult: {
-    type: Number,
-    required: true,
   }
 })
-
-const zoomMult = computed({
-  get() {
-    return  (((96 * window.devicePixelRatio) / (props.globalZoomMult * 1)) / 25.4)
-  },
-  set(newValue) {
-    emit('update:globalZoomMult', (((96 * window.devicePixelRatio) / (newValue * 1)) / 25.4)); // Emit an event to update the parent
-  },
-});
 
 // Emits
 const emit = defineEmits([
@@ -172,8 +163,7 @@ const emit = defineEmits([
   'updateDuration',
   'nextAnnotation',
   'previousAnnotation',
-  'setStart',
-  'update:globalZoomMult'
+  'setStart'
 ])
 
 
@@ -298,12 +288,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
-
-.el-input-number {
-  width: 180px;
-  margin: 0 8px
-}
+@import '../../../assets/_variables.scss';
 
 .timeseries-viewer-toolbar {
   border-top: 1px solid #DADADA;
@@ -316,17 +301,17 @@ onMounted(() => {
 }
 
 .btn-icon {
-  color: theme.$gray_4;
+  color: $gray_4;
   margin-left: 8px;
   margin-right: 2px;
   &:last-child {
     margin-right: 8px;
   }
   &.selected, &:hover, &[focused] {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
   &[disabled] {
-    color: theme.$gray_2;
+    color: $gray_2;
   }
 }
 

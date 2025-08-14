@@ -1,9 +1,7 @@
-@use './theme';
-
 .published-dataset-list-item,
 .bf-dataset-list-item,
 .proposed-dataset-list-item {
-  border-bottom: 1px solid theme.$gray_2;
+  border-bottom: 1px solid $gray_2;
   padding: 8px;
   margin-top: 4px;
 
@@ -18,13 +16,13 @@
     padding-bottom: 0;
   }
   h2 {
-    color: theme.$purple_3;
+    color: $purple_3;
     display: block;
     font-size: 16px;
     font-weight: 300;
     margin: 8px 0;
     &.publish-in-progress {
-      color: theme.$gray_4;
+      color: $gray_4;
     }
     .svg-icon {
       color: #000
@@ -77,29 +75,29 @@
 }
 
 .dataset-meta, .workspace-meta {
-  color: theme.$gray_4;
+  color: $gray_4;
   font-size: 13px;
   strong {
-    color: theme.$text-color;
+    color: $text-color;
   }
 }
 .publish-info {
   align-items: center;
-  color: theme.$gray_4;
+  color: $gray_4;
   display: flex;
   &.error {
-    color: theme.$error-color;
+    color: $error-color;
   }
   p {
     margin: 0;
   }
   strong {
-    color: theme.$gray_6;
+    color: $gray_6;
   }
   .bf-icon-waiting {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
   .link-separator {
-    color: theme.$text-color
+    color: $text-color
   }
 }

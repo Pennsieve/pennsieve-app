@@ -28,11 +28,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 .bf-tag {
   align-items: center;
-  background: theme.$gray_2;
+  background: $gray_2;
   border-radius: 4px;
   display: flex;
   justify-content: space-between;

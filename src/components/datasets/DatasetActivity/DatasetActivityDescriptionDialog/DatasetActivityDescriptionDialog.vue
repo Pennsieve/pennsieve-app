@@ -95,7 +95,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-//@use '../../../../styles/theme';
-//@use '../../../shared/MarkdownEditor/_markdown.scss';
+@import '../../../../assets/_variables.scss';
+@import '../../../shared/MarkdownEditor/_markdown.scss';
 
 </style>

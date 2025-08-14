@@ -415,27 +415,27 @@ export default {
 </script>
 
 <style lang="scss">
-@use '../../styles/theme';
+@import '../../assets/variables.scss';
 
 .logo-container {
   width: 300px;
 }
 
 .reset-password {
-  background: theme.$purple_1;
+  background: $purple_1;
   display: block;
 
   h2 {
-    color: theme.$purple_3;
+    color: $purple_3;
     font: 700 24px/31px SharpSans,sans-serif;
     margin: 0 0 10px 0;
   }
 
 
   .reset-password-wrapper {
-    background: theme.$white;
+    background: $white;
     box-sizing: border-box;
-    color: theme.$gray_4;
+    color: $gray_4;
     max-width: 720px;
     min-height: 100vh;
     padding-bottom: 20px;
@@ -446,9 +446,9 @@ export default {
   }
 
   .reset-password-inner {
-    background: theme.$white;
+    background: $white;
     box-sizing: border-box;
-    color: theme.$gray_4;
+    color: $gray_4;
     max-width: 720px;
     flex: 1;
     width: 360px;
@@ -527,7 +527,7 @@ export default {
     }
   }
   .error {
-    color: theme.$error-color;
+    color: $error-color;
   }
 }
 

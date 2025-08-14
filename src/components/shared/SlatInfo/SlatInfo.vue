@@ -17,10 +17,10 @@
 </script>
 
 <style lang="scss" scoped>
-  @use '../../../styles/theme';
+  @import '../../../assets/_variables.scss';
 
   .slat-info {
-    border-top: 1px solid theme.$gray_2;
+    border-top: 1px solid $gray_2;
     display: flex;
     justify-content: space-between;
     padding: 8px 0;

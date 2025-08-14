@@ -1,91 +1,85 @@
 <template>
-  <div>
-    <el-dialog
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      data-cy="bfMoveDialog"
-      class="bf-move-dialog"
-      :show-close="false"
-      @close="closeDialog"
-      @open="onOpenDialog"
-    >
-      <template #header>
-        <bf-dialog-header data-cy="bfMoveDialogTitle" :title="dialogTitle" />
+  <el-dialog
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    data-cy="bfMoveDialog"
+    class="bf-move-dialog"
+    :show-close="false"
+    @close="closeDialog"
+    @open="onOpenDialog"
+  >
+    <template #header>
+      <bf-dialog-header data-cy="bfMoveDialogTitle" :title="dialogTitle" />
+    </template>
+
+    <dialog-body>
+      <template v-if="hasConflicts">
+        <p>
+          You have tried to move an item(s) with the same name into the same
+          destination. If you would like to proceed, the following item(s) will
+          be renamed:
+        </p>
+        <div class="content-wrap">
+          <bf-file-label
+            v-for="file in moveConflict.display"
+            :key="file.content.id"
+            :file="file"
+            :interactive="false"
+          />
+        </div>
       </template>
 
-      <dialog-body>
-        <template v-if="hasConflicts">
-          <p>
-            You have tried to move an item(s) with the same name into the same
-            destination. If you would like to proceed, the following item(s)
-            will be renamed:
-          </p>
-          <div class="content-wrap">
+      <template v-else>
+        <div class="breadcrumb-dropdown">
+          <div id="current-folder" data-cy="moveFolderLink">
+            <button v-if="!isAtDataset" id="btn-go-up" @click="goUp">
+              <IconArrowLeft name="icon-arrow-left" :height="8" :width="8" />
+            </button>
+
+            <div id="current-folder-name">
+              {{ fileName }}
+            </div>
+          </div>
+        </div>
+
+        <div v-loading="isLoading" element-loading-background="transparent">
+          <div ref="filesList" class="file-wrap files-list" data-cy="filesList">
             <bf-file-label
-              v-for="file in moveConflict.display"
-              :key="file.content.id"
-              :file="file"
-              :interactive="false"
+              v-for="folder in folders"
+              :key="folder.content.id"
+              :class="[isSelected(folder) ? 'selected' : '']"
+              :file="folder"
+              @click="onFileClick(folder)"
+              @click-name="onFileNameClick(folder)"
             />
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="breadcrumb-dropdown">
-            <div id="current-folder" data-cy="moveFolderLink">
-              <button v-if="!isAtDataset" id="btn-go-up" @click="goUp">
-                <IconArrowLeft name="icon-arrow-left" :height="8" :width="8" />
-              </button>
-
-              <div id="current-folder-name">
-                {{ fileName }}
-              </div>
+            <div v-if="folders.length === 0 && !isLoading" id="empty-state">
+              <p>There are no more subfolders</p>
             </div>
           </div>
-
-          <div v-loading="isLoading" element-loading-background="transparent">
-            <div
-              ref="filesList"
-              class="file-wrap files-list"
-              data-cy="filesList"
-            >
-              <bf-file-label
-                v-for="folder in folders"
-                :key="folder.content.id"
-                :class="[isSelected(folder) ? 'selected' : '']"
-                :file="folder"
-                @click="onFileClick(folder)"
-                @click-name="onFileNameClick(folder)"
-              />
-              <div v-if="folders.length === 0 && !isLoading" id="empty-state">
-                <p>There are no more subfolders</p>
-              </div>
-            </div>
-          </div>
-        </template>
-      </dialog-body>
-
-      <template #footer>
-        <bf-button
-          class="secondary"
-          data-cy="closeMoveDialog"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          v-if="hasConflicts"
-          data-cy="fileRenameConflicts"
-          @click="renameConflicts"
-        >
-          Proceed
-        </bf-button>
-        <bf-button v-if="!hasConflicts" data-cy="moveFile" @click="move">
-          Move here
-        </bf-button>
+        </div>
       </template>
-    </el-dialog>
-  </div>
+    </dialog-body>
+
+    <template #footer>
+      <bf-button
+        class="secondary"
+        data-cy="closeMoveDialog"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        v-if="hasConflicts"
+        data-cy="fileRenameConflicts"
+        @click="renameConflicts"
+      >
+        Proceed
+      </bf-button>
+      <bf-button v-if="!hasConflicts" data-cy="moveFile" @click="move">
+        Move here
+      </bf-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
@@ -399,8 +393,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../../styles/theme";
-@use "../../../../styles/icon-item-colors";
+@import "../../../../assets/_variables.scss";
+@import "../../../../assets/_icon-item-colors.scss";
 
 .bf-move-dialog {
   .files-list {
@@ -413,30 +407,11 @@ export default {
       &:last-child {
         border: none;
       }
-    }
-
-    #current-folder {
-      align-items: center;
-      color: #000;
-      display: flex;
-      font-weight: 300;
-      font-size: 14pt;
-      margin-bottom: 8px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid theme.$gray_3;
-    }
-    #current-folder-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #btn-go-up {
-      align-items: center;
-      display: inline-flex;
-      padding: 0 8px;
-      &:hover,
-      &:focus {
-        color: theme.$app-primary-color;
+      &.selected {
+        background: #f5f6f9;
+      }
+      .svg-icon {
+        margin-right: 8px;
       }
     }
   }
@@ -449,7 +424,7 @@ export default {
     font-size: 14pt;
     margin-bottom: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid theme.$gray_3;
+    border-bottom: 1px solid $gray_3;
   }
   #current-folder-name {
     overflow: hidden;
@@ -462,7 +437,7 @@ export default {
     padding: 0 8px;
     &:hover,
     &:focus {
-      color: theme.$app-primary-color;
+      color: $app-primary-color;
     }
   }
   #empty-state {

@@ -39,13 +39,13 @@
 </script>
 
 <style lang="scss" scoped>
-  @use '../../../styles/theme';
+  @import '../../../assets/variables';
 
   .sidebar-message {
     padding: 24px 32px;
 
     &.border-bottom {
-      border-bottom: solid 1px theme.$gray_2;
+      border-bottom: solid 1px $gray_2;
     }
 
     &.green {

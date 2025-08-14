@@ -96,10 +96,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .accordion {
-  background: theme.$gray_1;
+  background: $gray_1;
   color: #000;
   font-size: 12px;
   text-decoration: none;
@@ -111,7 +111,7 @@ export default {
 }
 .accordion-trigger {
   align-items: center;
-  border-bottom: solid 1px theme.$gray_2;
+  border-bottom: solid 1px $gray_2;
   display: flex;
   flex-direction: row;
 }
@@ -120,7 +120,7 @@ export default {
 }
 a {
   align-items: center;
-  color: theme.$text-color;
+  color: $text-color;
   display: flex;
   flex: 1;
   height: 34px;
@@ -135,7 +135,7 @@ h3 {
 
 }
 .selected {
-  color: theme.$purple_1
+  color: $purple_1
 }
 bf-annotation-group {
   flex: 0;

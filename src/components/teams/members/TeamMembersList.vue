@@ -448,13 +448,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
-@use '../../../styles/element/table';
-@use '../../../styles/element/dialog';
-@use '../../../styles/element/pagination';
+@import '../../../assets/variables';
 
 .icon {
-  color: theme.$purple_1
+  color: $purple_1
 }
 
 .team-wrap {
@@ -499,7 +496,7 @@ export default {
   .sub-page-title {
     font-size: 24px;
     padding-left: 20px;
-    color: theme.$purple_3;
+    color: $purple_3;
     align-self: end;
   }
 }

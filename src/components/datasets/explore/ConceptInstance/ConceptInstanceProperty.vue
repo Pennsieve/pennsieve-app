@@ -338,11 +338,10 @@
 </script>
 
 <style lang="scss">
-  @use '_concept-instance-property';
-  @use '../../../../styles/theme';
+  @import '_concept-instance-property';
 
   .name-edit {
-    border-top: 1px solid theme.$purple_tint;
+    border-top: 1px solid $purple_tint;
     padding-top: 4px;
 
   }
@@ -350,9 +349,9 @@
   .add-another-input {
     align-items: center;
     background: transparent;
-    border: 1px dashed theme.$gray_2;
+    border: 1px dashed $gray_2;
     box-sizing: border-box;
-    color: theme.$gray_6;
+    color: $gray_6;
     cursor: pointer;
     display: flex;
     height: 38px;
@@ -372,7 +371,7 @@
     }
 
     &.viewing {
-      border-bottom: 1px solid theme.$gray_2;
+      border-bottom: 1px solid $gray_2;
     }
   }
 </style>

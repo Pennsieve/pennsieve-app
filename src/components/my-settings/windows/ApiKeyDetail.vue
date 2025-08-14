@@ -1,46 +1,43 @@
 <template>
-  <div>
-    <el-dialog
-      v-model="dialogVisible"
-      :show-close="false"
-      @close="closeDialog"
-    >
-      <template #header="{ close, titleId, titleClass }">
-        <bf-dialog-header
-          title="Newly Created API Credentials"
-        />
-      </template>
+  <el-dialog
+    v-model="dialogVisible"
+    :show-close="false"
+    @close="closeDialog"
+  >
+    <template #header="{ close, titleId, titleClass }">
+      <bf-dialog-header
+        title="Newly Created API Credentials"
+      />
+    </template>
 
-      <dialog-body>
-        <div class="api-key-message">
-          For your protection, store your access keys securely and do not share them.
-          You will not be able to access the key again once this window is closed.
-        </div>
-        <p><strong>Key:</strong> {{ apiKey.key }} </p>
-        <p><strong>Secret:</strong> {{ apiKey.secret }}</p>
+    <dialog-body>
+      <div class="api-key-message">
+        For your protection, store your access keys securely and do not share them.
+        You will not be able to access the key again once this window is closed.
+      </div>
+      <p><strong>Key:</strong> {{ apiKey.key }} </p>
+      <p><strong>Secret:</strong> {{ apiKey.secret }}</p>
 
-        <div class="copy-text">
-          {{ copyText }}
-        </div>
-      </dialog-body>
+      <div class="copy-text">
+        {{ copyText }}
+      </div>
+    </dialog-body>
 
-      <template #footer>
-        <bf-button
-          class="secondary"
-          @click="copyApiKey"
-        >
-          Copy API Key
-        </bf-button>
-        <bf-button
-          class="secondary"
-          @click="copyApiSecret"
-        >
-          Copy API Secret
-        </bf-button>
-      </template>
-    </el-dialog>
-
-  </div>
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="copyApiKey"
+      >
+        Copy API Key
+      </bf-button>
+      <bf-button
+        class="secondary"
+        @click="copyApiSecret"
+      >
+        Copy API Secret
+      </bf-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
@@ -118,15 +115,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
-@use '../../../styles/element/dialog';
+@import '../../../assets/_variables';
 
 .api-key-message {
   margin-bottom: 20px;
 }
 
 .copy-text {
-  color: theme.$green_1;
+  color: $green_1;
   height: 24px;
 }
 </style>

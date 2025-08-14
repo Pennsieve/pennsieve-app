@@ -1,8 +1,3 @@
-@use '../theme';
-
-.el-dropdown {
-}
-
 .el-dropdown-menu, .el-select-dropdown__list {
   padding: 8px 0;
 }
@@ -17,10 +12,10 @@
   cursor: pointer;
   outline: none;
   &:hover, &:focus {
-    color: #{theme.$app-primary-color};
+    color: $app-primary-color;
   }
 }
-//.el-dropdown-text-link {
-//  font-weight: 300;
-//  letter-spacing: 0.5px;
-//}
+.el-dropdown-text-link {
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}

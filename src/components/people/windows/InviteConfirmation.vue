@@ -97,7 +97,7 @@
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme' ;
+@import '../../../assets/_variables.scss';
   .dialog-header {
     line-height: 16px;
     width: 169px;
@@ -120,7 +120,7 @@
    text-align: center;
    font-weight: 600;
    margin-top: -1px;
-   color: theme.$gray_6;
+   color: $gray_6;
    display: block;
  }
 

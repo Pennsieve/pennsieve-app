@@ -602,14 +602,14 @@ onEvent((eventData) => {
 })
 
 onChannelDetails((channelDetails) => {
-  console.log('📡 RECEIVED CHANNEL DETAILS:', {
-    channelCount: channelDetails.length,
-    channels: channelDetails.map(ch => ({
-      id: ch.content?.id,
-      name: ch.content?.name,
-      type: ch.content?.channelType
-    }))
-  })
+  // console.log('📡 RECEIVED CHANNEL DETAILS:', {
+  //   channelCount: channelDetails.length,
+  //   channels: channelDetails.map(ch => ({
+  //     id: ch.content?.id,
+  //     name: ch.content?.name,
+  //     type: ch.content?.channelType
+  //   }))
+  // })
 
   // Remove the extra baseChannels parameter - it's already available in the composable
   const virtualChannels = processChannelData(channelDetails)

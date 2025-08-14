@@ -1,9 +1,9 @@
-@use './theme';
+@import '../../assets/_variables.scss';
 
 .bf-navigation {
-  background: #{theme.$purple_2};
+  background: $purple_2;
   box-sizing: border-box;
-  color: #{theme.$white};
+  color: $white;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -28,10 +28,10 @@
   top: 0;
   width: 18px;
   &:hover {
-    border-color: #{theme.$purple_2};
+    border-color: $purple_2;
   }
   .primary &:hover {
-    border-color: #{theme.$purple_2}
+    border-color: $purple_2
   }
 }
 .logo {

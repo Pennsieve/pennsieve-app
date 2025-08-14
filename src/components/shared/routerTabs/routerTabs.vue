@@ -1,5 +1,7 @@
 <template >
-  <ul class="tabs">
+  <ul
+    class="tabs"
+  >
     <li v-for="tab in tabs" :key="tab.to">
       <router-link :to="{ name: tab.to }">
         {{ tab.name }}
@@ -28,7 +30,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 ul {
   list-style: none;
@@ -37,30 +39,22 @@ ul {
 }
 
 .tabs {
-  display: flex;
-  li {
-    margin-left: 32px;
-    &:first-child {
-      margin: 0;
-    }
-  }
   a {
-    color: theme.$gray_5;
+    color: $gray_5;
     display: inline-flex;
     padding: 0 0 16px;
     position: relative;
     text-decoration: none;
-    &:hover ,
+    &:hover,
     &:focus {
-      color: theme.$purple_2;
+      color: $purple_2;
       text-decoration: none;
     }
     &.router-link-active,
     &.active {
-      color: theme.$purple_3;
-      font-weight: 500;
+      color: $purple_2;
       &:after {
-        background: theme.$purple_1;
+        background: $purple_1;
         bottom: 0;
         content: '';
         left: 0;
@@ -71,7 +65,7 @@ ul {
     }
     &.disabled {
       cursor: default;
-      color: theme.$gray_4;
+      color: $gray_4;
     }
   }
 
@@ -84,22 +78,21 @@ ul {
       }
     }
     a {
-      color: theme.$purple_tint;
+      color: $purple_tint;
       display: inline-flex;
       padding: 0 0 16px;
       position: relative;
       text-decoration: none;
       &:hover,
       &:focus {
-        color: theme.$gray_2;
+        color: $gray_2;
         text-decoration: none;
       }
       &.router-link-active,
       &.active {
         color: white;
-        font-weight: 500;
         &:after {
-          background: theme.$gray_1;
+          background: $gray_1;
           bottom: 0;
           content: '';
           left: 0;
@@ -110,11 +103,9 @@ ul {
       }
       &.disabled {
         cursor: default;
-        color: theme.$purple_tint;
+        color: $purple_tint;
       }
     }
   }
 }
-
-
 </style>

@@ -510,9 +510,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
-@use  '../../../styles/element/pagination';
-@use '../../../styles/element/dialog';
+@import "../../../assets/_variables.scss";
 
 .no-results-found-wrapper {
   img {
@@ -540,7 +538,7 @@ export default {
   display: flex;
   flex: 1;
   flex-direction: column;
-  color: theme.$gray_5;
+  color: $gray_5;
 }
 .dataset-list-controls {
   align-items: center;

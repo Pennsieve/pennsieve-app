@@ -38,6 +38,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
+@import '../../assets/_variables.scss';
 
 .icon-sort {
   margin-left: 4px;

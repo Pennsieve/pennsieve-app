@@ -114,7 +114,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .breadcrumb-navigation {
   align-items: center;
@@ -125,10 +125,10 @@ export default {
   margin: 0;
   margin-left: 16px;
   white-space: nowrap;
-  color: theme.$purple_3;
+  color: $purple_3;
 
   .el-dropdown {
-    color: theme.$purple_3;
+    color: $purple_3;
     display: inline-flex;
   }
 
@@ -146,13 +146,13 @@ export default {
   }
   .collection-name {
     align-items: center;
-    color: theme.$purple_3;
+    color: $purple_3;
     outline: none;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .dark-text {
-    color: theme.$gray_5;
+    color: $gray_5;
   }
 }
 </style>

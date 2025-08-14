@@ -644,7 +644,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
+
 
 .explore-wrapper {
   display: flex;
@@ -672,14 +673,18 @@ export default {
 
 .section-heading {
   margin-bottom: 8px;
-  color: theme.$purple_3;
+  color: $purple_3;
   font-size: larger;
 }
 
 .models-list-wrap {
   background: #fff;
+  //box-shadow: -3px 1px 11px 0 rgba(0,0,0,0.21);
+  //height: calc(100vh - 130px);
   overflow: hidden;
+  //position: absolute;
   right: 0;
+  //top: 0px;
   transform: translate3d(100%, 0, 0);
   transition: transform .3s ease-out;
   width: 250px;
@@ -731,7 +736,7 @@ p {
 }
 
 .file-meta-data-info {
-  border: 1px solid theme.$gray_2;
+  border: 1px solid $gray_2;
   margin-left: 16px;
   border-radius: 4px;
   flex: 0 0 260px;
@@ -742,15 +747,15 @@ p {
 .header {
   height: 38px;
   font-size: 16px;
-  background-color: theme.$gray_1;
-  border-bottom: 1px solid theme.$gray_2;
+  background-color: $gray_1;
+  border-bottom: 1px solid $gray_2;
   line-height: 38px;
   padding-left: 16px;
-  color: theme.$gray_4;
+  color: $gray_4;
 }
 
 .model-name-heading {
-  color: theme.$purple_3;
+  color: $purple_3;
   margin: 0 0 0 16px;
   text-transform: capitalize;
   font-size: 18px;
@@ -773,9 +778,12 @@ p {
 .btn-toggle-models-list {
   align-items: center;
   background: #fff;
+  //box-shadow: -3px 1px 11px 0 rgba(0, 0, 0, 0.21);
   display: flex;
   height: 32px;
+  //left: -33px;
   justify-content: center;
+  //position: absolute;
   top: 20px;
   width: 33px;
 
@@ -784,11 +792,15 @@ p {
     content: '';
     height: 100%;
     pointer-events: none;
+    //position: absolute;
     top: 0;
     right: -5px;
     width: 5px;
   }
 }
+
+
+
 
 .stage-wrapper {
   display: flex;
@@ -797,12 +809,14 @@ p {
   .results {
     flex: 1;
     min-width: 0;
+    //margin-right: 16px;
     display: flex;
     flex-direction: column;
   }
 }
 
 .records-table .model-title {
+  //color: $purple_1;
   text-decoration: none;
   &:hover, &:focus {
     outline: none;

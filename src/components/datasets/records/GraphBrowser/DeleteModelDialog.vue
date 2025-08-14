@@ -52,59 +52,55 @@ function onDeleteModel() {
 </script>
 
 <template>
-  <div>
-    <el-dialog
+  <el-dialog
 
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      :show-close="false"
-      @close="closeDialog"
-    >
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :show-close="false"
+    @close="closeDialog"
+  >
 
-      <template #header>
-        <bf-dialog-header
-          title="Delete property"
-        />
-      </template>
+    <template #header>
+      <bf-dialog-header
+        title="Delete property"
+      />
+    </template>
 
-      <div class="dialog-main">
-        <IconTrash
-          class="trash-icon"
-          :height="32"
-          :width="32"
-        />
+    <div class="dialog-main">
+      <IconTrash
+        class="trash-icon"
+        :height="32"
+        :width="32"
+      />
 
-        <!--      <h3>Delete {{ props.model.displayName }}?</h3>-->
-        <p>Are you sure you want to delete the relationship from the model?</p>
+<!--      <h3>Delete {{ props.model.displayName }}?</h3>-->
+      <p>Are you sure you want to delete the relationship from the model?</p>
 
-      </div>
+    </div>
 
 
-      <template #footer>
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          processing-text="Deleting"
-          @click="onDeleteModel"
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        processing-text="Deleting"
+        @click="onDeleteModel"
 
-        >
-          Delete
+      >
+        Delete
 
-        </bf-button>
-      </template>
+      </bf-button>
+    </template>
 
-    </el-dialog>
-  </div>
-
+  </el-dialog>
 </template>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/dialog';
+@import '../../../../assets/_variables.scss';
 
 h1 {
   font-size: 14px;
@@ -121,7 +117,7 @@ h1 {
 }
 
 .trash-icon {
-  color: theme.$error-color
+  color: $color-error
 }
 
 </style>

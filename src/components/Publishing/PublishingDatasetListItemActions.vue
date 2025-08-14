@@ -613,7 +613,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/_variables.scss";
 
 .button-wrapper {
   display: flex;

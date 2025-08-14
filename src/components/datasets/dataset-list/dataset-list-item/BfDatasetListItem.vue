@@ -389,11 +389,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../../styles/theme";
-@use "../../../../styles/list-item";
+@import "../../../../assets/_variables.scss";
+@import "../../../../assets/_list-item.scss";
 
 .list-item-status-wrapper {
-  color: theme.$gray_4;
+  color: $gray_4;
   font-size: 12px;
   line-height: 18px;
   font-weight: normal;

@@ -82,10 +82,10 @@
 </script>
 
 <style scoped lang="scss">
-  @use '../../../styles/theme';
+  @import '../../../assets/_variables';
 
   .locked-banner {
-    background-color: theme.$status_orange;
+    background-color: $status_orange;
     padding: 8px 0 8px 0;
     color: white;
     display: flex;
@@ -104,7 +104,7 @@
     text-align: center;
     p {
       font-weight: normal;
-      color: theme.$gray_6;
+      color: $gray_6;
       padding: 8px 0;
     }
   }

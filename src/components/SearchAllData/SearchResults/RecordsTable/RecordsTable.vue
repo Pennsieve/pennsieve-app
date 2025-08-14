@@ -1,5 +1,4 @@
 <template>
-  <div>
     <el-table
       ref="table"
       :border="true"
@@ -37,14 +36,14 @@
           </template>
         </template>
 
-        <!--        Something here-->
+<!--        Something here-->
 
-        <!--        <template slot-scope="scope">-->
-        <!--          <div-->
-        <!--            :class="{ 'model-title': heading.modelTitle }"-->
-        <!--            v-html="$sanitize(scope.row[heading.name], ['a'])"-->
-        <!--          />-->
-        <!--        </template>-->
+<!--        <template slot-scope="scope">-->
+<!--          <div-->
+<!--            :class="{ 'model-title': heading.modelTitle }"-->
+<!--            v-html="$sanitize(scope.row[heading.name], ['a'])"-->
+<!--          />-->
+<!--        </template>-->
       </el-table-column>
 
       <el-table-column
@@ -69,8 +68,6 @@
         </template>
       </el-table-column>
     </el-table>
-
-  </div>
 </template>
 
 <script>
@@ -209,8 +206,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/table';
+@import '../../../../assets/_variables.scss';
 
 .records-table {
   position: relative;
@@ -255,7 +251,7 @@ export default {
     display: none;
   }
   .highlight {
-    background-color: theme.$status_yellow;
+    background-color: $status_yellow;
   }
 }
 .record-actions-wrap {

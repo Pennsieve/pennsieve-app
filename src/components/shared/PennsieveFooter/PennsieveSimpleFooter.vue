@@ -38,10 +38,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 .bf-footer {
-  background: theme.$white;
+  background: $white;
   display: block;
   font-size: 13px;
   padding: 0 0 20px 0;
@@ -71,11 +71,11 @@ li:first-child:after {
 }
 
 a {
-  color: theme.$gray_4;
+  color: $gray_4;
 }
 
 a:hover {
-  color: theme.$primary-color;
+  color: $primary-color;
 }
 </style>
 

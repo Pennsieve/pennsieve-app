@@ -215,8 +215,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
-@use "../../../styles/element/dialog";
+@import "../../../assets/variables";
 
 .addApplicationContainer {
   display: flex;

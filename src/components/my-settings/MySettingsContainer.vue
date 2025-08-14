@@ -921,7 +921,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/_variables";
 
 .mt-20 {
   margin-top: 20px;
@@ -936,7 +936,7 @@ p {
 }
 
 .divider {
-  background: theme.$gray_2;
+  background: $gray_2;
   height: 1px;
   margin: 19px 1px 20px 1px;
 }
@@ -956,10 +956,10 @@ p {
   }
 
   .status-icon {
-    color: theme.$red_1;
+    color: red;
 
     &.enabled {
-      color: theme.$green_1;
+      color: green;
     }
   }
 }
@@ -981,11 +981,11 @@ p {
   padding-right: 16px;
 
   button {
-    color: theme.$gray_4;
+    color: $gray_4;
     &:hover,
     &:focus {
       cursor: pointer;
-      color: theme.$purple_1;
+      color: $purple_1;
     }
   }
 }
@@ -1082,12 +1082,12 @@ p {
     flex-direction: row-reverse;
 
     button {
-      color: theme.$gray_4;
+      color: $gray_4;
       margin-top: 7px;
       &:hover,
       &:focus {
         cursor: pointer;
-        color: theme.$purple_1;
+        color: $purple_1;
       }
     }
   }

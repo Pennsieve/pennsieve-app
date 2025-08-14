@@ -115,7 +115,7 @@ export default {
   }
 </style>
 <style scoped lang="scss">
-@use "../../../../styles/theme";
+@import "../../../../assets/_variables.scss";
 
 .margin-top {
   margin-top: 10px;
@@ -134,7 +134,7 @@ export default {
   color: #928d85;
 }
 .svg-icon {
-  color: theme.$app-primary-color;
+  color: $app-primary-color;
 }
 .flex {
   display: flex;

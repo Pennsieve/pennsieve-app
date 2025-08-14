@@ -40,11 +40,11 @@ const isSelected = computed( () => {
 </template>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .model-node {
-  border: 1px solid theme.$purple_tint;
-  background: theme.$white;
+  border: 1px solid $purple_tint;
+  background: $white;
   border-radius: 0 0 2px 2px;
   min-width: 200px;
 
@@ -54,7 +54,7 @@ const isSelected = computed( () => {
 
 .label {
   font-size: 10pt;
-  background: theme.$purple_tint;
+  background: $purple_tint;
   padding: 4px;
   text-align: center;
 }

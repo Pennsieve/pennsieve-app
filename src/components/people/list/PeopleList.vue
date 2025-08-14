@@ -396,8 +396,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/element/pagination";
-@use "../../../styles/element/table";
 
 .data-usage {
   text-align: right;

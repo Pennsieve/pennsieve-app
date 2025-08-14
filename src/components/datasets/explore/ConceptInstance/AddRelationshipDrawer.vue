@@ -846,7 +846,7 @@ export default {
 </script>
 
 <style lang="scss">
-@use '../../../../styles/theme';
+@import '../../../../assets/variables';
 
 .side-drawer {
   .full-width {
@@ -863,7 +863,7 @@ export default {
     }
 
     button {
-      background: theme.$purple_1;
+      background: $purple_1;
       border: solid 1px transparent;
       border-radius: 0 3px 3px 0;
       cursor: pointer;
@@ -873,7 +873,7 @@ export default {
       text-align: center;
 
       &:hover {
-        background: theme.$purple_3;
+        background: $purple_3;
       }
     }
   }
@@ -899,16 +899,19 @@ export default {
     min-height: 350px;
   }
 }
+</style>
+<style lang="scss" scoped>
+@import '../../../../assets/variables';
 
 .add-relationship-drawer {
   .circle-icon {
-    background: theme.$app-primary-color;
+    background: $app-primary-color;
     color: #fff;
     font-size: 16px;
     font-weight: 500;
     -webkit-font-smoothing: antialiased;
     &.complete {
-      background: theme.$green_1;
+      background: $green_1;
     }
   }
 }
@@ -930,7 +933,7 @@ export default {
 }
 .btn-load-more {
   align-self: flex-start;
-  color: theme.$app-primary-color;
+  color: $app-primary-color;
   font-size: 12px;
   font-weight: 500;
   &:hover, &:focus {

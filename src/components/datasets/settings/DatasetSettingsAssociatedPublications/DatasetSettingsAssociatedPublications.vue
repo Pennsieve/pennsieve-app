@@ -30,7 +30,7 @@
       </div>
     </div>
     <reference-types-dialog
-      v-model:dialog-visible="publicationsDialogVisible"
+      v-model="publicationsDialogVisible"
       :url="externalPublicationsUrl"
       @add-reference="addReference"
       @close="closeReferenceDialog"
@@ -222,7 +222,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/_variables.scss';
 
 .dataset-settings-associated-publications {
   .doi-input {
@@ -231,7 +231,7 @@ export default {
   }
 
   .error {
-    color: theme.$error-color;
+    color: $error-color;
   }
 
   .citation-list {

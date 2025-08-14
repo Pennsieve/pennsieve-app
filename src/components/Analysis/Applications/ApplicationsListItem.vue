@@ -281,12 +281,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
+@import "../../../assets/_variables.scss";
 
 .applications-list-item {
   width: 230px;
   height: 300px;
-  border: 1px solid theme.$gray_3;
+  border: 1px solid $gray_3;
   margin: 0 8px 16px 8px;
   background-color: white;
   display: flex;
@@ -303,7 +303,7 @@ export default {
 
 .application-description {
   font-size: 14px;
-  color: theme.$gray_5;
+  color: $gray_5;
   min-height: 3em;
   max-width: 500px;
   margin: 8px;
@@ -311,7 +311,7 @@ export default {
 }
 
 .info {
-  background: theme.$purple_tint;
+  background: $purple_tint;
   padding: 16px 8px;
 }
 .applications-update-app {
@@ -355,6 +355,6 @@ export default {
 .delete-application-container {
   display: flex;
   justify-content: flex-end;
-  background: theme.$purple_tint;
+  background: $purple_tint;
 }
 </style>

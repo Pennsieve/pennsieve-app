@@ -9,6 +9,7 @@
       hasPrefixSlot ? 'hasPrefix' : '',
     ]"
   >
+
     <span v-if="hasPrefixSlot" class="prefix">
       <slot name="prefix" />
     </span>
@@ -78,14 +79,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../styles/theme";
+@import "../../../assets/_variables.scss";
 
 .bf-button {
   align-items: center;
-  background: theme.$app-primary-color;
+  background: $app-primary-color;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: theme.$white;
+  color: $white;
   cursor: pointer;
   display: inline-flex;
   flex-direction: row;
@@ -114,13 +115,13 @@ export default {
 
   &[disabled] {
     opacity: 0.3;
-    color: theme.$gray_1;
+    color: $gray_1;
     cursor: default;
   }
   &:not([disabled]) {
     &:hover,
     &:focus {
-      background: theme.$purple_3;
+      background: $purple_3;
     }
     &:hover {
       box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
@@ -147,86 +148,86 @@ export default {
     height: 40px;
   }
   &.secondary {
-    background: theme.$gray_1;
+    background: $gray_1;
     border-color: #d3d5da;
-    color: theme.$text-color;
+    color: $text-color;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$gray_2;
+        background: $gray_2;
       }
     }
     &.ghost {
-      border-color: theme.$gray_2;
-      color: theme.$text-color;
+      border-color: $gray_2;
+      color: $text-color;
       &:not([disabled]) {
         &:active,
         &:focus {
           background: #f9f9f9;
-          color: theme.$text-color;
+          color: $text-color;
         }
       }
     }
   }
   &.viewer-selector {
-    background: theme.$purple_tint;
-    border: 1px solid theme.$purple_0_7;
+    background: $purple_tint;
+    border: 1px solid $purple_0_7;
     min-height: 40px;
     margin: 0;
     min-width: 140px;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$purple_0_7;
+        background: $purple_0_7;
       }
     }
     &.active {
       color: white;
-      background-color: theme.$purple_1;
+      background-color: $purple_1;
       &:not([disabled]) {
         &:active,
         &:focus {
-          background: theme.$purple_1;
+          background: $purple_1;
           color: white;
         }
       }
     }
   }
   &.green {
-    background: theme.$green_1;
+    background: $green_1;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$green_2;
+        background: $green_2;
       }
     }
     &.ghost {
-      border-color: theme.$green_1;
-      color: theme.$green_1;
+      border-color: $green_1;
+      color: $green_1;
       &:not([disabled]) {
         &:active,
         &:focus {
-          background: theme.$green_1;
+          background: $green_1;
           color: white;
         }
       }
     }
   }
   &.red {
-    background: theme.$red_1;
+    background: $red_1;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$red_2;
+        background: $red_2;
       }
     }
     &.ghost {
-      border-color: theme.$red_1;
-      color: theme.$red_1;
+      border-color: $red_1;
+      color: $red_1;
       &:not([disabled]) {
         &:active,
         &:focus {
-          background: theme.$red_1;
+          background: $red_1;
           color: white;
         }
       }
@@ -234,8 +235,8 @@ export default {
   }
   &.ghost {
     background: transparent;
-    border-color: theme.$app-primary-color;
-    color: theme.$app-primary-color;
+    border-color: $app-primary-color;
+    color: $app-primary-color;
     font-weight: 500;
     &:not([disabled]) {
       &:hover {
@@ -243,21 +244,21 @@ export default {
       }
       &:active,
       &:focus {
-        background: theme.$app-primary-color;
+        background: $app-primary-color;
         color: white;
       }
     }
   }
   &.dashed {
     background: #f9f9f9;
-    border: 1px dashed theme.$gray_2;
-    color: theme.$gray_6;
+    border: 1px dashed $gray_2;
+    color: $gray_6;
     &:not([disabled]) {
       &:hover,
       &:active,
       &:focus {
         background: #f9f9f9;
-        color: theme.$gray_6;
+        color: $gray_6;
       }
     }
   }

@@ -108,9 +108,9 @@ export default {
 </script>
 
 <style lang="scss">
-@use '../../styles/theme';
+@import '../../assets/_variables.scss';
 
 .link-to-files {
-  color: theme.$white;
+  color: $white;
 }
 </style>

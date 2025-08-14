@@ -500,19 +500,19 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
-@use "../../styles/navigation";
-@use "../../styles/dataset-status";
+@import "bf-navigation";
+@import "../../assets/_variables.scss";
+@import "../../assets/components/_dataset-status.scss";
 
 .bf-navigation {
-  background: theme.$gray_1;
+  background: $gray_1;
   box-shadow: -1px 0 0 rgba(64, 69, 84, 0.2) inset;
   padding-right: 1px;
   z-index: 99;
 }
 
 hr {
-  background-color: theme.$gray_2;
+  background-color: $gray_2;
   height: 1px;
   border: 0;
   margin: 0 24px;
@@ -527,9 +527,11 @@ hr {
 
 .heading-wrap {
   box-sizing: border-box;
-  color: theme.$gray_6;
+  color: $gray_6;
   padding: 21px 24px 0px;
 
+  //background-color: $gray_2;
+  //border-bottom: 1px solid $gray_2;
   display: flex;
   justify-content: space-between;
   white-space: nowrap;
@@ -537,7 +539,7 @@ hr {
   align-items: baseline;
 
   .condensed & {
-    background: theme.$purple_1;
+    background: $purple_1;
     height: 56px;
     padding: 10px;
   }
@@ -557,12 +559,12 @@ hr {
   display: flex;
   align-items: center;
   .dataset {
-    color: theme.$gray_4;
+    color: $gray_4;
     font-size: 12px;
   }
 
   .dataset-status {
-    color: theme.$gray_4;
+    color: $gray_4;
     font-size: 14px;
     font-weight: normal;
     overflow: hidden;
@@ -575,7 +577,7 @@ hr {
   .dataset-name {
     font-weight: bold;
     font-size: 12px;
-    color: theme.$gray_6;
+    color: $gray_6;
     margin-left: 4px;
   }
 }
@@ -594,7 +596,7 @@ hr {
 
 .wip-item {
   .dot {
-    background-color: theme.$purple_1;
+    background-color: $purple_1;
   }
 }
 

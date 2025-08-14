@@ -371,13 +371,13 @@ import EventBus from '../../../../utils/event-bus'
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/variables';
 
 .concept-property-item {
   box-sizing: border-box;
-  color: theme.$gray_4;
+  color: $gray_4;
   cursor: grab;
-  border-top: 1px solid theme.$gray_2;
+  border-top: 1px solid $gray_2;
   min-height: 49px;
   padding: 24px 16px;
 
@@ -397,7 +397,7 @@ import EventBus from '../../../../utils/event-bus'
     }
 
     .icon-reorder {
-      color: theme.$purple_1;
+      color: $purple_1;
     }
   }
 
@@ -415,7 +415,7 @@ import EventBus from '../../../../utils/event-bus'
 
   &.changed {
     .icon-reorder {
-      color: theme.$green_1
+      color: $green_1
     }
   }
 
@@ -424,7 +424,7 @@ import EventBus from '../../../../utils/event-bus'
   }
 
   &.drag-over {
-    border-bottom: 4px solid theme.$purple_1;
+    border-bottom: 4px solid $purple_1;
     cursor: grabbing;
   }
 
@@ -447,7 +447,7 @@ import EventBus from '../../../../utils/event-bus'
   display: block;
   font-weight: 500;
   .svg-icon {
-    color: theme.$gray_4;
+    color: $gray_4;
     margin-left: 8px;
   }
   .locked-model & {

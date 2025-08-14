@@ -27,7 +27,7 @@
 </template>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
+@import '../../../assets/variables';
 
 .user {
   display: flex;
@@ -59,7 +59,7 @@
   }
 
   .email {
-    color: theme.$gray_4;
+    color: $gray_4;
   }
 
   .user-info {

@@ -86,12 +86,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
-@use '../../../styles/element/dialog';
+@import '../../../assets/_variables.scss';
 
 .montage-error-dialog {
   svg {
-    color: theme.$red_1;
+    color: $red_1;
     display: block;
     margin: 0 auto 8px;
   }

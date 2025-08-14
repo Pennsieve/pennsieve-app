@@ -201,7 +201,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 .logo-wrapper {
   justify-content: flex-end;
@@ -223,7 +223,7 @@ export default {
 }
 
 .repository-list-item {
-  border-bottom: 1px solid theme.$gray_3;
+  border-bottom: 1px solid $gray_3;
   margin: 0 0 16px 0;
   //padding:  16px 24px 8px 24px;
   background-color: white;
@@ -232,7 +232,7 @@ export default {
   cursor: pointer;
 
   :hover {
-    background-color: theme.$purple-tint;
+    background-color: $purple-tint;
   }
 
   .info {
@@ -243,18 +243,18 @@ export default {
 .repository-title {
   font-size: 16px;
   margin-bottom: 8px;
-  color: theme.$purple_3;
+  color: $purple_3;
 }
 
 .repository-type {
-  color: theme.$gray_5;
+  color: $gray_5;
   font-weight: 500;
   font-size: 12px;
 }
 
 .repository-description {
   font-size: 12px;
-  color: theme.$gray_5;
+  color: $gray_5;
   min-height: 3em;
   max-width: 650px;
 }

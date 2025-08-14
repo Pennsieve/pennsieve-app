@@ -211,11 +211,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../../styles/theme';
+@import '../../../../../assets/_variables.scss';
 
 .slat-info.contributor-row {
   align-items: center;
-  color: theme.$gray_6;
+  color: $gray_6;
   padding: 16px 0;
 }
 .contributor-info-wrap {
@@ -238,7 +238,7 @@ h3 {
   }
 }
 .icon-orcid {
-  fill: theme.$gray_2;
+  fill: $gray_2;
   &.has-orcid {
     fill: #A6CE39
   }

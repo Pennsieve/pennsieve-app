@@ -95,12 +95,12 @@
 </script>
 
 <style lang="scss" scoped>
-  @use '../../../styles/theme';
+  @import '../../../assets/_variables.scss';
   .dataset-banner {
-    border: 1px solid theme.$gray_2;
+    border: 1px solid $gray_2;
     border-radius: 3px;
     &:hover, &.is-dragging {
-      border-color: theme.$app-primary-color;
+      border-color: $app-primary-color;
     }
   }
   img {
@@ -108,7 +108,7 @@
     width: 100%;
   }
   .empty-state-wrap {
-    background: theme.$white;
+    background: $white;
     align-items: center;
     height: 100%;
     display: flex;
@@ -117,7 +117,7 @@
     width: 100%;
   }
   .empty-state {
-    color: theme.$gray_4;
+    color: $gray_4;
     cursor: pointer;
     font-size: 12px;
   }

@@ -382,7 +382,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../styles/theme";
+@import "../../../assets/_variables.scss";
 
 .empty {
   display: flex;
@@ -419,7 +419,7 @@ export default {
   font-weight: 500;
 }
 .dataset-integrations-settings {
-  background: theme.$white;
+  background: $white;
 
   hr {
     margin: 32px 0 24px;

@@ -195,22 +195,22 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
+@import '../../../../assets/variables';
 
 .file-container {
   margin-left: 40px;
 }
 .table-header {
   margin-top: 8px;
-  background-color: theme.$white;
+  background-color: $white;
   padding: 8px;
   font-weight: 500;
-  border-bottom: 1px solid theme.$gray_2;
+  border-bottom: 1px solid $gray_2;
 }
 .load-more {
   margin-left: 20px;
   cursor: pointer;
-  color: theme.$purple_2;
+  color: $purple_2;
   margin-bottom: 8px;
 
 }

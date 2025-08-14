@@ -109,7 +109,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
+@import '../../../assets/_variables.scss';
 
 .bf-menu hr {
   margin: 8px 0

@@ -1,7 +1,10 @@
 <template>
   <slat-info class="contributor-row">
     <div class="contributor-info-wrap">
-      <div class="mr-8"></div>
+      <div
+        class="mr-8"
+      >
+      </div>
       <div class="contributor-info">
         <h3 class="mb-0 mt-0">
           {{ displayName }}
@@ -21,10 +24,21 @@
       @command="onMenuSelect"
     >
       <button class="el-dropdown-link" @click.prevent="">
-        <svg-icon name="icon-menu" height="20" width="20" />
+        <svg-icon
+          name="icon-menu"
+          height="20"
+          width="20"
+        />
       </button>
-      <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
-        <el-dropdown-item :disabled="proposalLocked" command="edit-contributor">
+      <el-dropdown-menu
+        slot="dropdown"
+        class="bf-menu"
+        :offset="9"
+      >
+        <el-dropdown-item
+          :disabled="proposalLocked"
+          command="edit-contributor"
+        >
           Update
         </el-dropdown-item>
         <el-dropdown-item
@@ -39,65 +53,70 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from "vuex";
+import {
+  mapGetters,
+  mapState
+} from 'vuex'
 
-import SlatInfo from "../../shared/SlatInfo/SlatInfo.vue";
-import { displayNameAndDegree } from "../../../utils/displayNameAndDegree";
+import SlatInfo from '../../shared/SlatInfo/SlatInfo.vue'
+import { displayNameAndDegree } from '../../../utils/displayNameAndDegree'
 
 export default {
-  name: "ProposalContributor",
+  name: 'ProposalContributor',
 
   components: {
-    SlatInfo,
+    SlatInfo
   },
 
   props: {
     id: {
       type: String,
-      required: true,
+      required: true
     },
     contributor: {
       type: Object,
-      default: function () {
+      default: function() {
         return {
           contributorId: null,
-          emailAddress: "",
-          firstName: "",
-          lastName: "",
-          orcid: "",
-          userId: "",
-        };
-      },
+          emailAddress: '',
+          firstName: '',
+          lastName: '',
+          orcid: '',
+          userId: ''
+        }
+      }
     },
     locked: {
       type: Boolean,
-      default: false,
+      default: false
     },
   },
 
   computed: {
-    ...mapState([]),
+    ...mapState([
+    ]),
 
-    ...mapGetters([]),
+    ...mapGetters([
+    ]),
 
     /**
      * Compute the user's full name
      * @returns {String}
      */
-    displayName: function () {
-      return displayNameAndDegree(this.contributor);
+    displayName: function() {
+      return displayNameAndDegree(this.contributor)
     },
 
     /**
      * Compute whether the email should be shown
      * @returns {Boolean}
      */
-    shouldShowEmail: function () {
-      return this.contributor.emailAddress !== "";
+    shouldShowEmail: function() {
+      return this.contributor.emailAddress !== ''
     },
 
-    proposalLocked: function () {
-      return false;
+    proposalLocked: function() {
+      return false
     },
   },
 
@@ -106,19 +125,19 @@ export default {
      * When the user selects an option from
      * the menu, emit an event
      */
-    onMenuSelect: function (command) {
-      this.$emit(command, { id: this.id, contributor: this.contributor });
-    },
-  },
-};
+    onMenuSelect: function(command) {
+      this.$emit(command, {id: this.id, contributor: this.contributor})
+    }
+  }
+}
 </script>
 
 <style lang="scss" scoped>
-@use "../../../styles/theme";
+@import '../../../assets/_variables.scss';
 
 .slat-info.contributor-row {
   align-items: center;
-  color: theme.$gray_6;
+  color: $gray_6;
   padding: 16px 0;
 }
 .contributor-info-wrap {
@@ -134,16 +153,16 @@ h3 {
     &:not(:first-child) {
       margin-left: 4px;
       &:before {
-        content: "\2022";
+        content: '\2022';
         margin-right: 4px;
       }
     }
   }
 }
 .icon-orcid {
-  fill: theme.$gray_2;
+  fill: $gray_2;
   &.has-orcid {
-    fill: #a6ce39;
+    fill: #A6CE39
   }
 }
 </style>

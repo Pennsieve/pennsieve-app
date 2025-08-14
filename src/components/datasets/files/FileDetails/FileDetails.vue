@@ -340,29 +340,29 @@
     <!--        </el-collapse>-->
 
     <!-- Relationships Table Empty State -->
-    <!--    <div-->
-    <!--      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"-->
-    <!--      class="relationships-empty-state"-->
-    <!--    >-->
-    <!--      <div class="relationships-empty-state-inner">-->
-    <!--        <h3>Create Relationships</h3>-->
-    <!--        <div>-->
-    <!--          <p class="relationship-inner-text">-->
-    <!--            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other-->
-    <!--            objects in your graph by clicking the "Link to ..." button above.-->
-    <!--          </p>-->
-    <!--          <a-->
-    <!--            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"-->
-    <!--            target="_blank"-->
-    <!--          >-->
-    <!--            <bf-button class="primary learn-more"> Learn More </bf-button>-->
-    <!--          </a>-->
-    <!--          <div>-->
-    <!--            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>-->
-    <!--          </div>-->
-    <!--        </div>-->
-    <!--      </div>-->
-    <!--    </div>-->
+<!--    <div-->
+<!--      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"-->
+<!--      class="relationships-empty-state"-->
+<!--    >-->
+<!--      <div class="relationships-empty-state-inner">-->
+<!--        <h3>Create Relationships</h3>-->
+<!--        <div>-->
+<!--          <p class="relationship-inner-text">-->
+<!--            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other-->
+<!--            objects in your graph by clicking the "Link to ..." button above.-->
+<!--          </p>-->
+<!--          <a-->
+<!--            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"-->
+<!--            target="_blank"-->
+<!--          >-->
+<!--            <bf-button class="primary learn-more"> Learn More </bf-button>-->
+<!--          </a>-->
+<!--          <div>-->
+<!--            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
 
     <!-- BEGIN RELATIONSHIPS TABLE -->
     <template v-if="hasRelationships">
@@ -387,13 +387,13 @@
       </el-collapse>
     </template>
 
-    <!--    <add-relationship-drawer-->
-    <!--      ref="addRelationshipDrawer"-->
-    <!--      :relationship-types="relationshipTypes"-->
-    <!--      :record="proxyRecord.content"-->
-    <!--      :record-name="drawerOriginatingName"-->
-    <!--      :is-file="true"-->
-    <!--    />-->
+<!--    <add-relationship-drawer-->
+<!--      ref="addRelationshipDrawer"-->
+<!--      :relationship-types="relationshipTypes"-->
+<!--      :record="proxyRecord.content"-->
+<!--      :record-name="drawerOriginatingName"-->
+<!--      :is-file="true"-->
+<!--    />-->
 
     <div class="viewer-pane-wrap">
       <div class="header">
@@ -419,6 +419,8 @@
       <viewer-pane class="viewer-pane" :is-preview="true" :pkg="proxyRecord" />
     </div>
   </bf-stage>
+
+
 </template>
 
 <script>
@@ -466,11 +468,8 @@ import SourceFilesTable from "./SourceFilesTable.vue";
 import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
 import { viewerToolTypes } from "../../../../utils/constants";
-import { useGetToken } from "@/composables/useGetToken";
-import {
-  useHandleXhrError,
-  useSendXhr,
-} from "@/mixins/request/request_composable";
+import {useGetToken} from "@/composables/useGetToken";
+import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 
 export default {
   name: "FileDetails",
@@ -604,10 +603,11 @@ export default {
      * @returns {String}
      */
     exportFileUrl: async function () {
-      return useGetToken().then((token) => {
+      return useGetToken().then(token => {
         const packageId = pathOr("", ["content", "id"], this.proxyRecord);
         return `${this.config.apiUrl}/packages/${packageId}/export?api_key=${token}`;
-      });
+      })
+
     },
 
     /**
@@ -675,11 +675,11 @@ export default {
      * @returns {String}
      */
     packageFilesUrl: async function () {
-      return useGetToken().then((token) => {
+      return useGetToken().then(token => {
         const url = pathOr("", ["config", "apiUrl"])(this);
         const packageId = this.fileId;
         return `${url}/packages/${packageId}/sources-paged?api_key=${token}`;
-      });
+      })
     },
 
     sourceFilesUrl: function () {
@@ -859,9 +859,9 @@ export default {
      * @returns {String}
      */
     moveUrl: async function () {
-      return useGetToken().then((token) => {
+      return useGetToken().then(token => {
         return `${this.config.apiUrl}/data/move?api_key=${token}`;
-      });
+      })
     },
 
     /**
@@ -897,9 +897,10 @@ export default {
      * @returns {String}
      */
     packageDetailsUrl: async function () {
-      return await useGetToken().then((token) => {
+      return await useGetToken().then(token => {
         return `${this.config.apiUrl}/packages/${this.fileId}?api_key=${token}&includeAncestors=true`;
-      });
+
+      })
     },
 
     /**
@@ -1007,6 +1008,7 @@ export default {
       const datasetId = pathOr("", ["params", "datasetId"], this.$route);
       const modelId = pathOr("", ["params", "conceptId"], this.$route);
       return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`;
+
     },
 
     getRecordFileRelationshipsUrl: function () {
@@ -1055,10 +1057,10 @@ export default {
      * @returns {String}
      */
     processFileUrl: async function () {
-      return useGetToken().then((token) => {
+      return useGetToken().then(token => {
         const packageId = this.fileId;
-        return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
-      });
+        return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`
+      })
     },
 
     /**
@@ -1199,11 +1201,13 @@ export default {
       return val !== undefined ? val.toString() : val;
     },
 
+
     /**
      * Linked Properties URL
      * @returns {String}
      */
     linkedPropertiesUrl: function () {
+
       const datasetId = pathOr("", ["params", "datasetId"], this.$route);
       const modelId = pathOr("", ["params", "conceptId"], this.$route);
       const instanceId = pathOr("", ["params", "instanceId"], this.$route);
@@ -1220,9 +1224,11 @@ export default {
      * @returns {String}
      */
     stringSubtypeUrl: async function () {
-      return await useGetToken().then((token) => {
+      return await useGetToken().then(token => {
         return `${this.config.apiUrl}/models/datasets/${this.datasetId}/properties/strings?api_key=${token}`;
-      });
+      })
+
+
     },
   },
 
@@ -1366,7 +1372,10 @@ export default {
   },
 
   methods: {
-    ...mapActions(["updateEditingInstance", "updateConcepts"]),
+    ...mapActions([
+      "updateEditingInstance",
+      "updateConcepts",
+    ]),
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
@@ -1376,21 +1385,23 @@ export default {
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function () {
-      this.stringSubtypeUrl.then((url) => {
+
+      this.stringSubtypeUrl.then((url)=> {
         useSendXhr(url)
           .then((subTypes) => {
-            this.stringSubtypes = Object.entries(subTypes).reduce(
-              (options, [val, config]) => [
-                ...options,
-                { value: val, label: config.label, regex: config.regex },
-              ],
-              []
-            );
-          })
+          this.stringSubtypes = Object.entries(subTypes).reduce(
+            (options, [val, config]) => [
+              ...options,
+              { value: val, label: config.label, regex: config.regex },
+            ],
+            []
+          );
+        })
           .catch((response) => {
             this.handleXhrError(response);
           });
-      });
+      })
+
     },
 
     /**
@@ -1410,10 +1421,11 @@ export default {
         fileType: command,
       };
 
-      this.exportFileUrl.then((url) => {
+      this.exportFileUrl.then(url => {
         this.sendXhr(url, {
           method: "PUT",
-          header: {},
+          header: {
+          },
           body: payload,
         })
           .then((response) => {
@@ -1427,7 +1439,9 @@ export default {
             });
           })
           .catch(this.handleXhrError.bind(this));
-      });
+      })
+
+
     },
 
     /**
@@ -1435,7 +1449,7 @@ export default {
      * of an unprocessed state
      */
     processFile: function () {
-      this.processFileUrl.then((url) => {
+      this.processFileUrl.then(url => {
         this.sendXhr(url, {
           method: "PUT",
         })
@@ -1444,20 +1458,21 @@ export default {
             this.getFileStatus;
           })
           .catch(this.handleXhrError.bind(this));
-      });
+      })
     },
 
     /**
      * API call to get source files data for table
      */
     getSourceFiles: function () {
-      this.packageFilesUrl.then((url) => {
+      this.packageFilesUrl.then(url => {
         this.sendXhr(url)
           .then((response) => {
             this.packageSourceFiles = response.results;
           })
           .catch(this.handleXhrError.bind(this));
-      });
+      })
+
     },
 
     // showMove: function() {
@@ -1482,54 +1497,55 @@ export default {
      */
     getRelationshipTypes: function () {
       if (this.relationshipsUrl) {
+
         useGetToken()
-          .then((token) => {
-            return useSendXhr(this.relationshipsUrl, {
+          .then(token => {
+            return useSendXhr(this.relationshipsUrl,{
               header: {
                 Authorization: `bearer ${token}`,
-              },
-            });
+              }
+            })
           })
           .then((response) => {
-            // get model id
-            const modelId = pathOr("", ["params", "conceptId"], this.$route);
+          // get model id
+          const modelId = pathOr("", ["params", "conceptId"], this.$route);
 
-            // check to see which relationship types are related to the current record id
-            const relatedRelationshipTypes = response.filter((relType) =>
-              Boolean(relType.from === modelId || relType.to === modelId)
-            );
+          // check to see which relationship types are related to the current record id
+          const relatedRelationshipTypes = response.filter((relType) =>
+            Boolean(relType.from === modelId || relType.to === modelId)
+          );
 
-            // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
-            const relationships = relatedRelationshipTypes.map((relType) => {
-              const { to, from } = relType;
-              const isFrom = Boolean(from === modelId);
-              const relModelId = isFrom ? to : from;
-              const { displayName, name, id } = this.getModelById(relModelId);
+          // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
+          const relationships = relatedRelationshipTypes.map((relType) => {
+            const { to, from } = relType;
+            const isFrom = Boolean(from === modelId);
+            const relModelId = isFrom ? to : from;
+            const { displayName, name, id } = this.getModelById(relModelId);
 
-              // update relationship types state, adding modelName and modelId to DTO
-              this.relationshipTypes.push({
-                ...relType,
-                modelName: name,
-                modelId: id,
-              });
-
-              // return relationship count object
-              return { count: 0, displayName, name };
+            // update relationship types state, adding modelName and modelId to DTO
+            this.relationshipTypes.push({
+              ...relType,
+              modelName: name,
+              modelId: id,
             });
 
-            // update relationships state
-            this.relationships = uniqBy(prop("displayName"), [
-              ...this.relationships,
-              ...relationships,
-            ]);
-
-            // update active sections state
-            const relationshipNames = pluck("name", this.relationships);
-            this.activeSections = uniq([
-              ...this.activeSections,
-              ...relationshipNames,
-            ]);
+            // return relationship count object
+            return { count: 0, displayName, name };
           });
+
+          // update relationships state
+          this.relationships = uniqBy(prop("displayName"), [
+            ...this.relationships,
+            ...relationships,
+          ]);
+
+          // update active sections state
+          const relationshipNames = pluck("name", this.relationships);
+          this.activeSections = uniq([
+            ...this.activeSections,
+            ...relationshipNames,
+          ]);
+        });
       }
     },
 
@@ -1596,42 +1612,46 @@ export default {
 
       this.isRelationshipsLoading = true;
 
-      useGetToken().then((token) => {
-        useSendXhr(url, {
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-        })
-          .then((resp) => {
-            resp.forEach((obj) => {
-              this.activeSections.push(obj.name);
-            });
-            const filesIdx = findIndex(propEq("name", "package"), resp);
-            if (filesIdx >= 0) {
-              const filesObj = resp[filesIdx];
-              resp.splice(filesIdx, 1);
-              resp.unshift(filesObj);
-              this.relationships = resp;
-            } else {
-              this.relationships = resp;
-            }
-            if (this.relationships.count !== this.lastRelationshipCount) {
-              this.relationships.count = this.lastRelationshipCount;
-            }
-
-            this.isRelationshipsLoading = false;
+      useGetToken()
+        .then(token => {
+          useSendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
           })
-          .catch(() => {
-            this.handleXhrError.bind(this);
-          });
-      });
+            .then((resp) => {
+              resp.forEach((obj) => {
+                this.activeSections.push(obj.name);
+              });
+              const filesIdx = findIndex(propEq("name", "package"), resp);
+              if (filesIdx >= 0) {
+                const filesObj = resp[filesIdx];
+                resp.splice(filesIdx, 1);
+                resp.unshift(filesObj);
+                this.relationships = resp;
+              } else {
+                this.relationships = resp;
+              }
+              if (this.relationships.count !== this.lastRelationshipCount) {
+                this.relationships.count = this.lastRelationshipCount;
+              }
+
+              this.isRelationshipsLoading = false;
+            })
+            .catch(() => {
+              this.handleXhrError.bind(this);
+            });
+        })
+
     },
     /**
      * Gets instance details
      */
     getInstanceDetails: function () {
-      this.packageDetailsUrl.then((url) => {
-        return this.sendXhr(url, {})
+
+      this.packageDetailsUrl.then(url => {
+        return this.sendXhr(url, {
+        })
           .then((resp) => {
             if (this.isFile) {
               this.setProxyAsRecord(resp);
@@ -1640,7 +1660,8 @@ export default {
             }
           })
           .catch(this.handleXhrError.bind(this));
-      });
+      })
+
     },
 
     /**
@@ -1958,7 +1979,7 @@ export default {
 
         try {
           // Make request to create new instance
-          useGetToken().then((token) => {
+          useGetToken().then(token => {
             this.sendXhr(url, {
               header: {
                 Authorization: `bearer ${token}`,
@@ -1967,7 +1988,7 @@ export default {
               body: {
                 values,
               },
-            }).then(async (response) => {
+            }).then(async response => {
               const batchUrl = `${url}/${record.id}/linked/batch`;
               await this.createBatchLinkedProperties(
                 batchUrl,
@@ -1997,8 +2018,8 @@ export default {
                 this.changedProperties = [];
                 this.errorProperties = [];
               });
-            });
-          });
+            })
+          })
         } catch (e) {
           this.processing = false;
           this.savingChanges = false;
@@ -2024,7 +2045,7 @@ export default {
           };
         });
 
-      return useGetToken().then((token) => {
+      return useGetToken().then(token => {
         return this.sendXhr(url, {
           header: {
             Authorization: `bearer ${token}`,
@@ -2034,7 +2055,8 @@ export default {
             data: properties,
           },
         });
-      });
+      })
+
     },
 
     /**
@@ -2132,7 +2154,7 @@ export default {
         const url = this.packageDetailsUrl;
         const values = this.formatSavedValues();
 
-        useGetToken().then((token) => {
+        useGetToken().then(token => {
           this.sendXhr(url, {
             header: {
               Authorization: `bearer ${token}`,
@@ -2166,7 +2188,8 @@ export default {
               this.savingChanges = false;
               this.handleXhrError(err);
             });
-        });
+        })
+
       }
     },
 
@@ -2223,27 +2246,30 @@ export default {
     archiveRecord: function () {
       const name = propOr("", "value", this.conceptTitle);
 
-      useGetToken().then((token) => {
-        useSendXhr(this.packageDetailsUrl, {
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-          method: "DELETE",
-        })
-          .then(() => {
-            this.$router.replace({ name: "dataset-records" });
 
-            EventBus.$emit("toast", {
-              detail: {
-                type: "success",
-                msg: `${name} deleted`,
-              },
-            });
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.packageDetailsUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            method: "DELETE",
           })
-          .catch((response) => {
-            this.handleXhrError(response);
-          });
-      });
+            .then(() => {
+              this.$router.replace({ name: "dataset-records" });
+
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "success",
+                  msg: `${name} deleted`,
+                },
+              });
+            })
+            .catch((response) => {
+              this.handleXhrError(response);
+            });
+        })
+
     },
 
     /**
@@ -2288,26 +2314,28 @@ export default {
       properties = this.checkModelTitle(property, properties);
       properties.push(property);
 
-      useGetToken().then((token) => {
-        useSendXhr(this.getModelSchemaUrl, {
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-          method: "PUT",
-          body: properties,
-        })
-          .then(() => {
-            // Check model title for existing properties before adding new one
-            this.checkModelTitle(property, this.instance.values);
-
-            this.instance.values.push(property);
-
-            this.addEditPropertyDialogVisible = false;
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            method: "PUT",
+            body: properties,
           })
-          .catch((response) => {
-            this.handleXhrError(response);
-          });
-      });
+            .then(() => {
+              // Check model title for existing properties before adding new one
+              this.checkModelTitle(property, this.instance.values);
+
+              this.instance.values.push(property);
+
+              this.addEditPropertyDialogVisible = false;
+            })
+            .catch((response) => {
+              this.handleXhrError(response);
+            });
+        })
+
     },
 
     /**
@@ -2328,13 +2356,15 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function () {
-      useGetToken().then((token) => {
-        return useSendXhr(this.getModelSchemaUrl, {
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-        });
-      });
+      useGetToken()
+        .then(token => {
+          return useSendXhr(this.getModelSchemaUrl, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+          });
+        })
+
     },
 
     /**
@@ -2399,8 +2429,8 @@ export default {
       this.proxyRecord = response;
 
       // Set Active Viewer
-      console.log("Setting active viewer");
-      console.log(this.proxyRecord);
+      console.log('Setting active viewer')
+      console.log(this.proxyRecord)
       this.setActiveViewer(this.proxyRecord);
 
       this.selectedFiles.push(response);
@@ -2449,20 +2479,22 @@ export default {
       // check if belongs_to relationship exists in dataset
       const url = this.relationshipsUrl;
       if (url) {
-        useGetToken().then((token) => {
-          useSendXhr(url, {
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-          })
-            .then((resp) => {
-              const belongsTo = find(propEq("name", "belongs_to"), resp);
-              if (resp.length === 0 || !belongsTo) {
-                this.createDefaultRelationship();
-              }
+        useGetToken()
+          .then(token => {
+            useSendXhr(url, {
+              header: {
+                Authorization: `bearer ${token}`,
+              },
             })
-            .catch(this.handleXhrError.bind(this));
-        });
+              .then((resp) => {
+                const belongsTo = find(propEq("name", "belongs_to"), resp);
+                if (resp.length === 0 || !belongsTo) {
+                  this.createDefaultRelationship();
+                }
+              })
+              .catch(this.handleXhrError.bind(this));
+          })
+
       }
     },
 
@@ -2470,20 +2502,22 @@ export default {
      * Creates default relationship
      */
     createDefaultRelationship: function () {
-      useGetToken().then((token) => {
-        useSendXhr(this.relationshipsUrl, {
-          method: "POST",
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-          body: {
-            name: "belongs_to",
-            displayName: "Belongs To",
-            description: "",
-            schema: [],
-          },
-        }).catch(this.handleXhrError.bind(this));
-      });
+      useGetToken()
+        .then(token => {
+          useSendXhr(this.relationshipsUrl, {
+            method: "POST",
+            header: {
+              Authorization: `bearer ${token}`,
+            },
+            body: {
+              name: "belongs_to",
+              displayName: "Belongs To",
+              description: "",
+              schema: [],
+            },
+          }).catch(this.handleXhrError.bind(this));
+        })
+
     },
 
     /**
@@ -2584,14 +2618,15 @@ export default {
       const baseUrl = this.proxyRecord.parent ? "packages" : "datasets";
 
       useGetToken()
-        .then((token) => {
+        .then(token => {
           const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${token}&includeAncestors=true`;
           return this.sendXhr(url).then((response) => {
             moveDialog.file = response;
             moveDialog.visible = true;
           });
-        })
-        .catch((err) => useHandleXhrError(err));
+        }).catch(err => useHandleXhrError(err))
+
+
     },
 
     /**
@@ -2600,7 +2635,8 @@ export default {
      * @param {Array} items
      */
     moveItems: function (destination, items) {
-      this.moveUrl.then((url) => {
+
+      this.moveUrl.then(url => {
         const things = items.map(window.R.path(["content", "id"]));
         this.sendXhr(url, {
           method: "POST",
@@ -2631,7 +2667,7 @@ export default {
           .catch((response) => {
             this.handleXhrError(response);
           });
-      });
+      })
     },
 
     /**
@@ -2660,7 +2696,7 @@ export default {
     onRenameConflicts: function (destination, files) {
       // Rename each file with proposed new name
 
-      useGetToken().then((token) => {
+      useGetToken().then(token =>{
         const promises = files.map((obj) => {
           const id = propOr("", "id", obj);
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
@@ -2685,7 +2721,8 @@ export default {
           // Hide user notice of conflicts
           this.$refs.moveDialog.visible = false;
         });
-      });
+      })
+
     },
 
     /**
@@ -2718,7 +2755,7 @@ export default {
      */
     getLinkedProperties: function () {
       if (this.linkedPropertiesUrl) {
-        useGetToken().then((token) => {
+        useGetToken().then(token => {
           this.sendXhr(this.linkedPropertiesUrl, {
             header: {
               Authorization: `bearer ${token}`,
@@ -2742,7 +2779,8 @@ export default {
             .catch((response) => {
               this.handleXhrError(response);
             });
-        });
+        })
+
       }
     },
 
@@ -2814,7 +2852,7 @@ export default {
 
       const packageDetailsUrl = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${conceptId}/instances/${instanceId}`;
 
-      useGetToken().then((token) => {
+      useGetToken().then(token => {
         this.sendXhr(packageDetailsUrl, {
           header: {
             Authorization: `bearer ${token}`,
@@ -2826,7 +2864,8 @@ export default {
             this.linkedProperties.splice(index, 1, linkedProperty);
           })
           .catch(this.handleXhrError.bind(this));
-      });
+      })
+
     },
 
     /**
@@ -2844,8 +2883,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../../styles/theme";
-@use "../../../../styles/_icon-item-colors";
+@import "../../../../assets/_variables.scss";
+@import "../../../../assets/_icon-item-colors.scss";
+//@import '../../../../assets/components/_uploader-empty-state.scss';
 
 #file-name-header {
   font-size: 20px;
@@ -2859,9 +2899,15 @@ export default {
   color: white;
   font-weight: 300;
 }
+</style>
+
+<style scoped lang="scss">
+@import "../../../../assets/_variables.scss";
+@import "../../../../assets/_icon-item-colors.scss";
+//@import '../../../../assets/components/_uploader-empty-state.scss';
 
 .highlight-property {
-  color: theme.$gray_6;
+  color: $gray_6;
   font-weight: 500;
 }
 
@@ -2876,7 +2922,7 @@ export default {
   }
 
   &.editing {
-    background: theme.$gray_1;
+    background: $gray_1;
 
     h2 {
       margin-bottom: 4px;
@@ -2919,7 +2965,7 @@ export default {
     .table-info,
     .table-actions {
       align-items: center;
-      color: theme.$purple_1;
+      color: $purple_1;
       display: flex;
       line-height: initial;
       font-size: 12px;
@@ -2927,12 +2973,12 @@ export default {
     }
     .table-info {
       .selected-files {
-        color: theme.$gray_6;
+        color: $gray_6;
         margin-right: 16px;
       }
 
       .selected-source-files {
-        color: theme.$gray_6;
+        color: $gray_6;
       }
     }
     &.row-is-selected {
@@ -2946,7 +2992,7 @@ export default {
     flex: 1;
     h2 {
       font-family: "roboto";
-      color: theme.$purple_1;
+      color: $purple_1;
       flex: 1;
       font-size: 20px;
       font-weight: 600;
@@ -3020,8 +3066,8 @@ export default {
     padding: 0;
   }
   .bf-upload-dropzone {
-    background: theme.$purple_tint;
-    border: 1px dashed theme.$purple_1;
+    background: $purple_tint;
+    border: 1px dashed $purple_1;
     height: 214px;
     padding: 0;
   }
@@ -3041,16 +3087,16 @@ export default {
     max-width: 500px;
 
     a {
-      color: theme.$purple_1;
+      color: $purple_1;
     }
 
     p {
       max-width: 450px;
       padding: 0 16px;
-      color: theme.$gray_4;
+      color: $gray_4;
 
       a {
-        color: theme.$purple_1;
+        color: $purple_1;
       }
     }
 
@@ -3068,13 +3114,13 @@ export default {
 
 .property-list {
   padding: 0 16px;
-  background: theme.$gray_1;
+  background: $gray_1;
   margin-bottom: 16px;
 }
 
 .relationships-empty-state {
-  background: theme.$purple_tint;
-  border: 1px dashed theme.$purple_1;
+  background: $purple_tint;
+  border: 1px dashed $purple_1;
   height: 214px;
   display: flex;
 
@@ -3085,7 +3131,7 @@ export default {
     padding: 8px;
 
     .relationship-inner-text {
-      color: theme.$gray_4;
+      color: $gray_4;
       margin-bottom: 16px;
     }
 
@@ -3109,11 +3155,11 @@ export default {
     }
   }
   button {
-    color: theme.$gray_4;
+    color: $gray_4;
     display: none;
     margin-left: 8px;
     &:hover {
-      color: theme.$app-primary-color;
+      color: $app-primary-color;
     }
   }
 }
@@ -3129,7 +3175,7 @@ export default {
 }
 
 .viewer-pane-wrap {
-  color: theme.$purple_2;
+  color: $purple_2;
   flex: 1;
   font-size: 12px;
   font-weight: 300;
@@ -3149,7 +3195,7 @@ export default {
 }
 
 .instance-type {
-  color: theme.$gray_4;
+  color: $gray_4;
   font-weight: 600;
   text-transform: capitalize;
 }

@@ -358,8 +358,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
-@use "../../../styles/element/pagination";
+@import "../../../assets/_variables.scss";
 
 .actions-wrapper {
   display: flex;

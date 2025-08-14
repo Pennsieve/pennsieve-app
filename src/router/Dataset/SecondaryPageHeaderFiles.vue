@@ -50,18 +50,18 @@ function backToFiles(){
 </template>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/_variables.scss";
 
 .flex-heading {
-  background-color: theme.$purple_1;
+  background-color: $purple_1;
 }
 
 .el-collapse-item__header {
-  background: theme.$purple_2;
+  background: $purple_2;
 }
 
 .link-to-files {
-  color: theme.$white;
+  color: $white;
   cursor: pointer;
 }
 </style>

@@ -147,17 +147,19 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/select';
+@import '../../../../assets/variables';
 
 .el-select {
   width: 100%;
 }
+</style>
+<style lang="scss">
+@import '../../../../assets/_variables.scss';
 
 .relationship-input-options {
   .el-select-dropdown__item:not(.filtered-field) {
     align-items: center;
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
     display: flex;
     padding: 16px;
     text-decoration: underline;
@@ -194,5 +196,4 @@ export default {
 .relationship-input.can-create .el-select__caret {
   display: none;
 }
-
 </style>

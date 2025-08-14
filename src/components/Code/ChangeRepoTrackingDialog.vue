@@ -1,34 +1,31 @@
 <template>
-  <div>
-    <el-dialog
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      class="fixed-width"
-      @close="closeDialog"
-    >
-      <template #header>
-        <bf-dialog-header slot="title" title="Change Tracking" />
-      </template>
+  <el-dialog
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    class="fixed-width"
+    @close="closeDialog"
+  >
+    <template #header>
+      <bf-dialog-header slot="title" title="Change Tracking" />
+    </template>
 
-      <dialog-body>
-        <p>Please confirm if you would like to update the tracking on this repo:</p>
-        <p>
-          <strong>{{repo.name}}</strong>
-        </p>
-      </dialog-body>
-      <!-- Buttons -->
-      <template #footer>
-        <bf-button v-if="startTrackingMode" @click="handleEnableTracking">
-          Enable Tracking
-        </bf-button>
-        <bf-button v-if="stopTrackingMode" @click="handleDisableTracking">
-          Disable Tracking
-        </bf-button>
-        <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
-      </template>
-    </el-dialog>
-
-  </div>
+    <dialog-body>
+       <p>Please confirm if you would like to update the tracking on this repo:</p>
+       <p>
+         <strong>{{repo.name}}</strong>
+       </p>
+    </dialog-body>
+    <!-- Buttons -->
+    <template #footer>
+      <bf-button v-if="startTrackingMode" @click="handleEnableTracking">
+        Enable Tracking
+      </bf-button>
+      <bf-button v-if="stopTrackingMode" @click="handleDisableTracking">
+        Disable Tracking
+      </bf-button>
+      <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
@@ -160,8 +157,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
-@use '../../styles/element/dialog';
+@import "../../assets/_variables.scss";
 
 .text-area-wrapper {
   width: 100%;
@@ -171,7 +167,7 @@ export default {
   .el-form-item {
     .el-form-item__label {
       font-weight: 500;
-      color: theme.$gray_5;
+      color: $gray_5;
     }
   }
 
@@ -208,12 +204,12 @@ export default {
     line-height: 1em;
   }
   .el-checkbox__inner {
-    border: 1px solid theme.$gray_5;
+    border: 1px solid $gray_5;
   }
 
   .el-checkbox__label,
   .el-form-item__label {
-    color: theme.$gray_6;
+    color: $gray_6;
     font-weight: 400;
   }
 
@@ -247,12 +243,12 @@ export default {
   }
   .info {
     font-size: 12px;
-    color: theme.$gray_4;
+    color: $gray_4;
     line-height: 16px;
   }
   .info {
     font-size: 12px;
-    color: theme.$gray_4;
+    color: $gray_4;
     &.disabled-label {
       color: #c0c4cc;
       cursor: not-allowed;
@@ -282,12 +278,12 @@ export default {
   .url-format-info {
     display: block;
     font-size: 12px;
-    color: theme.$gray_6;
+    color: $gray_6;
     margin-top: 4px;
   }
 
   .url-format-info a {
-    color: theme.$primary-color;
+    color: $primary-color;
     text-decoration: none;
   }
 

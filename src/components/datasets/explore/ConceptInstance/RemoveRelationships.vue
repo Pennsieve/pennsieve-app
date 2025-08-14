@@ -1,55 +1,52 @@
 <template>
-  <div>
-    <el-dialog
-      class="simple"
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      :show-close="false"
-      @close="closeDialog"
-    >
-      <template #header>
-        <bf-dialog-header
-          title="Remove relationships"
+  <el-dialog
+    class="simple"
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :show-close="false"
+    @close="closeDialog"
+  >
+    <template #header>
+      <bf-dialog-header
+        title="Remove relationships"
+      />
+    </template>
+
+    <dialog-body>
+      <template #icon>
+        <IconGraph
+          class="icon-graph"
+          :height="32"
+          :width="32"
         />
       </template>
 
-      <dialog-body>
-        <template #icon>
-          <IconGraph
-            class="icon-graph"
-            :height="32"
-            :width="32"
-          />
-        </template>
-
-        <template #heading>
-          <h2>
-            {{ this.relationshipText }}
-          </h2>
-        </template>
-
-        <p>Deleting relationships cannot be undone.</p>
-
-      </dialog-body>
-
-      <template #footer>
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          class="red"
-          @click="sendRequest"
-        >
-          Delete
-        </bf-button>
+      <template #heading>
+        <h2>
+          {{ this.relationshipText }}
+        </h2>
       </template>
 
-    </el-dialog>
+      <p>Deleting relationships cannot be undone.</p>
 
-  </div>
+    </dialog-body>
+
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        class="red"
+        @click="sendRequest"
+      >
+        Delete
+      </bf-button>
+    </template>
+
+  </el-dialog>
 </template>
 
 <script>
@@ -175,16 +172,15 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/_icon-item-colors';
-@use '../../../../styles/element/dialog';
+@import '../../../../assets/_variables.scss';
+@import '../../../../assets/_icon-item-colors.scss';
 
 .dialog-body {
   text-align: center;
 
   .icon-graph {
     margin-bottom: 8px;
-    color: theme.$purple_2;
+    color: $purple_2;
   }
 }
 

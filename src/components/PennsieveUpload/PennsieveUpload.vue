@@ -199,8 +199,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
-@use "../../styles/element/dialog";
+@import "../../assets/_variables.scss";
 
 .clear-action-wrapper {
   display: flex;
@@ -208,7 +207,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   flex-direction: column;
 
   .clear-action {
-    color: theme.$purple_3;
+    color: $purple_3;
     cursor: pointer;
     margin-right: 4px;
   }
@@ -224,15 +223,15 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   color: red;
 
   &.microscope {
-    color: theme.$purple_2;
+    color: $purple_2;
   }
 
   &.time-series {
-    color: theme.$purple_1;
+    color: $purple_1;
   }
 
   &.upload {
-    color: theme.$purple_2;
+    color: $purple_2;
   }
 }
 
@@ -241,7 +240,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   overflow: scroll;
 
   &:first-child {
-    border-top: 1px solid theme.$gray_2;
+    border-top: 1px solid $gray_2;
   }
 }
 
@@ -261,11 +260,37 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
   text-align: center;
 
   &.hover {
-    border: 2px solid theme.$green_1;
+    border: 2px solid $green_1;
   }
 
+  //&:after {
+  //  border: 4px solid $green_2;
+  //
+  //  content: '';
+  //  height: calc(100% - 4px);
+  //  left: -2px;
+  //  pointer-events: none;
+  //  position: absolute;
+  //  opacity: 0;
+  //  transition: opacity .2s ease-out;
+  //  top: -2px;
+  //  width: calc(100% - 4px);
+  //}
+  //&.is-dragging {
+  //  .icon-upload-extra {
+  //    opacity: 1;
+  //    transform: translateX(0);
+  //    &.outside {
+  //      transition-delay: .1s;
+  //      transition-duration: .3s
+  //    }
+  //  }
+  //}
+  //&.is-dragging:after {
+  //  opacity: 1;
+  //}
   &.condensed {
-    color: theme.$gray_4;
+    color: $gray_4;
     flex: none;
     padding: 13px;
     margin-bottom: 10px;
@@ -281,7 +306,7 @@ const { getRootProps, getInputProps, isFocused, isDragReject, open } =
       font-weight: 300;
 
       a {
-        color: theme.$purple_2;
+        color: $purple_2;
         text-decoration: underline;
         cursor: pointer;
       }

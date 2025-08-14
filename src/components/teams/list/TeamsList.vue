@@ -225,9 +225,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../styles/theme";
-@use "../../../styles/element/table";
-@use "../../../styles/element/dialog";
+@import "../../../assets/variables";
 
 .empty {
   display: flex;

@@ -1,70 +1,67 @@
 <template>
-  <div>
-    <el-dialog
-      class="timeseries-filter-modal"
-      ref="filter-modal"
-      title="Dataset Description"
-      :modelValue="visible"
-      @update:modelValue="visible = $event" @close='close'
-    >
+  <el-dialog
+    class="timeseries-filter-modal"
+    ref="filter-modal"
+    title="Dataset Description"
+    :modelValue="visible"
+    @update:modelValue="visible = $event" @close='close'
+  >
 
-      <template #default>
-        <div slot="body">
-          <div>
-            <button
-              v-if="isEditingMarkdownDescription"
-              class="linked mr-8"
-              @click="isEditingMarkdownDescription= false"
-            >
-              Cancel
-            </button>
-            <button
-              v-if="isEditingMarkdownDescription"
-              class="linked"
-              @click="isSavingMarkdownDescription = true"
-            >
-              Save
-            </button>
+    <template #default>
+      <div slot="body">
+        <div>
+          <button
+            v-if="isEditingMarkdownDescription"
+            class="linked mr-8"
+            @click="isEditingMarkdownDescription= false"
+          >
+            Cancel
+          </button>
+          <button
+            v-if="isEditingMarkdownDescription"
+            class="linked"
+            @click="isSavingMarkdownDescription = true"
+          >
+            Save
+          </button>
 
-            <button
-              v-else
-              slot="title-aux"
-              class="linked-9"
-              @click="isEditingMarkdownDescription= true"
-            >
-              Update
-            </button>
+          <button
+            v-else
+            slot="title-aux"
+            class="linked-9"
+            @click="isEditingMarkdownDescription= true"
+          >
+            Update
+          </button>
+        </div>
+        <markdown-editor
+          ref="markdownEditor"
+          :value="datasetDescription"
+          :is-editing="isEditingMarkdownDescription"
+          :is-saving="isSavingMarkdownDescription"
+          :empty-state="datasetDescriptionEmptyState"
+          :is-loading="isLoadingDatasetDescription"
+          @save="onReadmeSave"
+        />
+
+      </div>
+
+    </template>
+
+    <template #footer>
+      <div slot="footer">
+        <div class="button-wrapper">
+          <div class="buttons">
+            <bf-button @click="isSavingMarkdownDescription = true">Save and Close
+            </bf-button>
           </div>
-          <markdown-editor
-            ref="markdownEditor"
-            :value="datasetDescription"
-            :is-editing="isEditingMarkdownDescription"
-            :is-saving="isSavingMarkdownDescription"
-            :empty-state="datasetDescriptionEmptyState"
-            :is-loading="isLoadingDatasetDescription"
-            @save="onReadmeSave"
-          />
-
         </div>
 
-      </template>
-
-      <template #footer>
-        <div slot="footer">
-          <div class="button-wrapper">
-            <div class="buttons">
-              <bf-button @click="isSavingMarkdownDescription = true">Save and Close
-              </bf-button>
-            </div>
-          </div>
-
-        </div>
-      </template>
+      </div>
+    </template>
 
 
-    </el-dialog>
-
-  </div>
+  </el-dialog>
 
 </template>
 
@@ -207,8 +204,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
-@use '../../../styles/element/dialog';
+@import '../../../assets/_variables.scss';
 
 .timeseries-filter-modal {
   display: block;
@@ -260,5 +256,11 @@ h2 {
 
 .filter-input-wrapper {
   margin-top: 24px;
+}
+</style>
+
+<style lang="scss">
+.timeseries-filter-modal span {
+  font-size: 24px;
 }
 </style>

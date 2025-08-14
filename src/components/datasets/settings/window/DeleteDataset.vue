@@ -1,81 +1,78 @@
 <template>
-  <div>
-    <el-dialog
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      :show-close="false"
-      @close="closeDialog"
-    >
-      <template #header>
-        <bf-dialog-header
-          title="Confirm Delete"
+  <el-dialog
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    :show-close="false"
+    @close="closeDialog"
+  >
+    <template #header>
+      <bf-dialog-header
+        title="Confirm Delete"
+      />
+    </template>
+
+
+    <dialog-body>
+      <div class="warning-wrap">
+        <icon-warning-circle
+          :height="32"
+          :width="32"
+          color="#C14D49"
         />
-      </template>
-
-
-      <dialog-body>
-        <div class="warning-wrap">
-          <icon-warning-circle
-            :height="32"
-            :width="32"
-            color="#C14D49"
-          />
-          <h4 class="delete-dataset-title">
-            Delete {{ datasetName }}
-          </h4>
-          <div class="warning-message">
-            Warning: This cannot be undone
-          </div>
+        <h4 class="delete-dataset-title">
+          Delete {{ datasetName }}
+        </h4>
+        <div class="warning-message">
+          Warning: This cannot be undone
         </div>
-        <el-form
-          ref="deleteDatasetForm"
-          @submit.native.prevent="onFormSubmit"
-        >
-          <el-form-item prop="checkBoxes">
-            <el-checkbox-group
-              v-model="form.checkBoxes"
-              @change="isChecked"
-            >
-              <el-checkbox
-                class="step-1"
-                :label="stepOneLabelText"
-                name="type"
-              />
-              <el-checkbox
-                class="step-2"
-                label="Shared data will become inaccessible for all users"
-                name="type"
-              />
-              <el-checkbox
-                v-if="isPublished"
-                class="step-2"
-                label="Published dataset will no longer be available in Discover"
-                name="type"
-              />
-            </el-checkbox-group>
-          </el-form-item>
-        </el-form>
-      </dialog-body>
+      </div>
+      <el-form
+        ref="deleteDatasetForm"
+        @submit.native.prevent="onFormSubmit"
+      >
+        <el-form-item prop="checkBoxes">
+          <el-checkbox-group
+            v-model="form.checkBoxes"
+            @change="isChecked"
+          >
+            <el-checkbox
+              class="step-1"
+              :label="stepOneLabelText"
+              name="type"
+            />
+            <el-checkbox
+              class="step-2"
+              label="Shared data will become inaccessible for all users"
+              name="type"
+            />
+            <el-checkbox
+              v-if="isPublished"
+              class="step-2"
+              label="Published dataset will no longer be available in Discover"
+              name="type"
+            />
+          </el-checkbox-group>
+        </el-form-item>
+      </el-form>
+    </dialog-body>
 
-      <template #footer>
-        <bf-button
-          class="secondary"
-          @click="closeDialog"
-        >
-          Cancel
-        </bf-button>
-        <bf-button
-          class="red"
-          :disabled="disabled"
-          @click="onFormSubmit"
-        >
-          Delete
-        </bf-button>
-      </template>
+    <template #footer>
+      <bf-button
+        class="secondary"
+        @click="closeDialog"
+      >
+        Cancel
+      </bf-button>
+      <bf-button
+        class="red"
+        :disabled="disabled"
+        @click="onFormSubmit"
+      >
+        Delete
+      </bf-button>
+    </template>
 
-    </el-dialog>
-  </div>
-
+  </el-dialog>
 </template>
 
 <script>
@@ -177,8 +174,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/dialog';
+@import '../../../../assets/_variables';
 
 .el-form {
   display: flex;
@@ -187,7 +183,7 @@ export default {
 }
 
 .delete-dataset-title {
-  color:  theme.$red_2;
+  color:  $red_2;
   margin-top: 0;
 }
 
@@ -203,7 +199,7 @@ export default {
 }
 
 .svg-icon {
-  color: theme.$red_1;
+  color: $red_1;
 }
 
 .warning-wrap {
@@ -212,7 +208,7 @@ export default {
 }
 
 .warning-message {
-  color: theme.$red_2;
+  color: $red_2;
 }
 
 .el-form-item {
@@ -222,6 +218,6 @@ export default {
 .step-1,
 .step-2 {
   margin-left: 0;
-  color: theme.$gray_5;
+  color: $gray_5;
 }
 </style>

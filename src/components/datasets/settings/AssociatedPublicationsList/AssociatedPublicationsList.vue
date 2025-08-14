@@ -109,9 +109,7 @@ import IconMenu from "../../../icons/IconMenu.vue";
 </script>
 
 <style lang="scss" scoped>
-@use '../../../../styles/theme';
-@use '../../../../styles/element/dropdown';
-
+@import '../../../../assets/_variables.scss';
 .associated-publications-list {
   .doi-wrap {
     margin-top: 16px;
@@ -134,9 +132,9 @@ import IconMenu from "../../../icons/IconMenu.vue";
         display: flex;
         flex-direction: row;
         &--error-message {
-          color: theme.$red_1;
+          color: $red_1;
           a {
-            color: theme.$red_1;
+            color: $red_1;
             text-decoration: underline;
           }
           .svg-icon {

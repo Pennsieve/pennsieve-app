@@ -493,10 +493,16 @@
 </script>
 
 <style lang="scss" scoped>
-@use "../../../../styles/theme";
+@import "../../../../assets/_variables.scss";
+
+.el-dialog__header, .el-dialog__body {
+  padding: 24px 24px 32px 0;
+
+}
+
 
 .acknowledgeInfo {
-  color: theme.$gray_5;
+  color: $gray_5;
 }
 
 .integration-list {
@@ -504,7 +510,7 @@
   overflow: scroll;
 }
 .section-title {
-  color: theme.$gray_5;
+  color: $gray_5;
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 8px;
@@ -512,11 +518,11 @@
 
 .section-description {
   margin-bottom: 40px;
-  color:theme.$gray_5;
+  color:$gray_5;
 }
 
 .org-name {
-  color: theme.$purple_1;
+  color: $purple_1;
   font-weight: 500;
 }
 
@@ -537,22 +543,22 @@
   }
 
   &:hover {
-    background: theme.$gray_2;
+    background: $gray_2;
     hr {
-      border-top-color: theme.$gray_2;
+      border-top-color: $gray_2;
     }
   }
 
   &.selected {
     color: white;
-    background: theme.$purple_1;
+    background: $purple_1;
 
     h2 {
       color: white;
     }
 
     hr {
-      border-top-color: theme.$purple_1;
+      border-top-color: $purple_1;
     }
   }
 }
@@ -574,4 +580,17 @@
   margin-left: 4px;
 }
 </style>
+
+<!--<style lang="scss">-->
+<!--.create-new-dataset-dialog {-->
+<!--  &.step-1 {-->
+<!--    .el-dialog__body {-->
+<!--      max-height: 250px;-->
+<!--      overflow-y: scroll;-->
+<!--      padding: 0 0 24px;-->
+<!--    }-->
+<!--  }-->
+<!--}-->
+<!--</style>-->
+
 

@@ -194,7 +194,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
+@import '../../../assets/_variables';
 
 .el-form {
   display: flex;
@@ -218,7 +218,7 @@ export default {
 }
 
 .svg-icon {
-  color: theme.$info-color;
+  color: $info-color;
 }
 
 .warning-wrap {
@@ -227,11 +227,11 @@ export default {
 }
 
 .info-message {
-  color: theme.$purple_1;
+  color: $purple_1;
 }
 
 .warning-message {
-  color: theme.$red_1;
+  color: $red_1;
 }
 
 .el-form-item {

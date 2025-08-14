@@ -1,39 +1,36 @@
 <template>
-  <div>
-    <el-dialog
-      :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
-      class="light-header fixed-width simple"
-      :show-close="false"
-      @close="closeDialog"
-    >
-      <dialog-body>
-        <IconWarningCircle
-          height="32"
-          width="32"
-          color="#2760ff"
-        />
-        <h2>Delete Status</h2>
-        <p>Are you sure you want to Delete this status? Any datasets with this status applied will revert to "{{ replacementName }}".</p>
+  <el-dialog
+    :modelValue="dialogVisible"
+    @update:modelValue="dialogVisible = $event"
+    class="light-header fixed-width simple"
+    :show-close="false"
+    @close="closeDialog"
+  >
+    <dialog-body>
+      <IconWarningCircle
+        height="32"
+        width="32"
+        color="#2760ff"
+      />
+      <h2>Delete Status</h2>
+      <p>Are you sure you want to Delete this status? Any datasets with this status applied will revert to "{{ replacementName }}".</p>
 
-        <div class="dialog-simple-buttons">
-          <bf-button
-            class="secondary"
-            @click="closeDialog"
-          >
-            Cancel
-          </bf-button>
-          <bf-button
-            class="primary"
-            @click="removeStatus"
-          >
-            Confirm
-          </bf-button>
-        </div>
-      </dialog-body>
-    </el-dialog>
-  </div>
-
+      <div class="dialog-simple-buttons">
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="primary"
+          @click="removeStatus"
+        >
+          Confirm
+        </bf-button>
+      </div>
+    </dialog-body>
+  </el-dialog>
 </template>
 
 <script>
@@ -81,11 +78,10 @@
 </script>
 
 <style scoped lang="scss">
-  @use '../../../styles/theme';
-  @use '../../../styles/element/dialog';
+  @import '../../../assets/_variables.scss';
 
   .svg-icon {
-    color: theme.$app-primary-color;
+    color: $app-primary-color;
   }
   .dialog-body {
     text-align: center
@@ -97,7 +93,7 @@
   }
 
   p {
-    color: theme.$gray_4;
+    color: $gray_4;
     font-size: 14px;
     font-weight: normal;
     line-height: 18px;

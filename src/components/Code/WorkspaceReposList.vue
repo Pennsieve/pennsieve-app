@@ -98,7 +98,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@import "../../assets/_variables.scss";
 
 .pagination-container {
   display: flex;

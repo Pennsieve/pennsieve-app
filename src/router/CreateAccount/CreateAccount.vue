@@ -222,16 +222,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../styles/theme";
+@import "../../assets/_variables.scss";
 
 .create-account {
-  background: theme.$purple_1;
+  background: $purple_1;
   display: block;
 
   .create-account-wrapper {
-    background: theme.$white;
+    background: $white;
     box-sizing: border-box;
-    color: theme.$gray_4;
+    color: $gray_4;
     max-width: 720px;
     min-height: 100vh;
     padding-bottom: 20px;
@@ -242,9 +242,9 @@ export default {
   }
 
   .create-account-inner {
-    background: theme.$white;
+    background: $white;
     box-sizing: border-box;
-    color: theme.$gray_4;
+    color: $gray_4;
     max-width: 720px;
     width: 360px;
   }
@@ -289,9 +289,9 @@ h2 {
   align-content: flex-start;
 }
 .error-copy {
-  color: theme.$error-color;
+  color: $error-color;
   &.conflict {
-    color: theme.$success-color;
+    color: $success-color;
   }
 }
 </style>

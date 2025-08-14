@@ -92,10 +92,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use "../../../../styles/theme";
+@import "../../../../assets/_variables.scss";
 
 .bf-upload-info {
-  background: theme.$gray_1;
+  background: $gray_1;
   border-radius: 4px;
   box-shadow: 0 0 1px 0 rgba(0, 0, 0, 0.21), 0 0 5px 0 rgba(0, 0, 0, 0.18);
   box-sizing: border-box;
@@ -115,7 +115,7 @@ export default {
   }
 }
 button {
-  color: theme.$app-primary-color;
+  color: $app-primary-color;
   text-decoration: underline;
 }
 .upload-details {

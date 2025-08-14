@@ -164,10 +164,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "../../../../styles/theme";
+@import "../../../../assets/_variables.scss";
 
 .integration-success {
-  border: solid 1px theme.$gray_2;
+  border: solid 1px #dadada;
   padding: 10px;
   display: flex;
   flex-direction: row;
@@ -211,12 +211,12 @@ export default {
     flex-direction: row-reverse;
 
     button {
-      color: theme.$gray_4;
+      color: $gray_4;
       margin-top: 7px;
       &:hover,
       &:focus {
         cursor: pointer;
-        color: theme.$purple_1;
+        color: $purple_1;
       }
     }
   }

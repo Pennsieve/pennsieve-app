@@ -521,24 +521,20 @@ async function onDeleteModel() {
 </template>
 
 <style lang="sass">
-/* this contains the default theme, these are optional styles */
-@use '../../../../styles/vueflow_core'
-@use '../../../../styles/_vueflow.css'
+
 
 /* these are necessary styles for vue flow */
 @import '@vue-flow/core/dist/style.css'
+
+/* this contains the default theme, these are optional styles */
+@import '../../../../assets/_vueflow_core.scss'
+@import '../../../../assets/_vueflow.css'
+
 @import '@vue-flow/minimap/dist/style.css'
-
-
-
-
-
 </style>
 
 <style lang="scss" scoped>
-@use "../../../../styles/theme";
-@use '../../../../styles/element/dialog';
-
+@import "../../../../assets/_variables.scss";
 
 .modified-stage {
   margin: 0;
@@ -568,11 +564,11 @@ async function onDeleteModel() {
 
 .btn-toggle-model-details {
   align-items: center;
-  background: theme.$gray_1;
-  border-left: 1px solid theme.$gray_2;
-  border-right: 1px solid theme.$gray_2;
-  border-top: 1px solid theme.$gray_2;
-  border-bottom: 1px solid theme.$gray_2;
+  background: $gray_1;
+  border-left: 1px solid $gray_2;
+  border-right: 1px solid $gray_2;
+  border-top: 1px solid $gray_2;
+  border-bottom: 1px solid $gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
   height: 48px;
@@ -584,8 +580,8 @@ async function onDeleteModel() {
 }
 .btn-toggle-models-list {
   align-items: center;
-  background: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
+  background: $gray_1;
+  border: 1px solid $gray_2;
   border-radius: 4px 0 0 4px;
   display: flex;
   height: 48px;
@@ -597,7 +593,7 @@ async function onDeleteModel() {
 
   &.selected {
     &:after {
-      background: theme.$gray_1;
+      background: $gray_1;
       content: "";
       height: 100%;
       pointer-events: none;
