@@ -1,30 +1,32 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    class="light-header fixed-width simple"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header slot="title" />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      class="light-header fixed-width simple"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" />
+      </template>
 
-    <dialog-body>
-      <h2>Withdraw Dataset?</h2>
-      <p>Withdraw your dataset from the review process.</p>
+      <dialog-body>
+        <h2>Withdraw Dataset?</h2>
+        <p>Withdraw your dataset from the review process.</p>
 
-      <p>
-        This will unlock the dataset and you can re-submit your dataset when it
-        is ready for review.
-      </p>
+        <p>
+          This will unlock the dataset and you can re-submit your dataset when
+          it is ready for review.
+        </p>
 
-      <div class="dialog-simple-buttons">
-        <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
-        <bf-button @click="withdrawDataset"> Submit </bf-button>
-      </div>
-    </dialog-body>
-  </el-dialog>
+        <div class="dialog-simple-buttons">
+          <bf-button class="secondary" @click="closeDialog"> Cancel </bf-button>
+          <bf-button @click="withdrawDataset"> Submit </bf-button>
+        </div>
+      </dialog-body>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
@@ -67,6 +69,7 @@ export default {
 
 <style lang="scss" scoped>
 @use "../../../../../styles/theme";
+@use "../../../../../styles/element/dialog";
 
 .dialog-body {
   .dialog-simple-buttons {
