@@ -208,6 +208,7 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: function (packageDTOs, fileDTOs) {
+      console.log("triggerDownload Runs");
       this.packageDTOs = packageDTOs;
       this.fileDTOs = fileDTOs;
       this.$nextTick(() => {
@@ -238,19 +239,42 @@ export default {
     /**
      * downloads multiple packages
      * @param {Array} nodeIds
-     * @param {Array} fileIds - when downloading a single package, includes only specified files
+     * @param {Array} fileIds
      */
-    downloadPackages: function (nodeIds, fileIds) {
+    downloadPackages: async function (nodeIds, fileIds) {
       const fileIdPayload = fileIds ? { fileIds } : {};
       const archiveNamePayload =
         this.archiveName && nodeIds.length > 1
           ? { archiveName: this.archiveName }
           : {};
       const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
-      this.zipData = JSON.stringify(payload, undefined);
-      this.$nextTick(() => {
-        zipForm.submit();
-      });
+
+      try {
+        const token = await useGetToken();
+        const response = await fetch(
+          `${this.config.zipitUrl}/?api_key=${token}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+            mode: "cors",
+          }
+        );
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${this.archiveName}.zip`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        }
+      } catch (error) {
+        console.error("Download failed:", error);
+      }
     },
   },
 };
