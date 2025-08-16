@@ -208,7 +208,6 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: function (packageDTOs, fileDTOs) {
-      console.log("triggerDownload Runs");
       this.packageDTOs = packageDTOs;
       this.fileDTOs = fileDTOs;
       this.$nextTick(() => {
@@ -239,9 +238,9 @@ export default {
     /**
      * downloads multiple packages
      * @param {Array} nodeIds
-     * @param {Array} fileIds
+     * @param {Array} fileIds - when downloading a single package, includes only specified files
      */
-    downloadPackages: async function (nodeIds, fileIds) {
+    downloadPackages: function (nodeIds, fileIds) {
       const fileIdPayload = fileIds ? { fileIds } : {};
       const archiveNamePayload =
         this.archiveName && nodeIds.length > 1
@@ -249,32 +248,20 @@ export default {
           : {};
       const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
 
-      try {
-        const token = await useGetToken();
-        const response = await fetch(
-          `${this.config.zipitUrl}/?api_key=${token}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-            mode: "cors",
-          }
-        );
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = this.zipItUrl;
+      form.target = "_blank"; // Open in new tab
 
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${this.archiveName}.zip`;
-          a.click();
-          window.URL.revokeObjectURL(url);
-        }
-      } catch (error) {
-        console.error("Download failed:", error);
-      }
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "data";
+      input.value = JSON.stringify(payload);
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
     },
   },
 };
