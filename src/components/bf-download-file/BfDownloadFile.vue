@@ -251,7 +251,7 @@ export default {
       const form = document.createElement("form");
       form.method = "POST";
       form.action = this.zipItUrl;
-      form.target = "_blank"; // Open in new tab
+      form.target = "_blank";
 
       const input = document.createElement("input");
       input.type = "hidden";
