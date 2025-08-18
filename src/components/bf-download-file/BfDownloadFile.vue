@@ -249,7 +249,11 @@ export default {
       const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
       this.zipData = JSON.stringify(payload, undefined);
       this.$nextTick(() => {
-        zipForm.submit();
+        try {
+          zipForm.submit();
+        } catch (error) {
+          console.error(error);
+        }
       });
     },
   },
