@@ -1,147 +1,133 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :class="calculateModalWidth"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        title="Repository Information"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :class="calculateModalWidth"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header title="Repository Information" />
+      </template>
 
-    <div class="image-wrapper">
-      <img
-        :src=logoPath
-        class="logo"
-        alt="Logo for Pennsieve"
-      />
-      <div>
-        <a :href="selectedRepoForRequest.url" target="_blank">
-          <bf-button class="primary">
-            Visit Repository
-          </bf-button>
-        </a>
+      <div class="image-wrapper">
+        <img :src="logoPath" class="logo" alt="Logo for Pennsieve" />
+        <div>
+          <a :href="selectedRepoForRequest.url" target="_blank">
+            <bf-button class="primary"> Visit Repository </bf-button>
+          </a>
+        </div>
       </div>
-    </div>
 
-    <dialog-body>
-      <markdown-editor
-        ref="markdownEditor"
-        :value="readmeText"
-        :is-editing="false"
-        :is-saving="false"
-        :is-loading="isLoadingRepositoryDescription"/>
-    </dialog-body>
-
-  </el-dialog>
-
+      <dialog-body>
+        <markdown-editor
+          ref="markdownEditor"
+          :value="readmeText"
+          :is-editing="false"
+          :is-saving="false"
+          :is-loading="isLoadingRepositoryDescription"
+        />
+      </dialog-body>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
-import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
+import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import MarkdownEditor from "../../shared/MarkdownEditor/MarkdownEditor.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
 
-
-import {
-  mapState,
-  mapActions
-} from 'vuex'
+import { mapState, mapActions } from "vuex";
 export default {
   name: "RepositoryInfo",
   components: {
     BfDialogHeader,
     DialogBody,
     MarkdownEditor,
-    BfButton
+    BfButton,
   },
   props: {
     dialogVisible: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   data: function () {
     return {
       readmeText: "",
-    }
+    };
   },
   computed: {
-    ...mapState([
-      'primaryNavCondensed',
-      'secondaryNavOpen',
-    ]),
-    ...mapState('repositoryModule',[
+    ...mapState(["primaryNavCondensed", "secondaryNavOpen"]),
+    ...mapState("repositoryModule", [
       "isLoadingRepositoryDescription",
-      'selectedRepoForRequest'
+      "selectedRepoForRequest",
     ]),
 
-    logoPath: function() {
+    logoPath: function () {
       if (this.selectedRepoForRequest) {
-        return this.selectedRepoForRequest.logoFile
+        return this.selectedRepoForRequest.logoFile;
       }
-      return ""
+      return "";
     },
     /**
      * Calculate modal width based on navigation width
      * @returns {String}
      */
-    calculateModalWidth: function() {
+    calculateModalWidth: function () {
       return this.primaryNavCondensed || this.secondaryNavOpen
-        ? 'condensed-nav-modal-width'
-        : 'default-nav-modal-width'
+        ? "condensed-nav-modal-width"
+        : "default-nav-modal-width";
     },
   },
   watch: {
     selectedRepoForRequest: {
-      handler: function() {
-        this.getReadmeText()
-      }
-    }
+      handler: function () {
+        this.getReadmeText();
+      },
+    },
   },
   methods: {
-    ...mapActions('repositoryModule',[
-        'updateModalVisible'
-      ]
-    ),
+    ...mapActions("repositoryModule", ["updateModalVisible"]),
 
-    getReadmeText: async function() {
-      let result = ""
+    getReadmeText: async function () {
+      let result = "";
       if (this.selectedRepoForRequest) {
-        let response = await fetch(this.selectedRepoForRequest.overviewDocument)
+        let response = await fetch(
+          this.selectedRepoForRequest.overviewDocument
+        );
         if (response.ok) {
-          result = await response.text()
+          result = await response.text();
         }
       }
-      this.readmeText = result
+      this.readmeText = result;
     },
 
     /**
      * Closes the Search Across All Datasets dialog
      */
-    closeDialog: function() {
-      this.updateModalVisible(false)
+    closeDialog: function () {
+      this.updateModalVisible(false);
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped lang="scss">
+@use "../../../styles/theme";
+@use "../../../styles/element/dialog";
 
 .image-wrapper {
   display: flex;
   justify-content: space-between;
   .logo {
-    max-width:240px;
+    max-width: 240px;
     padding-left: 16px;
     margin: 24px 0;
   }
 }
-
 
 .el-dialog {
   margin-top: 16px !important;
@@ -160,6 +146,4 @@ export default {
 }
 </style>
 
-<style scoped>
-
-</style>
+<style scoped></style>

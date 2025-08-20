@@ -247,14 +247,21 @@ export default {
           ? { archiveName: this.archiveName }
           : {};
       const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
-      this.zipData = JSON.stringify(payload, undefined);
-      this.$nextTick(() => {
-        try {
-          zipForm.submit();
-        } catch (error) {
-          console.error(error);
-        }
-      });
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = this.zipItUrl;
+      form.target = "_blank";
+
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "data";
+      input.value = JSON.stringify(payload);
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
     },
   },
 };
