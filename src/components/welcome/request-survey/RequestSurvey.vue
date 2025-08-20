@@ -1,172 +1,174 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :class="calculateModalWidth"
-    @open="openDialog"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header title="Dataset Submission Request" />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :class="calculateModalWidth"
+      @open="openDialog"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header title="Dataset Submission Request" />
+      </template>
 
-    <div class="status-info">
-      <div class="wrapper">
-        <div>
-          <div class="status">
-            <span>Dataset submission status:</span> {{ statusStr }}
+      <div class="status-info">
+        <div class="wrapper">
+          <div>
+            <div class="status">
+              <span>Dataset submission status:</span> {{ statusStr }}
+            </div>
+          </div>
+          <div>
+            <repo-selector :locked="proposalLocked" />
           </div>
         </div>
         <div>
-          <repo-selector :locked="proposalLocked" />
-        </div>
-      </div>
-      <div>
-        <div v-if="showSave" class="save-draft-cta-wrapper">
+          <div v-if="showSave" class="save-draft-cta-wrapper">
+            <bf-button
+              class="primary"
+              :disabled="!readyToSave || invalidName"
+              @click="triggerAction(DatasetProposalAction.SAVE)"
+            >
+              Save Draft
+            </bf-button>
+            <p class="cta-hint">
+              Complete all fields marked with Asterisk (*) to save draft
+            </p>
+          </div>
           <bf-button
+            v-if="showAccept"
             class="primary"
-            :disabled="!readyToSave || invalidName"
-            @click="triggerAction(DatasetProposalAction.SAVE)"
+            @click="triggerAction(DatasetProposalAction.ACCEPT)"
           >
-            Save Draft
+            Accept Proposal
           </bf-button>
-          <p class="cta-hint">
-            Complete all fields marked with Asterisk (*) to save draft
-          </p>
+
+          <bf-button
+            v-if="showReject"
+            class="primary"
+            @click="triggerAction(DatasetProposalAction.REJECT)"
+          >
+            Reject Proposal
+          </bf-button>
         </div>
-        <bf-button
-          v-if="showAccept"
-          class="primary"
-          @click="triggerAction(DatasetProposalAction.ACCEPT)"
-        >
-          Accept Proposal
-        </bf-button>
-
-        <bf-button
-          v-if="showReject"
-          class="primary"
-          @click="triggerAction(DatasetProposalAction.REJECT)"
-        >
-          Reject Proposal
-        </bf-button>
       </div>
-    </div>
 
-    <el-form
-      id="proposal-request-survey"
-      ref="proposalRequestSurvey"
-      :model="proposal"
-    >
-      <data-card
-        ref="titleDataCard"
-        class="compact purple question-card"
-        title="What is the proposed name for the dataset?"
-        :is-expandable="true"
-        :padding="false"
-        :required="true"
+      <el-form
+        id="proposal-request-survey"
+        ref="proposalRequestSurvey"
+        :model="proposal"
       >
-        <el-input v-model="proposal.name" :readonly="proposalLocked" />
-        <p class="warning-message" v-if="invalidName">
-          Invalid character! A dataset proposal name may not contain these
-          characters: {{ reservedCharacters }}
-        </p>
-      </data-card>
-
-      <data-card
-        ref="descriptionDataCard"
-        class="compact purple question-card"
-        title="Please describe the proposed dataset"
-        :is-expandable="true"
-        :padding="false"
-        :required="true"
-      >
-        <template v-if="!proposalLocked" #title-aux>
-          <button
-            v-if="!isEditingMarkdown"
-            class="linked mr-8"
-            :disabled="proposalLocked"
-            @click="onClickEditMarkdown"
-          >
-            Edit
-          </button>
-          <button
-            v-if="isEditingMarkdown"
-            class="linked"
-            @click="onClickSaveMarkdown"
-          >
-            Save
-          </button>
-        </template>
-        <markdown-editor
-          ref="proposalMarkdownEditor"
-          :value="proposal.description"
-          :is-editing="isEditingMarkdown"
-          :is-saving="isSavingMarkdown"
-          :empty-state="datasetProposalEmptyState"
-          :is-loading="isLoadingMarkdown"
-          @save="saveDescription"
-        />
-      </data-card>
-
-      <!--      TODO: Bring this back. Currently, it does not correctly check for email and not sure what the difference is between request and proposal in object-->
-
-      <!--      <data-card-->
-      <!--        ref="contributorsDataCard"-->
-      <!--        class="compact purple question-card"-->
-      <!--        title="Invite other investigators to work on your dataset"-->
-      <!--        :is-expandable="true"-->
-      <!--        :padding="false"-->
-      <!--      >-->
-      <!--        <template v-if="!proposalLocked" #title-aux>-->
-      <!--          <button-->
-      <!--            class="linked mr-8"-->
-      <!--            :disabled="proposalLocked"-->
-      <!--            @click.prevent="onClickAddContributor"-->
-      <!--          >-->
-      <!--            Add-->
-      <!--          </button>-->
-      <!--        </template>-->
-      <!--        <template v-for="(contributor, idx) in proposal.contributors">-->
-      <!--          <proposal-contributor-->
-      <!--            :id=contributor.emailAddress-->
-      <!--            :index=idx-->
-      <!--            :contributor=contributor-->
-      <!--            :locked="proposalLocked"-->
-      <!--            @edit-contributor="editContributor"-->
-      <!--            @remove-contributor="removeContributor"-->
-      <!--            />-->
-      <!--        </template>-->
-      <!--      </data-card>-->
-
-      <div class="questions">
         <data-card
-          v-for="(question, id) in repositoryQuestions"
-          :key="question.id"
-          ref="surveyDataCard"
+          ref="titleDataCard"
           class="compact purple question-card"
-          :title="question.question"
+          title="What is the proposed name for the dataset?"
           :is-expandable="true"
           :padding="false"
           :required="true"
         >
-          <el-input
-            v-model="proposal.survey[question.id]"
-            :readonly="proposalLocked"
+          <el-input v-model="proposal.name" :readonly="proposalLocked" />
+          <p class="warning-message" v-if="invalidName">
+            Invalid character! A dataset proposal name may not contain these
+            characters: {{ reservedCharacters }}
+          </p>
+        </data-card>
+
+        <data-card
+          ref="descriptionDataCard"
+          class="compact purple question-card"
+          title="Please describe the proposed dataset"
+          :is-expandable="true"
+          :padding="false"
+          :required="true"
+        >
+          <template v-if="!proposalLocked" #title-aux>
+            <button
+              v-if="!isEditingMarkdown"
+              class="linked mr-8"
+              :disabled="proposalLocked"
+              @click="onClickEditMarkdown"
+            >
+              Edit
+            </button>
+            <button
+              v-if="isEditingMarkdown"
+              class="linked"
+              @click="onClickSaveMarkdown"
+            >
+              Save
+            </button>
+          </template>
+          <markdown-editor
+            ref="proposalMarkdownEditor"
+            :value="proposal.description"
+            :is-editing="isEditingMarkdown"
+            :is-saving="isSavingMarkdown"
+            :empty-state="datasetProposalEmptyState"
+            :is-loading="isLoadingMarkdown"
+            @save="saveDescription"
           />
         </data-card>
-      </div>
-    </el-form>
 
-    <!--    <proposal-contributor-dialog-->
-    <!--      :dialog-visible="contributorDialogVisible"-->
-    <!--      :all-contributors="proposal.contributors"-->
-    <!--      :id="selectedContributorId"-->
-    <!--      :contributor="selectedContributor"-->
-    <!--      @add-contributor="addContributor"-->
-    <!--      @update-contributor="updateContributor"-->
-    <!--      @close="closeContributorDialog"-->
-    <!--    />-->
-  </el-dialog>
+        <!--      TODO: Bring this back. Currently, it does not correctly check for email and not sure what the difference is between request and proposal in object-->
+
+        <!--      <data-card-->
+        <!--        ref="contributorsDataCard"-->
+        <!--        class="compact purple question-card"-->
+        <!--        title="Invite other investigators to work on your dataset"-->
+        <!--        :is-expandable="true"-->
+        <!--        :padding="false"-->
+        <!--      >-->
+        <!--        <template v-if="!proposalLocked" #title-aux>-->
+        <!--          <button-->
+        <!--            class="linked mr-8"-->
+        <!--            :disabled="proposalLocked"-->
+        <!--            @click.prevent="onClickAddContributor"-->
+        <!--          >-->
+        <!--            Add-->
+        <!--          </button>-->
+        <!--        </template>-->
+        <!--        <template v-for="(contributor, idx) in proposal.contributors">-->
+        <!--          <proposal-contributor-->
+        <!--            :id=contributor.emailAddress-->
+        <!--            :index=idx-->
+        <!--            :contributor=contributor-->
+        <!--            :locked="proposalLocked"-->
+        <!--            @edit-contributor="editContributor"-->
+        <!--            @remove-contributor="removeContributor"-->
+        <!--            />-->
+        <!--        </template>-->
+        <!--      </data-card>-->
+
+        <div class="questions">
+          <data-card
+            v-for="(question, id) in repositoryQuestions"
+            :key="question.id"
+            ref="surveyDataCard"
+            class="compact purple question-card"
+            :title="question.question"
+            :is-expandable="true"
+            :padding="false"
+            :required="true"
+          >
+            <el-input
+              v-model="proposal.survey[question.id]"
+              :readonly="proposalLocked"
+            />
+          </data-card>
+        </div>
+      </el-form>
+
+      <!--    <proposal-contributor-dialog-->
+      <!--      :dialog-visible="contributorDialogVisible"-->
+      <!--      :all-contributors="proposal.contributors"-->
+      <!--      :id="selectedContributorId"-->
+      <!--      :contributor="selectedContributor"-->
+      <!--      @add-contributor="addContributor"-->
+      <!--      @update-contributor="updateContributor"-->
+      <!--      @close="closeContributorDialog"-->
+      <!--    />-->
+    </el-dialog>
+  </div>
 </template>
 
 <script>
@@ -519,6 +521,7 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+@use "../../../styles/element/dialog";
 
 .status-info {
   display: flex;
