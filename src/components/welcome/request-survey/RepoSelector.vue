@@ -91,6 +91,7 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+@use "../../../styles/element/dropdown";
 
 .drop-menu {
   display: flex;
