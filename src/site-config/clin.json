@@ -1,0 +1,41 @@
+{
+  "app_domain": "pennsieve.org",
+  "apiUrl": "https://api.pennsieve.org",
+  "api2Url": "https://api2.pennsieve.org",
+  "zipitUrl": "https://api.pennsieve.org/zipit",
+  "discoverUrl": "https://api.pennsieve.org/discover",
+  "discoverAppUrl": "https://discover.pennsieve.org",
+  "docsUrl": "https://docs.pennsieve.org",
+  "maxDownloadSize": 15000000000,
+  "environment": "prod",
+  "ORCIDpubUrl": "https://pub.orcid.org/v2.1",
+  "ORCIDUrl": "https://orcid.org/oauth/authorize?client_id=APP-DRQCE0GUWKTRCWY2&response_type=code&scope=/read-limited%20/activities/update&redirect_uri=https://app.pennsieve.io/orcid-redirect",
+  "timeSeriesUrl": "wss://api.pennsieve.org/streaming/ts/query",
+  "timeSeriesApi": "https://api.pennsieve.org/streaming",
+  "conceptsUrl": "https://api.pennsieve.org/models",
+  "bucket": "https://pennsieve-clin-prod-uploads-v2-pennsieve.s3.amazonaws.com",
+  "bucketName": "pennsieve-clin-prod-uploads-v2-use1",
+  "googleAnalytics": "G-Z28G260TGJ",
+  "notificationUrl": "wss://api.pennsieve.io/notifications/notification/connect",
+  "googleMapApi": "xxxxxxxxxxxxxx",
+  "mapTiler": "xxxxx",
+  "awsConfig": {
+    "authenticationFlowType": "USER_PASSWORD_AUTH",
+    "region": "us-east-1",
+    "userPoolId": "us-east-1_rx3jtFNkR",
+    "userPoolWebClientId": "2mflm59j6ki7lomtsmbuegcou1",
+    "oauth": {
+      "domain": "pennsieve-clin-users.auth.us-east-1.amazoncognito.com",
+      "redirectSignIn": "https://app.pennsieve.org",
+      "redirectSignOut": "https://app.pennsieve.org",
+      "responseType": "token",
+      "scope": ["openid"]
+    }
+  },
+  "pusherConfig": {
+    "appId": "33f0678ef1a028da5b9f",
+    "region": "us2"
+  },
+  "GitHubAppUrl": "https://github.com/apps/pennsieve/installations/new",
+  "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG"
+}
