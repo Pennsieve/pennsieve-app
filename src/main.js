@@ -8,14 +8,14 @@ import Cookies from 'js-cookie'
 import * as siteConfig from '@/site-config/site.json'
 import { VueReCaptcha } from 'vue-recaptcha-v3'
 import AWSConfig from './utils/aws-exports.js'
-import { ElMessage } from 'element-plus'
+// import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"
-import 'element-plus/es/components/message/style/index';
+// import 'element-plus/es/components/message/style/index';
 import { CookieStorage } from 'aws-amplify/utils';
 import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import {fetchAuthSession} from "aws-amplify/auth";
@@ -29,7 +29,7 @@ import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
 import { useViewerStore } from '@/stores/tsviewer'
 
-
+import Pusher from 'pusher-js'
 
 Amplify.configure(AWSConfig)
 
@@ -50,9 +50,9 @@ app.use(createPinia())
 
 
 //Import Dashboard
-import ElementPlus from 'element-plus';
-import 'element-plus/dist/index.css';
-app.use(ElementPlus);
+// import ElementPlus from 'element-plus';
+// import 'element-plus/dist/index.css';
+// app.use(ElementPlus);
 installDashboard(app, ["TextWidget"]);
 
 app.use(VueClipboard, {

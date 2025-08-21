@@ -163,7 +163,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .text-area-wrapper {
   width: 100%;
@@ -173,7 +173,7 @@ export default {
   .el-form-item {
     .el-form-item__label {
       font-weight: 500;
-      color: $gray_5;
+      color: theme.$gray_5;
     }
     &.is-error {
       .el-form-item__label {
@@ -219,12 +219,12 @@ export default {
     line-height: 1em;
   }
   .el-checkbox__inner {
-    border: 1px solid $gray_5;
+    border: 1px solid theme.$gray_5;
   }
 
   .el-checkbox__label,
   .el-form-item__label {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-weight: 400;
   }
 
@@ -258,12 +258,12 @@ export default {
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     line-height: 16px;
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     &.disabled-label {
       color: #c0c4cc;
       cursor: not-allowed;

@@ -429,10 +429,10 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../../assets/_variables.scss';
+  @use '../../../../styles/theme';
 
   .card-icon {
-    color: $purple_2;
+    color: theme.$purple_2;
   }
 
   .models {

@@ -344,7 +344,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 .dataset-info {
   margin: 8px;
@@ -352,7 +352,6 @@ export default {
 }
 
 .file-meta-data-info {
-  //border: 1px solid $gray_2;
   margin-left: 16px;
   border-radius: 4px;
   flex: 0 0 260px;
@@ -363,11 +362,10 @@ export default {
 .header {
   height: 38px;
   font-size: 16px;
-  //background-color: $gray_1;
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   line-height: 38px;
   padding-left: 16px;
-  color: $purple_3;
+  color: theme.$purple_3;
 }
 
 .record-info {
@@ -375,12 +373,12 @@ export default {
   margin: 0 8px 16px 4px;
 
   .record-header {
-    color: $purple_1;
+    color: theme.$purple_1;
     background: none;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
   }
 
   .record-props {
@@ -388,7 +386,7 @@ export default {
     //margin: 0 16px 16px 16px;
 
     .record-prop-item {
-      border-top: 1px solid $gray_1;
+      border-top: 1px solid theme.$gray_1;
       font-weight: 500;
 
       .prop-label {
@@ -400,7 +398,7 @@ export default {
 
 .copy-clipboard {
   align-self: center;
-  color: $purple_1;
+  color: theme.$purple_1;
   cursor: pointer;
 }
 .file-info {
@@ -420,13 +418,13 @@ export default {
     font-weight: 300;
     min-width: 50px;
     font-size: 12px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 
   .value {
     margin-left: 8px;
     font-size: 12px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 }
 </style>

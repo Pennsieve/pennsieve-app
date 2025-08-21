@@ -136,9 +136,9 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../assets/variables.scss';
+@use '../../../styles/theme';
 
 .person-icon {
-  color: $purple_1;
+  color: theme.$purple_1;
 }
 </style>

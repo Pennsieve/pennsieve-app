@@ -86,52 +86,52 @@ function closeDialog() {
 </script>
 
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    class="large-dialog"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header slot="title" title="Activity Logs" />
-    </template>
-    <dialog-body class="activity-log-body">
-      <div v-if="isLoading" class="icon-waiting mr-16">
-        <bf-waiting-icon />
-      </div>
-      <div v-else>
-        <div v-if="logsPending">Logs Pending...</div>
-        <div v-if="noLogsAvailable">No Logs Available</div>
-        <div v-else>
-          <el-table :data="TableData" class="tw-text-sm log-table">
-            <el-table-column type="expand">
-              <template #default="property">
-                <div>
-                  <p>{{ property.row.Message }}</p>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="CreationTime"
-              label="Creation Time"
-              width="200"
-              show-overflow-tooltip
-            />
-            <el-table-column prop="Message" label="Message" />
-          </el-table>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      class="large-dialog"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Activity Logs" />
+      </template>
+      <dialog-body class="activity-log-body">
+        <div v-if="isLoading" class="icon-waiting mr-16">
+          <bf-waiting-icon />
         </div>
-      </div>
-    </dialog-body>
-  </el-dialog>
+        <div v-else>
+          <div v-if="logsPending">Logs Pending...</div>
+          <div v-if="noLogsAvailable">No Logs Available</div>
+          <div v-else>
+            <el-table :data="TableData" class="tw-text-sm log-table">
+              <el-table-column type="expand">
+                <template #default="property">
+                  <div>
+                    <p>{{ property.row.Message }}</p>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column
+                prop="CreationTime"
+                label="Creation Time"
+                width="200"
+                show-overflow-tooltip
+              />
+              <el-table-column prop="Message" label="Message" />
+            </el-table>
+          </div>
+        </div>
+      </dialog-body>
+    </el-dialog>
+  </div>
 </template>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
+@use "../../../styles/element/dialog";
+@use "../../../styles/element/table";
 
-.log-dialog {
-  height: 80%;
-  width: 80%;
-}
 .icon-waiting {
   align-items: center;
   display: flex;

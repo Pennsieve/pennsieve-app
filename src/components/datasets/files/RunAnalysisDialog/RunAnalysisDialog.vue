@@ -39,7 +39,7 @@
       </div>
       <div v-show="shouldShow(2)">
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="preprocessorValue"
           placeholder="Select Preprocessor"
           @change="setSelectedPreprocessor(preprocessorValue)"
@@ -52,7 +52,7 @@
           ></el-option>
         </el-select>
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="processorValue"
           placeholder="Select Processor"
           @change="setSelectedProcessor(processorValue)"
@@ -65,7 +65,7 @@
           ></el-option>
         </el-select>
         <el-select
-          class="margin flex"
+          class="margin"
           v-model="postprocessorValue"
           placeholder="Select Postprocessor"
           @change="setSelectedPostprocessor(postprocessorValue)"
@@ -691,7 +691,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "../../../../assets/_variables.scss";
+@use "../../../../styles/theme";
 
 .table-container {
   overflow-y: scroll;
@@ -710,7 +710,7 @@ export default {
 
 .lds-ring {
   /* change color here */
-  color: #1c4c5b;
+  color: theme.$purple_2;
 }
 .lds-ring,
 .lds-ring div {
@@ -752,7 +752,7 @@ export default {
   }
 }
 .warning-message-div {
-  color: red;
+  color: theme.$red_2;
   margin: 3px;
 }
 </style>

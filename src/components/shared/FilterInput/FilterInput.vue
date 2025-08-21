@@ -38,11 +38,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
 
   .filter-input {
     align-items: center;
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
     display: flex;
     flex-shrink: 0;
     height: 48px;
@@ -56,11 +56,11 @@ export default {
       outline: none;
       padding: 0;
       &::placeholder {
-        color: $gray_4
+        color: theme.$gray_4
       }
     }
     .svg-icon {
-      color: $gray_4;
+      color: theme.$gray_4;
       height: 16px;
       width: 16px;
     }

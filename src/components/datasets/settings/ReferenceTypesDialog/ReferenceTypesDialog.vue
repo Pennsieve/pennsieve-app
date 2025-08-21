@@ -1,125 +1,128 @@
 <template>
-  <el-dialog
-    :visible="visible"
-    :show-close="false"
-    @close="closeDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="Add a dataset reference"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
+    >
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          title="Add a dataset reference"
+        />
+      </template>
 
-    <dialog-body>
-      <p class="info-blurb">
-        List references to other items that are associated with this dataset
-        (e.g Publications, Protocols, and Other Datasets).
-      </p>
-      <div>
-        <el-form
-          ref="referenceForm"
-          :model="ruleForm"
-          :rules="rules"
-        >
-          <el-form-item prop="doi">
-            <el-input
-              ref="inputDOI"
-              v-model="ruleForm.doi"
-              class="mb-8 doi-input"
-              placeholder="Enter a DOI to add citation"
-              :disabled="datasetLocked"
-              @blur="previewCitation"
-            >
-              <template #prefix>
-                <IconDocument
-                  :height="20"
-                  :width="20"
-                />
-              </template>
-
-            </el-input>
-            <div
-              v-if="notFound"
-              class="not-found"
-            >
-              <p class="doi-wrap-item__content--unavailable-doi">
-                {{ ruleForm.doi }}
-              </p>
-              <p class="doi-wrap-item__content--error-message">
-                {{ doi }}
-                <a
-                  href="#"
-                  @click.prevent="previewCitation"
-                >
-                  <icon-try-again
-                    height="20"
-                    :width="20"
-                    color="E94B4B"
-                  />
-                  Try Again
-                </a>
-              </p>
-            </div>
-            <div
-              v-else
-              class="citation"
-            >
-              <span v-html="$sanitize(doi.citation, ['i', 'b'])" />
-              <a
-                :href="doi.doiUrl"
-                target="blank"
+      <dialog-body>
+        <p class="info-blurb">
+          List references to other items that are associated with this dataset
+          (e.g Publications, Protocols, and Other Datasets).
+        </p>
+        <div>
+          <el-form
+            ref="referenceForm"
+            :model="ruleForm"
+            :rules="rules"
+          >
+            <el-form-item prop="doi">
+              <el-input
+                ref="inputDOI"
+                v-model="ruleForm.doi"
+                class="mb-8 doi-input"
+                placeholder="Enter a DOI to add citation"
+                :disabled="datasetLocked"
+                @blur="previewCitation"
               >
-                {{ doi.doiUrl }}
-              </a>
-            </div>
-            <p
-              v-if="hasError"
-              class="error"
-            >
-              Sorry, an error has occurred. Please try again.
-            </p>
-            <p
-              v-if="invalidDOI"
-              class="error"
-            >
-              The input is not a valid DOI.
-            </p>
-          </el-form-item>
-          <el-form-item prop="reference">
-            <el-select
-              v-model="ruleForm.reference"
-              placeholder="Select a reference type"
-              class="reference-select"
-            >
-              <el-option
-                v-for="item in referenceTypeOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-form>
-      </div>
-    </dialog-body>
+                <template #prefix>
+                  <IconDocument
+                    :height="20"
+                    :width="20"
+                  />
+                </template>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        class="primary"
-        @click="onAdd()"
-      >
-        Add Reference
-      </bf-button>
-    </template>
+              </el-input>
+              <div
+                v-if="notFound"
+                class="not-found"
+              >
+                <p class="doi-wrap-item__content--unavailable-doi">
+                  {{ ruleForm.doi }}
+                </p>
+                <p class="doi-wrap-item__content--error-message">
+                  {{ doi }}
+                  <a
+                    href="#"
+                    @click.prevent="previewCitation"
+                  >
+                    <icon-try-again
+                      height="20"
+                      :width="20"
+                      color="E94B4B"
+                    />
+                    Try Again
+                  </a>
+                </p>
+              </div>
+              <div
+                v-else
+                class="citation"
+              >
+                <span v-html="$sanitize(doi.citation, ['i', 'b'])" />
+                <a
+                  :href="doi.doiUrl"
+                  target="blank"
+                >
+                  {{ doi.doiUrl }}
+                </a>
+              </div>
+              <p
+                v-if="hasError"
+                class="error"
+              >
+                Sorry, an error has occurred. Please try again.
+              </p>
+              <p
+                v-if="invalidDOI"
+                class="error"
+              >
+                The input is not a valid DOI.
+              </p>
+            </el-form-item>
+            <el-form-item prop="reference">
+              <el-select
+                v-model="ruleForm.reference"
+                placeholder="Select a reference type"
+                class="reference-select"
+              >
+                <el-option
+                  v-for="item in referenceTypeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+        </div>
+      </dialog-body>
 
-  </el-dialog>
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          class="primary"
+          @click="onAdd()"
+        >
+          Add Reference
+        </bf-button>
+      </template>
+
+    </el-dialog>
+  </div>
 </template>
 
 <script>
@@ -145,7 +148,7 @@ export default {
   },
   mixins: [Request],
   props: {
-    visible: {
+    dialogVisible: {
       type: Boolean,
       default: false
     }
@@ -295,7 +298,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
+
 .info-blurb {
   margin-bottom: 21px;
   color: #000;
@@ -306,7 +311,7 @@ export default {
 }
 
 .error {
-  color: $error-color;
+  color: theme.$error-color;
   margin-top: -11px;
 }
 
@@ -325,11 +330,11 @@ export default {
     display: flex;
     flex-direction: row;
     &--error-message {
-      color: $red_1;
+      color: theme.$red_1;
       margin-top: -10px;
       margin-bottom: -12px;
       a {
-        color: $red_1;
+        color: theme.$red_1;
         text-decoration: underline;
       }
       .svg-icon {

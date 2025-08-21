@@ -1,0 +1,133 @@
+@use '../theme';
+@use '../element/input';
+@use 'button';
+
+
+:deep(.el-dialog) {
+  --el-dialog-bg-color: #{theme.$white};
+
+  border-radius: 5px;
+  box-shadow: 0 2px 15px 0 rgba(0,0,0,0.25), 0 28px 41px 0 rgba(33,43,54,0.2);
+
+  &.fixed-width {
+    width: 540px;
+  }
+  &.large-dialog {
+    width: 80%;
+    height: 80%;
+    margin:auto;
+    margin-top:5%;
+  } 
+  &.full-dialog{
+    width: 95%;
+    height: 95%;
+    margin:auto;
+    margin-top:1%;
+    overflow: hidden;
+  }
+  &.light-header {
+    .el-dialog__header {
+      background: #{theme.$white};
+      color: theme.$gray_6;
+    }
+  }
+
+  .el-dialog__header {
+    background: #{theme.$purple_2};
+    color: #{theme.$white};
+    padding: 24px 32px;
+    margin: 0;
+
+    .el-dialog__headerbtn {
+      color: white;
+      &:focus, &:hover{
+        color: #{theme.$purple_3};
+      }
+      .el-dialog__close {
+        color: white;
+
+        &:focus, &:hover {
+          color: #{theme.$purple_3};
+        }
+      }
+    }
+  }
+
+  .el-dialog__body {
+    line-height: inherit;
+    word-break: normal;
+    padding: 24px 32px;
+    margin: 0;
+  }
+
+  .el-dialog__footer {
+    border-top: 1px solid theme.$gray_2;
+    text-align: left;
+    padding: 16px 32px;
+
+    .bf-button {
+      margin-right: 8px;
+    }
+  }
+}
+
+.add-property-dialog {
+  .el-dialog__header {
+    align-items: flex-start;
+    background: #{theme.$purple_2};
+    color: #{theme.$white};
+    padding: 24px 24px 0 24px;
+  }
+
+}
+
+
+:deep(.dialog-footer) {
+  display: flex;
+  flex-direction: row;
+  &.center {
+    justify-content: center;
+  }
+}
+.el-dialog__footer .bf-button {
+  margin-right: 8px !important;
+  &:last-child {
+    margin-right: 0 !important
+  }
+}
+.dialog-msg {
+  color: #{theme.$gray_4};
+  padding: 0 8px;
+  text-align: center;
+  .dialog-msg-icon {
+    color: #{theme.$green_1};
+    margin-bottom: 8px;
+  }
+  h3 {
+    color: #{theme.$text-color};
+    font-size: 14px;
+    margin: 0 0 8px;
+  }
+}
+
+.el-dialog__wrapper.simple {
+  .el-dialog {
+    padding: 0;
+  }
+  .el-dialog__header {
+    border: none;
+    padding: 0;
+    position: absolute;
+    top: 24px;
+    right: 24px;
+  }
+  .el-dialog__body {
+    padding: 0;
+  }
+}
+
+.el-dialog_carousel {
+  width: 860px;
+  height: 669px;
+}
+

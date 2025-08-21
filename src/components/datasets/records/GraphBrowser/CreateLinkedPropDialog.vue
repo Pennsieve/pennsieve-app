@@ -221,90 +221,94 @@ function postLinkedPropertyChanges() {
 </script>
 
 <template>
-  <el-dialog
-    class="create-linked-prop-dialog"
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="closeDialog"
+  <div>
+    <el-dialog
+      class="create-linked-prop-dialog"
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="closeDialog"
     >
 
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="Create a link between models"
-      />
-    </template>
-
-
-    <div class="relationship-info">
-      <div class="title">{{effectiveSource.data.label}} --> {{effectiveTarget.data.label}}</div>
-      <bf-button class="icon secondary" @click="toggleReverse">
-        <template #default>
-          <IconRotateRight/>
-
-        </template>
-      </bf-button>
-    </div>
-
-    <div class="modal-info">Properties that point to other records are called <u>links</u>. Links are defined in the model schema. You can use links to relate records of different types. Pennsieve can use links for advanced querying and visualization.  </div>
-
-
-    <el-form
-      ref="createFormRef"
-      :model="createForm"
-      :rules="rules"
-      label-position="top"
-    >
-
-      <el-form-item prop="label">
-        <template #label>
-          Property Name <span class="label-helper">
-              required
-            </span>
-        </template>
-        <el-input
-          v-model="createForm.label"
-          placeholder="Provide a property name"
-          autofocus
+      <template #header>
+        <bf-dialog-header
+          slot="title"
+          title="Create a link between models"
         />
+      </template>
 
-      </el-form-item>
 
-      <el-form-item label="Options">
-        <el-checkbox v-model="createForm.multiple" prop="multple"  label="Allow multiple links" size="large" />
-      </el-form-item>
+      <div class="relationship-info">
+        <div class="title">{{effectiveSource.data.label}} --> {{effectiveTarget.data.label}}</div>
+        <bf-button class="icon secondary" @click="toggleReverse">
+          <template #default>
+            <IconRotateRight/>
 
-      <div class="info-panel">
-        <ul> <li> Records of type <u>{{effectiveSource.data.label}}</u> will have a property (<b>{{propNameOrUnknown}} </b>) that links to <b>{{ singleOrMultipleStr }}</b> of type <u> {{effectiveTarget.data.label}}</u>.</li>
-        <li> Records of type <u>{{effectiveTarget.data.label}}</u> will have links to <b>multiple records </b>of type <u> {{effectiveSource.data.label}}</u>.</li>
-        </ul>
+          </template>
+        </bf-button>
       </div>
 
-    </el-form>
+      <div class="modal-info">Properties that point to other records are called <u>links</u>. Links are defined in the model schema. You can use links to relate records of different types. Pennsieve can use links for advanced querying and visualization.  </div>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="closeDialog"
+
+      <el-form
+        ref="createFormRef"
+        :model="createForm"
+        :rules="rules"
+        label-position="top"
       >
-        Cancel
-      </bf-button>
-      <bf-button
-        processing-text="Saving"
-        @click="submitForm(createFormRef)"
 
-      >
-        Create
+        <el-form-item prop="label">
+          <template #label>
+            Property Name <span class="label-helper">
+              required
+            </span>
+          </template>
+          <el-input
+            v-model="createForm.label"
+            placeholder="Provide a property name"
+            autofocus
+          />
 
-      </bf-button>
-    </template>
+        </el-form-item>
 
-  </el-dialog>
+        <el-form-item label="Options">
+          <el-checkbox v-model="createForm.multiple" prop="multple"  label="Allow multiple links" size="large" />
+        </el-form-item>
+
+        <div class="info-panel">
+          <ul> <li> Records of type <u>{{effectiveSource.data.label}}</u> will have a property (<b>{{propNameOrUnknown}} </b>) that links to <b>{{ singleOrMultipleStr }}</b> of type <u> {{effectiveTarget.data.label}}</u>.</li>
+            <li> Records of type <u>{{effectiveTarget.data.label}}</u> will have links to <b>multiple records </b>of type <u> {{effectiveSource.data.label}}</u>.</li>
+          </ul>
+        </div>
+
+      </el-form>
+
+      <template #footer>
+        <bf-button
+          class="secondary"
+          @click="closeDialog"
+        >
+          Cancel
+        </bf-button>
+        <bf-button
+          processing-text="Saving"
+          @click="submitForm(createFormRef)"
+
+        >
+          Create
+
+        </bf-button>
+      </template>
+
+    </el-dialog>
+
+  </div>
 </template>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
+@use '../../../../styles/element/dialog';
 
 h1 {
   font-size: 14px;
@@ -331,7 +335,7 @@ h1 {
  }
 
 .info-panel {
-  background: $purple_tint;
+  background: theme.$purple_tint;
   padding: 8px 100px 8px 8px ;
 }
 
@@ -339,7 +343,7 @@ li {
   margin: 16px 0;
 
   b {
-    color: $purple_3;
+    color: theme.$purple_3;
   }
 }
 

@@ -456,7 +456,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
+@use '../../../styles/bfmenu';
 
 .bf-menu hr {
   margin: 8px 0
@@ -469,19 +470,19 @@ export default {
   display: inline-block;
 }
 .dataset-no-status-item .dot{
-  background-color: #d2d2d2;
+  background-color: theme.$gray_2;
 }
 
 .dataset-wip-item .dot {
-  background-color: $purple_1;
+  background-color: theme.$purple_1;
 }
 
 .dataset-in-review-item .dot {
-  background-color: $status_orange;
+  background-color: theme.$status_orange;
 }
 
 .dataset-completed-item .dot {
-  background-color: $green_1;
+  background-color: theme.$green_1;
 }
 
 .status-item {

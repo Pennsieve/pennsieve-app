@@ -100,7 +100,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
+@use '../../../styles/theme';
 
 .wrapper {
   width: 100%;
@@ -108,7 +108,7 @@ export default {
 
 .warning {
   font-size: 12px;
-  color: $gray_4;
+  color: theme.$gray_4;
   margin-top: -6px;
 }
 </style>

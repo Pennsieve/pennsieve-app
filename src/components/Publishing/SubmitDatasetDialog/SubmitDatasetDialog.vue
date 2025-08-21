@@ -1,135 +1,117 @@
 <template>
-  <el-dialog
-    :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
-    :show-close="false"
-    @close="close"
-    @closed="resetDialog"
-  >
-    <template #header>
-      <bf-dialog-header
-        slot="title"
-        title="Submit a Dataset for Review"
-      />
-    </template>
+  <div>
+    <el-dialog
+      :modelValue="dialogVisible"
+      @update:modelValue="dialogVisible = $event"
+      :show-close="false"
+      @close="close"
+      @closed="resetDialog"
+    >
+      <template #header>
+        <bf-dialog-header slot="title" title="Submit a Dataset for Review" />
+      </template>
 
-
-    <dialog-body>
-      <p>
-        Your dataset will be submitted for review to the Publishers within your organization. While under review, the dataset will become locked until it has either been approved or rejected.
-      </p>
-      <el-checkbox
-        v-model="isAgreementChecked"
-        class="mb-16"
-      >
-        I understand that submitting for review will lock this dataset.
-      </el-checkbox>
-      <el-checkbox
-        ref="checkboxEmbargo"
-        v-model="isEmbargoed"
-        :disabled="isEmbargoedDisabled"
-        class="long-label"
-      >
-        Request dataset to be placed under embargo and not <br>be made public immediately
-        <span class="help-link">
-          (
-          <a
-            href="https://docs.pennsieve.io/docs/what-is-an-embargoed-dataset"
-            target="_blank"
-          >
-            what is this?
-          </a>
-          )
-        </span>
-      </el-checkbox>
-
-      <div
-        v-if="isEmbargoed"
-        class="mt-16"
-      >
-        <div
-          class="mb-8"
+      <dialog-body>
+        <p>
+          Your dataset will be submitted for review to the Publishers within
+          your organization. While under review, the dataset will become locked
+          until it has either been approved or rejected.
+        </p>
+        <el-checkbox v-model="isAgreementChecked" class="mb-16">
+          I understand that submitting for review will lock this dataset.
+        </el-checkbox>
+        <el-checkbox
+          ref="checkboxEmbargo"
+          v-model="isEmbargoed"
+          :disabled="isEmbargoedDisabled"
+          class="long-label"
         >
-          <label>
-            When should the dataset be fully released?
-          </label>
+          Request dataset to be placed under embargo and not <br />be made
+          public immediately
+          <span class="help-link">
+            (
+            <a
+              href="https://docs.pennsieve.io/docs/what-is-an-embargoed-dataset"
+              target="_blank"
+            >
+              what is this?
+            </a>
+            )
+          </span>
+        </el-checkbox>
+
+        <div v-if="isEmbargoed" class="mt-16">
+          <div class="mb-8">
+            <label> When should the dataset be fully released? </label>
+          </div>
+          <el-date-picker
+            v-model="embargoReleaseDate"
+            type="date"
+            name="embargoReleaseDate"
+            format="MM/DD/YYYY"
+            value-format="YYYY-MM-DD"
+            placeholder="Select a date"
+            :picker-options="pickerOptions"
+          />
         </div>
-        <el-date-picker
-          v-model="embargoReleaseDate"
-          type="date"
-          name="embargoReleaseDate"
-          format="MM/DD/YYYY"
-          value-format="YYYY-MM-DD"
-          placeholder="Select a date"
-          :picker-options="pickerOptions"
-        />
-      </div>
-    </dialog-body>
+      </dialog-body>
 
-    <template #footer>
-      <bf-button
-        class="secondary"
-        @click="close"
-      >
-        Cancel
-      </bf-button>
-      <bf-button
-        processing-text="Submitting"
-        :disabled="isCheckboxDisabled"
-        :processing="isSubmitting"
-        @click="submitDataset"
-      >
-        Submit
-      </bf-button>
-    </template>
-
-  </el-dialog>
+      <template #footer>
+        <bf-button class="secondary" @click="close"> Cancel </bf-button>
+        <bf-button
+          processing-text="Submitting"
+          :disabled="isCheckboxDisabled"
+          :processing="isSubmitting"
+          @click="submitDataset"
+        >
+          Submit
+        </bf-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
-import { mapActions, mapState } from 'vuex'
+import { mapActions, mapState } from "vuex";
 
-import moment from 'moment'
+import moment from "moment";
 
-import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
+import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
 
-import Request from '../../../mixins/request/index'
-import { PublicationStatus } from '../../../utils/constants'
-import EventBus from '../../../utils/event-bus'
-import {useGetToken} from "@/composables/useGetToken";
-import {useSendXhr} from "@/mixins/request/request_composable";
+import Request from "../../../mixins/request/index";
+import { PublicationStatus } from "../../../utils/constants";
+import EventBus from "../../../utils/event-bus";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 const getPublicationType = (isEmbargoed) => {
-  return isEmbargoed ? 'embargo'
-    : 'publication'
-}
+  return isEmbargoed ? "embargo" : "publication";
+};
 export default {
-  name: 'SubmitDatasetDialog',
+  name: "SubmitDatasetDialog",
 
   components: {
     BfDialogHeader,
     DialogBody,
-    BfButton
+    BfButton,
   },
 
-  mixins: [
-    Request
-  ],
+  mixins: [Request],
 
   props: {
     dialogVisible: {
       type: Boolean,
-      default: false
+      default: false,
     },
     datasetId: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
 
-  data: function() {
+  data: function () {
     return {
       datasets: [],
       selectedDataset: {},
@@ -137,70 +119,72 @@ export default {
       isAgreementChecked: false,
       isSubmitting: false,
       isEmbargoed: false,
-      embargoReleaseDate: '',
+      embargoReleaseDate: "",
       pickerOptions: {
         disabledDate: (date) => {
-          return this.computeIsDisabledDate(date)
-        }
-      }
-    }
+          return this.computeIsDisabledDate(date);
+        },
+      },
+    };
   },
 
   computed: {
-    ...mapState([
-      'config',
-      'dataset'
-    ]),
+    ...mapState(["config", "dataset"]),
 
     /**
      * Compute if the submit button is disabled
      * based on if the user selected a dataset and checked the checkbox
      * @returns {Boolean}
      */
-    isCheckboxDisabled: function() {
-      const basicRequirements = Object.keys(this.dataset).length === 0 || !this.isAgreementChecked
-      return this.isEmbargoed
-        ? !this.embargoReleaseDate
-        : basicRequirements
+    isCheckboxDisabled: function () {
+      const basicRequirements =
+        Object.keys(this.dataset).length === 0 || !this.isAgreementChecked;
+      return this.isEmbargoed ? !this.embargoReleaseDate : basicRequirements;
     },
 
     /**
      * compute whether this dataset has been published, and thus can be revised
      * @returns {Boolean}
      */
-    isRevisable: function() {
-      return Boolean(this.selectedDataset.publication
-        && this.selectedDataset.publication.publishedDataset
-        && this.selectedDataset.publication.type === 'publication')
+    isRevisable: function () {
+      return Boolean(
+        this.selectedDataset.publication &&
+          this.selectedDataset.publication.publishedDataset &&
+          this.selectedDataset.publication.type === "publication"
+      );
     },
 
     /**
      * Compute if the dataset is an embargoed dataset
      * @returns {Boolean}
      */
-    isEmbargoedDataset: function() {
-      return Boolean(this.selectedDataset.publication
-        && this.selectedDataset.publication.publishedDataset
-        && this.selectedDataset.publication.type === 'embargo')
+    isEmbargoedDataset: function () {
+      return Boolean(
+        this.selectedDataset.publication &&
+          this.selectedDataset.publication.publishedDataset &&
+          this.selectedDataset.publication.type === "embargo"
+      );
     },
 
     /**
      * Compute if the dataset has been previously published
      * @returns {Boolean}
      */
-    isCurrentlyPublished: function() {
-      return Boolean(this.selectedDataset.publication
-            && this.selectedDataset.publication.publishedDataset
-            && this.selectedDataset.publication.type !== 'removal')
+    isCurrentlyPublished: function () {
+      return Boolean(
+        this.selectedDataset.publication &&
+          this.selectedDataset.publication.publishedDataset &&
+          this.selectedDataset.publication.type !== "removal"
+      );
     },
 
     /**
      * Compute if the embargo checkbox is disabled
      * @returns {Boolean}
      */
-    isEmbargoedDisabled: function() {
-      return this.isEmbargoedDataset || this.isCurrentlyPublished
-    }
+    isEmbargoedDisabled: function () {
+      return this.isEmbargoedDataset || this.isCurrentlyPublished;
+    },
   },
 
   watch: {
@@ -208,12 +192,12 @@ export default {
      * Watches visible value
      * @param {Boolean} visible
      */
-    visible: function(visible) {
+    visible: function (visible) {
       if (visible) {
-        this.getDatasets()
-        this.isAgreementChecked = false
-        this.isEmbargoed = false
-        this.embargoReleaseDate = ''
+        this.getDatasets();
+        this.isAgreementChecked = false;
+        this.isEmbargoed = false;
+        this.embargoReleaseDate = "";
       }
     },
 
@@ -221,13 +205,13 @@ export default {
      * Watches request_id query param
      * @param {String} val
      */
-    '$route.query.request_id': {
-      handler: function(val) {
+    "$route.query.request_id": {
+      handler: function (val) {
         if (val) {
-          this.$emit('update:visible', true)
+          this.$emit("update:visible", true);
         }
       },
-      immediate: true
+      immediate: true,
     },
 
     /**
@@ -236,26 +220,26 @@ export default {
      * `publicationType` is set to `embargo` on the request.
      * @param {Boolean} val
      */
-    isEmbargoedDataset: function(val) {
-      this.isEmbargoed = val
+    isEmbargoedDataset: function (val) {
+      this.isEmbargoed = val;
     },
   },
 
   methods: {
-    ...mapActions(['updateDataset']),
+    ...mapActions(["updateDataset"]),
     /**
      * Emit event to update the synced property
      */
-    close: function() {
-      this.$emit('close')
+    close: function () {
+      this.$emit("close");
     },
 
     /**
      * Get all datasets
      */
-    getDatasets: function() {
-      this.selectedDataset = {}
-      this.isLoadingDatasets = true
+    getDatasets: function () {
+      this.selectedDataset = {};
+      this.isLoadingDatasets = true;
 
       /*
        * High limit for now as discussed during the kickoff.
@@ -264,98 +248,90 @@ export default {
        * request again at the correct offset
        */
       useGetToken()
-        .then(token => {
-          const url = `${this.config.apiUrl
-          }/datasets/paginated?api_key=${token
-          }&limit=10000&onlyMyDatasets=true&includePublishedDataset=true&canPublish=true`
+        .then((token) => {
+          const url = `${this.config.apiUrl}/datasets/paginated?api_key=${token}&limit=10000&onlyMyDatasets=true&includePublishedDataset=true&canPublish=true`;
 
-          return useSendXhr(url)
-            .then(response => {
-              this.datasets = response.datasets
-              // Check if the user pre-selected a dataset
-              if (this.$route.query.request_id) {
-                // Find the dataset requested in the response and set it
-                const selectedDataset = response.datasets.find(dataset => {
-                  return dataset.content.id === this.$route.query.request_id
-                })
-                this.selectedDataset = selectedDataset
+          return useSendXhr(url).then((response) => {
+            this.datasets = response.datasets;
+            // Check if the user pre-selected a dataset
+            if (this.$route.query.request_id) {
+              // Find the dataset requested in the response and set it
+              const selectedDataset = response.datasets.find((dataset) => {
+                return dataset.content.id === this.$route.query.request_id;
+              });
+              this.selectedDataset = selectedDataset;
 
-                // Remove the query param in the URL
-                this.$router.replace({
-                  query: {}
-                })
-              } else {
-                // this is coming from the settings page
-                this.selectedDataset = this.dataset
-              }
-            })
+              // Remove the query param in the URL
+              this.$router.replace({
+                query: {},
+              });
+            } else {
+              // this is coming from the settings page
+              this.selectedDataset = this.dataset;
+            }
+          });
         })
         .catch(this.handleXhrError.bind(this))
         .finally(() => {
-          this.isLoadingDatasets = false
-        })
-
+          this.isLoadingDatasets = false;
+        });
     },
 
     /**
      * Reset values of the dialog
      */
-    resetDialog: function() {
-      this.selectedDataset = {}
-      this.isAgreementChecked = false
-      this.embargoReleaseDate = ''
+    resetDialog: function () {
+      this.selectedDataset = {};
+      this.isAgreementChecked = false;
+      this.embargoReleaseDate = "";
     },
 
     /**
      * Submit dataset for publication
      */
-    submitDataset: function() {
+    submitDataset: function () {
       const id = this.datasetId
         ? this.datasetId
-        : (this.selectedDataset.content ? this.selectedDataset.content.id : '')
+        : this.selectedDataset.content
+        ? this.selectedDataset.content.id
+        : "";
 
-      const publicationType = getPublicationType(this.isEmbargoed)
+      const publicationType = getPublicationType(this.isEmbargoed);
 
       if (id) {
-        this.isSubmitting = true
+        this.isSubmitting = true;
 
         useGetToken()
-          .then(token => {
-            const url = `${this.config.apiUrl
-            }/datasets/${id
-            }/publication/request?api_key=${token
-            }&publicationType=${publicationType
-            }&embargoReleaseDate=${this.embargoReleaseDate}`
+          .then((token) => {
+            const url = `${this.config.apiUrl}/datasets/${id}/publication/request?api_key=${token}&publicationType=${publicationType}&embargoReleaseDate=${this.embargoReleaseDate}`;
 
-            return useSendXhr(url, { method: 'POST' })
-              .then(() => {
+            return useSendXhr(url, { method: "POST" }).then(() => {
+              const updatedPublicationState = {
+                ...this.dataset.publication,
+                status: PublicationStatus.REQUESTED,
+                type: publicationType,
+              };
+              const updatedDataset = {
+                ...this.dataset,
+                publication: updatedPublicationState,
+              };
 
-                const updatedPublicationState = {
-                  ...this.dataset.publication,
-                  status: PublicationStatus.REQUESTED,
-                  type: publicationType
-                }
-                const updatedDataset = {
-                  ...this.dataset,
-                  publication: updatedPublicationState
-                }
+              this.updateDataset(updatedDataset);
 
-                this.updateDataset(updatedDataset)
+              EventBus.$emit("toast", {
+                detail: {
+                  type: "success",
+                  msg: "Your dataset has been successfully submitted for review.",
+                },
+              });
 
-                EventBus.$emit('toast', {
-                  detail: {
-                    type: 'success',
-                    msg: 'Your dataset has been successfully submitted for review.'
-                  }
-                })
-
-                this.close()
-              })
+              this.close();
+            });
           })
           .catch(this.handleXhrError.bind(this))
           .finally(() => {
-            this.isSubmitting = false
-          })
+            this.isSubmitting = false;
+          });
       }
     },
 
@@ -364,18 +340,24 @@ export default {
      * @param {String} date
      * @returns {Boolean}
      */
-    computeIsDisabledDate: function(date) {
-      const isSameOrAfter = moment(date).isSameOrAfter(moment(), 'day')
-      const isBeforeOneYear = moment(date).isSameOrBefore(moment().add(1, 'years'), 'day')
+    computeIsDisabledDate: function (date) {
+      const isSameOrAfter = moment(date).isSameOrAfter(moment(), "day");
+      const isBeforeOneYear = moment(date).isSameOrBefore(
+        moment().add(1, "years"),
+        "day"
+      );
 
-      const isAllowed = isSameOrAfter && isBeforeOneYear
-      return !isAllowed
-    }
-  }
-}
+      const isAllowed = isSameOrAfter && isBeforeOneYear;
+      return !isAllowed;
+    },
+  },
+};
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use "../../../styles/theme";
+@use "../../../styles/element/dialog";
+
 .el-select,
 .el-date-editor {
   width: 100%;

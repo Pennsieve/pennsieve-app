@@ -955,7 +955,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .add-property-dialog {
   .el-select {
@@ -968,7 +968,7 @@ export default {
     }
   }
   .el-checkbox__label, .el-form-item__label {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-weight: 400;
   }
 
@@ -1005,11 +1005,11 @@ export default {
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     &.scientific-label {
       //margin-top: -18px;
       height: 26px;
@@ -1036,7 +1036,7 @@ export default {
     width: 100%;
   }
   .configure-property-btn {
-    color: $purple_1;
+    color: theme.$purple_1;
     font-size: 14px;
     margin-left: 24px;
     &:not([disabled]) {

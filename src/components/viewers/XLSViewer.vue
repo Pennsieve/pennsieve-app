@@ -129,14 +129,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../assets/_variables.scss";
+@use "../../styles/theme";
 
 th {
   text-align: left;
 }
 
 td {
-  border-bottom: 1px solid $purple_tint;
+  border-bottom: 1px solid theme.$purple_tint;
   height: 24px;
 }
 
@@ -149,7 +149,7 @@ td {
   width: 100%;
   height: 100%;
   background: white;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
 }
 
 .wrapper {

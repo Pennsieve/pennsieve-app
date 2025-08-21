@@ -79,6 +79,7 @@
                 :swatches="colors"
                 :show-checkbox="false"
                 :inline="true"
+                row-length="5"
                 :close-on-select="true"
                 shapes="circles"
                 swatch-size="16"
@@ -549,8 +550,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../assets/_variables.scss';
-@import '../../../assets/components/_dataset-status.scss';
+@use '../../../styles/theme';
+@use '../../../styles/dataset-status';
+@use 'vue3-swatches/dist/style.css';
 
 
 .menu-icon {
@@ -570,7 +572,7 @@ ul {
   font-weight: normal;
   font-style: italic;
   margin-top: 8px;
-  color: $red_1;
+  color: theme.$red_1;
 }
 
 .settings-status-color {
@@ -587,7 +589,7 @@ ul {
 
   li {
     &:hover {
-      background-color: $gray_2;
+      background-color: theme.$gray_2;
       width: 216px;
       padding-left: 0px !important;
     }
@@ -622,15 +624,19 @@ input[type='text']:disabled {
   margin-left: -28px;
   cursor: pointer;
 }
+
+
 </style>
 
 <style lang="scss">
-@import 'vue3-swatches/dist/style.css';
+@use 'vue3-swatches/dist/style.css';
 
-.vue-swatches {
-  .vue-swatches__container {
-    .vue-swatches__wrapper {
-      width: 180px !important;
+:deep(.vue-swatches) {
+  :deep(.vue-swatches__container) {
+    :deep(.vue-swatches__wrapper) {
+      width: 200px;
+      display: flex;
+      flex-wrap: wrap;
     }
   }
 }

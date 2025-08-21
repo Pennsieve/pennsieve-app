@@ -402,9 +402,8 @@
 </script>
 
 <style lang="scss" scoped>
-  @import './_markdown.scss';
-  @import '../../../assets/_variables.scss';
-
+  @use '../../../styles/theme';
+  @use './_markdown.scss' as *;
 
   textarea {
     font: 14px/1.1 monospace;
@@ -426,8 +425,8 @@
 
   .markdown-editor-toolbar {
     align-items: center;
-    background: $gray_1;
-    border-bottom: 1px solid $gray_2;
+    background: theme.$gray_1;
+    border-bottom: 1px solid theme.$gray_2;
     display: flex;
     flex-wrap: wrap;
     padding: 8px 16px 0;
@@ -446,15 +445,15 @@
   }
   .markdown-controls-button {
     border-radius: 4px 4px 0 0;
-    border: 1px solid $gray_2;
-    color: $gray_4;
+    border: 1px solid theme.$gray_2;
+    color: theme.$gray_4;
     cursor: pointer;
     padding: 13px 22px;
     transform: translateY(1px);
     &.active {
       background: #fff;
       border-bottom-color: #fff;
-      color: $gray_6
+      color: theme.$gray_6
     }
   }
 

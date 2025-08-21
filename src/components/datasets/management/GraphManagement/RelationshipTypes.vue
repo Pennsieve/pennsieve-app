@@ -740,11 +740,11 @@
 </script>
 
 <style lang="scss">
-  @import '../../../../assets/_variables.scss';
-  @import './_filter-menu.scss';
+  @use '../../../../styles/theme';
+  @use './filter-menu';
 
   .model-name-heading {
-    color: $purple_3;
+    color: theme.$purple_3;
     margin: 0 0 0 16px;
     text-transform: capitalize;
     font-size: 18px;
@@ -775,14 +775,14 @@
     .data-model-graph {
       margin-bottom: 24px;
       .chart {
-        border: 1px solid $gray_2;
+        border: 1px solid theme.$gray_2;
       }
     }
 
     .add-relationship-type-btn {
       align-items: center;
-      border: 1px solid $gray_2;
-      color: $purple_1;
+      border: 1px solid theme.$gray_2;
+      color: theme.$purple_1;
       display: flex;
       cursor: pointer;
       font-size: 14px;
@@ -815,7 +815,7 @@
     }
 
     .icon-procedure {
-      color: $purple_1;
+      color: theme.$purple_1;
     }
   }
 </style>

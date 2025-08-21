@@ -526,7 +526,7 @@ function createMemoryItems(cpu, comp) {
 </script>
 
 <style scoped lang="scss">
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .text-area-wrapper {
   width: 100%;
@@ -536,7 +536,7 @@ function createMemoryItems(cpu, comp) {
   .el-form-item {
     .el-form-item__label {
       font-weight: 500;
-      color: $gray_5;
+      color: theme.$gray_5;
     }
   }
 
@@ -573,12 +573,12 @@ function createMemoryItems(cpu, comp) {
     line-height: 1em;
   }
   .el-checkbox__inner {
-    border: 1px solid $gray_5;
+    border: 1px solid theme.$gray_5;
   }
 
   .el-checkbox__label,
   .el-form-item__label {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-weight: 400;
   }
 
@@ -612,12 +612,12 @@ function createMemoryItems(cpu, comp) {
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     line-height: 16px;
   }
   .info {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     &.disabled-label {
       color: #c0c4cc;
       cursor: not-allowed;
@@ -647,12 +647,12 @@ function createMemoryItems(cpu, comp) {
   .url-format-info {
     display: block;
     font-size: 12px;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-top: 4px;
   }
 
   .url-format-info a {
-    color: $primary-color;
+    color: theme.$primary-color;
     text-decoration: none;
   }
 

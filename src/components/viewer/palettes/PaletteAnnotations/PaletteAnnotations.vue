@@ -353,7 +353,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .palette-annotations {
   background: #fff;
@@ -368,8 +368,8 @@ h3 {
 
 .annotations-heading {
   align-items: center;
-  background: $purple_0_7;
-  border-bottom: solid 1px $gray_2;
+  background: theme.$purple_0_7;
+  border-bottom: solid 1px theme.$gray_2;
   display: flex;
   overflow: hidden;
   padding: 8px;
@@ -417,7 +417,7 @@ iron-icon {
   color: #9B9B9B;
 }
 iron-icon:hover, iron-icon[focused] {
-  color: $app-primary-color
+  color: theme.$app-primary-color
 }
 .all-hidden {
   color: #DADADA;

@@ -1,8 +1,8 @@
 <template>
   <div class="user-menu-wrap">
     <el-popover
+      style="--el-popover-padding: 102px"
       ref="userMenu"
-      popper-class="user-menu-popover no-padding"
       placement="right-end"
       width="260"
       transition=""
@@ -90,7 +90,7 @@
           </div>
           <hr>
           <ul>
-            <li>
+            <li >
               <a
                 class="bf-menu-item"
                 href="#"
@@ -346,7 +346,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  @import '../../../assets/_variables.scss';
+  @use '../../../styles/theme';
+  @use '../../../styles/element/dropdown';
+  @use '../../../styles/element/select';
+  @use '../../../styles/bfmenu';
+  @use '../../../styles/element/popover';
+
+  .user-menu-wrap {
+    --el-popover-padding: 0;
+    --el-popover-bg-color: theme.$purple_2;
+  }
 
   .person-circle {
     margin-left: 11px;
@@ -356,7 +365,7 @@ export default {
     border: solid 2px #fff;
     border-radius: 50%;
     box-sizing: border-box;
-    color: $white;
+    color: theme.$white;
     display: inline-flex;
     font-weight: 600;
     height: 32px;
@@ -364,9 +373,9 @@ export default {
     width: 32px;
   }
   .user-menu-wrap {
-    background: $purple_3;
+    background: theme.$purple_3;
     .secondary & {
-      background: $gray_2;
+      background: theme.$gray_2;
     }
   }
   .user-menu {
@@ -404,11 +413,8 @@ export default {
   }
   .filter-input {
     border-bottom: none;
-    border-top: 1px solid $gray_2;
+    border-top: 1px solid theme.$gray_2;
   }
-</style>
-<style scoped lang="scss">
-  @import '../../../assets/_variables.scss';
 
   .user-menu-org-menu {
     margin-left: 0 !important;
@@ -419,6 +425,6 @@ export default {
   .icon-check {
     margin-top: -4px;
     float: right;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 </style>

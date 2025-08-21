@@ -284,58 +284,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import "./assets/_variables.scss";
-.refresh-action {
-  color: $purple_3;
-  margin: 0 16px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.session-info {
-  background-color: $purple_tint;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  font-weight: 500;
-  color: $purple_2;
-}
-</style>
-
-<style lang="scss">
-@import "./assets/_variables.scss";
-@import url("https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&family=Roboto:wght@100;300;400;500;700&display=swap");
-
-html,
-body {
-  font-family: $system-font;
-  font-weight: 300;
-  font-size: 14px;
-  line-height: 17px;
-}
-
-body {
-  background-color: $white;
-  color: $text-color;
-  margin: 0;
-  min-height: 100vh;
-}
-
-// Hide only visually, but have it available for screenreaders: h5bp.com
-.visually-hidden {
-  border: 0;
-  clip: rect(0 0 0 0);
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  padding: 0;
-  position: absolute;
-  width: 1px;
-}
-
-.login-form {
-  @extend .visually-hidden;
-}
+@use "./styles/theme";
 
 #app-wrap {
   display: flex;
@@ -350,6 +299,72 @@ body {
   flex-direction: row;
   overflow: hidden;
 }
+
+#page {
+  flex: 1;
+  overflow: auto;
+}
+
+
+.refresh-action {
+  color: theme.$purple_3;
+  margin: 0 16px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.session-info {
+  background-color: theme.$purple_tint;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-weight: 500;
+  color: theme.$purple_2;
+}
+</style>
+
+<style lang="scss">
+@use "./styles/base" as *;
+@use "./styles/_theme";
+
+html,
+body {
+  font-family: theme.$system-font;
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 17px;
+}
+
+body {
+  background-color: theme.$white;
+  color: theme.$text-color;
+  margin: 0;
+  min-height: 100vh;
+}
+
+//// Hide only visually, but have it available for screenreaders: h5bp.com
+//.visually-hidden {
+//  border: 0;
+//  clip: rect(0 0 0 0);
+//  height: 1px;
+//  margin: -1px;
+//  overflow: hidden;
+//  padding: 0;
+//  position: absolute;
+//  width: 1px;
+//}
+//
+//.login-form {
+//  @extend .visually-hidden;
+//}
+
+//#app-wrap {
+//  display: flex;
+//  flex-direction: column;
+//  height: 100vh;
+//  width: 100vw;
+//}
+
 
 #page {
   flex: 1;

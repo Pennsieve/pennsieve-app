@@ -46,7 +46,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../../assets/_variables.scss";
+@use "../../../styles/theme";
 
 .button-array {
   position: absolute;
@@ -81,10 +81,10 @@ export default {
 .ps-button-dropdown {
   //margin-left: 8px;
   align-items: center;
-  background: $app-primary-color;
+  background: theme.$app-primary-color;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: $white;
+  color: theme.$white;
   cursor: pointer;
   display: inline-flex;
   flex-direction: row;
@@ -97,8 +97,8 @@ export default {
   width: 40px;
 
   &.active {
-    background: $purple_tint;
-    color: $purple_3;
+    background: theme.$purple_tint;
+    color: theme.$purple_3;
   }
 }
 

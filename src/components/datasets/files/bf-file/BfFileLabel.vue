@@ -150,7 +150,10 @@ export default {
         packageProperties,
         'subtype'
       ).toLowerCase()
+
+      console.log('subtype is: ' + subtype)
       if (this.whitelist.indexOf(subtype) >= 0) {
+        console.log('yes to viewer')
         hasViewer = true
       }
 
@@ -237,9 +240,7 @@ export default {
      * @returns {Boolean}
      */
     shouldShowBtnOpenFilePackage: function() {
-      return this.packageType != 'Collection'
-        && this.hasViewer
-        && this.getFileState === ''
+      return this.packageType != 'Collection' && this.hasViewer
     },
 
     /**
@@ -300,11 +301,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../../assets/_icon-item-colors.scss';
+@use '../../../../styles/theme';
 
 
 .no-link-name {
-  color:$gray_6
+  color: theme.$gray_6
 }
 
 .btn-open-file {
@@ -344,7 +345,7 @@ export default {
     &:hover,
     &:focus {
       cursor: pointer;
-      color: $app-primary-color;
+      color: theme.$app-primary-color;
       text-decoration: underline;
     }
   }
@@ -363,7 +364,7 @@ export default {
   line-height: 1;
   .btn-icon-viewer {
     align-items: center;
-    background: $app-primary-color;
+    background: theme.$app-primary-color;
     color: #fff;
     height: 24px;
     justify-content: center;
@@ -371,7 +372,7 @@ export default {
     width: 24px;
     &:hover,
     &:focus {
-      background: $purple_3;
+      background: theme.$purple_3;
     }
     &:hover {
       box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);

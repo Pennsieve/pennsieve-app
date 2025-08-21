@@ -15,6 +15,8 @@ const emit = defineEmits([
   'updateColorMap'
 ]);
 
+const pointSize = 5
+
 // Props
 const props = defineProps({
   pointCount: {
@@ -67,7 +69,7 @@ function handleResize() {
   canvasRef.value.height = height;
   
   gl.viewport(0, 0, width, height);
-  drawScatterplot(gl, programInfo, transform, 2, highlightedPoint);
+  drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
 }
 
 // Watch for force regenerate flag
@@ -99,7 +101,7 @@ watch(() => props.forceRegenerate, () => {
     }
     
     // Redraw
-    drawScatterplot(gl, programInfo, transform, 2, null);
+    drawScatterplot(gl, programInfo, transform, pointSize, null);
   }
 });
 
@@ -353,9 +355,8 @@ function generateData(count, colorMode, startColor, endColor, singleColor) {
       rawY: y,
       color,
       id: i,
-      species: props.data[i][4],
       value: value,
-      label: `Point ${i+1}: (${x.toFixed(2)}, ${y.toFixed(2)})`,
+      label: ``,
       category: value < 25 ? 'Near' : value < 50 ? 'Medium' : 'Far'
     });
   }
@@ -526,6 +527,7 @@ function drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint
     return;
   }
 
+
   try {
     const {
       program,
@@ -560,11 +562,15 @@ function drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint
 
     // Scale factor to map our data range (-50 to 50) to WebGL's (-1 to 1)
     const stat1 = props.metaData.row_groups[0].columns[0].meta_data.statistics
-    const dataScaleFactor = 2/(stat1.max_value-stat1.min_value);
+    // const dataScaleFactor = 2/(stat1.max_value-stat1.min_value);
+    const dataScaleFactor = 1;
 
     // Calculate final translation that keeps center point centered during zoom
-    const translateX = (transform.x / width * 2) -1;
-    const translateY = (-transform.y / height * 2) +1;
+    // const translateX = (transform.x / width * 2) -1;
+    // const translateY = (-transform.y / height * 2) +1;
+
+    const translateX = 0;
+    const translateY = 0;
 
     const matrix = new Float32Array([
       transform.k * dataScaleFactor, 0, 0, 0,
@@ -649,7 +655,7 @@ function updateColors() {
   programInfo.colorBuffer = colorBuffer;
 
   // Redraw
-  drawScatterplot(gl, programInfo, transform, 2, highlightedPoint);
+  drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
 }
 
 // Initialize the visualization
@@ -745,20 +751,22 @@ function initVisualization() {
   // Set up zoom behavior
   transform = d3.zoomIdentity;
   const stat1 = props.metaData.row_groups[0].columns[0].meta_data.statistics
-  const dataScaleFactor = 2/(stat1.max_value-stat1.min_value);
+  // const dataScaleFactor = 2/(stat1.max_value-stat1.min_value);
 
-  transform['k'] = 0.8
-  transform['x'] = ((stat1.max_value - stat1.min_value)/2)/dataScaleFactor+ width/2
-  const stat2 = props.metaData.row_groups[0].columns[1].meta_data.statistics
-  transform['y'] = -((stat2.max_value - stat2.min_value)/2) + height/2
+  const dataScaleFactor = 1;
+
+  // transform['k'] = 0.8
+  // transform['x'] = ((stat1.max_value - stat1.min_value)/2)/dataScaleFactor+ width/2
+  // const stat2 = props.metaData.row_groups[0].columns[1].meta_data.statistics
+  // transform['y'] = -((stat2.max_value - stat2.min_value)/2) + height/2
 
   // Create the zoom behavior
   zoom = d3.zoom()
-    .scaleExtent([0.1, 100])
+    .scaleExtent([0.1, 15])
     .on('zoom', (event) => {
       transform = event.transform;
 
-      drawScatterplot(gl, programInfo, transform, 2, highlightedPoint);
+      drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
 
       // Update debug info
       if (debugRef.value) {
@@ -780,7 +788,7 @@ function initVisualization() {
   // Initial draw with delay to ensure everything is set up
   setTimeout(() => {
     try {
-      drawScatterplot(gl, programInfo, transform, 2, null);
+      drawScatterplot(gl, programInfo, transform, pointSize, null);
     } catch (err) {
       console.error('Error during initial draw:', err);
     }
@@ -827,7 +835,7 @@ function handleMouseMove(event) {
 
     // Update the highlighted point and redraw
     highlightedPoint = point;
-    drawScatterplot(gl, programInfo, transform, 2, highlightedPoint);
+    drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
   } else {
     // Hide tooltip
     if (tooltipRef.value) {
@@ -837,7 +845,7 @@ function handleMouseMove(event) {
     // Clear highlighted point if there was one
     if (highlightedPoint !== null) {
       highlightedPoint = null;
-      drawScatterplot(gl, programInfo, transform, 2, null);
+      drawScatterplot(gl, programInfo, transform, pointSize, null);
     }
   }
 }
@@ -852,7 +860,7 @@ function handleMouseLeave() {
   // Clear highlighted point when mouse leaves canvas
   if (highlightedPoint !== null) {
     highlightedPoint = null;
-    drawScatterplot(gl, programInfo, transform, 2, null);
+    drawScatterplot(gl, programInfo, transform, pointSize, null);
   }
 }
 
@@ -891,7 +899,7 @@ watch([() => props.startColor, () => props.endColor, () => props.singleColor], (
       programInfo.colorBuffer = colorBuffer;
 
       // Redraw
-      drawScatterplot(gl, programInfo, transform, 2, highlightedPoint);
+      drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
     }
   }
 });
@@ -919,7 +927,7 @@ watch(() => props.pointCount, (newCount) => {
       programInfo = prepareBuffers(gl, program, data);
 
       // Redraw
-      drawScatterplot(gl, programInfo, transform, 2, null);
+      drawScatterplot(gl, programInfo, transform, pointSize, null);
     }
   }
 });
@@ -951,7 +959,7 @@ canvas {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s;
-  z-index: 200;
+  z-index: pointSize;
   white-space: nowrap;
 }
 

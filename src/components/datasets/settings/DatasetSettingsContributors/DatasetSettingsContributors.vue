@@ -460,7 +460,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../assets/_variables.scss';
+@use '../../../../styles/theme';
 
 .contributor-input-wrap {
   display: flex;
@@ -474,7 +474,7 @@ export default {
 }
 .add-contributor-dropdown {
   .el-select-group__title {
-    color: $gray_4;
+    color: theme.$gray_4;
     font-size: 12px;
     font-weight: 600;
     line-height: 1;
