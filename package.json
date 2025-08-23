@@ -11,7 +11,7 @@
     "site-config-local": "cp ./src/site-config/local.json ./src/site-config/site.json",
     "site-config-dev": "cp ./src/site-config/dev.json ./src/site-config/site.json",
     "site-config-prod": "cp ./src/site-config/prod.json ./src/site-config/site.json",
-    "site-config-clin": "cp ./src/site-config/clin.json ./src/site-config/site.json",
+    "site-config-clin": "cp ./src/site-config/clin.json ./src/site-config/site.json && cp ./src/site-config/headers/_headers_clin ./public/_headers",
     "build-dev": "npm run site-config-dev && npm run build",
     "build-production": "npm run site-config-prod && npm run build",
     "build-clin": "npm run site-config-clin && npm run build"
