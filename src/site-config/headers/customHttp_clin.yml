@@ -102,7 +102,7 @@ customHeaders:
           object-src 'self';
           frame-ancestors 'none';
           base-uri 'self';
-          form-action 'self'
+          form-action 'self';
 
       # Additional Security Headers
       - key: "X-Frame-Options"
@@ -110,9 +110,6 @@ customHeaders:
 
       - key: "X-Content-Type-Options"
         value: "nosniff"
-
-      - key: "X-XSS-Protection"
-        value: "1; mode=block"
 
       - key: "Referrer-Policy"
         value: "strict-origin-when-cross-origin"
@@ -135,39 +132,4 @@ customHeaders:
         value: >
           default-src 'self';
           img-src 'self' data: https:;
-          style-src 'self' 'unsafe-inline'
-
-# ========================================================================
-# MAINTENANCE GUIDE:
-# ========================================================================
-#
-# ADDING NEW DOMAINS:
-# 1. Identify the correct CSP directive:
-#    - script-src: JavaScript files and libraries
-#    - style-src: CSS files and stylesheets
-#    - img-src: Images, icons, graphics
-#    - font-src: Web fonts
-#    - connect-src: AJAX calls, APIs, WebSockets
-#    - frame-src: Embedded iframes
-#    - media-src: Audio/video files
-#    - worker-src: Web workers (for video players)
-#
-# 2. Add the domain under the appropriate directive
-# 3. Keep domains organized by service (Google, Pennsieve, CDNs, etc.)
-# 4. Test in browser console for CSP violations
-# 5. Deploy and monitor for blocked resources
-#
-# COMMON SERVICES BY CATEGORY:
-# - Google: maps, analytics, fonts, recaptcha
-# - Pennsieve: APIs, storage buckets, streaming
-# - CDNs: jQuery, Bootstrap, FontAwesome, Polyfills
-# - Analytics: Google Analytics, Heap, New Relic, Sentry
-# - Communication: Pusher (WebSockets), Intercom
-# - Research: ORCID, CrossCite, DataCite, DOI
-#
-# TESTING CSP:
-# 1. Open browser dev tools → Console
-# 2. Look for messages like: "Content Security Policy: The page's settings blocked..."
-# 3. Add the blocked domain to the appropriate directive
-# 4. Commit changes and redeploy
-# ========================================================================
+          style-src 'self' 'unsafe-inline';
