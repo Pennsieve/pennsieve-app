@@ -128,6 +128,10 @@ export default {
       ],
       pennsieveAnalysisFeature: [
         {
+          name: "Workflow Builder",
+          to: "workflow-builder",
+        },
+        {
           name: "Activity",
           to: "activity",
         },
