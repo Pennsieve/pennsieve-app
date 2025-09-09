@@ -90,7 +90,11 @@ export const useViewerStore = defineStore('tsviewer', () => {
     }
 
     const setWorkspaceMontages = (montages) => {
-        workspaceMontages.value = montages
+        if(!montages) {
+          workspaceMontages.value = []
+        } else {
+          workspaceMontages.value = montages
+        }
     }
 
     const setViewerErrors = (errors) => {
