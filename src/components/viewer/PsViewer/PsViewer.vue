@@ -327,6 +327,11 @@ export default {
      * @param {String} palette
      */
     togglePanel: function (palette) {
+      // don't open palette if user is bulk editing channels
+      if (this.bulkEditingChannels) {
+        return;
+      }
+
       let isOpen = true;
       // If the side panel view is already set to the new view
       if (
