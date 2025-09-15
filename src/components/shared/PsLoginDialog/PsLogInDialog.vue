@@ -29,7 +29,7 @@
               <el-input
                 v-model="logInForm.email"
                 placeholder="Email Address"
-                @keyup.enter.native="onEnter"
+                @keyup.enter="onEnter"
               />
             </el-form-item>
             <el-form-item prop="password">
@@ -38,7 +38,7 @@
                 v-model="logInForm.password"
                 type="password"
                 placeholder="Password"
-                @keyup.enter.native="onEnter"
+                @keyup.enter="onFormSubmit('logInForm')"
                 show-password
               />
             </el-form-item>
@@ -383,11 +383,7 @@ export default {
     ...mapActions(["updateProfile"]),
 
     onEnter(event) {
-      if (event.currentTarget === this.$refs.pwdField.ref) {
-        this.onFormSubmit("logInForm");
-      } else {
         this.$refs.pwdField.focus();
-      }
     },
     /**
      * Reset all values and validation for
