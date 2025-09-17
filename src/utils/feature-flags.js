@@ -48,9 +48,7 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isIHSurgeProd = orgId === "N:organization:6eb2d536-ff28-4ad0-b9e0-3f6ed7a2d7c1";
 
-   const isNewOrg = orgId === "N:organization:6eb2d536-ff28-4ad0-b9e0-3f6ed7a2d7c1";
-
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics || isIHSurgeProd || isNewOrg;
+   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics || isIHSurgeProd;
 }
 
 export function isEnabledForAllDevOrgs(url) {
