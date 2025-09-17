@@ -96,7 +96,7 @@ async function doDeleteMontage(evt) {
     confirmationDialogVisible.value = false
 
     // Fetch updated montages using viewerStore
-    await viewerStore.fetchWorkspaceMontages()
+    viewerStore.fetchWorkspaceMontages()
   } catch (error) {
     console.error('Error deleting montage:', error)
     // Could add error handling/notification here

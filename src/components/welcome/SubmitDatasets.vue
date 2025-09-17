@@ -285,6 +285,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
+@use '../../styles/element/dialog';
 
 .add-proposal-img {
   width: 120px;

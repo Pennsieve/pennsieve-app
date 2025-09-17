@@ -61,7 +61,7 @@ export function useAnnotationLayers() {
     const createAnnotationLayer = async (newLayer, activeViewer, emit) => {
         try {
             const token = await useGetToken()
-            const url = `${config.value.apiUrl}/timeseries/${activeViewer.content.id}/layers?api_key=${token}`
+            const url = `${config.value.apiUrl}/timeseries/${activeViewer?.content?.id}/layers?api_key=${token}`
 
             const response = await useSendXhr(url, {
                 method: "POST",
