@@ -130,8 +130,6 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 
-const store = useStore();
-
 const defaultComputeNodeFormValues = () => ({
   name: "",
   description: "",

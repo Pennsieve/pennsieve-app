@@ -4,7 +4,7 @@ import { computed, ref } from "vue";
 const props = defineProps({
   panelVisible: {
     type: Boolean,
-    default: true,
+    default: false,
   },
   showDetailsPanel: {
     type: Boolean,
@@ -30,7 +30,12 @@ const emit = defineEmits([
   "close-details",
 ]);
 
-const activeTab = ref("applications");
+const workflowsListVisible = ref(false);
+const workflowsListSelected = ref(true);
+const processorInfoSelected = ref(false);
+const mouseHoverInfo = ref(false);
+const mouseHoverList = ref(false);
+
 const searchQuery = ref("");
 
 const filteredApplications = computed(() => {
@@ -51,22 +56,93 @@ const filteredWorkflows = computed(() => {
   );
 });
 
+// Toggle functions matching reference design
+function mouseLeave(event) {
+  const evtId = event.currentTarget.id;
+  if (!props.panelVisible) {
+    mouseHoverInfo.value = false;
+    mouseHoverList.value = false;
+    return;
+  }
+
+  switch (evtId) {
+    case "workflowsList":
+      mouseHoverList.value = false;
+      break;
+    case "processorInfo":
+      mouseHoverInfo.value = false;
+      break;
+  }
+}
+
+function mouseOver(event) {
+  const evtId = event.currentTarget.id;
+
+  if (!props.panelVisible) {
+    mouseHoverInfo.value = false;
+    mouseHoverList.value = false;
+    return;
+  }
+
+  switch (evtId) {
+    case "workflowsList":
+      if (workflowsListSelected.value) {
+        mouseHoverList.value = true;
+      }
+      break;
+    case "processorInfo":
+      if (processorInfoSelected.value) {
+        mouseHoverInfo.value = true;
+      }
+      break;
+  }
+}
+
+function toggleModelsList(event) {
+  const evtId = event.currentTarget.id;
+
+  switch (evtId) {
+    case "workflowsList":
+      if (workflowsListSelected.value) {
+        workflowsListVisible.value = false;
+        workflowsListSelected.value = false;
+        emit("toggle-panel-visibility");
+      } else if (processorInfoSelected.value) {
+        workflowsListSelected.value = true;
+        processorInfoSelected.value = false;
+        mouseHoverList.value = true;
+      } else {
+        workflowsListSelected.value = true;
+        mouseHoverList.value = true;
+        emit("toggle-panel-visibility");
+      }
+      break;
+    case "processorInfo":
+      if (processorInfoSelected.value) {
+        workflowsListVisible.value = false;
+        processorInfoSelected.value = false;
+        emit("toggle-panel-visibility");
+      } else if (workflowsListSelected.value) {
+        processorInfoSelected.value = true;
+        workflowsListSelected.value = false;
+        mouseHoverInfo.value = true;
+      } else {
+        processorInfoSelected.value = true;
+        mouseHoverInfo.value = true;
+        emit("toggle-panel-visibility");
+      }
+      break;
+  }
+}
+
 // Drag handlers for applications
 const onDragStart = (event, application) => {
   event.dataTransfer.setData("application/json", application.id);
   event.dataTransfer.effectAllowed = "copy";
 };
 
-const togglePanelVisibility = () => {
-  emit("toggle-panel-visibility");
-};
-
 const loadWorkflow = (workflow) => {
   emit("load-workflow", workflow);
-};
-
-const closeDetailsPanel = () => {
-  emit("close-details");
 };
 
 const formatDate = (dateString) => {
@@ -87,175 +163,227 @@ const getApplicationIcon = (type) => {
   };
   return iconMap[type] || "📦";
 };
+
+const isActive = (workflow) => {
+  return !workflow.completedAt;
+};
 </script>
 
 <template>
-  <div class="workflow-side-panel" :class="{ visible: panelVisible }">
-    <!-- Panel Toggle Button -->
+  <div class="workflows-list-wrap" :class="{ visible: panelVisible }">
     <button
-      class="panel-toggle"
-      @click="togglePanelVisibility"
-      :title="panelVisible ? 'Hide Panel' : 'Show Panel'"
+      id="processorInfo"
+      :class="{
+        selected: processorInfoSelected,
+        'btn-toggle': true,
+        second: true,
+      }"
+      @click="toggleModelsList"
+      @mouseenter="mouseOver"
+      @mouseleave="mouseLeave"
     >
-      {{ panelVisible ? "›" : "‹" }}
+      <!-- Info Icon placeholder - replace with your IconInfo component -->
+      <svg
+        v-if="!mouseHoverInfo"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"
+        />
+      </svg>
+      <!-- Arrow Icon placeholder - replace with your IconArrowRight component -->
+      <svg
+        v-else
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+      </svg>
     </button>
+    <button
+      id="workflowsList"
+      :class="{
+        selected: workflowsListSelected,
+        'btn-toggle': true,
+        first: true,
+      }"
+      @click="toggleModelsList"
+      @mouseenter="mouseOver"
+      @mouseleave="mouseLeave"
+    >
+      <!-- Document Icon placeholder - replace with your IconDocument component -->
+      <svg
+        v-if="!mouseHoverList"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
+        />
+      </svg>
+      <!-- Arrow Icon placeholder - replace with your IconArrowRight component -->
+      <svg
+        v-else
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+      </svg>
+    </button>
+    <div ref="workflowsList" class="workflows-list-scroll">
+      <!-- Workflows List -->
+      <div v-show="workflowsListSelected" class="workflows-list scrolling-list">
+        <h2 class="heading">Workflows</h2>
+        <template v-if="savedWorkflows.length > 0">
+          <div class="workflows-list-loading-wrap">
+            <div class="workflows-list-wrap-scroll">
+              <div class="workflows-list-wrap">
+                <div
+                  v-for="(workflow, index) in filteredWorkflows"
+                  :key="index"
+                  class="workflow-list-item"
+                  :class="{ active: isActive(workflow) }"
+                  @click="loadWorkflow(workflow)"
+                >
+                  <div class="workflow-main-info">
+                    <div class="workflow-header">
+                      <h4 class="workflow-name">{{ workflow.name }}</h4>
+                      <div class="workflow-actions" @click.stop>
+                        <button
+                          class="action-btn"
+                          @click="$emit('duplicate-workflow', workflow)"
+                          title="Duplicate workflow"
+                        >
+                          📋
+                        </button>
+                        <button
+                          class="action-btn danger"
+                          @click="$emit('delete-workflow', workflow)"
+                          title="Delete workflow"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
 
-    <div class="panel-content" v-show="panelVisible">
-      <!-- Details Panel (shown when node is selected) -->
-      <div v-if="showDetailsPanel && selectedNode.id" class="details-panel">
-        <div class="details-header">
-          <h3>Node Details</h3>
-          <button class="close-details" @click="closeDetailsPanel">×</button>
-        </div>
+                    <div class="workflow-meta">
+                      <div class="workflow-stats">
+                        <span class="stat-item">
+                          <span class="stat-icon">📦</span>
+                          {{ workflow.nodes?.length || 0 }} nodes
+                        </span>
+                        <span class="stat-item">
+                          <span class="stat-icon">🔗</span>
+                          {{ workflow.edges?.length || 0 }} connections
+                        </span>
+                      </div>
 
-        <div class="details-content">
-          <div class="detail-group">
-            <label>Name:</label>
-            <span>{{ selectedNode.data?.label }}</span>
+                      <div class="workflow-dates">
+                        <div class="date-info">
+                          <span class="date-label">Modified:</span>
+                          <span class="date-value">{{
+                            formatDate(workflow.updatedAt)
+                          }}</span>
+                        </div>
+                        <div class="date-info">
+                          <span class="date-label">Created:</span>
+                          <span class="date-value">{{
+                            formatDate(workflow.createdAt)
+                          }}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="workflow.description"
+                      class="workflow-description"
+                    >
+                      {{ workflow.description }}
+                    </div>
+
+                    <div class="workflow-preview">
+                      <div class="preview-header">
+                        <span class="preview-label">Applications:</span>
+                      </div>
+                      <div class="applications-preview">
+                        <span
+                          v-for="(appType, appIndex) in workflow.nodes
+                            ?.map((n) => n.data?.type)
+                            .filter(Boolean)"
+                          :key="appIndex"
+                          class="app-type-badge"
+                          :class="appType.toLowerCase()"
+                        >
+                          {{ getApplicationIcon(appType) }} {{ appType }}
+                        </span>
+                        <span v-if="!workflow.nodes?.length" class="no-apps">
+                          No applications
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+        </template>
+        <template v-if="!savedWorkflows.length">
+          <div class="no-workflows">There are no Workflows at this time.</div>
+        </template>
+      </div>
 
-          <div class="detail-group">
-            <label>Type:</label>
-            <span class="type-badge" :class="selectedNode.data?.type">
-              {{ getApplicationIcon(selectedNode.data?.type) }}
-              {{ selectedNode.data?.type || "Unknown" }}
-            </span>
+      <!-- Processor/Node Details -->
+      <div v-show="processorInfoSelected" class="model-details">
+        <div v-if="selectedNode.id" class="processor-details">
+          <bf-button @click="handleLogsClick">View Logs</bf-button>
+          <div class="processor-item">
+            <span class="label">Name: </span>
+            <span class="value">{{ selectedNode.data?.label }}</span>
           </div>
-
-          <div class="detail-group">
-            <label>Description:</label>
-            <span>{{
+          <div class="processor-item">
+            <span class="label">ID: </span>
+            <span class="value">{{ selectedNode.id }}</span>
+          </div>
+          <div class="processor-item">
+            <span class="label">Description: </span>
+            <span class="value">{{
               selectedNode.data?.application?.description ||
               "No description available"
             }}</span>
           </div>
-
-          <div class="detail-group">
-            <label>Position:</label>
-            <span
-              >x: {{ Math.round(selectedNode.position?.x) }}, y:
-              {{ Math.round(selectedNode.position?.y) }}</span
+          <div class="processor-item">
+            <span class="label">Type: </span>
+            <span class="value">{{
+              selectedNode.data?.type || "Unknown"
+            }}</span>
+          </div>
+          <div class="processor-item">
+            <span class="label">Position: </span>
+            <span class="value"
+              >x: {{ Math.round(selectedNode.position?.x || 0) }}, y:
+              {{ Math.round(selectedNode.position?.y || 0) }}</span
             >
           </div>
-
-          <div class="detail-actions">
-            <bf-button class="secondary small">Configure</bf-button>
-            <bf-button class="danger small">Remove</bf-button>
-          </div>
         </div>
-      </div>
-
-      <!-- Main Panel Content -->
-      <div v-else class="main-panel">
-        <!-- Tab Navigation -->
-        <div class="tab-navigation">
-          <button
-            class="tab-button"
-            :class="{ active: activeTab === 'applications' }"
-            @click="activeTab = 'applications'"
-          >
-            Applications
-          </button>
-          <button
-            class="tab-button"
-            :class="{ active: activeTab === 'workflows' }"
-            @click="activeTab = 'workflows'"
-          >
-            Saved Workflows
-          </button>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="search-section">
-          <input
-            v-model="searchQuery"
-            type="text"
-            class="search-input"
-            :placeholder="
-              activeTab === 'applications'
-                ? 'Search applications...'
-                : 'Search workflows...'
-            "
-          />
-        </div>
-
-        <!-- Applications Tab -->
-        <div v-if="activeTab === 'applications'" class="applications-section">
-          <div class="section-header">
-            <h3>Available Applications</h3>
-            <p>Drag applications to the canvas to build your workflow</p>
+        <div v-else>
+          <div class="img-container">
+            <img
+              src="/src/assets/images/illustrations/illo-empty-file-types.svg"
+              class="empty-image"
+              alt="No processor selected"
+            />
           </div>
-
-          <div class="applications-list">
-            <div
-              v-for="app in filteredApplications"
-              :key="app.id"
-              class="application-item"
-              :class="app.type"
-              draggable="true"
-              @dragstart="onDragStart($event, app)"
-            >
-              <div class="app-header">
-                <div class="app-icon">{{ getApplicationIcon(app.type) }}</div>
-                <div class="app-info">
-                  <h4>{{ app.name }}</h4>
-                  <span class="app-type">{{ app.type }}</span>
-                </div>
-                <div class="drag-indicator">⋮⋮</div>
-              </div>
-              <p class="app-description">{{ app.description }}</p>
-            </div>
-          </div>
-
-          <div v-if="filteredApplications.length === 0" class="no-results">
-            <p>No applications found matching "{{ searchQuery }}"</p>
-          </div>
-        </div>
-
-        <!-- Workflows Tab -->
-        <div v-if="activeTab === 'workflows'" class="workflows-section">
-          <div class="section-header">
-            <h3>Saved Workflows</h3>
-            <p>Load a previously saved workflow</p>
-          </div>
-
-          <div class="workflows-list">
-            <div
-              v-for="workflow in filteredWorkflows"
-              :key="workflow.id"
-              class="workflow-item"
-              @click="loadWorkflow(workflow)"
-            >
-              <div class="workflow-header">
-                <h4>{{ workflow.name }}</h4>
-                <span class="workflow-date">{{
-                  formatDate(workflow.updatedAt)
-                }}</span>
-              </div>
-              <div class="workflow-meta">
-                <span class="workflow-stat"
-                  >{{ workflow.nodes?.length || 0 }} nodes</span
-                >
-                <span class="workflow-stat"
-                  >{{ workflow.edges?.length || 0 }} connections</span
-                >
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="filteredWorkflows.length === 0 && searchQuery"
-            class="no-results"
-          >
-            <p>No workflows found matching "{{ searchQuery }}"</p>
-          </div>
-
-          <div v-if="savedWorkflows.length === 0" class="no-workflows">
-            <div class="empty-state">
-              <div class="empty-icon">📋</div>
-              <h4>No Saved Workflows</h4>
-              <p>Build and save your first workflow to see it here.</p>
-            </div>
+          <div class="img-container">
+            <p class="message">No processor selected</p>
           </div>
         </div>
       </div>
@@ -266,113 +394,268 @@ const getApplicationIcon = (type) => {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 
-.workflow-side-panel {
-  position: fixed;
+.workflows-list-wrap {
+  border-top: 1px solid theme.$gray_2;
+  border-left: 1px solid theme.$gray_2;
+  border-bottom: 1px solid theme.$gray_2;
+  border-radius: 4px 0 0 4px;
+  height: calc(100% - 94px);
+  position: absolute;
   right: 0;
-  top: 72px; // Adjust based on header height
-  bottom: 0;
-  width: 350px;
-  background: white;
-  border-left: 1px solid theme.$gray_3;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-  z-index: 100;
+  top: 0;
+  transform: translate3d(100%, 72px, 0);
+  transition: transform 0.3s ease-out;
+  width: 500px;
+  will-change: transform;
+  z-index: 3;
 
   &.visible {
-    transform: translateX(0);
+    transform: translate3d(0, 72px, 0);
   }
 }
 
-.panel-toggle {
+.workflows-list-scroll {
+  height: 100%;
+  overflow: hidden;
+  background: theme.$gray_1;
+  border-radius: 4px 0px 0 4px;
+}
+
+.btn-toggle {
+  align-items: center;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  height: 48px;
+  left: -35px;
+  justify-content: center;
   position: absolute;
-  left: -40px;
-  top: 20px;
-  width: 32px;
-  height: 32px;
+  top: 8px;
+  width: 35px;
+  color: theme.$purple_1;
+  fill: theme.$purple_1;
+  background: theme.$gray_1;
+
+  &.first {
+    top: 33px;
+  }
+
+  &.second {
+    top: 85px;
+  }
+
+  &.selected {
+    background: linear-gradient(to left, theme.$gray_1, theme.$white);
+
+    &:after {
+      background: theme.$gray_1;
+      content: "";
+      height: 100%;
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      right: -5px;
+      width: 5px;
+    }
+  }
+}
+
+/* Workflows List Styles */
+.workflows-list.scrolling-list {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .workflows-list-wrap-scroll {
+    box-sizing: border-box;
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 0 16px 8px;
+  }
+
+  .workflows-list-loading-wrap {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+}
+
+.workflows-list-wrap {
+  background: theme.$gray_1;
+  padding: 16px;
+}
+
+.heading {
+  margin: 15px;
+  color: theme.$purple_3;
+}
+
+.no-workflows {
+  padding: 16px;
+  color: theme.$gray_3;
+  text-align: center;
+}
+
+/* Workflow List Item Styles */
+.workflow-list-item {
   background: white;
   border: 1px solid theme.$gray_3;
-  border-right: none;
-  border-radius: 4px 0 0 4px;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: theme.$gray_4;
+  transition: all 0.2s ease;
 
   &:hover {
-    background: theme.$gray_1;
-    color: theme.$app-primary-color;
+    border-color: theme.$app-primary-color;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    border-color: theme.$app-primary-color;
+    background: rgba(99, 102, 241, 0.02);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
   }
 }
 
-.panel-content {
-  height: 100%;
+.workflow-main-info {
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
-.details-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.details-header {
+.workflow-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid theme.$gray_3;
+  align-items: flex-start;
+}
 
-  h3 {
-    margin: 0;
-    color: theme.$purple_3;
+.workflow-name {
+  margin: 0;
+  font-size: 16px;
+  color: theme.$gray_6;
+  font-weight: 600;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.workflow-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+
+  .workflow-list-item:hover & {
+    opacity: 1;
   }
 }
 
-.close-details {
+.action-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  padding: 4px;
+  border-radius: 4px;
   cursor: pointer;
-  color: theme.$gray_4;
+  font-size: 14px;
+  transition: background 0.2s ease;
 
   &:hover {
+    background: theme.$gray_2;
+  }
+
+  &.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
   }
 }
 
-.details-content {
-  flex: 1;
-  padding: 16px;
+.workflow-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.detail-group {
-  margin-bottom: 16px;
+.workflow-stats {
+  display: flex;
+  gap: 16px;
+}
 
-  label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 4px;
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: theme.$gray_4;
+
+  .stat-icon {
+    font-size: 10px;
+  }
+}
+
+.workflow-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.date-info {
+  font-size: 11px;
+
+  .date-label {
+    color: theme.$gray_4;
+    margin-right: 4px;
+  }
+
+  .date-value {
     color: theme.$gray_5;
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  span {
-    color: theme.$gray_6;
+    font-weight: 500;
   }
 }
 
-.type-badge {
+.workflow-description {
+  font-size: 13px;
+  color: theme.$gray_4;
+  line-height: 1.4;
+  background: theme.$gray_1;
+  padding: 8px;
+  border-radius: 4px;
+  font-style: italic;
+}
+
+.workflow-preview {
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 8px;
+}
+
+.preview-header {
+  margin-bottom: 8px;
+}
+
+.preview-label {
+  font-size: 11px;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.applications-preview {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.app-type-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
   font-weight: 500;
+  text-transform: capitalize;
 
   &.preprocessor {
     background: rgba(16, 185, 129, 0.1);
@@ -390,278 +673,50 @@ const getApplicationIcon = (type) => {
   }
 }
 
-.detail-actions {
-  margin-top: 24px;
-  display: flex;
-  gap: 8px;
-
-  .bf-button {
-    flex: 1;
-  }
-}
-
-.main-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.tab-navigation {
-  display: flex;
-  border-bottom: 1px solid theme.$gray_3;
-}
-
-.tab-button {
-  flex: 1;
-  padding: 12px 16px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  color: theme.$gray_4;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: theme.$gray_1;
-    color: theme.$gray_6;
-  }
-
-  &.active {
-    color: theme.$app-primary-color;
-    border-bottom-color: theme.$app-primary-color;
-    background: theme.$gray_1;
-  }
-}
-
-.search-section {
-  padding: 16px;
-  border-bottom: 1px solid theme.$gray_3;
-}
-
-.search-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  font-size: 14px;
-
-  &:focus {
-    outline: none;
-    border-color: theme.$app-primary-color;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
-  }
-}
-
-.section-header {
-  padding: 16px 16px 12px 16px;
-
-  h3 {
-    margin: 0 0 4px 0;
-    color: theme.$purple_3;
-    font-size: 16px;
-  }
-
-  p {
-    margin: 0;
-    color: theme.$gray_4;
-    font-size: 12px;
-  }
-}
-
-.applications-section,
-.workflows-section {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.applications-list,
-.workflows-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px 16px 16px;
-}
-
-.application-item {
-  background: white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
-  cursor: grab;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$app-primary-color;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-
-  &.preprocessor {
-    border-left: 4px solid #10b981;
-  }
-
-  &.processor {
-    border-left: 4px solid #3b82f6;
-  }
-
-  &.postprocessor {
-    border-left: 4px solid #8b5cf6;
-  }
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.app-icon {
-  font-size: 16px;
-}
-
-.app-info {
-  flex: 1;
-
-  h4 {
-    margin: 0;
-    font-size: 14px;
-    color: theme.$gray_6;
-  }
-}
-
-.app-type {
+.no-apps {
   font-size: 11px;
-  color: theme.$gray_4;
-  text-transform: capitalize;
-}
-
-.drag-indicator {
   color: theme.$gray_3;
-  font-size: 12px;
-  transform: rotate(90deg);
+  font-style: italic;
 }
 
-.app-description {
-  margin: 0;
-  font-size: 12px;
-  color: theme.$gray_4;
-  line-height: 1.4;
+/* Model Details Styles */
+.model-details {
+  margin: 30px;
 }
 
-.workflow-item {
-  background: white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$app-primary-color;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-  }
-}
-
-.workflow-header {
+.processor-details {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-
-  h4 {
-    margin: 0;
-    font-size: 14px;
-    color: theme.$gray_6;
-  }
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.workflow-date {
-  font-size: 11px;
-  color: theme.$gray_4;
+.label {
+  font-weight: bold;
+  color: theme.$purple_3;
 }
 
-.workflow-meta {
-  display: flex;
-  gap: 12px;
+.value {
+  color: theme.$black;
+  font-weight: normal;
 }
 
-.workflow-stat {
-  font-size: 11px;
-  color: theme.$gray_4;
-  background: theme.$gray_1;
-  padding: 2px 6px;
-  border-radius: 10px;
+.processor-item {
+  font-weight: bold;
+  color: theme.$purple_3;
 }
 
-.no-results {
-  padding: 32px 16px;
+.img-container {
   text-align: center;
+  padding: 20px;
+}
+
+.empty-image {
+  max-width: 150px;
+  opacity: 0.5;
+}
+
+.message {
   color: theme.$gray_4;
-
-  p {
-    margin: 0;
-    font-style: italic;
-  }
-}
-
-.no-workflows {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
-}
-
-.empty-state {
-  text-align: center;
-
-  .empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-
-  h4 {
-    margin: 0 0 8px 0;
-    color: theme.$gray_5;
-  }
-
-  p {
-    margin: 0;
-    color: theme.$gray_4;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-}
-
-/* Scrollbar styling */
-.applications-list::-webkit-scrollbar,
-.workflows-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.applications-list::-webkit-scrollbar-track,
-.workflows-list::-webkit-scrollbar-track {
-  background: theme.$gray_1;
-}
-
-.applications-list::-webkit-scrollbar-thumb,
-.workflows-list::-webkit-scrollbar-thumb {
-  background: theme.$gray_3;
-  border-radius: 3px;
-
-  &:hover {
-    background: theme.$gray_4;
-  }
+  font-style: italic;
 }
 </style>
