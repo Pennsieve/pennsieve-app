@@ -76,7 +76,7 @@
               @change="onAppSelectionChange"
             >
               <el-option
-                v-for="account in computeResourceAccountsWithDummy"
+                v-for="account in computeResourceAccounts"
                 :key="account.accountId"
                 :label="account.name || account.accountId"
                 :value="account.accountId"
@@ -130,20 +130,15 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 
+const store = useStore();
+
 const defaultComputeNodeFormValues = () => ({
-  name: "Complex ML Data Processing Workflow",
-  description:
-    "A comprehensive workflow demonstrating parallel processing paths, multiple dependencies, and branching data flows for ML model training and real-time analytics.",
+  name: "",
+  description: "",
   apps: [],
 });
 
-const getDefaultAppSelections = () => [
-  { account: "data-ingestion-service", dependencies: [] },
-  { account: "data-validation-engine", dependencies: [0] },
-  { account: "transformation-processor", dependencies: [1] },
-  { account: "feature-extraction-api", dependencies: [2] },
-  { account: "ml-training-pipeline", dependencies: [3] },
-];
+const getDefaultAppSelections = () => [{ account: null, dependencies: [] }];
 
 export default {
   name: "CreateWorkflowDialog",
@@ -162,68 +157,6 @@ export default {
     return {
       computeNode: defaultComputeNodeFormValues(),
       appSelections: getDefaultAppSelections(),
-      dummyComputeResourceAccounts: [
-        {
-          accountId: "data-ingestion-service",
-          name: "Data Ingestion Service",
-          type: "ingestion",
-        },
-        {
-          accountId: "data-validation-engine",
-          name: "Data Validation Engine",
-          type: "validation",
-        },
-        {
-          accountId: "transformation-processor",
-          name: "Transformation Processor",
-          type: "transform",
-        },
-        {
-          accountId: "ml-training-pipeline",
-          name: "ML Training Pipeline",
-          type: "ml",
-        },
-        {
-          accountId: "feature-extraction-api",
-          name: "Feature Extraction API",
-          type: "processing",
-        },
-        {
-          accountId: "model-serving-endpoint",
-          name: "Model Serving Endpoint",
-          type: "serving",
-        },
-        {
-          accountId: "data-quality-monitor",
-          name: "Data Quality Monitor",
-          type: "monitoring",
-        },
-        {
-          accountId: "batch-processing-worker",
-          name: "Batch Processing Worker",
-          type: "batch",
-        },
-        {
-          accountId: "real-time-analytics",
-          name: "Real-time Analytics",
-          type: "analytics",
-        },
-        {
-          accountId: "notification-service",
-          name: "Notification Service",
-          type: "notification",
-        },
-        {
-          accountId: "audit-logging-system",
-          name: "Audit Logging System",
-          type: "logging",
-        },
-        {
-          accountId: "data-warehouse-connector",
-          name: "Data Warehouse Connector",
-          type: "storage",
-        },
-      ],
       rules: {
         name: [
           { required: true, message: "Please input a name", trigger: "blur" },
@@ -249,11 +182,6 @@ export default {
   computed: {
     ...mapState(["userToken", "config"]),
     ...mapState("analysisModule", ["computeResourceAccounts"]),
-
-    // Add dummy data for development/testing
-    computeResourceAccountsWithDummy() {
-      return this.computeResourceAccounts || this.dummyComputeResourceAccounts;
-    },
   },
 
   watch: {
@@ -313,7 +241,7 @@ export default {
     },
 
     getAppDisplayName(accountId) {
-      const account = this.computeResourceAccountsWithDummy.find(
+      const account = this.computeResourceAccounts.find(
         (acc) => acc.accountId === accountId
       );
       return account?.name || accountId;
@@ -323,7 +251,7 @@ export default {
       return dependencies
         .map((depIndex) => {
           const app = this.appSelections[depIndex];
-          const accountData = this.computeResourceAccountsWithDummy.find(
+          const accountData = this.computeResourceAccounts.find(
             (acc) => acc.accountId === app.account
           );
           return `App ${depIndex + 1} (${accountData?.name || app.account})`;
@@ -378,7 +306,7 @@ export default {
           const selectedAccounts = this.appSelections
             .filter((app) => app.account)
             .map((app, index) => {
-              const accountData = this.computeResourceAccountsWithDummy.find(
+              const accountData = this.computeResourceAccounts.find(
                 (elem) => elem.accountId === app.account
               );
               return {
@@ -390,11 +318,11 @@ export default {
 
           const formattedWorkflow = {
             ...this.computeNode,
-            processors: selectedAccounts, // Fixed variable name
+            processors: selectedAccounts,
           };
 
           try {
-            const result = await this.createComputeNode(formattedWorkflow); // Fixed variable name
+            const result = await this.createComputeNode(formattedWorkflow);
             EventBus.$emit("toast", {
               detail: {
                 type: "success",
@@ -417,7 +345,6 @@ export default {
       });
     },
 
-    // Fixed method name
     handleCreateWorkflow() {
       this.handleCreateComputeNode();
     },
