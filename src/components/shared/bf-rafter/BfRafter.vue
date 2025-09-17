@@ -12,21 +12,50 @@ let route = useRoute();
       :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']"
     >
 
-      <template v-if="datasetNameVisible">
-        <div class="parent">
-          <div class="dataset-name">{{ datasetNameDisplay() }}</div>
-        </div>
-      </template>
+      <!-- Header Navigation Section -->
+      <div v-if="datasetNameVisible || showBreadcrumbs || showLinkBack" class="rafter-navigation">
+        <!-- Navigation layout with breadcrumbs on left, dataset on right -->
+        <div class="nav-primary">
+          <!-- Left side: Breadcrumbs or back link -->
+          <div class="nav-left">
+            <!-- Breadcrumb Navigation (new feature) -->
+            <template v-if="showBreadcrumbs">
+              <div class="breadcrumb-nav">
+                <template v-for="(crumb, index) in breadcrumbs" :key="index">
+                  <span v-if="index > 0" class="breadcrumb-separator">/</span>
+                  <template v-if="index === breadcrumbs.length - 1">
+                    <span class="breadcrumb-current">{{ crumb.name }}</span>
+                  </template>
+                  <template v-else>
+                    <a @click="navigateToBreadcrumb(crumb)" class="breadcrumb-link">
+                      {{ crumb.name }}
+                    </a>
+                  </template>
+                </template>
+              </div>
+            </template>
 
-      <template v-if="showLinkBack">
-        <a @click="backRoute" class="link-back">
-          <IconArrowLeft
-            :height="10"
-            :width="10"
-          />
-          Back to {{ linkBack.name }}
-        </a>
-      </template>
+            <!-- Legacy Back Link (backward compatibility) -->
+            <template v-else-if="showLinkBack">
+              <a @click="backRoute" class="link-back">
+                <IconArrowLeft
+                  :height="10"
+                  :width="10"
+                />
+                Back to {{ linkBack.name }}
+              </a>
+            </template>
+          </div>
+          
+          <!-- Right side: Dataset context -->
+          <div v-if="datasetNameVisible" class="nav-right">
+            <div class="dataset-context">
+              <span class="dataset-label">Dataset:</span>
+              <a @click="navigateToDatasetOverview" class="dataset-name clickable">{{ datasetNameDisplay }}</a>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div
         v-if="$slots.breadcrumb"
@@ -66,9 +95,7 @@ let route = useRoute();
       </div>
 
       <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
-
         <readme-doc :slug="slug" :show-header=true />
-
       </div>
 
 
@@ -83,13 +110,6 @@ let route = useRoute();
       </div>
 
     </div>
-
-
-<!--    <div v-if="$slots['help']" class="row bf-rafter-help">-->
-<!--      <slot name="help" />-->
-<!--    </div>-->
-
-
   </header>
 </template>
 
@@ -131,6 +151,12 @@ export default {
         return {}
       }
     },
+    breadcrumbs: {
+      type: Array,
+      default: () => {
+        return []
+      }
+    },
     orgId: {
       type: String,
       default: ''
@@ -138,6 +164,10 @@ export default {
     datasetId: {
       type: String,
       default: ''
+    },
+    hideDatasetName: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -214,6 +244,10 @@ export default {
       return Object.keys(this.linkBack).length > 0
     },
 
+    showBreadcrumbs: function() {
+      return this.breadcrumbs.length > 0
+    },
+
     getThemeColors: function() {
       return this.getTheme(this.orgId)
     },
@@ -252,10 +286,16 @@ export default {
     },
 
     datasetNameDisplay: function() {
-      const name = this.datasetName
-      this.datasetNameTruncated = false
-
-      return name
+      const name = this.datasetName()
+      const maxLength = 30 // Reasonable character limit for dataset names
+      
+      if (name && name.length > maxLength) {
+        this.datasetNameTruncated = true
+        return name.substring(0, maxLength) + '...'
+      } else {
+        this.datasetNameTruncated = false
+        return name
+      }
     },
 
     getDatasetUpdateUrl: async function() {
@@ -284,11 +324,8 @@ export default {
     },
 
     datasetNameVisible: function() {
-      if (this.datasetPageList.includes(this.currentRouteName)) {
-        return true
-      } else {
-        return false
-      }
+      // Show dataset name when we have a datasetId in the route params, unless explicitly hidden
+      return !this.hideDatasetName && !!(this.$route.params.datasetId || this.datasetId)
     },
 
     isDatasetOverview: function() {
@@ -314,6 +351,33 @@ export default {
 
     backRoute: function() {
       this.$router.push({ name: this.linkBack.to, params: { datasetId: this.datasetId, orgId: this.orgId}})
+    },
+
+    navigateToBreadcrumb: function(crumb) {
+      if (crumb.to) {
+        // Handle named routes
+        this.$router.push({ 
+          name: crumb.to, 
+          params: { 
+            datasetId: this.$route.params.datasetId || this.datasetId, 
+            orgId: this.$route.params.orgId || this.orgId,
+            ...crumb.params 
+          }
+        })
+      } else if (crumb.path) {
+        // Handle direct paths
+        this.$router.push(crumb.path)
+      }
+    },
+
+    navigateToDatasetOverview: function() {
+      this.$router.push({ 
+        name: 'dataset-overview', 
+        params: { 
+          datasetId: this.$route.params.datasetId || this.datasetId, 
+          orgId: this.$route.params.orgId || this.orgId
+        }
+      })
     },
 
     pageBackRoute: function() {
@@ -395,6 +459,86 @@ export default {
   display: flex;
   align-items: center;
   cursor: pointer;
+}
+
+// Header Navigation Section
+.rafter-navigation {
+  margin-bottom: 16px;
+  
+  .nav-primary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .nav-left {
+      flex: 1;
+    }
+    
+    .nav-right {
+      flex-shrink: 0;
+    }
+    
+    .dataset-context {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      .dataset-label {
+        font-size: 12px;
+        color: theme.$gray_3;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 500;
+      }
+      
+      .dataset-name {
+        font-size: 14px;
+        color: theme.$white;
+        font-weight: 500;
+        
+        &.clickable {
+          cursor: pointer;
+          text-decoration: none;
+          transition: opacity 0.2s ease;
+          
+          &:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+  }
+}
+
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  
+  .breadcrumb-link {
+    color: theme.$gray_2;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    
+    &:hover {
+      color: theme.$white;
+      text-decoration: underline;
+    }
+  }
+  
+  .breadcrumb-separator {
+    color: theme.$gray_3;
+    margin: 0 8px;
+    font-weight: 400;
+  }
+  
+  .breadcrumb-current {
+    color: theme.$white;
+    font-weight: 600;
+  }
 }
 
 .bf-rafter-heading {
@@ -576,13 +720,7 @@ export default {
   margin: -2px 0;
   float: right;
 }
-.dataset-name {
-  font-weight: 300;
-  font-size: 16px;
-  color: white;
-  padding-top: 8px;
-}
-
+// Legacy styles - keeping for backward compatibility
 .parent {
   position: relative;
 }
