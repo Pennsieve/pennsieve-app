@@ -106,6 +106,24 @@
             </div>
             <div
               class="detail-item"
+              v-if="
+                selectedWorkflow.processors &&
+                selectedWorkflow.processors.length
+              "
+            >
+              <strong>Processors:</strong>
+              <div class="processors-list">
+                <span
+                  class="processor"
+                  v-for="processor in selectedWorkflow.processors"
+                  :key="processor.name || processor.sourceUrl || processor"
+                >
+                  {{ getProcessorDisplay(processor) }}
+                </span>
+              </div>
+            </div>
+            <div
+              class="detail-item"
               v-if="selectedWorkflow.tags && selectedWorkflow.tags.length"
             >
               <strong>Tags:</strong>
@@ -337,6 +355,23 @@ export default {
       if (!dateString) return "";
       const date = new Date(dateString);
       return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+    },
+    /**
+     * Get processor display text (name or sourceUrl)
+     * @param {Object|String} processor
+     * @returns {String}
+     */
+    getProcessorDisplay: function (processor) {
+      if (typeof processor === "string") {
+        return processor;
+      }
+
+      if (processor && typeof processor === "object") {
+        // Prefer name if available, otherwise use sourceUrl, fallback to string representation
+        return processor.name || processor.sourceUrl || processor.toString();
+      }
+
+      return processor;
     },
     /**
      * Get files URL for dataset
@@ -716,6 +751,22 @@ export default {
         font-size: 12px;
         margin-right: 5px;
         margin-left: 5px;
+      }
+
+      .processors-list {
+        margin-top: 5px;
+
+        .processor {
+          display: inline-block;
+          background-color: #007bff;
+          color: white;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 12px;
+          margin-right: 8px;
+          margin-bottom: 4px;
+          font-weight: 500;
+        }
       }
     }
 
