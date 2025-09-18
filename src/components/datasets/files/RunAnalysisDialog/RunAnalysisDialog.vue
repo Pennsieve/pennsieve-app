@@ -13,45 +13,113 @@
 
     <dialog-body>
       <div v-show="shouldShow(1)">
-        <el-select
-          class="margin"
-          v-model="computeNodeValue"
-          placeholder="Select Compute Node"
-          @change="setSelectedComputeNode(computeNodeValue)"
-        >
-          <el-option
-            v-for="(item, i) in computeNodeOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-input
-          class="margin"
-          v-model="targetDirectory"
-          placeholder="Target Directory (optional)"
-        />
-        <el-input
-          class="margin"
-          v-model="name"
-          placeholder="Workflow Run Name (optional)"
-        />
+        <div class="form-section">
+          <label class="field-label" for="compute-node-select"
+            >Compute Node *</label
+          >
+          <el-select
+            id="compute-node-select"
+            class="margin"
+            v-model="computeNodeValue"
+            placeholder="Select Compute Node"
+            @change="setSelectedComputeNode(computeNodeValue)"
+          >
+            <el-option
+              v-for="(item, i) in computeNodeOptions"
+              :key="i"
+              :label="item.label"
+              :value="item.value"
+            ></el-option>
+          </el-select>
+        </div>
+
+        <div class="form-section">
+          <label class="field-label" for="target-directory"
+            >Target Directory</label
+          >
+          <el-input
+            id="target-directory"
+            class="margin"
+            v-model="targetDirectory"
+            placeholder="Target Directory (optional)"
+          />
+        </div>
+
+        <div class="form-section">
+          <label class="field-label" for="workflow-name"
+            >Workflow Run Name</label
+          >
+          <el-input
+            id="workflow-name"
+            class="margin"
+            v-model="name"
+            placeholder="Workflow Run Name (optional)"
+          />
+        </div>
       </div>
+
       <div v-show="shouldShow(2)">
-        <el-select
-          class="margin"
-          v-model="workflowValue"
-          placeholder="Select Workflow"
-          @change="setSelectedWorkflow(workflowValue)"
+        <div class="form-section">
+          <label class="field-label" for="workflow-select">Workflow *</label>
+          <el-select
+            id="workflow-select"
+            class="margin"
+            v-model="workflowValue"
+            placeholder="Select Workflow"
+            @change="setSelectedWorkflow(workflowValue)"
+          >
+            <el-option
+              v-for="(item, i) in workflows"
+              :key="i"
+              :label="item.label"
+              :value="item.name"
+            ></el-option>
+          </el-select>
+        </div>
+
+        <!-- Workflow Details Section -->
+        <div
+          v-if="selectedWorkflow && selectedWorkflow.name"
+          class="workflow-details"
         >
-          <el-option
-            v-for="(item, i) in workflows"
-            :key="i"
-            :label="item.label"
-            :value="item.name"
-          ></el-option>
-        </el-select>
+          <h3 class="details-title">Workflow Details</h3>
+          <div class="details-content">
+            <div class="detail-item">
+              <strong>Name:</strong> {{ selectedWorkflow.name }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.description">
+              <strong>Description:</strong> {{ selectedWorkflow.description }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.version">
+              <strong>Version:</strong> {{ selectedWorkflow.version }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.computeNode">
+              <strong>Compute Node:</strong>
+              {{ selectedWorkflow.computeNode.name }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.author">
+              <strong>Author:</strong> {{ selectedWorkflow.author }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.createdAt">
+              <strong>Created:</strong>
+              {{ formatDate(selectedWorkflow.createdAt) }}
+            </div>
+            <div
+              class="detail-item"
+              v-if="selectedWorkflow.tags && selectedWorkflow.tags.length"
+            >
+              <strong>Tags:</strong>
+              <span
+                class="tag"
+                v-for="tag in selectedWorkflow.tags"
+                :key="tag"
+                >{{ tag }}</span
+              >
+            </div>
+          </div>
+        </div>
       </div>
+
       <div v-show="shouldShow(3)">
         <div v-if="!selectedWorkflowHasParams()">
           The selected Workflow has no parameter values.
@@ -80,6 +148,7 @@
           </el-form-item>
         </el-form>
       </div>
+
       <div v-show="shouldShow(4)">
         <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
@@ -260,6 +329,16 @@ export default {
       this.clearSelectedValues = !this.clearSelected;
     },
     /**
+     * Format date for display
+     * @param {String} dateString
+     * @returns {String}
+     */
+    formatDate: function (dateString) {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+    },
+    /**
      * Get files URL for dataset
      * @returns {String}
      */
@@ -437,7 +516,7 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         name: this.name,
-        workflowId: this.selectedWorkflow.workflowId || "",
+        workflowUuid: this.selectedWorkflow.uuid,
         params: {
           target_path: this.targetDirectory,
         },
@@ -590,6 +669,61 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../../styles/theme";
+
+.form-section {
+  margin-bottom: 20px;
+
+  .field-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: theme.$gray_4;
+    font-size: 14px;
+  }
+}
+
+.workflow-details {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+
+  .details-title {
+    margin: 0 0 15px 0;
+    color: theme.$gray_5;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .details-content {
+    .detail-item {
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+
+      strong {
+        color: theme.$gray_5;
+        margin-right: 8px;
+      }
+
+      .tag {
+        display: inline-block;
+        background-color: theme.$purple_1;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        margin-right: 5px;
+        margin-left: 5px;
+      }
+    }
+
+    .detail-item:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
 
 .table-container {
   overflow-y: scroll;
