@@ -118,7 +118,18 @@
                   v-for="processor in selectedWorkflow.processors"
                   :key="processor.name || processor.sourceUrl || processor"
                 >
-                  {{ getProcessorDisplay(processor) }}
+                  <a
+                    v-if="isProcessorUrl(processor)"
+                    :href="getProcessorUrl(processor)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="processor-link"
+                  >
+                    {{ getProcessorDisplay(processor) }}
+                  </a>
+                  <span v-else class="processor-text">
+                    {{ getProcessorDisplay(processor) }}
+                  </span>
                 </span>
               </div>
             </div>
@@ -372,6 +383,31 @@ export default {
       }
 
       return processor;
+    },
+    /**
+     * Check if processor has a URL that should be linkable
+     * @param {Object|String} processor
+     * @returns {Boolean}
+     */
+    isProcessorUrl: function (processor) {
+      const url = this.getProcessorUrl(processor);
+      return url && (url.startsWith("http://") || url.startsWith("https://"));
+    },
+    /**
+     * Get the URL from processor (either sourceUrl property or if it's a URL string)
+     * @param {Object|String} processor
+     * @returns {String}
+     */
+    getProcessorUrl: function (processor) {
+      if (typeof processor === "string") {
+        return processor.startsWith("http") ? processor : null;
+      }
+
+      if (processor && typeof processor === "object") {
+        return processor.sourceUrl || null;
+      }
+
+      return null;
     },
     /**
      * Get files URL for dataset
@@ -758,13 +794,39 @@ export default {
 
         .processor {
           display: inline-block;
-          background-color: #007bff;
+          margin-right: 8px;
+          margin-bottom: 4px;
+        }
+
+        .processor-link {
+          display: inline-block;
+          background-color: #1a365d !important;
+          color: white !important;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          text-decoration: none !important;
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background-color: #2c5282 !important;
+            text-decoration: none !important;
+            color: white !important;
+          }
+
+          &:visited {
+            color: white !important;
+          }
+        }
+
+        .processor-text {
+          display: inline-block;
+          background-color: theme.$purple_2;
           color: white;
           padding: 4px 10px;
           border-radius: 6px;
           font-size: 12px;
-          margin-right: 8px;
-          margin-bottom: 4px;
           font-weight: 500;
         }
       }
