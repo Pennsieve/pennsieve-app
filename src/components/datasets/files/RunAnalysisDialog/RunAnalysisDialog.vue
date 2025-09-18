@@ -40,52 +40,26 @@
       <div v-show="shouldShow(2)">
         <el-select
           class="margin"
-          v-model="preprocessorValue"
-          placeholder="Select Preprocessor"
-          @change="setSelectedPreprocessor(preprocessorValue)"
+          v-model="workflowValue"
+          placeholder="Select Workflow"
+          @change="setSelectedWorkflow(workflowValue)"
         >
           <el-option
-            v-for="(item, i) in preprocessorOptions"
+            v-for="(item, i) in workflows"
             :key="i"
             :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-select
-          class="margin"
-          v-model="processorValue"
-          placeholder="Select Processor"
-          @change="setSelectedProcessor(processorValue)"
-        >
-          <el-option
-            v-for="(item, i) in processorOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-select
-          class="margin"
-          v-model="postprocessorValue"
-          placeholder="Select Postprocessor"
-          @change="setSelectedPostprocessor(postprocessorValue)"
-        >
-          <el-option
-            v-for="(item, i) in postprocessorOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
+            :value="item.name"
           ></el-option>
         </el-select>
       </div>
       <div v-show="shouldShow(3)">
-        <div v-if="!selectedProcessorHasParams()">
-          The selected Processor has no parameter values.
+        <div v-if="!selectedWorkflowHasParams()">
+          The selected Workflow has no parameter values.
         </div>
-        <el-form v-if="selectedProcessorHasParams()">
+        <el-form v-if="selectedWorkflowHasParams()">
           <el-form-item prop="parameters" id="paramsInput">
             <el-table
-              :data="selectedProcessorParams"
+              :data="selectedWorkflowParams"
               max-height="250"
               :border="true"
             >
@@ -187,15 +161,9 @@ export default {
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
-      preprocessorOptions: [],
-      preprocessorValue: "",
-      selectedPreprocessor: {},
-      processorOptions: [],
-      processorValue: "",
-      selectedProcessor: {},
-      postprocessorOptions: [],
-      postprocessorValue: "",
-      selectedPostprocessor: {},
+      workflowOptions: [],
+      workflowValue: "",
+      selectedWorkflow: {},
       filesLoading: false,
       file: {
         content: {
@@ -211,16 +179,13 @@ export default {
       name: "",
       clearSelectedValues: false,
       warningMessage: "",
-      selectedProcessorParams: [],
-      warningMessage: "",
+      selectedWorkflowParams: [],
     };
   },
   computed: {
     ...mapState("analysisModule", [
       "computeNodes",
-      "preprocessors",
-      "processors",
-      "postprocessors",
+      "workflows",
       "selectedFilesForAnalysis",
       "fileCount",
     ]),
@@ -256,18 +221,22 @@ export default {
     computeNodes: function () {
       this.formatComputeNodeOptions();
     },
-    selectedComputeNode: function () {
-      this.formatPreprocessorOptions();
-      this.formatProcessorOptions();
-      this.formatPostprocessorOptions();
+    workflows: function () {
+      this.formatWorkflowOptions();
     },
-    selectedProcessor: function () {
-      this.selectedProcessorParams = [];
-      if (this.selectedProcessor && this.selectedProcessor.params) {
+    selectedComputeNode: function () {
+      this.formatWorkflowOptions();
+      // Clear workflow selection when compute node changes
+      this.workflowValue = "";
+      this.selectedWorkflow = {};
+    },
+    selectedWorkflow: function () {
+      this.selectedWorkflowParams = [];
+      if (this.selectedWorkflow && this.selectedWorkflow.params) {
         for (const [key, value] of Object.entries(
-          this.selectedProcessor.params
+          this.selectedWorkflow.params
         )) {
-          this.selectedProcessorParams.push({ name: key, value: value });
+          this.selectedWorkflowParams.push({ name: key, value: value });
         }
       }
     },
@@ -276,7 +245,7 @@ export default {
   mounted() {
     this.fetchFiles();
     this.fetchComputeNodes();
-    this.fetchApplications();
+    this.fetchWorkflows();
   },
 
   methods: {
@@ -284,7 +253,7 @@ export default {
       "setSelectedFiles",
       "clearSelectedFiles",
       "fetchComputeNodes",
-      "fetchApplications",
+      "fetchWorkflows",
       "updateFileCount",
     ]),
     handleClearSelectedValues: function () {
@@ -372,12 +341,8 @@ export default {
       this.processStep = 1;
       this.computeNodeValue = "";
       this.selectedComputeNode = {};
-      this.preprocessorValue = "";
-      this.selectedPreprocessor = {};
-      this.processorValue = "";
-      this.selectedProcessor = {};
-      this.postprocessorValue = "";
-      this.selectedPostprocessor = {};
+      this.workflowValue = "";
+      this.selectedWorkflow = {};
       this.clearSelectedFiles();
       this.updateFileCount();
       this.targetDirectory = "";
@@ -393,7 +358,7 @@ export default {
         isValid = this.validateNode();
       }
       if (this.processStep === 2 && step === 1) {
-        isValid = this.validateProcessors();
+        isValid = this.validateWorkflow();
       }
       if (isValid) {
         this.processStep += step;
@@ -417,23 +382,19 @@ export default {
       }
     },
     /**
-     * validate to make sure all processors have been assigned
+     * validate to make sure workflow has been selected
      */
-    validateProcessors: function () {
-      if (
-        this.preprocessorValue &&
-        this.processorValue &&
-        this.postprocessorValue
-      ) {
+    validateWorkflow: function () {
+      if (this.workflowValue) {
         this.warningMessage = "";
         return true;
       } else {
-        this.warningMessage = "please select a value for all processors";
+        this.warningMessage = "please select a workflow";
         return false;
       }
     },
-    selectedProcessorHasParams: function () {
-      if (this.selectedProcessorParams.length > 0) {
+    selectedWorkflowHasParams: function () {
+      if (this.selectedWorkflowParams.length > 0) {
         return true;
       } else {
         return false;
@@ -458,26 +419,15 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = (application, parameters) => {
-        let paramsObject = {};
-        if (parameters != null) {
-          let paramsEntries = [];
-          parameters.forEach((param) => {
-            paramsEntries.push([param.name, param.value]);
-          });
-          paramsObject = Object.fromEntries(paramsEntries);
-        }
-        return {
-          name: application.name || "",
-          description: application.description || "",
-          uuid: application.uuid || "",
-          applicationId: application.applicationId || "",
-          applicationContainerName: application.applicationContainerName || "",
-          applicationType: application.applicationType || "",
-          params: paramsObject,
-          commandArguments: application.commandArguments || [],
-        };
-      };
+      // Format workflow parameters
+      let paramsObject = {};
+      if (this.selectedWorkflowParams.length > 0) {
+        let paramsEntries = [];
+        this.selectedWorkflowParams.forEach((param) => {
+          paramsEntries.push([param.name, param.value]);
+        });
+        paramsObject = Object.fromEntries(paramsEntries);
+      }
 
       const body = {
         datasetId: this.datasetId,
@@ -487,14 +437,7 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         name: this.name,
-        workflow: [
-          formatApplication(this.selectedPreprocessor, null),
-          formatApplication(
-            this.selectedProcessor,
-            this.selectedProcessorParams
-          ),
-          formatApplication(this.selectedPostprocessor, null),
-        ],
+        workflowId: this.selectedWorkflow.workflowId || "",
         params: {
           target_path: this.targetDirectory,
         },
@@ -523,14 +466,13 @@ export default {
       } finally {
         this.closeDialog();
         this.targetDirectory = "";
-        this.selectedApplication = {};
-        this.value = "";
+        this.selectedWorkflow = {};
+        this.workflowValue = "";
       }
     },
     /**
      * Determines if tab content is active
      * @param {number} key
-     * @param {String} type
      * @returns {Boolean}
      */
     shouldShow: function (key) {
@@ -551,52 +493,30 @@ export default {
       });
     },
     /**
-     * Access processors from global state and format options for input select
+     * Access workflows from global state and format options for input select
      */
-    formatProcessorOptions: function () {
-      const filteredProcessors = this.processors.filter(
-        (processor) =>
-          this.selectedComputeNode.uuid === processor.computeNode.uuid
-      );
+    formatWorkflowOptions: function () {
+      if (!this.workflows) {
+        return;
+      }
 
-      this.processorOptions = filteredProcessors.map((processor) => {
+      let filteredWorkflows = this.workflows;
+
+      // Filter workflows by selected compute node if one is selected
+      if (this.selectedComputeNode.uuid) {
+        filteredWorkflows = this.workflows.filter(
+          (workflow) =>
+            workflow.computeNode &&
+            this.selectedComputeNode.uuid === workflow.computeNode.uuid
+        );
+      }
+
+      this.workflowOptions = filteredWorkflows.map((workflow) => {
         return {
-          value: processor.name,
-          label: processor.name,
+          value: workflow.name,
+          label: workflow.name,
         };
       });
-    },
-    /**
-     * Access preprocessors from global state and format options for input select
-     */
-    formatPreprocessorOptions: function () {
-      const filteredPreprocessors = this.preprocessors.filter(
-        (preprocessor) =>
-          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
-      );
-      this.preprocessorOptions = filteredPreprocessors.map((preprocessor) => {
-        return {
-          value: preprocessor.name,
-          label: preprocessor.name,
-        };
-      });
-    },
-    /**
-     * Access postprocessors from global state and format options for input select
-     */
-    formatPostprocessorOptions: function () {
-      const filteredPostprocessors = this.postprocessors.filter(
-        (postprocessor) =>
-          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
-      );
-      this.postprocessorOptions = filteredPostprocessors.map(
-        (postprocessor) => {
-          return {
-            value: postprocessor.name,
-            label: postprocessor.name,
-          };
-        }
-      );
     },
     /**
      * Set Selected Compute Node
@@ -607,33 +527,11 @@ export default {
       );
     },
     /**
-     * Set Selected Preprocessor
+     * Set Selected Workflow
      */
-    setSelectedPreprocessor: function (value) {
-      this.selectedPreprocessor = this.preprocessors.find(
-        (preprocessor) =>
-          preprocessor.name === value &&
-          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
-      );
-    },
-    /**
-     * Set Selected Processor
-     */
-    setSelectedProcessor: function (value) {
-      this.selectedProcessor = this.processors.find(
-        (processor) =>
-          processor.name === value &&
-          this.selectedComputeNode.uuid === processor.computeNode.uuid
-      );
-    },
-    /**
-     * Set Selected Postprocessor
-     */
-    setSelectedPostprocessor: function (value) {
-      this.selectedPostprocessor = this.postprocessors.find(
-        (postprocessor) =>
-          postprocessor.name === value &&
-          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+    setSelectedWorkflow: function (value) {
+      this.selectedWorkflow = this.workflows.find(
+        (workflow) => workflow.name === value
       );
     },
     /**

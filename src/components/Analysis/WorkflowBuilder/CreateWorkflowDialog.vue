@@ -79,7 +79,7 @@
                 v-for="application in applications"
                 :key="application.uuid"
                 :label="application.name"
-                :value="application"
+                :value="application.uuid"
               />
             </el-select>
           </el-form-item>
@@ -255,19 +255,10 @@ export default {
         .filter((app) => app.name);
     },
 
-    getAppDisplayName(app) {
-      // Handle both app object and string cases
-      if (typeof app === "object" && app.name) {
-        return app.name;
-      }
-      if (typeof app === "string") {
-        return app;
-      }
-      // Fallback for accountId lookup
-      const application = this.applications.find(
-        (acc) => acc.accountId === app || acc.uuid === app
-      );
-      return application?.name || app;
+    getAppDisplayName(appUuid) {
+      // Find application by UUID and return name
+      const application = this.applications.find((app) => app.uuid === appUuid);
+      return application?.name || appUuid;
     },
 
     formatDependencies(dependencies) {
@@ -284,7 +275,7 @@ export default {
     },
 
     onAppSelectionChange(index, value) {
-      // Set the selected app
+      // Set the selected app UUID
       this.appSelections[index].name = value;
 
       // Clear dependencies for apps that come after the changed one
@@ -301,15 +292,8 @@ export default {
     updateWorkflowApps() {
       this.workflow.apps = this.appSelections
         .filter((app) => app.name)
-        .map((app) => {
-          // Handle both object and primitive cases
-          if (typeof app.name === "object") {
-            return app.name.accountId || app.name.uuid;
-          }
-          return app.name;
-        });
+        .map((app) => app.name); // Now contains UUIDs
     },
-
     validateApps(rule, value, callback) {
       const hasEmptyApp = this.appSelections.some((app) => !app.name);
       if (hasEmptyApp) {
@@ -335,31 +319,17 @@ export default {
           const processors = this.appSelections
             .filter((app) => app.name)
             .map((app, index) => {
-              let appData;
-              if (typeof app.name === "object") {
-                appData = app.name;
-              } else {
-                appData = this.applications.find(
-                  (elem) =>
-                    elem.account.accountId === app.name ||
-                    elem.uuid === app.name
-                );
-              }
+              // Find the app data by UUID since app.name now contains UUID
+              const appData = this.applications.find(
+                (application) => application.uuid === app.name
+              );
 
               // Build dependsOn array based on selected dependencies
               const dependsOn = (app.dependencies || []).map((depIndex) => {
                 const dependentApp = this.appSelections[depIndex];
-                let dependentAppData;
-
-                if (typeof dependentApp.name === "object") {
-                  dependentAppData = dependentApp.name;
-                } else {
-                  dependentAppData = this.applications.find(
-                    (elem) =>
-                      elem.account.accountId === dependentApp.name ||
-                      elem.uuid === dependentApp.name
-                  );
-                }
+                const dependentAppData = this.applications.find(
+                  (application) => application.uuid === dependentApp.name
+                );
 
                 return {
                   sourceUrl: dependentAppData?.source?.url,

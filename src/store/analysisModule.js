@@ -22,7 +22,8 @@ const initialState = () => ({
     workflowInstances: [],
     selectedWorkflowActivity: {},
     cancelWorkflowDialogVisible: false,
-    activityDialogVisible: false
+    activityDialogVisible: false,
+    workflows: []
   })
   
   export const state = initialState()
@@ -106,8 +107,10 @@ const initialState = () => ({
     },
     SET_SELECTED_PROCESSOR(state, processor) {
       state.selectedProcessor = processor;
-    }
-  
+    },
+    UPDATE_WORKFLOWS(state, workflows) {
+  state.workflows = workflows
+    },
   }
 
   export const actions = {
@@ -522,6 +525,30 @@ const initialState = () => ({
     setSelectedProcessor: ({ commit, rootState }, processor) => {
       commit('SET_SELECTED_PROCESSOR', processor)
     },
+    fetchWorkflows: async({ commit, rootState }) => {
+      try {
+        const userToken = await useGetToken()
+        const url = `${rootState.config.api2Url}/workflows?organization_id=${rootState.activeOrganization.organization.id}`;
+        
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          console.log('here', result)
+          commit('UPDATE_WORKFLOWS', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+        commit('UPDATE_WORKFLOWS', [])
+        return Promise.reject(err)
+      }
+    }
   }
   
   export const getters = {
