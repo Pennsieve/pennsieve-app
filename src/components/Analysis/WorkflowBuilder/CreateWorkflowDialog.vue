@@ -11,11 +11,11 @@
 
     <dialog-body>
       <el-form
-        :model="computeNode"
+        :model="workflow"
         :rules="rules"
         ref="workflowForm"
         label-position="top"
-        @submit.native.prevent="handleCreateComputeNode"
+        @submit.native.prevent="handleCreateWorkflow"
       >
         <el-form-item prop="name">
           <template #label>
@@ -23,7 +23,7 @@
             <span class="label-helper"> required </span>
           </template>
           <el-input
-            v-model="computeNode.name"
+            v-model="workflow.name"
             placeholder="ex: My Workflow"
             autofocus
           />
@@ -37,7 +37,7 @@
           <div class="text-area-wrapper">
             <el-input
               ref="input"
-              v-model="computeNode.description"
+              v-model="workflow.description"
               type="textarea"
               :rows="5"
               :maxlength="255"
@@ -70,21 +70,25 @@
             </template>
             <el-select
               ref="enum"
-              v-model="app.account"
+              v-model="app.name"
               class="input-property"
               placeholder="Choose an App"
-              @change="onAppSelectionChange"
+              @change="(value) => onAppSelectionChange(index, value)"
             >
               <el-option
-                v-for="account in computeResourceAccounts"
-                :key="account.accountId"
-                :label="account.name || account.accountId"
-                :value="account.accountId"
+                v-for="application in applications"
+                :key="application.uuid"
+                :label="application.name"
+                :value="application"
               />
             </el-select>
           </el-form-item>
 
-          <el-form-item v-if="app.account" class="dependency-selection">
+          <!-- Only show dependencies if this app is selected AND there are previous apps -->
+          <el-form-item
+            v-if="app.name && getPreviousApps(index).length > 0"
+            class="dependency-selection"
+          >
             <template #label>
               <span>Dependencies</span>
               <span class="label-helper"> optional </span>
@@ -101,7 +105,7 @@
                 v-for="(prevApp, prevIndex) in getPreviousApps(index)"
                 :key="prevIndex"
                 :label="`App ${prevIndex + 1}: ${getAppDisplayName(
-                  prevApp.account
+                  prevApp.name
                 )}`"
                 :value="prevIndex"
               />
@@ -130,13 +134,13 @@ import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
 
-const defaultComputeNodeFormValues = () => ({
+const defaultWorkflowValues = () => ({
   name: "",
   description: "",
   apps: [],
 });
 
-const getDefaultAppSelections = () => [{ account: null, dependencies: [] }];
+const getDefaultAppSelections = () => [{ name: null, dependencies: [] }];
 
 export default {
   name: "CreateWorkflowDialog",
@@ -153,7 +157,7 @@ export default {
 
   data() {
     return {
-      computeNode: defaultComputeNodeFormValues(),
+      workflow: defaultWorkflowValues(),
       appSelections: getDefaultAppSelections(),
       rules: {
         name: [
@@ -170,16 +174,25 @@ export default {
           {
             required: true,
             validator: this.validateApps,
-            trigger: "change",
+            trigger: "submit",
           },
         ],
       },
     };
   },
 
+  async mounted() {
+    try {
+      await this.fetchApplications();
+      console.log("Applications loaded:", this.applications);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+    }
+  },
+
   computed: {
     ...mapState(["userToken", "config"]),
-    ...mapState("analysisModule", ["computeResourceAccounts"]),
+    ...mapState("analysisModule", ["applications"]),
   },
 
   watch: {
@@ -192,19 +205,19 @@ export default {
 
     appSelections: {
       handler() {
-        this.updateComputeNodeApps();
+        this.updateWorkflowApps();
       },
       deep: true,
     },
   },
 
   methods: {
-    ...mapActions("analysisModule", ["createComputeNode"]),
+    ...mapActions("analysisModule", ["fetchApplications", "createWorkflow"]),
 
     resetForm() {
-      this.computeNode = defaultComputeNodeFormValues();
+      this.workflow = defaultWorkflowValues();
       this.appSelections = getDefaultAppSelections();
-      this.updateComputeNodeApps();
+      this.updateWorkflowApps();
 
       // Clear form validation errors
       this.$nextTick(() => {
@@ -215,69 +228,90 @@ export default {
     },
 
     addApp() {
-      this.appSelections.push({ account: null, dependencies: [] });
-      this.updateComputeNodeApps();
+      this.appSelections.push({ name: null, dependencies: [] });
+      this.updateWorkflowApps();
     },
 
     removeApp(index) {
       this.appSelections.splice(index, 1);
+
       // Clean up dependencies that reference the removed app
       this.appSelections.forEach((app) => {
         if (app.dependencies) {
+          // Remove dependencies that reference indices >= the removed index
           app.dependencies = app.dependencies
             .filter((depIndex) => depIndex < index)
-            .map((depIndex) => (depIndex > index ? depIndex - 1 : depIndex));
+            // Adjust indices for apps that come after the removed one
+            .map((depIndex) => depIndex);
         }
       });
-      this.updateComputeNodeApps();
+
+      this.updateWorkflowApps();
     },
 
     getPreviousApps(currentIndex) {
       return this.appSelections
         .slice(0, currentIndex)
-        .filter((app) => app.account);
+        .filter((app) => app.name);
     },
 
-    getAppDisplayName(accountId) {
-      const account = this.computeResourceAccounts.find(
-        (acc) => acc.accountId === accountId
+    getAppDisplayName(app) {
+      // Handle both app object and string cases
+      if (typeof app === "object" && app.name) {
+        return app.name;
+      }
+      if (typeof app === "string") {
+        return app;
+      }
+      // Fallback for accountId lookup
+      const application = this.applications.find(
+        (acc) => acc.accountId === app || acc.uuid === app
       );
-      return account?.name || accountId;
+      return application?.name || app;
     },
 
     formatDependencies(dependencies) {
       return dependencies
         .map((depIndex) => {
           const app = this.appSelections[depIndex];
-          const accountData = this.computeResourceAccounts.find(
-            (acc) => acc.accountId === app.account
-          );
-          return `App ${depIndex + 1} (${accountData?.name || app.account})`;
+          if (app && app.name) {
+            const displayName = this.getAppDisplayName(app.name);
+            return `App ${depIndex + 1} (${displayName})`;
+          }
+          return `App ${depIndex + 1}`;
         })
         .join(", ");
     },
 
-    onAppSelectionChange() {
-      // Clear dependencies if an app selection changes
-      this.appSelections.forEach((app, index) => {
-        if (app.dependencies) {
-          app.dependencies = app.dependencies.filter((depIndex) => {
-            return (
-              this.appSelections[depIndex] &&
-              this.appSelections[depIndex].account
-            );
-          });
-        }
-      });
-      this.updateComputeNodeApps();
+    onAppSelectionChange(index, value) {
+      // Set the selected app
+      this.appSelections[index].name = value;
+
+      // Clear dependencies for apps that come after the changed one
+      // since the workflow structure may have changed
+      for (let i = index + 1; i < this.appSelections.length; i++) {
+        this.appSelections[i].dependencies = this.appSelections[
+          i
+        ].dependencies.filter((depIndex) => depIndex < index + 1);
+      }
+
+      this.updateWorkflowApps();
     },
 
-    updateComputeNodeApps() {
-      this.computeNode.apps = this.appSelections.map((app) => app.account);
+    updateWorkflowApps() {
+      this.workflow.apps = this.appSelections
+        .filter((app) => app.name)
+        .map((app) => {
+          // Handle both object and primitive cases
+          if (typeof app.name === "object") {
+            return app.name.accountId || app.name.uuid;
+          }
+          return app.name;
+        });
     },
 
     validateApps(rule, value, callback) {
-      const hasEmptyApp = this.appSelections.some((app) => !app.account);
+      const hasEmptyApp = this.appSelections.some((app) => !app.name);
       if (hasEmptyApp) {
         callback(new Error("Please select an app for all app selections"));
       } else {
@@ -290,10 +324,7 @@ export default {
       this.$emit("close", false);
     },
 
-    async handleCreateComputeNode() {
-      // Update the computeNode apps before validation
-      this.updateComputeNodeApps();
-
+    async handleCreateWorkflow() {
       if (!this.$refs.workflowForm) {
         console.error("Form ref not found");
         return;
@@ -301,30 +332,58 @@ export default {
 
       this.$refs.workflowForm.validate(async (valid) => {
         if (valid) {
-          const selectedAccounts = this.appSelections
-            .filter((app) => app.account)
+          const processors = this.appSelections
+            .filter((app) => app.name)
             .map((app, index) => {
-              const accountData = this.computeResourceAccounts.find(
-                (elem) => elem.accountId === app.account
-              );
+              let appData;
+              if (typeof app.name === "object") {
+                appData = app.name;
+              } else {
+                appData = this.applications.find(
+                  (elem) =>
+                    elem.account.accountId === app.name ||
+                    elem.uuid === app.name
+                );
+              }
+
+              // Build dependsOn array based on selected dependencies
+              const dependsOn = (app.dependencies || []).map((depIndex) => {
+                const dependentApp = this.appSelections[depIndex];
+                let dependentAppData;
+
+                if (typeof dependentApp.name === "object") {
+                  dependentAppData = dependentApp.name;
+                } else {
+                  dependentAppData = this.applications.find(
+                    (elem) =>
+                      elem.account.accountId === dependentApp.name ||
+                      elem.uuid === dependentApp.name
+                  );
+                }
+
+                return {
+                  sourceUrl: dependentAppData?.source?.url,
+                };
+              });
+
               return {
-                ...accountData,
-                dependencies: app.dependencies || [],
-                order: index,
+                sourceUrl: appData?.source?.url,
+                dependsOn: dependsOn,
               };
             });
 
           const formattedWorkflow = {
-            ...this.computeNode,
-            processors: selectedAccounts,
+            name: this.workflow.name,
+            description: this.workflow.description,
+            processors: processors,
           };
 
           try {
-            const result = await this.createComputeNode(formattedWorkflow);
+            const result = await this.createWorkflow(formattedWorkflow);
             EventBus.$emit("toast", {
               detail: {
                 type: "success",
-                msg: "Your request to create a Compute Node has been initiated.",
+                msg: "Your request to create a Workflow has been initiated.",
                 duration: 8000,
               },
             });
@@ -341,10 +400,6 @@ export default {
           }
         }
       });
-    },
-
-    handleCreateWorkflow() {
-      this.handleCreateComputeNode();
     },
   },
 };

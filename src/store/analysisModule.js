@@ -251,6 +251,33 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
+    createWorkflow: async ({ commit, rootState }, newWorkflow) => {
+      const url = `${rootState.config.api2Url}/workflows`;
+
+      try {
+        const userToken = await useGetToken()
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: JSON.stringify(newWorkflow)
+        });
+
+        if (!response.ok) {
+          const errorDetails = await response.text(); 
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+
+        const result = await response.json();
+        return result;
+
+      } catch (err) {
+        console.error('Failed to workflow:', err.message); 
+        throw err; 
+      }
+    },
     // Note that this to to deploy application, there is another action for editing application
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
