@@ -503,28 +503,39 @@ export default {
       const token = await useGetToken();
 
       try {
-        this.sendXhr(url, {
+        const response = await this.sendXhr(url, {
           method: "POST",
-          header: {
+          headers: {
+            // Fixed: "headers" instead of "header"
             Authorization: `Bearer ${token}`,
           },
           body: body,
         });
 
-        EventBus.$emit("toast", {
-          detail: {
-            msg: "Your workflow has been successfully initiated!",
-            type: "success",
-          },
-        });
+        // Check if the response indicates success
+        if (response.ok || (response.status >= 200 && response.status < 300)) {
+          EventBus.$emit("toast", {
+            detail: {
+              msg: "Your workflow has been successfully initiated!",
+              type: "success",
+            },
+          });
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       } catch (err) {
         console.error(err);
-        this.closeDialog();
+        EventBus.$emit("toast", {
+          detail: {
+            msg: "Failed to initiate workflow. Please try again.",
+            type: "error",
+          },
+        });
       } finally {
         this.closeDialog();
         this.targetDirectory = "";
-        this.selectedApplication = {};
-        this.value = "";
+        this.selectedApplication = {}; // Note: this was "selectedApplication" not "selectedWorkflow"
+        this.value = ""; // Note: this was "value" not "workflowValue"
       }
     },
     /**
