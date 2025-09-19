@@ -7,6 +7,7 @@ const initialState = () => ({
     applicationsLoaded: false,
     processors: [],
     preprocessors:[],
+    postprocessors: [],
     selectedWorkflow: {},
     selectedProcessor: {},
     selectedFilesForAnalysis: [],
