@@ -259,12 +259,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElInput, ElSelect, ElOption, ElButton, ElTag } from 'element-plus'
+import { ElInput, ElSelect, ElOption, ElButton, ElTag, ElMessage, ElMessageBox } from 'element-plus'
 import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue"
 import * as site from "@/site-config/site.json"
 import { useGetToken } from "@/composables/useGetToken"
 import toQueryParams from "@/utils/toQueryParams"
+import { useMetadataStore } from '@/stores/metadataStore.js'
 
 // Props
 const props = defineProps({
@@ -279,16 +280,20 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'template-selected'])
+const emit = defineEmits(['close', 'template-selected', 'models-created'])
 
 // Router
 const router = useRouter()
+
+// Store
+const metadataStore = useMetadataStore()
 
 // Reactive data
 const templates = ref([])
 const selectedTemplate = ref(null)
 const selectedTemplates = ref([])
 const loading = ref(false)
+const creatingModels = ref(false)
 const error = ref('')
 
 // Filter and sort state
@@ -696,43 +701,38 @@ const fetchTemplates = async () => {
   error.value = ''
   
   try {
-    // TODO: Replace with actual API call when backend is ready
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
+    // Use the metadata store to fetch templates with organization ID
+    const fetchedTemplates = await metadataStore.fetchTemplates(props.orgId)
     
-    // Use test templates for now
-    templates.value = testTemplates
-    
-    /* 
-    // Actual API call - uncomment when backend is ready
-    const endpoint = `${site.api2Url}/metadata/templates`
-    const token = await useGetToken()
-    
-    const queryParams = toQueryParams({
-      // Add any query parameters if needed
-    })
-    
-    const url = queryParams ? `${endpoint}?${queryParams}` : endpoint
-    
-    const myHeaders = new Headers()
-    myHeaders.append('Authorization', 'Bearer ' + token)
-    myHeaders.append('Accept', 'application/json')
-    
-    const resp = await fetch(url, {
-      method: 'GET',
-      headers: myHeaders
-    })
-    
-    if (resp.ok) {
-      const response = await resp.json()
-      templates.value = response
+    // Transform the API response to match the expected component structure
+    if (fetchedTemplates && Array.isArray(fetchedTemplates)) {
+      templates.value = fetchedTemplates.map(template => ({
+        id: template.model_template?.id || template.id,
+        name: template.model_template?.name || template.name,
+        display_name: template.model_template?.display_name || template.display_name,
+        description: template.description || template.model_template?.description || '',
+        category: template.category || 'general', // Default category if not provided
+        tags: template.tags || [], // Default empty tags if not provided
+        latest_version: template.model_template?.latest_version || template.latest_version || {
+          version: 1,
+          schema: template.model_template?.latest_version?.schema || template.schema || {}
+        },
+        created_at: template.created_at || template.model_template?.created_at
+      }))
     } else {
-      throw new Error(`Failed to fetch templates: ${resp.statusText}`)
+      templates.value = []
     }
-    */
   } catch (err) {
     console.error('Error fetching templates:', err)
     error.value = err.message || 'Failed to load templates'
+    
+    // Fallback to test templates if API fails during development
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Falling back to test templates due to API error')
+      templates.value = testTemplates
+    } else {
+      templates.value = []
+    }
   } finally {
     loading.value = false
   }
@@ -779,49 +779,65 @@ const clearAllSelections = () => {
   selectedTemplates.value = []
 }
 
-const createModelsFromTemplates = () => {
+const createModelsFromTemplates = async () => {
   if (selectedTemplates.value.length === 0) return
   
-  if (selectedTemplates.value.length === 1) {
-    // Single template - use existing logic
-    router.push({
-      name: 'new-model',
-      params: {
-        datasetId: props.datasetId,
-        orgId: props.orgId,
-      },
-      query: {
-        template: btoa(JSON.stringify(selectedTemplates.value[0]))
-      }
-    })
-  } else {
-    // Multiple templates - create models sequentially
-    createMultipleModels()
-  }
-}
-
-const createMultipleModels = async () => {
+  creatingModels.value = true
+  
   try {
-    // For multiple templates, we'll navigate to the first one and pass the rest
-    // The ModelSpecGenerator can handle creating multiple models
-    const templatesData = {
-      templates: selectedTemplates.value,
-      mode: 'multiple'
+    // Prepare templates array for API call
+    const templatesArray = selectedTemplates.value.map(template => ({
+      template: {
+        id: template.id,
+        name: template.name,
+        display_name: template.display_name,
+        description: template.description,
+        latest_version: template.latest_version
+      }
+    }))
+    
+    // Call the store method to create models from templates
+    const results = await metadataStore.createModelsFromTemplates(props.datasetId, templatesArray)
+    
+    // Show success/failure message
+    if (results.successful.length > 0 && results.failed.length === 0) {
+      ElMessage.success({
+        message: `Successfully created ${results.successful.length} model${results.successful.length > 1 ? 's' : ''} from template${results.successful.length > 1 ? 's' : ''}`,
+        duration: 3000
+      })
+      
+      // Clear selections
+      clearAllSelections()
+      
+      // Navigate to the models list or refresh the page
+      // You might want to emit an event or navigate somewhere
+      emit('models-created', results.successful)
+      
+    } else if (results.successful.length > 0 && results.failed.length > 0) {
+      ElMessage.warning({
+        message: `Created ${results.successful.length} model${results.successful.length > 1 ? 's' : ''}, but ${results.failed.length} failed`,
+        duration: 4000
+      })
+    } else {
+      ElMessage.error({
+        message: `Failed to create models from templates`,
+        duration: 3000
+      })
     }
     
-    router.push({
-      name: 'new-model',
-      params: {
-        datasetId: props.datasetId,
-        orgId: props.orgId,
-      },
-      query: {
-        templates: btoa(JSON.stringify(templatesData))
-      }
-    })
+    // Log any failures for debugging
+    if (results.failed.length > 0) {
+      console.error('Failed to create models:', results.failed)
+    }
+    
   } catch (error) {
-    console.error('Error creating multiple models:', error)
-    // Handle error appropriately
+    console.error('Error creating models from templates:', error)
+    ElMessage.error({
+      message: `Error: ${error.message || 'Failed to create models'}`,
+      duration: 4000
+    })
+  } finally {
+    creatingModels.value = false
   }
 }
 

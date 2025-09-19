@@ -150,10 +150,12 @@ const modelProperties = computed(() => {
 })
 
 const previewModel = computed(() => {
+  let baseModel = modelData.value
+  
   if (mode.value === 'json' && jsonContent.value && !jsonError.value) {
     try {
       const parsed = JSON.parse(jsonContent.value)
-      return {
+      baseModel = {
         ...modelData.value,
         latest_version: {
           ...modelData.value.latest_version,
@@ -161,10 +163,24 @@ const previewModel = computed(() => {
         }
       }
     } catch (e) {
-      return modelData.value
+      baseModel = modelData.value
     }
   }
-  return modelData.value
+  
+  // When editing an existing model, increment the version for preview
+  if (isEditMode.value) {
+    return {
+      ...baseModel,
+      latest_version: {
+        ...baseModel.latest_version,
+        version: (baseModel.latest_version?.version || 1) + 1
+      },
+      // For preview, don't show the original creation date since this will be a new version
+      created_at: null
+    }
+  }
+  
+  return baseModel
 })
 
 // Computed property for property form data to pass to PropertyDialog
@@ -569,6 +585,19 @@ const generateModelName = () => {
   }
 }
 
+// Format date function (same as in ModelSpecViewer)
+const formatDate = (dateString) => {
+  if (!dateString) return 'TBD on creation'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 // Handle PropertyDialog save event
 const handlePropertySave = ({ propertyName, propertySchema, required, oldPropertyName }) => {
   try {
@@ -780,26 +809,37 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
       <!-- Left Panel: Form or JSON Editor -->
       <div class="editor-panel">
         <!-- Model Basic Info -->
-        <el-card class="model-info-card">
-          <template #header>
+        <el-card class="model-info-card" :class="{ 'edit-mode': isEditMode }">
+          <template #header v-if="!isEditMode">
             <span>Model Information</span>
           </template>
           
-          <!-- Edit Mode: Static display similar to ModelSpecViewer -->
+          <!-- Edit Mode: Static display exactly like ModelSpecViewer -->
           <div v-if="isEditMode" class="model-info-static">
-
-            <div class="model-info-item">
-              <label>Display Name</label>
-              <div class="info-value">{{ modelData.display_name }}</div>
+            <div class="model-header">
+              <span class="model-name">{{ modelData.display_name || modelData.name }}</span>
+              <el-tag type="info" size="small" effect="plain">
+                {{ Object.keys(modelData.latest_version?.schema?.properties || {}).length }} properties
+              </el-tag>
             </div>
-            <div class="model-info-item">
-              <label>Model Identifier</label>
-              <div class="info-value">{{ modelData.name }}</div>
-            </div>
-            <div class="model-info-item">
-              <label>Description</label>
-              <div class="info-value">{{ modelData.description || 'No description provided' }}</div>
-            </div>
+            
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="Name">
+                {{ modelData.name }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Display Name">
+                {{ modelData.display_name }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Description">
+                {{ modelData.description || 'No description' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Created">
+                {{ formatDate(modelData.created_at) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Version">
+                v{{ modelData.latest_version?.version || 1 }}
+              </el-descriptions-item>
+            </el-descriptions>
           </div>
           
           <!-- Create Mode: Editable form -->
@@ -956,7 +996,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
               </div>
             </div>
           </template>
-          <ModelSpecViewer :model="sharedJsonData" :view-mode="previewViewMode" :hide-selector="true" :minimal="true" />
+          <ModelSpecViewer :model="previewModel" :view-mode="previewViewMode" :hide-selector="true" :minimal="true" />
         </el-card>
       </div>
     </div>
@@ -1087,6 +1127,19 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
       border-left: 2px solid theme.$purple_2;
       border-radius: 0;
       
+      // Edit mode: remove header and left border
+      &.edit-mode {
+        border-left: none;
+        
+        :deep(.el-card__header) {
+          display: none;
+        }
+        
+        :deep(.el-card__body) {
+          padding: 0;
+        }
+      }
+      
       :deep(.el-card__header) {
         background-color: theme.$gray_1;
         border-bottom: 1px solid theme.$gray_2;
@@ -1103,6 +1156,19 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
       }
       
       .model-info-static {
+        .model-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-left: 8px;
+          
+          .model-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: theme.$gray_6;
+          }
+        }
+        
         .model-info-item {
           margin-bottom: 16px;
           
@@ -1128,12 +1194,22 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
           }
         }
       }
+      
+      // Style the descriptions component to match ModelSpecViewer
+      :deep(.el-descriptions) {
+        .el-descriptions__label {
+          font-weight: 500;
+          width: 120px;
+        }
+      }
     }
     
     .guided-mode,
     .json-mode {
       flex: 1;
       min-height: 400px;
+      display: flex;
+      flex-direction: column;
       
       .el-card {
         height: 100%;
@@ -1141,11 +1217,14 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
         box-shadow: none;
         border-left: 2px solid theme.$purple_2;
         border-radius: 0;
+        display: flex;
+        flex-direction: column;
         
         :deep(.el-card__header) {
           background-color: theme.$gray_1;
           border-bottom: 1px solid theme.$gray_2;
           padding: 16px 20px;
+          flex-shrink: 0;
           
           .properties-header {
             display: flex;
@@ -1173,9 +1252,27 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
         }
         
         :deep(.el-card__body) {
-          height: calc(100% - 60px);
-          overflow-y: auto;
+          flex: 1;
+          overflow: hidden;
           padding: 20px;
+          display: flex;
+          flex-direction: column;
+        }
+      }
+      
+      .json-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        
+        :deep(.el-textarea) {
+          height: 100%;
+          
+          .el-textarea__inner {
+            height: 100% !important;
+            resize: none;
+            min-height: 300px;
+          }
         }
       }
     }

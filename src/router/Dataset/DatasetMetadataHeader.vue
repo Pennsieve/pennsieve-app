@@ -72,12 +72,12 @@ export default {
           name: "Models"
         },
         {
-          to: 'graph',
-          name: 'Schema',
-        },
-        {
           to: 'records',
           name: 'Records',
+        },
+        {
+          to: 'graph',
+          name: 'Explorer',
         },
 
       ]

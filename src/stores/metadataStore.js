@@ -141,16 +141,26 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch all available templates
-    const fetchTemplates = async () => {
+    const fetchTemplates = async (organizationId = null) => {
         try {
             const endpoint = `${site.api2Url}/metadata/templates`
             const token = await useGetToken()
+
+            // Add organization_id query parameter if provided
+            const queryParams = {}
+            if (organizationId) {
+                queryParams.organization_id = organizationId
+            }
+
+            const url = Object.keys(queryParams).length > 0 
+                ? `${endpoint}?${toQueryParams(queryParams)}` 
+                : endpoint
 
             const myHeaders = new Headers();
             myHeaders.append('Authorization', 'Bearer ' + token)
             myHeaders.append('Accept', 'application/json')
 
-            const resp = await fetch(endpoint, {
+            const resp = await fetch(url, {
                 method: 'GET',
                 headers: myHeaders
             })
@@ -283,6 +293,176 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Update model metadata (display_name, description) without creating new version
+    const updateModelMetadata = async (datasetId, modelId, metadata) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}`
+            const token = await useGetToken()
+
+            const queryParams = toQueryParams({
+                dataset_id: datasetId
+            })
+
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers();
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Content-Type', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'PATCH',
+                headers: myHeaders,
+                body: JSON.stringify(metadata)
+            })
+
+            if (!resp.ok) {
+                const errorText = await resp.text()
+                throw new Error(`Failed to update model metadata: ${resp.status} - ${errorText}`)
+            }
+
+            const response = await resp.json()
+
+            // Reload models to reflect the updated metadata
+            await fetchModels(datasetId)
+
+            return response
+        } catch (error) {
+            console.error('Failed to update model metadata:', error)
+            throw error
+        }
+    }
+
+    // Create a model from a template
+    const createModelFromTemplate = async (datasetId, templateId, modelData, templateVersion = null) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/templates/${templateId}/models`
+            const token = await useGetToken()
+
+            const queryParams = {
+                dataset_id: datasetId
+            }
+            
+            // Add version to query params if specified
+            if (templateVersion) {
+                queryParams.version = templateVersion
+            }
+
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                name: modelData.name,
+                display_name: modelData.display_name || modelData.name,
+                description: modelData.description || ''
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                const createdModel = await resp.json()
+                // Refresh models list after successful creation
+                await fetchModels(datasetId)
+                return createdModel
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to create model from template: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error creating model from template:', error)
+            throw error
+        }
+    }
+
+    // Create multiple models from templates
+    const createModelsFromTemplates = async (datasetId, templatesArray) => {
+        const results = {
+            successful: [],
+            failed: [],
+            total: templatesArray.length
+        }
+
+        // Process templates one by one
+        for (const templateData of templatesArray) {
+            try {
+                const modelData = {
+                    name: templateData.name || templateData.template.name,
+                    display_name: templateData.display_name || templateData.template.display_name || templateData.template.name,
+                    description: templateData.description || templateData.template.description || ''
+                }
+
+                const createdModel = await createModelFromTemplate(
+                    datasetId, 
+                    templateData.template.id,
+                    modelData,
+                    templateData.version || templateData.template.latest_version?.version
+                )
+                
+                results.successful.push({
+                    model: createdModel,
+                    source: templateData
+                })
+            } catch (error) {
+                results.failed.push({
+                    source: templateData,
+                    error: error.message
+                })
+            }
+        }
+
+        return results
+    }
+
+    // Create a template from a model
+    const createTemplateFromModel = async (templateData, organizationId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/template`
+            const token = await useGetToken()
+
+            const queryParams = toQueryParams({
+                organization_id: organizationId
+            })
+
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                name: templateData.name,
+                display_name: templateData.display_name,
+                description: templateData.description,
+                schema: templateData.schema
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                const createdTemplate = await resp.json()
+                return createdTemplate
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to create template: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error creating template from model:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -300,7 +480,11 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchTemplates,
         createModel,
         createModels,
-        updateVersion
+        createModelFromTemplate,
+        createModelsFromTemplates,
+        createTemplateFromModel,
+        updateVersion,
+        updateModelMetadata
     }
 
 })
