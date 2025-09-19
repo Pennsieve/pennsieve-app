@@ -13,79 +13,150 @@
 
     <dialog-body>
       <div v-show="shouldShow(1)">
-        <el-select
-          class="margin"
-          v-model="computeNodeValue"
-          placeholder="Select Compute Node"
-          @change="setSelectedComputeNode(computeNodeValue)"
-        >
-          <el-option
-            v-for="(item, i) in computeNodeOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-input
-          class="margin"
-          v-model="targetDirectory"
-          placeholder="Target Directory (optional)"
-        />
-        <el-input
-          class="margin"
-          v-model="name"
-          placeholder="Workflow Run Name (optional)"
-        />
-      </div>
-      <div v-show="shouldShow(2)">
-        <el-select
-          class="margin"
-          v-model="preprocessorValue"
-          placeholder="Select Preprocessor"
-          @change="setSelectedPreprocessor(preprocessorValue)"
-        >
-          <el-option
-            v-for="(item, i) in preprocessorOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-select
-          class="margin"
-          v-model="processorValue"
-          placeholder="Select Processor"
-          @change="setSelectedProcessor(processorValue)"
-        >
-          <el-option
-            v-for="(item, i) in processorOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-        <el-select
-          class="margin"
-          v-model="postprocessorValue"
-          placeholder="Select Postprocessor"
-          @change="setSelectedPostprocessor(postprocessorValue)"
-        >
-          <el-option
-            v-for="(item, i) in postprocessorOptions"
-            :key="i"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-      </div>
-      <div v-show="shouldShow(3)">
-        <div v-if="!selectedProcessorHasParams()">
-          The selected Processor has no parameter values.
+        <div class="form-section">
+          <label class="field-label" for="compute-node-select"
+            >Compute Node *</label
+          >
+          <el-select
+            id="compute-node-select"
+            class="margin"
+            v-model="computeNodeValue"
+            placeholder="Select Compute Node"
+            @change="setSelectedComputeNode(computeNodeValue)"
+          >
+            <el-option
+              v-for="(item, i) in computeNodeOptions"
+              :key="i"
+              :label="item.label"
+              :value="item.value"
+            ></el-option>
+          </el-select>
         </div>
-        <el-form v-if="selectedProcessorHasParams()">
+
+        <div class="form-section">
+          <label class="field-label" for="target-directory"
+            >Target Directory</label
+          >
+          <el-input
+            id="target-directory"
+            class="margin"
+            v-model="targetDirectory"
+            placeholder="Target Directory (optional)"
+          />
+        </div>
+
+        <div class="form-section">
+          <label class="field-label" for="workflow-name"
+            >Workflow Run Name</label
+          >
+          <el-input
+            id="workflow-name"
+            class="margin"
+            v-model="name"
+            placeholder="Workflow Run Name (optional)"
+          />
+        </div>
+      </div>
+
+      <div v-show="shouldShow(2)">
+        <div class="form-section">
+          <label class="field-label" for="workflow-select">Workflow *</label>
+          <el-select
+            id="workflow-select"
+            class="margin"
+            v-model="workflowValue"
+            placeholder="Select Workflow"
+            @change="setSelectedWorkflow(workflowValue)"
+          >
+            <el-option
+              v-for="(item, i) in workflows"
+              :key="i"
+              :label="item.label"
+              :value="item.name"
+            ></el-option>
+          </el-select>
+        </div>
+
+        <!-- Workflow Details Section -->
+        <div
+          v-if="selectedWorkflow && selectedWorkflow.name"
+          class="workflow-details"
+        >
+          <h3 class="details-title">Workflow Details</h3>
+          <div class="details-content">
+            <div class="detail-item">
+              <strong>Name:</strong> {{ selectedWorkflow.name }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.description">
+              <strong>Description:</strong> {{ selectedWorkflow.description }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.version">
+              <strong>Version:</strong> {{ selectedWorkflow.version }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.computeNode">
+              <strong>Compute Node:</strong>
+              {{ selectedWorkflow.computeNode.name }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.author">
+              <strong>Author:</strong> {{ selectedWorkflow.author }}
+            </div>
+            <div class="detail-item" v-if="selectedWorkflow.createdAt">
+              <strong>Created:</strong>
+              {{ formatDate(selectedWorkflow.createdAt) }}
+            </div>
+            <div
+              class="detail-item"
+              v-if="
+                selectedWorkflow.processors &&
+                selectedWorkflow.processors.length
+              "
+            >
+              <strong>Processors:</strong>
+              <div class="processors-list">
+                <span
+                  class="processor"
+                  v-for="processor in selectedWorkflow.processors"
+                  :key="processor.name || processor.sourceUrl || processor"
+                >
+                  <a
+                    v-if="isProcessorUrl(processor)"
+                    :href="getProcessorUrl(processor)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="processor-link"
+                  >
+                    {{ getProcessorDisplay(processor) }}
+                  </a>
+                  <span v-else class="processor-text">
+                    {{ getProcessorDisplay(processor) }}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div
+              class="detail-item"
+              v-if="selectedWorkflow.tags && selectedWorkflow.tags.length"
+            >
+              <strong>Tags:</strong>
+              <span
+                class="tag"
+                v-for="tag in selectedWorkflow.tags"
+                :key="tag"
+                >{{ tag }}</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="shouldShow(3)">
+        <div v-if="!selectedWorkflowHasParams()">
+          The selected Workflow has no parameter values.
+        </div>
+        <el-form v-if="selectedWorkflowHasParams()">
           <el-form-item prop="parameters" id="paramsInput">
             <el-table
-              :data="selectedProcessorParams"
+              :data="selectedWorkflowParams"
               max-height="250"
               :border="true"
             >
@@ -106,6 +177,7 @@
           </el-form-item>
         </el-form>
       </div>
+
       <div v-show="shouldShow(4)">
         <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
@@ -187,15 +259,9 @@ export default {
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
-      preprocessorOptions: [],
-      preprocessorValue: "",
-      selectedPreprocessor: {},
-      processorOptions: [],
-      processorValue: "",
-      selectedProcessor: {},
-      postprocessorOptions: [],
-      postprocessorValue: "",
-      selectedPostprocessor: {},
+      workflowOptions: [],
+      workflowValue: "",
+      selectedWorkflow: {},
       filesLoading: false,
       file: {
         content: {
@@ -211,16 +277,13 @@ export default {
       name: "",
       clearSelectedValues: false,
       warningMessage: "",
-      selectedProcessorParams: [],
-      warningMessage: "",
+      selectedWorkflowParams: [],
     };
   },
   computed: {
     ...mapState("analysisModule", [
       "computeNodes",
-      "preprocessors",
-      "processors",
-      "postprocessors",
+      "workflows",
       "selectedFilesForAnalysis",
       "fileCount",
     ]),
@@ -256,18 +319,22 @@ export default {
     computeNodes: function () {
       this.formatComputeNodeOptions();
     },
-    selectedComputeNode: function () {
-      this.formatPreprocessorOptions();
-      this.formatProcessorOptions();
-      this.formatPostprocessorOptions();
+    workflows: function () {
+      this.formatWorkflowOptions();
     },
-    selectedProcessor: function () {
-      this.selectedProcessorParams = [];
-      if (this.selectedProcessor && this.selectedProcessor.params) {
+    selectedComputeNode: function () {
+      this.formatWorkflowOptions();
+      // Clear workflow selection when compute node changes
+      this.workflowValue = "";
+      this.selectedWorkflow = {};
+    },
+    selectedWorkflow: function () {
+      this.selectedWorkflowParams = [];
+      if (this.selectedWorkflow && this.selectedWorkflow.params) {
         for (const [key, value] of Object.entries(
-          this.selectedProcessor.params
+          this.selectedWorkflow.params
         )) {
-          this.selectedProcessorParams.push({ name: key, value: value });
+          this.selectedWorkflowParams.push({ name: key, value: value });
         }
       }
     },
@@ -276,7 +343,7 @@ export default {
   mounted() {
     this.fetchFiles();
     this.fetchComputeNodes();
-    this.fetchApplications();
+    this.fetchWorkflows();
   },
 
   methods: {
@@ -284,11 +351,63 @@ export default {
       "setSelectedFiles",
       "clearSelectedFiles",
       "fetchComputeNodes",
-      "fetchApplications",
+      "fetchWorkflows",
       "updateFileCount",
     ]),
     handleClearSelectedValues: function () {
       this.clearSelectedValues = !this.clearSelected;
+    },
+    /**
+     * Format date for display
+     * @param {String} dateString
+     * @returns {String}
+     */
+    formatDate: function (dateString) {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+    },
+    /**
+     * Get processor display text (name or sourceUrl)
+     * @param {Object|String} processor
+     * @returns {String}
+     */
+    getProcessorDisplay: function (processor) {
+      if (typeof processor === "string") {
+        return processor;
+      }
+
+      if (processor && typeof processor === "object") {
+        // Prefer name if available, otherwise use sourceUrl, fallback to string representation
+        return processor.name || processor.sourceUrl || processor.toString();
+      }
+
+      return processor;
+    },
+    /**
+     * Check if processor has a URL that should be linkable
+     * @param {Object|String} processor
+     * @returns {Boolean}
+     */
+    isProcessorUrl: function (processor) {
+      const url = this.getProcessorUrl(processor);
+      return url && (url.startsWith("http://") || url.startsWith("https://"));
+    },
+    /**
+     * Get the URL from processor (either sourceUrl property or if it's a URL string)
+     * @param {Object|String} processor
+     * @returns {String}
+     */
+    getProcessorUrl: function (processor) {
+      if (typeof processor === "string") {
+        return processor.startsWith("http") ? processor : null;
+      }
+
+      if (processor && typeof processor === "object") {
+        return processor.sourceUrl || null;
+      }
+
+      return null;
     },
     /**
      * Get files URL for dataset
@@ -372,12 +491,8 @@ export default {
       this.processStep = 1;
       this.computeNodeValue = "";
       this.selectedComputeNode = {};
-      this.preprocessorValue = "";
-      this.selectedPreprocessor = {};
-      this.processorValue = "";
-      this.selectedProcessor = {};
-      this.postprocessorValue = "";
-      this.selectedPostprocessor = {};
+      this.workflowValue = "";
+      this.selectedWorkflow = {};
       this.clearSelectedFiles();
       this.updateFileCount();
       this.targetDirectory = "";
@@ -393,7 +508,7 @@ export default {
         isValid = this.validateNode();
       }
       if (this.processStep === 2 && step === 1) {
-        isValid = this.validateProcessors();
+        isValid = this.validateWorkflow();
       }
       if (isValid) {
         this.processStep += step;
@@ -417,23 +532,19 @@ export default {
       }
     },
     /**
-     * validate to make sure all processors have been assigned
+     * validate to make sure workflow has been selected
      */
-    validateProcessors: function () {
-      if (
-        this.preprocessorValue &&
-        this.processorValue &&
-        this.postprocessorValue
-      ) {
+    validateWorkflow: function () {
+      if (this.workflowValue) {
         this.warningMessage = "";
         return true;
       } else {
-        this.warningMessage = "please select a value for all processors";
+        this.warningMessage = "please select a workflow";
         return false;
       }
     },
-    selectedProcessorHasParams: function () {
-      if (this.selectedProcessorParams.length > 0) {
+    selectedWorkflowHasParams: function () {
+      if (this.selectedWorkflowParams.length > 0) {
         return true;
       } else {
         return false;
@@ -458,26 +569,15 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      const formatApplication = (application, parameters) => {
-        let paramsObject = {};
-        if (parameters != null) {
-          let paramsEntries = [];
-          parameters.forEach((param) => {
-            paramsEntries.push([param.name, param.value]);
-          });
-          paramsObject = Object.fromEntries(paramsEntries);
-        }
-        return {
-          name: application.name || "",
-          description: application.description || "",
-          uuid: application.uuid || "",
-          applicationId: application.applicationId || "",
-          applicationContainerName: application.applicationContainerName || "",
-          applicationType: application.applicationType || "",
-          params: paramsObject,
-          commandArguments: application.commandArguments || [],
-        };
-      };
+      // Format workflow parameters
+      let paramsObject = {};
+      if (this.selectedWorkflowParams.length > 0) {
+        let paramsEntries = [];
+        this.selectedWorkflowParams.forEach((param) => {
+          paramsEntries.push([param.name, param.value]);
+        });
+        paramsObject = Object.fromEntries(paramsEntries);
+      }
 
       const body = {
         datasetId: this.datasetId,
@@ -487,14 +587,7 @@ export default {
           computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
         },
         name: this.name,
-        workflow: [
-          formatApplication(this.selectedPreprocessor, null),
-          formatApplication(
-            this.selectedProcessor,
-            this.selectedProcessorParams
-          ),
-          formatApplication(this.selectedPostprocessor, null),
-        ],
+        workflowUuid: this.selectedWorkflow.uuid,
         params: {
           target_path: this.targetDirectory,
         },
@@ -533,14 +626,13 @@ export default {
       } finally {
         this.closeDialog();
         this.targetDirectory = "";
-        this.selectedApplication = {}; // Note: this was "selectedApplication" not "selectedWorkflow"
-        this.value = ""; // Note: this was "value" not "workflowValue"
+        this.selectedWorkflow = {};
+        this.workflowValue = "";
       }
     },
     /**
      * Determines if tab content is active
      * @param {number} key
-     * @param {String} type
      * @returns {Boolean}
      */
     shouldShow: function (key) {
@@ -561,52 +653,30 @@ export default {
       });
     },
     /**
-     * Access processors from global state and format options for input select
+     * Access workflows from global state and format options for input select
      */
-    formatProcessorOptions: function () {
-      const filteredProcessors = this.processors.filter(
-        (processor) =>
-          this.selectedComputeNode.uuid === processor.computeNode.uuid
-      );
+    formatWorkflowOptions: function () {
+      if (!this.workflows) {
+        return;
+      }
 
-      this.processorOptions = filteredProcessors.map((processor) => {
+      let filteredWorkflows = this.workflows;
+
+      // Filter workflows by selected compute node if one is selected
+      if (this.selectedComputeNode.uuid) {
+        filteredWorkflows = this.workflows.filter(
+          (workflow) =>
+            workflow.computeNode &&
+            this.selectedComputeNode.uuid === workflow.computeNode.uuid
+        );
+      }
+
+      this.workflowOptions = filteredWorkflows.map((workflow) => {
         return {
-          value: processor.name,
-          label: processor.name,
+          value: workflow.name,
+          label: workflow.name,
         };
       });
-    },
-    /**
-     * Access preprocessors from global state and format options for input select
-     */
-    formatPreprocessorOptions: function () {
-      const filteredPreprocessors = this.preprocessors.filter(
-        (preprocessor) =>
-          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
-      );
-      this.preprocessorOptions = filteredPreprocessors.map((preprocessor) => {
-        return {
-          value: preprocessor.name,
-          label: preprocessor.name,
-        };
-      });
-    },
-    /**
-     * Access postprocessors from global state and format options for input select
-     */
-    formatPostprocessorOptions: function () {
-      const filteredPostprocessors = this.postprocessors.filter(
-        (postprocessor) =>
-          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
-      );
-      this.postprocessorOptions = filteredPostprocessors.map(
-        (postprocessor) => {
-          return {
-            value: postprocessor.name,
-            label: postprocessor.name,
-          };
-        }
-      );
     },
     /**
      * Set Selected Compute Node
@@ -617,33 +687,11 @@ export default {
       );
     },
     /**
-     * Set Selected Preprocessor
+     * Set Selected Workflow
      */
-    setSelectedPreprocessor: function (value) {
-      this.selectedPreprocessor = this.preprocessors.find(
-        (preprocessor) =>
-          preprocessor.name === value &&
-          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
-      );
-    },
-    /**
-     * Set Selected Processor
-     */
-    setSelectedProcessor: function (value) {
-      this.selectedProcessor = this.processors.find(
-        (processor) =>
-          processor.name === value &&
-          this.selectedComputeNode.uuid === processor.computeNode.uuid
-      );
-    },
-    /**
-     * Set Selected Postprocessor
-     */
-    setSelectedPostprocessor: function (value) {
-      this.selectedPostprocessor = this.postprocessors.find(
-        (postprocessor) =>
-          postprocessor.name === value &&
-          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+    setSelectedWorkflow: function (value) {
+      this.selectedWorkflow = this.workflows.find(
+        (workflow) => workflow.name === value
       );
     },
     /**
@@ -702,6 +750,103 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../../styles/theme";
+
+.form-section {
+  margin-bottom: 20px;
+
+  .field-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: theme.$gray_4;
+    font-size: 14px;
+  }
+}
+
+.workflow-details {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+
+  .details-title {
+    margin: 0 0 15px 0;
+    color: theme.$gray_5;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .details-content {
+    .detail-item {
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+
+      strong {
+        color: theme.$gray_5;
+        margin-right: 8px;
+      }
+
+      .tag {
+        display: inline-block;
+        background-color: theme.$purple_1;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        margin-right: 5px;
+        margin-left: 5px;
+      }
+
+      .processors-list {
+        margin-top: 5px;
+
+        .processor {
+          display: inline-block;
+          margin-right: 8px;
+          margin-bottom: 4px;
+        }
+
+        .processor-link {
+          display: inline-block;
+          background-color: #1a365d !important;
+          color: white !important;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          text-decoration: none !important;
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background-color: #2c5282 !important;
+            text-decoration: none !important;
+            color: white !important;
+          }
+
+          &:visited {
+            color: white !important;
+          }
+        }
+
+        .processor-text {
+          display: inline-block;
+          background-color: theme.$purple_2;
+          color: white;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .detail-item:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
 
 .table-container {
   overflow-y: scroll;

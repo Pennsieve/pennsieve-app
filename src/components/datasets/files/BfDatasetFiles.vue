@@ -25,10 +25,10 @@
               <template #prefix>
                 <IconAnalysis class="mr-8" :height="20" :width="20" />
               </template>
-              Run Analysis (Workflow)
+              Run Analysis
             </bf-button>
 
-            <bf-button
+            <!-- <bf-button
               :disabled="!isFeatureFlagEnabled"
               @click="openOldRunAnalysisDialog"
               class="mr-8 flex"
@@ -37,7 +37,7 @@
                 <IconAnalysis class="mr-8" :height="20" :width="20" />
               </template>
               Run Analysis (Choose Processors)
-            </bf-button>
+            </bf-button> -->
 
             <bf-button
               v-if="getPermission('editor')"

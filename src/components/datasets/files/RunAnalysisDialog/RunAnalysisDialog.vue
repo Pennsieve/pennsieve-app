@@ -12,6 +12,7 @@
     </template>
 
     <dialog-body>
+      <!-- Step 1: Compute Node and Basic Settings -->
       <div v-show="shouldShow(1)">
         <div class="form-section">
           <label class="field-label" for="compute-node-select"
@@ -58,8 +59,21 @@
         </div>
       </div>
 
+      <!-- Step 2: Choose Workflow Type -->
       <div v-show="shouldShow(2)">
         <div class="form-section">
+          <label class="field-label">Workflow Type *</label>
+          <el-radio-group
+            v-model="workflowType"
+            class="workflow-type-selection"
+          >
+            <el-radio label="named">Select Workflow</el-radio>
+            <el-radio label="custom">Processor Selection (Legacy)</el-radio>
+          </el-radio-group>
+        </div>
+
+        <!-- Named Workflow Selection -->
+        <div v-if="workflowType === 'named'" class="form-section">
           <label class="field-label" for="workflow-select">Workflow *</label>
           <el-select
             id="workflow-select"
@@ -75,109 +89,205 @@
               :value="item.name"
             ></el-option>
           </el-select>
-        </div>
 
-        <!-- Workflow Details Section -->
-        <div
-          v-if="selectedWorkflow && selectedWorkflow.name"
-          class="workflow-details"
-        >
-          <h3 class="details-title">Workflow Details</h3>
-          <div class="details-content">
-            <div class="detail-item">
-              <strong>Name:</strong> {{ selectedWorkflow.name }}
-            </div>
-            <div class="detail-item" v-if="selectedWorkflow.description">
-              <strong>Description:</strong> {{ selectedWorkflow.description }}
-            </div>
-            <div class="detail-item" v-if="selectedWorkflow.version">
-              <strong>Version:</strong> {{ selectedWorkflow.version }}
-            </div>
-            <div class="detail-item" v-if="selectedWorkflow.computeNode">
-              <strong>Compute Node:</strong>
-              {{ selectedWorkflow.computeNode.name }}
-            </div>
-            <div class="detail-item" v-if="selectedWorkflow.author">
-              <strong>Author:</strong> {{ selectedWorkflow.author }}
-            </div>
-            <div class="detail-item" v-if="selectedWorkflow.createdAt">
-              <strong>Created:</strong>
-              {{ formatDate(selectedWorkflow.createdAt) }}
-            </div>
-            <div
-              class="detail-item"
-              v-if="
-                selectedWorkflow.processors &&
-                selectedWorkflow.processors.length
-              "
-            >
-              <strong>Processors:</strong>
-              <div class="processors-list">
-                <span
-                  class="processor"
-                  v-for="processor in selectedWorkflow.processors"
-                  :key="processor.name || processor.sourceUrl || processor"
-                >
-                  <a
-                    v-if="isProcessorUrl(processor)"
-                    :href="getProcessorUrl(processor)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="processor-link"
+          <!-- Workflow Details Section -->
+          <div
+            v-if="selectedWorkflow && selectedWorkflow.name"
+            class="workflow-details"
+          >
+            <h3 class="details-title">Workflow Details</h3>
+            <div class="details-content">
+              <div class="detail-item">
+                <strong>Name:</strong> {{ selectedWorkflow.name }}
+              </div>
+              <div class="detail-item" v-if="selectedWorkflow.description">
+                <strong>Description:</strong> {{ selectedWorkflow.description }}
+              </div>
+              <div class="detail-item" v-if="selectedWorkflow.version">
+                <strong>Version:</strong> {{ selectedWorkflow.version }}
+              </div>
+              <div class="detail-item" v-if="selectedWorkflow.computeNode">
+                <strong>Compute Node:</strong>
+                {{ selectedWorkflow.computeNode.name }}
+              </div>
+              <div class="detail-item" v-if="selectedWorkflow.author">
+                <strong>Author:</strong> {{ selectedWorkflow.author }}
+              </div>
+              <div class="detail-item" v-if="selectedWorkflow.createdAt">
+                <strong>Created:</strong>
+                {{ formatDate(selectedWorkflow.createdAt) }}
+              </div>
+              <div
+                class="detail-item"
+                v-if="
+                  selectedWorkflow.processors &&
+                  selectedWorkflow.processors.length
+                "
+              >
+                <strong>Processors:</strong>
+                <div class="processors-list">
+                  <span
+                    class="processor"
+                    v-for="processor in selectedWorkflow.processors"
+                    :key="processor.name || processor.sourceUrl || processor"
                   >
-                    {{ getProcessorDisplay(processor) }}
-                  </a>
-                  <span v-else class="processor-text">
-                    {{ getProcessorDisplay(processor) }}
+                    <a
+                      v-if="isProcessorUrl(processor)"
+                      :href="getProcessorUrl(processor)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="processor-link"
+                    >
+                      {{ getProcessorDisplay(processor) }}
+                    </a>
+                    <span v-else class="processor-text">
+                      {{ getProcessorDisplay(processor) }}
+                    </span>
                   </span>
-                </span>
+                </div>
+              </div>
+              <div
+                class="detail-item"
+                v-if="selectedWorkflow.tags && selectedWorkflow.tags.length"
+              >
+                <strong>Tags:</strong>
+                <span
+                  class="tag"
+                  v-for="tag in selectedWorkflow.tags"
+                  :key="tag"
+                  >{{ tag }}</span
+                >
               </div>
             </div>
-            <div
-              class="detail-item"
-              v-if="selectedWorkflow.tags && selectedWorkflow.tags.length"
+          </div>
+        </div>
+
+        <!-- Custom Workflow Selection -->
+        <div v-if="workflowType === 'custom'" class="custom-workflow-section">
+          <div class="form-section">
+            <label class="field-label" for="preprocessor-select"
+              >Preprocessor *</label
             >
-              <strong>Tags:</strong>
-              <span
-                class="tag"
-                v-for="tag in selectedWorkflow.tags"
-                :key="tag"
-                >{{ tag }}</span
-              >
-            </div>
+            <el-select
+              id="preprocessor-select"
+              class="margin"
+              v-model="preprocessorValue"
+              placeholder="Select Preprocessor"
+              @change="setSelectedPreprocessor(preprocessorValue)"
+            >
+              <el-option
+                v-for="(item, i) in preprocessorOptions"
+                :key="i"
+                :label="item.label"
+                :value="item.value"
+              ></el-option>
+            </el-select>
+          </div>
+
+          <div class="form-section">
+            <label class="field-label" for="processor-select"
+              >Processor *</label
+            >
+            <el-select
+              id="processor-select"
+              class="margin"
+              v-model="processorValue"
+              placeholder="Select Processor"
+              @change="setSelectedProcessor(processorValue)"
+            >
+              <el-option
+                v-for="(item, i) in processorOptions"
+                :key="i"
+                :label="item.label"
+                :value="item.value"
+              ></el-option>
+            </el-select>
+          </div>
+
+          <div class="form-section">
+            <label class="field-label" for="postprocessor-select"
+              >Postprocessor *</label
+            >
+            <el-select
+              id="postprocessor-select"
+              class="margin"
+              v-model="postprocessorValue"
+              placeholder="Select Postprocessor"
+              @change="setSelectedPostprocessor(postprocessorValue)"
+            >
+              <el-option
+                v-for="(item, i) in postprocessorOptions"
+                :key="i"
+                :label="item.label"
+                :value="item.value"
+              ></el-option>
+            </el-select>
           </div>
         </div>
       </div>
 
+      <!-- Step 3: Parameters -->
       <div v-show="shouldShow(3)">
-        <div v-if="!selectedWorkflowHasParams()">
-          The selected Workflow has no parameter values.
+        <div v-if="workflowType === 'named'">
+          <div v-if="!selectedWorkflowHasParams()">
+            The selected Workflow has no parameter values.
+          </div>
+          <el-form v-if="selectedWorkflowHasParams()">
+            <el-form-item prop="parameters" id="paramsInput">
+              <el-table
+                :data="selectedWorkflowParams"
+                max-height="250"
+                :border="true"
+              >
+                <el-table-column label="Name">
+                  <template #default="scope">
+                    <el-input v-model="scope.row.name" disabled></el-input>
+                  </template>
+                </el-table-column>
+                <el-table-column label="Value">
+                  <template #default="scope">
+                    <el-input
+                      v-model="scope.row.value"
+                      placeholder="Enter value"
+                    ></el-input>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-form-item>
+          </el-form>
         </div>
-        <el-form v-if="selectedWorkflowHasParams()">
-          <el-form-item prop="parameters" id="paramsInput">
-            <el-table
-              :data="selectedWorkflowParams"
-              max-height="250"
-              :border="true"
-            >
-              <el-table-column label="Name">
-                <template #default="scope">
-                  <el-input v-model="scope.row.name" disabled></el-input>
-                </template>
-              </el-table-column>
-              <el-table-column label="Value">
-                <template #default="scope">
-                  <el-input
-                    v-model="scope.row.value"
-                    placeholder="Enter value"
-                  ></el-input>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-form-item>
-        </el-form>
+
+        <div v-if="workflowType === 'custom'">
+          <div v-if="!selectedProcessorHasParams()">
+            The selected Processor has no parameter values.
+          </div>
+          <el-form v-if="selectedProcessorHasParams()">
+            <el-form-item prop="parameters" id="paramsInput">
+              <el-table
+                :data="selectedProcessorParams"
+                max-height="250"
+                :border="true"
+              >
+                <el-table-column label="Name">
+                  <template #default="scope">
+                    <el-input v-model="scope.row.name" disabled></el-input>
+                  </template>
+                </el-table-column>
+                <el-table-column label="Value">
+                  <template #default="scope">
+                    <el-input
+                      v-model="scope.row.value"
+                      placeholder="Enter value"
+                    ></el-input>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-form-item>
+          </el-form>
+        </div>
       </div>
 
+      <!-- Step 4: File Selection -->
       <div v-show="shouldShow(4)">
         <div>Selected Files: {{ fileCount }}</div>
         <div slot="body" class="bf-upload-body">
@@ -231,7 +341,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
-  name: "RunAnalysisDialog",
+  name: "IntegratedAnalysisDialog",
 
   components: {
     BfDialogHeader,
@@ -256,12 +366,32 @@ export default {
     return {
       processStep: 1,
       lastProcessStep: 5,
+      workflowType: "named", // 'named' or 'custom'
+
+      // Compute Node
       computeNodeOptions: [],
       computeNodeValue: "",
       selectedComputeNode: {},
+
+      // Named Workflow
       workflowOptions: [],
       workflowValue: "",
       selectedWorkflow: {},
+      selectedWorkflowParams: [],
+
+      // Custom Workflow
+      preprocessorOptions: [],
+      preprocessorValue: "",
+      selectedPreprocessor: {},
+      processorOptions: [],
+      processorValue: "",
+      selectedProcessor: {},
+      postprocessorOptions: [],
+      postprocessorValue: "",
+      selectedPostprocessor: {},
+      selectedProcessorParams: [],
+
+      // File Management
       filesLoading: false,
       file: {
         content: {
@@ -273,17 +403,21 @@ export default {
       offset: 0,
       limit: 500,
       tableResultsTotalCount: 0,
+
+      // General
       targetDirectory: "",
       name: "",
       clearSelectedValues: false,
       warningMessage: "",
-      selectedWorkflowParams: [],
     };
   },
   computed: {
     ...mapState("analysisModule", [
       "computeNodes",
       "workflows",
+      "preprocessors",
+      "processors",
+      "postprocessors",
       "selectedFilesForAnalysis",
       "fileCount",
     ]),
@@ -303,10 +437,6 @@ export default {
         this.file
       );
     },
-    /**
-     * Computes create property CTA
-     * @returns {String}
-     */
     proceedText: function () {
       return this.processStep === 4 ? "Run Analysis" : "Next";
     },
@@ -324,9 +454,19 @@ export default {
     },
     selectedComputeNode: function () {
       this.formatWorkflowOptions();
-      // Clear workflow selection when compute node changes
+      this.formatPreprocessorOptions();
+      this.formatProcessorOptions();
+      this.formatPostprocessorOptions();
+
+      // Clear selections when compute node changes
       this.workflowValue = "";
       this.selectedWorkflow = {};
+      this.preprocessorValue = "";
+      this.selectedPreprocessor = {};
+      this.processorValue = "";
+      this.selectedProcessor = {};
+      this.postprocessorValue = "";
+      this.selectedPostprocessor = {};
     },
     selectedWorkflow: function () {
       this.selectedWorkflowParams = [];
@@ -338,12 +478,35 @@ export default {
         }
       }
     },
+    selectedProcessor: function () {
+      this.selectedProcessorParams = [];
+      if (this.selectedProcessor && this.selectedProcessor.params) {
+        for (const [key, value] of Object.entries(
+          this.selectedProcessor.params
+        )) {
+          this.selectedProcessorParams.push({ name: key, value: value });
+        }
+      }
+    },
+    workflowType: function () {
+      // Clear selections when workflow type changes
+      this.workflowValue = "";
+      this.selectedWorkflow = {};
+      this.preprocessorValue = "";
+      this.selectedPreprocessor = {};
+      this.processorValue = "";
+      this.selectedProcessor = {};
+      this.postprocessorValue = "";
+      this.selectedPostprocessor = {};
+      this.warningMessage = "";
+    },
   },
 
   mounted() {
     this.fetchFiles();
     this.fetchComputeNodes();
     this.fetchWorkflows();
+    this.fetchApplications();
   },
 
   methods: {
@@ -352,67 +515,45 @@ export default {
       "clearSelectedFiles",
       "fetchComputeNodes",
       "fetchWorkflows",
+      "fetchApplications",
       "updateFileCount",
     ]),
+
     handleClearSelectedValues: function () {
       this.clearSelectedValues = !this.clearSelected;
     },
-    /**
-     * Format date for display
-     * @param {String} dateString
-     * @returns {String}
-     */
+
     formatDate: function (dateString) {
       if (!dateString) return "";
       const date = new Date(dateString);
       return date.toLocaleDateString() + " " + date.toLocaleTimeString();
     },
-    /**
-     * Get processor display text (name or sourceUrl)
-     * @param {Object|String} processor
-     * @returns {String}
-     */
+
     getProcessorDisplay: function (processor) {
       if (typeof processor === "string") {
         return processor;
       }
-
       if (processor && typeof processor === "object") {
-        // Prefer name if available, otherwise use sourceUrl, fallback to string representation
         return processor.name || processor.sourceUrl || processor.toString();
       }
-
       return processor;
     },
-    /**
-     * Check if processor has a URL that should be linkable
-     * @param {Object|String} processor
-     * @returns {Boolean}
-     */
+
     isProcessorUrl: function (processor) {
       const url = this.getProcessorUrl(processor);
       return url && (url.startsWith("http://") || url.startsWith("https://"));
     },
-    /**
-     * Get the URL from processor (either sourceUrl property or if it's a URL string)
-     * @param {Object|String} processor
-     * @returns {String}
-     */
+
     getProcessorUrl: function (processor) {
       if (typeof processor === "string") {
         return processor.startsWith("http") ? processor : null;
       }
-
       if (processor && typeof processor === "object") {
         return processor.sourceUrl || null;
       }
-
       return null;
     },
-    /**
-     * Get files URL for dataset
-     * @returns {String}
-     */
+
     getFilesUrl: async function () {
       return useGetToken().then((token) => {
         const baseUrl = "datasets";
@@ -420,9 +561,7 @@ export default {
         return `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true&limit=${this.limit}&offset=${this.offset}`;
       });
     },
-    /**
-     * Send API request to get files for item
-     */
+
     fetchFiles: function () {
       this.getFilesUrl()
         .then((url) => {
@@ -434,10 +573,7 @@ export default {
           this.handleXhrError(response);
         });
     },
-    /**
-     * Handler for clicking file
-     * @param {Object} file
-     */
+
     onClickLabel: function (file) {
       if (file.content.packageType !== "Collection") {
         return;
@@ -452,7 +588,6 @@ export default {
             this.files = [...response.children];
 
             if (file.content.packageType === "Collection") {
-              // Prepare the new ancestor
               const newAncestor =
                 this.fileId && this.fileName
                   ? {
@@ -460,10 +595,8 @@ export default {
                     }
                   : null;
 
-              // Update file first
               this.file = file;
 
-              // Then update ancestor list if needed
               if (
                 newAncestor &&
                 !this.ancestorList.some((a) => a.content.id === this.fileId)
@@ -479,28 +612,34 @@ export default {
           this.handleXhrError(response);
         });
     },
+
     onFileSelect: function (selectedFiles, parentId) {
       this.setSelectedFiles({ selectedFiles, parentId });
       this.updateFileCount();
     },
-    /**
-     * Closes the dialog
-     */
+
     closeDialog: function () {
       this.$emit("close");
       this.processStep = 1;
+      this.workflowType = "named";
       this.computeNodeValue = "";
       this.selectedComputeNode = {};
       this.workflowValue = "";
       this.selectedWorkflow = {};
+      this.preprocessorValue = "";
+      this.selectedPreprocessor = {};
+      this.processorValue = "";
+      this.selectedProcessor = {};
+      this.postprocessorValue = "";
+      this.selectedPostprocessor = {};
       this.clearSelectedFiles();
       this.updateFileCount();
       this.targetDirectory = "";
+      this.name = "";
       this.handleClearSelectedValues();
+      this.warningMessage = "";
     },
-    /**
-     * Manages the Multi Step Functionality
-     */
+
     advanceStep: async function (step) {
       let isValid = true;
 
@@ -508,20 +647,22 @@ export default {
         isValid = this.validateNode();
       }
       if (this.processStep === 2 && step === 1) {
-        isValid = this.validateWorkflow();
+        isValid = this.validateWorkflowSelection();
       }
+
       if (isValid) {
         this.processStep += step;
       }
-      // When you click Cancel
+
       if (this.processStep === 0) {
         this.closeDialog();
       }
-      // When you click "Run Analysis"
+
       if (this.processStep > 4) {
         await this.runAnalysis();
       }
     },
+
     validateNode: function () {
       if (this.computeNodeValue) {
         this.warningMessage = "";
@@ -531,28 +672,40 @@ export default {
         return false;
       }
     },
-    /**
-     * validate to make sure workflow has been selected
-     */
-    validateWorkflow: function () {
-      if (this.workflowValue) {
-        this.warningMessage = "";
-        return true;
-      } else {
-        this.warningMessage = "please select a workflow";
-        return false;
+
+    validateWorkflowSelection: function () {
+      if (this.workflowType === "named") {
+        if (this.workflowValue) {
+          this.warningMessage = "";
+          return true;
+        } else {
+          this.warningMessage = "please select a workflow";
+          return false;
+        }
+      } else if (this.workflowType === "custom") {
+        if (
+          this.preprocessorValue &&
+          this.processorValue &&
+          this.postprocessorValue
+        ) {
+          this.warningMessage = "";
+          return true;
+        } else {
+          this.warningMessage = "please select all processors";
+          return false;
+        }
       }
+      return false;
     },
+
     selectedWorkflowHasParams: function () {
-      if (this.selectedWorkflowParams.length > 0) {
-        return true;
-      } else {
-        return false;
-      }
+      return this.selectedWorkflowParams.length > 0;
     },
-    /**
-     * Run Analysis Workflow on Selected Files
-     */
+
+    selectedProcessorHasParams: function () {
+      return this.selectedProcessorParams.length > 0;
+    },
+
     runAnalysis: async function () {
       const url = `${this.config.api2Url}/workflows/instances`;
 
@@ -565,33 +718,83 @@ export default {
         const ids = this.selectedFilesForAnalysis[key].map((file) => {
           return pathOr("", ["content", "id"], file);
         });
-
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
-      // Format workflow parameters
-      let paramsObject = {};
-      if (this.selectedWorkflowParams.length > 0) {
-        let paramsEntries = [];
-        this.selectedWorkflowParams.forEach((param) => {
-          paramsEntries.push([param.name, param.value]);
-        });
-        paramsObject = Object.fromEntries(paramsEntries);
-      }
+      let body;
 
-      const body = {
-        datasetId: this.datasetId,
-        packageIds: arrayOfPackageIds,
-        computeNode: {
-          uuid: this.selectedComputeNode.uuid,
-          computeNodeGatewayUrl: this.selectedComputeNode.computeNodeGatewayUrl,
-        },
-        name: this.name,
-        workflowUuid: this.selectedWorkflow.uuid,
-        params: {
-          target_path: this.targetDirectory,
-        },
-      };
+      if (this.workflowType === "named") {
+        // Named workflow API callƒ
+        let paramsObject = {};
+        if (this.selectedWorkflowParams.length > 0) {
+          let paramsEntries = [];
+          this.selectedWorkflowParams.forEach((param) => {
+            paramsEntries.push([param.name, param.value]);
+          });
+          paramsObject = Object.fromEntries(paramsEntries);
+        }
+
+        body = {
+          datasetId: this.datasetId,
+          packageIds: arrayOfPackageIds,
+          computeNode: {
+            uuid: this.selectedComputeNode.uuid,
+            computeNodeGatewayUrl:
+              this.selectedComputeNode.computeNodeGatewayUrl,
+          },
+          name: this.name,
+          workflowUuid: this.selectedWorkflow.uuid,
+          params: {
+            target_path: this.targetDirectory,
+            ...paramsObject,
+          },
+        };
+      } else {
+        // Custom workflow API call
+        const formatApplication = (application, parameters) => {
+          let paramsObject = {};
+          if (parameters != null) {
+            let paramsEntries = [];
+            parameters.forEach((param) => {
+              paramsEntries.push([param.name, param.value]);
+            });
+            paramsObject = Object.fromEntries(paramsEntries);
+          }
+          return {
+            name: application.name || "",
+            description: application.description || "",
+            uuid: application.uuid || "",
+            applicationId: application.applicationId || "",
+            applicationContainerName:
+              application.applicationContainerName || "",
+            applicationType: application.applicationType || "",
+            params: paramsObject,
+            commandArguments: application.commandArguments || [],
+          };
+        };
+
+        body = {
+          datasetId: this.datasetId,
+          packageIds: arrayOfPackageIds,
+          computeNode: {
+            uuid: this.selectedComputeNode.uuid,
+            computeNodeGatewayUrl:
+              this.selectedComputeNode.computeNodeGatewayUrl,
+          },
+          name: this.name,
+          workflow: [
+            formatApplication(this.selectedPreprocessor, null),
+            formatApplication(
+              this.selectedProcessor,
+              this.selectedProcessorParams
+            ),
+            formatApplication(this.selectedPostprocessor, null),
+          ],
+          params: {
+            target_path: this.targetDirectory,
+          },
+        };
+      }
 
       const token = await useGetToken();
 
@@ -599,13 +802,11 @@ export default {
         const response = await this.sendXhr(url, {
           method: "POST",
           headers: {
-            // Note: should be "headers", not "header"
             Authorization: `Bearer ${token}`,
           },
           body: body,
         });
 
-        // Check if the response indicates success
         if (response.ok || (response.status >= 200 && response.status < 300)) {
           EventBus.$emit("toast", {
             detail: {
@@ -626,22 +827,13 @@ export default {
         });
       } finally {
         this.closeDialog();
-        this.targetDirectory = "";
-        this.selectedWorkflow = {};
-        this.workflowValue = "";
       }
     },
-    /**
-     * Determines if tab content is active
-     * @param {number} key
-     * @returns {Boolean}
-     */
+
     shouldShow: function (key) {
       return this.processStep === key;
     },
-    /**
-     * Access integrations from global state and format options for input select
-     */
+
     formatComputeNodeOptions: function () {
       if (!this.computeNodes) {
         return;
@@ -653,9 +845,7 @@ export default {
         };
       });
     },
-    /**
-     * Access workflows from global state and format options for input select
-     */
+
     formatWorkflowOptions: function () {
       if (!this.workflows) {
         return;
@@ -663,7 +853,6 @@ export default {
 
       let filteredWorkflows = this.workflows;
 
-      // Filter workflows by selected compute node if one is selected
       if (this.selectedComputeNode.uuid) {
         filteredWorkflows = this.workflows.filter(
           (workflow) =>
@@ -679,33 +868,109 @@ export default {
         };
       });
     },
-    /**
-     * Set Selected Compute Node
-     */
+
+    formatProcessorOptions: function () {
+      if (!this.processors || !this.selectedComputeNode.uuid) {
+        this.processorOptions = [];
+        return;
+      }
+
+      const filteredProcessors = this.processors.filter(
+        (processor) =>
+          processor.computeNode &&
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
+      );
+
+      this.processorOptions = filteredProcessors.map((processor) => {
+        return {
+          value: processor.name,
+          label: processor.name,
+        };
+      });
+    },
+
+    formatPreprocessorOptions: function () {
+      if (!this.preprocessors || !this.selectedComputeNode.uuid) {
+        this.preprocessorOptions = [];
+        return;
+      }
+
+      const filteredPreprocessors = this.preprocessors.filter(
+        (preprocessor) =>
+          preprocessor.computeNode &&
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
+      );
+
+      this.preprocessorOptions = filteredPreprocessors.map((preprocessor) => {
+        return {
+          value: preprocessor.name,
+          label: preprocessor.name,
+        };
+      });
+    },
+
+    formatPostprocessorOptions: function () {
+      if (!this.postprocessors || !this.selectedComputeNode.uuid) {
+        this.postprocessorOptions = [];
+        return;
+      }
+
+      const filteredPostprocessors = this.postprocessors.filter(
+        (postprocessor) =>
+          postprocessor.computeNode &&
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+      );
+
+      this.postprocessorOptions = filteredPostprocessors.map(
+        (postprocessor) => {
+          return {
+            value: postprocessor.name,
+            label: postprocessor.name,
+          };
+        }
+      );
+    },
+
     setSelectedComputeNode: function (value) {
       this.selectedComputeNode = this.computeNodes.find(
         (computeNode) => computeNode.name === value
       );
     },
-    /**
-     * Set Selected Workflow
-     */
+
     setSelectedWorkflow: function (value) {
       this.selectedWorkflow = this.workflows.find(
         (workflow) => workflow.name === value
       );
     },
-    /**
-     * Navigate to file
-     * @param {String} id
-     */
+
+    setSelectedPreprocessor: function (value) {
+      this.selectedPreprocessor = this.preprocessors.find(
+        (preprocessor) =>
+          preprocessor.name === value &&
+          this.selectedComputeNode.uuid === preprocessor.computeNode.uuid
+      );
+    },
+
+    setSelectedProcessor: function (value) {
+      this.selectedProcessor = this.processors.find(
+        (processor) =>
+          processor.name === value &&
+          this.selectedComputeNode.uuid === processor.computeNode.uuid
+      );
+    },
+
+    setSelectedPostprocessor: function (value) {
+      this.selectedPostprocessor = this.postprocessors.find(
+        (postprocessor) =>
+          postprocessor.name === value &&
+          this.selectedComputeNode.uuid === postprocessor.computeNode.uuid
+      );
+    },
+
     navigateToFile: function (id) {
       this.fetchFilesForAnalysisDialog(this.offset, this.limit, id);
     },
-    /**
-     * Handler for breadcrumb overflow navigation
-     * @param {String} id
-     */
+
     handleNavigateBreadcrumb: function (id = "") {
       if (!isEmpty(id)) {
         this.navigateToFile(id);
@@ -727,6 +992,7 @@ export default {
         this.fetchFilesForAnalysisDialog(this.offset, this.limit, id);
       }
     },
+
     fetchFilesForAnalysisDialog: function (offset, limit, id = null) {
       useGetToken()
         .then(async (token) => {
@@ -762,6 +1028,23 @@ export default {
     color: theme.$gray_4;
     font-size: 14px;
   }
+}
+
+.workflow-type-selection {
+  margin: 16px 0;
+
+  .el-radio {
+    margin-right: 24px;
+    font-size: 14px;
+  }
+}
+
+.custom-workflow-section {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
 
 .workflow-details {
@@ -865,7 +1148,6 @@ export default {
 }
 
 .lds-ring {
-  /* change color here */
   color: theme.$purple_2;
 }
 .lds-ring,
