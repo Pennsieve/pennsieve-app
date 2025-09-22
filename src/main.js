@@ -27,7 +27,8 @@ import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+
+
 
 import Pusher from 'pusher-js'
 
@@ -45,15 +46,13 @@ const app = createApp(App)
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
+installDashboard(app, ["TextWidget"]);
 
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 
 
 //Import Dashboard
-// import ElementPlus from 'element-plus';
-// import 'element-plus/dist/index.css';
-// app.use(ElementPlus);
-installDashboard(app, ["TextWidget"]);
 
 app.use(VueClipboard, {
     autoSetContainer: true,
@@ -85,8 +84,6 @@ app.config.globalProperties.$message = ElMessage;
 app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
     cluster: siteConfig.pusherConfig.region
 });
-
-const viewerStore = useViewerStore()
 
 
 // Top level routes allowList
