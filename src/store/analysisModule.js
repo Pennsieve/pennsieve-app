@@ -157,9 +157,9 @@ const initialState = () => ({
           const preprocessors = result.filter(application => application.applicationType === 'preprocessor')
           const processors = result.filter(application => application.applicationType === 'processor')
           const postprocessors = result.filter(application => application.applicationType === 'postprocessor')
-          commit('UPDATE_PREPROCESSORS', preprocessors)
-          commit('UPDATE_PROCESSORS', processors)
-          commit('UPDATE_POSTPROCESSORS', postprocessors)
+          // commit('UPDATE_PREPROCESSORS', preprocessors)
+          commit('UPDATE_PROCESSORS', result)
+          // commit('UPDATE_POSTPROCESSORS', postprocessors)
         } else {
           return Promise.reject(resp)
         }
@@ -369,55 +369,56 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
 
-      if (!workflow) {
-        commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
-        return;
-      }
-      try {
-        const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
+  if (!workflow) {
+    commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+    return;
+  }
+  try {
+    const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
 
-        const userToken = await useGetToken()
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
+    const userToken = await useGetToken()
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    })
+  
+    if (resp.ok) {
+      const result = await resp.json();
+
+      // This code combines two API responses (/status and /instances) we need properties from, matching on uuid
+      // The /instances response is missing status, and the /status response does not tell us the applicationType
       
-        if (resp.ok) {
-          const result = await resp.json();
+      const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
+      
+      // Map each processor from instances to its corresponding status data
+      updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
+        const statusProcessor = result.workflow.find(statusProc => statusProc.uuid === instanceProcessor.uuid);
+        return { ...instanceProcessor, ...statusProcessor };
+      });
 
-          // This code combines two API reponses (/status and /instances) we need properties from, matching on uuid
-          // The /instances response is missing status, and the /status response does not tell us the applicationType
-          // Do not rely on array position for applicationType, array index does not reliably correlate to preprocessor/ processor/ postprocessor
-          
-          const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
-          const applicationTypes = ['preprocessor', 'processor', 'postprocessor'];
-          updatedResult.workflow = applicationTypes.map((type, index) => {
-            const fromInstances = workflow.workflow.find(w => w.applicationType === type);
-            const fromStatus = result.workflow.find(w => w.uuid === fromInstances.uuid);
-            return { ...fromInstances, ...fromStatus };
-          });
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
-          const updatedProcessor = updatedResult.workflow.find(
-            processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
-          );
-          if (updatedProcessor) {
-            commit('SET_SELECTED_PROCESSOR', updatedProcessor);
-            if (rootState.analysisModule.activityDialogVisible) {
-              dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
-            }
-          }
-        } else {
-          return Promise.reject(resp)
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
+      
+      const updatedProcessor = updatedResult.workflow.find(
+        processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
+      );
+      if (updatedProcessor) {
+        commit('SET_SELECTED_PROCESSOR', updatedProcessor);
+        if (rootState.analysisModule.activityDialogVisible) {
+          dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
         }
-      } catch (err) {
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
-          return Promise.reject(err)
       }
-    },
+    } else {
+      return Promise.reject(resp)
+    }
+  } catch (err) {
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+      return Promise.reject(err)
+  }
+},
     cancelWorkflow: async ({commit}, workflowId) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
       // API not yet available 
