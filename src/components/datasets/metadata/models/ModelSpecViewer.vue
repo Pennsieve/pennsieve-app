@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, defineComponent, h, onMounted } from 'vue'
 import { ElCard, ElTag, ElTooltip, ElMessage, ElSelect, ElOption } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
 // Import composables
@@ -14,6 +15,8 @@ import SaveAsTemplateDialog from './SaveAsTemplateDialog.vue'
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
+import IconEyeball from '@/components/icons/IconEyeball.vue'
 
 const props = defineProps({
   datasetId: {
@@ -25,6 +28,10 @@ const props = defineProps({
     default: ''
   },
   modelId: {
+    type: String,
+    default: ''
+  },
+  templateId: {
     type: String,
     default: ''
   },
@@ -60,12 +67,20 @@ const props = defineProps({
 })
 
 const metadataStore = useMetadataStore()
+const router = useRouter()
 
 const internalViewMode = ref('ui')
 const viewMode = computed(() => props.viewMode || internalViewMode.value)
 
+// Dropdown state for action buttons
+const quickActionsVisible = ref(true)
+
 // The model and version management
 const model = ref()
+const templateData = ref()
+
+// Computed to determine if we're viewing a template
+const isTemplate = computed(() => !!props.templateId)
 
 // Use composablesOKay
 const {
@@ -82,6 +97,27 @@ const {
   modelData,
   displaySchema
 } = useModelData(props, model, currentVersionData, selectedVersion)
+
+// Template data computed properties
+const templateDataFormatted = computed(() => {
+  if (!templateData.value) return null
+  
+  return {
+    id: templateData.value.id,
+    name: templateData.value.name,
+    display_name: templateData.value.display_name,
+    description: templateData.value.description,
+    latest_version: templateData.value.latest_version
+  }
+})
+
+// Combined data source - use template data if we're viewing a template
+const effectiveModelData = computed(() => {
+  if (isTemplate.value && templateDataFormatted.value) {
+    return templateDataFormatted.value
+  }
+  return modelData.value
+})
 
 const {
   formatPropertyType,
@@ -133,18 +169,71 @@ const handleTemplateCreated = (createdTemplate) => {
   console.log('Template created successfully:', createdTemplate)
 }
 
-onMounted(async () => {
-  if (!metadataStore.modelsLoaded) {
-    await metadataStore.fetchModels(props.datasetId)
+// Navigation functions
+const goToRecords = () => {
+  if (!props.modelId) {
+    console.warn('No model ID available for navigation')
+    return
   }
-  model.value = metadataStore.modelById(props.modelId)
   
-  // Fetch available versions
-  await fetchVersions()
-  
-  // If we have a selectedVersion that's not 'latest', fetch that version's data
-  if (selectedVersion.value !== 'latest') {
-    fetchVersion(selectedVersion.value)
+  router.push({
+    name: 'model-records',
+    params: {
+      modelId: props.modelId
+    }
+  })
+}
+
+// Dropdown toggle function
+const toggleActionDropdown = () => {
+  quickActionsVisible.value = !quickActionsVisible.value
+}
+
+// Template fetching function
+const fetchTemplateData = async () => {
+  try {
+    const fetchedTemplates = await metadataStore.fetchTemplates(props.orgId)
+    if (fetchedTemplates && Array.isArray(fetchedTemplates)) {
+      const template = fetchedTemplates.find(t => 
+        (t.model_template?.id || t.id) === props.templateId
+      )
+      
+      if (template) {
+        templateData.value = {
+          id: template.model_template?.id || template.id,
+          name: template.model_template?.name || template.name,
+          display_name: template.model_template?.display_name || template.display_name,
+          description: template.description || template.model_template?.description || '',
+          latest_version: template.model_template?.latest_version || template.latest_version || {
+            version: 1,
+            schema: template.model_template?.latest_version?.schema || template.schema || {}
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch template data:', error)
+  }
+}
+
+onMounted(async () => {
+  if (isTemplate.value) {
+    // If viewing a template, fetch template data
+    await fetchTemplateData()
+  } else {
+    // If viewing a model, fetch model data
+    if (!metadataStore.modelsLoaded) {
+      await metadataStore.fetchModels(props.datasetId)
+    }
+    model.value = metadataStore.modelById(props.modelId)
+    
+    // Fetch available versions
+    await fetchVersions()
+    
+    // If we have a selectedVersion that's not 'latest', fetch that version's data
+    if (selectedVersion.value !== 'latest') {
+      fetchVersion(selectedVersion.value)
+    }
   }
 })
 
@@ -540,24 +629,59 @@ const PropertyTree = defineComponent({
           </div>
         </template>
         <template #right>
-          <!-- Action buttons -->
-          <div v-if="!hideSelector" class="action-buttons">
-            <bf-button @click="createNewVersion" size="small">
-              Draft New Version
-            </bf-button>
-            <bf-button @click="handleSaveAsTemplate" type="secondary" size="small">
-              Save as Template
-            </bf-button>
+          <!-- Action buttons with dropdown -->
+          <div v-if="!hideSelector && !isTemplate" class="action-buttons">
+            <!-- Always visible View Records button -->
+
+            
+            <!-- Quick actions (shown when dropdown is closed) -->
+            <template v-if="quickActionsVisible">
+              <bf-button @click="goToRecords" size="small" class="mr-8">
+                <template #prefix>
+                  <IconEyeball class="mr-8" :height="16" :width="16" />
+                </template>
+                View Records
+              </bf-button>
+<!--              <bf-button @click="createNewVersion" size="small" class="mr-8">-->
+<!--                Draft New Version-->
+<!--              </bf-button>-->
+<!--              <bf-button @click="handleSaveAsTemplate" type="secondary" size="small">-->
+<!--                Save as Template-->
+<!--              </bf-button>-->
+            </template>
+            
+            <!-- Dropdown with all actions -->
+            <ps-button-dropdown
+              @click="toggleActionDropdown"
+              :menu-open="!quickActionsVisible"
+            >
+              <template #buttons>
+                <bf-button @click="goToRecords" class="dropdown-button">
+                  <template #prefix>
+                    <IconEyeball class="mr-8" :height="16" :width="16" />
+                  </template>
+                  View Records
+                </bf-button>
+                
+                <bf-button @click="createNewVersion" class="dropdown-button">
+                  Draft New Version
+                </bf-button>
+                
+                <bf-button @click="handleSaveAsTemplate" class="dropdown-button">
+                  Save as Template
+                </bf-button>
+              </template>
+            </ps-button-dropdown>
           </div>
         </template>
       </stage-actions>
     </template>
 
     <!-- Model Information Header outside stage-actions -->
-    <div class="model-info-header">
-      <span class="model-name">{{ modelData.display_name || modelData.name }}</span>
+    <div v-if="effectiveModelData" class="model-info-header">
+      <span class="model-name">{{ effectiveModelData.display_name || effectiveModelData.name }}</span>
       <el-tag type="info" size="small" effect="plain">
-        {{ Object.keys(modelData.latest_version.schema.properties).length }} properties
+        {{ Object.keys(effectiveModelData.latest_version.schema.properties).length }} properties
       </el-tag>
     </div>
 
@@ -637,9 +761,9 @@ const PropertyTree = defineComponent({
         </div>
         
         <!-- Properties list -->
-        <div class="properties-list">
+        <div v-if="effectiveModelData" class="properties-list">
           <div 
-            v-for="(property, propName) in modelData.latest_version.schema.properties"
+            v-for="(property, propName) in effectiveModelData.latest_version.schema.properties"
             :key="propName"
             class="property-item"
             :class="{ 'is-nested': isNestedObject(property) }"
@@ -650,7 +774,7 @@ const PropertyTree = defineComponent({
               </span>
               <div class="property-tags">
                 <el-tag 
-                  v-if="isRequired(modelData.latest_version.schema, propName)"
+                  v-if="isRequired(effectiveModelData.latest_version.schema, propName)"
                   type="" 
                   size="small"
                   effect="plain"
@@ -785,6 +909,8 @@ const PropertyTree = defineComponent({
 
 <style lang="scss" scoped>
 @use '../../../../styles/theme' as theme;
+@use '../../../../styles/element/tag';
+
 
 .model-spec-viewer {
   padding: 16px;
@@ -1191,6 +1317,10 @@ const PropertyTree = defineComponent({
   display: flex;
   gap: 8px;
   align-items: center;
+  
+  .dropdown-button {
+    margin-top: 8px;
+  }
 }
 
 :deep(.el-collapse-item__header) {

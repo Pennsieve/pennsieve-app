@@ -6,6 +6,9 @@ import ModelList from "@/components/datasets/metadata/models/modelList.vue";
 import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
+import TemplateSpecViewer from "@/components/datasets/metadata/models/TemplateSpecViewer.vue";
+import TemplateSpecGenerator from "@/components/datasets/metadata/models/TemplateSpecGenerator.vue";
+import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -599,6 +602,23 @@ const router = createRouter({
                   }
                 },
                 {
+                  path: ':modelId/records',
+                  name: 'model-records',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Model Details", to: "model-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Model Details", to: "model-details" },
+                      { name: "Records", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: ListRecords
+                  }
+                },
+                {
                   path: 'new',
                   name: 'new-model',
                   props: true,
@@ -628,6 +648,44 @@ const router = createRouter({
                   },
                   components: {
                     stage: TemplateGallery
+                  }
+                },
+                {
+                  path: 'templates/:templateId',
+                  name: 'template-details',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Template Gallery", to: "new-model-from-template"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Template Gallery", to: "new-model-from-template" },
+                      { name: "Template Details", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: TemplateSpecViewer
+                  }
+                },
+                {
+                  path: 'templates/:templateId/edit',
+                  name: 'template-edit',
+                  props: route => ({
+                    templateId: route.params.templateId,
+                    orgId: route.params.orgId
+                  }),
+                  meta: { 
+                    backLink: {name: "Template Details", to: "template-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Template Gallery", to: "new-model-from-template" },
+                      { name: "Template Details", to: "template-details" },
+                      { name: "Edit Template", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: TemplateSpecGenerator
                   }
                 },
               ]

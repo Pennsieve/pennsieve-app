@@ -201,7 +201,7 @@
           </div>
           <div class="template-preview">
             <div class="template-info">
-              <h3 class="template-title">{{ template.display_name || template.name }}</h3>
+              <h3 class="template-title" @click="navigateToTemplateDetails(template, $event)">{{ template.display_name || template.name }}</h3>
               <p class="template-description">{{ template.description || 'No description available' }}</p>
               <div class="template-meta">
                 <span class="property-count">
@@ -289,7 +289,6 @@ const router = useRouter()
 const metadataStore = useMetadataStore()
 
 // Reactive data
-const templates = ref([])
 const selectedTemplate = ref(null)
 const selectedTemplates = ref([])
 const loading = ref(false)
@@ -304,6 +303,10 @@ const sortBy = ref('name')
 const sortDirection = ref('asc')
 
 // Computed properties
+const templates = computed(() => {
+  return metadataStore.templates
+})
+
 const availableCategories = computed(() => {
   const categories = new Set()
   templates.value.forEach(template => {
@@ -701,38 +704,11 @@ const fetchTemplates = async () => {
   error.value = ''
   
   try {
-    // Use the metadata store to fetch templates with organization ID
-    const fetchedTemplates = await metadataStore.fetchTemplates(props.orgId)
-    
-    // Transform the API response to match the expected component structure
-    if (fetchedTemplates && Array.isArray(fetchedTemplates)) {
-      templates.value = fetchedTemplates.map(template => ({
-        id: template.model_template?.id || template.id,
-        name: template.model_template?.name || template.name,
-        display_name: template.model_template?.display_name || template.display_name,
-        description: template.description || template.model_template?.description || '',
-        category: template.category || 'general', // Default category if not provided
-        tags: template.tags || [], // Default empty tags if not provided
-        latest_version: template.model_template?.latest_version || template.latest_version || {
-          version: 1,
-          schema: template.model_template?.latest_version?.schema || template.schema || {}
-        },
-        created_at: template.created_at || template.model_template?.created_at
-      }))
-    } else {
-      templates.value = []
-    }
+    // Use the metadata store to fetch templates (store handles storage and transformation)
+    await metadataStore.fetchTemplates(props.orgId)
   } catch (err) {
     console.error('Error fetching templates:', err)
     error.value = err.message || 'Failed to load templates'
-    
-    // Fallback to test templates if API fails during development
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Falling back to test templates due to API error')
-      templates.value = testTemplates
-    } else {
-      templates.value = []
-    }
   } finally {
     loading.value = false
   }
@@ -909,6 +885,22 @@ const clearAllFilters = () => {
   searchQuery.value = ''
   selectedCategory.value = ''
   selectedTags.value = []
+}
+
+// Navigation method for template title clicks
+const navigateToTemplateDetails = (template, event) => {
+  // Prevent the card selection event from firing
+  event.stopPropagation()
+  
+  // Navigate to template details route
+  router.push({
+    name: 'template-details',
+    params: {
+      orgId: props.orgId,
+      datasetId: props.datasetId,
+      templateId: template.id
+    }
+  })
 }
 
 // Lifecycle
@@ -1205,6 +1197,13 @@ onMounted(() => {
           font-weight: 600;
           color: theme.$gray_6;
           margin: 0 0 8px 0;
+          cursor: pointer;
+          transition: color 0.2s ease;
+          
+          &:hover {
+            color: theme.$purple_2;
+            text-decoration: underline;
+          }
         }
         
         .template-description {

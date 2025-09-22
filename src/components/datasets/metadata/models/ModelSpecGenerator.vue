@@ -77,6 +77,9 @@ const jsonContent = ref('')
 const jsonError = ref('')
 const jsonEditor = ref(null)
 
+// Track if model name was manually edited
+const modelNameManuallyEdited = ref(false)
+
 // Property dialog
 const propertyDialogVisible = ref(false)
 const editingProperty = ref(null)
@@ -356,118 +359,6 @@ const openPropertyDialog = (propertyName = null) => {
   propertyDialogVisible.value = true
 }
 
-const saveProperty = async () => {
-  // Validate form
-  const form = document.querySelector('.property-form')
-  if (!form) return
-
-  try {
-    // Build property schema
-    const property = {
-      type: propertyForm.value.type
-    }
-
-    if (propertyForm.value.displayName !== propertyForm.value.name) {
-      property.title = propertyForm.value.displayName
-    }
-
-    if (propertyForm.value.description) {
-      property.description = propertyForm.value.description
-    }
-
-    if (propertyForm.value.format && propertyForm.value.type === 'string') {
-      property.format = propertyForm.value.format
-    }
-
-    // Add constraints based on type
-    if (propertyForm.value.type === 'string') {
-      if (propertyForm.value.minLength !== undefined && propertyForm.value.minLength !== '') {
-        property.minLength = parseInt(propertyForm.value.minLength)
-      }
-      if (propertyForm.value.maxLength !== undefined && propertyForm.value.maxLength !== '') {
-        property.maxLength = parseInt(propertyForm.value.maxLength)
-      }
-      if (propertyForm.value.pattern) {
-        property.pattern = propertyForm.value.pattern
-      }
-    }
-
-    if (propertyForm.value.type === 'number' || propertyForm.value.type === 'integer') {
-      if (propertyForm.value.minimum !== undefined && propertyForm.value.minimum !== '') {
-        property.minimum = parseFloat(propertyForm.value.minimum)
-      }
-      if (propertyForm.value.maximum !== undefined && propertyForm.value.maximum !== '') {
-        property.maximum = parseFloat(propertyForm.value.maximum)
-      }
-    }
-
-    // Handle enum values
-    if (propertyForm.value.enumInput) {
-      const enumValues = propertyForm.value.enumInput.split(',').map(v => v.trim()).filter(v => v)
-      if (enumValues.length > 0) {
-        property.enum = enumValues
-      }
-    }
-
-    // Handle default value
-    if (propertyForm.value.default !== undefined && propertyForm.value.default !== '') {
-      let defaultValue = propertyForm.value.default
-      if (propertyForm.value.type === 'number') {
-        defaultValue = parseFloat(defaultValue)
-      } else if (propertyForm.value.type === 'integer') {
-        defaultValue = parseInt(defaultValue)
-      } else if (propertyForm.value.type === 'boolean') {
-        defaultValue = defaultValue === 'true' || defaultValue === true
-      }
-      property.default = defaultValue
-    }
-
-    // Update schema
-    const newProperties = { ...modelData.value.latest_version.schema.properties }
-    const newRequired = [...(modelData.value.latest_version.schema.required || [])]
-
-    // Remove old property name if editing
-    if (editingProperty.value && editingProperty.value !== propertyForm.value.name) {
-      delete newProperties[editingProperty.value]
-      const oldIndex = newRequired.indexOf(editingProperty.value)
-      if (oldIndex > -1) {
-        newRequired.splice(oldIndex, 1)
-      }
-    }
-
-    // Add/update property
-    newProperties[propertyForm.value.name] = property
-
-    // Handle required status
-    const requiredIndex = newRequired.indexOf(propertyForm.value.name)
-    if (propertyForm.value.required && requiredIndex === -1) {
-      newRequired.push(propertyForm.value.name)
-    } else if (!propertyForm.value.required && requiredIndex > -1) {
-      newRequired.splice(requiredIndex, 1)
-    }
-
-    // Update model
-    modelData.value.latest_version.schema = {
-      ...modelData.value.latest_version.schema,
-      properties: newProperties,
-      required: newRequired
-    }
-
-    // Update JSON content if in JSON mode
-    if (mode.value === 'json') {
-      updateJsonContent()
-    }
-
-    // Update shared JSON data for preview
-    updateSharedJsonData()
-
-    propertyDialogVisible.value = false
-    ElMessage.success(editingProperty.value ? 'Property updated successfully' : 'Property added successfully')
-  } catch (error) {
-    ElMessage.error('Failed to save property: ' + error.message)
-  }
-}
-
 const removeProperty = (propertyName) => {
   const newProperties = { ...modelData.value.latest_version.schema.properties }
   delete newProperties[propertyName]
@@ -513,12 +404,13 @@ const saveModel = async () => {
       })
       ElMessage.success(`New version of "${modelData.value.display_name}" created successfully`)
       
-      // Navigate back to models list after successful version creation
+      // Navigate to model details page after successful version creation
       router.push({
-        name: 'models-list',
+        name: 'model-details',
         params: {
           datasetId: props.datasetId,
-          orgId: props.orgId
+          orgId: props.orgId,
+          modelId: modelData.value.id
         }
       })
     } else {
@@ -576,7 +468,8 @@ const generatePropertyName = () => {
 
 // Generate model name from display name
 const generateModelName = () => {
-  if (modelData.value.display_name && !modelData.value.name) {
+  // Only auto-generate if the name field hasn't been manually edited
+  if (modelData.value.display_name && !modelNameManuallyEdited.value) {
     modelData.value.name = modelData.value.display_name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '_')
@@ -855,6 +748,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
               <el-input
                 v-model="modelData.name"
                 placeholder="Technical identifier (e.g., clinical_drug)"
+                @input="modelNameManuallyEdited = true"
               />
             </el-form-item>
             <el-form-item prop="description" label="Description">
@@ -1016,6 +910,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
 <style lang="scss" scoped>
 @use '../../../../styles/theme' as theme;
 @use '../../../../styles/element/button';
+@use '../../../../styles/element/tag';
 
 
 .model-spec-generator {

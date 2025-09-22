@@ -21,12 +21,13 @@ const nrOfProperties = computed( () => {
 })
 
 const modelId = computed(() => {
-  return propOr('', 'id', props.model.id)
+  return propOr('', 'id', props.model)
 })
 
 const onMenuSelect = function (command) {
   const commandsList = {
     'configure': () => openModel(),
+    'records': () => openRecords(),
     'newRecord': () => this.$router.push({ name: 'metadata-record', params: { modelId: this.modelId, instanceId: 'new' }})
   }
   const cmd = commandsList[command]
@@ -36,13 +37,25 @@ const onMenuSelect = function (command) {
 }
 
 /**
+ * Navigate to model records page
+ */
+const openRecords = function() {
+  router.push({
+    name: 'model-records',
+    params: {
+      modelId: modelId.value
+    }
+  })
+}
+
+/**
  * Navigate to concept management page
  */
 const openModel = function() {
   router.push({
     name: 'model-details',
     params: {
-      modelId: modelId
+      modelId: modelId.value
     }
   })
 }
@@ -125,34 +138,14 @@ const openModel = function() {
           />
         </span>
         <template #dropdown>
-          <el-dropdown-menu
-            slot="dropdown"
-            class="bf-menu"
-            :offset="9"
-          >
-            <template>
-              <el-dropdown-item
-                command="configure"
-              >
-                Configure
-              </el-dropdown-item>
-              <!--              <el-dropdown-item-->
-              <!--                v-if="concept.count === 0"-->
-              <!--                command="archive"-->
-              <!--                :disabled="datasetLocked"-->
-              <!--              >-->
-              <!--                Delete-->
-              <!--              </el-dropdown-item>-->
-<!--              <el-dropdown-item-->
-<!--                v-if="concept.propertyCount > 0"-->
-<!--                :disabled="datasetLocked"-->
-<!--                command="newRecord"-->
-<!--              >-->
-<!--                Create new {{ modelDisplayName }}-->
-<!--              </el-dropdown-item>-->
-            </template>
+          <el-dropdown-menu class="bf-menu">
+            <el-dropdown-item command="configure">
+              Configure
+            </el-dropdown-item>
+            <el-dropdown-item command="records">
+              View Records
+            </el-dropdown-item>
           </el-dropdown-menu>
-
         </template>
       </el-dropdown>
     </el-col>
@@ -259,6 +252,29 @@ const openModel = function() {
     .svg-icon {
       color: theme.$gray_4;
       margin-left: 8px;
+    }
+  }
+}
+
+.menu-col {
+  .btn-file-menu {
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    
+    &:hover {
+      background-color: theme.$gray_1;
+    }
+  }
+  
+  .el-dropdown-link {
+    color: theme.$gray_4;
+    
+    &:hover {
+      color: theme.$gray_6;
     }
   }
 }
