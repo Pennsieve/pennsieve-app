@@ -796,15 +796,15 @@ export default {
         };
       }
 
-      const token = await useGetToken();
-
       try {
-        const response = await this.sendXhr(url, {
+        const userToken = await useGetToken();
+        const response = await fetch(url, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
           },
-          body: body,
+          body: JSON.stringify(body),
         });
 
         if (response.ok || (response.status >= 200 && response.status < 300)) {
