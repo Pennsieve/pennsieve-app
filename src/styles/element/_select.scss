@@ -2,6 +2,7 @@
 
 :deep(.el-select) {
   --el-select-input-focus-border-color: #{theme.$purple_2};
+  --el-select-input-focus-border: #{theme.$purple_2};
 }
 
 :deep(.el-select-dropdown)  {

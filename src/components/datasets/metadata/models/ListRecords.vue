@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElTable, ElTableColumn, ElInput, ElCard, ElButton, ElSelect, ElOption } from 'element-plus'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import IconMagnifyingGlass from '@/components/icons/IconMagnifyingGlass.vue'
-import RecordFilter from './RecordFilter.vue'
+import RecordFilter from './RecordFilterStyled.vue'
 
 // Props
 const props = defineProps({
@@ -148,9 +148,9 @@ const fetchModel = async () => {
     
     if (model.value?.latest_version?.schema) {
       modelSchema.value = model.value.latest_version.schema
-      // Initialize selected version to 'latest' if not already set
-      if (!selectedVersion.value) {
-        selectedVersion.value = 'latest'
+      // Initialize selected version to the latest version number if not already set
+      if (!selectedVersion.value && model.value?.latest_version?.version) {
+        selectedVersion.value = model.value.latest_version.version.toString()
       }
     } else {
       throw new Error('Model schema not found')
@@ -320,7 +320,6 @@ onMounted(async () => {
         <div class="header-info">
           <h2 v-if="model">{{ model.display_name || model.name }}</h2>
           <p v-if="model" class="model-description">{{ model.description || 'No description available' }}</p>
-          <p v-if="hasRecords">{{ searchHeading }}</p>
         </div>
         
         <div class="search-controls">
@@ -502,7 +501,8 @@ onMounted(async () => {
 <style lang="scss" scoped>
 @use '../../../../styles/theme' as theme;
 @use '../../../../styles/element/table';
-
+@use '../../../../styles/element/select';
+@use '../../../../styles/element/input';
 
 .list-records {
   padding: 24px;
@@ -557,7 +557,7 @@ onMounted(async () => {
             :deep(.el-input__wrapper) {
               height: 32px;
               border-radius: 4px;
-              border: 1px solid theme.$gray_2;
+              //border: 1px solid theme.$gray_2;
               background-color: theme.$white;
             }
           }
