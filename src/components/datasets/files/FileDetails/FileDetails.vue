@@ -1350,8 +1350,6 @@ export default {
       this.hasSeenRelationshipsInfo = true;
     }
 
-    EventBus.$on("update-external-file", this.onExternalFileUpdate);
-
     // In FileDetails window, the tool for viewing should be limited/set to PAN for panning the image/timeseries etc.
     this.setActiveTool(viewerToolTypes.PAN);
   },
@@ -1362,7 +1360,6 @@ export default {
     EventBus.$off("refresh-table-data", this.refreshTableData);
     EventBus.$off("add-relationship", this.handleAddRelationship);
     EventBus.$off("update-relationships-list", this.updateRelationshipsList);
-    EventBus.$off("update-external-file", this.onExternalFileUpdate);
   },
 
   methods: {
@@ -2533,42 +2530,6 @@ export default {
         file
       );
     },
-
-    /**
-     * Set new name and description for external file
-     * @param {Object} file
-     */
-    onExternalFileUpdate: function (file) {
-      const oldName = pathOr("", ["content", "name"], this.proxyRecord);
-      const oldDescription = pathOr(
-        "",
-        ["externalFile", "description"],
-        this.proxyRecord
-      );
-      this.proxyRecord.content.name = pathOr(
-        oldName,
-        ["content", "name"],
-        file
-      );
-      this.proxyRecord.externalFile.location = pathOr(
-        "",
-        ["externalFile", "location"],
-        file
-      );
-      this.proxyRecord.externalFile.description = pathOr(
-        oldDescription,
-        ["externalFile", "description"],
-        file
-      );
-
-      EventBus.$emit("toast", {
-        detail: {
-          msg: "External file was updated",
-          type: "success",
-        },
-      });
-    },
-
     /**
      * Show move dialog after getting the parent's (or dataset's) children
      */
