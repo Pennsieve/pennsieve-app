@@ -158,7 +158,7 @@ const initialState = () => ({
           const processors = result.filter(application => application.applicationType === 'processor')
           const postprocessors = result.filter(application => application.applicationType === 'postprocessor')
           commit('UPDATE_PREPROCESSORS', preprocessors)
-          commit('UPDATE_PROCESSORS', result)
+          commit('UPDATE_PROCESSORS', processors)
           commit('UPDATE_POSTPROCESSORS', postprocessors)
         } else {
           return Promise.reject(resp)
