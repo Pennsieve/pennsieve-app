@@ -49,23 +49,6 @@
                   </el-dropdown-item>
                 </template>
                 <template v-else>
-                  <el-dropdown-item
-                    v-if="!isExternalFile"
-                    class="bf-menu-item"
-                    :disabled="datasetLocked"
-                    command="rename-file"
-                  >
-                    Rename
-                  </el-dropdown-item>
-
-                  <el-dropdown-item
-                    v-else
-                    class="bf-menu-item"
-                    :disabled="datasetLocked"
-                    command="edit-file"
-                  >
-                    Update
-                  </el-dropdown-item>
 
                   <el-dropdown-item
                     class="bf-menu-item"
@@ -758,16 +741,6 @@ export default {
      */
     externalFile: function () {
       return propOr({}, "externalFile", this.proxyRecord);
-    },
-
-    /**
-     * Compute if package is an external file
-     * @returns {Boolean}
-     */
-    isExternalFile: function () {
-      return Boolean(
-        pathOr("", ["externalFile", "location"], this.proxyRecord)
-      );
     },
 
     /**
@@ -2175,8 +2148,6 @@ export default {
       const commands = {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
-        "rename-file": this.showRenameFileDialog,
-        "edit-file": this.showEditFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2187,24 +2158,10 @@ export default {
     },
 
     /**
-     * Show edit file dialog
-     */
-    showEditFileDialog: function () {
-      EventBus.$emit("open-external-file-modal", this.proxyRecord);
-    },
-
-    /**
      * Show archive dialog
      */
     showArchiveDialog: function () {
       this.archiveDialogVisible = true;
-    },
-
-    /**
-     * Show rename file dialog
-     */
-    showRenameFileDialog: function () {
-      EventBus.$emit("rename-file", this.proxyRecord);
     },
 
     /**
