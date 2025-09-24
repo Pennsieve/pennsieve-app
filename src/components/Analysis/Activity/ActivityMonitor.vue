@@ -200,8 +200,6 @@ onMounted(async () => {
     ? selectedWorkflowActivity.value
     : workflowInstances.value[0];
 
-  console.log("workflow", workflow);
-
   if (workflowInstances.value.length && !intervalId) {
     try {
       await getApplicationsStatus(workflow);
