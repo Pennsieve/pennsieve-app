@@ -129,20 +129,16 @@
                   <span
                     class="processor"
                     v-for="processor in selectedWorkflow.processors"
-                    :key="processor.name || processor.sourceUrl || processor"
+                    :key="processor.sourceUrl"
                   >
                     <a
-                      v-if="isProcessorUrl(processor)"
                       :href="getProcessorUrl(processor)"
                       target="_blank"
                       rel="noopener noreferrer"
                       class="processor-link"
                     >
-                      {{ getProcessorDisplay(processor) }}
+                      {{ getProcessorUrl(processor) }}
                     </a>
-                    <span v-else class="processor-text">
-                      {{ getProcessorDisplay(processor) }}
-                    </span>
                   </span>
                 </div>
               </div>
@@ -529,29 +525,17 @@ export default {
       return date.toLocaleDateString() + " " + date.toLocaleTimeString();
     },
 
-    getProcessorDisplay: function (processor) {
-      if (typeof processor === "string") {
-        return processor;
-      }
-      if (processor && typeof processor === "object") {
-        return processor.name || processor.sourceUrl || processor.toString();
-      }
-      return processor;
-    },
-
-    isProcessorUrl: function (processor) {
-      const url = this.getProcessorUrl(processor);
-      return url && (url.startsWith("http://") || url.startsWith("https://"));
-    },
-
     getProcessorUrl: function (processor) {
-      if (typeof processor === "string") {
-        return processor.startsWith("http") ? processor : null;
+      if (
+        processor.sourceUrl &&
+        processor.sourceUrl.startsWith("git://github.com/")
+      ) {
+        return processor.sourceUrl.replace(
+          "git://github.com/",
+          "https://github.com/"
+        );
       }
-      if (processor && typeof processor === "object") {
-        return processor.sourceUrl || null;
-      }
-      return null;
+      return processor.sourceUrl;
     },
 
     getFilesUrl: async function () {
