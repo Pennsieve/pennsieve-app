@@ -118,7 +118,6 @@
           :table-loading="filesLoading"
           @move="showMove"
           @delete="showDeleteDialog"
-          @rename-file="showRenameFileDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
@@ -495,7 +494,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$on("update-external-file", this.onFileRenamed);
     EventBus.$on("openDeletedModal", (data) => {
       this.deletedDialogOpen = data;
       this.fetchDeleted();
@@ -523,7 +521,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$off("update-external-file", this.onFileRenamed);
   },
 
   /**
