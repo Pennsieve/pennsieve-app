@@ -105,7 +105,6 @@
     <!--    <bf-package-dialog-->
     <!--      ref="packageDialog"-->
     <!--      :parent-folder="proxyRecord"-->
-    <!--      @file-renamed="onFileRenamed"-->
     <!--    />-->
 
     <!--    <remove-linked-property-dialog-->
@@ -739,7 +738,6 @@ export default {
     //   this.hasSeenRelationshipsInfo = true
     // }
     //
-    // EventBus.$on('update-external-file', this.onExternalFileUpdate)
 
   },
 
@@ -749,7 +747,6 @@ export default {
     // EventBus.$off('refresh-table-data', this.refreshTableData)
     // // EventBus.$off('add-relationship', this.handleAddRelationship)
     // EventBus.$off('update-relationships-list', this.updateRelationshipsList)
-    // EventBus.$off('update-external-file', this.onExternalFileUpdate)
   },
 
   methods: {
