@@ -396,7 +396,6 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
       // The /instances response is missing status, and the /status response does not tell us the applicationType
       
       const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
-      console.log('updatedResult:', updatedResult)
 
       if (workflow.workflow) {
  // Map each processor from instances to its corresponding status data
@@ -549,7 +548,6 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
 
         if (resp.ok) {
           const result = await resp.json()
-          console.log('here', result)
           commit('UPDATE_WORKFLOWS', result)
         } else {
           return Promise.reject(resp)
