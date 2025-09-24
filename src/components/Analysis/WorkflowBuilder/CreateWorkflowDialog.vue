@@ -184,7 +184,6 @@ export default {
   async mounted() {
     try {
       await this.fetchApplications();
-      console.log("Applications loaded:", this.applications);
     } catch (error) {
       console.error("Error fetching applications:", error);
     }
