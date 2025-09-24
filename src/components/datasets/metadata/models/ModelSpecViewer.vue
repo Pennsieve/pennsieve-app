@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, defineComponent, h, onMounted } from 'vue'
-import { ElCard, ElTag, ElTooltip, ElMessage, ElSelect, ElOption } from 'element-plus'
+import { ElCard, ElTag, ElTooltip, ElMessage, ElSelect, ElOption, ElButtonGroup, ElButton } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
@@ -17,6 +17,7 @@ import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 import IconEyeball from '@/components/icons/IconEyeball.vue'
+import ViewToggle from "@/components/shared/ViewToggle/ViewToggle.vue";
 
 const props = defineProps({
   datasetId: {
@@ -177,11 +178,33 @@ const goToRecords = () => {
   }
   
   router.push({
-    name: 'model-records',
+    name: 'model-records-search',
     params: {
       modelId: props.modelId
     }
   })
+}
+
+const goToCreateRecord = () => {
+  if (!props.modelId) {
+    console.warn('No model ID available for navigation')
+    return
+  }
+  
+  const routeParams = {
+    name: 'create-record',
+    params: {
+      datasetId: props.datasetId,
+      modelId: props.modelId
+    }
+  }
+  
+  // Add version as query parameter if it's not 'latest'
+  if (selectedVersion.value && selectedVersion.value !== 'latest') {
+    routeParams.query = { version: selectedVersion.value }
+  }
+  
+  router.push(routeParams)
 }
 
 // Dropdown toggle function
@@ -663,6 +686,10 @@ const PropertyTree = defineComponent({
                   View Records
                 </bf-button>
                 
+                <bf-button @click="goToCreateRecord" class="dropdown-button">
+                  Create Record
+                </bf-button>
+                
                 <bf-button @click="createNewVersion" class="dropdown-button">
                   Draft New Version
                 </bf-button>
@@ -699,23 +726,13 @@ const PropertyTree = defineComponent({
         <!-- Properties Header with View Mode Tabs -->
         <div class="properties-header">
           <h4 class="properties-title">JSON Schema</h4>
-          <div v-if="!hideSelector" class="view-mode-tabs" :class="{ minimal: minimal }">
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'ui', minimal: minimal }"
-              @click="handleViewModeChange('ui')"
-            >
-              <span class="tab-icon">👁</span>
-              <span v-if="!minimal" class="tab-label">Enhanced View</span>
-            </button>
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'json', minimal: minimal }"
-              @click="handleViewModeChange('json')"
-            >
-              <span class="tab-icon">{ }</span>
-              <span v-if="!minimal" class="tab-label">JSON View</span>
-            </button>
+          <div v-if="!hideSelector" class="view-controls">
+            <ViewToggle
+              :view-mode="viewMode"
+              size='small'
+              :minimal="minimal"
+              @update:view-mode="handleViewModeChange"
+            />
           </div>
         </div>
         
@@ -740,23 +757,13 @@ const PropertyTree = defineComponent({
         <!-- Properties Header with View Mode Tabs -->
         <div class="properties-header">
           <h4 class="properties-title">Properties</h4>
-          <div v-if="!hideSelector" class="view-mode-tabs" :class="{ minimal: minimal }">
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'ui', minimal: minimal }"
-              @click="handleViewModeChange('ui')"
-            >
-              <span class="tab-icon">👁</span>
-              <span v-if="!minimal" class="tab-label">Enhanced View</span>
-            </button>
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'json', minimal: minimal }"
-              @click="handleViewModeChange('json')"
-            >
-              <span class="tab-icon">{ }</span>
-              <span v-if="!minimal" class="tab-label">JSON View</span>
-            </button>
+          <div v-if="!hideSelector" class="view-controls">
+            <ViewToggle 
+              :view-mode="viewMode"
+              size='small'
+              :minimal="minimal"
+              @update:view-mode="handleViewModeChange"
+            />
           </div>
         </div>
         
@@ -910,6 +917,7 @@ const PropertyTree = defineComponent({
 <style lang="scss" scoped>
 @use '../../../../styles/theme' as theme;
 @use '../../../../styles/element/tag';
+@use '../../../../styles/element/button';
 
 
 .model-spec-viewer {
@@ -953,6 +961,10 @@ const PropertyTree = defineComponent({
     font-size: 14px;
     font-weight: 600;
     color: theme.$gray_6;
+  }
+
+  .view-controls {
+    // ViewToggle component handles its own styling
   }
 }
 

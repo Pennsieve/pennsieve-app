@@ -599,6 +599,86 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Fetch a specific record by ID
+    const fetchRecord = async (datasetId, modelId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
+            const token = await useGetToken()
+
+            const queryParams = toQueryParams({
+                dataset_id: datasetId
+            })
+
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+
+            if (resp.ok) {
+                const response = await resp.json()
+                return response
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record:', error)
+            throw error
+        }
+    }
+
+    // Create new record(s) for a model
+    const createRecord = async (datasetId, modelId, recordData, modelVersion = null) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records`
+            const token = await useGetToken()
+
+            const queryParams = {
+                dataset_id: datasetId
+            }
+
+            // Add version to query params if specified
+            if (modelVersion) {
+                queryParams.version = modelVersion
+            }
+
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            // Ensure recordData is an array as expected by the API
+            const payload = {
+                records: Array.isArray(recordData) ? recordData : [recordData]
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                const response = await resp.json()
+                return response
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to create record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error creating record:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -618,6 +698,8 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchModelVersions,
         fetchTemplates,
         fetchRecords,
+        fetchRecord,
+        createRecord,
         createModel,
         createModels,
         createModelFromTemplate,

@@ -72,13 +72,13 @@ export default {
           name: "Models"
         },
         {
-          to: 'records',
+          to: 'records-list',
           name: 'Records',
         },
-        {
-          to: 'graph',
-          name: 'Explorer',
-        },
+        // {
+        //   to: 'graph',
+        //   name: 'Explorer',
+        // },
 
       ]
     },

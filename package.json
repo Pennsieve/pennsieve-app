@@ -36,6 +36,8 @@
     "@vueup/vue-quill": "^1.2.0",
     "@vueuse/components": "^10.6.0",
     "@vueuse/core": "^10.6.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "animejs": "^3.2.1",
     "aws-amplify": "^6.8.0",
     "blueimp-md5": "^2.19.0",

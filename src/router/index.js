@@ -9,6 +9,8 @@ import TemplateGallery from "@/components/datasets/metadata/models/TemplateGalle
 import TemplateSpecViewer from "@/components/datasets/metadata/models/TemplateSpecViewer.vue";
 import TemplateSpecGenerator from "@/components/datasets/metadata/models/TemplateSpecGenerator.vue";
 import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
+import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
+import CreateRecord from "@/components/datasets/metadata/models/CreateRecord.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -117,6 +119,7 @@ const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityM
  */
 // const DatasetRecords = () => import('../components/datasets/records/DatasetRecords/DatasetRecords.vue')
 const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
+const ModelRecordsSelector = () => import('../components/datasets/metadata/models/ModelRecordsSelector.vue')
 const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
 const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
@@ -504,14 +507,98 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: ModelRecords
+                stage: DatasetMetadataView
               },
-              meta: {
-                breadcrumbs: [
-                  { name: "Metadata", to: "metadata" },
-                  { name: "Records", current: true }
-                ]
-              }
+              redirect: {
+                name: 'records-list'
+              },
+              children: [
+                {
+                  path: '',
+                  name: 'records-list',
+                  beforeEnter: async (to, from, next) => {
+                    try {
+                      // Import the metadata store
+                      const { useMetadataStore } = await import('@/stores/metadataStore.js')
+                      const metadataStore = useMetadataStore()
+                      
+                      // Fetch models for this dataset
+                      await metadataStore.fetchModels(to.params.datasetId)
+                      
+                      // Get the first model if available
+                      if (metadataStore.models && metadataStore.models.length > 0) {
+                        const firstModel = metadataStore.models[0].model || metadataStore.models[0]
+                        if (firstModel && firstModel.id) {
+                          // Redirect to the first model's records
+                          next({
+                            name: 'model-records-search',
+                            params: {
+                              orgId: to.params.orgId,
+                              datasetId: to.params.datasetId,
+                              modelId: firstModel.id
+                            }
+                          })
+                          return
+                        }
+                      }
+                      
+                      // If no models exist, redirect to models list
+                      next({ name: 'models-list' })
+                    } catch (error) {
+                      console.error('Error redirecting to records:', error)
+                      // Fallback to models list on error
+                      next({ name: 'models-list' })
+                    }
+                  }
+                },
+                {
+                  path: ':modelId/search',
+                  name: 'model-records-search',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "records"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: ListRecords
+                  }
+                },
+                {
+                  path: ':modelId/create',
+                  name: 'create-record',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "model-records-search"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Create Record", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: CreateRecord
+                  }
+                },
+                {
+                  path: ':modelId/:recordId',
+                  name: 'record-details',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "model-records-search"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Record Details", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: RecordSpecViewer
+                  }
+                }
+              ]
             },
             {
               path: 'record/:modelId/:instanceId',
@@ -599,23 +686,6 @@ const router = createRouter({
                   },
                   components: {
                     stage: ModelSpecGenerator
-                  }
-                },
-                {
-                  path: ':modelId/records',
-                  name: 'model-records',
-                  props: true,
-                  meta: { 
-                    backLink: {name: "Model Details", to: "model-details"},
-                    breadcrumbs: [
-                      { name: "Metadata", to: "metadata" },
-                      { name: "Models", to: "models-list" },
-                      { name: "Model Details", to: "model-details" },
-                      { name: "Records", current: true }
-                    ]
-                  },
-                  components: {
-                    stage: ListRecords
                   }
                 },
                 {
