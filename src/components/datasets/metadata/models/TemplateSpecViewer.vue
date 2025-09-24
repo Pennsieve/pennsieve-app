@@ -8,6 +8,7 @@ import { useMetadataStore } from '@/stores/metadataStore.js'
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 
 const props = defineProps({
@@ -121,9 +122,6 @@ const fetchTemplateData = async () => {
 }
 
 // Event handlers
-const handleViewModeChange = (mode) => {
-  internalViewMode.value = mode
-}
 
 const handleCreateModel = () => {
   if (!effectiveTemplateData.value) return
@@ -438,23 +436,8 @@ const PropertyTree = defineComponent({
         <!-- Properties Header with View Mode Tabs (shared between both views) -->
         <div class="properties-header">
           <h4 class="properties-title">{{ viewMode === 'json' ? 'JSON Schema' : 'Properties' }}</h4>
-          <div v-if="!hideSelector && !minimal" class="view-mode-tabs" :class="{ minimal: minimal }">
-            <button
-              class="view-mode-tab"
-              :class="{ active: viewMode === 'ui', minimal: minimal }"
-              @click="handleViewModeChange('ui')"
-            >
-              <span class="tab-icon">👁</span>
-              <span v-if="!minimal" class="tab-label">Enhanced View</span>
-            </button>
-            <button
-              class="view-mode-tab"
-              :class="{ active: viewMode === 'json', minimal: minimal }"
-              @click="handleViewModeChange('json')"
-            >
-              <span class="tab-icon">{ }</span>
-              <span v-if="!minimal" class="tab-label">JSON View</span>
-            </button>
+          <div v-if="!hideSelector && !minimal" class="view-controls">
+            <ViewToggle v-model:viewMode="internalViewMode" :minimal="minimal" />
           </div>
         </div>
 
@@ -591,26 +574,11 @@ const PropertyTree = defineComponent({
 
 
       <div v-if="viewMode === 'json'" class="json-view">
-        <!-- Properties Header with View Mode Tabs -->
+        <!-- Properties Header with View Mode Toggle -->
         <div class="properties-header">
           <h4 class="properties-title">JSON Schema</h4>
-          <div v-if="!hideSelector && !minimal" class="view-mode-tabs" :class="{ minimal: minimal }">
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'ui', minimal: minimal }"
-              @click="handleViewModeChange('ui')"
-            >
-              <span class="tab-icon">👁</span>
-              <span v-if="!minimal" class="tab-label">Enhanced View</span>
-            </button>
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'json', minimal: minimal }"
-              @click="handleViewModeChange('json')"
-            >
-              <span class="tab-icon">{ }</span>
-              <span v-if="!minimal" class="tab-label">JSON View</span>
-            </button>
+          <div v-if="!hideSelector && !minimal" class="view-controls">
+            <ViewToggle v-model:viewMode="internalViewMode" :minimal="minimal" />
           </div>
         </div>
         
@@ -621,26 +589,11 @@ const PropertyTree = defineComponent({
       </div>
 
       <div v-else class="ui-view">
-        <!-- Properties Header with View Mode Tabs -->
+        <!-- Properties Header with View Mode Toggle -->
         <div class="properties-header">
           <h4 class="properties-title">Properties</h4>
-          <div v-if="!hideSelector && !minimal" class="view-mode-tabs" :class="{ minimal: minimal }">
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'ui', minimal: minimal }"
-              @click="handleViewModeChange('ui')"
-            >
-              <span class="tab-icon">👁</span>
-              <span v-if="!minimal" class="tab-label">Enhanced View</span>
-            </button>
-            <button 
-              class="view-mode-tab" 
-              :class="{ active: viewMode === 'json', minimal: minimal }"
-              @click="handleViewModeChange('json')"
-            >
-              <span class="tab-icon">{ }</span>
-              <span v-if="!minimal" class="tab-label">JSON View</span>
-            </button>
+          <div v-if="!hideSelector && !minimal" class="view-controls">
+            <ViewToggle v-model:viewMode="internalViewMode" :minimal="minimal" />
           </div>
         </div>
         

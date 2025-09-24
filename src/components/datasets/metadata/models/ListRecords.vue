@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElTable, ElTableColumn, ElInput, ElCard, ElButton, ElSelect, ElOption } from 'element-plus'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
-import IconMagnifyingGlass from '@/components/icons/IconMagnifyingGlass.vue'
 import RecordFilter from './RecordFilterStyled.vue'
+import ModelSelectorDialog from './ModelSelectorDialog.vue'
 
 // Props
 const props = defineProps({
@@ -14,17 +15,21 @@ const props = defineProps({
   modelId: {
     type: String,
     required: true
+  },
+  versionId: {
+    type: String,
+    required: false
   }
 })
 
-// Store
+// Store and router
 const metadataStore = useMetadataStore()
+const router = useRouter()
 
 // Reactive data
 const records = ref([])
 const loading = ref(false)
 const error = ref('')
-const searchQuery = ref('')
 const activeFilter = ref(null) // Store the active predicate filter
 const pageSize = ref(10)
 const nextCursor = ref(null)
@@ -40,6 +45,10 @@ const model = ref(null)
 const modelSchema = ref(null)
 const availableVersions = ref([])
 const loadingVersions = ref(false)
+const loadingModels = ref(false)
+const modelError = ref('')
+const versionError = ref('')
+const modelSelectorVisible = ref(false)
 
 // Computed properties
 const tableColumns = computed(() => {
@@ -55,20 +64,71 @@ const tableColumns = computed(() => {
 
 const hasRecords = computed(() => records.value.length > 0)
 
-const searchHeading = computed(() => {
+const recordsHeading = computed(() => {
   const modelName = model.value?.display_name || model.value?.name || 'Unknown Model'
   const recordsText = records.value.length === 1 ? 'record' : 'records'
   const versionText = selectedVersion.value ? ` (v${selectedVersion.value})` : ''
   
-  if (searchQuery.value) {
-    return `Showing ${records.value.length} ${recordsText} for "${searchQuery.value}" in ${modelName}${versionText}`
-  }
   return `Showing ${records.value.length} ${recordsText} in ${modelName}${versionText} (Page ${currentPageNumber.value})`
 })
 
 const versionOptions = computed(() => {
-  return availableVersions.value // Already properly formatted from fetchVersions
+  const options = []
+  const latestVersionNum = model.value?.latest_version?.version || 1
+  
+  // Always show "Latest" as first option
+  options.push({
+    value: 'latest',
+    label: `Latest (v${latestVersionNum})`,
+    isLatest: true,
+    version: latestVersionNum,
+    createdAt: model.value?.latest_version?.created_at,
+    author: model.value?.latest_version?.created_by
+  })
+  
+  // Add specific versions
+  if (availableVersions.value?.length) {
+    availableVersions.value.forEach(version => {
+      if (version.value !== 'latest') {
+        options.push({
+          value: version.value,
+          label: version.label,
+          isLatest: false,
+          version: parseInt(version.value),
+          createdAt: version.versionData?.created_at,
+          author: version.versionData?.created_by
+        })
+      }
+    })
+  }
+  
+  return options
 })
+
+const modelOptions = computed(() => {
+  const rawModels = metadataStore.models || []
+  const models = rawModels.map(item => item.model || item).filter(Boolean)
+  
+  return models.map(model => ({
+    label: model.display_name || model.name,
+    value: model.id,
+    description: model.description || '',
+    count: model.count || 0,
+    latestVersion: model.latest_version?.version || 1
+  })).filter(option => option.value).sort((a, b) => a.label.localeCompare(b.label))
+})
+
+const noRecordsMessage = computed(() => {
+  // Check if there are multiple versions available
+  const hasMultipleVersions = versionOptions.value.length > 1
+  
+  if (hasMultipleVersions) {
+    return "This model version doesn't have any records yet. You might want to try an older model version."
+  } else {
+    return "This model doesn't have any records yet."
+  }
+})
+
 
 // Methods
 const fetchRecords = async (cursor = null, direction = 'forward', resetPagination = false) => {
@@ -84,11 +144,16 @@ const fetchRecords = async (cursor = null, direction = 'forward', resetPaginatio
       hasPreviousPage.value = false
     }
     
+    // Convert "latest" to actual version number for API call
+    const apiVersion = selectedVersion.value === 'latest' 
+      ? model.value?.latest_version?.version 
+      : selectedVersion.value
+    
     const options = {
       limit: pageSize.value,
       cursor: cursor,
       ...(activeFilter.value && { filter: activeFilter.value }),
-      ...(selectedVersion.value && { version: selectedVersion.value })
+      ...(apiVersion && { version: apiVersion })
     }
     
     console.log(`🔍 Fetching records with cursor:`, cursor, `direction: ${direction}`)
@@ -140,6 +205,9 @@ const fetchRecords = async (cursor = null, direction = 'forward', resetPaginatio
 
 const fetchModel = async () => {
   try {
+    loadingModels.value = true
+    modelError.value = ''
+    
     // Ensure models are loaded
     await metadataStore.fetchModels(props.datasetId)
     
@@ -148,25 +216,37 @@ const fetchModel = async () => {
     
     if (model.value?.latest_version?.schema) {
       modelSchema.value = model.value.latest_version.schema
-      // Initialize selected version to the latest version number if not already set
-      if (!selectedVersion.value && model.value?.latest_version?.version) {
-        selectedVersion.value = model.value.latest_version.version.toString()
+      // Initialize selected version based on route param or default to latest
+      if (!selectedVersion.value) {
+        if (props.versionId) {
+          selectedVersion.value = props.versionId
+        } else {
+          selectedVersion.value = 'latest'
+        }
       }
     } else {
-      throw new Error('Model schema not found')
+      const errorMsg = 'Model schema not found'
+      modelError.value = errorMsg
+      error.value = errorMsg
     }
   } catch (err) {
     console.error('Error fetching model:', err)
-    error.value = err.message || 'Failed to load model information'
+    const errorMsg = err.message || 'Failed to load model information'
+    modelError.value = errorMsg
+    error.value = errorMsg
+  } finally {
+    loadingModels.value = false
   }
 }
 
 const fetchVersions = async () => {
   try {
     loadingVersions.value = true
+    versionError.value = ''
+    
     const response = await metadataStore.fetchModelVersions(props.datasetId, props.modelId)
     
-    // Extract versions array from the nested response structure like ModelSpecViewer
+    // Extract versions array from the nested response structure
     const versions = response?.model?.versions || []
     const versionOptions = []
     
@@ -174,24 +254,31 @@ const fetchVersions = async () => {
     const latestVersionNum = model.value?.latest_version?.version || 1
     versionOptions.push({
       value: 'latest',
-      label: `Latest (v${latestVersionNum})`
+      label: `Latest (v${latestVersionNum})`,
+      versionData: {
+        created_at: model.value?.latest_version?.created_at,
+        created_by: model.value?.latest_version?.created_by
+      }
     })
     
     // Add individual version options from API response
     if (versions && versions.length > 0) {
       versions.forEach(version => {
-        versionOptions.push({
-          value: version.version.toString(),
-          label: `Version ${version.version}`,
-          versionData: version
-        })
+        if (version.version !== latestVersionNum) {
+          versionOptions.push({
+            value: version.version.toString(),
+            label: `Version ${version.version}`,
+            versionData: version
+          })
+        }
       })
     } else {
       // Fallback: create versions based on latest version number
-      for (let i = latestVersionNum; i >= 1; i--) {
+      for (let i = latestVersionNum - 1; i >= 1; i--) {
         versionOptions.push({
           value: i.toString(),
-          label: `Version ${i}`
+          label: `Version ${i}`,
+          versionData: {}
         })
       }
     }
@@ -200,19 +287,21 @@ const fetchVersions = async () => {
     console.log('📄 Fetched versions:', availableVersions.value)
   } catch (err) {
     console.error('Error fetching model versions:', err)
-    // Fallback to mock data on error
+    versionError.value = 'Failed to load version information'
+    
+    // Fallback to basic version structure
     const latestVersionNum = model.value?.latest_version?.version || 1
-    const fallbackVersions = []
-    
-    fallbackVersions.push({
+    const fallbackVersions = [{
       value: 'latest',
-      label: `Latest (v${latestVersionNum})`
-    })
+      label: `Latest (v${latestVersionNum})`,
+      versionData: {}
+    }]
     
-    for (let i = latestVersionNum; i >= 1; i--) {
+    for (let i = latestVersionNum - 1; i >= 1; i--) {
       fallbackVersions.push({
         value: i.toString(),
-        label: `Version ${i}`
+        label: `Version ${i}`,
+        versionData: {}
       })
     }
     
@@ -222,9 +311,6 @@ const fetchVersions = async () => {
   }
 }
 
-const onSearch = () => {
-  fetchRecords(null, 'forward', true)
-}
 
 const onFilterChange = (newFilter) => {
   activeFilter.value = newFilter
@@ -263,9 +349,45 @@ const onPageSizeChange = (size) => {
   fetchRecords(null, 'forward', true)
 }
 
+const normalizeVersion = (version) => {
+  if (!version || version === 'latest') return 'latest'
+  return version.toString()
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  try {
+    return new Date(dateString).toLocaleDateString()
+  } catch {
+    return ''
+  }
+}
+
 const onVersionChange = (version) => {
-  selectedVersion.value = version
+  const normalizedVersion = normalizeVersion(version)
+  selectedVersion.value = normalizedVersion
+  
+  // Just refetch records without changing the URL
+  // The current route structure uses /metadata/models/{modelId}/records/search
   fetchRecords(null, 'forward', true)
+}
+
+const openModelSelector = () => {
+  modelSelectorVisible.value = true
+}
+
+const selectModel = (newModelId) => {
+  modelSelectorVisible.value = false
+  
+  // Navigate to the new model's records route
+  router.push({
+    name: 'model-records-search',
+    params: {
+      orgId: router.currentRoute.value.params.orgId,
+      datasetId: props.datasetId,
+      modelId: newModelId
+    }
+  })
 }
 
 const formatCellValue = (value, column) => {
@@ -297,6 +419,17 @@ const formatCellValue = (value, column) => {
   return String(value)
 }
 
+const goToRecordDetails = (record) => {
+  router.push({
+    name: 'record-details',
+    params: {
+      datasetId: props.datasetId,
+      modelId: props.modelId,
+      recordId: record.id
+    }
+  })
+}
+
 // Watch for route changes
 watch(() => [props.datasetId, props.modelId], () => {
   Promise.all([fetchModel(), fetchVersions()]).then(() => {
@@ -318,19 +451,33 @@ onMounted(async () => {
     <div class="records-header">
       <div class="header-content">
         <div class="header-info">
-          <h2 v-if="model">{{ model.display_name || model.name }}</h2>
-          <p v-if="model" class="model-description">{{ model.description || 'No description available' }}</p>
+          <div class="model-title-section">
+            <div class="model-title-content" @click="openModelSelector" :class="{ 'loading': loadingModels }">
+              <h2 v-if="model" class="model-title">{{ model.display_name || model.name }}</h2>
+              <div class="model-selector-icon" :class="{ 'loading': loadingModels }">
+                <svg v-if="!loadingModels" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 10l5 5 5-5H7z"/>
+                </svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="loading-spinner">
+                  <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
+                  <path d="M12,4a8,8,0,0,1,8,8" />
+                </svg>
+              </div>
+            </div>
+            <p v-if="model" class="model-description">{{ model.description || 'No description available' }}</p>
+          </div>
         </div>
         
-        <div class="search-controls">
-          <!-- Version selector -->
-          <div class="version-controls">
+        <div class="version-controls">
+          <div class="version-selector">
+            <label class="version-label">Model Version</label>
             <el-select 
               :model-value="selectedVersion"
               @update:model-value="onVersionChange"
-              placeholder="Select version"
+              placeholder="Choose version..."
               size="small"
               :loading="loadingVersions"
+              :disabled="!versionOptions.length && !loadingVersions"
               class="version-dropdown"
             >
               <el-option
@@ -338,23 +485,27 @@ onMounted(async () => {
                 :key="version.value"
                 :label="version.label"
                 :value="version.value"
-              />
+              >
+                <div class="version-option">
+                  <div class="version-info">
+                    <span class="version-label">{{ version.label }}</span>
+                    <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
+                  </div>
+                </div>
+              </el-option>
             </el-select>
           </div>
-          
-          <form class="search-form" @submit.prevent="onSearch">
-            <el-input
-              v-model="searchQuery"
-              class="search-input"
-              placeholder="Search records..."
-              @keyup.enter="onSearch"
-            >
-              <template #prefix>
-                <IconMagnifyingGlass :height="20" :width="20" color="#71747c" />
-              </template>
-            </el-input>
-          </form>
         </div>
+        
+        <!-- Model Selector Dialog -->
+        <ModelSelectorDialog
+          v-model:visible="modelSelectorVisible"
+          :models="modelOptions"
+          :current-model-id="modelId"
+          :loading="loadingModels"
+          @select="selectModel"
+          @cancel="modelSelectorVisible = false"
+        />
       </div>
     </div>
 
@@ -380,8 +531,7 @@ onMounted(async () => {
         <div class="no-records-content">
           <h3>No Records Found</h3>
           <p v-if="activeFilter">No records match your filter criteria.</p>
-          <p v-else-if="searchQuery">No records match your search criteria.</p>
-          <p v-else>This model doesn't have any records yet.</p>
+          <p v-else>{{ noRecordsMessage }}</p>
         </div>
       </el-card>
     </div>
@@ -395,7 +545,7 @@ onMounted(async () => {
       <!-- Pagination Controls (Top) -->
       <div class="records-controls">
         <div class="records-controls-left">
-          <span class="records-count">{{ searchHeading }}</span>
+          <span class="records-count">{{ recordsHeading }}</span>
         </div>
         
         <div v-if="hasNextPage || hasPreviousPage" class="pagination-controls">
@@ -423,6 +573,8 @@ onMounted(async () => {
           stripe
           style="width: 100%"
           :default-sort="{ prop: 'created_at', order: 'descending' }"
+          @row-click="goToRecordDetails"
+          class="clickable-table"
         >
           <!-- Dynamic columns from model schema -->
           <el-table-column
@@ -503,12 +655,13 @@ onMounted(async () => {
 @use '../../../../styles/element/table';
 @use '../../../../styles/element/select';
 @use '../../../../styles/element/input';
+@use '../../../../styles/element/dialog';
 
 .list-records {
   padding: 24px;
   
   .records-header {
-    margin-bottom: 24px;
+    margin-bottom: 40px;
     
     .header-content {
       display: flex;
@@ -519,17 +672,92 @@ onMounted(async () => {
       .header-info {
         flex: 1;
         
-        h2 {
-          margin: 0 0 8px 0;
-          font-size: 24px;
-          font-weight: 600;
-          color: theme.$gray_6;
-        }
-        
-        .model-description {
-          margin: 0 0 16px 0;
-          color: theme.$gray_5;
-          font-size: 16px;
+        .model-title-section {
+          .model-title-content {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            padding: 8px 12px 8px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: transparent;
+            border: 1px solid transparent;
+            user-select: none;
+            
+            &:hover:not(.loading) {
+              background-color: theme.$gray_1;
+            }
+            
+            &:active:not(.loading) {
+              background-color: theme.$gray_2;
+            }
+            
+            &.loading {
+              cursor: default;
+              opacity: 0.7;
+            }
+            
+            .model-title {
+              margin: 0;
+              font-size: 24px;
+              font-weight: 600;
+              color: theme.$gray_6;
+              transition: color 0.2s ease;
+            }
+            
+            .model-selector-icon {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 28px;
+              height: 28px;
+              border-radius: 3px;
+              color: theme.$purple_3;
+              background-color: theme.$white;
+              border: 1px solid theme.$gray_2;
+              transition: all 0.2s ease;
+              flex-shrink: 0;
+              
+              &:not(.loading) {
+                transform: translateY(0);
+              }
+              
+              svg {
+                display: block;
+                transition: transform 0.2s ease;
+              }
+            }
+            
+            &:hover:not(.loading) .model-selector-icon {
+              //background-color: theme.$purple_1;
+              border-color: theme.$purple_2;
+              color: theme.$purple_3;
+              
+              svg {
+                transform: translateY(1px);
+              }
+            }
+            
+            &:active:not(.loading) .model-selector-icon {
+              background-color: theme.$purple_2;
+              border-color: theme.$purple_3;
+              
+              svg {
+                transform: translateY(2px);
+              }
+            }
+            
+            .loading-spinner {
+              animation: spin 1s linear infinite;
+            }
+          }
+          
+          .model-description {
+            margin: 0;
+            color: theme.$gray_5;
+            font-size: 16px;
+          }
         }
         
         p {
@@ -539,33 +767,42 @@ onMounted(async () => {
         }
       }
       
-      .search-controls {
+      .version-controls {
         flex-shrink: 0;
         display: flex;
-        align-items: center;
-        gap: 16px;
+        align-items: flex-start;
         
-        .version-controls {
+        .version-selector {
           display: flex;
-          align-items: center;
-          gap: 12px;
+          flex-direction: column;
+          gap: 6px;
+          
+          .version-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: theme.$gray_6;
+            margin-bottom: 2px;
+          }
           
           .version-dropdown {
-            width: 160px;
+            width: 180px;
             height: 32px;
             
             :deep(.el-input__wrapper) {
               height: 32px;
               border-radius: 4px;
-              //border: 1px solid theme.$gray_2;
+              border: 1px solid theme.$gray_3;
               background-color: theme.$white;
+              
+              &:hover {
+                border-color: theme.$purple_2;
+              }
+              
+              &.is-focus {
+                border-color: theme.$purple_3;
+                box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+              }
             }
-          }
-        }
-        
-        .search-form {
-          .search-input {
-            width: 300px;
           }
         }
       }
@@ -681,6 +918,27 @@ onMounted(async () => {
         }
       }
     }
+    
+    // Clickable table styling
+    :deep(.clickable-table) {
+      .el-table__row {
+        cursor: pointer;
+        
+        &:hover {
+          background-color: theme.$gray_1;
+        }
+      }
+    }
+  }
+}
+
+// Keyframe animations
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -722,6 +980,90 @@ onMounted(async () => {
       border-color: theme.$purple_3;
       color: theme.$white;
     }
+  }
+}
+
+// Custom dropdown option styling
+:deep(.el-select-dropdown) {
+  .model-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    width: 100%;
+
+    .model-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .model-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: theme.$gray_6;
+      }
+
+      .model-description {
+        font-size: 12px;
+        color: theme.$gray_4;
+        line-height: 1.3;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .model-stats {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+  }
+
+  .version-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    width: 100%;
+
+    .version-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .version-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: theme.$gray_6;
+      }
+
+      .version-date {
+        font-size: 12px;
+        color: theme.$gray_4;
+      }
+    }
+
+    .version-meta {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+  }
+}
+
+// Custom latest indicator styling
+:deep(.el-select-dropdown) {
+  .latest-indicator {
+    font-size: 11px;
+    color: theme.$gray_4;
+    font-style: italic;
+    text-transform: lowercase;
   }
 }
 </style>

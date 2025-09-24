@@ -20,6 +20,7 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         additionalData: `@use "./src/styles/index.scss" as *;`,
+        silenceDeprecations: ['global-builtin', 'legacy-js-api', 'new-global', 'color-functions'],
       },
     },
   },
