@@ -2778,6 +2778,7 @@ export default {
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
 @use "../../../../styles/_icon-item-colors";
+@use "../../../../styles/element/dialog";
 
 #file-name-header {
   font-size: 20px;
