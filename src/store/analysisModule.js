@@ -398,14 +398,40 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
       const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
 
       if (workflow.workflow) {
- // Map each processor from instances to its corresponding status data
-      updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
-        const statusProcessor = result.workflow.find(statusProc => statusProc.uuid === instanceProcessor.uuid);
-        return { ...instanceProcessor, ...statusProcessor };
-      });
+        updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
+          const statusProcessor = result.workflow.find(statusProc => statusProc.uuid === instanceProcessor.uuid);
+          return { ...instanceProcessor, ...statusProcessor };
+        });
+
+        const workflowWithApplications = await Promise.all(
+          updatedResult.workflow.map(async (processor) => {
+            try {
+              const applicationUrl = `${rootState.config.api2Url}/applications/${processor.uuid}`;
+              const applicationResp = await fetch(applicationUrl, {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${userToken}`,
+                },
+              });
+
+              if (applicationResp.ok) {
+                const applicationData = await applicationResp.json();
+                return { ...applicationData, ...processor };
+              } else {
+                console.warn(`Failed to fetch application data for processor ${processor.uuid}`);
+                return processor;
+              }
+
+
+            } catch (error) {
+              console.warn(`Error fetching application data for processor ${processor.uuid}:`, error);
+              return processor;
+            }
+          })
+        );
+              console.log('workflowWithApplications', workflowWithApplications)
+        updatedResult.workflow = workflowWithApplications;
       }
-      
-     
 
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
       

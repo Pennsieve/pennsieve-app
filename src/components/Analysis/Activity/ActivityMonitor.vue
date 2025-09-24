@@ -90,9 +90,9 @@ const getLabel = (workflow, type, index) => {
   }
 
   // Generate default labels based on position
-  if (index === 0) return "Preprocessor";
-  if (workflow && index === workflow.length - 1) return "Postprocessor";
-  return `Processor ${index}`;
+  // if (index === 0) return "Preprocessor";
+  // if (workflow && index === workflow.length - 1) return "Postprocessor";
+  return "Loading...";
 };
 
 const getClass = (workflow, processorIdx) => {
