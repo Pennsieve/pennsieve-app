@@ -1,4 +1,4 @@
-[<script setup>
+<script setup>
 import { useRoute } from "vue-router";
 let route = useRoute();
 </script>
@@ -6,34 +6,10 @@ let route = useRoute();
 <template >
   <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading">
-
-    <template #heading>
-      <h1
-        class="flex-heading"
-      >
-        {{pageName}}
-      </h1>
-    </template>
-
+  <bf-rafter slot="heading" :breadcrumbs="breadcrumbs">
     <template #tabs>
       <router-tabs :tabs="tabs" class="secondary"/>
-
-<!--      <ul-->
-<!--        slot="tabs"-->
-<!--        class="tabs unstyled"-->
-<!--      >-->
-<!--        <li-->
-<!--          v-for="tab in tabs"-->
-<!--          :key="tab.route.name"-->
-<!--        >-->
-<!--          <router-link :to="tab.route">-->
-<!--            {{ tab.label }}-->
-<!--          </router-link>-->
-<!--        </li>-->
-<!--      </ul>-->
     </template>
-
   </bf-rafter>
 </template>
 
@@ -56,6 +32,13 @@ export default {
     RouterTabs
   },
   computed: {
+    /**
+     * Compute breadcrumbs based on current route
+     * @returns {Array}
+     */
+    breadcrumbs: function() {
+      return this.$route.meta.breadcrumbs || []
+    },
 
     /**
      * Compute publishing tab based on user's publisher role

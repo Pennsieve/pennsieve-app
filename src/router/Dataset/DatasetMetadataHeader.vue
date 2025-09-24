@@ -7,21 +7,10 @@ let route = useRoute();
   <div>
     <locked-banner slot="banner" />
 
-    <bf-rafter slot="heading" :link-back=route.meta.backLink :dataset-id="datasetId" :org-id="orgId">
-
-
-      <template #heading>
-        <h1
-          class="flex-heading"
-        >
-          {{pageName}}
-        </h1>
-      </template>
-
+    <bf-rafter slot="heading" :link-back=route.meta.backLink :breadcrumbs="breadcrumbs" :dataset-id="datasetId" :org-id="orgId">
       <template v-if="hasTabs" #tabs>
         <RouterTabs :tabs="tabs" class="secondary"/>
       </template>
-
     </bf-rafter>
   </div>
 
@@ -64,6 +53,13 @@ export default {
     }
   },
   computed: {
+    /**
+     * Compute breadcrumbs based on current route
+     * @returns {Array}
+     */
+    breadcrumbs: function() {
+      return this.$route.meta.breadcrumbs || []
+    },
 
     /**
      * Compute publishing tab based on user's publisher role
@@ -72,13 +68,17 @@ export default {
     tabs: function() {
       return [
         {
-          to: 'graph',
-          name: 'Schema',
+          to: 'models',
+          name: "Models"
         },
         {
-          to: 'records',
+          to: 'records-list',
           name: 'Records',
         },
+        // {
+        //   to: 'graph',
+        //   name: 'Explorer',
+        // },
 
       ]
     },
@@ -92,10 +92,16 @@ export default {
       const r = useRoute()
 
       switch (r.name) {
-        case "records":
-          return "Metadata Records"
-        case "graph":
-          return "Metadata Graph"
+        case "models-list":
+          return "Metadata Models"
+        case "new-model":
+          return "Create Model"
+        case "new-model-from-template":
+          return "Create Models from Template"
+        case "model-details":
+          return "Model Details"
+        case "model-edit":
+          return "Edit Model"
         case "metadata-record":
           return "Metadata Record"
 
