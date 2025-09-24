@@ -326,8 +326,11 @@ const initialState = () => ({
         });
     
         if (resp.ok) {
-          const workflowInstances = await resp.json();
-          const sortedWorkflows = workflowInstances.sort((a, b) => {
+ 
+         const result = await resp.json();
+
+
+          const sortedWorkflows = result.sort((a, b) => {
             const dateA = new Date(a.startedAt).getTime();
             const dateB = new Date(b.startedAt).getTime();
             if (isNaN(dateA)) return 1; 
@@ -393,12 +396,17 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
       // The /instances response is missing status, and the /status response does not tell us the applicationType
       
       const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
-      
-      // Map each processor from instances to its corresponding status data
+      console.log('updatedResult:', updatedResult)
+
+      if (workflow.workflow) {
+ // Map each processor from instances to its corresponding status data
       updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
         const statusProcessor = result.workflow.find(statusProc => statusProc.uuid === instanceProcessor.uuid);
         return { ...instanceProcessor, ...statusProcessor };
       });
+      }
+      
+     
 
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
       

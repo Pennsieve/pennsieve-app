@@ -57,7 +57,7 @@ const cancelWorkflow = () => {
       EventBus.$emit("toast", {
         detail: {
           type: "success",
-          msg: "Your cancellation request was successful. It may take some time to complete.",
+          msg: "Your cancelation request was successful. It may take some time to complete.",
         },
       });
     })
@@ -188,6 +188,7 @@ onMounted(async () => {
   try {
     isLoading.value = true;
     await store.dispatch("analysisModule/fetchWorkflowInstances");
+    await getApplicationsStatus(workflowInstances.value[0]);
   } catch (err) {
     console.error(err);
   } finally {
@@ -198,6 +199,8 @@ onMounted(async () => {
   const workflow = Object.keys(selectedWorkflowActivity.value).length
     ? selectedWorkflowActivity.value
     : workflowInstances.value[0];
+
+  console.log("workflow", workflow);
 
   if (workflowInstances.value.length && !intervalId) {
     try {
