@@ -73,6 +73,14 @@
       </stage-actions>
     </template>
 
+    <bf-delete-dialog
+      ref="deleteDialog"
+      :dialog-visible="deleteDialogVisible"
+      :selected-files="selectedFiles"
+      @file-delete="onDelete"
+      @close="onCloseDeleteDialog"
+    />
+
     <div class="concept-instance-section">
       <div files-section class="file-list">
         <concept-instance-static-property
@@ -538,6 +546,7 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
+      deleteDialogVisible: false
     };
   },
 
@@ -2168,7 +2177,12 @@ export default {
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.$refs.deleteFilesDialog.visible = true;
+      this.selectedFileForAction = {};
+      this.deleteDialogVisible = true;
+    },
+
+    onCloseDeleteDialog: function () {
+      this.deleteDialogVisible = false;
     },
 
     /**
