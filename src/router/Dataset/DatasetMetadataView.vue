@@ -26,9 +26,6 @@ onMounted(async () => {
 
 
 <template>
-
   <router-view name="stage" />
-
-
 </template>
 

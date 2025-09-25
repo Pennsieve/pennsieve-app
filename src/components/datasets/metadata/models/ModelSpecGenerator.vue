@@ -687,7 +687,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
           <p v-else>Update your model specification and properties.</p>
         </div>
         <div class="header-actions">
-          <bf-button @click="cancelAndReturnToList">
+          <bf-button class="secondary" @click="cancelAndReturnToList">
             Cancel
           </bf-button>
           <bf-button type="primary" @click="saveModel">

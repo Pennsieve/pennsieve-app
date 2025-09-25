@@ -9,9 +9,10 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
-import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
+import IconPencil from '@/components/icons/IconPencil.vue'
+import AddRelationshipDialog from './AddRelationshipDialog.vue'
 
 const props = defineProps({
   datasetId: {
@@ -42,6 +43,9 @@ const viewMode = ref('ui') // 'ui' or 'json'
 const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
 const pageSize = 25
+
+// Dialog state
+const showAddRelationshipDialog = ref(false)
 
 // Computed properties
 const recordData = computed(() => {
@@ -169,10 +173,23 @@ const fetchModel = async () => {
 
 const goBackToRecords = () => {
   router.push({
-    name: 'model-records',
+    name: 'model-records-search',
     params: {
+      orgId: router.currentRoute.value.params.orgId,
       datasetId: props.datasetId,
       modelId: props.modelId
+    }
+  })
+}
+
+const goToUpdateRecord = () => {
+  router.push({
+    name: 'update-record',
+    params: {
+      orgId: router.currentRoute.value.params.orgId,
+      datasetId: props.datasetId,
+      modelId: props.modelId,
+      recordId: props.recordId
     }
   })
 }
@@ -235,6 +252,17 @@ const copyRecordId = async () => {
   } catch (error) {
     console.error('Failed to copy record ID:', error)
     ElMessage.error('Failed to copy record ID to clipboard')
+  }
+}
+
+// Copy Model ID to clipboard
+const copyModelId = async () => {
+  try {
+    await navigator.clipboard.writeText(props.modelId)
+    ElMessage.success('Model ID copied to clipboard')
+  } catch (error) {
+    console.error('Failed to copy model ID:', error)
+    ElMessage.error('Failed to copy model ID to clipboard')
   }
 }
 
@@ -321,6 +349,16 @@ const handleOutboundPageChange = (page) => {
   outboundCurrentPage.value = page
 }
 
+// Dialog methods
+const openAddRelationshipDialog = () => {
+  showAddRelationshipDialog.value = true
+}
+
+const handleRelationshipAdded = async () => {
+  // Refresh the current record to show the new relationship
+  await fetchRecord()
+}
+
 // Watch for prop changes to refetch data when navigating between records
 watch([() => props.modelId, () => props.recordId], async () => {
   console.log('Props changed - refetching data for:', props.modelId, props.recordId)
@@ -354,6 +392,14 @@ onMounted(async () => {
 <!--            </template>-->
 <!--            Back to Records-->
 <!--          </bf-button>-->
+        </template>
+        <template #right>
+          <bf-button @click="goToUpdateRecord" size="small">
+            <template #prefix>
+              <IconPencil class="mr-8" :height="16" :width="16" />
+            </template>
+            Update Record
+          </bf-button>
         </template>
       </stage-actions>
     </template>
@@ -396,32 +442,50 @@ onMounted(async () => {
                 <IconCopyDocument :width="12" :height="12" />
               </el-button>
             </el-tag>
-            
+
+            <!-- Model ID Tag -->
+            <el-tag size="small" class="record-tag model-id-tag">
+              Model ID: {{ modelId }}
+              <el-button
+                @click="copyModelId"
+                link
+                size="small"
+                class="tag-action-btn"
+                title="Copy Model ID"
+              >
+                <IconCopyDocument :width="12" :height="12" />
+              </el-button>
+            </el-tag>
+
             <!-- Model Information Group -->
             <el-tag size="small" class="record-tag version-tag">
               Version {{ recordMetadata.model_version }}
-              <el-button 
-                @click="goToModelDetails" 
+              <el-button
+                @click="goToModelDetails"
                 link
-                size="small" 
-                class="tag-action-btn" 
+                size="small"
+                class="tag-action-btn"
                 title="Go to Model Details"
               >
                 <IconArrowRight :width="12" :height="12" />
               </el-button>
             </el-tag>
-            
+
+
+
+          </div>
+          <div class="record-meta">
             <!-- Temporal Information Group -->
             <el-tag size="small" class="record-tag created-tag">
               Created {{ new Date(recordMetadata.created_at).toLocaleDateString() }}
             </el-tag>
-            
+
             <!-- Relationships Group -->
-            <el-tag v-if="relationshipsSummary.inbound > 0" size="small" class="record-tag relationship-tag inbound">
-              ← {{ relationshipsSummary.inbound }} inbound
+            <el-tag size="small" class="record-tag relationship-tag inbound">
+              ← {{ relationshipsSummary.inbound > 0 ? `${relationshipsSummary.inbound} inbound` : 'No inbound' }}
             </el-tag>
-            <el-tag v-if="relationshipsSummary.outbound > 0" size="small" class="record-tag relationship-tag outbound">
-              {{ relationshipsSummary.outbound }} outbound →
+            <el-tag size="small" class="record-tag relationship-tag outbound">
+              {{ relationshipsSummary.outbound > 0 ? `${relationshipsSummary.outbound} outbound` : 'No outbound' }} →
             </el-tag>
           </div>
         </div>
@@ -458,21 +522,28 @@ onMounted(async () => {
         </div>
 
         <!-- Relationships Section -->
-        <div v-if="hasRelationships" class="section">
+        <div class="section">
           <div class="section-header">
             <h3>Relationships</h3>
-            <el-tag type="info" size="small">
-              {{ relationshipsSummary.total }} connections
-            </el-tag>
+            <div class="header-actions">
+              <el-tag type="info" size="small">
+                {{ relationshipsSummary.total }} connections
+              </el-tag>
+              <span class="add-relationship-link" @click="openAddRelationshipDialog">
+                Add Relationship
+              </span>
+            </div>
           </div>
 
           <div class="relationships-container">
             <!-- Simplified Relationships List -->
             <div class="relationships-list">
               <!-- Inbound Relationships -->
-              <div v-if="relationships.inbound.length > 0" class="relationship-section">
+              <div class="relationship-section">
                 <h4 class="relationship-section-title inbound">← Inbound</h4>
-                <div class="relationship-items">
+                
+                <!-- Inbound relationships exist -->
+                <div v-if="relationships.inbound.length > 0" class="relationship-items">
                   <div
                     v-for="(relationship, index) in paginatedInboundRelationships"
                     :key="`inbound-${index}`"
@@ -484,6 +555,11 @@ onMounted(async () => {
                     <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
                     <IconArrowRight class="nav-icon" :width="12" :height="12" />
                   </div>
+                </div>
+                
+                <!-- No inbound relationships -->
+                <div v-else class="no-relationships">
+                  <p class="no-relationships-message">No inbound relationships</p>
                 </div>
                 
                 <!-- Inbound Pagination -->
@@ -501,9 +577,11 @@ onMounted(async () => {
               </div>
 
               <!-- Outbound Relationships -->
-              <div v-if="relationships.outbound.length > 0" class="relationship-section">
+              <div class="relationship-section">
                 <h4 class="relationship-section-title outbound">Outbound →</h4>
-                <div class="relationship-items">
+                
+                <!-- Outbound relationships exist -->
+                <div v-if="relationships.outbound.length > 0" class="relationship-items">
                   <div
                     v-for="(relationship, index) in paginatedOutboundRelationships"
                     :key="`outbound-${index}`"
@@ -515,6 +593,11 @@ onMounted(async () => {
                     <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
                     <IconArrowRight class="nav-icon" :width="12" :height="12" />
                   </div>
+                </div>
+                
+                <!-- No outbound relationships -->
+                <div v-else class="no-relationships">
+                  <p class="no-relationships-message">No outbound relationships</p>
                 </div>
                 
                 <!-- Outbound Pagination -->
@@ -547,12 +630,23 @@ onMounted(async () => {
         </el-card>
       </div>
     </div>
+
+    <!-- Add Relationship Dialog -->
+    <AddRelationshipDialog
+      v-model:visible="showAddRelationshipDialog"
+      :source-record-id="recordId"
+      :source-model-id="modelId"
+      :dataset-id="datasetId"
+      @relationship-added="handleRelationshipAdded"
+    />
   </bf-stage>
 </template>
 
 <style lang="scss" scoped>
 @use 'sass:color';
 @use '../../../../styles/theme' as theme;
+@use '../../../../styles/element/select';
+@use '../../../../styles/element/dialog';
 
 
 .record-spec-viewer {
@@ -587,14 +681,14 @@ onMounted(async () => {
   }
 
   .record-content {
-    padding: 24px;
+    padding: 0 24px 24px 24px;
 
     .record-header {
       margin-bottom: 24px;
 
       .record-info {
         h2 {
-          margin: 0 0 12px 0;
+          margin: 8px 0 12px 0;
           font-size: 24px;
           font-weight: 600;
           color: theme.$gray_6;
@@ -604,6 +698,7 @@ onMounted(async () => {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
+          margin-top: 4px;
           
           // Base styling for all record tags
           .record-tag {
@@ -634,40 +729,41 @@ onMounted(async () => {
             }
 
             // Record Identification Group (teal theme)
-            &.record-id-tag {
-              background-color: theme.$teal_tint !important;
-              border-color: theme.$teal_1 !important;
-              color: theme.$teal_1 !important;
+            &.record-id-tag,
+            &.model-id-tag {
+              background-color: theme.$gray_1 !important;
+              border-color: theme.$gray_3 !important;
+              color: theme.$gray_4 !important;
               
-              .tag-action-btn {
-                color: theme.$teal_1 !important;
-                
-                &:hover {
-                  color: theme.$teal_2 !important;
-                }
-              }
+              //.tag-action-btn {
+              //  color: theme.$gray_4 !important;
+              //
+              //  &:hover {
+              //    color: theme.$gray_5 !important;
+              //  }
+              //}
             }
 
             // Model Information Group (green theme)
             &.version-tag {
-              background-color: theme.$green_tint !important;
-              border-color: theme.$green_1 !important;
-              color: theme.$green_1 !important;
+              background-color: theme.$gray_1 !important;
+              border-color: theme.$gray_3 !important;
+              color: theme.$gray_4 !important;
               
-              .tag-action-btn {
-                color: theme.$green_1 !important;
-                
-                &:hover {
-                  color: theme.$green_2 !important;
-                }
-              }
+              //.tag-action-btn {
+              //  color: theme.$gray_4 !important;
+              //
+              //  &:hover {
+              //    color: theme.$gray_5 !important;
+              //  }
+              //}
             }
 
             // Temporal Information Group (gray theme)
             &.created-tag {
-              background-color: theme.$gray_1 !important;
-              border-color: theme.$gray_3 !important;
-              color: theme.$gray_5 !important;
+              background-color: theme.$teal_tint !important;
+              border-color: theme.$teal_1 !important;
+              color: theme.$teal_2 !important;
             }
 
             // Relationships Group
@@ -696,6 +792,8 @@ onMounted(async () => {
       gap: 32px;
 
       .section {
+
+
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -706,9 +804,33 @@ onMounted(async () => {
 
           h3 {
             margin: 0;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 500;
             color: theme.$gray_6;
+          }
+          
+          .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            
+            .add-relationship-link {
+              color: theme.$purple_1;
+              font-size: 13px;
+              font-weight: 500;
+              cursor: pointer;
+              text-decoration: none;
+              transition: all 0.2s ease;
+              
+              &:hover {
+                color: theme.$purple_2;
+                text-decoration: underline;
+              }
+              
+              &:active {
+                color: theme.$purple_1;
+              }
+            }
           }
         }
 
@@ -741,7 +863,7 @@ onMounted(async () => {
 
         // Minimal metadata section
         &:last-child {
-          margin-top: 8px;
+          margin-top: 16px;
           
           .section-header {
             margin-bottom: 12px;
@@ -857,6 +979,22 @@ onMounted(async () => {
                     transition: color 0.2s ease;
                     flex-shrink: 0;
                   }
+                }
+              }
+
+              // No relationships styling - subtle and clean
+              .no-relationships {
+                padding: 20px 16px;
+                text-align: center;
+                background-color: theme.$gray_1;
+                border: 1px solid theme.$gray_2;
+                margin: 4px 0;
+
+                .no-relationships-message {
+                  margin: 0;
+                  color: theme.$gray_4;
+                  font-size: 13px;
+                  font-style: italic;
                 }
               }
 

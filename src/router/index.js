@@ -10,7 +10,7 @@ import TemplateSpecViewer from "@/components/datasets/metadata/models/TemplateSp
 import TemplateSpecGenerator from "@/components/datasets/metadata/models/TemplateSpecGenerator.vue";
 import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
-import CreateRecord from "@/components/datasets/metadata/models/CreateRecord.vue";
+import RecordSpecGenerator from "@/components/datasets/metadata/models/RecordSpecGenerator.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -119,12 +119,12 @@ const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/Wo
  * Metadata Components
  */
 // const DatasetRecords = () => import('../components/datasets/records/DatasetRecords/DatasetRecords.vue')
-const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
-const ModelRecordsSelector = () => import('../components/datasets/metadata/models/ModelRecordsSelector.vue')
-const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
+// const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
+// const ModelRecordsSelector = () => import('../components/datasets/metadata/models/ModelRecordsSelector.vue')
+// const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
 const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
-const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
+// const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
 
@@ -580,7 +580,24 @@ const router = createRouter({
                     ]
                   },
                   components: {
-                    stage: CreateRecord
+                    stage: RecordSpecGenerator
+                  }
+                },
+                {
+                  path: ':modelId/:recordId/update',
+                  name: 'update-record',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Record Details", to: "record-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Record Details", to: "record-details" },
+                      { name: "Update Record", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: RecordSpecGenerator
                   }
                 },
                 {

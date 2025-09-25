@@ -22,6 +22,10 @@ const props = defineProps({
   modelId: {
     type: String,
     required: true
+  },
+  recordId: {
+    type: String,
+    required: false
   }
 })
 
@@ -31,6 +35,7 @@ const route = useRoute()
 
 // Reactive data
 const model = ref(null)
+const existingRecord = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -58,6 +63,8 @@ try {
 }
 
 // Computed properties
+const isUpdateMode = computed(() => !!props.recordId)
+
 const modelSchema = computed(() => {
   if (!model.value?.latest_version?.schema) return null
   return model.value.latest_version.schema
@@ -253,6 +260,26 @@ const fetchModel = async () => {
   }
 }
 
+const fetchExistingRecord = async () => {
+  if (!isUpdateMode.value || !props.recordId) return
+  
+  try {
+    loading.value = true
+    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId)
+    existingRecord.value = response
+    
+    // Populate form with existing record data
+    if (response && response.value) {
+      formData.value = { ...response.value }
+    }
+  } catch (err) {
+    console.error('Error fetching existing record:', err)
+    error.value = err.message || 'Failed to load existing record'
+  } finally {
+    loading.value = false
+  }
+}
+
 const initializeFormData = () => {
   const data = {}
   
@@ -282,7 +309,10 @@ const initializeFormData = () => {
     })
   }
   
-  formData.value = data
+  // Only set defaults if not in update mode (existing data will be loaded separately)
+  if (!isUpdateMode.value) {
+    formData.value = data
+  }
 }
 
 const handleCancel = () => {
@@ -318,12 +348,19 @@ const handleSubmit = async () => {
   saving.value = true
   
   try {
-    await createRecord()
-    ElMessage.success('Record created successfully')
-    goBackToRecords()
+    if (isUpdateMode.value) {
+      await updateRecord()
+      ElMessage.success('Record updated successfully')
+      // Navigate back to records list since the record ID changes after update
+      goBackToRecords()
+    } else {
+      await createRecord()
+      ElMessage.success('Record created successfully')
+      goBackToRecords()
+    }
   } catch (err) {
-    console.error('Error creating record:', err)
-    ElMessage.error(err.message || 'Failed to create record')
+    console.error(`Error ${isUpdateMode.value ? 'updating' : 'creating'} record:`, err)
+    ElMessage.error(err.message || `Failed to ${isUpdateMode.value ? 'update' : 'create'} record`)
   } finally {
     saving.value = false
   }
@@ -341,6 +378,21 @@ const createRecord = async () => {
     return response
   } catch (err) {
     throw new Error(err.message || 'Failed to create record')
+  }
+}
+
+const updateRecord = async () => {
+  try {
+    const response = await metadataStore.updateRecord(
+      props.datasetId,
+      props.modelId,
+      props.recordId,
+      recordJson.value
+    )
+    
+    return response
+  } catch (err) {
+    throw new Error(err.message || 'Failed to update record')
   }
 }
 
@@ -603,6 +655,9 @@ const getSuggestion = (error) => {
 // Initialize
 onMounted(async () => {
   await fetchModel()
+  if (isUpdateMode.value) {
+    await fetchExistingRecord()
+  }
 })
 </script>
 
@@ -624,7 +679,7 @@ onMounted(async () => {
               :loading="saving"
               :disabled="!isValidRecord"
             >
-              Create Record
+              {{ isUpdateMode ? 'Save Record' : 'Save Record' }}
             </bf-button>
           </div>
         </template>
@@ -654,7 +709,7 @@ onMounted(async () => {
       <!-- Header -->
       <div class="create-header">
         <div class="create-info">
-          <h2>Create New {{ model.display_name || model.name }} Record</h2>
+          <h2>{{ isUpdateMode ? 'Update' : 'Create New' }} <span class="model-name-highlight">{{ model.display_name || model.name }}</span> Record</h2>
           <div class="create-meta">
             <el-tag type="info" size="small" class="model-id-tag">
               Model: {{ model.name }}
@@ -793,7 +848,7 @@ onMounted(async () => {
           <div v-if="!isValidRecord" class="validation-section">
             <div class="validation-header">
               <h4>Validation Issues</h4>
-              <p>Please address the following to create a valid record:</p>
+              <p>Please address the following to {{ isUpdateMode ? 'update' : 'create' }} a valid record:</p>
             </div>
             
             <div class="validation-list">
@@ -812,7 +867,7 @@ onMounted(async () => {
           <!-- Success Message -->
           <div v-else class="validation-success">
             <h4>✅ Validation Passed</h4>
-            <p>This record conforms to the model's JSON schema and is ready to be created.</p>
+            <p>This record conforms to the model's JSON schema and is ready to be {{ isUpdateMode ? 'updated' : 'created' }}.</p>
           </div>
         </el-card>
       </div>
@@ -871,10 +926,14 @@ onMounted(async () => {
 
       .create-info {
         h2 {
-          margin: 0 0 8px 0;
           font-size: 24px;
-          font-weight: 600;
+          font-weight: 400;
           color: theme.$gray_6;
+          
+          .model-name-highlight {
+            color: theme.$purple_1;
+            font-weight: 600;
+          }
         }
 
         .create-meta {
