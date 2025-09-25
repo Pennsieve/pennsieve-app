@@ -5,6 +5,9 @@ import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import RecordFilter from './RecordFilterStyled.vue'
 import ModelSelectorDialog from './ModelSelectorDialog.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import StageActions from "@/components/shared/StageActions/StageActions.vue";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 // Props
 const props = defineProps({
@@ -67,7 +70,15 @@ const hasRecords = computed(() => records.value.length > 0)
 const recordsHeading = computed(() => {
   const modelName = model.value?.display_name || model.value?.name || 'Unknown Model'
   const recordsText = records.value.length === 1 ? 'record' : 'records'
-  const versionText = selectedVersion.value ? ` (v${selectedVersion.value})` : ''
+  
+  let versionText = ''
+  if (selectedVersion.value === 'all') {
+    versionText = ' (All Versions)'
+  } else if (selectedVersion.value === 'latest') {
+    versionText = ` (Latest - v${model.value?.latest_version?.version || 1})`
+  } else if (selectedVersion.value) {
+    versionText = ` (v${selectedVersion.value})`
+  }
   
   return `Showing ${records.value.length} ${recordsText} in ${modelName}${versionText} (Page ${currentPageNumber.value})`
 })
@@ -76,7 +87,17 @@ const versionOptions = computed(() => {
   const options = []
   const latestVersionNum = model.value?.latest_version?.version || 1
   
-  // Always show "Latest" as first option
+  // Always show "All Versions" as first option
+  options.push({
+    value: 'all',
+    label: 'All Versions',
+    isAll: true,
+    version: null,
+    createdAt: null,
+    author: null
+  })
+  
+  // Then show "Latest" as second option
   options.push({
     value: 'latest',
     label: `Latest (v${latestVersionNum})`,
@@ -144,10 +165,14 @@ const fetchRecords = async (cursor = null, direction = 'forward', resetPaginatio
       hasPreviousPage.value = false
     }
     
-    // Convert "latest" to actual version number for API call
-    const apiVersion = selectedVersion.value === 'latest' 
-      ? model.value?.latest_version?.version 
-      : selectedVersion.value
+    // Handle version parameter for API call
+    let apiVersion = null
+    if (selectedVersion.value === 'latest') {
+      apiVersion = model.value?.latest_version?.version
+    } else if (selectedVersion.value !== 'all') {
+      apiVersion = selectedVersion.value
+    }
+    // If selectedVersion.value === 'all', apiVersion remains null (omit version parameter)
     
     const options = {
       limit: pageSize.value,
@@ -216,12 +241,12 @@ const fetchModel = async () => {
     
     if (model.value?.latest_version?.schema) {
       modelSchema.value = model.value.latest_version.schema
-      // Initialize selected version based on route param or default to latest
+      // Initialize selected version based on route param or default to all versions
       if (!selectedVersion.value) {
         if (props.versionId) {
           selectedVersion.value = props.versionId
         } else {
-          selectedVersion.value = 'latest'
+          selectedVersion.value = 'all'
         }
       }
     } else {
@@ -351,6 +376,7 @@ const onPageSizeChange = (size) => {
 
 const normalizeVersion = (version) => {
   if (!version || version === 'latest') return 'latest'
+  if (version === 'all') return 'all'
   return version.toString()
 }
 
@@ -430,6 +456,17 @@ const goToRecordDetails = (record) => {
   })
 }
 
+const createRecord = () => {
+  router.push({
+    name: 'create-record',
+    params: {
+      orgId: router.currentRoute.value.params.orgId,
+      datasetId: props.datasetId,
+      modelId: props.modelId
+    }
+  })
+}
+
 // Watch for route changes
 watch(() => [props.datasetId, props.modelId], () => {
   Promise.all([fetchModel(), fetchVersions()]).then(() => {
@@ -446,71 +483,81 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="list-records">
-    <!-- Header with model info and search -->
-    <div class="records-header">
-      <div class="header-content">
-        <div class="header-info">
-          <div class="model-title-section">
-            <div class="model-title-content" @click="openModelSelector" :class="{ 'loading': loadingModels }">
-              <h2 v-if="model" class="model-title">{{ model.display_name || model.name }}</h2>
-              <div class="model-selector-icon" :class="{ 'loading': loadingModels }">
-                <svg v-if="!loadingModels" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 10l5 5 5-5H7z"/>
-                </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="loading-spinner">
-                  <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
-                  <path d="M12,4a8,8,0,0,1,8,8" />
-                </svg>
+  <bf-stage class="list-records" >
+    <template #actions>
+      <stage-actions>
+        <template #left>
+          <div class="left-wrapper">
+            <!-- Model Selector -->
+            <div class="model-selector-section">
+              <!--            <div class="model-label">Model</div>-->
+              <div class="model-title-content" @click="openModelSelector" :class="{ 'loading': loadingModels }">
+                <h3 v-if="model" class="model-title">{{ model.display_name || model.name }}</h3>
+                <div class="model-selector-icon" :class="{ 'loading': loadingModels }">
+                  <svg v-if="!loadingModels" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 10l5 5 5-5H7z"/>
+                  </svg>
+                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="loading-spinner">
+                    <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
+                    <path d="M12,4a8,8,0,0,1,8,8" />
+                  </svg>
+                </div>
               </div>
             </div>
-            <p v-if="model" class="model-description">{{ model.description || 'No description available' }}</p>
-          </div>
-        </div>
-        
-        <div class="version-controls">
-          <div class="version-selector">
-            <label class="version-label">Model Version</label>
-            <el-select 
-              :model-value="selectedVersion"
-              @update:model-value="onVersionChange"
-              placeholder="Choose version..."
-              size="small"
-              :loading="loadingVersions"
-              :disabled="!versionOptions.length && !loadingVersions"
-              class="version-dropdown"
-            >
-              <el-option
-                v-for="version in versionOptions"
-                :key="version.value"
-                :label="version.label"
-                :value="version.value"
+
+            <!-- Version Selector -->
+            <div class="version-selector-section">
+              <!--            <label class="selector-label">Version</label>-->
+              <el-select
+                :model-value="selectedVersion"
+                @update:model-value="onVersionChange"
+                placeholder="Choose version..."
+                :loading="loadingVersions"
+                :disabled="!versionOptions.length && !loadingVersions"
+                class="version-dropdown-compact"
               >
-                <div class="version-option">
-                  <div class="version-info">
-                    <span class="version-label">{{ version.label }}</span>
-                    <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
+                <el-option
+                  v-for="version in versionOptions"
+                  :key="version.value"
+                  :label="version.label"
+                  :value="version.value"
+                >
+                  <div class="version-option">
+                    <div class="version-info">
+                      <span class="version-label">{{ version.label }}</span>
+                      <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
+                    </div>
                   </div>
-                </div>
-              </el-option>
-            </el-select>
+                </el-option>
+              </el-select>
+            </div>
           </div>
-        </div>
-        
-        <!-- Model Selector Dialog -->
-        <ModelSelectorDialog
-          v-model:visible="modelSelectorVisible"
-          :models="modelOptions"
-          :current-model-id="modelId"
-          :loading="loadingModels"
-          @select="selectModel"
-          @cancel="modelSelectorVisible = false"
-        />
-      </div>
-    </div>
+
+        </template>
+        <template #right>
+          <!-- Create Record Button -->
+          <bf-button @click="createRecord" size="small">
+            <template #prefix>
+              <IconPlus class="mr-8" :height="16" :width="16" />
+            </template>
+            Create Record
+          </bf-button>
+        </template>
+      </stage-actions>
+    </template>
+    <!-- Model Selector Dialog -->
+    <ModelSelectorDialog
+      v-model:visible="modelSelectorVisible"
+      :models="modelOptions"
+      :current-model-id="modelId"
+      :loading="loadingModels"
+      @select="selectModel"
+      @cancel="modelSelectorVisible = false"
+    />
 
     <!-- Record Filters - Always show when schema is available -->
     <record-filter
+      class="record-filter-section"
       v-if="modelSchema && !error"
       :model-schema="modelSchema"
       @filter-change="onFilterChange"
@@ -572,7 +619,6 @@ onMounted(async () => {
           v-loading="loading"
           stripe
           style="width: 100%"
-          :default-sort="{ prop: 'created_at', order: 'descending' }"
           @row-click="goToRecordDetails"
           class="clickable-table"
         >
@@ -595,7 +641,6 @@ onMounted(async () => {
             prop="created_at"
             label="Created"
             width="180"
-            sortable
           >
             <template #default="{ row }">
               {{ new Date(row.created_at).toLocaleString() }}
@@ -647,7 +692,7 @@ onMounted(async () => {
         </div>
       </div>
     </div>
-  </div>
+  </bf-stage>
 </template>
 
 <style lang="scss" scoped>
@@ -656,153 +701,160 @@ onMounted(async () => {
 @use '../../../../styles/element/select';
 @use '../../../../styles/element/input';
 @use '../../../../styles/element/dialog';
+@use '../../../../styles/element/dropdown';
+
+.record-filter-section {
+}
 
 .list-records {
   padding: 24px;
   
-  .records-header {
-    margin-bottom: 40px;
-    
-    .header-content {
+  // Stage actions compact selectors
+  :deep(.stage-actions) {
+    align-items: flex-end; // Align items to bottom to prevent stretching
+
+    .left-wrapper {
+      align-items: center;
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 24px;
-      
-      .header-info {
-        flex: 1;
+      flex-direction: row;
+    }
+
+    .model-selector-section,
+    .version-selector-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .selector-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: theme.$gray_5;
+        margin: 0;
+      }
+
+      .model-label {
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 16px;
+        color: theme.$gray_5;
+      }
+
+      .model-title-prefix {
+        font-size: 12px;
+        font-weight: 300;
+      }
+
+    }
+    
+    // Ensure Create Record button doesn't stretch
+    .bf-button,
+    button {
+      align-self: flex-end;
+      height: 32px; // Match the height of other controls
+    }
+    
+    .model-selector-section {
+      .model-title-content {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px;
+        margin: 8px 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: theme.$white;
+        //border: 1px solid theme.$gray_3;
+        border-radius: 4px;
+        user-select: none;
+        min-height: 32px;
+
         
-        .model-title-section {
-          .model-title-content {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            padding: 8px 12px 8px 0;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: transparent;
-            border: 1px solid transparent;
-            user-select: none;
-            
-            &:hover:not(.loading) {
-              background-color: theme.$gray_1;
-            }
-            
-            &:active:not(.loading) {
-              background-color: theme.$gray_2;
-            }
-            
-            &.loading {
-              cursor: default;
-              opacity: 0.7;
-            }
-            
-            .model-title {
-              margin: 0;
-              font-size: 24px;
-              font-weight: 600;
-              color: theme.$gray_6;
-              transition: color 0.2s ease;
-            }
-            
-            .model-selector-icon {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 28px;
-              height: 28px;
-              border-radius: 3px;
-              color: theme.$purple_3;
-              background-color: theme.$white;
-              border: 1px solid theme.$gray_2;
-              transition: all 0.2s ease;
-              flex-shrink: 0;
-              
-              &:not(.loading) {
-                transform: translateY(0);
-              }
-              
-              svg {
-                display: block;
-                transition: transform 0.2s ease;
-              }
-            }
-            
-            &:hover:not(.loading) .model-selector-icon {
-              //background-color: theme.$purple_1;
-              border-color: theme.$purple_2;
-              color: theme.$purple_3;
-              
-              svg {
-                transform: translateY(1px);
-              }
-            }
-            
-            &:active:not(.loading) .model-selector-icon {
-              background-color: theme.$purple_2;
-              border-color: theme.$purple_3;
-              
-              svg {
-                transform: translateY(2px);
-              }
-            }
-            
-            .loading-spinner {
-              animation: spin 1s linear infinite;
-            }
-          }
+        &:hover:not(.loading) {
+          background-color: theme.$gray_1;
+          border-color: theme.$purple_2;
+        }
+        
+        &.loading {
+          cursor: default;
+          opacity: 0.7;
+        }
+        
+        .model-title {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 500;
+          color: theme.$purple_3;
+          transition: color 0.2s ease;
+          white-space: nowrap;
+          //overflow: hidden;
+          text-overflow: ellipsis;
+          //min-width: 70px;
+
+        }
+        
+        .model-selector-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 16px;
+          height: 16px;
+          color: theme.$gray_5;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
           
-          .model-description {
-            margin: 0;
-            color: theme.$gray_5;
-            font-size: 16px;
+          svg {
+            display: block;
+            transition: transform 0.2s ease;
           }
         }
         
-        p {
-          margin: 0;
-          color: theme.$gray_5;
-          font-size: 14px;
+        &:hover:not(.loading) .model-selector-icon {
+          color: theme.$purple_3;
+          
+          svg {
+            transform: translateY(1px);
+          }
+        }
+        
+        .loading-spinner {
+          animation: spin 1s linear infinite;
         }
       }
-      
-      .version-controls {
-        flex-shrink: 0;
-        display: flex;
-        align-items: flex-start;
+    }
+    
+    .version-dropdown-compact {
+      width: 140px;
+      height: 32px;
+
+      :deep(.el-input__wrapper) {
+        height: 32px;
+        border-radius: 4px;
+        border: 1px solid theme.$gray_3;
+        background-color: theme.$white;
+        box-shadow: none;
         
-        .version-selector {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
+        &:hover:not(.is-disabled) {
+          border-color: theme.$purple_2;
+          background-color: theme.$white;
+        }
+        
+        &.is-focus {
+          border-color: theme.$purple_3;
+          box-shadow: 0 0 0 2px rgba(1, 31, 91, 0.1);
+        }
+        
+        .el-input__inner {
+          color: theme.$gray_6;
+          font-size: 14px;
           
-          .version-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: theme.$gray_6;
-            margin-bottom: 2px;
+          &::placeholder {
+            color: theme.$gray_4;
           }
-          
-          .version-dropdown {
-            width: 180px;
-            height: 32px;
-            
-            :deep(.el-input__wrapper) {
-              height: 32px;
-              border-radius: 4px;
-              border: 1px solid theme.$gray_3;
-              background-color: theme.$white;
-              
-              &:hover {
-                border-color: theme.$purple_2;
-              }
-              
-              &.is-focus {
-                border-color: theme.$purple_3;
-                box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
-              }
-            }
+        }
+        
+        .el-input__suffix {
+          .el-icon {
+            color: theme.$gray_5;
           }
         }
       }
@@ -985,6 +1037,30 @@ onMounted(async () => {
 
 // Custom dropdown option styling
 :deep(.el-select-dropdown) {
+  // Override Element Plus dropdown item colors
+  .el-select-dropdown__item {
+    color: theme.$gray_6;
+    
+    &:hover:not(.is-disabled) {
+      background-color: theme.$gray_1;
+      color: theme.$purple_3;
+    }
+    
+    &.is-selected {
+      color: theme.$purple_3;
+      font-weight: 600;
+      
+      &:hover {
+        background-color: theme.$gray_1;
+      }
+    }
+    
+    &.is-disabled {
+      color: theme.$gray_3;
+      cursor: not-allowed;
+    }
+  }
+  
   .model-option {
     display: flex;
     justify-content: space-between;
@@ -1001,7 +1077,7 @@ onMounted(async () => {
       .model-name {
         font-size: 14px;
         font-weight: 500;
-        color: theme.$gray_6;
+        color: inherit;
       }
 
       .model-description {
@@ -1039,7 +1115,7 @@ onMounted(async () => {
       .version-label {
         font-size: 14px;
         font-weight: 500;
-        color: theme.$gray_6;
+        color: inherit;
       }
 
       .version-date {

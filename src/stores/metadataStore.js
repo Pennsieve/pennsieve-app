@@ -679,6 +679,128 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Update an existing record to create a new version
+    const updateRecord = async (datasetId, modelId, recordId, recordData) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
+            const token = await useGetToken()
+
+            const queryParams = toQueryParams({
+                dataset_id: datasetId
+            })
+
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                record: recordData
+            }
+
+            const resp = await fetch(url, {
+                method: 'PUT',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to update record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error updating record:', error)
+            throw error
+        }
+    }
+
+    /**
+     * Create a relationship between records
+     * @param {string} datasetId - The dataset ID
+     * @param {string} sourceRecordId - The source record ID
+     * @param {string} targetRecordId - The target record ID  
+     * @param {string} relationshipType - The type of relationship
+     * @returns {Promise<Object>} The created relationship
+     */
+    const createRelationship = async (datasetId, sourceRecordId, targetRecordId, relationshipType) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${sourceRecordId}/relationships`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                target_record_id: targetRecordId,
+                relationship_type: relationshipType
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to create relationship: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error creating relationship:', error)
+            throw error
+        }
+    }
+
+    /**
+     * Search records across all models in a dataset
+     * @param {string} datasetId - The dataset ID
+     * @param {string} query - The search query
+     * @param {number} limit - Maximum number of results to return
+     * @returns {Promise<Array>} Array of matching records
+     */
+    const searchRecords = async (datasetId, query, limit = 20) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/search`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ 
+                dataset_id: datasetId,
+                query: query,
+                limit: limit
+            })
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+
+            if (resp.ok) {
+                const data = await resp.json()
+                return data.records || []
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to search records: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error searching records:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -700,6 +822,9 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchRecords,
         fetchRecord,
         createRecord,
+        updateRecord,
+        createRelationship,
+        searchRecords,
         createModel,
         createModels,
         createModelFromTemplate,
