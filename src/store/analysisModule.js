@@ -373,7 +373,6 @@ const initialState = () => ({
       }
     },
 setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
-
   if (!workflow) {
     commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
     return;
@@ -429,12 +428,22 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
             }
           })
         );
-              console.log('workflowWithApplications', workflowWithApplications)
         updatedResult.workflow = workflowWithApplications;
       }
+      // orginal array is not ordered based on execution order, so we use the startedAt time to derrive the execution order
+      // execution order is available on the `/workflows` endpoint, but this avoids extra API calls
 
-      commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
-      
+      const sortByStartedAt = (applications, ascending = true) => {
+        return [...applications].sort((a, b) => {
+          const timeA = new Date(a.startedAt);
+          const timeB = new Date(b.startedAt);
+        return ascending ? timeA - timeB : timeB - timeA;
+        });
+      };
+
+      const sortedWorkflow = sortByStartedAt( updatedResult.workflow, true ) 
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', {...updatedResult, workflow: sortedWorkflow} );
+
       const updatedProcessor = updatedResult.workflow.find(
         processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
       );
@@ -444,6 +453,7 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
           dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
         }
       }
+
     } else {
       return Promise.reject(resp)
     }
