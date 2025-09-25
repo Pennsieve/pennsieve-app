@@ -1,66 +1,108 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { useStore } from 'vuex';
-import { PublicationStatus } from '../../../utils/constants';
-
-/* 
-Props
-*/
-const props = defineProps({
-  dialogVisible: Boolean,
-});
+import { computed, ref, watch } from 'vue'
+import { useStore } from 'vuex'
+import { PublicationStatus } from '../../../utils/constants'
+import { PennsieveDashboard, MarkdownWidget, TextWidget } from 'pennsieve-dashboard'
+import 'element-plus/dist/index.css';
+import 'pennsieve-dashboard/style.css'
 
 
-/*
-Emits
-*/
-const emit = defineEmits(["close-dialog"]);
+// props / emits
+const props = defineProps({ dialogVisible: Boolean })
+const emit  = defineEmits(['close-dialog'])
 
-/* 
-Global State
-*/
-const store = useStore();
-const dataset = computed(() => store.state.dataset);
-/*
-Computed
-*/
-const publicationStatus = computed(() => {
-  return (dataset.value?.publication?.status ?? PublicationStatus.DRAFT).toUpperCase();
-});
+// store
+const store   = useStore()
+const dataset = computed(() => store.state.dataset)
+
+// Computed
+const publicationStatus = computed(() =>
+  (dataset.value?.publication?.status ?? PublicationStatus.DRAFT).toUpperCase()
+)
 
 const filesCount = computed(() => {
-  const counts = dataset.value?.packageTypeCounts;
-  return counts ? Object.values(counts).filter(Number.isFinite).reduce((sum, val) => sum + val, 0).toString() : "0";
-});
-
-const collaboratorCounts = computed(()=>{
-  const counts = dataset.value?.collaboratorCounts;
-  return counts ? Object.values(counts).filter(Number.isFinite).reduce((sum, val) => sum + val, 0).toString() : "0";
+  const counts = dataset.value?.packageTypeCounts
+  return counts
+    ? Object.values(counts).filter(Number.isFinite).reduce((sum, v) => sum + v, 0).toString()
+    : '0'
 })
+
+const collaboratorCounts = computed(() => {
+  const counts = dataset.value?.collaboratorCounts
+  return counts
+    ? Object.values(counts).filter(Number.isFinite).reduce((sum, v) => sum + v, 0).toString()
+    : '0'
+})
+
+// Component Options
+const availableWidgets = [
+  { name: 'TextWidget', component: TextWidget },
+  { name: 'MarkdownWidget', component: MarkdownWidget },
+]
+
+const defaultLayout = [
+        {
+          id: 'MarkdownWidget-6',
+          x: 0, y: 0, w: 4, h: 7,
+          componentKey: 'MarkdownWidget',
+          componentName: 'Markdown Widget',
+          component: MarkdownWidget,   
+          Props:{
+            markdownText:[
+          '# Dataset Overview',
+          '',
+          'This dashboard gives you an at-a-glance overview of the metrics of your Dataset',
+          '',
+          '## Widgets',
+          '',
+          '### Text Widgets',
+          'These are customizable and allow you to track the variables that are important to you. *Click on the pencil icon to edit*',
+          '',
+          'Click **Edit Grid** to add or rearrange widgets',
+          '',
+        ].join('\n')
+          }
+        },
+        { 
+          id: "TextWidget-2", 
+          x: 4, y: 0, h: 2, w:1, 
+          componentName:"Files",
+          componentKey:"TextWidget",
+          component:TextWidget,
+          Props:{bindedKey:"FileCount"} 
+        },
+        { 
+          id: "TextWidget-3", 
+          x: 5, y: 0, h: 2, w:2, 
+          componentName:"Status",
+          componentKey:"TextWidget",
+          component:TextWidget,
+          Props:{bindedKey:"Status"}
+        },
+        { 
+          id: "TextWidget-4", 
+          x: 4, y: 2, h: 2, w:2, 
+          componentName:"Collaborator Counts",
+          componentKey:"TextWidget",
+          component:TextWidget,
+          Props:{bindedKey:"CollaboratorCounts"}}
+      ]
 
 const dashboardOptions = computed(() => ({
   globalData: {
     FileCount: filesCount.value,
     Status: publicationStatus.value,
-    CollaboratorCounts: collaboratorCounts.value
-  }
-}));
+    CollaboratorCounts: collaboratorCounts.value,
+  },
+  availableWidgets,
+  defaultLayout,
+}))
 
-/* 
-Local State
-*/
+// Dashboard Key
+const dashboardKey = computed(() => String(dataset.value?.content?.id ?? 'none'))
 
-const dashboardItems=
-[{ id: "TextWidget-1", x: 0, y: 0, h: 1, w:4, componentName:"Text",component:"TextWidget",hideHeader:true, Props:{displayText:"Dataset Overview",hideHeader:true} },
-{ id: "TextWidget-2", x: 0, y: 1, h: 2, w:1, componentName:"Files",component:"TextWidget",Props:{bindedKey:"FileCount"} },
-{ id: "TextWidget-3", x: 1, y: 1, h: 2, w:2, componentName:"Status",component:"TextWidget",Props:{bindedKey:"Status"}},
-{ id: "TextWidget-4", x: 3, y: 1, h: 2, w:2, componentName:"Collaborator Counts",component:"TextWidget",Props:{bindedKey:"CollaboratorCounts"}}];
-
-/*
-Closes the dialog
-*/
-function closeDialog() {
-  emit("close-dialog", false);
+function closeDialog () {
+  emit('close-dialog', false)
 }
 </script>
 
@@ -71,13 +113,21 @@ function closeDialog() {
     @close="closeDialog"
   >
     <template #header>
-      <bf-dialog-header class="dialog-dash-header" slot="title" title="Overview Dashboard" />
+      <bf-dialog-header class="dialog-dash-header" title="Overview Dashboard" />
     </template>
+
     <dialog-body>
-        <Sparc-Dashboard :dBItems="dashboardItems" :hideHeader="true" :options="dashboardOptions"></Sparc-Dashboard>
+      <!-- v-if avoids mounting with a stale/empty dataset -->
+      <PennsieveDashboard
+        v-if="dataset"
+        :key="dashboardKey"
+        class="dashboard-app"
+        :options="dashboardOptions"
+      />
     </dialog-body>
   </el-dialog>
 </template>
+
 
 <style lang="scss" scoped>
 .dashboard-app{
@@ -86,23 +136,17 @@ function closeDialog() {
     --el-color-primary-dark-2: #546085;
     --el-text-color-primary:white;
     --color:#243d8e;
-    --el-dialog-width: 90%;
     --dash-secondary: #243d8e;
+     background-color: #f6fcff;
+     border: solid aliceblue;
 }
-
-:deep(.dash-header){
-    background-color: transparent;
-    padding-top: 10px;
-}
-:deep(.widget-body){
-    margin: auto;
-    min-width: 50px;
-    margin-top: 20px;
-    text-align: center;
-}  
 
 </style>
 <style>
+.full-dialog{
+  --el-dialog-width: 90%;
+}
 .el-dialog__title {
   color: white;
-}</style>
+}
+</style>
