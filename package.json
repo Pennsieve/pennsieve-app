@@ -63,8 +63,7 @@
     "protobufjs": "^7.2.6",
     "pusher-js": "^8.4.0",
     "ramda": "^0.28.0",
-    "pennsieve-dashboard":"0.2.2",
-    "pennsieve-visualization": "^0.4.8",
+    "sparc-dashboard-beta": "^0.4.24",
     "striptags": "^3.2.0",
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
@@ -86,9 +85,6 @@
     "vuex": "^4.0.2",
     "woofmark": "^4.2.6",
     "xlsx": "^0.18.5"
-  },
-  "overrides": {
-    "element-plus":"2.8.5"
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.1.4",
