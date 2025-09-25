@@ -12,7 +12,6 @@ import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
-import AddRelationshipDialog from './AddRelationshipDialog.vue'
 
 const props = defineProps({
   datasetId: {
@@ -44,8 +43,11 @@ const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
 const pageSize = 25
 
-// Dialog state
-const showAddRelationshipDialog = ref(false)
+// Helper to get a record display name for the current record
+const currentRecordDisplayName = computed(() => {
+  if (!record.value || !recordData.value) return 'Unknown Record'
+  return getRecordDisplayValue(record.value)
+})
 
 // Computed properties
 const recordData = computed(() => {
@@ -349,14 +351,16 @@ const handleOutboundPageChange = (page) => {
   outboundCurrentPage.value = page
 }
 
-// Dialog methods
-const openAddRelationshipDialog = () => {
-  showAddRelationshipDialog.value = true
-}
-
-const handleRelationshipAdded = async () => {
-  // Refresh the current record to show the new relationship
-  await fetchRecord()
+// Relationship creation methods
+const startRelationshipCreation = () => {
+  metadataStore.startRelationshipCreation(
+    props.recordId,
+    props.modelId, 
+    props.datasetId,
+    currentRecordDisplayName.value
+  )
+  
+  ElMessage.info('Relationship creation started. Navigate to find your target record.')
 }
 
 // Watch for prop changes to refetch data when navigating between records
@@ -459,7 +463,7 @@ onMounted(async () => {
 
             <!-- Model Information Group -->
             <el-tag size="small" class="record-tag version-tag">
-              Version {{ recordMetadata.model_version }}
+              Model Version: {{ recordMetadata.model_version }}
               <el-button
                 @click="goToModelDetails"
                 link
@@ -499,8 +503,8 @@ onMounted(async () => {
       <!-- Enhanced View -->
       <div v-if="viewMode === 'ui'" class="enhanced-view">
         <!-- Record Properties -->
-        <div class="section">
-          <div class="section-header">
+        <div class="section record-data">
+          <div class="section-header record-data">
             <h3>Record Data</h3>
             <el-tag type="info" size="small">
               {{ recordProperties.length }} properties
@@ -529,7 +533,7 @@ onMounted(async () => {
               <el-tag type="info" size="small">
                 {{ relationshipsSummary.total }} connections
               </el-tag>
-              <span class="add-relationship-link" @click="openAddRelationshipDialog">
+              <span class="add-relationship-link" @click="startRelationshipCreation">
                 Add Relationship
               </span>
             </div>
@@ -631,14 +635,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Add Relationship Dialog -->
-    <AddRelationshipDialog
-      v-model:visible="showAddRelationshipDialog"
-      :source-record-id="recordId"
-      :source-model-id="modelId"
-      :dataset-id="datasetId"
-      @relationship-added="handleRelationshipAdded"
-    />
   </bf-stage>
 </template>
 
@@ -684,7 +680,7 @@ onMounted(async () => {
     padding: 0 24px 24px 24px;
 
     .record-header {
-      margin-bottom: 24px;
+      margin-bottom: 8px;
 
       .record-info {
         h2 {
@@ -781,7 +777,7 @@ onMounted(async () => {
     }
 
     .view-controls {
-      margin-bottom: 20px;
+      margin-bottom: 8px;
       display: flex;
       justify-content: flex-end;
     }
@@ -794,6 +790,9 @@ onMounted(async () => {
       .section {
 
 
+
+
+
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -801,6 +800,10 @@ onMounted(async () => {
           margin-bottom: 16px;
           padding-bottom: 8px;
           border-bottom: 1px solid theme.$gray_2;
+
+          &.record-data{
+            border-bottom: 2px solid theme.$purple_2;
+          }
 
           h3 {
             margin: 0;
@@ -863,7 +866,7 @@ onMounted(async () => {
 
         // Minimal metadata section
         &:last-child {
-          margin-top: 16px;
+          margin-top: 24px;
           
           .section-header {
             margin-bottom: 12px;

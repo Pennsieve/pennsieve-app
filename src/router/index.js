@@ -11,6 +11,7 @@ import TemplateSpecGenerator from "@/components/datasets/metadata/models/Templat
 import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/models/RecordSpecGenerator.vue";
+import DatasetMetadataRecordsView from "@/router/Dataset/DatasetMetadataRecordsView.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -507,7 +508,7 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: DatasetMetadataView
+                stage: DatasetMetadataRecordsView
               },
               redirect: {
                 name: 'records-list'

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption } from 'element-plus'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import RecordFilter from './RecordFilterStyled.vue'
@@ -445,7 +445,48 @@ const formatCellValue = (value, column) => {
   return String(value)
 }
 
-const goToRecordDetails = (record) => {
+// Helper function to get a record display name
+const getRecordDisplayName = (record) => {
+  if (!record || !record.value) return 'Unknown Record'
+  
+  const data = record.value
+  
+  // Try common fields that might be meaningful for display
+  const displayFields = ['name', 'title', 'description', 'code', 'outcome', 'manufacturer_name']
+  
+  for (const field of displayFields) {
+    if (data[field] && typeof data[field] === 'string') {
+      return data[field]
+    }
+  }
+  
+  // Fall back to first string value
+  const firstStringValue = Object.values(data).find(val => typeof val === 'string' && val.length > 0)
+  if (firstStringValue) return firstStringValue
+  
+  // Fall back to record ID
+  return `Record ${record.id.slice(0, 8)}...`
+}
+
+const goToRecordDetails = async (record) => {
+  // Check if we're in relationship creation mode
+  if (metadataStore.activeRelationshipCreation) {
+    // Create a custom event to trigger relationship creation with complete record data
+    const recordData = {
+      id: record.id,
+      name: getRecordDisplayName(record),
+      modelId: props.modelId,
+      modelName: model.value?.display_name || model.value?.name || 'Unknown Model'
+    }
+    
+    const event = new CustomEvent('record-selected', { 
+      detail: recordData
+    })
+    window.dispatchEvent(event)
+    return
+  }
+  
+  // Normal record navigation
   router.push({
     name: 'record-details',
     params: {

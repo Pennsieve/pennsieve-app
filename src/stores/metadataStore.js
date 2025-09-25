@@ -20,6 +20,9 @@ export const useMetadataStore = defineStore('metadata', () => {
     const templates = ref([])
     const templatesLoaded = ref(false)
 
+    // Relationship creation state
+    const activeRelationshipCreation = ref(null) // { sourceRecordId, sourceModelId, datasetId, sourceRecordName }
+
     // RecordFilter are used to filter records in Record list
     const createFilter = () => {
         return {
@@ -801,6 +804,37 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Relationship creation actions
+    const startRelationshipCreation = (sourceRecordId, sourceModelId, datasetId, sourceRecordName) => {
+        activeRelationshipCreation.value = {
+            sourceRecordId,
+            sourceModelId,
+            datasetId,
+            sourceRecordName
+        }
+    }
+
+    const cancelRelationshipCreation = () => {
+        activeRelationshipCreation.value = null
+    }
+
+    const completeRelationshipCreation = async (targetRecordId, relationshipType) => {
+        if (!activeRelationshipCreation.value) {
+            throw new Error('No active relationship creation in progress')
+        }
+
+        const { sourceRecordId, datasetId } = activeRelationshipCreation.value
+
+        try {
+            const result = await createRelationship(datasetId, sourceRecordId, targetRecordId, relationshipType)
+            activeRelationshipCreation.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -809,6 +843,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         templates,
         templatesLoaded,
         recordFilterParams,
+        activeRelationshipCreation,
 
         // Getters
         modelById,
@@ -832,7 +867,12 @@ export const useMetadataStore = defineStore('metadata', () => {
         createTemplateFromModel,
         createTemplateVersion,
         updateVersion,
-        updateModelMetadata
+        updateModelMetadata,
+        
+        // Relationship creation actions
+        startRelationshipCreation,
+        cancelRelationshipCreation,
+        completeRelationshipCreation
     }
 
 })
