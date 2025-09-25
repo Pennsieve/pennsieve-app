@@ -329,7 +329,6 @@ const initialState = () => ({
  
          const result = await resp.json();
 
-
           const sortedWorkflows = result.sort((a, b) => {
             const dateA = new Date(a.startedAt).getTime();
             const dateB = new Date(b.startedAt).getTime();
@@ -394,7 +393,7 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
       // This code combines two API responses (/status and /instances) we need properties from, matching on uuid
       // The /instances response is missing status, and the /status response does not tell us the applicationType
       
-      const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
+      const updatedResult = { ...workflow, ...result, workflow: [...result.workflow] };
 
       if (workflow.workflow) {
         updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
@@ -421,7 +420,6 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
                 return processor;
               }
 
-
             } catch (error) {
               console.warn(`Error fetching application data for processor ${processor.uuid}:`, error);
               return processor;
@@ -430,18 +428,46 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
         );
         updatedResult.workflow = workflowWithApplications;
       }
-      // orginal array is not ordered based on execution order, so we use the startedAt time to derrive the execution order
-      // execution order is available on the `/workflows` endpoint, but this avoids extra API calls
 
-      const sortByStartedAt = (applications, ascending = true) => {
-        return [...applications].sort((a, b) => {
-          const timeA = new Date(a.startedAt);
-          const timeB = new Date(b.startedAt);
-        return ascending ? timeA - timeB : timeB - timeA;
+      // Sort processors based on executionOrder instead of startedAt time
+      const sortByExecutionOrder = (processors, executionOrder) => {
+        // Dummy data for testing
+        // const dummyExecutionOrder = [
+        //   ["git://github.com/Pennsieve/processor-pre-packages-v2"],
+        //   ["git://github.com/oscarruizbcm/trimgalore-docker-app"],
+        //   ["git://github.com/oscarruizbcm/hisat2-docker-app"],
+        //   ["git://github.com/oscarruizbcm/samtools-docker-app"],
+        //   ["git://github.com/oscarruizbcm/featurecounts-docker-app"],
+        //   ["git://github.com/Pennsieve/processor-post-agent-v2"]
+        // ];
+
+        // const orderToUse = executionOrder || dummyExecutionOrder;
+        const orderToUse = executionOrder 
+
+        if (!orderToUse || !Array.isArray(orderToUse)) {
+          return processors;
+        }
+
+        // Create a map of git URLs to their execution order index
+        const executionOrderMap = new Map();
+        orderToUse.forEach((orderGroup, groupIndex) => {
+          if (Array.isArray(orderGroup)) {
+            orderGroup.forEach(gitUrl => {
+              executionOrderMap.set(gitUrl, groupIndex);
+            });
+          }
         });
+
+        const sorted = [...processors].sort((a, b) => {
+          const orderA = executionOrderMap.get(a.source?.url) ?? Number.MAX_SAFE_INTEGER;
+          const orderB = executionOrderMap.get(b.source?.url) ?? Number.MAX_SAFE_INTEGER;
+          return orderA - orderB;
+        });
+
+        return sorted;
       };
 
-      const sortedWorkflow = sortByStartedAt( updatedResult.workflow, true ) 
+      const sortedWorkflow = sortByExecutionOrder(updatedResult.workflow, updatedResult.executionOrder);
       commit('SET_SELECTED_WORKFLOW_ACTIVITY', {...updatedResult, workflow: sortedWorkflow} );
 
       const updatedProcessor = updatedResult.workflow.find(
