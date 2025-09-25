@@ -1,6 +1,7 @@
 
 import { createApp} from "vue";
 import App from "./App.vue";
+import ElementPlus  from "element-plus"
 import router from "./router";
 import store from "./store";
 import striptags from 'striptags';
@@ -25,7 +26,6 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
-import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
 import { useViewerStore } from '@/stores/tsviewer'
 
@@ -49,12 +49,6 @@ app.use(store);
 app.use(createPinia())
 
 
-//Import Dashboard
-// import ElementPlus from 'element-plus';
-// import 'element-plus/dist/index.css';
-// app.use(ElementPlus);
-installDashboard(app, ["TextWidget"]);
-
 app.use(VueClipboard, {
     autoSetContainer: true,
     appendToBody: true,
@@ -72,6 +66,7 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 
+app.use(ElementPlus)
 // In your main.js or App.vue
 window.addEventListener('beforeunload', () => {
     store.dispatch('resetState');
