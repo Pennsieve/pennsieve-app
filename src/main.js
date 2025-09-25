@@ -27,7 +27,8 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+
+
 
 import Pusher from 'pusher-js'
 
@@ -45,8 +46,10 @@ const app = createApp(App)
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
+installDashboard(app, ["TextWidget"]);
 
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 
 
 app.use(VueClipboard, {
@@ -80,8 +83,6 @@ app.config.globalProperties.$message = ElMessage;
 app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
     cluster: siteConfig.pusherConfig.region
 });
-
-const viewerStore = useViewerStore()
 
 
 // Top level routes allowList

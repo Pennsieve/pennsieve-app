@@ -2,6 +2,15 @@ import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 
 import NotFound from './not-found/NotFound.vue'
+import ModelList from "@/components/datasets/metadata/models/modelList.vue";
+import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
+import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
+import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
+import TemplateSpecViewer from "@/components/datasets/metadata/models/TemplateSpecViewer.vue";
+import TemplateSpecGenerator from "@/components/datasets/metadata/models/TemplateSpecGenerator.vue";
+import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
+import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
+import RecordSpecGenerator from "@/components/datasets/metadata/models/RecordSpecGenerator.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -104,16 +113,18 @@ const IntegrationsList = () => import ('../components/Integrations/IntegrationsL
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
+const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 
 /**
  * Metadata Components
  */
 // const DatasetRecords = () => import('../components/datasets/records/DatasetRecords/DatasetRecords.vue')
-const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
-const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
+// const ModelRecords = () => import('../components/datasets/explore/search/ModelRecords.vue')
+// const ModelRecordsSelector = () => import('../components/datasets/metadata/models/ModelRecordsSelector.vue')
+// const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
 const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
-const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
+// const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
 
@@ -317,6 +328,11 @@ const router = createRouter({
           },
           props: {
             stage: true,
+          },
+          meta: {
+            breadcrumbs: [
+              { name: "Overview", current: true }
+            ]
           }
         },
         {
@@ -329,6 +345,11 @@ const router = createRouter({
           props: {
             stage: true,
           },
+          meta: {
+            breadcrumbs: [
+              { name: "Files", current: true }
+            ]
+          },
           children: [
             {
               name: 'dataset-files',
@@ -339,7 +360,12 @@ const router = createRouter({
               props: {
                 stage: true,
               },
-              meta: { helpSection: 'files-tab'},
+              meta: { 
+                helpSection: 'files-tab',
+                breadcrumbs: [
+                  { name: "Files", current: true }
+                ]
+              },
             },
             {
               name: 'collection-files',
@@ -350,6 +376,12 @@ const router = createRouter({
               props: {
                 stage: true,
               },
+              meta: {
+                breadcrumbs: [
+                  { name: "Files", to: "dataset-files" },
+                  { name: "Collection", current: true }
+                ]
+              },
             },
             {
               name: 'file-record',
@@ -357,7 +389,13 @@ const router = createRouter({
               components: {
                 stage: FileDetails
               },
-              meta: { showBackToFiles: true},
+              meta: { 
+                showBackToFiles: true,
+                breadcrumbs: [
+                  { name: "Files", to: "dataset-files" },
+                  { name: "File Details", current: true }
+                ]
+              },
               props: {
                 stage: true,
               },
@@ -372,7 +410,12 @@ const router = createRouter({
             stageHeader: SecondaryPageHeader,
             stage: BfPublishingSettings
           },
-          props: true
+          props: true,
+          meta: {
+            breadcrumbs: [
+              { name: "Publishing Settings", current: true }
+            ]
+          }
         },
         {
           name: 'dataset-settings',
@@ -383,6 +426,11 @@ const router = createRouter({
           },
           props: {
             stage: true,
+          },
+          meta: {
+            breadcrumbs: [
+              { name: "Settings", current: true }
+            ]
           }
         },
         {
@@ -398,6 +446,11 @@ const router = createRouter({
           props: {
             stage: true,
           },
+          meta: {
+            breadcrumbs: [
+              { name: "Permissions", current: true }
+            ]
+          },
           children: [
             {
               name: 'user-permissions',
@@ -407,6 +460,12 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Permissions", to: "dataset-permissions" },
+                  { name: "User Permissions", current: true }
+                ]
               }
             },
             {
@@ -417,6 +476,12 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Permissions", to: "dataset-permissions" },
+                  { name: "Embargo Permissions", current: true }
+                ]
               }
             },
           ]
@@ -433,7 +498,7 @@ const router = createRouter({
             stageHeader: true
           },
           redirect: {
-            name: 'graph'
+            name: 'models-list'
           },
           children: [
             {
@@ -443,8 +508,115 @@ const router = createRouter({
                 stage: true
               },
               components: {
-                stage: ModelRecords
-              }
+                stage: DatasetMetadataView
+              },
+              redirect: {
+                name: 'records-list'
+              },
+              children: [
+                {
+                  path: '',
+                  name: 'records-list',
+                  beforeEnter: async (to, from, next) => {
+                    try {
+                      // Import the metadata store
+                      const { useMetadataStore } = await import('@/stores/metadataStore.js')
+                      const metadataStore = useMetadataStore()
+                      
+                      // Fetch models for this dataset
+                      await metadataStore.fetchModels(to.params.datasetId)
+                      
+                      // Get the first model if available
+                      if (metadataStore.models && metadataStore.models.length > 0) {
+                        const firstModel = metadataStore.models[0].model || metadataStore.models[0]
+                        if (firstModel && firstModel.id) {
+                          // Redirect to the first model's records
+                          next({
+                            name: 'model-records-search',
+                            params: {
+                              orgId: to.params.orgId,
+                              datasetId: to.params.datasetId,
+                              modelId: firstModel.id
+                            }
+                          })
+                          return
+                        }
+                      }
+                      
+                      // If no models exist, redirect to models list
+                      next({ name: 'models-list' })
+                    } catch (error) {
+                      console.error('Error redirecting to records:', error)
+                      // Fallback to models list on error
+                      next({ name: 'models-list' })
+                    }
+                  }
+                },
+                {
+                  path: ':modelId/search',
+                  name: 'model-records-search',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "records"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: ListRecords
+                  }
+                },
+                {
+                  path: ':modelId/create',
+                  name: 'create-record',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "model-records-search"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Create Record", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: RecordSpecGenerator
+                  }
+                },
+                {
+                  path: ':modelId/:recordId/update',
+                  name: 'update-record',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Record Details", to: "record-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Record Details", to: "record-details" },
+                      { name: "Update Record", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: RecordSpecGenerator
+                  }
+                },
+                {
+                  path: ':modelId/:recordId',
+                  name: 'record-details',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Records", to: "model-records-search"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Records", to: "model-records-search" },
+                      { name: "Record Details", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: RecordSpecViewer
+                  }
+                }
+              ]
             },
             {
               path: 'record/:modelId/:instanceId',
@@ -487,17 +659,121 @@ const router = createRouter({
                   path: 'list',
                   name: 'models-list',
                   props: true,
+                  meta: {
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", current: true }
+                    ]
+                  },
                   components: {
-                    stage: Models
+                    stage: ModelList
                   }
                 },
                 {
                   path: 'details/:modelId',
                   name: 'model-details',
                   props: true,
-                  meta: { backLink: {name: "Models", to: "models-list"}},
+                  meta: { 
+                    backLink: {name: "Models", to: "models-list"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Model Details", current: true }
+                    ]
+                  },
                   components: {
-                    stage: ModelInstance
+                    stage: ModelSpecViewer
+                  }
+                },
+                {
+                  path: 'details/:modelId/edit',
+                  name: 'model-edit',
+                  props: route => ({
+                    modelId: route.params.modelId,
+                    datasetId: route.params.datasetId,
+                    orgId: route.params.orgId
+                  }),
+                  meta: { 
+                    backLink: {name: "Models", to: "models-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Model Details", to: "model-details" },
+                      { name: "Edit Model", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: ModelSpecGenerator
+                  }
+                },
+                {
+                  path: 'new',
+                  name: 'new-model',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Models", to: "models-list"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Create Model", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: ModelSpecGenerator
+                  }
+                },
+                {
+                  path: 'fromTemplate',
+                  name: 'new-model-from-template',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Models", to: "models-list"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Template Gallery", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: TemplateGallery
+                  }
+                },
+                {
+                  path: 'templates/:templateId',
+                  name: 'template-details',
+                  props: true,
+                  meta: { 
+                    backLink: {name: "Template Gallery", to: "new-model-from-template"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Template Gallery", to: "new-model-from-template" },
+                      { name: "Template Details", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: TemplateSpecViewer
+                  }
+                },
+                {
+                  path: 'templates/:templateId/edit',
+                  name: 'template-edit',
+                  props: route => ({
+                    templateId: route.params.templateId,
+                    orgId: route.params.orgId
+                  }),
+                  meta: { 
+                    backLink: {name: "Template Details", to: "template-details"},
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "Template Gallery", to: "new-model-from-template" },
+                      { name: "Template Details", to: "template-details" },
+                      { name: "Edit Template", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: TemplateSpecGenerator
                   }
                 },
               ]
@@ -510,6 +786,12 @@ const router = createRouter({
               },
               components: {
                 stage: RelationshipTypes
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Metadata", to: "metadata" },
+                  { name: "Relationships", current: true }
+                ]
               }
             },
             {
@@ -520,6 +802,12 @@ const router = createRouter({
               },
               components: {
                 stage: GraphBrowse2
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Metadata", to: "metadata" },
+                  { name: "Schema", current: true }
+                ]
               }
             },
           ]
@@ -531,7 +819,12 @@ const router = createRouter({
             stageHeader: SecondaryPageHeader,
             stage: DatasetIntegrationsSettings
           },
-          props: true
+          props: true,
+          meta: {
+            breadcrumbs: [
+              { name: "Integration Settings", current: true }
+            ]
+          }
         },
         {
           name: 'dataset-activity',
@@ -546,6 +839,11 @@ const router = createRouter({
           props: {
             stage: true,
           },
+          meta: {
+            breadcrumbs: [
+              { name: "Activity", current: true }
+            ]
+          },
           children: [
             {
               name: 'activity-log',
@@ -555,6 +853,12 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Activity", to: "dataset-activity" },
+                  { name: "Activity Log", current: true }
+                ]
               }
             },
             {
@@ -565,6 +869,12 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              },
+              meta: {
+                breadcrumbs: [
+                  { name: "Activity", to: "dataset-activity" },
+                  { name: "Upload Manifests", current: true }
+                ]
               }
             },
           ]
@@ -729,6 +1039,13 @@ const router = createRouter({
       },
       props: true,
       children: [
+           {
+          name: 'workflow-builder',
+          path: 'workflow-builder',
+          components: {
+            stage: WorkflowBuilder,
+          }
+        },
         {
           name: 'activity',
           path: 'activity',
