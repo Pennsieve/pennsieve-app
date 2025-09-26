@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElCard, ElTag, ElMessage, ElButton, ElPagination } from 'element-plus'
+import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
@@ -37,11 +37,13 @@ const model = ref(null)
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
+const packages = ref([])
 
 // Pagination state
 const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
 const pageSize = 25
+
 
 // Helper to get a record display name for the current record
 const currentRecordDisplayName = computed(() => {
@@ -170,6 +172,17 @@ const fetchModel = async () => {
   } catch (err) {
     console.error('Error fetching model:', err)
     error.value = err.message || 'Failed to load model information'
+  }
+}
+
+const fetchPackages = async () => {
+  try {
+    const response = await metadataStore.fetchRecordPackages(props.datasetId, props.recordId)
+    packages.value = response || []
+  } catch (err) {
+    console.error('Error fetching packages:', err)
+    // Don't show error for packages as it's not critical
+    packages.value = []
   }
 }
 
@@ -363,6 +376,78 @@ const startRelationshipCreation = () => {
   ElMessage.info('Relationship creation started. Navigate to find your target record.')
 }
 
+// Package attachment methods
+const startPackageAttachment = () => {
+  metadataStore.startPackageAttachment(
+    props.recordId,
+    props.modelId,
+    props.datasetId,
+    currentRecordDisplayName.value
+  )
+}
+
+// Navigate to package details
+const goToPackageDetails = (packageItem) => {
+  const currentRoute = router.currentRoute.value
+  const orgId = currentRoute.params.orgId
+  
+  router.push({
+    name: 'file-record',
+    params: {
+      orgId: orgId,
+      datasetId: props.datasetId,
+      fileId: packageItem.package.node_id
+    }
+  })
+}
+
+// Get shortened location for package display
+const getPackageLocation = (packageItem) => {
+  // For now, just show the dataset context
+  return `~/datasets/${props.datasetId.slice(-8)}/`
+}
+
+// Delete package from record
+const deletePackage = async (packageItem) => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to remove "${packageItem.package.name}" from this record? This will not delete the file from the dataset.`,
+      'Remove File',
+      {
+        confirmButtonText: 'Remove',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+        center: true,
+        lockScroll: true,
+        closeOnClickModal: false,
+        closeOnPressEscape: true,
+        showClose: true,
+        beforeClose: null,
+        distinguishCancelAndClose: true,
+        roundButton: false
+      }
+    )
+
+    await metadataStore.deletePackageFromRecord(
+      props.datasetId,
+      props.recordId,
+      packageItem.package.node_id
+    )
+
+    ElMessage.success('File removed from record successfully')
+
+    // Refresh the packages list
+    await fetchPackages()
+  } catch (action) {
+    if (action === 'cancel' || action === 'close') {
+      // User cancelled or closed dialog
+      return
+    }
+    console.error('Error deleting package from record:', action)
+    ElMessage.error(`Failed to remove file: ${action.message || 'Unknown error'}`)
+  }
+}
+
 // Watch for prop changes to refetch data when navigating between records
 watch([() => props.modelId, () => props.recordId], async () => {
   console.log('Props changed - refetching data for:', props.modelId, props.recordId)
@@ -376,17 +461,17 @@ watch([() => props.modelId, () => props.recordId], async () => {
   outboundCurrentPage.value = 1
   
   // Fetch new data
-  await Promise.all([fetchModel(), fetchRecord()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
 })
 
 // Initialize
 onMounted(async () => {
-  await Promise.all([fetchModel(), fetchRecord()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
 })
 </script>
 
 <template>
-  <bf-stage class="record-spec-viewer" no-padding>
+  <bf-stage class="record-spec-viewer" >
     <template #actions>
       <stage-actions>
         <template #left>
@@ -431,86 +516,74 @@ onMounted(async () => {
       <!-- Record Header -->
       <div class="record-header">
         <div class="record-info">
-          <h2>{{ model.display_name || model.name }} Record</h2>
-          <div class="record-meta">
-            <!-- Record Identification Group -->
-            <el-tag size="small" class="record-tag record-id-tag">
-              Record ID: {{ record.id }}
-              <el-button 
-                @click="copyRecordId" 
-                link
-                size="small" 
-                class="tag-action-btn" 
-                title="Copy Record ID"
-              >
-                <IconCopyDocument :width="12" :height="12" />
-              </el-button>
-            </el-tag>
-
-            <!-- Model ID Tag -->
-            <el-tag size="small" class="record-tag model-id-tag">
-              Model ID: {{ modelId }}
-              <el-button
-                @click="copyModelId"
-                link
-                size="small"
-                class="tag-action-btn"
-                title="Copy Model ID"
-              >
-                <IconCopyDocument :width="12" :height="12" />
-              </el-button>
-            </el-tag>
-
-            <!-- Model Information Group -->
-            <el-tag size="small" class="record-tag version-tag">
-              Model Version: {{ recordMetadata.model_version }}
-              <el-button
-                @click="goToModelDetails"
-                link
-                size="small"
-                class="tag-action-btn"
-                title="Go to Model Details"
-              >
-                <IconArrowRight :width="12" :height="12" />
-              </el-button>
-            </el-tag>
-
-
-
+          <div class="title-row">
+            <h2>{{ model.display_name || model.name }} Record</h2>
+            <ViewToggle v-model:viewMode="viewMode" size="small" />
           </div>
-          <div class="record-meta">
-            <!-- Temporal Information Group -->
-            <el-tag size="small" class="record-tag created-tag">
-              Created {{ new Date(recordMetadata.created_at).toLocaleDateString() }}
-            </el-tag>
+          
+          <!-- Record Metadata (hidden in JSON mode) -->
+          <div v-if="viewMode === 'ui'" class="record-metadata">
+            <div class="metadata-item">
+              <span class="metadata-label">Record ID:</span>
+              <div class="metadata-value-container">
+                <span class="metadata-value">{{ record.id }}</span>
+                <el-button
+                  @click="copyRecordId"
+                  link
+                  size="small"
+                  class="metadata-action-btn"
+                  title="Copy Record ID"
+                >
+                  <IconCopyDocument :width="12" :height="12" />
+                </el-button>
+              </div>
+            </div>
 
-            <!-- Relationships Group -->
-            <el-tag size="small" class="record-tag relationship-tag inbound">
-              ← {{ relationshipsSummary.inbound > 0 ? `${relationshipsSummary.inbound} inbound` : 'No inbound' }}
-            </el-tag>
-            <el-tag size="small" class="record-tag relationship-tag outbound">
-              {{ relationshipsSummary.outbound > 0 ? `${relationshipsSummary.outbound} outbound` : 'No outbound' }} →
-            </el-tag>
+            <div class="metadata-item">
+              <span class="metadata-label">Model ID:</span>
+              <div class="metadata-value-container">
+                <span class="metadata-value">{{ modelId }}</span>
+                <el-button
+                  @click="copyModelId"
+                  link
+                  size="small"
+                  class="metadata-action-btn"
+                  title="Copy Model ID"
+                >
+                  <IconCopyDocument :width="12" :height="12" />
+                </el-button>
+              </div>
+            </div>
+
+            <div class="metadata-item">
+              <span class="metadata-label">Model Version:</span>
+              <div class="metadata-value-container">
+                <span class="metadata-value">{{ recordMetadata.model_version }}</span>
+                <el-button
+                  @click="goToModelDetails"
+                  link
+                  size="small"
+                  class="metadata-action-btn"
+                  title="Go to Model Details"
+                >
+                  <IconArrowRight :width="12" :height="12" />
+                </el-button>
+              </div>
+            </div>
+
+            <div class="metadata-item">
+              <span class="metadata-label">Created At:</span>
+              <span class="metadata-value">{{ new Date(recordMetadata.created_at).toLocaleString() }}</span>
+            </div>
           </div>
+
         </div>
-      </div>
-
-      <!-- View Mode Toggle -->
-      <div class="view-controls">
-        <ViewToggle v-model:viewMode="viewMode" size="small" />
       </div>
 
       <!-- Enhanced View -->
       <div v-if="viewMode === 'ui'" class="enhanced-view">
         <!-- Record Properties -->
         <div class="section record-data">
-          <div class="section-header record-data">
-            <h3>Record Data</h3>
-            <el-tag type="info" size="small">
-              {{ recordProperties.length }} properties
-            </el-tag>
-          </div>
-
           <div class="record-attributes">
             <div
               v-for="prop in recordProperties"
@@ -525,13 +598,18 @@ onMounted(async () => {
           </div>
         </div>
 
+
+
         <!-- Relationships Section -->
         <div class="section">
           <div class="section-header">
             <h3>Relationships</h3>
             <div class="header-actions">
-              <el-tag type="info" size="small">
-                {{ relationshipsSummary.total }} connections
+              <el-tag size="small" class="record-tag relationship-tag inbound">
+                ← {{ relationshipsSummary.inbound > 0 ? `${relationshipsSummary.inbound} inbound` : 'No inbound' }}
+              </el-tag>
+              <el-tag size="small" class="record-tag relationship-tag outbound">
+                {{ relationshipsSummary.outbound > 0 ? `${relationshipsSummary.outbound} outbound` : 'No outbound' }} →
               </el-tag>
               <span class="add-relationship-link" @click="startRelationshipCreation">
                 Add Relationship
@@ -621,6 +699,53 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Files Section -->
+        <div class="section">
+          <div class="section-header">
+            <h3>Attached Files</h3>
+            <div class="header-actions">
+              <el-tag size="small" class="record-tag files-tag">
+                {{ packages.length > 0 ? `${packages.length} files` : 'No files' }}
+              </el-tag>
+              <span class="attach-file-link" @click="startPackageAttachment">
+                Attach File
+              </span>
+            </div>
+          </div>
+
+          <div class="files-container">
+            <!-- Files exist -->
+            <div v-if="packages.length > 0" class="file-items">
+              <div
+                v-for="(packageItem, index) in packages"
+                :key="`package-${index}`"
+                class="file-item"
+                :title="'Click to view file details'"
+              >
+                <div class="file-content clickable" @click="goToPackageDetails(packageItem)">
+                  <el-tag size="small" class="package-type">{{ packageItem.package.package_type }}</el-tag>
+                  <span class="package-name">{{ packageItem.package.name }}</span>
+                  <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                </div>
+                <el-button
+                  @click.stop="deletePackage(packageItem)"
+                  link
+                  size="small"
+                  class="delete-package-btn"
+                  title="Remove file from record"
+                >
+                  ✕
+                </el-button>
+              </div>
+            </div>
+
+            <!-- No files -->
+            <div v-else class="no-files">
+              <p class="no-files-message">No files attached to this record</p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- JSON View -->
@@ -643,6 +768,7 @@ onMounted(async () => {
 @use '../../../../styles/theme' as theme;
 @use '../../../../styles/element/select';
 @use '../../../../styles/element/dialog';
+@use '../../../../styles/element/tag';
 
 
 .record-spec-viewer {
@@ -677,17 +803,79 @@ onMounted(async () => {
   }
 
   .record-content {
-    padding: 0 24px 24px 24px;
+    //padding: 0 24px 24px 24px;
 
     .record-header {
       margin-bottom: 8px;
 
       .record-info {
-        h2 {
+        .title-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
           margin: 8px 0 12px 0;
-          font-size: 24px;
-          font-weight: 600;
-          color: theme.$gray_6;
+          
+          h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: theme.$gray_6;
+          }
+        }
+
+        // Record Metadata Section (minimal styling)
+        .record-metadata {
+          border-bottom: 1px solid theme.$gray_2;
+          padding-bottom: 12px;
+          margin-bottom: 16px;
+
+          .metadata-item {
+            display: inline-block;
+            margin-right: 24px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: theme.$gray_4;
+
+            .metadata-label {
+              font-weight: 500;
+              margin-right: 6px;
+            }
+
+            .metadata-value-container {
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+
+              .metadata-value {
+                color: theme.$gray_5;
+                font-size: 12px;
+              }
+
+              .metadata-action-btn {
+                opacity: 0.5;
+                transition: all 0.2s ease;
+                padding: 1px !important;
+                min-height: unset !important;
+                height: 14px !important;
+                width: 14px !important;
+                
+                :deep(.el-button__icon) {
+                  margin: 0 !important;
+                }
+                
+                &:hover {
+                  opacity: 0.8;
+                  color: theme.$gray_5 !important;
+                }
+              }
+            }
+
+            // For metadata items without actions (like Created At)
+            .metadata-value:not(.metadata-value-container .metadata-value) {
+              color: theme.$gray_5;
+              font-size: 12px;
+            }
+          }
         }
 
         .record-meta {
@@ -730,14 +918,7 @@ onMounted(async () => {
               background-color: theme.$gray_1 !important;
               border-color: theme.$gray_3 !important;
               color: theme.$gray_4 !important;
-              
-              //.tag-action-btn {
-              //  color: theme.$gray_4 !important;
-              //
-              //  &:hover {
-              //    color: theme.$gray_5 !important;
-              //  }
-              //}
+
             }
 
             // Model Information Group (green theme)
@@ -757,9 +938,9 @@ onMounted(async () => {
 
             // Temporal Information Group (gray theme)
             &.created-tag {
-              background-color: theme.$teal_tint !important;
-              border-color: theme.$teal_1 !important;
-              color: theme.$teal_2 !important;
+              background-color: theme.$purple_tint !important;
+              border-color: theme.$purple_1 !important;
+              color: theme.$purple_2 !important;
             }
 
             // Relationships Group
@@ -770,6 +951,13 @@ onMounted(async () => {
                 border-color: theme.$orange_1 !important;
                 color: theme.$orange_1 !important;
               }
+            }
+            
+            // Files Group
+            &.files-tag {
+              background-color: theme.$teal_tint !important;
+              border-color: theme.$teal_1 !important;
+              color: theme.$teal_2 !important;
             }
           }
         }
@@ -816,9 +1004,36 @@ onMounted(async () => {
             display: flex;
             align-items: center;
             gap: 12px;
+
+            // Ensure record tags in headers have correct styling
+            .record-tag {
+              position: relative;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              font-weight: 500;
+              transition: all 0.2s ease;
+
+              // Relationships Group
+              &.relationship-tag {
+                &.inbound,
+                &.outbound {
+                  background-color: theme.$orange_tint !important;
+                  border-color: theme.$orange_1 !important;
+                  color: theme.$orange_1 !important;
+                }
+              }
+              
+              // Files Group
+              &.files-tag {
+                background-color: theme.$teal_tint !important;
+                border-color: theme.$teal_1 !important;
+                color: theme.$teal_2 !important;
+              }
+            }
             
             .add-relationship-link {
-              color: theme.$purple_1;
+              color: theme.$orange_2;
               font-size: 13px;
               font-weight: 500;
               cursor: pointer;
@@ -826,13 +1041,86 @@ onMounted(async () => {
               transition: all 0.2s ease;
               
               &:hover {
-                color: theme.$purple_2;
+                color: theme.$orange_1;
                 text-decoration: underline;
               }
               
               &:active {
-                color: theme.$purple_1;
+                color: theme.$orange_1;
               }
+            }
+            
+            .attach-file-link {
+              color: theme.$teal_2;
+              font-size: 13px;
+              font-weight: 500;
+              cursor: pointer;
+              text-decoration: none;
+              transition: all 0.2s ease;
+              
+              &:hover {
+                color: theme.$teal_1;
+                text-decoration: underline;
+              }
+              
+              &:active {
+                color: theme.$teal_1;
+              }
+            }
+          }
+        }
+
+        // Record Metadata Section (minimal styling)
+        .record-metadata {
+          border-bottom: 1px solid theme.$gray_2;
+          padding-bottom: 12px;
+          margin-bottom: 16px;
+
+          .metadata-item {
+            display: inline-block;
+            margin-right: 24px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: theme.$gray_4;
+
+            .metadata-label {
+              font-weight: 500;
+              margin-right: 6px;
+            }
+
+            .metadata-value-container {
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+
+              .metadata-value {
+                color: theme.$gray_5;
+                font-size: 12px;
+              }
+
+              .metadata-action-btn {
+                opacity: 0.5;
+                transition: all 0.2s ease;
+                padding: 1px !important;
+                min-height: unset !important;
+                height: 14px !important;
+                width: 14px !important;
+                
+                :deep(.el-button__icon) {
+                  margin: 0 !important;
+                }
+                
+                &:hover {
+                  opacity: 0.8;
+                  color: theme.$gray_5 !important;
+                }
+              }
+            }
+
+            // For metadata items without actions (like Created At)
+            .metadata-value:not(.metadata-value-container .metadata-value) {
+              color: theme.$gray_5;
+              font-size: 12px;
             }
           }
         }
@@ -840,21 +1128,27 @@ onMounted(async () => {
         .record-attributes {
           .attribute-item {
             display: flex;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+            //padding: 8px 0;
+            border-bottom: 1px solid theme.$gray_1;
             
             &:last-child {
               margin-bottom: 0;
+              border-bottom: none;
             }
 
             .attribute-name {
-              font-weight: 600;
-              color: theme.$gray_6;
-              margin-right: 8px;
-              min-width: 150px;
+              font-weight: 500;
+              color: theme.$gray_5;
+              margin-right: 16px;
+              min-width: 160px;
+              font-size: 14px;
             }
 
             .attribute-value {
               color: theme.$gray_6;
+              font-size: 14px;
+              line-height: 1.4;
               
               &.is-null {
                 color: theme.$gray_4;
@@ -864,20 +1158,15 @@ onMounted(async () => {
           }
         }
 
-        // Minimal metadata section
-        &:last-child {
-          margin-top: 24px;
-          
+        // Files and Relationships sections styling
+        &:not(.record-data) {
           .section-header {
-            margin-bottom: 12px;
-            padding-bottom: 4px;
             border-bottom: 1px solid theme.$gray_2;
-
-            h3 {
-              font-size: 14px;
-              font-weight: 500;
-              color: theme.$gray_5;
-            }
+          }
+          
+          // Add extra spacing for relationships section
+          &:nth-child(2) {
+            margin-top: 24px;
           }
         }
 
@@ -905,6 +1194,116 @@ onMounted(async () => {
           }
         }
 
+        // Files Section Styling
+        .files-container {
+          .file-items {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .file-item {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 6px 12px;
+              background: white;
+              border: 1px solid theme.$gray_2;
+              border-radius: 4px;
+              transition: all 0.2s ease;
+              justify-content: space-between;
+
+              .file-content {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 1;
+
+                &.clickable {
+                  cursor: pointer;
+                }
+              }
+
+              &:hover {
+                border-color: theme.$teal_1;
+                background-color: theme.$gray_1;
+
+                .nav-icon {
+                  color: theme.$teal_2;
+                }
+
+                .delete-package-btn {
+                  opacity: 1;
+                }
+              }
+
+              .delete-package-btn {
+                opacity: 0;
+                transition: all 0.2s ease;
+                padding: 2px 4px !important;
+                min-height: unset !important;
+                height: 18px !important;
+                width: 18px !important;
+                font-size: 12px;
+                color: theme.$gray_4;
+                flex-shrink: 0;
+                
+                &:hover {
+                  color: theme.$red_2 !important;
+                  background-color: theme.$red_tint !important;
+                }
+              }
+
+              .package-type {
+                font-size: 10px;
+                font-weight: 500;
+                padding: 2px 6px;
+                white-space: nowrap;
+                flex-shrink: 0;
+                background: theme.$gray_1 !important;
+                border-color: theme.$gray_3 !important;
+                color: theme.$gray_5 !important;
+              }
+
+              .package-name {
+                flex: 1;
+                font-size: 13px;
+                color: theme.$gray_6;
+                font-weight: 400;
+                line-height: 1.3;
+              }
+
+              .package-location {
+                font-size: 11px;
+                color: theme.$gray_4;
+                font-style: italic;
+                flex-shrink: 0;
+              }
+
+              .nav-icon {
+                color: theme.$gray_4;
+                transition: color 0.2s ease;
+                flex-shrink: 0;
+              }
+            }
+          }
+
+          .no-files {
+            padding: 20px 16px;
+            text-align: center;
+            background-color: theme.$gray_1;
+            border: 1px solid theme.$gray_2;
+            margin: 4px 0;
+            border-radius: 4px;
+
+            .no-files-message {
+              margin: 0;
+              color: theme.$gray_4;
+              font-size: 13px;
+              font-style: italic;
+            }
+          }
+        }
+
         // Relationships Section Styling
         .relationships-container {
           .relationships-list {
@@ -922,7 +1321,7 @@ onMounted(async () => {
                 
                 &.inbound,
                 &.outbound {
-                  color: theme.$orange_1;
+                  color: theme.$orange_2;
                 }
               }
 

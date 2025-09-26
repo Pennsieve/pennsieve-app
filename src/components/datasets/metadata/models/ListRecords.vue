@@ -524,7 +524,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <bf-stage class="list-records" >
+  <bf-stage class="list-records" :no-padding="true">
     <template #actions>
       <stage-actions>
         <template #left>

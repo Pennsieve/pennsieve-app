@@ -39,6 +39,8 @@ watch(() => route.path, (newPath, oldPath) => {
       console.log('Canceling relationship creation - left metadata section')
       metadataStore.cancelRelationshipCreation()
     }
+    // Note: PackageAttachmentWidget is now handled at the Datasets component level
+    // so we don't cancel package attachment here anymore
   }
 })
 
@@ -49,6 +51,8 @@ onUnmounted(() => {
     console.log('Canceling relationship creation - unmounting metadata view')
     metadataStore.cancelRelationshipCreation()
   }
+  // Note: PackageAttachmentWidget is now handled at the Datasets component level
+  // so we don't cancel package attachment here anymore
 })
 
 // Always load the models when in this scenario

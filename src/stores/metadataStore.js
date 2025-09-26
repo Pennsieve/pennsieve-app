@@ -22,6 +22,9 @@ export const useMetadataStore = defineStore('metadata', () => {
 
     // Relationship creation state
     const activeRelationshipCreation = ref(null) // { sourceRecordId, sourceModelId, datasetId, sourceRecordName }
+    
+    // Package attachment state
+    const activePackageAttachment = ref(null) // { recordId, modelId, datasetId, recordName }
 
     // RecordFilter are used to filter records in Record list
     const createFilter = () => {
@@ -804,6 +807,47 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    /**
+     * Attach a package (file/folder) to a record
+     * @param {string} datasetId - The dataset ID
+     * @param {string} recordId - The record ID to attach package to
+     * @param {string} packageId - The package ID to attach
+     * @returns {Promise<Object>} The attachment result
+     */
+    const attachPackageToRecord = async (datasetId, recordId, packageId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                package_id: packageId
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to attach package to record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error attaching package to record:', error)
+            throw error
+        }
+    }
+
     // Relationship creation actions
     const startRelationshipCreation = (sourceRecordId, sourceModelId, datasetId, sourceRecordName) => {
         activeRelationshipCreation.value = {
@@ -835,6 +879,95 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Package attachment actions
+    const startPackageAttachment = (recordId, modelId, datasetId, recordName) => {
+        activePackageAttachment.value = {
+            recordId,
+            modelId,
+            datasetId,
+            recordName
+        }
+    }
+
+    const cancelPackageAttachment = () => {
+        activePackageAttachment.value = null
+    }
+
+    const completePackageAttachment = async (packageId) => {
+        if (!activePackageAttachment.value) {
+            throw new Error('No active package attachment in progress')
+        }
+
+        const { recordId, datasetId } = activePackageAttachment.value
+
+        try {
+            const result = await attachPackageToRecord(datasetId, recordId, packageId)
+            activePackageAttachment.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
+    // Fetch packages attached to a record
+    const fetchRecordPackages = async (datasetId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record packages: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record packages:', error)
+            throw error
+        }
+    }
+
+    // Delete a package from a record
+    const deletePackageFromRecord = async (datasetId, recordId, packageId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages/${encodeURIComponent(packageId)}`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to delete package from record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error deleting package from record:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -844,6 +977,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         templatesLoaded,
         recordFilterParams,
         activeRelationshipCreation,
+        activePackageAttachment,
 
         // Getters
         modelById,
@@ -868,11 +1002,21 @@ export const useMetadataStore = defineStore('metadata', () => {
         createTemplateVersion,
         updateVersion,
         updateModelMetadata,
+        attachPackageToRecord,
         
         // Relationship creation actions
         startRelationshipCreation,
         cancelRelationshipCreation,
-        completeRelationshipCreation
+        completeRelationshipCreation,
+        
+        // Package attachment actions
+        startPackageAttachment,
+        cancelPackageAttachment,
+        completePackageAttachment,
+        fetchRecordPackages,
+        deletePackageFromRecord
+
+
     }
 
 })

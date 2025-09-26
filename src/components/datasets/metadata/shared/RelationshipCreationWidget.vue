@@ -72,21 +72,24 @@ const confirmRelationship = async () => {
 
   loading.value = true
   try {
+    // Store navigation parameters before they get cleared
+    const navigationParams = {
+      orgId: router.currentRoute.value.params.orgId,
+      datasetId: activeCreation.value.datasetId,
+      modelId: activeCreation.value.sourceModelId,
+      recordId: activeCreation.value.sourceRecordId
+    }
+
     await metadataStore.completeRelationshipCreation(
       selectedTargetRecord.value.id, 
       selectedRelationshipType.value
     )
     ElMessage.success('Relationship created successfully')
     
-    // Navigate back to the source record
+    // Navigate back to the source record using stored parameters
     router.push({
       name: 'record-details',
-      params: {
-        orgId: router.currentRoute.value.params.orgId,
-        datasetId: activeCreation.value.datasetId,
-        modelId: activeCreation.value.sourceModelId,
-        recordId: activeCreation.value.sourceRecordId
-      }
+      params: navigationParams
     })
   } catch (error) {
     console.error('Error creating relationship:', error)
