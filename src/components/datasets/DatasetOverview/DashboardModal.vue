@@ -109,7 +109,7 @@ function closeDialog () {
 <template>
   <el-dialog
     :modelValue="dialogVisible"
-    class="full-dialog"
+    class="full-dialog full-dialog-db"
     @close="closeDialog"
   >
     <template #header>
@@ -140,11 +140,13 @@ function closeDialog () {
      background-color: #f6fcff;
      border: solid aliceblue;
 }
-
+:deep(.grid-stack){height: auto !important;}
 </style>
 <style>
-.full-dialog{
+.full-dialog-db{
   --el-dialog-width: 90%;
+  --el-dialog-margin-top:2vh;
+  height:90%;
 }
 .el-dialog__title {
   color: white;
