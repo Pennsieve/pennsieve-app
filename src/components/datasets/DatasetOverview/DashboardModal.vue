@@ -1,32 +1,23 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { useStore } from 'vuex';
-import { PublicationStatus } from '../../../utils/constants';
+import { computed, ref, watch } from 'vue'
+import { useStore } from 'vuex'
+import { PublicationStatus } from '../../../utils/constants'
+import { PennsieveDashboard, MarkdownWidget, TextWidget } from 'pennsieve-dashboard'
+import 'element-plus/dist/index.css';
+import 'pennsieve-dashboard/style.css'
 
-/* 
-Props
-*/
-const props = defineProps({
-  dialogVisible: Boolean,
-});
+// props / emits
+const props = defineProps({ dialogVisible: Boolean })
+const emit  = defineEmits(['close-dialog'])
 
+// store
+const store   = useStore()
+const dataset = computed(() => store.state.dataset)
 
-/*
-Emits
-*/
-const emit = defineEmits(["close-dialog"]);
-
-/* 
-Global State
-*/
-const store = useStore();
-const dataset = computed(() => store.state.dataset);
-/*
-Computed
-*/
-const publicationStatus = computed(() => {
-  return (dataset.value?.publication?.status ?? PublicationStatus.DRAFT).toUpperCase();
-});
+// Computed
+const publicationStatus = computed(() =>
+  (dataset.value?.publication?.status ?? PublicationStatus.DRAFT).toUpperCase()
+)
 
 const filesCount = computed(() => {
   const counts = dataset.value?.packageTypeCounts;
