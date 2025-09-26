@@ -1,6 +1,7 @@
 
 import { createApp} from "vue";
 import App from "./App.vue";
+import ElementPlus  from "element-plus"
 import router from "./router";
 import store from "./store";
 import striptags from 'striptags';
@@ -25,7 +26,6 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
-import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
 
 
@@ -49,7 +49,7 @@ app.use(store);
 
 const pinia = createPinia()
 app.use(pinia)
-
+app.use(ElementPlus)
 
 //Import Dashboard
 
