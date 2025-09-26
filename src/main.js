@@ -46,7 +46,6 @@ const app = createApp(App)
 app.directive('click-outside', ClickOutside)
 
 app.use(store);
-installDashboard(app, ["TextWidget"]);
 
 const pinia = createPinia()
 app.use(pinia)
