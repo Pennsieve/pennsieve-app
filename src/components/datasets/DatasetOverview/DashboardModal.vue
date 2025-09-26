@@ -6,7 +6,6 @@ import { PennsieveDashboard, MarkdownWidget, TextWidget } from 'pennsieve-dashbo
 import 'element-plus/dist/index.css';
 import 'pennsieve-dashboard/style.css'
 
-
 // props / emits
 const props = defineProps({ dialogVisible: Boolean })
 const emit  = defineEmits(['close-dialog'])
