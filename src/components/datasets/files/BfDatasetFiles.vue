@@ -28,6 +28,17 @@
               Run Analysis
             </bf-button>
 
+            <!-- <bf-button
+              :disabled="!isFeatureFlagEnabled"
+              @click="openOldRunAnalysisDialog"
+              class="mr-8 flex"
+            >
+              <template #prefix>
+                <IconAnalysis class="mr-8" :height="20" :width="20" />
+              </template>
+              Run Analysis (Choose Processors)
+            </bf-button> -->
+
             <bf-button
               v-if="getPermission('editor')"
               class="flex mr-8"
@@ -108,7 +119,6 @@
           :is-package-attachment-active="isPackageAttachmentActive"
           @move="showMove"
           @delete="showDeleteDialog"
-          @rename-file="showRenameFileDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
@@ -180,6 +190,12 @@
       :file="file"
     />
 
+    <old-run-analysis-dialog
+      :datasetId="datasetId"
+      :dialog-visible="oldRunAnalysisDialogVisible"
+      @close="onCloseOldRunAnalysisDialog"
+    />
+
     <bf-upload-info v-if="showUploadInfo" />
   </bf-stage>
 </template>
@@ -202,6 +218,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
 import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
+import OldRunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -307,6 +324,7 @@ export default {
       pusherChannelName: "",
       pusherChannel: {},
       runAnalysisDialogVisible: false,
+      oldRunAnalysisDialogVisible: false,
     };
   },
 
@@ -488,7 +506,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$on("update-external-file", this.onFileRenamed);
     EventBus.$on("openDeletedModal", (data) => {
       this.deletedDialogOpen = data;
       this.fetchDeleted();
@@ -516,7 +533,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$off("update-external-file", this.onFileRenamed);
   },
 
   /**
@@ -587,6 +603,9 @@ export default {
     },
     onCloseRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = false;
+    },
+    onCloseOldRunAnalysisDialog: function () {
+      this.oldRunAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
@@ -1216,6 +1235,9 @@ export default {
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
+    },
+    openOldRunAnalysisDialog: function () {
+      this.oldRunAnalysisDialogVisible = true;
     },
 
     handleRouteChange: function (to, from) {

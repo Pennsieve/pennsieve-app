@@ -22,7 +22,7 @@
         :model="newDatasetForm"
         label-position="top"
         :rules="rules"
-        @submit.native.prevent="createDataset()"
+        @submit.prevent="createDataset()"
       >
         <el-form-item
           label="Dataset Name"
@@ -53,7 +53,7 @@
         ref="newDatasetFormStep2"
         :model="newDatasetForm"
         :rules="rules"
-        @submit.native.prevent="createDataset('newDatasetForm')"
+        @submit.prevent="createDataset('newDatasetForm')"
       >
         <div
           class="section-title"
@@ -363,7 +363,7 @@
       /**
        * Create Dataset
        */
-      createDataset: function() {
+      createDataset: async function() {
         this.duplicateName = false
         let isValid = true
 
@@ -371,14 +371,14 @@
         this.newDatasetForm.includedWebhookIds= this.integrations.filter(n => n.isActive === true).map(x => x.id)
         this.newDatasetForm.excludedWebhookIds = this.integrations.filter(n => n.isActive === false).map(x => x.id)
 
-        this.$refs.newDatasetFormStep1.validate( (valid) => {
+        await this.$refs.newDatasetFormStep1.validate( (valid) => {
           if (!valid) {
             isValid = false
             return this.processStep = 1
           }
         })
 
-        this.$refs.newDatasetFormStep2.validate( (valid) => {
+        await this.$refs.newDatasetFormStep2.validate( (valid) => {
           if (!valid) {
             isValid = false
             return this.processStep = 2

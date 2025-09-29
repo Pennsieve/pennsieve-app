@@ -112,6 +112,7 @@ const IntegrationsList = () => import ('../components/Integrations/IntegrationsL
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
+const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 
 /**
  * Metadata Components
@@ -1058,6 +1059,13 @@ const router = createRouter({
       },
       props: true,
       children: [
+           {
+          name: 'workflow-builder',
+          path: 'workflow-builder',
+          components: {
+            stage: WorkflowBuilder,
+          }
+        },
         {
           name: 'activity',
           path: 'activity',

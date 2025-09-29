@@ -44,8 +44,6 @@ export default {
     EventBus.$on('open-uploader', this.onOpenUploader.bind(this))
     EventBus.$on('close-uploader', this.onCloseUploader.bind(this))
     EventBus.$on('get-file-proxy-id', this.getFilesProxyId.bind(this))
-    EventBus.$on('open-external-file-modal', this.onOpenExternalFileModal.bind(this))
-    EventBus.$on('close-external-file-modal', this.onCloseExternalFileModal.bind(this))
     EventBus.$on('set-default-route', this.setDefaultRoute.bind(this))
     EventBus.$on('finalize-orcid-integration', this.finalizeOrcidIntegration.bind(this))
     EventBus.$on('update-organization-members', this.getOrgMembers.bind(this))
@@ -65,8 +63,6 @@ export default {
     EventBus.$off('open-uploader', this.onOpenUploader.bind(this))
     EventBus.$off('close-uploader', this.onCloseUploader.bind(this))
     EventBus.$off('get-file-proxy-id', this.getFilesProxyId.bind(this))
-    EventBus.$off('open-external-file-modal', this.onOpenExternalFileModal.bind(this))
-    EventBus.$off('close-external-file-modal', this.onCloseExternalFileModal.bind(this))
     EventBus.$off('set-default-route', this.setDefaultRoute.bind(this))
     EventBus.$off('finalize-orcid-integration', this.finalizeOrcidIntegration.bind(this))
     EventBus.$off('update-organization-members', this.getOrgMembers.bind(this))
@@ -577,24 +573,6 @@ export default {
           isAddingFiles: true
         }
       })
-    },
-
-    /**
-     * Handle open-external-file-modal event
-     * @param {Object} file
-     */
-    onOpenExternalFileModal: function(file = {}) {
-      if (file.externalFile) {
-        this.externalFile = file
-      }
-      this.isUploadExternalFileModalOpen = true
-    },
-
-    /**
-     * Handle close-external-file-modal event
-     */
-    onCloseExternalFileModal: function() {
-      this.isUploadExternalFileModalOpen = false
     },
 
     /**

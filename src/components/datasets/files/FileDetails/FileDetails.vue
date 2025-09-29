@@ -49,23 +49,6 @@
                   </el-dropdown-item>
                 </template>
                 <template v-else>
-                  <el-dropdown-item
-                    v-if="!isExternalFile"
-                    class="bf-menu-item"
-                    :disabled="datasetLocked"
-                    command="rename-file"
-                  >
-                    Rename
-                  </el-dropdown-item>
-
-                  <el-dropdown-item
-                    v-else
-                    class="bf-menu-item"
-                    :disabled="datasetLocked"
-                    command="edit-file"
-                  >
-                    Update
-                  </el-dropdown-item>
 
                   <el-dropdown-item
                     class="bf-menu-item"
@@ -89,6 +72,14 @@
         </template>
       </stage-actions>
     </template>
+
+    <bf-delete-dialog
+      ref="deleteDialog"
+      :dialog-visible="deleteDialogVisible"
+      :selected-files="selectedFiles"
+      @file-delete="onDelete"
+      @close="onCloseDeleteDialog"
+    />
 
     <div class="concept-instance-section">
       <div files-section class="file-list">
@@ -555,6 +546,7 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
+      deleteDialogVisible: false
     };
   },
 
@@ -758,16 +750,6 @@ export default {
      */
     externalFile: function () {
       return propOr({}, "externalFile", this.proxyRecord);
-    },
-
-    /**
-     * Compute if package is an external file
-     * @returns {Boolean}
-     */
-    isExternalFile: function () {
-      return Boolean(
-        pathOr("", ["externalFile", "location"], this.proxyRecord)
-      );
     },
 
     /**
@@ -1350,8 +1332,6 @@ export default {
       this.hasSeenRelationshipsInfo = true;
     }
 
-    EventBus.$on("update-external-file", this.onExternalFileUpdate);
-
     // In FileDetails window, the tool for viewing should be limited/set to PAN for panning the image/timeseries etc.
     this.setActiveTool(viewerToolTypes.PAN);
   },
@@ -1362,7 +1342,6 @@ export default {
     EventBus.$off("refresh-table-data", this.refreshTableData);
     EventBus.$off("add-relationship", this.handleAddRelationship);
     EventBus.$off("update-relationships-list", this.updateRelationshipsList);
-    EventBus.$off("update-external-file", this.onExternalFileUpdate);
   },
 
   methods: {
@@ -2178,8 +2157,6 @@ export default {
       const commands = {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
-        "rename-file": this.showRenameFileDialog,
-        "edit-file": this.showEditFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2190,13 +2167,6 @@ export default {
     },
 
     /**
-     * Show edit file dialog
-     */
-    showEditFileDialog: function () {
-      EventBus.$emit("open-external-file-modal", this.proxyRecord);
-    },
-
-    /**
      * Show archive dialog
      */
     showArchiveDialog: function () {
@@ -2204,17 +2174,15 @@ export default {
     },
 
     /**
-     * Show rename file dialog
-     */
-    showRenameFileDialog: function () {
-      EventBus.$emit("rename-file", this.proxyRecord);
-    },
-
-    /**
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.$refs.deleteFilesDialog.visible = true;
+      this.selectedFileForAction = {};
+      this.deleteDialogVisible = true;
+    },
+
+    onCloseDeleteDialog: function () {
+      this.deleteDialogVisible = false;
     },
 
     /**
@@ -2533,42 +2501,6 @@ export default {
         file
       );
     },
-
-    /**
-     * Set new name and description for external file
-     * @param {Object} file
-     */
-    onExternalFileUpdate: function (file) {
-      const oldName = pathOr("", ["content", "name"], this.proxyRecord);
-      const oldDescription = pathOr(
-        "",
-        ["externalFile", "description"],
-        this.proxyRecord
-      );
-      this.proxyRecord.content.name = pathOr(
-        oldName,
-        ["content", "name"],
-        file
-      );
-      this.proxyRecord.externalFile.location = pathOr(
-        "",
-        ["externalFile", "location"],
-        file
-      );
-      this.proxyRecord.externalFile.description = pathOr(
-        oldDescription,
-        ["externalFile", "description"],
-        file
-      );
-
-      EventBus.$emit("toast", {
-        detail: {
-          msg: "External file was updated",
-          type: "success",
-        },
-      });
-    },
-
     /**
      * Show move dialog after getting the parent's (or dataset's) children
      */
@@ -2846,6 +2778,7 @@ export default {
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
 @use "../../../../styles/_icon-item-colors";
+@use "../../../../styles/element/dialog";
 
 #file-name-header {
   font-size: 20px;

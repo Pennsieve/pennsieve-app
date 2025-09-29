@@ -28,7 +28,6 @@ import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
-import {installDashboard} from 'sparc-dashboard-beta';
 import { createPinia } from 'pinia'
 
 
