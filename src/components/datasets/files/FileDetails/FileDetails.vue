@@ -53,6 +53,14 @@
                   <el-dropdown-item
                     class="bf-menu-item"
                     :disabled="datasetLocked"
+                    command="rename-file"
+                  >
+                    Rename
+                  </el-dropdown-item>
+                  
+                  <el-dropdown-item
+                    class="bf-menu-item"
+                    :disabled="datasetLocked"
                     command="move-file"
                   >
                     Move
@@ -79,6 +87,13 @@
       :selected-files="selectedFiles"
       @file-delete="onDelete"
       @close="onCloseDeleteDialog"
+    />
+
+    <RenameFileDialog
+      :dialog-visible="renameDialogVisible"
+      :file="proxyRecord"
+      @file-renamed="onFileRenamed"
+      @close="onCloseRenameFileDialog"
     />
 
     <div class="concept-instance-section">
@@ -546,7 +561,8 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
-      deleteDialogVisible: false
+      deleteDialogVisible: false,
+      renameDialogVisible: false
     };
   },
 
@@ -1372,6 +1388,13 @@ export default {
       });
     },
 
+    onCloseRenameFileDialog: function () {
+      this.renameDialogVisible = false;
+    },
+    showRenameFileDialog: function () {
+      this.renameDialogVisible = true;
+    },
+
     /**
      * Open office 365 file
      */
@@ -2157,6 +2180,7 @@ export default {
       const commands = {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
+        "rename-file": this.showRenameFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2177,7 +2201,6 @@ export default {
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.selectedFileForAction = {};
       this.deleteDialogVisible = true;
     },
 
