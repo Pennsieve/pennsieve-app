@@ -35,9 +35,9 @@
             :maxlength="255"
           />
 
-          <template #error>
+          <template #error="{ error }"">
             <!-- eslint-disable-next-line --><!-- $sanitize in use -->
-            <div class="el-form-item__error" v-html="$sanitize(error.error, ['a'])" />
+            <div class="el-form-item__error" v-html="$sanitize(error, ['a'])" />
           </template>
         </el-form-item>
       </el-form>
@@ -69,9 +69,7 @@ import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '../../shared/dialog-body/DialogBody.vue'
 import Request from '../../../mixins/request/index'
 import AutoFocus from '../../../mixins/auto-focus'
-import CheckUniqueNames from '../../../mixins/check-unique-names/index'
 import SanitizeName from '../../../mixins/sanitize-name/index'
-import { isValidPackageName } from '@/utils/namingConventions'
 import { mapGetters } from 'vuex'
 import { pathOr, pathEq, equals } from 'ramda'
 import {useGetToken} from "@/composables/useGetToken";
@@ -89,7 +87,6 @@ export default {
   mixins: [
     AutoFocus,
     Request,
-    CheckUniqueNames,
     SanitizeName
   ],
 
@@ -97,18 +94,6 @@ export default {
     dialogVisible: {
       type: Boolean,
       default: false
-    },
-    parentFolder: {
-      type: Object,
-      default: () => {
-        return {}
-      }
-    },
-    files: {
-      type: Array,
-      default: function() {
-        return []
-      }
     },
     file: {},
   },
@@ -121,10 +106,11 @@ export default {
       },
       rules: {
         name: [
-          { required: true, validator: this.validateName, trigger: 'false' },
+          { required: true, validator: this.validateName, trigger: 'blur' },
         ]
       },
-      isDuplicate: false
+      serverError: false, 
+      serverErrorMessage: ''
     }
   },
 
@@ -179,7 +165,8 @@ export default {
      * @param {String} formName
      */
     submitForm: function(formName) {
-      this.isDuplicate = false
+      this.serverError = false
+      this.serverErrorMessage = ''
 
       this.$refs[formName]
         .validate((valid) => {
@@ -211,10 +198,11 @@ export default {
               this.closeDialog()
             })
             .catch(response => {
-              if (response.status === 500) {
-                response.text()
+              if (response.status === 400) {
+                response.json()
                   .then(data => {
-                    this.isDuplicate = data.indexOf('package name is already taken') >= 0
+                    this.serverErrorMessage = data.message
+                    this.serverError = true
 
                     // Validate form again to show error
                     this.$refs.packageForm.validate()
@@ -232,32 +220,15 @@ export default {
      * @param {Function} callback
      */
     validateName: function(rule, value, callback) {
-      const packageType = pathOr('Collection', ['content', 'packageType'], this.file)
-      // Get list based on the file's packageType
-      const list = this.filterFiles(packageType === 'Collection')
-      const isUnique = this.checkUniqueName(list, ['content', 'name'], value, value)
-      const isValidName = isValidPackageName(value)
       if (value === '') {
-        callback(new Error('Please provide name'))
-      } else if (!isValidName) {
-        callback(new Error('This is not a valid filename. Find out more <a href="https://docs.pennsieve.io/" target="_blank">here</a>.'))
-      } else if (!isUnique || this.isDuplicate) {
-        callback(new Error('Name must be unique'))
+        callback(new Error('Please provide a name'))
+      } else if (this.serverError) {
+        callback(new Error('Within the current folder, '+this.serverErrorMessage))
       } else {
         callback()
       }
-    },
-
-    /**
-     * Get all collections or everything but collections
-     * @returns {Array}
-     */
-    filterFiles: function(collectionsOnly) {
-      return this.files.filter(item => {
-        const packageType = pathOr('', ['content', 'packageType'], item)
-        return equals(packageType, 'Collection') === collectionsOnly
-      })
     }
+
   }
 }
 </script>
