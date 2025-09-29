@@ -57,11 +57,11 @@ onUnmounted(() => {
 
 // Always load the models when in this scenario
 onMounted(async () => {
-  try {
-    store.dispatch('metadataModule/fetchModels')
-  } catch (err) {
-    console.error(err);
-  }
+  // try {
+  //   store.dispatch('metadataModule/fetchModels')
+  // } catch (err) {
+  //   console.error(err);
+  // }
 })
 
 </script>

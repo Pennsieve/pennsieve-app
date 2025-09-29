@@ -75,10 +75,10 @@ export default {
           to: 'records-list',
           name: 'Records',
         },
-        // {
-        //   to: 'graph',
-        //   name: 'Explorer',
-        // },
+        {
+          to: 'explore',
+          name: 'Explore',
+        },
 
       ]
     },

@@ -4,7 +4,7 @@
       v-model="dialogVisible"
       :show-close="false"
       class="property-dialog"
-      width="600px"
+      width="800px"
     >
       <template #header>
         <bf-dialog-header :title="editingProperty ? 'Edit Property' : 'Add Property'" />
@@ -109,6 +109,13 @@
                     Sensitive Data
                   </el-checkbox>
                   <div class="field-help">Mark this property as containing sensitive information</div>
+                </el-form-item>
+
+                <el-form-item v-if="propertyForm.required">
+                  <el-checkbox v-model="propertyForm.allowNull">
+                    Allow Null Values
+                  </el-checkbox>
+                  <div class="field-help">Allow this required property to be null</div>
                 </el-form-item>
               </div>
             </div>
@@ -300,7 +307,8 @@ const propertyForm = ref({
   default: '',
   required: false,
   isKey: false,
-  isSensitive: false
+  isSensitive: false,
+  allowNull: false
 })
 
 // Property types with enhanced descriptions
@@ -436,7 +444,8 @@ watch(() => props.initialPropertyData, (newData) => {
       default: '',
       required: false,
       isKey: false,
-      isSensitive: false
+      isSensitive: false,
+      allowNull: false
     }
   }
 }, { deep: true, immediate: true })
@@ -467,6 +476,27 @@ const onTypeChange = () => {
   propertyForm.value.enumInput = ''
   propertyForm.value.default = ''
 }
+
+// Watch for changes to the required property to clear allowNull when not required
+watch(() => propertyForm.value.required, (newRequired) => {
+  if (!newRequired) {
+    propertyForm.value.allowNull = false
+  }
+})
+
+// Watch for changes to the isKey property to automatically set required
+watch(() => propertyForm.value.isKey, (newIsKey) => {
+  if (newIsKey) {
+    propertyForm.value.required = true
+  }
+})
+
+// Watch for changes to the isSensitive property to automatically set required
+watch(() => propertyForm.value.isSensitive, (newIsSensitive) => {
+  if (newIsSensitive) {
+    propertyForm.value.required = true
+  }
+})
 
 const validateForm = () => {
   const errors = []
@@ -593,14 +623,29 @@ const handleSave = () => {
     })
     return
   }
-  // Build property schema
-  const property = {
-    type: propertyForm.value.type
+
+  // Validate Pennsieve-specific rules
+  if (propertyForm.value.isKey && !propertyForm.value.required) {
+    ElMessage.error(`Property "${propertyForm.value.name}" has "Part of Key" set but is not marked as required`)
+    return
   }
 
-  if (propertyForm.value.displayName !== propertyForm.value.name) {
-    property.title = propertyForm.value.displayName
+  if (propertyForm.value.isSensitive && !propertyForm.value.required) {
+    ElMessage.error(`Property "${propertyForm.value.name}" has "Sensitive Data" set but is not marked as required`)
+    return
   }
+
+  // Build property schema
+  const property = {}
+  
+  // Handle type - if allowNull is true, use array format [type, "null"]
+  if (propertyForm.value.allowNull) {
+    property.type = [propertyForm.value.type, "null"]
+  } else {
+    property.type = propertyForm.value.type
+  }
+
+  property.title = propertyForm.value.displayName
 
   if (propertyForm.value.description) {
     property.description = propertyForm.value.description

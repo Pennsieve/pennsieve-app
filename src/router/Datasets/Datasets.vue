@@ -251,8 +251,8 @@ export default {
               }
             })
             .then(() => {
-              this.getConcepts();
-              EventBus.$emit("get-file-proxy-id");
+              // this.getConcepts();
+              // EventBus.$emit("get-file-proxy-id");
             })
             .catch((err) => console.log(err));
         })

@@ -529,16 +529,22 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Create a new template version
-    const createTemplateVersion = async (templateId, versionData) => {
+    const createTemplateVersion = async (templateId, versionData, orgId) => {
         try {
             const endpoint = `${site.api2Url}/metadata/templates/${templateId}/versions`
             const token = await useGetToken()
+            
+            const queryParams = {
+                organization_id: orgId
+            }
+            
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
             
             const payload = {
                 schema: versionData.schema
             }
 
-            const resp = await fetch(endpoint, {
+            const resp = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -556,6 +562,41 @@ export const useMetadataStore = defineStore('metadata', () => {
             }
         } catch (error) {
             console.error('Error creating template version:', error)
+            throw error
+        }
+    }
+
+    // Fetch all versions of a template
+    const fetchTemplateVersions = async (templateId, orgId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/templates/${templateId}/versions`
+            const token = await useGetToken()
+            
+            const queryParams = {
+                organization_id: orgId
+            }
+            
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+
+            if (!resp.ok) {
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch template versions: ${resp.status} - ${errorText}`)
+            }
+
+            const data = await resp.json()
+            // Handle the API response structure: {"model_template": {"versions": [...]}}
+            return data.model_template?.versions || data.versions || data
+        } catch (error) {
+            console.error('Error fetching template versions:', error)
             throw error
         }
     }
@@ -939,6 +980,39 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+     // Fetch relationships for a record
+    const fetchRecordRelationships = async (datasetId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/relationships`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                // Return empty array for 404 (no relationships) instead of throwing error
+                if (resp.status === 404) {
+                    return []
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record relationships: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record relationships:', error)
+            throw error
+        }
+    }
+
     // Delete a package from a record
     const deletePackageFromRecord = async (datasetId, recordId, packageId) => {
         try {
@@ -968,6 +1042,39 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Delete a relationship between records
+    const deleteRelationship = async (datasetId, sourceRecordId, targetRecordId, relationshipType) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${sourceRecordId}/relationships/${targetRecordId}`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders,
+                body: JSON.stringify({
+                    relationship_type: relationshipType
+                })
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to delete relationship: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error deleting relationship:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -988,6 +1095,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchModelVersion,
         fetchModelVersions,
         fetchTemplates,
+        fetchTemplateVersions,
         fetchRecords,
         fetchRecord,
         createRecord,
@@ -1014,7 +1122,9 @@ export const useMetadataStore = defineStore('metadata', () => {
         cancelPackageAttachment,
         completePackageAttachment,
         fetchRecordPackages,
-        deletePackageFromRecord
+        fetchRecordRelationships,
+        deletePackageFromRecord,
+        deleteRelationship
 
 
     }

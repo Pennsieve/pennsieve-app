@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch, h } from 'vue'
-import { ElCard, ElForm, ElFormItem, ElInput, ElInputNumber, ElSelect, ElOption, ElSwitch, ElDatePicker, ElMessage, ElButton } from 'element-plus'
+import { ElCard, ElForm, ElFormItem, ElInput, ElInputNumber, ElSelect, ElOption, ElDatePicker, ElMessage, ElButton } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import Ajv from 'ajv'
@@ -42,6 +42,7 @@ const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
 const formData = ref({})
 const validationErrors = ref([])
+const nullKeyFields = ref({}) // Track which nullable fields should be set to null
 
 // Form validation - configure AJV for JSON Schema Draft 2020-12
 const ajv = new Ajv({ 
@@ -150,7 +151,13 @@ const recordJson = computed(() => {
   
   // Convert flat form data back to nested structure
   Object.entries(formData.value).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') {
+    // Check if this is a nullable field that should be explicitly set to null
+    const shouldSetNull = nullKeyFields.value[key]
+    
+    // Include the field if:
+    // 1. It's a nullable field explicitly set to null, OR
+    // 2. It has a non-empty, non-unspecified value
+    if (shouldSetNull || (value !== null && value !== undefined && value !== '' && value !== 'unspecified')) {
       // Handle nested keys like "clinical_data.participants.total_enrolled"
       const keyParts = key.split('.')
       let current = cleanData
@@ -164,9 +171,9 @@ const recordJson = computed(() => {
         current = current[part]
       }
       
-      // Set the final value
+      // Set the final value (null if explicitly set, otherwise the actual value)
       const finalKey = keyParts[keyParts.length - 1]
-      current[finalKey] = value
+      current[finalKey] = shouldSetNull ? null : value
     }
   })
   
@@ -270,7 +277,43 @@ const fetchExistingRecord = async () => {
     
     // Populate form with existing record data
     if (response && response.value) {
-      formData.value = { ...response.value }
+      // First, set all boolean fields to 'unspecified' by default
+      const initialData = {}
+      schemaProperties.value.forEach(prop => {
+        if (prop.type === 'boolean' && !prop.isObjectHeader) {
+          initialData[prop.key] = 'unspecified'
+        }
+      })
+      
+      // Then overlay actual values from the record
+      // Flatten nested object structure for form
+      const flattenRecordData = (obj, prefix = '') => {
+        const flattened = {}
+        Object.entries(obj).forEach(([key, value]) => {
+          const fullKey = prefix ? `${prefix}.${key}` : key
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            Object.assign(flattened, flattenRecordData(value, fullKey))
+          } else {
+            flattened[fullKey] = value
+          }
+        })
+        return flattened
+      }
+      
+      const flatData = flattenRecordData(response.value)
+      formData.value = { ...initialData, ...flatData }
+      
+      // Initialize null fields tracking - check for any nullable fields that are explicitly null
+      schemaProperties.value.forEach(prop => {
+        // Check if field is nullable (type includes "null")
+        const isNullable = prop.property && Array.isArray(prop.property.type) && prop.property.type.includes('null')
+        if (isNullable && !prop.isObjectHeader) {
+          // Check if this field is null in the actual record data
+          if (flatData[prop.key] === null) {
+            nullKeyFields.value[prop.key] = true
+          }
+        }
+      })
     }
   } catch (err) {
     console.error('Error fetching existing record:', err)
@@ -295,7 +338,7 @@ const initializeFormData = () => {
           data[prop.key] = null
           break
         case 'boolean':
-          data[prop.key] = false
+          data[prop.key] = 'unspecified' // Default to unspecified for booleans
           break
         case 'array':
           data[prop.key] = []
@@ -396,13 +439,20 @@ const updateRecord = async () => {
   }
 }
 
-const renderFormField = (property) => {
+// Helper function for rendering just the form input
+const renderFormFieldInput = (property) => {
   const { key, type, format, enum: enumValues } = property
   
   if (enumValues && enumValues.length > 0) {
     return h(ElSelect, {
       modelValue: formData.value[key],
-      'onUpdate:modelValue': (value) => formData.value[key] = value,
+      'onUpdate:modelValue': (value) => {
+        formData.value[key] = value
+        // If user selects a value, uncheck the null checkbox
+        if (nullKeyFields.value[key]) {
+          nullKeyFields.value[key] = false
+        }
+      },
       placeholder: `Select ${property.label}`,
       clearable: true,
       size: 'default'
@@ -444,7 +494,13 @@ const renderFormField = (property) => {
       } else {
         return h(ElInput, {
           modelValue: formData.value[key],
-          'onUpdate:modelValue': (value) => formData.value[key] = value,
+          'onUpdate:modelValue': (value) => {
+            formData.value[key] = value
+            // If user types something, uncheck the null checkbox
+            if (value && nullKeyFields.value[key]) {
+              nullKeyFields.value[key] = false
+            }
+          },
           placeholder: `Enter ${property.label}`,
           type: format === 'email' ? 'email' : 'text',
           size: 'default'
@@ -458,6 +514,10 @@ const renderFormField = (property) => {
         'onUpdate:modelValue': (value) => {
           const numValue = type === 'integer' ? parseInt(value) : parseFloat(value)
           formData.value[key] = isNaN(numValue) ? null : numValue
+          // If user types something, uncheck the null checkbox
+          if (!isNaN(numValue) && nullKeyFields.value[key]) {
+            nullKeyFields.value[key] = false
+          }
         },
         placeholder: `Enter ${property.label}`,
         type: 'number',
@@ -466,21 +526,32 @@ const renderFormField = (property) => {
       })
     
     case 'boolean':
-      return h('div', {
-        class: 'boolean-switch-wrapper',
-        onClick: (event) => {
-          // Toggle on any click within the wrapper
-          formData.value[key] = !formData.value[key]
-          event.preventDefault()
-          event.stopPropagation()
-        }
-      }, [
-        h(ElSwitch, {
-          modelValue: !!formData.value[key],
-          size: 'default',
-          style: { pointerEvents: 'none' } // Disable direct interaction
+      // Create tri-state boolean selector (true/false/unspecified)
+      const booleanOptions = [
+        { label: 'True', value: true },
+        { label: 'False', value: false },
+        { label: 'Unspecified', value: 'unspecified' }
+      ]
+      
+      return h(ElSelect, {
+        modelValue: formData.value[key],
+        'onUpdate:modelValue': (value) => {
+          formData.value[key] = value
+          // If user selects a value, uncheck the null checkbox
+          if (value !== 'unspecified' && nullKeyFields.value[key]) {
+            nullKeyFields.value[key] = false
+          }
+        },
+        placeholder: `Select ${property.label}`,
+        clearable: false,
+        size: 'default'
+      }, () => booleanOptions.map(option => 
+        h(ElOption, { 
+          key: String(option.value), 
+          label: option.label, 
+          value: option.value 
         })
-      ])
+      ))
     
     case 'array':
       return h(ElInput, {
@@ -504,6 +575,45 @@ const renderFormField = (property) => {
         size: 'default'
       })
   }
+}
+
+const renderFormField = (property) => {
+  const { key, type, format, enum: enumValues } = property
+  // Check if field is nullable (type includes "null")
+  const isNullable = property.property && Array.isArray(property.property.type) && property.property.type.includes('null')
+  const isNullSet = nullKeyFields.value[key]
+  
+  // If this is a nullable field, wrap the input with null checkbox
+  if (isNullable) {
+    return h('div', { class: 'key-field-wrapper' }, [
+      h('div', { class: 'key-field-control' }, [
+        h('label', { class: 'null-checkbox-label' }, [
+          h('input', {
+            type: 'checkbox',
+            checked: isNullSet,
+            onChange: (e) => {
+              nullKeyFields.value[key] = e.target.checked
+              if (e.target.checked) {
+                // Clear the field value when setting to null
+                formData.value[key] = type === 'boolean' ? 'unspecified' : 
+                                     type === 'number' || type === 'integer' ? null :
+                                     type === 'array' ? [] :
+                                     type === 'object' ? {} : ''
+              }
+            },
+            class: 'null-checkbox'
+          }),
+          h('span', { class: 'null-label' }, ' Set to null')
+        ])
+      ]),
+      h('div', { 
+        class: 'key-field-input',
+        style: { opacity: isNullSet ? '0.5' : '1', pointerEvents: isNullSet ? 'none' : 'auto' }
+      }, [renderFormFieldInput(property)])
+    ])
+  }
+  
+  return renderFormFieldInput(property)
 }
 
 // View mode handler
@@ -1177,6 +1287,34 @@ onMounted(async () => {
                       pointer-events: auto;
                       z-index: inherit;
                     }
+                  }
+                }
+                
+                // Nullable field wrapper styling
+                .key-field-wrapper {
+                  .key-field-control {
+                    margin-bottom: 8px;
+                    
+                    .null-checkbox-label {
+                      display: flex;
+                      align-items: center;
+                      font-size: 13px;
+                      color: theme.$gray_5;
+                      cursor: pointer;
+                      
+                      .null-checkbox {
+                        margin-right: 6px;
+                        cursor: pointer;
+                      }
+                      
+                      .null-label {
+                        font-style: italic;
+                      }
+                    }
+                  }
+                  
+                  .key-field-input {
+                    transition: opacity 0.2s ease;
                   }
                 }
                 

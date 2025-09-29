@@ -391,8 +391,11 @@ const goToPackageDetails = (packageItem) => {
   const currentRoute = router.currentRoute.value
   const orgId = currentRoute.params.orgId
   
+  // For collections, navigate to the folder view instead of details page
+  const routeName = packageItem.package.package_type === 'Collection' ? 'collection-files' : 'file-record'
+  
   router.push({
-    name: 'file-record',
+    name: routeName,
     params: {
       orgId: orgId,
       datasetId: props.datasetId,
@@ -445,6 +448,53 @@ const deletePackage = async (packageItem) => {
     }
     console.error('Error deleting package from record:', action)
     ElMessage.error(`Failed to remove file: ${action.message || 'Unknown error'}`)
+  }
+}
+
+// Delete relationship from record
+const deleteRelationship = async (relationship, direction) => {
+  const isOutbound = direction === 'outbound'
+  const sourceRecordId = isOutbound ? props.recordId : relationship.record.id
+  const targetRecordId = isOutbound ? relationship.record.id : props.recordId
+  const relationshipDisplayName = getRecordDisplayValue(relationship.record)
+  
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to remove the "${relationship.relationship_type}" relationship with "${relationshipDisplayName}"? This cannot be undone.`,
+      'Remove Relationship',
+      {
+        confirmButtonText: 'Remove',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+        center: true,
+        lockScroll: true,
+        closeOnClickModal: false,
+        closeOnPressEscape: true,
+        showClose: true,
+        beforeClose: null,
+        distinguishCancelAndClose: true,
+        roundButton: false
+      }
+    )
+
+    await metadataStore.deleteRelationship(
+      props.datasetId,
+      sourceRecordId,
+      targetRecordId,
+      relationship.relationship_type
+    )
+
+    ElMessage.success('Relationship removed successfully')
+
+    // Refresh the record to get updated relationships
+    await fetchRecord()
+  } catch (action) {
+    if (action === 'cancel' || action === 'close') {
+      // User cancelled or closed dialog
+      return
+    }
+    console.error('Error deleting relationship:', action)
+    ElMessage.error(`Failed to remove relationship: ${action.message || 'Unknown error'}`)
   }
 }
 
@@ -618,30 +668,38 @@ onMounted(async () => {
           </div>
 
           <div class="relationships-container">
-            <!-- Simplified Relationships List -->
-            <div class="relationships-list">
-              <!-- Inbound Relationships -->
-              <div class="relationship-section">
+            <!-- Show "no relationships" message when there are none -->
+            <div v-if="!hasRelationships" class="no-relationships">
+              <p class="no-relationships-message">No relationships have been created for this record</p>
+            </div>
+
+            <!-- Show relationship lists when there are relationships -->
+            <div v-else class="relationships-list">
+              <!-- Inbound Relationships (only show if there are inbound relationships) -->
+              <div v-if="relationships.inbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title inbound">← Inbound</h4>
                 
-                <!-- Inbound relationships exist -->
-                <div v-if="relationships.inbound.length > 0" class="relationship-items">
+                <div class="relationship-items">
                   <div
                     v-for="(relationship, index) in paginatedInboundRelationships"
                     :key="`inbound-${index}`"
-                    class="relationship-item clickable"
-                    @click="goToRelatedRecord(relationship.record)"
-                    :title="'Click to view record'"
+                    class="relationship-item"
                   >
-                    <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
-                    <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                    <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
+                      <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
+                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                    </div>
+                    <el-button
+                      @click.stop="deleteRelationship(relationship, 'inbound')"
+                      link
+                      size="small"
+                      class="delete-relationship-btn"
+                      title="Remove relationship"
+                    >
+                      ✕
+                    </el-button>
                   </div>
-                </div>
-                
-                <!-- No inbound relationships -->
-                <div v-else class="no-relationships">
-                  <p class="no-relationships-message">No inbound relationships</p>
                 </div>
                 
                 <!-- Inbound Pagination -->
@@ -658,28 +716,31 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <!-- Outbound Relationships -->
-              <div class="relationship-section">
+              <!-- Outbound Relationships (only show if there are outbound relationships) -->
+              <div v-if="relationships.outbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title outbound">Outbound →</h4>
                 
-                <!-- Outbound relationships exist -->
-                <div v-if="relationships.outbound.length > 0" class="relationship-items">
+                <div class="relationship-items">
                   <div
                     v-for="(relationship, index) in paginatedOutboundRelationships"
                     :key="`outbound-${index}`"
-                    class="relationship-item clickable"
-                    @click="goToRelatedRecord(relationship.record)"
-                    :title="'Click to view record'"
+                    class="relationship-item"
                   >
-                    <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
-                    <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                    <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
+                      <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
+                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                    </div>
+                    <el-button
+                      @click.stop="deleteRelationship(relationship, 'outbound')"
+                      link
+                      size="small"
+                      class="delete-relationship-btn"
+                      title="Remove relationship"
+                    >
+                      ✕
+                    </el-button>
                   </div>
-                </div>
-                
-                <!-- No outbound relationships -->
-                <div v-else class="no-relationships">
-                  <p class="no-relationships-message">No outbound relationships</p>
                 </div>
                 
                 <!-- Outbound Pagination -->
@@ -1339,17 +1400,46 @@ onMounted(async () => {
                   border: 1px solid theme.$gray_2;
                   border-radius: 4px;
                   transition: all 0.2s ease;
+                  justify-content: space-between;
 
-                  &.clickable {
-                    cursor: pointer;
+                  .relationship-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex: 1;
 
+                    &.clickable {
+                      cursor: pointer;
+                    }
+                  }
+
+                  &:hover {
+                    border-color: theme.$purple_1;
+                    background-color: theme.$gray_1;
+
+                    .nav-icon {
+                      color: theme.$purple_2;
+                    }
+
+                    .delete-relationship-btn {
+                      opacity: 1;
+                    }
+                  }
+
+                  .delete-relationship-btn {
+                    opacity: 0;
+                    transition: all 0.2s ease;
+                    padding: 2px 4px !important;
+                    min-height: unset !important;
+                    height: 18px !important;
+                    width: 18px !important;
+                    font-size: 12px;
+                    color: theme.$gray_4;
+                    flex-shrink: 0;
+                    
                     &:hover {
-                      border-color: theme.$purple_1;
-                      background-color: theme.$gray_1;
-
-                      .nav-icon {
-                        color: theme.$purple_2;
-                      }
+                      color: theme.$red_2 !important;
+                      background-color: theme.$red_tint !important;
                     }
                   }
 

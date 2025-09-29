@@ -40,6 +40,19 @@ const props = defineProps({
     type: Object,
     default: null
   },
+  // Template support props
+  isTemplate: {
+    type: Boolean,
+    default: false
+  },
+  templateData: {
+    type: Object,
+    default: null
+  },
+  showTemplateActions: {
+    type: Boolean,
+    default: false
+  },
   minimal: {
     type: Boolean,
     default: false
@@ -81,7 +94,7 @@ const model = ref()
 const templateData = ref()
 
 // Computed to determine if we're viewing a template
-const isTemplate = computed(() => !!props.templateId)
+const isTemplate = computed(() => props.isTemplate || !!props.templateId)
 
 // Use composablesOKay
 const {
@@ -101,6 +114,18 @@ const {
 
 // Template data computed properties
 const templateDataFormatted = computed(() => {
+  // Use props.templateData if provided directly (for preview mode)
+  if (props.templateData) {
+    return {
+      id: props.templateData.id,
+      name: props.templateData.name,
+      display_name: props.templateData.display_name,
+      description: props.templateData.description,
+      latest_version: props.templateData.latest_version || props.templateData
+    }
+  }
+  
+  // Fallback to internal templateData (for templateId mode)
   if (!templateData.value) return null
   
   return {
@@ -115,6 +140,16 @@ const templateDataFormatted = computed(() => {
 // Combined data source - use template data if we're viewing a template
 const effectiveModelData = computed(() => {
   if (isTemplate.value && templateDataFormatted.value) {
+    // If a specific template version is selected and loaded, use that version's data
+    if (currentTemplateVersionData.value && selectedTemplateVersion.value !== null) {
+      return {
+        ...templateDataFormatted.value,
+        latest_version: {
+          version: selectedTemplateVersion.value,
+          schema: currentTemplateVersionData.value.latest_version?.schema || currentTemplateVersionData.value.schema || templateDataFormatted.value.latest_version.schema
+        }
+      }
+    }
     return templateDataFormatted.value
   }
   return modelData.value
@@ -170,6 +205,45 @@ const handleTemplateCreated = (createdTemplate) => {
   console.log('Template created successfully:', createdTemplate)
 }
 
+// Template-specific action handlers
+const handleCreateModel = () => {
+  if (!effectiveModelData.value) return
+  
+  // Navigate to new-model route with template data
+  router.push({
+    name: 'new-model',
+    params: {
+      datasetId: props.datasetId
+    },
+    query: {
+      template: btoa(JSON.stringify(effectiveModelData.value)) // Base64 encode the template
+    }
+  })
+}
+
+const handleEditTemplate = () => {
+  if (!effectiveModelData.value) return
+  
+  // Navigate to template edit route
+  router.push({
+    name: 'template-edit',
+    params: {
+      templateId: effectiveModelData.value.id,
+      orgId: props.orgId
+    }
+  })
+}
+
+const copyTemplateId = async () => {
+  try {
+    await navigator.clipboard.writeText(effectiveModelData.value.id)
+    ElMessage.success('Template ID copied to clipboard')
+  } catch (error) {
+    console.error('Failed to copy template ID:', error)
+    ElMessage.error('Failed to copy template ID')
+  }
+}
+
 // Navigation functions
 const goToRecords = () => {
   if (!props.modelId) {
@@ -212,31 +286,94 @@ const toggleActionDropdown = () => {
   quickActionsVisible.value = !quickActionsVisible.value
 }
 
-// Template fetching function
-const fetchTemplateData = async () => {
+// Template version handling
+const availableTemplateVersions = ref([])
+const selectedTemplateVersion = ref(null)
+const currentTemplateVersionData = ref(null)
+const loadingTemplateVersion = ref(false)
+
+const fetchTemplateVersions = async () => {
+  if (!props.templateId || !props.orgId) return
+  
   try {
-    const fetchedTemplates = await metadataStore.fetchTemplates(props.orgId)
-    if (fetchedTemplates && Array.isArray(fetchedTemplates)) {
-      const template = fetchedTemplates.find(t => 
-        (t.model_template?.id || t.id) === props.templateId
-      )
-      
-      if (template) {
-        templateData.value = {
-          id: template.model_template?.id || template.id,
-          name: template.model_template?.name || template.name,
-          display_name: template.model_template?.display_name || template.display_name,
-          description: template.description || template.model_template?.description || '',
-          latest_version: template.model_template?.latest_version || template.latest_version || {
-            version: 1,
-            schema: template.model_template?.latest_version?.schema || template.schema || {}
-          }
+    const versions = await metadataStore.fetchTemplateVersions(props.templateId, props.orgId)
+    availableTemplateVersions.value = versions || []
+    
+    // If no versions found, create a default one
+    if (availableTemplateVersions.value.length === 0 && templateData.value) {
+      availableTemplateVersions.value = [{
+        version: templateData.value.latest_version?.version || 1,
+        created_at: templateData.value.created_at || new Date().toISOString()
+      }]
+    }
+    
+    // Set selected version to the latest version number if not already set
+    if (!selectedTemplateVersion.value && availableTemplateVersions.value.length > 0) {
+      // Find the highest version number
+      const latestVersionNumber = Math.max(...availableTemplateVersions.value.map(v => v.version))
+      selectedTemplateVersion.value = latestVersionNumber
+    }
+  } catch (error) {
+    console.error('Failed to fetch template versions:', error)
+    availableTemplateVersions.value = []
+  }
+}
+
+const fetchTemplateVersion = async (versionNumber) => {
+  if (!props.templateId || !props.orgId) return
+  
+  try {
+    loadingTemplateVersion.value = true
+    
+    // Find the specific version in the availableTemplateVersions array
+    const selectedVersion = availableTemplateVersions.value.find(v => v.version === versionNumber)
+    
+    if (selectedVersion) {
+      // Use the selected version's schema
+      currentTemplateVersionData.value = {
+        ...templateData.value,
+        latest_version: {
+          version: selectedVersion.version,
+          schema: selectedVersion.schema,
+          created_at: selectedVersion.created_at
         }
       }
+    } else {
+      // Fallback to template data if version not found
+      currentTemplateVersionData.value = templateData.value
     }
+  } catch (error) {
+    console.error('Failed to fetch template version:', error)
+    currentTemplateVersionData.value = templateData.value
+  } finally {
+    loadingTemplateVersion.value = false
+  }
+}
+
+const fetchTemplateData = async () => {
+  if (!props.templateId) return
+  
+  try {
+    // Fetch template data from store
+    if (!metadataStore.templatesLoaded) {
+      await metadataStore.fetchTemplates(props.orgId)
+    }
+    
+    templateData.value = metadataStore.templateById(props.templateId)
+    
+    // Fetch available template versions
+    await fetchTemplateVersions()
+    
+    // Fetch current version data
+    await fetchTemplateVersion(selectedTemplateVersion.value)
   } catch (error) {
     console.error('Failed to fetch template data:', error)
   }
+}
+
+const handleTemplateVersionChange = (version) => {
+  selectedTemplateVersion.value = version
+  fetchTemplateVersion(version)
 }
 
 onMounted(async () => {
@@ -628,13 +765,15 @@ const PropertyTree = defineComponent({
 </script>
 
 <template>
-  <bf-stage class="model-spec-viewer" :class="{ minimal: minimal }" no-padding: true>
-    <template #actions>
+  <bf-stage class="model-spec-viewer" :class="{ minimal: minimal }" :no-padding="true">
+    <template v-if="!hideSelector" #actions>
       <stage-actions>
         <template #left>
           <!-- Version selector -->
           <div v-if="!hideSelector" class="version-controls">
+            <!-- Model version selector -->
             <el-select 
+              v-if="!isTemplate"
               :model-value="selectedVersion"
               @update:model-value="handleVersionChange"
               placeholder="Select version"
@@ -649,10 +788,28 @@ const PropertyTree = defineComponent({
                 :value="version.value"
               />
             </el-select>
+            
+            <!-- Template version selector -->
+            <el-select 
+              v-if="isTemplate"
+              :model-value="selectedTemplateVersion"
+              @update:model-value="handleTemplateVersionChange"
+              placeholder="Select version"
+              size="small"
+              :loading="loadingTemplateVersion"
+              class="version-dropdown"
+            >
+              <el-option
+                v-for="version in availableTemplateVersions"
+                :key="version.version"
+                :label="`Version ${version.version}`"
+                :value="version.version"
+              />
+            </el-select>
           </div>
         </template>
         <template #right>
-          <!-- Action buttons with dropdown -->
+          <!-- Model Action buttons with dropdown -->
           <div v-if="!hideSelector && !isTemplate" class="action-buttons">
             <!-- Always visible View Records button -->
 
@@ -700,6 +857,16 @@ const PropertyTree = defineComponent({
               </template>
             </ps-button-dropdown>
           </div>
+
+          <!-- Template Action buttons -->
+          <div v-if="!hideSelector && isTemplate" class="action-buttons">
+            <bf-button @click="handleEditTemplate" size="small">
+              Edit Template
+            </bf-button>
+            <bf-button @click="handleCreateModel" type="primary" size="small">
+              Create Model from Template
+            </bf-button>
+          </div>
         </template>
       </stage-actions>
     </template>
@@ -707,6 +874,9 @@ const PropertyTree = defineComponent({
     <!-- Model Information Header outside stage-actions -->
     <div v-if="effectiveModelData" class="model-info-header">
       <span class="model-name">{{ effectiveModelData.display_name || effectiveModelData.name }}</span>
+      <el-tag v-if="isTemplate" type="success" size="small" effect="plain">
+        Template
+      </el-tag>
       <el-tag type="info" size="small" effect="plain">
         {{ Object.keys(effectiveModelData.latest_version.schema.properties).length }} properties
       </el-tag>
@@ -737,7 +907,7 @@ const PropertyTree = defineComponent({
         </div>
         
         <!-- JSON Schema display -->
-        <el-card>
+        <el-card shadow="never">
           <pre class="json-content">{{ JSON.stringify(displaySchema, null, 2) }}</pre>
         </el-card>
       </div>
@@ -928,6 +1098,10 @@ const PropertyTree = defineComponent({
     
     .model-content {
       padding: 0;
+    }
+    
+    .model-info-header {
+      margin: 0;
     }
   }
 }
@@ -1308,7 +1482,7 @@ const PropertyTree = defineComponent({
   }
 }
 
-// Model info header styling (outside stage-actions)
+// Model info header styling (outside stage-actions)in
 .model-info-header {
   display: flex;
   align-items: center;

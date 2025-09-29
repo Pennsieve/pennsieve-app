@@ -6,8 +6,6 @@ import ModelList from "@/components/datasets/metadata/models/modelList.vue";
 import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
-import TemplateSpecViewer from "@/components/datasets/metadata/models/TemplateSpecViewer.vue";
-import TemplateSpecGenerator from "@/components/datasets/metadata/models/TemplateSpecGenerator.vue";
 import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/models/RecordSpecGenerator.vue";
@@ -123,7 +121,7 @@ const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityM
 // const ModelRecordsSelector = () => import('../components/datasets/metadata/models/ModelRecordsSelector.vue')
 // const Models = () => import('../components/datasets/management/GraphManagement/Models.vue')
 const RelationshipTypes = () => import('../components/datasets/management/GraphManagement/RelationshipTypes.vue')
-const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
+// const GraphBrowse2 = () => import('../components/datasets/records/GraphBrowser/GraphBrowse2.vue')
 // const ModelInstance = () => import('../components/datasets/management/ConceptManagement/ConceptManagement.vue')
 const ConceptInstance = () => import('../components/datasets/explore/ConceptInstance/ConceptInstance.vue')
 const InstanceEdit = () => import('../components/datasets/explore/ConceptInstance/InstanceEdit.vue')
@@ -498,7 +496,7 @@ const router = createRouter({
             stageHeader: true
           },
           redirect: {
-            name: 'models-list'
+            name: 'records-list'
           },
           children: [
             {
@@ -741,7 +739,11 @@ const router = createRouter({
                 {
                   path: 'templates/:templateId',
                   name: 'template-details',
-                  props: true,
+                  props: route => ({
+                    templateId: route.params.templateId,
+                    orgId: route.params.orgId,
+                    isTemplate: true
+                  }),
                   meta: { 
                     backLink: {name: "Template Gallery", to: "new-model-from-template"},
                     breadcrumbs: [
@@ -752,7 +754,7 @@ const router = createRouter({
                     ]
                   },
                   components: {
-                    stage: TemplateSpecViewer
+                    stage: ModelSpecViewer
                   }
                 },
                 {
@@ -760,7 +762,8 @@ const router = createRouter({
                   name: 'template-edit',
                   props: route => ({
                     templateId: route.params.templateId,
-                    orgId: route.params.orgId
+                    orgId: route.params.orgId,
+                    isTemplate: true
                   }),
                   meta: { 
                     backLink: {name: "Template Details", to: "template-details"},
@@ -773,7 +776,7 @@ const router = createRouter({
                     ]
                   },
                   components: {
-                    stage: TemplateSpecGenerator
+                    stage: ModelSpecGenerator
                   }
                 },
               ]
@@ -794,22 +797,38 @@ const router = createRouter({
                 ]
               }
             },
+            // {
+            //   path: 'graph',
+            //   name: 'graph',
+            //   props: {
+            //     stage: true
+            //   },
+            //   components: {
+            //     stage: GraphBrowse2
+            //   },
+            //   meta: {
+            //     breadcrumbs: [
+            //       { name: "Metadata", to: "metadata" },
+            //       { name: "Schema", current: true }
+            //     ]
+            //   }
+            // },
             {
-              path: 'graph',
-              name: 'graph',
+              path: 'explore',
+              name: 'explore',
               props: {
                 stage: true
               },
               components: {
-                stage: GraphBrowse2
+                stage: () => import('@/components/datasets/explore/GraphExplorer/GraphExplorer.vue')
               },
               meta: {
                 breadcrumbs: [
                   { name: "Metadata", to: "metadata" },
-                  { name: "Schema", current: true }
+                  { name: "Explore", current: true }
                 ]
               }
-            },
+            }
           ]
         },
         {
