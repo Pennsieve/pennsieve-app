@@ -65,7 +65,17 @@
             </span>
           </div>
         </el-form-item>
+      </el-form>
 
+      <bf-button @click="addApp" type="button">Add an App</bf-button>
+
+      <el-form
+        :model="workflow"
+        :rules="rules"
+        ref="workflowForm"
+        label-position="top"
+        @submit.native.prevent="handleCreateWorkflow"
+      >
         <div
           v-for="(app, index) in appSelections"
           :key="index"
