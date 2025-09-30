@@ -47,7 +47,24 @@
           </div>
         </el-form-item>
 
-        <bf-button @click="addApp" type="button">Add an App</bf-button>
+        <el-form-item class="workflow-mode-selector">
+          <template #label>
+            <span>Workflow Mode</span>
+          </template>
+          <el-radio-group v-model="workflowMode" @change="onWorkflowModeChange">
+            <el-radio label="linear">Linear (automatic dependencies)</el-radio>
+            <el-radio label="custom">Custom (manual dependencies)</el-radio>
+          </el-radio-group>
+          <div class="mode-description">
+            <span v-if="workflowMode === 'linear'">
+              Each app will automatically depend on the previous app in
+              sequence.
+            </span>
+            <span v-else>
+              You can manually define dependencies between apps.
+            </span>
+          </div>
+        </el-form-item>
 
         <div
           v-for="(app, index) in appSelections"
@@ -80,13 +97,27 @@
                 :key="application.uuid"
                 :label="application.name"
                 :value="application.uuid"
+                :disabled="isAppAlreadySelected(application.uuid, index)"
               />
             </el-select>
           </el-form-item>
 
-          <!-- Only show dependencies if this app is selected AND there are previous apps -->
+          <!-- Show warning if app is used multiple times -->
+          <div
+            v-if="app.name && isAppAlreadySelected(app.name, index)"
+            class="duplicate-warning"
+          >
+            <i class="el-icon-warning"></i> This app is already used in this
+            workflow
+          </div>
+
+          <!-- Only show dependencies if this app is selected AND there are previous apps AND in custom mode -->
           <el-form-item
-            v-if="app.name && getPreviousApps(index).length > 0"
+            v-if="
+              workflowMode === 'custom' &&
+              app.name &&
+              getPreviousApps(index).length > 0
+            "
             class="dependency-selection"
           >
             <template #label>
@@ -100,6 +131,7 @@
               multiple
               collapse-tags
               collapse-tags-tooltip
+              @change="(value) => onDependencyChange(index, value)"
             >
               <el-option
                 v-for="(prevApp, prevIndex) in getPreviousApps(index)"
@@ -117,12 +149,38 @@
               This app depends on: {{ formatDependencies(app.dependencies) }}
             </div>
           </el-form-item>
+
+          <!-- Show linear dependency info -->
+          <div
+            v-if="workflowMode === 'linear' && app.name && index > 0"
+            class="linear-dependency-info"
+          >
+            <i class="el-icon-link"></i>
+            Depends on: App {{ index }} ({{
+              getAppDisplayName(appSelections[index - 1].name)
+            }})
+          </div>
+        </div>
+
+        <!-- Display circular dependency error if exists -->
+        <div v-if="circularDependencyError" class="circular-error">
+          <i class="el-icon-warning"></i> {{ circularDependencyError }}
+        </div>
+
+        <!-- Display duplicate app error if exists -->
+        <div v-if="duplicateAppError" class="circular-error">
+          <i class="el-icon-warning"></i> {{ duplicateAppError }}
         </div>
       </el-form>
     </dialog-body>
 
     <template #footer>
-      <bf-button @click="handleCreateWorkflow"> Create Workflow </bf-button>
+      <bf-button
+        @click="handleCreateWorkflow"
+        :disabled="!!circularDependencyError || !!duplicateAppError"
+      >
+        Create Workflow
+      </bf-button>
     </template>
   </el-dialog>
 </template>
@@ -159,6 +217,9 @@ export default {
     return {
       workflow: defaultWorkflowValues(),
       appSelections: getDefaultAppSelections(),
+      workflowMode: "linear", // 'linear' or 'custom'
+      circularDependencyError: null,
+      duplicateAppError: null,
       rules: {
         name: [
           { required: true, message: "Please input a name", trigger: "blur" },
@@ -205,6 +266,8 @@ export default {
     appSelections: {
       handler() {
         this.updateWorkflowApps();
+        this.checkForCircularDependencies();
+        this.checkForDuplicateApps();
       },
       deep: true,
     },
@@ -216,6 +279,9 @@ export default {
     resetForm() {
       this.workflow = defaultWorkflowValues();
       this.appSelections = getDefaultAppSelections();
+      this.workflowMode = "linear";
+      this.circularDependencyError = null;
+      this.duplicateAppError = null;
       this.updateWorkflowApps();
 
       // Clear form validation errors
@@ -227,23 +293,42 @@ export default {
     },
 
     addApp() {
-      this.appSelections.push({ name: null, dependencies: [] });
+      const newIndex = this.appSelections.length;
+      const newApp = { name: null, dependencies: [] };
+
+      // In linear mode, if there are already apps, set dependency to the last app
+      if (this.workflowMode === "linear" && newIndex > 0) {
+        newApp.dependencies = [newIndex - 1];
+      }
+
+      this.appSelections.push(newApp);
       this.updateWorkflowApps();
     },
 
     removeApp(index) {
       this.appSelections.splice(index, 1);
 
-      // Clean up dependencies that reference the removed app
-      this.appSelections.forEach((app) => {
-        if (app.dependencies) {
-          // Remove dependencies that reference indices >= the removed index
-          app.dependencies = app.dependencies
-            .filter((depIndex) => depIndex < index)
-            // Adjust indices for apps that come after the removed one
-            .map((depIndex) => depIndex);
-        }
-      });
+      // In linear mode, update dependencies to maintain linear chain
+      if (this.workflowMode === "linear") {
+        this.appSelections.forEach((app, idx) => {
+          if (idx > 0 && app.name) {
+            app.dependencies = [idx - 1];
+          } else {
+            app.dependencies = [];
+          }
+        });
+      } else {
+        // Clean up dependencies that reference the removed app
+        this.appSelections.forEach((app) => {
+          if (app.dependencies) {
+            // Remove dependencies that reference indices >= the removed index
+            app.dependencies = app.dependencies
+              .filter((depIndex) => depIndex < index)
+              // Adjust indices for apps that come after the removed one
+              .map((depIndex) => depIndex);
+          }
+        });
+      }
 
       this.updateWorkflowApps();
     },
@@ -274,18 +359,151 @@ export default {
     },
 
     onAppSelectionChange(index, value) {
+      // Check if this app is already selected elsewhere
+      if (this.isAppAlreadySelected(value, index)) {
+        // Revert the selection
+        this.appSelections[index].name = null;
+        this.appSelections[index].dependencies = [];
+
+        const appName = this.getAppDisplayName(value);
+        EventBus.$emit("toast", {
+          detail: {
+            type: "warning",
+            msg: `"${appName}" is already used in this workflow. Each app can only be added once.`,
+            duration: 4000,
+          },
+        });
+        return;
+      }
+
       // Set the selected app UUID
       this.appSelections[index].name = value;
 
-      // Clear dependencies for apps that come after the changed one
-      // since the workflow structure may have changed
-      for (let i = index + 1; i < this.appSelections.length; i++) {
-        this.appSelections[i].dependencies = this.appSelections[
-          i
-        ].dependencies.filter((depIndex) => depIndex < index + 1);
+      // In linear mode, automatically set dependency to previous app
+      if (this.workflowMode === "linear" && index > 0) {
+        this.appSelections[index].dependencies = [index - 1];
+      } else {
+        // Clear dependencies for apps that come after the changed one
+        // since the workflow structure may have changed
+        for (let i = index + 1; i < this.appSelections.length; i++) {
+          this.appSelections[i].dependencies = this.appSelections[
+            i
+          ].dependencies.filter((depIndex) => depIndex < index + 1);
+        }
       }
 
       this.updateWorkflowApps();
+    },
+
+    onDependencyChange(index, value) {
+      this.appSelections[index].dependencies = value;
+      this.checkForCircularDependencies();
+    },
+
+    onWorkflowModeChange(mode) {
+      if (mode === "linear") {
+        // Automatically set dependencies for all apps to previous app
+        this.appSelections.forEach((app, index) => {
+          if (index > 0 && app.name) {
+            app.dependencies = [index - 1];
+          } else {
+            app.dependencies = [];
+          }
+        });
+      } else {
+        // In custom mode, clear all dependencies
+        this.appSelections.forEach((app) => {
+          app.dependencies = [];
+        });
+      }
+      this.updateWorkflowApps();
+      this.checkForCircularDependencies();
+    },
+
+    isAppAlreadySelected(appUuid, currentIndex) {
+      // Check if this app is selected in any other position
+      return this.appSelections.some(
+        (app, index) => index !== currentIndex && app.name === appUuid
+      );
+    },
+
+    checkForDuplicateApps() {
+      const selectedApps = this.appSelections
+        .map((app, index) => ({ uuid: app.name, index }))
+        .filter((item) => item.uuid);
+
+      const duplicates = selectedApps.filter(
+        (item, index) =>
+          selectedApps.findIndex((a) => a.uuid === item.uuid) !== index
+      );
+
+      if (duplicates.length > 0) {
+        const firstDuplicate = duplicates[0];
+        const appName = this.getAppDisplayName(firstDuplicate.uuid);
+        this.duplicateAppError = `Cannot add the same app multiple times. "${appName}" is already used in this workflow.`;
+      } else {
+        this.duplicateAppError = null;
+      }
+    },
+
+    checkForCircularDependencies() {
+      // Build adjacency list for the dependency graph
+      const graph = {};
+
+      this.appSelections.forEach((app, index) => {
+        if (app.name) {
+          graph[index] = app.dependencies || [];
+        }
+      });
+
+      // Detect cycles using DFS
+      const visited = new Set();
+      const recursionStack = new Set();
+
+      const hasCycle = (node, path = []) => {
+        if (recursionStack.has(node)) {
+          // Found a cycle - build error message
+          const cycleStart = path.indexOf(node);
+          const cyclePath = [...path.slice(cycleStart), node];
+          const appNames = cyclePath.map(
+            (idx) =>
+              `App ${idx + 1} (${this.getAppDisplayName(
+                this.appSelections[idx].name
+              )})`
+          );
+          this.circularDependencyError = `Circular dependency detected: ${appNames.join(
+            " → "
+          )}`;
+          return true;
+        }
+
+        if (visited.has(node)) {
+          return false;
+        }
+
+        visited.add(node);
+        recursionStack.add(node);
+
+        const dependencies = graph[node] || [];
+        for (const dep of dependencies) {
+          if (hasCycle(dep, [...path, node])) {
+            return true;
+          }
+        }
+
+        recursionStack.delete(node);
+        return false;
+      };
+
+      // Check each node for cycles
+      this.circularDependencyError = null;
+      for (const node in graph) {
+        if (!visited.has(parseInt(node))) {
+          if (hasCycle(parseInt(node))) {
+            return;
+          }
+        }
+      }
     },
 
     updateWorkflowApps() {
@@ -293,10 +511,15 @@ export default {
         .filter((app) => app.name)
         .map((app) => app.name); // Now contains UUIDs
     },
+
     validateApps(rule, value, callback) {
       const hasEmptyApp = this.appSelections.some((app) => !app.name);
       if (hasEmptyApp) {
         callback(new Error("Please select an app for all app selections"));
+      } else if (this.duplicateAppError) {
+        callback(new Error(this.duplicateAppError));
+      } else if (this.circularDependencyError) {
+        callback(new Error(this.circularDependencyError));
       } else {
         callback();
       }
@@ -310,6 +533,29 @@ export default {
     async handleCreateWorkflow() {
       if (!this.$refs.workflowForm) {
         console.error("Form ref not found");
+        return;
+      }
+
+      // Check for circular dependencies or duplicates before validation
+      if (this.circularDependencyError) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: this.circularDependencyError,
+            duration: 6000,
+          },
+        });
+        return;
+      }
+
+      if (this.duplicateAppError) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "error",
+            msg: this.duplicateAppError,
+            duration: 6000,
+          },
+        });
         return;
       }
 
@@ -416,6 +662,70 @@ export default {
   color: theme.$gray_4;
   margin-top: 4px;
   font-style: italic;
+}
+
+.duplicate-warning {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 4px;
+  color: #fa8c16;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  i {
+    font-size: 14px;
+  }
+}
+
+.linear-dependency-info {
+  margin-top: 8px;
+  margin-left: 16px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #b3e0ff;
+  border-radius: 4px;
+  color: #0066cc;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  i {
+    font-size: 14px;
+  }
+}
+
+.workflow-mode-selector {
+  margin-top: 16px;
+  margin-bottom: 16px;
+
+  .mode-description {
+    margin-top: 8px;
+    font-size: 13px;
+    color: theme.$gray_4;
+    font-style: italic;
+  }
+}
+
+.circular-error {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  i {
+    font-size: 16px;
+  }
 }
 
 .add-integration-dialog {
