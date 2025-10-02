@@ -389,8 +389,9 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
   
     if (resp.ok) {
       const result = await resp.json();
+      console.log('result', result)
 
-      // This code combines two API responses (/status and /instances) we need properties from, matching on uuid
+      // This code combines three API responses (/status, /instances, and /applications?organizationId=foo&sourceUrl=bar) we need properties from, matching on uuid
       // The /instances response is missing status, and the /status response does not tell us the applicationType
       
       const updatedResult = { ...workflow, ...result, workflow: [...result.workflow] };
@@ -403,6 +404,7 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
 
         const workflowWithApplications = await Promise.all(
           updatedResult.workflow.map(async (processor) => {
+            console.log('processor', processor)
             try {
               const applicationUrl = `${rootState.config.api2Url}/applications/${processor.uuid}`;
               const applicationResp = await fetch(applicationUrl, {
