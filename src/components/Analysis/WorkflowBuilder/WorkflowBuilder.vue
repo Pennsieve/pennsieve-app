@@ -176,7 +176,9 @@ const saveWorkflow = async () => {
   const workflowData = {
     name: workflowName.value,
     description: workflowDescription.value,
-    applications: nodes.value.map((node) => node.data.application.uuid),
+    processors: nodes.value.map((node) => ({
+      sourceUrl: node.data.application?.source?.url,
+    })),
   };
 
   try {
