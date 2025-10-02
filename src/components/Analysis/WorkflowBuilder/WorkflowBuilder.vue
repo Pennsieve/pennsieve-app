@@ -25,6 +25,7 @@ const isLoading = ref(false);
 const nodes = ref([]);
 const edges = ref([]);
 const workflowName = ref("");
+const workflowDescription = ref("");
 const draggedApp = ref(null);
 
 /*
@@ -63,6 +64,22 @@ const onDrop = (event) => {
 
   if (!draggedApp.value) return;
 
+  // Check if application already exists in workflow
+  const appAlreadyExists = nodes.value.some(
+    (node) => node.data.application.uuid === draggedApp.value.uuid
+  );
+
+  if (appAlreadyExists) {
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: `"${draggedApp.value.name}" is already in the workflow.`,
+      },
+    });
+    draggedApp.value = null;
+    return;
+  }
+
   const nodeId = generateNodeId();
   const position = calculateNodePosition();
 
@@ -74,7 +91,6 @@ const onDrop = (event) => {
       application: draggedApp.value,
     },
     position,
-    class: "vue-flow__node-custom gray-node",
   };
 
   nodes.value.push(newNode);
@@ -133,6 +149,7 @@ const clearWorkflow = () => {
   nodes.value = [];
   edges.value = [];
   workflowName.value = "";
+  workflowDescription.value = "";
 };
 
 const saveWorkflow = async () => {
@@ -158,6 +175,7 @@ const saveWorkflow = async () => {
 
   const workflowData = {
     name: workflowName.value,
+    description: workflowDescription.value,
     applications: nodes.value.map((node) => node.data.application.uuid),
   };
 
@@ -234,6 +252,11 @@ watch(
           placeholder="Enter workflow name"
           style="width: 300px; margin-right: 10px"
         />
+        <el-input
+          v-model="workflowDescription"
+          placeholder="Enter workflow description (optional)"
+          style="width: 400px; margin-right: 10px"
+        />
 
         <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
         <bf-button @click="saveWorkflow">Save Workflow</bf-button>
@@ -262,10 +285,17 @@ watch(
           <template #node-default="{ data, id }">
             <div class="custom-node">
               <div class="node-header">
-                <span>{{ data.label }}</span>
+                <span class="node-title">{{ data.label }}</span>
                 <button class="remove-btn" @click.stop="removeNode(id)">
                   ×
                 </button>
+              </div>
+              <div v-if="data.application.description" class="node-description">
+                {{ data.application.description }}
+              </div>
+              <div v-if="data.application.resources" class="node-resources">
+                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                {{ data.application.resources.memory || "N/A" }}
               </div>
             </div>
           </template>
@@ -273,24 +303,38 @@ watch(
           <template #node-input="{ data, id }">
             <div class="custom-node input-node">
               <div class="node-header">
-                <span>{{ data.label }}</span>
+                <span class="node-title">{{ data.label }}</span>
                 <button class="remove-btn" @click.stop="removeNode(id)">
                   ×
                 </button>
               </div>
               <div class="node-badge">Start</div>
+              <div v-if="data.application.description" class="node-description">
+                {{ data.application.description }}
+              </div>
+              <div v-if="data.application.resources" class="node-resources">
+                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                {{ data.application.resources.memory || "N/A" }}
+              </div>
             </div>
           </template>
 
           <template #node-output="{ data, id }">
             <div class="custom-node output-node">
               <div class="node-header">
-                <span>{{ data.label }}</span>
+                <span class="node-title">{{ data.label }}</span>
                 <button class="remove-btn" @click.stop="removeNode(id)">
                   ×
                 </button>
               </div>
               <div class="node-badge">End</div>
+              <div v-if="data.application.description" class="node-description">
+                {{ data.application.description }}
+              </div>
+              <div v-if="data.application.resources" class="node-resources">
+                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                {{ data.application.resources.memory || "N/A" }}
+              </div>
             </div>
           </template>
         </VueFlow>
@@ -298,7 +342,7 @@ watch(
 
       <!-- Applications Sidebar (Right) -->
       <div class="applications-sidebar">
-        <h3>Available Applications</h3>
+        <h3>Applications</h3>
         <div v-if="isLoading" class="loading">Loading applications...</div>
         <div v-else class="applications-list">
           <div
@@ -328,6 +372,9 @@ watch(
       <div class="summary-content">
         <span><strong>Steps:</strong> {{ nodes.length }}</span>
         <span><strong>Name:</strong> {{ workflowName || "Unnamed" }}</span>
+        <span v-if="workflowDescription"
+          ><strong>Description:</strong> {{ workflowDescription }}</span
+        >
       </div>
     </div>
   </div>
@@ -337,6 +384,14 @@ watch(
 @use "../../../styles/vueflow_core";
 @use "../../../styles/vueflow.css";
 @import "@vue-flow/core/dist/style.css";
+
+// Hide default Vue Flow node styling
+.vue-flow__node {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
 </style>
 
 <style lang="scss" scoped>
@@ -362,6 +417,7 @@ watch(
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
   }
 }
 
@@ -512,19 +568,31 @@ watch(
   background: white;
   border: 2px solid theme.$gray_3;
   border-radius: 8px;
-  padding: 12px;
-  min-width: 200px;
+  padding: 14px;
+  min-width: 250px;
+  max-width: 350px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
 
   &:hover {
     border-color: theme.$black;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .node-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .node-title {
     font-weight: 600;
+    font-size: 15px;
+    color: theme.$black;
+    flex: 1;
+    line-height: 1.3;
   }
 
   .remove-btn {
@@ -540,14 +608,37 @@ watch(
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
+    flex-shrink: 0;
+    transition: background 0.2s;
 
     &:hover {
       background: darken(theme.$status_red, 10%);
     }
   }
 
+  .node-description {
+    font-size: 12px;
+    color: theme.$gray_4;
+    margin-bottom: 8px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .node-resources {
+    font-size: 11px;
+    color: theme.$gray_5;
+    font-weight: 500;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid theme.$gray_2;
+  }
+
   .node-badge {
     margin-top: 8px;
+    margin-bottom: 8px;
     padding: 4px 8px;
     background: theme.$gray_2;
     border-radius: 4px;
@@ -589,6 +680,7 @@ watch(
     display: flex;
     gap: 20px;
     font-size: 13px;
+    flex-wrap: wrap;
   }
 }
 </style>
