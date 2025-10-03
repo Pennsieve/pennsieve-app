@@ -145,7 +145,7 @@
       :move-conflict.sync="moveConflict"
       :selected-files="selectedFiles"
       @rename-conflicts="onRenameConflicts"
-      @move="moveItems"
+      @completeMove="moveItems"
       @close="onCloseMoveDialog"
     />
 
@@ -828,8 +828,7 @@ export default {
     showMove: function () {
       this.moveDialogVisible = true;
       const moveDialog = this.$refs.moveDialog;
-      moveDialog.file = this.file;
-      moveDialog.visible = true;
+      moveDialog.folder = this.file;
     },
     onCloseMoveDialog: function () {
       this.moveDialogVisible = false;
@@ -882,9 +881,6 @@ export default {
           files: failures,
           destination: propOr(null, "destination", response),
         };
-
-        // Show user notice of conflicts
-        this.$refs.moveDialog.visible = true;
       }
     },
 
@@ -915,9 +911,6 @@ export default {
 
         // Reset
         this.moveConflict = {};
-
-        // Hide user notice of conflicts
-        this.$refs.moveDialog.visible = false;
       });
     },
 

@@ -23,8 +23,8 @@
           <div class="content-wrap">
             <bf-file-label
               v-for="file in moveConflict.display"
-              :key="file.content.id"
-              :file="file"
+              :key="folder.content.id"
+              :file="folder"
               :interactive="false"
             />
           </div>
@@ -45,17 +45,15 @@
 
           <div v-loading="isLoading" element-loading-background="transparent">
             <div
-              ref="filesList"
-              class="file-wrap files-list"
+              ref="foldersList"
+              class="folders-list"
               data-cy="filesList"
             >
               <bf-file-label
                 v-for="folder in folders"
                 :key="folder.content.id"
-                :class="[isSelected(folder) ? 'selected' : '']"
                 :file="folder"
-                @click="onFileClick(folder)"
-                @click-name="onFileNameClick(folder)"
+                @click-name="onFolderNameClick(folder)"
               />
               <div v-if="folders.length === 0 && !isLoading" id="empty-state">
                 <p>There are no more subfolders</p>
@@ -80,7 +78,7 @@
         >
           Proceed
         </bf-button>
-        <bf-button v-if="!hasConflicts" data-cy="moveFile" @click="move">
+        <bf-button v-if="!hasConflicts" data-cy="moveFile" @click="initiateMove">
           Move here
         </bf-button>
       </template>
@@ -146,7 +144,7 @@ export default {
   data: function () {
     return {
       sortedFiles: [],
-      file: {},
+      folder: {},
       isLoading: false,
       destination: {},
     };
@@ -168,7 +166,7 @@ export default {
      * @returns {String}
      */
     fileName: function () {
-      let fName = pathOr("", ["content", "name"], this.file);
+      let fName = pathOr("", ["content", "name"], this.folder);
       if (this.isAtDataset) {
         fName = "Files";
       }
@@ -176,10 +174,6 @@ export default {
       return fName;
     },
 
-    /**
-     * Get dataset if there is a file
-     * @returns {String}
-     */
     datasetName: function () {
       return pathOr("", ["content", "name"], this.dataset);
     },
@@ -194,7 +188,7 @@ export default {
       if (this.selectedFiles.length) {
         const destination = defaultTo(
           {},
-          pathOr(path(["content"], this.file), ["content"], this.destination)
+          pathOr(path(["content"], this.folder), ["content"], this.destination)
         );
         const destinationName = propOr("", "name", destination);
 
@@ -212,9 +206,9 @@ export default {
      * Compute if viewing at the dataset level
      */
     isAtDataset: function () {
-      const fileId = pathOr("", ["content", "id"], this.file);
+      const folderId = pathOr("", ["content", "id"], this.folder);
       const datasetId = pathOr("", ["content", "id"], this.dataset);
-      return equals(fileId, datasetId);
+      return equals(folderId, datasetId);
     },
 
     /**
@@ -230,31 +224,23 @@ export default {
   },
 
   methods: {
-    /**
-     * Compute if file is set as the destination
-     * @returns {Boolean}
-     */
-    isSelected: function (file) {
-      const selectedId = pathOr("", ["content", "id"], this.destination);
-      return pathEq(["content", "id"], selectedId, file);
-    },
 
     /**
      * On dialog open
      */
     onOpenDialog: function () {
-      const children = propOr([], "children", this.file);
+      const children = propOr([], "children", this.folder);
       if (!children.length) {
         return;
       }
       const baseUrl = pathEq(
         ["content", "packageType"],
         "Collection",
-        this.file
+        this.folder
       )
         ? "packages"
         : "datasets";
-      const id = pathOr("", ["content", "id"], this.file);
+      const id = pathOr("", ["content", "id"], this.folder);
 
       useGetToken()
         .then((token) => {
@@ -268,7 +254,7 @@ export default {
      * Closes the dialog
      */
     closeDialog: function () {
-      this.file = {};
+      this.folder = {};
       this.destination = {};
       this.$emit("update:moveConflict", {});
       this.$emit("close");
@@ -294,25 +280,18 @@ export default {
     },
 
     /**
-     * Handle file click, set move destination
-     * @param {Object} file
+     * Handle folder name click, get folder data
+     * @param {Object} folder
      */
-    onFileClick: function (file) {
-      if (this.destination === file) {
+     onFolderNameClick: function (folder) {
+      if (this.destination === folder) {
         this.destination = {};
       } else {
-        this.destination = file;
+        this.destination = folder;
       }
-    },
-
-    /**
-     * Handle file name click, get file data
-     * @param {Object} file
-     */
-    onFileNameClick: function (file) {
       useGetToken()
         .then((token) => {
-          const id = pathOr("", ["content", "id"], file);
+          const id = pathOr("", ["content", "id"], folder);
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}&includeAncestors=true`;
           return this.fetchFiles(url);
         })
@@ -320,9 +299,9 @@ export default {
     },
 
     goUp: function () {
-      const destination = isNil(this.file.parent)
+      const destination = isNil(this.folder.parent) // is this property available ? ".parent"
         ? this.dataset
-        : this.file.parent;
+        : this.folder.parent;
 
       const baseUrl = pathEq(
         ["content", "packageType"],
@@ -336,8 +315,8 @@ export default {
       useGetToken()
         .then((token) => {
           const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true`;
-          const currentFileId = pathOr("", ["content", "id"], this.file);
-          if (id !== currentFileId) {
+          const currentFolderId = pathOr("", ["content", "id"], this.folder);
+          if (id !== currentFolderId) {
             return this.fetchFiles(url);
           } else {
             return Promise.resolve();
@@ -356,10 +335,10 @@ export default {
 
       return this.sendXhr(url)
         .then((response) => {
-          this.file = response;
+          this.folder = response;
           this.sortedFiles = this.returnSort(
             "content.name",
-            this.file.children,
+            this.folder.children,
             "asc"
           );
           this.scrollTopFiles();
@@ -372,14 +351,12 @@ export default {
     /**
      * Set move to destination and close dialog
      */
-    move: function () {
-      const fileId = pathOr("", ["content", "id"], this.file);
-      let destinationId = pathOr(fileId, ["content", "id"], this.destination);
-
+    initiateMove: function () {
+      const folderId = pathOr("", ["content", "id"], this.folder);
+      let destinationId = pathOr(folderId, ["content", "id"], this.destination);
       if (destinationId.indexOf("dataset") >= 0) {
         destinationId = null;
       }
-
       // Ensure the user isn't moving a folder into itself
       if (find(pathEq(["content", "id"], destinationId), this.selectedFiles)) {
         EventBus.$emit("toast", {
@@ -390,8 +367,8 @@ export default {
         });
         return;
       }
-
-      this.$emit("move", destinationId, this.selectedFiles);
+      
+      this.$emit("completeMove", destinationId, this.selectedFiles);
       this.closeDialog();
     },
   },
@@ -403,7 +380,7 @@ export default {
 @use "../../../../styles/icon-item-colors";
 
 .bf-move-dialog {
-  .files-list {
+  .folders-list {
     box-sizing: border-box;
     height: 264px;
     overflow: scroll;
