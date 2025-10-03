@@ -43,12 +43,10 @@ export default defineConfig({
     },
     dedupe: ['@aws-amplify/auth', '@aws-amplify/core',]
   },
-  optimizeDeps: {
-    include: ['@aws-amplify','@aws-amplify/auth'],  
-  },
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
     exclude: ['@duckdb/duckdb-wasm'],
+    include: ['@aws-amplify','@aws-amplify/auth'],  
     esbuildOptions: {
       target: "esnext",
     },
