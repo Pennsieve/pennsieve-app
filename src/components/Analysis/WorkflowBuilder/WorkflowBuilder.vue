@@ -273,73 +273,83 @@ watch(
           <p>Applications will be connected in the order you add them</p>
         </div>
 
-        <VueFlow
-          v-else
-          :nodes="nodes"
-          :edges="edges"
-          :default-viewport="{ zoom: 1 }"
-          :min-zoom="0.2"
-          :max-zoom="4"
-        >
-          <Background pattern-color="#aaa" :gap="16" />
-          <Controls position="top-left" />
+        <div v-else class="workflow-builder-flow">
+          <VueFlow
+            :nodes="nodes"
+            :edges="edges"
+            :default-viewport="{ zoom: 1 }"
+            :min-zoom="0.2"
+            :max-zoom="4"
+          >
+            <Background pattern-color="#aaa" :gap="16" />
+            <Controls position="top-left" />
 
-          <template #node-default="{ data, id }">
-            <div class="custom-node">
-              <div class="node-header">
-                <span class="node-title">{{ data.label }}</span>
-                <button class="remove-btn" @click.stop="removeNode(id)">
-                  ×
-                </button>
+            <template #node-default="{ data, id }">
+              <div class="custom-node">
+                <div class="node-header">
+                  <span class="node-title">{{ data.label }}</span>
+                  <button class="remove-btn" @click.stop="removeNode(id)">
+                    ×
+                  </button>
+                </div>
+                <div
+                  v-if="data.application.description"
+                  class="node-description"
+                >
+                  {{ data.application.description }}
+                </div>
+                <div v-if="data.application.resources" class="node-resources">
+                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                  {{ data.application.resources.memory || "N/A" }}
+                </div>
               </div>
-              <div v-if="data.application.description" class="node-description">
-                {{ data.application.description }}
-              </div>
-              <div v-if="data.application.resources" class="node-resources">
-                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                {{ data.application.resources.memory || "N/A" }}
-              </div>
-            </div>
-          </template>
+            </template>
 
-          <template #node-input="{ data, id }">
-            <div class="custom-node input-node">
-              <div class="node-header">
-                <span class="node-title">{{ data.label }}</span>
-                <button class="remove-btn" @click.stop="removeNode(id)">
-                  ×
-                </button>
+            <template #node-input="{ data, id }">
+              <div class="custom-node input-node">
+                <div class="node-header">
+                  <span class="node-title">{{ data.label }}</span>
+                  <button class="remove-btn" @click.stop="removeNode(id)">
+                    ×
+                  </button>
+                </div>
+                <div class="node-badge">Start</div>
+                <div
+                  v-if="data.application.description"
+                  class="node-description"
+                >
+                  {{ data.application.description }}
+                </div>
+                <div v-if="data.application.resources" class="node-resources">
+                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                  {{ data.application.resources.memory || "N/A" }}
+                </div>
               </div>
-              <div class="node-badge">Start</div>
-              <div v-if="data.application.description" class="node-description">
-                {{ data.application.description }}
-              </div>
-              <div v-if="data.application.resources" class="node-resources">
-                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                {{ data.application.resources.memory || "N/A" }}
-              </div>
-            </div>
-          </template>
+            </template>
 
-          <template #node-output="{ data, id }">
-            <div class="custom-node output-node">
-              <div class="node-header">
-                <span class="node-title">{{ data.label }}</span>
-                <button class="remove-btn" @click.stop="removeNode(id)">
-                  ×
-                </button>
+            <template #node-output="{ data, id }">
+              <div class="custom-node output-node">
+                <div class="node-header">
+                  <span class="node-title">{{ data.label }}</span>
+                  <button class="remove-btn" @click.stop="removeNode(id)">
+                    ×
+                  </button>
+                </div>
+                <div class="node-badge">End</div>
+                <div
+                  v-if="data.application.description"
+                  class="node-description"
+                >
+                  {{ data.application.description }}
+                </div>
+                <div v-if="data.application.resources" class="node-resources">
+                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
+                  {{ data.application.resources.memory || "N/A" }}
+                </div>
               </div>
-              <div class="node-badge">End</div>
-              <div v-if="data.application.description" class="node-description">
-                {{ data.application.description }}
-              </div>
-              <div v-if="data.application.resources" class="node-resources">
-                CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                {{ data.application.resources.memory || "N/A" }}
-              </div>
-            </div>
-          </template>
-        </VueFlow>
+            </template>
+          </VueFlow>
+        </div>
       </div>
 
       <!-- Applications Sidebar (Right) -->
@@ -383,17 +393,8 @@ watch(
 </template>
 
 <style lang="scss">
-@use "../../../styles/vueflow_core";
-@use "../../../styles/vueflow.css";
+/* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
-
-// Hide default Vue Flow node styling
-.vue-flow__node {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
 </style>
 
 <style lang="scss" scoped>
@@ -563,6 +564,19 @@ watch(
   p {
     margin: 0;
     font-size: 14px;
+  }
+}
+
+.workflow-builder-flow {
+  width: 100%;
+  height: 100%;
+
+  /* Hide default Vue Flow node styling only within workflow builder */
+  :deep(.vue-flow__node) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
   }
 }
 
