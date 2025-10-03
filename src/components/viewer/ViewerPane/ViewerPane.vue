@@ -27,6 +27,7 @@
       ref="viewer"
       :idx="0"
       :pkg="pkg"
+      :apiUrl="apiUrl"
       :side-panel-open="sidePanelOpen"
     />
   </div>
@@ -42,6 +43,9 @@ import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
+import {UMAP, DataExplorer} from "pennsieve-visualization"
+import * as siteConfig from '@/site-config/site.json'
+import 'pennsieve-visualization/style.css'
 
 export default {
   name: "ViewerPane",
@@ -80,9 +84,7 @@ export default {
     NiiViewer: defineAsyncComponent(() =>
       import("../../viewers/NiiViewer/NiiViewerWrapper.vue")
     ),
-    DataExplorer: defineAsyncComponent(() =>
-      import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
-    ),
+    DataExplorer: DataExplorer,
     CSVViewer: defineAsyncComponent(() =>
       import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
     ),
@@ -109,6 +111,7 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      apiUrl:siteConfig.apiUrl
     };
   },
 
@@ -116,7 +119,6 @@ export default {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
-          console.log(pkg);
           this.loadViewer(pkg);
         }
       },
@@ -144,7 +146,6 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
-      console.log(viewer);
       switch (viewer) {
         case "DataExplorer":
           return "Data Explorer";
@@ -156,7 +157,6 @@ export default {
     },
 
     selectViewer: function (evt) {
-      console.log(evt);
       this.cmpViewer = evt;
     },
 
@@ -172,7 +172,6 @@ export default {
       }
 
       this.availableViewers = this.checkViewerType(activeViewer);
-      console.log("Use viewerType: " + this.availableViewers);
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
