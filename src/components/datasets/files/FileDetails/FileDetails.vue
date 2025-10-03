@@ -2368,7 +2368,6 @@ export default {
 
       // Set Active Viewer
       console.log("Setting active viewer");
-      console.log(this.proxyRecord);
       this.setActiveViewer(this.proxyRecord);
 
       this.selectedFiles.push(response);
