@@ -132,6 +132,14 @@ export default {
           to: "activity",
         },
         {
+          name: "Workflow Builder",
+          to: "workflow-builder",
+        },
+        {
+          name: "Workflows",
+          to: "workflows",
+        },
+        {
           name: "Configuration",
           to: "compute-nodes",
         },

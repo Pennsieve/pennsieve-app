@@ -7,6 +7,7 @@ const initialState = () => ({
     applicationsLoaded: false,
     processors: [],
     preprocessors:[],
+    postprocessors: [],
     selectedWorkflow: {},
     selectedProcessor: {},
     selectedFilesForAnalysis: [],
@@ -22,7 +23,8 @@ const initialState = () => ({
     workflowInstances: [],
     selectedWorkflowActivity: {},
     cancelWorkflowDialogVisible: false,
-    activityDialogVisible: false
+    activityDialogVisible: false,
+    workflows: []
   })
   
   export const state = initialState()
@@ -106,8 +108,10 @@ const initialState = () => ({
     },
     SET_SELECTED_PROCESSOR(state, processor) {
       state.selectedProcessor = processor;
-    }
-  
+    },
+    UPDATE_WORKFLOWS(state, workflows) {
+  state.workflows = workflows
+    },
   }
 
   export const actions = {
@@ -251,6 +255,33 @@ const initialState = () => ({
         throw err; // Rethrow the error to be handled by the caller
       }
     },
+    createWorkflow: async ({ commit, rootState }, newWorkflow) => {
+      const url = `${rootState.config.api2Url}/workflows`;
+
+      try {
+        const userToken = await useGetToken()
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+          },
+          body: JSON.stringify(newWorkflow)
+        });
+
+        if (!response.ok) {
+          const errorDetails = await response.text(); 
+          throw new Error(`Error ${response.status}: ${response.statusText} - ${errorDetails}`);
+        }
+
+        const result = await response.json();
+        return result;
+
+      } catch (err) {
+        console.error('Failed to workflow:', err.message); 
+        throw err; 
+      }
+    },
     // Note that this to to deploy application, there is another action for editing application
     updateApplication: async ({ commit, rootState }, newApplication) => {
       const url = `${rootState.config.api2Url}/applications/deploy`;
@@ -295,8 +326,10 @@ const initialState = () => ({
         });
     
         if (resp.ok) {
-          const workflowInstances = await resp.json();
-          const sortedWorkflows = workflowInstances.sort((a, b) => {
+ 
+         const result = await resp.json();
+
+          const sortedWorkflows = result.sort((a, b) => {
             const dateA = new Date(a.startedAt).getTime();
             const dateB = new Date(b.startedAt).getTime();
             if (isNaN(dateA)) return 1; 
@@ -338,55 +371,123 @@ const initialState = () => ({
           return Promise.reject(err)
       }
     },
-    setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) => {
+  if (!workflow) {
+    commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+    return;
+  }
+  try {
+    const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
 
-      if (!workflow) {
-        commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
-        return;
-      }
-      try {
-        const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
+    const userToken = await useGetToken()
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    })
+  
+    if (resp.ok) {
+      const result = await resp.json();
 
-        const userToken = await useGetToken()
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        })
+      // This code combines two API responses (/status and /instances) we need properties from, matching on uuid
+      // The /instances response is missing status, and the /status response does not tell us the applicationType
       
-        if (resp.ok) {
-          const result = await resp.json();
+      const updatedResult = { ...workflow, ...result, workflow: [...result.workflow] };
 
-          // This code combines two API reponses (/status and /instances) we need properties from, matching on uuid
-          // The /instances response is missing status, and the /status response does not tell us the applicationType
-          // Do not rely on array position for applicationType, array index does not reliably correlate to preprocessor/ processor/ postprocessor
-          
-          const updatedResult = { ...result, workflow: [...result.workflow], name: workflow.name };
-          const applicationTypes = ['preprocessor', 'processor', 'postprocessor'];
-          updatedResult.workflow = applicationTypes.map((type, index) => {
-            const fromInstances = workflow.workflow.find(w => w.applicationType === type);
-            const fromStatus = result.workflow.find(w => w.uuid === fromInstances.uuid);
-            return { ...fromInstances, ...fromStatus };
-          });
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', updatedResult);
-          const updatedProcessor = updatedResult.workflow.find(
-            processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
-          );
-          if (updatedProcessor) {
-            commit('SET_SELECTED_PROCESSOR', updatedProcessor);
-            if (rootState.analysisModule.activityDialogVisible) {
-              dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
+      if (workflow.workflow) {
+        updatedResult.workflow = workflow.workflow.map(instanceProcessor => {
+          const statusProcessor = result.workflow.find(statusProc => statusProc.uuid === instanceProcessor.uuid);
+          return { ...instanceProcessor, ...statusProcessor };
+        });
+
+        const workflowWithApplications = await Promise.all(
+          updatedResult.workflow.map(async (processor) => {
+            try {
+              const applicationUrl = `${rootState.config.api2Url}/applications/${processor.uuid}`;
+              const applicationResp = await fetch(applicationUrl, {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${userToken}`,
+                },
+              });
+
+              if (applicationResp.ok) {
+                const applicationData = await applicationResp.json();
+                return { ...applicationData, ...processor };
+              } else {
+                console.warn(`Failed to fetch application data for processor ${processor.uuid}`);
+                return processor;
+              }
+
+            } catch (error) {
+              console.warn(`Error fetching application data for processor ${processor.uuid}:`, error);
+              return processor;
             }
-          }
-        } else {
-          return Promise.reject(resp)
-        }
-      } catch (err) {
-          commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
-          return Promise.reject(err)
+          })
+        );
+        updatedResult.workflow = workflowWithApplications;
       }
-    },
+
+      // Sort processors based on executionOrder instead of startedAt time
+      const sortByExecutionOrder = (processors, executionOrder) => {
+        // Dummy data for testing
+        // const dummyExecutionOrder = [
+        //   ["git://github.com/Pennsieve/processor-pre-packages-v2"],
+        //   ["git://github.com/oscarruizbcm/trimgalore-docker-app"],
+        //   ["git://github.com/oscarruizbcm/hisat2-docker-app"],
+        //   ["git://github.com/oscarruizbcm/samtools-docker-app"],
+        //   ["git://github.com/oscarruizbcm/featurecounts-docker-app"],
+        //   ["git://github.com/Pennsieve/processor-post-agent-v2"]
+        // ];
+
+        // const orderToUse = executionOrder || dummyExecutionOrder;
+        const orderToUse = executionOrder 
+
+        if (!orderToUse || !Array.isArray(orderToUse)) {
+          return processors;
+        }
+
+        // Create a map of git URLs to their execution order index
+        const executionOrderMap = new Map();
+        orderToUse.forEach((orderGroup, groupIndex) => {
+          if (Array.isArray(orderGroup)) {
+            orderGroup.forEach(gitUrl => {
+              executionOrderMap.set(gitUrl, groupIndex);
+            });
+          }
+        });
+
+        const sorted = [...processors].sort((a, b) => {
+          const orderA = executionOrderMap.get(a.source?.url) ?? Number.MAX_SAFE_INTEGER;
+          const orderB = executionOrderMap.get(b.source?.url) ?? Number.MAX_SAFE_INTEGER;
+          return orderA - orderB;
+        });
+
+        return sorted;
+      };
+
+      const sortedWorkflow = sortByExecutionOrder(updatedResult.workflow, updatedResult.executionOrder);
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', {...updatedResult, workflow: sortedWorkflow} );
+
+      const updatedProcessor = updatedResult.workflow.find(
+        processor => processor.uuid === rootState.analysisModule.selectedProcessor.uuid
+      );
+      if (updatedProcessor) {
+        commit('SET_SELECTED_PROCESSOR', updatedProcessor);
+        if (rootState.analysisModule.activityDialogVisible) {
+          dispatch('fetchWorkflowLogs', [workflow, updatedProcessor]);
+        }
+      }
+
+    } else {
+      return Promise.reject(resp)
+    }
+  } catch (err) {
+      commit('SET_SELECTED_WORKFLOW_ACTIVITY', {})
+      return Promise.reject(err)
+  }
+},
     cancelWorkflow: async ({commit}, workflowId) => {
       commit('HIDE_CANCEL_WORKFLOW_DIALOG')
       // API not yet available 
@@ -495,6 +596,29 @@ const initialState = () => ({
     setSelectedProcessor: ({ commit, rootState }, processor) => {
       commit('SET_SELECTED_PROCESSOR', processor)
     },
+    fetchWorkflows: async({ commit, rootState }) => {
+      try {
+        const userToken = await useGetToken()
+        const url = `${rootState.config.api2Url}/workflows?organization_id=${rootState.activeOrganization.organization.id}`;
+        
+        const resp = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        })
+
+        if (resp.ok) {
+          const result = await resp.json()
+          commit('UPDATE_WORKFLOWS', result)
+        } else {
+          return Promise.reject(resp)
+        }
+      } catch (err) {
+        commit('UPDATE_WORKFLOWS', [])
+        return Promise.reject(err)
+      }
+    }
   }
   
   export const getters = {
@@ -503,7 +627,9 @@ const initialState = () => ({
     workflowLogs: state => state.workflowLogs,
     selectedWorkflowActivity: state => state.selectedWorkflowActivity,
     activityDialogVisible: state => state.activityDialogVisible,
-    selectedProcessor: state => state.selectedProcessor
+    selectedProcessor: state => state.selectedProcessor,
+    applications: state => state.applications,
+    computeNodes: state => state.computeNodes  
   }
   
   const analysisModule = {

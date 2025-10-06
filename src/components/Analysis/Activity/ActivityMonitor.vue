@@ -21,47 +21,11 @@ import EventBus from "../../../utils/event-bus";
 const { onNodeClick } = useVueFlow();
 
 /*
-Initial Values
-*/
-const initialNodes = [
-  {
-    id: "1",
-    data: {},
-    position: { x: 130, y: 100 },
-  },
-  {
-    id: "2",
-    data: {},
-    position: { x: 150, y: 250 },
-  },
-  {
-    id: "3",
-    type: "output",
-    data: {},
-    position: { x: 170, y: 400 },
-  },
-];
-const initialEdges = [
-  {
-    id: "e1-1",
-    source: "1",
-    target: "2",
-    animated: false,
-  },
-  {
-    id: "e1-2",
-    source: "2",
-    target: "3",
-    animated: false,
-  },
-];
-
-/*
 Local State
 */
 const isLoading = ref(false);
-const nodes = ref(initialNodes);
-const edges = ref(initialEdges);
+const nodes = ref([]);
+const edges = ref([]);
 const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
 const selectedNode = ref({});
@@ -93,7 +57,7 @@ const cancelWorkflow = () => {
       EventBus.$emit("toast", {
         detail: {
           type: "success",
-          msg: "Your cancellation request was successful. It may take some time to complete.",
+          msg: "Your cancelation request was successful. It may take some time to complete.",
         },
       });
     })
@@ -120,8 +84,16 @@ const getApplicationsStatus = async (selectedWorkflow) => {
 Helpers
 */
 
-const getLabel = (workflow, type) =>
-  workflow?.name ? `${workflow.name}` : `No ${type} Selected`;
+const getLabel = (workflow, type, index) => {
+  if (workflow?.name) {
+    return `${workflow.name}`;
+  }
+
+  // Generate default labels based on position
+  // if (index === 0) return "Preprocessor";
+  // if (workflow && index === workflow.length - 1) return "Postprocessor";
+  return "Loading...";
+};
 
 const getClass = (workflow, processorIdx) => {
   if (!workflow || !workflow.workflow || !workflow.workflow[processorIdx]) {
@@ -140,6 +112,46 @@ const getClass = (workflow, processorIdx) => {
     default:
       return "gray-node";
   }
+};
+
+const generateNodesAndEdges = (workflowActivity) => {
+  if (
+    !workflowActivity?.workflow ||
+    !Array.isArray(workflowActivity.workflow)
+  ) {
+    return { nodes: [], edges: [] };
+  }
+
+  const processors = workflowActivity.workflow;
+  const nodeSpacing = 150; // Vertical spacing between nodes
+  const startY = 100; // Starting Y position
+  const baseX = 150; // Base X position with slight variation
+
+  // Generate nodes
+  const newNodes = processors.map((processor, index) => ({
+    id: `${index + 1}`,
+    type: index === processors.length - 1 ? "output" : "default",
+    data: {
+      label: getLabel(processor, "Processor", index),
+      status: processor.status,
+    },
+    position: {
+      x: baseX + index * 20, // Slight horizontal offset for visual appeal
+      y: startY + index * nodeSpacing,
+    },
+    class: getClass(workflowActivity, index),
+    selected: selectedProcessor.value.uuid === processor.uuid,
+  }));
+
+  // Generate edges (connections between consecutive nodes)
+  const newEdges = processors.slice(0, -1).map((_, index) => ({
+    id: `e${index + 1}-${index + 2}`,
+    source: `${index + 1}`,
+    target: `${index + 2}`,
+    animated: false,
+  }));
+
+  return { nodes: newNodes, edges: newEdges };
 };
 
 /*
@@ -176,6 +188,7 @@ onMounted(async () => {
   try {
     isLoading.value = true;
     await store.dispatch("analysisModule/fetchWorkflowInstances");
+    await getApplicationsStatus(workflowInstances.value[0]);
   } catch (err) {
     console.error(err);
   } finally {
@@ -215,55 +228,9 @@ Watch
 */
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
   // Update Nodes and Edges to render processors for selected workflow
-
-  nodes.value = [
-    {
-      id: "1",
-      type: "default",
-      data: {
-        label: getLabel(newVal.workflow[0], "Preprocessor"),
-        status: newVal.workflow[0].status,
-      },
-      position: { x: 130, y: 100 },
-      class: getClass(newVal, 0),
-      selected:
-        selectedProcessor.value.uuid ===
-        selectedWorkflowActivity.value.workflow[0].uuid
-          ? true
-          : false,
-    },
-    {
-      id: "2",
-      type: "default",
-      data: {
-        label: getLabel(newVal.workflow[1], "Processor"),
-        status: newVal.workflow[1].status,
-        class: getClass(newVal, 1),
-      },
-      position: { x: 150, y: 250 },
-      class: getClass(newVal, 1),
-      selected:
-        selectedProcessor.value.uuid ===
-        selectedWorkflowActivity.value.workflow[1].uuid
-          ? true
-          : false,
-    },
-    {
-      id: "3",
-      type: "default",
-      data: {
-        label: getLabel(newVal.workflow[2], "Postprocessor"),
-        status: newVal.workflow[2].status,
-      },
-      position: { x: 170, y: 400 },
-      class: getClass(newVal, 2),
-      selected:
-        selectedProcessor.value.uuid ===
-        selectedWorkflowActivity.value.workflow[2].uuid
-          ? true
-          : false,
-    },
-  ];
+  const { nodes: newNodes, edges: newEdges } = generateNodesAndEdges(newVal);
+  nodes.value = newNodes;
+  edges.value = newEdges;
 });
 
 /*
@@ -324,7 +291,7 @@ onNodeClick(({ node }) => {
       <div class="vue-flow-title">
         {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
       </div>
-      <div class="vue-flow-wrapper">
+      <div class="vue-flow-wrapper activity-monitor-flow">
         <VueFlow
           :nodes="nodes"
           :edges="edges"
@@ -375,16 +342,12 @@ onNodeClick(({ node }) => {
 </template>
 
 <style lang="scss">
-/* this contains the default theme, these are optional styles */
-@use "../../../styles/vueflow_core";
-@use "../../../styles/vueflow.css";
-
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/minimap/dist/style.css";
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 @use "../../../styles/theme";
 
 .modified-stage {
@@ -425,24 +388,43 @@ onNodeClick(({ node }) => {
   margin: 0;
 }
 
-.vue-flow__node.gray-node {
-  border: 2px solid gray;
-}
+/* Target nodes only within activity-monitor-flow */
+.activity-monitor-flow {
+  :deep(.vue-flow__node) {
+    padding: 10px 20px;
+    background: white;
+    border-radius: 3px;
+    min-width: 120px;
+    text-align: center;
+  }
 
-.vue-flow__node.blue-node {
-  border: 2px solid blue;
-}
+  :deep(.vue-flow__node.gray-node) {
+    border: 2px solid gray;
+  }
 
-.vue-flow__node.blue-node.animate {
-  animation: border-glow 5s infinite ease-in-out;
-}
+  :deep(.vue-flow__node.blue-node) {
+    border: 2px solid blue;
+  }
 
-.vue-flow__node.green-node {
-  border: 2px solid theme.$status_green;
-}
+  :deep(.vue-flow__node.blue-node.animate) {
+    animation: border-glow-activity 5s infinite ease-in-out;
+  }
 
-.vue-flow__node.red-node {
-  border: 2px solid red;
+  :deep(.vue-flow__node.green-node) {
+    border: 2px solid theme.$status_green;
+  }
+
+  :deep(.vue-flow__node.red-node) {
+    border: 2px solid red;
+  }
+
+  :deep(.vue-flow__node.selected) {
+    background-color: theme.$gray_2;
+  }
+
+  :deep(.vue-flow__node:hover) {
+    background-color: theme.$gray_2;
+  }
 }
 
 @keyframes pulse {
@@ -459,7 +441,8 @@ onNodeClick(({ node }) => {
     transform: scale(1);
   }
 }
-@keyframes border-glow {
+
+@keyframes border-glow-activity {
   0% {
     border-color: transparent;
     box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
@@ -471,16 +454,6 @@ onNodeClick(({ node }) => {
   100% {
     border-color: transparent;
     box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
-  }
-}
-
-.vue-flow__node.selected {
-  background-color: theme.$gray_2;
-}
-
-.vue-flow__node {
-  &:hover {
-    background-color: theme.$gray_2;
   }
 }
 </style>
