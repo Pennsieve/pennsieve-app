@@ -141,6 +141,7 @@
         </template>
       </bf-navigation-item>
 
+
       <bf-navigation-item
         :link="{ name: 'dataset-activity' }"
         label="Activity"

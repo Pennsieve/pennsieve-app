@@ -19,7 +19,7 @@ const props = defineProps({
   },
   datasetId: {
     type: String,
-    required: true
+    default: ''
   },
   modelId: {
     type: String,
@@ -32,14 +32,30 @@ const props = defineProps({
   orgId: {
     type: String,
     default: ''
+  },
+  // Template support props
+  isTemplate: {
+    type: Boolean,
+    default: false
+  },
+  initialTemplate: {
+    type: Object,
+    default: null
+  },
+  templateId: {
+    type: String,
+    default: null
   }
 })
 
-// Determine if we're in edit mode based on modelId presence
-const isEditMode = computed(() => props.editMode || !!props.modelId)
+// Determine if we're in template mode
+const isTemplateMode = computed(() => props.isTemplate || !!props.templateId)
+
+// Determine if we're in edit mode based on modelId or templateId presence
+const isEditMode = computed(() => props.editMode || !!props.modelId || !!props.templateId)
 
 // Emits
-const emit = defineEmits(['save-model', 'cancel'])
+const emit = defineEmits(['save-model', 'save-template', 'cancel'])
 
 // Reactive data
 const mode = ref('guided') // 'guided' or 'json'
@@ -201,7 +217,29 @@ const updateSharedJsonData = () => {
 
 // Methods
 const initializeData = () => {
-  if (props.initialModel) {
+  // Handle template initialization
+  if (isTemplateMode.value && props.initialTemplate) {
+    const template = JSON.parse(JSON.stringify(props.initialTemplate))
+    
+    modelData.value = {
+      id: template.id || undefined,
+      name: template.name || '',
+      display_name: template.display_name || template.displayName || '',
+      description: template.description || '',
+      created_at: template.created_at || template.createdAt || new Date().toISOString(),
+      latest_version: template.latest_version || template.latestVersion || {
+        version: 1,
+        schema: template.schema || { ...defaultSchema }
+      }
+    }
+    
+    // If the template has a direct schema property, use it
+    if (template.schema && !template.latest_version && !template.latestVersion) {
+      modelData.value.latest_version.schema = template.schema
+    }
+  } 
+  // Handle model initialization
+  else if (props.initialModel) {
     const model = JSON.parse(JSON.stringify(props.initialModel))
     
     // Ensure the model has the expected structure
@@ -269,6 +307,20 @@ const validateAndParseJson = () => {
       return false
     }
 
+    // Validate Pennsieve-specific rules
+    const required = parsed.required || []
+    const properties = parsed.properties || {}
+    
+    // Check that properties with x-pennsieve-key are required
+    for (const [propName, property] of Object.entries(properties)) {
+      if (property && property['x-pennsieve-key'] === true) {
+        if (!required.includes(propName)) {
+          jsonError.value = `Property "${propName}" has x-pennsieve-key set but is not marked as required`
+          return false
+        }
+      }
+    }
+
     modelData.value.latest_version.schema = parsed
     jsonError.value = ''
     return true
@@ -316,10 +368,27 @@ const openPropertyDialog = (propertyName = null) => {
   if (propertyName) {
     // Edit existing property
     const property = modelData.value.latest_version.schema.properties[propertyName]
+    
+    // Handle type - check if it's an array with null
+    let propertyType = property.type || 'string'
+    let allowNull = false
+    
+    if (Array.isArray(property.type)) {
+      // Find the non-null type
+      const nonNullTypes = property.type.filter(t => t !== 'null')
+      if (nonNullTypes.length === 1) {
+        propertyType = nonNullTypes[0]
+        allowNull = property.type.includes('null')
+      } else {
+        // If multiple non-null types, keep as is (shouldn't normally happen in our UI)
+        propertyType = property.type
+      }
+    }
+    
     propertyForm.value = {
       name: propertyName,
       displayName: property.title || propertyName,
-      type: property.type || 'string',
+      type: propertyType,
       required: modelData.value.latest_version.schema.required?.includes(propertyName) || false,
       description: property.description || '',
       format: property.format || '',
@@ -332,7 +401,8 @@ const openPropertyDialog = (propertyName = null) => {
       enumInput: property.enum ? property.enum.join(', ') : '',
       default: property.default,
       isKey: property['x-pennsieve-key'] || false,
-      isSensitive: property['x-pennsieve-sensitive'] || false
+      isSensitive: property['x-pennsieve-sensitive'] || false,
+      allowNull: allowNull
     }
   } else {
     // Add new property
@@ -352,7 +422,8 @@ const openPropertyDialog = (propertyName = null) => {
       enumInput: '',
       default: undefined,
       isKey: false,
-      isSensitive: false
+      isSensitive: false,
+      allowNull: false
     }
   }
   
@@ -381,15 +452,16 @@ const removeProperty = (propertyName) => {
   ElMessage.success('Property removed successfully')
 }
 
-const saveModel = async () => {
+const saveEntity = async () => {
   if (mode.value === 'json' && !validateAndParseJson()) {
     ElMessage.error('Please fix JSON errors before saving')
     return
   }
 
   // Basic validation
+  const entityType = isTemplateMode.value ? 'Template' : 'Model'
   if (!modelData.value.name || !modelData.value.display_name) {
-    ElMessage.error('Model name and display name are required')
+    ElMessage.error(`${entityType} name and display name are required`)
     return
   }
 
@@ -397,48 +469,91 @@ const saveModel = async () => {
     // Update schema title
     modelData.value.latest_version.schema.title = modelData.value.name
 
-    if (isEditMode.value) {
-      // Create new version of existing model
-      await metadataStore.updateVersion(props.datasetId, modelData.value.id, {
-        schema: modelData.value.latest_version.schema
-      })
-      ElMessage.success(`New version of "${modelData.value.display_name}" created successfully`)
-      
-      // Navigate to model details page after successful version creation
-      router.push({
-        name: 'model-details',
-        params: {
-          datasetId: props.datasetId,
-          orgId: props.orgId,
-          modelId: modelData.value.id
-        }
-      })
+    if (isTemplateMode.value) {
+      // Template save operations
+      if (isEditMode.value && props.templateId) {
+        // Create new version of existing template
+        await metadataStore.createTemplateVersion(props.templateId, {
+          schema: modelData.value.latest_version.schema
+        }, props.orgId)
+        ElMessage.success(`New version of "${modelData.value.display_name}" created successfully`)
+        
+        // Navigate back to template details after successful version creation
+        router.push({
+          name: 'template-details',
+          params: {
+            orgId: props.orgId,
+            templateId: props.templateId
+          }
+        })
+      } else {
+        // Create new template
+        const createdTemplate = await metadataStore.createTemplateFromModel({
+          name: modelData.value.name,
+          display_name: modelData.value.display_name,
+          description: modelData.value.description,
+          schema: modelData.value.latest_version.schema
+        }, props.orgId)
+        
+        ElMessage.success(`Template "${modelData.value.display_name}" created successfully`)
+        emit('save-template', createdTemplate)
+        
+        // Navigate back to template gallery after successful creation
+        router.push({
+          name: 'new-model-from-template',
+          params: {
+            orgId: props.orgId
+          }
+        })
+      }
     } else {
-      // Create new model
-      const createdModel = await metadataStore.createModel(props.datasetId, {
-        name: modelData.value.name,
-        display_name: modelData.value.display_name,
-        description: modelData.value.description,
-        schema: modelData.value.latest_version.schema
-      })
-      
-      ElMessage.success(`Model "${modelData.value.display_name}" created successfully`)
-      emit('save-model', createdModel)
-      
-      // Navigate back to models list after successful creation
-      router.push({
-        name: 'models-list',
-        params: {
-          datasetId: props.datasetId,
-          orgId: props.orgId
-        }
-      })
+      // Model save operations
+      if (isEditMode.value && props.modelId) {
+        // Create new version of existing model
+        await metadataStore.updateVersion(props.datasetId, modelData.value.id, {
+          schema: modelData.value.latest_version.schema
+        })
+        ElMessage.success(`New version of "${modelData.value.display_name}" created successfully`)
+        
+        // Navigate to model details page after successful version creation
+        router.push({
+          name: 'model-details',
+          params: {
+            datasetId: props.datasetId,
+            orgId: props.orgId,
+            modelId: modelData.value.id
+          }
+        })
+      } else {
+        // Create new model
+        const createdModel = await metadataStore.createModel(props.datasetId, {
+          name: modelData.value.name,
+          display_name: modelData.value.display_name,
+          description: modelData.value.description,
+          schema: modelData.value.latest_version.schema
+        })
+        
+        ElMessage.success(`Model "${modelData.value.display_name}" created successfully`)
+        emit('save-model', createdModel)
+        
+        // Navigate back to models list after successful creation
+        router.push({
+          name: 'models-list',
+          params: {
+            datasetId: props.datasetId,
+            orgId: props.orgId
+          }
+        })
+      }
     }
   } catch (error) {
-    console.error('Failed to save model:', error)
-    ElMessage.error(`Failed to save model: ${error.message || 'Unknown error'}`)
+    console.error(`Failed to save ${entityType.toLowerCase()}:`, error)
+    ElMessage.error(`Failed to save ${entityType.toLowerCase()}: ${error.message || 'Unknown error'}`)
   }
 }
+
+// Backward compatibility alias
+const saveModel = saveEntity
 
 const cancelEdit = () => {
   emit('cancel')
@@ -494,6 +609,17 @@ const formatDate = (dateString) => {
 // Handle PropertyDialog save event
 const handlePropertySave = ({ propertyName, propertySchema, required, oldPropertyName }) => {
   try {
+    // Validate Pennsieve-specific rules before saving
+    if (propertySchema['x-pennsieve-key'] === true && !required) {
+      ElMessage.error(`Property "${propertyName}" has x-pennsieve-key set but is not marked as required`)
+      return
+    }
+
+    if (propertySchema['x-pennsieve-sensitive'] === true && !required) {
+      ElMessage.error(`Property "${propertyName}" has x-pennsieve-sensitive set but is not marked as required`)
+      return
+    }
+
     // Update schema
     const newProperties = { ...modelData.value.latest_version.schema.properties }
     const newRequired = [...(modelData.value.latest_version.schema.required || [])]
@@ -546,13 +672,17 @@ const handlePropertyCancel = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Check if we're editing an existing model (modelId provided)
-  if (props.modelId) {
+  // Check if we're editing an existing template/model - prioritize template mode
+  if (isTemplateMode.value && props.templateId) {
+    await loadTemplateForEdit()
+  } else if (props.modelId) {
     await loadModelForEdit()
   } else {
     initializeData()
-    // Check for template data in URL query parameters
-    loadTemplateFromQuery()
+    // Check for template data in URL query parameters (for model creation from template)
+    if (!isTemplateMode.value) {
+      loadTemplateFromQuery()
+    }
   }
 })
 
@@ -570,12 +700,35 @@ const loadTemplateFromQuery = () => {
   }
 }
 
+// Helper function to clean template names for model creation
+const cleanTemplateName = (name) => {
+  if (!name) return ''
+  
+  // Remove 'template' (case insensitive) and clean up
+  return name
+    .replace(/[_\s]*template[_\s]*/gi, '_')  // Replace 'template' with single underscore
+    .replace(/^_+|_+$/g, '')  // Remove leading/trailing underscores
+    .replace(/_+/g, '_')  // Replace multiple underscores with single
+    || 'model'  // Fallback if name becomes empty
+}
+
+const cleanTemplateDisplayName = (displayName) => {
+  if (!displayName) return ''
+  
+  // Remove 'template' (case insensitive) and clean up
+  return displayName
+    .replace(/\s*template\s*/gi, ' ')  // Replace 'template' with single space
+    .replace(/^\s+|\s+$/g, '')  // Remove leading/trailing spaces
+    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+    || 'Model'  // Fallback if name becomes empty
+}
+
 // Load template data into the model
 const loadTemplate = (template) => {
   modelData.value = {
     id: undefined, // New model, no ID
-    name: template.name || '',
-    display_name: template.display_name || template.name || '',
+    name: cleanTemplateName(template.name),
+    display_name: cleanTemplateDisplayName(template.display_name || template.name),
     description: template.description || '',
     created_at: new Date().toISOString(),
     latest_version: {
@@ -638,6 +791,35 @@ const loadModelForEdit = async () => {
   }
 }
 
+// Load existing template for editing
+const loadTemplateForEdit = async () => {
+  try {
+    console.log('Loading template for edit with templateId:', props.templateId, 'orgId:', props.orgId)
+    
+    // Fetch template data from the store (implementation depends on your template store methods)
+    await metadataStore.fetchTemplates(props.orgId)
+    
+    // Get the template from the store (adjust based on your store implementation)
+    const template = metadataStore.templateById(props.templateId)
+    
+    if (template) {
+      loadExistingTemplate(template)
+    } else {
+      throw new Error(`Template with ID ${props.templateId} not found`)
+    }
+  } catch (error) {
+    console.error('Failed to load template for editing:', error)
+    ElMessage.error(`Failed to load template: ${error.message}`)
+    // Navigate back to template gallery on error
+    router.push({
+      name: 'new-model-from-template',
+      params: {
+        orgId: props.orgId
+      }
+    })
+  }
+}
+
 // Load existing model data into the form
 const loadExistingModel = (model) => {
   modelData.value = {
@@ -649,6 +831,24 @@ const loadExistingModel = (model) => {
     latest_version: {
       version: model.latest_version?.version || model.latestVersion?.version || 1,
       schema: model.latest_version?.schema || model.latestVersion?.schema || model.schema || { ...defaultSchema }
+    }
+  }
+  
+  updateJsonContent()
+  updateSharedJsonData()
+}
+
+// Load existing template data into the form
+const loadExistingTemplate = (template) => {
+  modelData.value = {
+    id: template.id,
+    name: template.name || '',
+    display_name: template.display_name || template.displayName || '',
+    description: template.description || '',
+    created_at: template.created_at || template.createdAt || new Date().toISOString(),
+    latest_version: {
+      version: template.latest_version?.version || template.latestVersion?.version || 1,
+      schema: template.latest_version?.schema || template.latestVersion?.schema || template.schema || { ...defaultSchema }
     }
   }
   
@@ -683,15 +883,20 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
       <div class="header-content">
         <div class="header-text">
 <!--          <h1>{{ editMode ? 'Edit Model' : 'Create Model' }}</h1>-->
-          <p v-if="!isEditMode">Define your JSON Schema specification using the guided builder or JSON editor.</p>
-          <p v-else>Update your model specification and properties.</p>
+          <div class="header-title-row">
+            <p v-if="!isEditMode">Define your JSON Schema specification using the guided builder or JSON editor.</p>
+            <p v-else>Update your {{ isTemplateMode ? 'template' : 'model' }} specification and properties.</p>
+            <el-tag v-if="isTemplateMode" type="success" size="small" effect="plain" class="template-badge">
+              Template
+            </el-tag>
+          </div>
         </div>
         <div class="header-actions">
           <bf-button class="secondary" @click="cancelAndReturnToList">
             Cancel
           </bf-button>
           <bf-button type="primary" @click="saveModel">
-            {{ isEditMode ? 'Create New Version' : 'Create Model' }}
+            {{ isEditMode ? 'Create New Version' : (isTemplateMode ? 'Create Template' : 'Create Model') }}
           </bf-button>
         </div>
       </div>
@@ -704,7 +909,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
         <!-- Model Basic Info -->
         <el-card class="model-info-card" :class="{ 'edit-mode': isEditMode }">
           <template #header v-if="!isEditMode">
-            <span>Model Information</span>
+            <span>{{ isTemplateMode ? 'Template' : 'Model' }} Information</span>
           </template>
           
           <!-- Edit Mode: Static display exactly like ModelSpecViewer -->
@@ -810,6 +1015,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
                     <span class="property-type">{{ property.type }}</span>
                     <span v-if="property.format" class="property-format">({{ property.format }})</span>
                     <span v-if="modelData.latest_version.schema.required?.includes(propName)" class="required-badge">Required</span>
+                    <span v-if="property['x-pennsieve-key']" class="key-badge">Key</span>
                   </div>
 <!--                  <div v-if="property.description" class="property-description">-->
 <!--                    {{ property.description }}-->
@@ -868,30 +1074,28 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
 
       <!-- Right Panel: Preview -->
       <div class="preview-panel">
-        <el-card>
-          <template #header>
-            <div class="preview-header">
-              <span>Preview</span>
-              <div class="preview-view-mode-tabs">
-                <button 
-                  class="preview-view-mode-tab" 
-                  :class="{ active: previewViewMode === 'ui' }"
-                  @click="previewViewMode = 'ui'"
-                >
-                  <span class="tab-icon">👁</span>
-                </button>
-                <button 
-                  class="preview-view-mode-tab" 
-                  :class="{ active: previewViewMode === 'json' }"
-                  @click="previewViewMode = 'json'"
-                >
-                  <span class="tab-icon">{ }</span>
-                </button>
-              </div>
-            </div>
-          </template>
+        <div class="preview-header">
+          <span>Preview</span>
+          <div class="preview-view-mode-tabs">
+            <button 
+              class="preview-view-mode-tab" 
+              :class="{ active: previewViewMode === 'ui' }"
+              @click="previewViewMode = 'ui'"
+            >
+              <span class="tab-icon">👁</span>
+            </button>
+            <button 
+              class="preview-view-mode-tab" 
+              :class="{ active: previewViewMode === 'json' }"
+              @click="previewViewMode = 'json'"
+            >
+              <span class="tab-icon">{ }</span>
+            </button>
+          </div>
+        </div>
+        <div class="preview-content">
           <ModelSpecViewer :model="previewModel" :view-mode="previewViewMode" :hide-selector="true" :minimal="true" />
-        </el-card>
+        </div>
       </div>
     </div>
 
@@ -933,6 +1137,22 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
           font-weight: 600;
           color: theme.$gray_6;
           margin: 0 0 8px 0;
+        }
+        
+        .header-title-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          
+          p {
+            color: theme.$gray_5;
+            margin: 0;
+            font-size: 16px;
+          }
+          
+          .template-badge {
+            flex-shrink: 0;
+          }
         }
         
         p {
@@ -1176,31 +1396,29 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
   .preview-panel {
     flex: 1;
     min-width: 0;
+    height: 100%;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    //border-left: 2px solid theme.$purple_2;
     
-    .el-card {
-      height: 100%;
-      min-height: 600px;
-      border: none;
-      box-shadow: none;
-      border-left: 2px solid theme.$purple_2;
-      border-radius: 0;
+    .preview-header {
+      //background-color: theme.$gray_1;
+      //border-bottom: 1px solid theme.$gray_2;
+      font-size: 18px;
+      //padding: 16px 20px;
+      flex-shrink: 0;
       
-      :deep(.el-card__header) {
-        background-color: theme.$gray_1;
-        border-bottom: 1px solid theme.$gray_2;
-        padding: 16px 20px;
-        
-        span {
-          font-weight: 500;
-          color: theme.$gray_6;
-        }
+      span {
+        font-weight: 500;
+        color: theme.$gray_6;
       }
-      
-      :deep(.el-card__body) {
-        height: calc(100% - 60px);
-        overflow-y: auto;
-        padding: 20px;
-      }
+    }
+    
+    .preview-content {
+      flex: 1;
+      overflow-y: auto;
+      //padding: 20px;
     }
   }
   
@@ -1358,6 +1576,14 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
       .required-badge {
         background-color: theme.$red_tint;
         color: theme.$red_2;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+      }
+      
+      .key-badge {
+        background-color: theme.$orange_tint;
+        color: theme.$orange_1;
         padding: 2px 6px;
         border-radius: 3px;
         font-size: 12px;

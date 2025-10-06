@@ -253,13 +253,74 @@
         </div>
       </div>
     </div>
+
+    <!-- Name Review Dialog -->
+    <el-dialog
+      v-model="showNameReviewDialog"
+      title="Review Model Names"
+      width="800px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <div class="name-review-dialog">
+        <div class="dialog-description">
+          <p>Review and edit the model names before creation. Names have been automatically cleaned to remove "template" text.</p>
+        </div>
+        
+        <div class="templates-list">
+          <div
+            v-for="(template, index) in templatesForReview"
+            :key="template.original.id"
+            class="template-review-item"
+          >
+            <div class="template-info">
+              <h4>{{ template.original.display_name || template.original.name }}</h4>
+              <p>{{ template.description }}</p>
+            </div>
+            
+            <div class="name-inputs">
+              <el-form-item label="Display Name">
+                <el-input
+                  v-model="template.display_name"
+                  placeholder="Human-readable name"
+                  @input="handleDisplayNameChange(template)"
+                />
+              </el-form-item>
+              
+              <el-form-item label="Model Identifier">
+                <el-input
+                  v-model="template.name"
+                  placeholder="Technical identifier"
+                  @input="handleModelNameManualEdit(template.original.id)"
+                />
+              </el-form-item>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <bf-button @click="closeNameReviewDialog" type="secondary">
+            Cancel
+          </bf-button>
+          <bf-button
+            @click="proceedWithModelCreation"
+            type="primary"
+            :loading="creatingModels"
+          >
+            {{ creatingModels ? (templatesForReview.length === 1 ? 'Creating Model...' : 'Creating Models...') : (templatesForReview.length === 1 ? 'Create Model' : `Create ${templatesForReview.length} Models`) }}
+          </bf-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElInput, ElSelect, ElOption, ElButton, ElTag, ElMessage, ElMessageBox } from 'element-plus'
+import { ElInput, ElSelect, ElOption, ElButton, ElTag, ElMessage, ElMessageBox, ElDialog, ElFormItem } from 'element-plus'
 import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue"
 import * as site from "@/site-config/site.json"
@@ -294,6 +355,9 @@ const selectedTemplates = ref([])
 const loading = ref(false)
 const creatingModels = ref(false)
 const error = ref('')
+const showNameReviewDialog = ref(false)
+const templatesForReview = ref([])
+const manuallyEditedNames = ref(new Set()) // Track which model names have been manually edited
 
 // Filter and sort state
 const searchQuery = ref('')
@@ -755,22 +819,118 @@ const clearAllSelections = () => {
   selectedTemplates.value = []
 }
 
+// Generate model name from display name (for auto-generation)
+const generateModelNameFromDisplayName = (displayName, templateId) => {
+  // Only auto-generate if the name hasn't been manually edited
+  if (!displayName || manuallyEditedNames.value.has(templateId)) {
+    return null
+  }
+  
+  return displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_')
+    || 'model'
+}
+
+// Handle display name change for a template
+const handleDisplayNameChange = (template) => {
+  const generatedName = generateModelNameFromDisplayName(template.display_name, template.original.id)
+  if (generatedName) {
+    template.name = generatedName
+  }
+}
+
+// Handle manual edit of model identifier
+const handleModelNameManualEdit = (templateId) => {
+  manuallyEditedNames.value.add(templateId)
+}
+
 const createModelsFromTemplates = async () => {
+  if (selectedTemplates.value.length === 0) return
+  
+  // Helper functions to clean template names
+  const cleanTemplateName = (name) => {
+    if (!name) return ''
+    return name
+      .replace(/[_\s]*template[_\s]*/gi, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_')
+      || 'model'
+  }
+
+  const cleanTemplateDisplayName = (displayName) => {
+    if (!displayName) return ''
+    return displayName
+      .replace(/\s*template\s*/gi, ' ')
+      .replace(/^\s+|\s+$/g, '')
+      .replace(/\s+/g, ' ')
+      || 'Model'
+  }
+
+  // Always show the name review dialog for template selection
+  // Prepare templates for review with cleaned names
+  templatesForReview.value = selectedTemplates.value.map(template => ({
+    original: template,
+    name: cleanTemplateName(template.name),
+    display_name: cleanTemplateDisplayName(template.display_name || template.name),
+    description: template.description
+  }))
+  
+  showNameReviewDialog.value = true
+}
+
+const proceedWithModelCreation = async () => {
   if (selectedTemplates.value.length === 0) return
   
   creatingModels.value = true
   
   try {
-    // Prepare templates array for API call
-    const templatesArray = selectedTemplates.value.map(template => ({
-      template: {
-        id: template.id,
-        name: template.name,
-        display_name: template.display_name,
-        description: template.description,
-        latest_version: template.latest_version
-      }
-    }))
+    // Helper functions to clean template names
+    const cleanTemplateName = (name) => {
+      if (!name) return ''
+      return name
+        .replace(/[_\s]*template[_\s]*/gi, '_')
+        .replace(/^_+|_+$/g, '')
+        .replace(/_+/g, '_')
+        || 'model'
+    }
+
+    const cleanTemplateDisplayName = (displayName) => {
+      if (!displayName) return ''
+      return displayName
+        .replace(/\s*template\s*/gi, ' ')
+        .replace(/^\s+|\s+$/g, '')
+        .replace(/\s+/g, ' ')
+        || 'Model'
+    }
+
+    let templatesArray
+    
+    if (templatesForReview.value.length > 0) {
+      // Use the reviewed templates with potentially edited names
+      templatesArray = templatesForReview.value.map(template => ({
+        template: {
+          id: template.original.id,
+          name: template.name,
+          display_name: template.display_name,
+          description: template.description,
+          latest_version: template.original.latest_version
+        }
+      }))
+    } else {
+      // Use the selected templates with cleaned names (single template case)
+      templatesArray = selectedTemplates.value.map(template => ({
+        template: {
+          id: template.id,
+          name: cleanTemplateName(template.name),
+          display_name: cleanTemplateDisplayName(template.display_name || template.name),
+          description: template.description,
+          latest_version: template.latest_version
+        }
+      }))
+    }
     
     // Call the store method to create models from templates
     const results = await metadataStore.createModelsFromTemplates(props.datasetId, templatesArray)
@@ -782,8 +942,9 @@ const createModelsFromTemplates = async () => {
         duration: 3000
       })
       
-      // Clear selections
+      // Clear selections and close dialog
       clearAllSelections()
+      closeNameReviewDialog()
       
       // Navigate to the models list or refresh the page
       // You might want to emit an event or navigate somewhere
@@ -815,6 +976,12 @@ const createModelsFromTemplates = async () => {
   } finally {
     creatingModels.value = false
   }
+}
+
+const closeNameReviewDialog = () => {
+  showNameReviewDialog.value = false
+  templatesForReview.value = []
+  manuallyEditedNames.value.clear() // Reset the manually edited tracking
 }
 
 const getPropertyCount = (template) => {
@@ -1311,6 +1478,75 @@ onMounted(() => {
       display: flex;
       gap: 12px;
     }
+  }
+
+  // Name Review Dialog Styles
+  .name-review-dialog {
+    .dialog-description {
+      margin-bottom: 24px;
+      
+      p {
+        color: theme.$gray_5;
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+    }
+    
+    .templates-list {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-height: 400px;
+      overflow-y: auto;
+      
+      .template-review-item {
+        border: 1px solid theme.$gray_2;
+        padding: 20px;
+        background: theme.$gray_1;
+        
+        .template-info {
+          margin-bottom: 16px;
+          
+          h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: theme.$gray_6;
+            margin: 0 0 4px 0;
+          }
+          
+          p {
+            font-size: 13px;
+            color: theme.$gray_5;
+            margin: 0;
+            line-height: 1.3;
+          }
+        }
+        
+        .name-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          
+          :deep(.el-form-item) {
+            margin-bottom: 0;
+          }
+          
+          :deep(.el-form-item__label) {
+            font-size: 12px;
+            font-weight: 500;
+            color: theme.$gray_6;
+            margin-bottom: 4px;
+          }
+        }
+      }
+    }
+  }
+  
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
   }
 }
 </style>

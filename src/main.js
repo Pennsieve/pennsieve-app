@@ -13,6 +13,9 @@ import AWSConfig from './utils/aws-exports.js'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
+// Import Element Plus CSS manually to ensure proper theming
+import 'element-plus/dist/index.css'
+
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"

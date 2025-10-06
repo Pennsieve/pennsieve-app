@@ -20,6 +20,12 @@ export const useMetadataStore = defineStore('metadata', () => {
     const templates = ref([])
     const templatesLoaded = ref(false)
 
+    // Relationship creation state
+    const activeRelationshipCreation = ref(null) // { sourceRecordId, sourceModelId, datasetId, sourceRecordName }
+    
+    // Package attachment state
+    const activePackageAttachment = ref(null) // { recordId, modelId, datasetId, recordName }
+
     // RecordFilter are used to filter records in Record list
     const createFilter = () => {
         return {
@@ -523,16 +529,22 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Create a new template version
-    const createTemplateVersion = async (templateId, versionData) => {
+    const createTemplateVersion = async (templateId, versionData, orgId) => {
         try {
             const endpoint = `${site.api2Url}/metadata/templates/${templateId}/versions`
             const token = await useGetToken()
+            
+            const queryParams = {
+                organization_id: orgId
+            }
+            
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
             
             const payload = {
                 schema: versionData.schema
             }
 
-            const resp = await fetch(endpoint, {
+            const resp = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -550,6 +562,41 @@ export const useMetadataStore = defineStore('metadata', () => {
             }
         } catch (error) {
             console.error('Error creating template version:', error)
+            throw error
+        }
+    }
+
+    // Fetch all versions of a template
+    const fetchTemplateVersions = async (templateId, orgId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/templates/${templateId}/versions`
+            const token = await useGetToken()
+            
+            const queryParams = {
+                organization_id: orgId
+            }
+            
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+
+            if (!resp.ok) {
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch template versions: ${resp.status} - ${errorText}`)
+            }
+
+            const data = await resp.json()
+            // Handle the API response structure: {"model_template": {"versions": [...]}}
+            return data.model_template?.versions || data.versions || data
+        } catch (error) {
+            console.error('Error fetching template versions:', error)
             throw error
         }
     }
@@ -801,6 +848,233 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    /**
+     * Attach a package (file/folder) to a record
+     * @param {string} datasetId - The dataset ID
+     * @param {string} recordId - The record ID to attach package to
+     * @param {string} packageId - The package ID to attach
+     * @returns {Promise<Object>} The attachment result
+     */
+    const attachPackageToRecord = async (datasetId, recordId, packageId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            const payload = {
+                package_id: packageId
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to attach package to record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error attaching package to record:', error)
+            throw error
+        }
+    }
+
+    // Relationship creation actions
+    const startRelationshipCreation = (sourceRecordId, sourceModelId, datasetId, sourceRecordName) => {
+        activeRelationshipCreation.value = {
+            sourceRecordId,
+            sourceModelId,
+            datasetId,
+            sourceRecordName
+        }
+    }
+
+    const cancelRelationshipCreation = () => {
+        activeRelationshipCreation.value = null
+    }
+
+    const completeRelationshipCreation = async (targetRecordId, relationshipType) => {
+        if (!activeRelationshipCreation.value) {
+            throw new Error('No active relationship creation in progress')
+        }
+
+        const { sourceRecordId, datasetId } = activeRelationshipCreation.value
+
+        try {
+            const result = await createRelationship(datasetId, sourceRecordId, targetRecordId, relationshipType)
+            activeRelationshipCreation.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
+    // Package attachment actions
+    const startPackageAttachment = (recordId, modelId, datasetId, recordName) => {
+        activePackageAttachment.value = {
+            recordId,
+            modelId,
+            datasetId,
+            recordName
+        }
+    }
+
+    const cancelPackageAttachment = () => {
+        activePackageAttachment.value = null
+    }
+
+    const completePackageAttachment = async (packageId) => {
+        if (!activePackageAttachment.value) {
+            throw new Error('No active package attachment in progress')
+        }
+
+        const { recordId, datasetId } = activePackageAttachment.value
+
+        try {
+            const result = await attachPackageToRecord(datasetId, recordId, packageId)
+            activePackageAttachment.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
+    // Fetch packages attached to a record
+    const fetchRecordPackages = async (datasetId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record packages: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record packages:', error)
+            throw error
+        }
+    }
+
+     // Fetch relationships for a record
+    const fetchRecordRelationships = async (datasetId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/relationships`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                // Return empty array for 404 (no relationships) instead of throwing error
+                if (resp.status === 404) {
+                    return []
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record relationships: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record relationships:', error)
+            throw error
+        }
+    }
+
+    // Delete a package from a record
+    const deletePackageFromRecord = async (datasetId, recordId, packageId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages/${encodeURIComponent(packageId)}`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to delete package from record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error deleting package from record:', error)
+            throw error
+        }
+    }
+
+    // Delete a relationship between records
+    const deleteRelationship = async (datasetId, sourceRecordId, targetRecordId, relationshipType) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${sourceRecordId}/relationships/${targetRecordId}`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ dataset_id: datasetId })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders,
+                body: JSON.stringify({
+                    relationship_type: relationshipType
+                })
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to delete relationship: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error deleting relationship:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -809,6 +1083,8 @@ export const useMetadataStore = defineStore('metadata', () => {
         templates,
         templatesLoaded,
         recordFilterParams,
+        activeRelationshipCreation,
+        activePackageAttachment,
 
         // Getters
         modelById,
@@ -819,6 +1095,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchModelVersion,
         fetchModelVersions,
         fetchTemplates,
+        fetchTemplateVersions,
         fetchRecords,
         fetchRecord,
         createRecord,
@@ -832,7 +1109,24 @@ export const useMetadataStore = defineStore('metadata', () => {
         createTemplateFromModel,
         createTemplateVersion,
         updateVersion,
-        updateModelMetadata
+        updateModelMetadata,
+        attachPackageToRecord,
+        
+        // Relationship creation actions
+        startRelationshipCreation,
+        cancelRelationshipCreation,
+        completeRelationshipCreation,
+        
+        // Package attachment actions
+        startPackageAttachment,
+        cancelPackageAttachment,
+        completePackageAttachment,
+        fetchRecordPackages,
+        fetchRecordRelationships,
+        deletePackageFromRecord,
+        deleteRelationship
+
+
     }
 
 })

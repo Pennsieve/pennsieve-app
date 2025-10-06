@@ -48,6 +48,12 @@
     "element-plus": "2.8.5",
     "fabric": "^5.3.0",
     "flush-promises": "^1.0.2",
+    "graphology": "^0.26.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-force": "^0.2.4",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "graphology-layout-noverlap": "^0.4.2",
+    "graphology-operators": "^1.6.1",
     "highlight.js": "^11.9.0",
     "hyparquet": "^1.12.1",
     "js-cookie": "^3.0.1",
@@ -59,12 +65,13 @@
     "moment-range": "^4.0.2",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^4.0.379",
+    "pennsieve-dashboard": "0.2.2",
+    "pennsieve-visualization": "^0.4.8",
     "pinia": "^3.0.3",
     "protobufjs": "^7.2.6",
     "pusher-js": "^8.4.0",
     "ramda": "^0.28.0",
-    "pennsieve-dashboard":"0.2.2",
-    "pennsieve-visualization": "^0.4.8",
+    "sigma": "^3.0.2",
     "striptags": "^3.2.0",
     "swiper": "^10.2.0",
     "tiny-emitter": "^2.1.0",
@@ -88,7 +95,7 @@
     "xlsx": "^0.18.5"
   },
   "overrides": {
-    "element-plus":"2.8.5"
+    "element-plus": "2.8.5"
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.1.4",
