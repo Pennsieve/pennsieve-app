@@ -78,9 +78,7 @@ export default {
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
-    UMAPViewer: defineAsyncComponent(() =>
-      import("../../viewers/UmapViewer/wrapper.vue")
-    ),
+    UMAPViewer: UMAP,
     NiiViewer: defineAsyncComponent(() =>
       import("../../viewers/NiiViewer/NiiViewerWrapper.vue")
     ),
