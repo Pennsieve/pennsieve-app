@@ -25,6 +25,7 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
   const createInitialState = () => ({
     // Query and search state
     queryFilters: [createFilter()],
+    recordLimit: 50, // Default record limit per model
     
     // Graph visualization data
     nodes: [],
@@ -142,6 +143,10 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
     updateState({ queryFilters: filters })
   }
   
+  const updateRecordLimit = (limit) => {
+    updateState({ recordLimit: limit })
+  }
+  
   const updateGraphData = (nodes, edges, counts = {}) => {
     updateState({
       nodes,
@@ -211,6 +216,11 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
   const currentQueryFilters = computed(() => {
     const state = getCurrentState()
     return state?.queryFilters || [createFilter()]
+  })
+  
+  const currentRecordLimit = computed(() => {
+    const state = getCurrentState()
+    return state?.recordLimit || 50
   })
   
   const currentNodes = computed(() => {
@@ -304,6 +314,7 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
     
     // Specific update methods
     updateQueryFilters,
+    updateRecordLimit,
     updateGraphData,
     updateLayout,
     updateExpandedNodes,
@@ -317,6 +328,7 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
     
     // Computed getters
     currentQueryFilters,
+    currentRecordLimit,
     currentNodes,
     currentEdges,
     currentLayout,

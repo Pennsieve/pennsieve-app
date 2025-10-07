@@ -25,6 +25,10 @@ const props = defineProps({
   recordId: {
     type: String,
     required: true
+  },
+  noPadding: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -521,7 +525,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <bf-stage class="record-spec-viewer" >
+  <bf-stage class="record-spec-viewer" :no-padding="noPadding" >
     <template #actions>
       <stage-actions>
         <template #left>

@@ -1,9 +1,54 @@
 <template>
-  <div class="graph-explorer">
+  <bf-stage class="graph-explorer" :no-padding="true">
+    <template #actions>
+      <stage-actions>
+        <template #left>
+          <div>
+            <h3 class="stage-title">Graph Explorer</h3>
+            <div>Select one or more models to generate a view over the dataset</div>
+          </div>
+
+        </template>
+        <template #right>
+          <div class="stage-actions-right">
+            <!-- Search Button -->
+            <bf-button
+              class="primary"
+              :disabled="!canExecuteQuery"
+              @click="executeQuery"
+            >
+              <template v-if="loading">
+                <i class="el-icon-loading"></i> Searching...
+              </template>
+              <template v-else>
+                <i class="el-icon-search"></i> Search
+              </template>
+            </bf-button>
+
+            <!-- Clear All Button -->
+            <bf-button
+              class="secondary"
+              @click="clearAllQueries"
+            >
+              Clear All
+            </bf-button>
+            
+            <!-- Collapse Button -->
+            <bf-button
+              class="collapse-btn"
+              @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"
+            >
+              <span v-if="isQuerySectionCollapsed">Show Filters</span>
+              <span v-else>Hide Filters</span>
+            </bf-button>
+          </div>
+        </template>
+      </stage-actions>
+    </template>
+    
     <!-- Query Builder Section -->
-    <div class="query-section">
-      <div class="query-builder">
-        <h3>Select Model Records</h3>
+    <div class="query-section" :class="{ 'collapsed': isQuerySectionCollapsed }">
+      <div class="query-builder" v-if="!isQuerySectionCollapsed">
         
         <!-- Multiple Query Rows -->
         <div v-for="(query, index) in queryFilters" :key="query.id" class="query-row">
@@ -18,39 +63,31 @@
           />
         </div>
         
-        <!-- Action Buttons -->
-        <div class="query-actions">
-
-
-          <!-- Search Button -->
-          <bf-button
-            class="primary"
-            :disabled="!canExecuteQuery"
-            @click="executeQuery"
-          >
-            <template v-if="loading">
-              <i class="el-icon-loading"></i> Searching...
-            </template>
-            <template v-else>
-              <i class="el-icon-search"></i> Search
-            </template>
-          </bf-button>
-
+        <!-- Filter Management Actions -->
+        <div class="filter-actions">
           <!-- Add Filter Button -->
-          <bf-button
-            class="secondary"
+          <button
+            class="btn-add-filter"
             @click="addFilter"
           >
-            <i class="el-icon-plus"></i> Add Row
-          </bf-button>
+            + Add Filter
+          </button>
 
-          <!-- Clear All Button -->
-          <bf-button
-            class="secondary"
-            @click="clearAllQueries"
-          >
-            Clear All
-          </bf-button>
+          <!-- Record Limit Dropdown -->
+          <div class="limit-selector">
+            <label class="limit-label">Records per model:</label>
+            <select 
+              v-model="recordLimit"
+              class="limit-select"
+            >
+              <option :value="10">10</option>
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+              <option :value="200">200</option>
+              <option :value="500">500</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -157,10 +194,19 @@
           </div>
         </div>
         <div class="properties-actions">
+          <!-- Unlock button - only show for locked nodes in Force mode -->
+          <button 
+            v-if="currentLayout === 'Force' && getSelectedNodeId() && isNodeLocked(getSelectedNodeId())"
+            class="unlock-btn" 
+            @click="unlockSelectedNode"
+            title="Unlock node from current position"
+          >
+            Unlock
+          </button>
           <button class="view-details-btn" @click="viewSelectedNodeDetails">
             View Details
           </button>
-          <button class="close-btn" @click="selectedNodeProperties = null">×</button>
+          <button class="close-btn" @click="selectedNodeProperties = null; sigmaInstance?.refresh()">×</button>
         </div>
       </div>
     </div>
@@ -168,19 +214,20 @@
     <!-- Record Details Panel -->
     <el-drawer
       v-model="showDetailsPanel"
-      :title="selectedRecord?.label || 'Record Details'"
+      title='Record Details'
       direction="rtl"
-      size="60%"
+      size="50%"
     >
       <div v-if="selectedRecord" class="record-details-container">
         <RecordSpecViewer
           :datasetId="props.datasetId"
           :modelId="selectedRecord.model"
           :recordId="selectedRecord.id"
+          :no-padding="true"
         />
       </div>
     </el-drawer>
-  </div>
+  </bf-stage>
 </template>
 
 <script setup>
@@ -192,14 +239,18 @@ import forceAtlas2 from 'graphology-layout-forceatlas2'
 import noverlap from 'graphology-layout-noverlap'
 import { circular } from 'graphology-layout'
 import { random } from 'graphology-layout'
+import { NodeBorderProgram } from '@sigma/node-border'
 import { ElSelect, ElOption, ElInput, ElDrawer, ElMessage } from 'element-plus'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import StageActions from '@/components/shared/StageActions/StageActions.vue'
+import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useGraphExplorerStore } from '@/stores/graphExplorerStore.js'
 import { getModelColor, createModelColorAssignment, packageColor } from '@/utils/modelColors.js'
 import MultiModelFilter from './MultiModelFilter.vue'
 import IconSizeToFit from '@/components/icons/IconSizeToFit.vue'
 import IconCenter from '@/components/icons/IconCenter.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
 import RecordSpecViewer from '@/components/datasets/metadata/models/RecordSpecViewer.vue'
 
 // Props
@@ -230,6 +281,8 @@ const nodes = ref([])
 const edges = ref([])
 const nodeCount = ref(0)
 const edgeCount = ref(0)
+const recordLimit = ref(50) // Default to 50 records per model
+const isQuerySectionCollapsed = ref(false) // Track query section collapse state
 const models = computed(() => {
   // Models in store have structure: [{ model: { id, name, display_name, ... } }]
   return (metadataStore.models || [])
@@ -240,6 +293,7 @@ const showDetailsPanel = ref(false)
 const selectedRecord = ref(null)
 const selectedNodeProperties = ref(null)
 const expandedNodes = ref(new Set())
+const lockedNodes = ref(new Set()) // Nodes locked in place during Force mode
 const currentLayout = ref('Force')
 
 // Layout options for Sigma.js
@@ -354,45 +408,72 @@ const executeQuery = async () => {
   
   loading.value = true
   try {
-    console.log('🔍 Executing queries with filters:', queryFilters.value)
     
-    // Prepare all query promises
-    const queryPromises = queryFilters.value
+    // Group filters by model for optimization
+    const filtersByModel = new Map()
+    
+    queryFilters.value
       .filter(filter => filter.model) // Only process filters with a model selected
-      .map(async (filter) => {
-        // Build filter predicate only if property, operator and value are provided
-        let options = { limit: 50 }
-        
-        if (filter.property && filter.operator && filter.value) {
-          // Use the metadata store's fetchRecords method with proper filter structure
-          const filterPredicate = {
-            property: `/${filter.property}`, // JSON Pointer format
-            operator: filter.operator,
-            value: parseValue(filter.value, filter.operator, filter.property, filter.modelProperties)
-          }
-          options.filter = filterPredicate
-          console.log('🔍 Query with filter:', filter.model, filterPredicate)
-        } else {
-          console.log('🔍 Query without filter (first 50 records):', filter.model)
+      .forEach(filter => {
+        if (!filtersByModel.has(filter.model)) {
+          filtersByModel.set(filter.model, [])
         }
-        
-        try {
-          const response = await metadataStore.fetchRecords(props.datasetId, filter.model, options)
-          return {
-            modelId: filter.model,
-            records: response.records || [],
-            filter: filter
-          }
-        } catch (error) {
-          console.error(`Query error for model ${filter.model}:`, error)
-          return {
-            modelId: filter.model,
-            records: [],
-            filter: filter,
-            error: error
-          }
-        }
+        filtersByModel.get(filter.model).push(filter)
       })
+    
+    
+    // Prepare query promises - one per unique model
+    const queryPromises = Array.from(filtersByModel.entries()).map(async ([modelId, filters]) => {
+      try {
+        let options = { limit: recordLimit.value }
+        let combinedFilters = []
+        let hasValidFilters = false
+        
+        // Collect all valid filters for this model
+        filters.forEach(filter => {
+          if (filter.property && filter.operator && filter.value) {
+            const filterPredicate = {
+              property: `/${filter.property}`, // JSON Pointer format
+              operator: filter.operator,
+              value: parseValue(filter.value, filter.operator, filter.property, filter.modelProperties)
+            }
+            combinedFilters.push(filterPredicate)
+            hasValidFilters = true
+          }
+        })
+        
+        // Apply combined filters if any exist
+        if (hasValidFilters) {
+          if (combinedFilters.length === 1) {
+            // Single filter - use it directly
+            options.filter = combinedFilters[0]
+          } else {
+            // Multiple filters - combine with OR logic for broader results
+            options.filter = {
+              operator: 'or',
+              filters: combinedFilters
+            }
+          }
+        } else {
+        }
+        
+        const response = await metadataStore.fetchRecords(props.datasetId, modelId, options)
+        return {
+          modelId: modelId,
+          records: response.records || [],
+          filters: filters,
+          combinedFilterCount: combinedFilters.length
+        }
+      } catch (error) {
+        console.error(`Query error for model ${modelId}:`, error)
+        return {
+          modelId: modelId,
+          records: [],
+          filters: filters,
+          error: error
+        }
+      }
+    })
     
     // Execute all queries in parallel
     const results = await Promise.all(queryPromises)
@@ -400,6 +481,8 @@ const executeQuery = async () => {
     // Combine and display results
     const allRecords = []
     let errorCount = 0
+    let totalApiCalls = results.length
+    let totalOriginalFilters = queryFilters.value.filter(f => f.model).length
     
     results.forEach(result => {
       if (result.error) {
@@ -409,10 +492,11 @@ const executeQuery = async () => {
       }
     })
     
-    console.log(`📊 Query complete: ${allRecords.length} total records from ${results.length} queries`)
     
     if (errorCount > 0) {
       ElMessage.warning(`${errorCount} queries failed, showing results from successful queries`)
+    } else if (totalApiCalls < totalOriginalFilters) {
+      ElMessage.success(`Query optimized: ${totalOriginalFilters} filters executed as ${totalApiCalls} API calls`)
     }
     
     displayQueryResults(allRecords)
@@ -474,7 +558,6 @@ const parseValue = (value, operator, propertyName, modelProperties) => {
 }
 
 const displayQueryResults = (records) => {
-  console.log('📊 Displaying query results:', records)
   
   // Clear existing data
   nodes.value = []
@@ -495,14 +578,12 @@ const displayQueryResults = (records) => {
   const uniqueModelIds = [...new Set(records.map(r => r.model_id).filter(id => id))]
   modelColorAssignment.value = createModelColorAssignment(uniqueModelIds)
   displayedModels.value = uniqueModelIds
-  console.log('🎨 Created color assignment for', uniqueModelIds.length, 'unique models')
   
   // Create nodes for each record in a grid layout
   const gridSize = Math.ceil(Math.sqrt(records.length))
   const spacing = 150 // Space between grid positions
   
   records.forEach((record, index) => {
-    console.log(`📊 Creating node for record ${index}:`, record)
     
     const nodeId = `record-${record.id}`
     const row = Math.floor(index / gridSize)
@@ -511,7 +592,6 @@ const displayQueryResults = (records) => {
     // The actual properties are in the 'value' field from the API response
     const properties = record.value || record.properties || record.values || {}
     
-    console.log(`📊 Extracted properties from record.value:`, properties, 'Keys:', Object.keys(properties))
     
     const node = {
       id: nodeId,
@@ -530,12 +610,9 @@ const displayQueryResults = (records) => {
       }
     }
     
-    console.log(`📊 Created node:`, node)
-    console.log(`📊 Node data properties:`, node.data.properties)
     nodes.value.push(node)
   })
   
-  console.log(`📊 Total nodes created: ${nodes.value.length}`)
   
   // Update the graph
   updateGraph()
@@ -550,10 +627,8 @@ const displayQueryResults = (records) => {
 
 const expandNode = async (nodeId) => {
   try {
-    console.log('🔄 Expanding node:', nodeId)
     
     if (expandedNodes.value.has(nodeId)) {
-      console.log('🔄 Node already expanded, collapsing instead')
       collapseNode(nodeId)
       return
     }
@@ -565,22 +640,16 @@ const expandNode = async (nodeId) => {
       return
     }
     
-    console.log('🔄 Found node for expansion:', node)
     
     loading.value = true
     
     // Fetch relationships for this record
-    console.log('🔗 Fetching relationships for record:', node.data.id)
     const relationships = await fetchRecordRelationships(node.data.id)
-    console.log('🔗 Fetched relationships:', relationships)
     
     // Fetch packages for this record
-    console.log('📦 Fetching packages for record:', node.data.id)
     const packages = await fetchRecordPackages(node.data.id)
-    console.log('📦 Fetched packages:', packages)
     
     // Add new nodes and edges
-    console.log('➕ Adding related nodes and edges')
     const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
     
     // Track expansion for proper collapse behavior
@@ -593,7 +662,6 @@ const expandNode = async (nodeId) => {
     expandedNodes.value.add(nodeId)
     node.data.expanded = true
     
-    console.log('✅ Node expansion complete, updating graph')
     
     // Update the graph display
     updateGraph()
@@ -601,8 +669,10 @@ const expandNode = async (nodeId) => {
     // Save state after node expansion
     saveStateToStore()
     
-    // Start animated force simulation after node expansion
-    await startBackgroundForceSimulation()
+    // Start animated force simulation after node expansion (only in Force mode)
+    if (currentLayout.value === 'Force') {
+      await startBackgroundForceSimulation()
+    }
     
     ElMessage.success(`Expanded node: added ${limitedRelationships.length} relationships and ${limitedPackages.length} files`)
     
@@ -618,7 +688,6 @@ const fetchRecordRelationships = async (recordId) => {
   try {
     // Use the metadata store method
     const relationships = await metadataStore.fetchRecordRelationships(props.datasetId, recordId)
-    console.log('🔗 Raw relationships response:', relationships)
     
     // Handle different response structures
     if (Array.isArray(relationships)) {
@@ -640,11 +709,8 @@ const fetchRecordRelationships = async (recordId) => {
           direction: 'outbound'
         })) : [])
       ]
-      console.log('🔗 Combined inbound + outbound relationships:', allRelationships)
       // Debug the structure of individual relationships
       if (allRelationships.length > 0) {
-        console.log('🔗 Sample relationship object:', allRelationships[0])
-        console.log('🔗 Relationship keys:', Object.keys(allRelationships[0]))
       }
       return allRelationships
     } else {
@@ -661,7 +727,6 @@ const fetchRecordPackages = async (recordId) => {
   try {
     // Use the metadata store method
     const packages = await metadataStore.fetchRecordPackages(props.datasetId, recordId)
-    console.log('📦 Raw packages response:', packages)
     
     // Handle different response structures
     if (Array.isArray(packages)) {
@@ -683,8 +748,6 @@ const fetchRecordPackages = async (recordId) => {
 const addRelatedNodes = (parentNode, relationships, packages) => {
   try {
     const parentId = parentNode.id
-    console.log(`➕ Adding related nodes for parent: ${parentId}`)
-    console.log(`➕ Processing ${relationships.length} relationships and ${packages.length} packages`)
     
     // Get current position of parent node from Sigma graph
     const currentParentAttrs = graph.value.getNodeAttributes(parentId)
@@ -692,7 +755,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
       x: currentParentAttrs.x || parentNode.position.x,
       y: currentParentAttrs.y || parentNode.position.y
     }
-    console.log(`📍 Parent current position:`, currentParentPosition)
     
     // Track new models found during expansion for legend updates
     const newModelIds = new Set()
@@ -718,13 +780,11 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
         limitedPackages = packages.slice(0, maxAdditionalNodes - relationships.length)
       }
       
-      console.log(`⚠️ Node expansion capped at ${maxAdditionalNodes} nodes. Using ${limitedRelationships.length} relationships and ${limitedPackages.length} packages`)
     }
     
     // Add relationship nodes with direction-aware edges
     limitedRelationships.forEach((rel, index) => {
       try {
-        console.log(`🔗 Processing relationship ${index + 1}:`, rel)
         
         // Extract the related record information
         const relatedRecord = rel.record || {}
@@ -763,7 +823,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             }
           }
           nodes.value.push(newNode)
-          console.log(`✅ Added new relationship node: ${targetId}`)
           
           // Track new model for color assignment and legend
           if (relatedRecord.model_id && !modelColorAssignment.value.has(relatedRecord.model_id)) {
@@ -774,7 +833,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           addedChildren.add(targetId)
         } else {
           nodeExists = true
-          console.log(`ℹ️ Relationship node already exists: ${targetId}, creating edge to existing node`)
         }
         
         // Create edge with direction-based coloring (always create edge, even to existing nodes)
@@ -806,9 +864,7 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           // Track edge for collapse functionality
           addedEdges.add(edgeId)
           
-          console.log(`✅ Added relationship edge: ${edgeId} ${nodeExists ? '(to existing node)' : '(to new node)'}`)
         } else {
-          console.log(`ℹ️ Relationship edge already exists: ${edgeId}`)
         }
       } catch (relError) {
         console.error('❌ Error processing relationship:', relError, rel)
@@ -817,7 +873,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
     
     // Update color assignments for new models
     if (newModelIds.size > 0) {
-      console.log(`🎨 Found ${newModelIds.size} new models during expansion:`, [...newModelIds])
       
       // Get all current model IDs including new ones
       const allModelIds = [...new Set([...displayedModels.value, ...newModelIds])]
@@ -835,13 +890,11 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
       modelColorAssignment.value = newColorAssignment
       displayedModels.value = allModelIds
       
-      console.log(`🎨 Updated color assignments for ${allModelIds.length} total models`)
     }
     
     // Add package nodes
     limitedPackages.forEach((pkg, index) => {
       try {
-        console.log(`📦 Processing package ${index + 1}:`, pkg)
         
         // Validate package has ID
         if (!pkg.id) {
@@ -865,19 +918,17 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             },
             data: {
               id: pkg.id,
-              label: pkg.name || pkg.id,
+              label: pkg.name || '',
               type: pkg.type,
               size: pkg.size,
               expanded: false
             }
           }
           nodes.value.push(newNode)
-          console.log(`✅ Added new package node: ${packageId}`)
           
           // Only track nodes that were actually created during this expansion
           addedChildren.add(packageId)
         } else {
-          console.log(`ℹ️ Package node already exists: ${packageId}`)
         }
         
         // Add edge to package
@@ -899,16 +950,13 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           // Track edge for collapse functionality
           addedEdges.add(edgeId)
           
-          console.log(`✅ Added package edge: ${edgeId}`)
         } else {
-          console.log(`ℹ️ Package edge already exists: ${edgeId}`)
         }
       } catch (pkgError) {
         console.error('❌ Error processing package:', pkgError, pkg)
       }
     })
     
-    console.log(`✅ Finished adding related nodes. Total nodes: ${nodes.value.length}, Total edges: ${edges.value.length}`)
     
     return { limitedRelationships, limitedPackages, addedChildren, addedEdges }
     
@@ -920,7 +968,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
 
 const collapseNode = (nodeId) => {
   try {
-    console.log('🔄 Collapsing node:', nodeId)
     
     const node = nodes.value.find(n => n.id === nodeId)
     if (!node) {
@@ -936,13 +983,11 @@ const collapseNode = (nodeId) => {
     }
     
     const { children, edges: trackedEdges } = expansionData
-    console.log(`🔄 Collapsing ${children.size} children and ${trackedEdges.size} edges`)
     
     // Remove only the tracked child nodes
     const childrenArray = Array.from(children)
     const removedNodeIds = new Set(childrenArray)
     nodes.value = nodes.value.filter(n => !removedNodeIds.has(n.id))
-    console.log(`✅ Removed ${childrenArray.length} child nodes`)
     
     // Only remove edges that connect to nodes being removed OR are specifically tracked
     // This prevents removing edges between nodes that should remain connected
@@ -958,7 +1003,6 @@ const collapseNode = (nodeId) => {
                           (connectsToRemovedNode && !isEdgeBetweenRemainingNodes(edge, removedNodeIds))
       
       if (shouldRemove) {
-        console.log(`🗑️ Removing edge: ${edgeId} (tracked: ${isTrackedEdge}, connects to removed: ${connectsToRemovedNode})`)
       }
       
       return !shouldRemove
@@ -971,7 +1015,6 @@ const collapseNode = (nodeId) => {
     expandedNodes.value.delete(nodeId)
     node.data.expanded = false
     
-    console.log('✅ Node collapsed successfully, updating graph')
     
     // Update graph
     updateGraph()
@@ -1055,7 +1098,6 @@ const toggleLayout = () => {
 
 const onEdgeClick = (event) => {
   // Handle edge click if needed
-  console.log('Edge clicked:', event)
 }
 
 const expandSelectedNode = () => {
@@ -1107,7 +1149,37 @@ const viewSelectedNodeDetails = () => {
 
 const viewPackageDetails = (packageId) => {
   // Navigate to package/file details view
-  console.log('View package details:', packageId)
+}
+
+// Node locking functions
+const lockNode = (nodeId) => {
+  if (currentLayout.value === 'Force') {
+    lockedNodes.value.add(nodeId)
+  }
+}
+
+const unlockNode = (nodeId) => {
+  lockedNodes.value.delete(nodeId)
+}
+
+const isNodeLocked = (nodeId) => {
+  return lockedNodes.value.has(nodeId)
+}
+
+const getSelectedNodeId = () => {
+  if (!selectedNodeProperties.value) return null
+  
+  // Use the nodeId stored directly in selectedNodeProperties
+  return selectedNodeProperties.value.nodeId || null
+}
+
+const unlockSelectedNode = () => {
+  const nodeId = getSelectedNodeId()
+  if (nodeId && isNodeLocked(nodeId)) {
+    unlockNode(nodeId)
+    // Refresh to update any visual indicators
+    sigmaInstance.value?.refresh()
+  }
 }
 
 // Format property value for display
@@ -1177,7 +1249,6 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
           }
         }
         
-        console.log(`🏷️ Model ${modelId} key property:`, keyProperty)
         
         if (keyProperty) {
           // Check for the key property value in record data
@@ -1185,15 +1256,15 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
           
           if (recordData[keyProperty] !== undefined && recordData[keyProperty] !== null) {
             const keyValue = String(recordData[keyProperty])
-            console.log(`🏷️ Using key property "${keyProperty}" = "${keyValue}" for record ${record.id}`)
             label = keyValue
           }
         }
       }
       
-      // Final fallback to record ID or generic label
+      // Final fallback to 'name' property, then no label
       if (!label) {
-        label = record.id || 'Record'
+        const recordData = record.value || record.properties || record.values || {}
+        label = recordData.name || '' // Use 'name' property as fallback, or empty string
       }
     }
     
@@ -1202,10 +1273,10 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
       return label.substring(0, maxLength - 3) + '...'
     }
     
-    return label || 'Record'
+    return label || 'record'
   } catch (error) {
     console.warn('Error getting record label:', error)
-    const fallback = record.display_name || record.name || record.id || 'Record'
+    const fallback = record.display_name || record.name || ''
     return fallback.length > maxLength ? fallback.substring(0, maxLength - 3) + '...' : fallback
   }
 }
@@ -1232,6 +1303,10 @@ const initializeGraph = () => {
     renderEdgeLabels: true,
     defaultNodeColor: '#7c3aed',
     defaultEdgeColor: '#d1d5db',
+    defaultNodeType: 'bordered',
+    nodeProgramClasses: {
+      bordered: NodeBorderProgram,
+    },
     minCameraRatio: 0.1,
     maxCameraRatio: 10,
     enableEdgeClickEvents: true,
@@ -1243,6 +1318,31 @@ const initializeGraph = () => {
     nodeReducer: (node, data) => {
       const res = { ...data }
       
+      // Get camera zoom ratio for dynamic sizing
+      const camera = sigmaInstance.value?.getCamera()
+      const zoomRatio = camera ? camera.ratio : 1
+      
+      // Calculate size scaling factor based on zoom
+      // When zoomed out (ratio > 1), make nodes smaller
+      // When zoomed in (ratio < 1), allow nodes to grow but cap at max size
+      const sizeFactor = Math.max(0.3, Math.min(2.0, 1 / Math.sqrt(zoomRatio)))
+      
+      // Check if this node is selected or expanded
+      const isSelected = selectedNodeProperties.value && 
+        selectedNodeProperties.value.nodeId === node
+      const isExpanded = expandedNodes.value.has(node)
+      
+      // Debug logging for visual indicators
+      if (isSelected || isExpanded) {
+      }
+      
+      
+      // Base size calculation
+      let baseSize = 8
+      if (isExpanded) {
+        baseSize = 9 // Slightly larger for expanded nodes
+      }
+      
       // Color nodes based on type and model
       if (node.startsWith('package-')) {
         res.color = packageColor.border
@@ -1251,7 +1351,7 @@ const initializeGraph = () => {
         // Limit package label length too
         const originalLabel = data.label || 'Package'
         res.label = originalLabel.length > 20 ? originalLabel.substring(0, 17) + '...' : originalLabel
-        res.size = 25 // Larger for packages
+        res.size = baseSize * sizeFactor // Scale size based on zoom
       } else {
         // Color by model using consistent assignment or fallback to hash
         const modelColor = modelColorAssignment.value.has(data.model) 
@@ -1261,12 +1361,20 @@ const initializeGraph = () => {
         res.borderColor = modelColor.border  
         res.backgroundColor = modelColor.background
         // Limit record label length
-        const originalLabel = data.label || 'Record'
+        const originalLabel = data.label || 'record'
         res.label = originalLabel.length > 20 ? originalLabel.substring(0, 17) + '...' : originalLabel
-        res.size = 15 // Smaller for records
+        res.size = baseSize * sizeFactor // Scale size based on zoom
       }
       
-      res.borderSize = 3
+      // Handle visual indicators for selection and expansion states
+      if (isSelected) {
+        // Selected nodes get a different color and are larger
+        res.color = '#FFD700' // Gold color for selection
+      } else if (isExpanded) {
+        // Expanded nodes get a green border while keeping their model color
+        res.borderColor = '#ffffff' // Green border for expanded nodes
+      }
+      
       return res
     },
     edgeReducer: (edge, data) => {
@@ -1324,11 +1432,14 @@ const initializeGraph = () => {
             }
         
         selectedNodeProperties.value = {
+          nodeId: nodeId,
           label: nodeData.label || 'Node Properties',
           properties: properties
         }
         
-        console.log('🔍 Set selectedNodeProperties:', selectedNodeProperties.value)
+        // Refresh to show selection visual indicator
+        sigmaInstance.value.refresh()
+        
       }
     }
   })
@@ -1347,6 +1458,12 @@ const initializeGraph = () => {
   
   // Add canvas drag detection
   setupCanvasDragBehavior()
+  
+  // Add camera update listener to refresh node sizes on zoom
+  sigmaInstance.value.getCamera().on('updated', () => {
+    // Trigger a refresh to recalculate node sizes based on new zoom
+    sigmaInstance.value.refresh()
+  })
 }
 
 // Setup drag behavior for nodes
@@ -1366,7 +1483,6 @@ const setupDragBehavior = () => {
     hasDraggedDistance = false
     startPosition = { x: event.event?.clientX || 0, y: event.event?.clientY || 0 }
     
-    console.log('🖱️ Started dragging node:', draggedNodeId)
   })
   
   // Mouse move - update node position during drag
@@ -1417,7 +1533,6 @@ const setupDragBehavior = () => {
   // Mouse up - end drag and re-evaluate forces
   const endDrag = () => {
     if (draggedNodeId && isDraggingNode) {
-      console.log('🖱️ Ended dragging node:', draggedNodeId, 'hasDraggedDistance:', hasDraggedDistance)
       
       // Re-enable camera
       sigmaInstance.value.getCamera().enable()
@@ -1426,6 +1541,11 @@ const setupDragBehavior = () => {
       
       // Only run force adjustment if we actually dragged
       if (hasDraggedDistance) {
+        // Lock the node if we're in Force mode and it was moved
+        if (currentLayout.value === 'Force') {
+          lockNode(draggedNodeId)
+        }
+        
         // Run a light ForceAtlas2 simulation to adjust connected nodes
         setTimeout(() => {
           applyDragAdjustment()
@@ -1451,7 +1571,6 @@ const setupDragBehavior = () => {
   // Also handle mouse leave to end drag
   sigmaInstance.value.getMouseCaptor().on('mouseleave', () => {
     if (draggedNodeId && isDraggingNode) {
-      console.log('🖱️ Mouse left container, ending drag')
       endDrag()
     }
   })
@@ -1471,7 +1590,6 @@ const setupCanvasDragBehavior = () => {
     if (!isDragging.value) {
       isCanvasDragging = true
       dragStartPosition = { x: event.x || 0, y: event.y || 0 }
-      console.log('🖱️ Started potential canvas drag')
     }
   })
   
@@ -1485,7 +1603,6 @@ const setupCanvasDragBehavior = () => {
       
       // If we've moved far enough, start continuous canvas simulation
       if (deltaX > canvasDragThreshold || deltaY > canvasDragThreshold) {
-        console.log('🎯 Canvas drag detected, starting continuous aggressive force simulation')
         isCanvasDragging = false // Prevent multiple triggers
         startCanvasForceSimulation()
       }
@@ -1495,7 +1612,6 @@ const setupCanvasDragBehavior = () => {
   // Mouse up - stop canvas force simulation
   sigmaInstance.value.getMouseCaptor().on('mouseup', () => {
     if (canvasForceRunning.value) {
-      console.log('🖱️ Canvas drag ended, stopping force simulation')
       stopCanvasForceSimulation()
     }
     isCanvasDragging = false
@@ -1505,7 +1621,6 @@ const setupCanvasDragBehavior = () => {
   // Mouse leave - also stop canvas force simulation
   sigmaInstance.value.getMouseCaptor().on('mouseleave', () => {
     if (canvasForceRunning.value) {
-      console.log('🖱️ Mouse left canvas, stopping force simulation')
       stopCanvasForceSimulation()
     }
     isCanvasDragging = false
@@ -1513,17 +1628,59 @@ const setupCanvasDragBehavior = () => {
   })
 }
 
-// Shared canvas force simulation settings for consistency
-const canvasForceSettings = {
-  gravity: 0.02, // Reduced gravity for smoother movement
-  scalingRatio: 120, // Increased repulsion for less aggressive movement
-  strongGravityMode: false,
-  barnesHutOptimize: true, // Enable optimization for smoother performance
-  barnesHutTheta: 1.2, // Slightly less accurate but smoother
-  linLogMode: false,
-  outboundAttractionDistribution: false,
-  adjustSizes: true,
-  edgeWeightInfluence: 0.3 // Reduced edge influence for gentler movement
+// Centralized force simulation settings - simplified into 3 main categories
+const forceSettings = {
+  // Standard settings - used for most interactions (canvas drag, light adjustments)
+  standard: {
+    gravity: 0.02,
+    scalingRatio: 150,
+    strongGravityMode: false,
+    barnesHutOptimize: true,
+    barnesHutTheta: 1.2,
+    linLogMode: false,
+    outboundAttractionDistribution: false,
+    adjustSizes: true,
+    edgeWeightInfluence: 0.3
+  },
+  
+  // Responsive settings - used for node expansion and background simulations
+  responsive: {
+    gravity: 0.012,
+    scalingRatio: 180,
+    strongGravityMode: false,
+    barnesHutOptimize: true,
+    barnesHutTheta: 1,
+    linLogMode: true,
+    outboundAttractionDistribution: false,
+    adjustSizes: true,
+    edgeWeightInfluence: 0.12
+  },
+  
+  // Layout settings - used for initial positioning
+  layout: {
+    expanded: {
+      gravity: 0.003,
+      scalingRatio: 1600,
+      strongGravityMode: false,
+      barnesHutOptimize: true,
+      barnesHutTheta: 1.5,
+      linLogMode: false,
+      outboundAttractionDistribution: false,
+      adjustSizes: true,
+      edgeWeightInfluence: 0.5
+    },
+    fresh: {
+      gravity: 0.006,
+      scalingRatio: 250,
+      strongGravityMode: false,
+      barnesHutOptimize: true,
+      barnesHutTheta: 1.2,
+      linLogMode: false,
+      outboundAttractionDistribution: false,
+      adjustSizes: true,
+      edgeWeightInfluence: 0.08
+    }
+  }
 }
 
 // Start continuous aggressive force simulation when canvas is dragged
@@ -1532,11 +1689,9 @@ const startCanvasForceSimulation = () => {
   
   // Don't run force simulation for non-Force layouts (Circle, Random)
   if (currentLayout.value !== 'Force') {
-    console.log('🚫 Skipping force simulation - current layout is not Force:', currentLayout.value)
     return
   }
   
-  console.log('🎬 Starting continuous aggressive canvas force simulation')
   canvasForceRunning.value = true
   
   let frameCount = 0
@@ -1550,9 +1705,28 @@ const startCanvasForceSimulation = () => {
     try {
       // Run calculations with reduced frequency for smoother movement
       if (frameCount % 2 === 0) { // Every other frame for smoother animation
+        // Store locked node positions before force simulation
+        const lockedPositions = new Map()
+        lockedNodes.value.forEach(nodeId => {
+          if (graph.value.hasNode(nodeId)) {
+            lockedPositions.set(nodeId, {
+              x: graph.value.getNodeAttribute(nodeId, 'x'),
+              y: graph.value.getNodeAttribute(nodeId, 'y')
+            })
+          }
+        })
+        
         forceAtlas2.assign(graph.value, {
           iterations: 2, // Reduced iterations for smoother movement
-          settings: canvasForceSettings
+          settings: forceSettings.standard
+        })
+        
+        // Restore locked node positions after force simulation
+        lockedPositions.forEach((position, nodeId) => {
+          if (graph.value.hasNode(nodeId)) {
+            graph.value.setNodeAttribute(nodeId, 'x', position.x)
+            graph.value.setNodeAttribute(nodeId, 'y', position.y)
+          }
         })
       }
       
@@ -1589,7 +1763,6 @@ const startCanvasForceSimulation = () => {
 // Stop continuous canvas force simulation
 const stopCanvasForceSimulation = () => {
   if (canvasForceRunning.value) {
-    console.log('⏹️ Stopping continuous canvas force simulation')
     canvasForceRunning.value = false
   }
 }
@@ -1599,40 +1772,35 @@ const applyDragAdjustment = () => {
   if (!graph.value || graph.value.order === 0) return
   
   try {
-    console.log('🔄 Applying drag adjustment with light ForceAtlas2')
     
     // Very light simulation to adjust connected nodes
     const positions = forceAtlas2(graph.value, {
       iterations: 10, // Very few iterations
       settings: {
-        gravity: 0.001, // Very low gravity
-        scalingRatio: 300, // High repulsion to push nodes apart
-        strongGravityMode: false,
-        barnesHutOptimize: true,
-        barnesHutTheta: 2.0, // Fast approximation
-        linLogMode: false,
-        outboundAttractionDistribution: false,
-        adjustSizes: true,
-        edgeWeightInfluence: 0.3 // Let edges pull connected nodes a bit
+        ...forceSettings.standard,
+        gravity: 0.001, // Very low gravity for adjustment
+        scalingRatio: 300 // High repulsion to push nodes apart
       }
     })
     
-    // Apply positions safely
+    // Apply positions safely, but skip locked nodes
     Object.entries(positions).forEach(([nodeId, position]) => {
       if (graph.value.hasNode(nodeId) && position && typeof position.x === 'number' && typeof position.y === 'number') {
-        graph.value.setNodeAttribute(nodeId, 'x', position.x)
-        graph.value.setNodeAttribute(nodeId, 'y', position.y)
-        
-        // Update our internal nodes array
-        const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
-        if (nodeIndex !== -1) {
-          nodes.value[nodeIndex].position = { x: position.x, y: position.y }
+        // Skip position updates for locked nodes
+        if (!isNodeLocked(nodeId)) {
+          graph.value.setNodeAttribute(nodeId, 'x', position.x)
+          graph.value.setNodeAttribute(nodeId, 'y', position.y)
+          
+          // Update our internal nodes array
+          const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
+          if (nodeIndex !== -1) {
+            nodes.value[nodeIndex].position = { x: position.x, y: position.y }
+          }
         }
       }
     })
     
     sigmaInstance.value.refresh()
-    console.log('✅ Drag adjustment completed')
   } catch (error) {
     console.warn('⚠️ Drag adjustment failed:', error)
   }
@@ -1642,22 +1810,11 @@ const applyDragAdjustment = () => {
 const startBackgroundForceSimulation = async () => {
   if (!graph.value || graph.value.order === 0 || forceLayoutRunning.value) return
   
-  console.log('🎬 Starting background force simulation for 1+ seconds')
   forceLayoutRunning.value = true
   
   try {
-    // Use more responsive settings for expanded graphs  
-    const settings = {
-      gravity: 0.012, // Increased gravity for more visible movement
-      scalingRatio: 180, // Balanced repulsion for fluid movement
-      strongGravityMode: false,
-      barnesHutOptimize: true, // Critical for performance
-      barnesHutTheta: 1, // Good approximation speed vs quality
-      linLogMode: false,
-      outboundAttractionDistribution: false,
-      adjustSizes: true,
-      edgeWeightInfluence: 0.12 // Increased edge influence for better connections
-    }
+    // Use responsive settings for expanded graphs
+    const settings = forceSettings.responsive
     
     const startTime = Date.now()
     const minDuration = 800 // Shorter duration for smoother feel
@@ -1674,7 +1831,6 @@ const startBackgroundForceSimulation = async () => {
       
       // Stop if we've run long enough
       if (elapsed >= maxDuration) {
-        console.log(`⏹️ Force simulation stopped after ${elapsed}ms (max duration reached)`)
         forceLayoutRunning.value = false
         return
       }
@@ -1682,6 +1838,17 @@ const startBackgroundForceSimulation = async () => {
       try {
         // Only run layout calculations every few frames for smoother animation
         if (frameCount % 3 === 0) { // Run calculations every 3rd frame (~20fps instead of 60fps)
+          // Store locked node positions before force simulation
+          const lockedPositions = new Map()
+          lockedNodes.value.forEach(nodeId => {
+            if (graph.value.hasNode(nodeId)) {
+              lockedPositions.set(nodeId, {
+                x: graph.value.getNodeAttribute(nodeId, 'x'),
+                y: graph.value.getNodeAttribute(nodeId, 'y')
+              })
+            }
+          })
+          
           // Run very small ForceAtlas2 iterations
           forceAtlas2.assign(graph.value, {
             iterations: 1, // Single iteration per calculation for smoothness
@@ -1694,17 +1861,25 @@ const startBackgroundForceSimulation = async () => {
             }
           })
           
-          // Run noverlap less frequently and with gentler settings
-          if (iterationCount % 12 === 0) { // Only every 12 iterations instead of 6
-            noverlap.assign(graph.value, {
-              maxIterations: 3, // Very few iterations for smooth animation
-              settings: {
-                margin: 35, // Slightly smaller margin for smoother convergence
-                speed: 1.5, // Slower speed for smoother animation  
-                maxMove: 50 // Much smaller moves for smoother animation
-              }
-            })
-          }
+          // Restore locked node positions after force simulation
+          lockedPositions.forEach((position, nodeId) => {
+            if (graph.value.hasNode(nodeId)) {
+              graph.value.setNodeAttribute(nodeId, 'x', position.x)
+              graph.value.setNodeAttribute(nodeId, 'y', position.y)
+            }
+          })
+          
+          // // Run noverlap less frequently and with gentler settings
+          // if (iterationCount % 12 === 0) { // Only every 12 iterations instead of 6
+          //   noverlap.assign(graph.value, {
+          //     maxIterations: 3, // Very few iterations for smooth animation
+          //     settings: {
+          //       margin: 35, // Slightly smaller margin for smoother convergence
+          //       speed: 1.5, // Slower speed for smoother animation
+          //       maxMove: 50 // Much smaller moves for smoother animation
+          //     }
+          //   })
+          // }
           
           iterationCount++
         }
@@ -1721,7 +1896,6 @@ const startBackgroundForceSimulation = async () => {
           if (shouldContinue) {
             requestAnimationFrame(animationLoop)
           } else {
-            console.log(`✅ Force simulation completed after ${elapsed}ms with ${iterationCount} iterations`)
             forceLayoutRunning.value = false
           }
         }
@@ -1756,7 +1930,6 @@ const startBackgroundForceSimulation = async () => {
 // Stop any running force simulation
 const stopBackgroundForceSimulation = () => {
   if (forceLayoutRunning.value) {
-    console.log('⏹️ Stopping background force simulation')
     forceLayoutRunning.value = false
   }
 }
@@ -1765,19 +1938,14 @@ const stopBackgroundForceSimulation = () => {
 const startDragForceAnimation = () => {
   if (!graph.value || graph.value.order === 0 || dragForceRunning.value) return
   
-  console.log('🎯 Starting continuous drag force animation')
   dragForceRunning.value = true
   
   // Very aggressive settings for immediate visible dragging response
   const dragSettings = {
+    ...forceSettings.standard,
     gravity: 0.05, // Much higher gravity for immediate visible movement
     scalingRatio: 80, // Much lower repulsion for very fluid movement
-    strongGravityMode: false,
     barnesHutOptimize: false, // Disable optimization for immediate response
-    barnesHutTheta: 1.0, // More accurate calculations
-    linLogMode: false,
-    outboundAttractionDistribution: false,
-    adjustSizes: true,
     edgeWeightInfluence: 0.4 // Very high edge influence for dramatic connected movement
   }
   
@@ -1790,11 +1958,30 @@ const startDragForceAnimation = () => {
     frameCount++
     
     try {
+      // Store locked node positions before force simulation
+      const lockedPositions = new Map()
+      lockedNodes.value.forEach(nodeId => {
+        if (graph.value.hasNode(nodeId)) {
+          lockedPositions.set(nodeId, {
+            x: graph.value.getNodeAttribute(nodeId, 'x'),
+            y: graph.value.getNodeAttribute(nodeId, 'y')
+          })
+        }
+      })
+      
       // Run calculations EVERY frame for immediate response
       // Run multiple iterations for more dramatic movement
       forceAtlas2.assign(graph.value, {
         iterations: 3, // Multiple iterations for more dramatic movement
         settings: dragSettings
+      })
+      
+      // Restore locked node positions after force simulation
+      lockedPositions.forEach((position, nodeId) => {
+        if (graph.value.hasNode(nodeId)) {
+          graph.value.setNodeAttribute(nodeId, 'x', position.x)
+          graph.value.setNodeAttribute(nodeId, 'y', position.y)
+        }
       })
       
       // Run noverlap frequently with aggressive settings
@@ -1832,7 +2019,6 @@ const startDragForceAnimation = () => {
 // Stop continuous force animation during drag
 const stopDragForceAnimation = () => {
   if (dragForceRunning.value) {
-    console.log('⏹️ Stopping continuous drag force animation')
     dragForceRunning.value = false
   }
 }
@@ -1851,13 +2037,11 @@ const updateGraph = () => {
       const mass = node.type === 'package' ? 0.5 : 1.0 // Packages are lighter
       const nodeSize = node.type === 'package' ? 35 : 25 // Match the nodeReducer sizes
       
-      console.log('📊 Adding node to graph:', node.id, 'with data:', node.data)
-      console.log('📊 Node properties:', node.data?.properties)
       
       graph.value.addNode(node.id, {
         x: node.position?.x || Math.random(),
         y: node.position?.y || Math.random(),
-        label: node.data?.label || node.id,
+        label: node.data?.label || (node.type === 'package' ? 'package' : 'record'),
         size: nodeSize,
         mass: mass,
         color: node.type === 'package' ? '#6b7280' : '#7c3aed',
@@ -1900,7 +2084,6 @@ const applyLayoutToGraph = () => {
   
   try {
     const layoutName = layoutOptions[currentLayout.value]
-    console.log('🎯 Applying layout:', layoutName, 'to', graph.value.order, 'nodes')
     
     // Skip ForceAtlas2 if we have any expanded nodes to preserve their positioning
     const hasExpandedNodes = expandedNodes.value.size > 0
@@ -1909,31 +2092,22 @@ const applyLayoutToGraph = () => {
       if (graph.value.order > 0) {
         try {
           // Use different settings based on whether we have expanded nodes
-          const settings = hasExpandedNodes ? {
-            // Lighter simulation for expanded graphs - allows movement but prevents major restructuring
-            gravity: 0.003, // Reduced gravity
-            scalingRatio: 1600, // Increased repulsion to prevent overlap
-            strongGravityMode: false,
-            barnesHutOptimize: true,
-            barnesHutTheta: 1.5,
-            linLogMode: false,
-            outboundAttractionDistribution: false,
-            adjustSizes: true,
-            edgeWeightInfluence: 0.5 // Reduced edge influence
-          } : {
-            // Full simulation for initial layouts with strong repulsion
-            gravity: 0.006, // Reduced gravity to allow spreading
-            scalingRatio: 250, // Much higher repulsion for better spacing
-            strongGravityMode: false,
-            barnesHutOptimize: true,
-            barnesHutTheta: 1.2,
-            linLogMode: false,
-            outboundAttractionDistribution: false,
-            adjustSizes: true,
-            edgeWeightInfluence: 0.08 // Moderate edge influence
-          }
+          const settings = hasExpandedNodes 
+            ? forceSettings.layout.expanded 
+            : forceSettings.layout.fresh
           
           const iterations = hasExpandedNodes ? 20 : 50 // Fewer iterations for expanded graphs
+          
+          // Store locked node positions before force simulation
+          const lockedPositions = new Map()
+          lockedNodes.value.forEach(nodeId => {
+            if (graph.value.hasNode(nodeId)) {
+              lockedPositions.set(nodeId, {
+                x: graph.value.getNodeAttribute(nodeId, 'x'),
+                y: graph.value.getNodeAttribute(nodeId, 'y')
+              })
+            }
+          })
           
           // Step 1: Apply ForceAtlas2 for force-directed positioning
           forceAtlas2.assign(graph.value, {
@@ -1941,7 +2115,14 @@ const applyLayoutToGraph = () => {
             settings
           })
           
-          console.log(`✅ ForceAtlas2 layout applied successfully (${hasExpandedNodes ? 'gentle' : 'full'} mode)`)
+          // Restore locked node positions after force simulation
+          lockedPositions.forEach((position, nodeId) => {
+            if (graph.value.hasNode(nodeId)) {
+              graph.value.setNodeAttribute(nodeId, 'x', position.x)
+              graph.value.setNodeAttribute(nodeId, 'y', position.y)
+            }
+          })
+          
           
           // Step 2: Apply noverlap to prevent node overlaps
           noverlap.assign(graph.value, {
@@ -1953,7 +2134,6 @@ const applyLayoutToGraph = () => {
             }
           })
           
-          console.log(`✅ Noverlap anti-collision applied successfully`)
         } catch (forceError) {
           console.warn('⚠️ ForceAtlas2 failed, falling back to circular:', forceError)
           circular.assign(graph.value)
@@ -1967,33 +2147,53 @@ const applyLayoutToGraph = () => {
       // Manual circular positioning to avoid NaN issues with graphology circular layout
       let nodeIndex = 0
       graph.value.forEachNode((nodeId) => {
-        const angle = (nodeIndex / nodeCount) * 2 * Math.PI
-        const x = Math.cos(angle) * radius
-        const y = Math.sin(angle) * radius
-        
-        graph.value.setNodeAttribute(nodeId, 'x', x)
-        graph.value.setNodeAttribute(nodeId, 'y', y)
-        
-        // Update our internal nodes array
-        const internalNodeIndex = nodes.value.findIndex(n => n.id === nodeId)
-        if (internalNodeIndex !== -1) {
-          nodes.value[internalNodeIndex].position = { x, y }
+        // Skip position updates for locked nodes
+        if (!isNodeLocked(nodeId)) {
+          const angle = (nodeIndex / nodeCount) * 2 * Math.PI
+          const x = Math.cos(angle) * radius
+          const y = Math.sin(angle) * radius
+          
+          graph.value.setNodeAttribute(nodeId, 'x', x)
+          graph.value.setNodeAttribute(nodeId, 'y', y)
+          
+          // Update our internal nodes array
+          const internalNodeIndex = nodes.value.findIndex(n => n.id === nodeId)
+          if (internalNodeIndex !== -1) {
+            nodes.value[internalNodeIndex].position = { x, y }
+          }
         }
         
         nodeIndex++
       })
       
-      console.log('✅ Circular layout applied with', nodeCount, 'nodes, radius:', radius)
       
       // Ensure camera shows the circular layout
       if (sigmaInstance.value) {
         const camera = sigmaInstance.value.getCamera()
-        console.log('📷 Resetting camera to show circular layout')
         camera.animatedReset({ duration: 300 })
       }
     } else if (layoutName === 'random') {
+      // Store locked node positions before applying random layout
+      const lockedPositions = new Map()
+      lockedNodes.value.forEach(nodeId => {
+        if (graph.value.hasNode(nodeId)) {
+          lockedPositions.set(nodeId, {
+            x: graph.value.getNodeAttribute(nodeId, 'x'),
+            y: graph.value.getNodeAttribute(nodeId, 'y')
+          })
+        }
+      })
+      
       random.assign(graph.value)
-      console.log('✅ Random layout applied')
+      
+      // Restore locked node positions after random layout
+      lockedPositions.forEach((position, nodeId) => {
+        if (graph.value.hasNode(nodeId)) {
+          graph.value.setNodeAttribute(nodeId, 'x', position.x)
+          graph.value.setNodeAttribute(nodeId, 'y', position.y)
+        }
+      })
+      
     }
     
     if (sigmaInstance.value) {
@@ -2017,8 +2217,6 @@ const applyLayoutToGraph = () => {
 // Lifecycle
 onMounted(async () => {
   // Debug props
-  console.log('🔧 GraphExplorer props:', props)
-  console.log('🔧 DatasetId:', props.datasetId)
   console.log('🔧 OrgId:', props.orgId)
   console.log('🔧 Route params:', route.params)
   
@@ -2050,6 +2248,7 @@ const restoreStateFromStore = () => {
   try {
     // Restore query filters
     queryFilters.value = graphStore.currentQueryFilters
+    recordLimit.value = graphStore.currentRecordLimit
     
     // Restore graph data
     nodes.value = graphStore.currentNodes
@@ -2075,6 +2274,7 @@ const restoreStateFromStore = () => {
       nodes: nodes.value.length,
       edges: edges.value.length,
       queryFilters: queryFilters.value.length,
+      recordLimit: recordLimit.value,
       expandedNodes: expandedNodes.value.size
     })
     
@@ -2093,6 +2293,7 @@ const restoreStateFromStore = () => {
 const saveStateToStore = () => {
   try {
     graphStore.updateQueryFilters(queryFilters.value)
+    graphStore.updateRecordLimit(recordLimit.value)
     graphStore.updateGraphData(nodes.value, edges.value, {
       nodeCount: nodeCount.value,
       edgeCount: edgeCount.value
@@ -2125,25 +2326,56 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 @use '@/styles/theme' as theme;
 
+.btn-add-filter {
+  background: none;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_3;
+    color: theme.$purple_3;
+  }
+}
+
 .graph-explorer {
-  display: flex;
-  flex-direction: column;
   height: 100%;
   min-height: calc(100vh - 85px);
-  background: theme.$gray_1;
+
+   //Stage actions styling
+  .stage-actions {
+    padding: 0 16px;
+    .stage-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: theme.$gray_6;
+      margin: 0 0 4px 0;
+    }
+
+    .stage-actions-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+  }
   
   .query-section {
     background: theme.$white;
     border-bottom: 1px solid theme.$gray_2;
     padding: 20px;
+    transition: all 0.3s ease;
+    
+    &.collapsed {
+      padding: 0;
+      height: 0;
+      overflow: hidden;
+      border-bottom: none;
+    }
     
     .query-builder {
-      h3 {
-        font-size: 18px;
-        font-weight: 600;
-        color: theme.$gray_6;
-        margin: 0 0 16px 0;
-      }
       
       .query-row {
         margin-bottom: 12px;
@@ -2153,13 +2385,66 @@ onUnmounted(() => {
         }
       }
       
-      .query-actions {
+      .filter-actions {
         display: flex;
         gap: 12px;
         align-items: center;
+        justify-content: space-between;
         margin-top: 16px;
-        padding-top: 0px;
-        //border-top: 2px solid theme.$gray_2;
+        padding-top: 8px;
+      }
+    }
+  }
+  
+  // Shared styles for buttons and selectors
+  .collapse-btn {
+    background: none;
+    border: 1px solid theme.$gray_3;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: theme.$gray_5;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: 120px;
+
+    &:hover {
+      background: theme.$gray_1;
+      border-color: theme.$gray_3;
+      color: theme.$purple_3;
+    }
+
+    &:focus {
+      background: theme.$white;
+
+    }
+  }
+  
+  .limit-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .limit-label {
+      font-size: 14px;
+      color: theme.$gray_5;
+      font-weight: 500;
+    }
+    
+    .limit-select {
+      border: 1px solid theme.$gray_3;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+      color: theme.$gray_6;
+      min-width: 80px;
+      
+      &:focus {
+        outline: none;
+        border-color: theme.$purple_3;
       }
     }
   }
@@ -2327,7 +2612,7 @@ onUnmounted(() => {
   .graph-container {
     flex: 1;
     position: relative;
-    background: theme.$gray_1;
+    background: theme.$purple_tint;
     display: flex;
     flex-direction: column;
     min-height: 400px; // Ensure minimum height for sigma
@@ -2343,8 +2628,8 @@ onUnmounted(() => {
       bottom: 0;
       left: 0;
       right: 0;
-      background: theme.$purple_tint;
-      border-top: 1px solid theme.$purple_0_7;
+      background: theme.$white;
+      border-top: 1px solid theme.$gray_2;
       z-index: 1000;
       display: flex;
       align-items: center;
@@ -2392,6 +2677,23 @@ onUnmounted(() => {
         gap: 8px;
         flex-shrink: 0;
         
+        .unlock-btn {
+          background: theme.$orange_2;
+          color: theme.$white;
+          border: none;
+          border-radius: 4px;
+          padding: 6px 12px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          margin-right: 8px;
+          
+          &:hover {
+            background: theme.$orange_1;
+          }
+        }
+        
         .view-details-btn {
           background: theme.$purple_2;
           color: theme.$white;
@@ -2428,8 +2730,7 @@ onUnmounted(() => {
   }
   
   .record-details-container {
-    // Remove default drawer padding and let RecordSpecViewer handle its own layout
-    margin: -24px;
+
     height: calc(100vh - 120px); // Full height minus header space
     overflow: hidden;
     
