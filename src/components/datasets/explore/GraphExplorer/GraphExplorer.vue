@@ -408,7 +408,6 @@ const executeQuery = async () => {
   
   loading.value = true
   try {
-    console.log('🔍 Executing queries with filters:', queryFilters.value)
     
     // Group filters by model for optimization
     const filtersByModel = new Map()
@@ -422,7 +421,6 @@ const executeQuery = async () => {
         filtersByModel.get(filter.model).push(filter)
       })
     
-    console.log(`🔍 Grouped ${queryFilters.value.length} filters into ${filtersByModel.size} unique models`)
     
     // Prepare query promises - one per unique model
     const queryPromises = Array.from(filtersByModel.entries()).map(async ([modelId, filters]) => {
@@ -449,17 +447,14 @@ const executeQuery = async () => {
           if (combinedFilters.length === 1) {
             // Single filter - use it directly
             options.filter = combinedFilters[0]
-            console.log('🔍 Query with single filter:', modelId, combinedFilters[0])
           } else {
             // Multiple filters - combine with OR logic for broader results
             options.filter = {
               operator: 'or',
               filters: combinedFilters
             }
-            console.log(`🔍 Query with ${combinedFilters.length} combined filters (OR logic):`, modelId, combinedFilters)
           }
         } else {
-          console.log(`🔍 Query without filter (first ${recordLimit.value} records):`, modelId)
         }
         
         const response = await metadataStore.fetchRecords(props.datasetId, modelId, options)
@@ -497,8 +492,6 @@ const executeQuery = async () => {
       }
     })
     
-    console.log(`📊 Query optimization: ${totalOriginalFilters} filters → ${totalApiCalls} API calls`)
-    console.log(`📊 Query complete: ${allRecords.length} total records from ${totalApiCalls} optimized queries`)
     
     if (errorCount > 0) {
       ElMessage.warning(`${errorCount} queries failed, showing results from successful queries`)
@@ -565,7 +558,6 @@ const parseValue = (value, operator, propertyName, modelProperties) => {
 }
 
 const displayQueryResults = (records) => {
-  console.log('📊 Displaying query results:', records)
   
   // Clear existing data
   nodes.value = []
@@ -586,14 +578,12 @@ const displayQueryResults = (records) => {
   const uniqueModelIds = [...new Set(records.map(r => r.model_id).filter(id => id))]
   modelColorAssignment.value = createModelColorAssignment(uniqueModelIds)
   displayedModels.value = uniqueModelIds
-  console.log('🎨 Created color assignment for', uniqueModelIds.length, 'unique models')
   
   // Create nodes for each record in a grid layout
   const gridSize = Math.ceil(Math.sqrt(records.length))
   const spacing = 150 // Space between grid positions
   
   records.forEach((record, index) => {
-    console.log(`📊 Creating node for record ${index}:`, record)
     
     const nodeId = `record-${record.id}`
     const row = Math.floor(index / gridSize)
@@ -602,7 +592,6 @@ const displayQueryResults = (records) => {
     // The actual properties are in the 'value' field from the API response
     const properties = record.value || record.properties || record.values || {}
     
-    console.log(`📊 Extracted properties from record.value:`, properties, 'Keys:', Object.keys(properties))
     
     const node = {
       id: nodeId,
@@ -621,12 +610,9 @@ const displayQueryResults = (records) => {
       }
     }
     
-    console.log(`📊 Created node:`, node)
-    console.log(`📊 Node data properties:`, node.data.properties)
     nodes.value.push(node)
   })
   
-  console.log(`📊 Total nodes created: ${nodes.value.length}`)
   
   // Update the graph
   updateGraph()
@@ -641,10 +627,8 @@ const displayQueryResults = (records) => {
 
 const expandNode = async (nodeId) => {
   try {
-    console.log('🔄 Expanding node:', nodeId)
     
     if (expandedNodes.value.has(nodeId)) {
-      console.log('🔄 Node already expanded, collapsing instead')
       collapseNode(nodeId)
       return
     }
@@ -656,22 +640,16 @@ const expandNode = async (nodeId) => {
       return
     }
     
-    console.log('🔄 Found node for expansion:', node)
     
     loading.value = true
     
     // Fetch relationships for this record
-    console.log('🔗 Fetching relationships for record:', node.data.id)
     const relationships = await fetchRecordRelationships(node.data.id)
-    console.log('🔗 Fetched relationships:', relationships)
     
     // Fetch packages for this record
-    console.log('📦 Fetching packages for record:', node.data.id)
     const packages = await fetchRecordPackages(node.data.id)
-    console.log('📦 Fetched packages:', packages)
     
     // Add new nodes and edges
-    console.log('➕ Adding related nodes and edges')
     const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
     
     // Track expansion for proper collapse behavior
@@ -684,7 +662,6 @@ const expandNode = async (nodeId) => {
     expandedNodes.value.add(nodeId)
     node.data.expanded = true
     
-    console.log('✅ Node expansion complete, updating graph')
     
     // Update the graph display
     updateGraph()
@@ -711,7 +688,6 @@ const fetchRecordRelationships = async (recordId) => {
   try {
     // Use the metadata store method
     const relationships = await metadataStore.fetchRecordRelationships(props.datasetId, recordId)
-    console.log('🔗 Raw relationships response:', relationships)
     
     // Handle different response structures
     if (Array.isArray(relationships)) {
@@ -733,11 +709,8 @@ const fetchRecordRelationships = async (recordId) => {
           direction: 'outbound'
         })) : [])
       ]
-      console.log('🔗 Combined inbound + outbound relationships:', allRelationships)
       // Debug the structure of individual relationships
       if (allRelationships.length > 0) {
-        console.log('🔗 Sample relationship object:', allRelationships[0])
-        console.log('🔗 Relationship keys:', Object.keys(allRelationships[0]))
       }
       return allRelationships
     } else {
@@ -754,7 +727,6 @@ const fetchRecordPackages = async (recordId) => {
   try {
     // Use the metadata store method
     const packages = await metadataStore.fetchRecordPackages(props.datasetId, recordId)
-    console.log('📦 Raw packages response:', packages)
     
     // Handle different response structures
     if (Array.isArray(packages)) {
@@ -776,8 +748,6 @@ const fetchRecordPackages = async (recordId) => {
 const addRelatedNodes = (parentNode, relationships, packages) => {
   try {
     const parentId = parentNode.id
-    console.log(`➕ Adding related nodes for parent: ${parentId}`)
-    console.log(`➕ Processing ${relationships.length} relationships and ${packages.length} packages`)
     
     // Get current position of parent node from Sigma graph
     const currentParentAttrs = graph.value.getNodeAttributes(parentId)
@@ -785,7 +755,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
       x: currentParentAttrs.x || parentNode.position.x,
       y: currentParentAttrs.y || parentNode.position.y
     }
-    console.log(`📍 Parent current position:`, currentParentPosition)
     
     // Track new models found during expansion for legend updates
     const newModelIds = new Set()
@@ -811,13 +780,11 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
         limitedPackages = packages.slice(0, maxAdditionalNodes - relationships.length)
       }
       
-      console.log(`⚠️ Node expansion capped at ${maxAdditionalNodes} nodes. Using ${limitedRelationships.length} relationships and ${limitedPackages.length} packages`)
     }
     
     // Add relationship nodes with direction-aware edges
     limitedRelationships.forEach((rel, index) => {
       try {
-        console.log(`🔗 Processing relationship ${index + 1}:`, rel)
         
         // Extract the related record information
         const relatedRecord = rel.record || {}
@@ -856,7 +823,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             }
           }
           nodes.value.push(newNode)
-          console.log(`✅ Added new relationship node: ${targetId}`)
           
           // Track new model for color assignment and legend
           if (relatedRecord.model_id && !modelColorAssignment.value.has(relatedRecord.model_id)) {
@@ -867,7 +833,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           addedChildren.add(targetId)
         } else {
           nodeExists = true
-          console.log(`ℹ️ Relationship node already exists: ${targetId}, creating edge to existing node`)
         }
         
         // Create edge with direction-based coloring (always create edge, even to existing nodes)
@@ -899,9 +864,7 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           // Track edge for collapse functionality
           addedEdges.add(edgeId)
           
-          console.log(`✅ Added relationship edge: ${edgeId} ${nodeExists ? '(to existing node)' : '(to new node)'}`)
         } else {
-          console.log(`ℹ️ Relationship edge already exists: ${edgeId}`)
         }
       } catch (relError) {
         console.error('❌ Error processing relationship:', relError, rel)
@@ -910,7 +873,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
     
     // Update color assignments for new models
     if (newModelIds.size > 0) {
-      console.log(`🎨 Found ${newModelIds.size} new models during expansion:`, [...newModelIds])
       
       // Get all current model IDs including new ones
       const allModelIds = [...new Set([...displayedModels.value, ...newModelIds])]
@@ -928,13 +890,11 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
       modelColorAssignment.value = newColorAssignment
       displayedModels.value = allModelIds
       
-      console.log(`🎨 Updated color assignments for ${allModelIds.length} total models`)
     }
     
     // Add package nodes
     limitedPackages.forEach((pkg, index) => {
       try {
-        console.log(`📦 Processing package ${index + 1}:`, pkg)
         
         // Validate package has ID
         if (!pkg.id) {
@@ -965,12 +925,10 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             }
           }
           nodes.value.push(newNode)
-          console.log(`✅ Added new package node: ${packageId}`)
           
           // Only track nodes that were actually created during this expansion
           addedChildren.add(packageId)
         } else {
-          console.log(`ℹ️ Package node already exists: ${packageId}`)
         }
         
         // Add edge to package
@@ -992,16 +950,13 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
           // Track edge for collapse functionality
           addedEdges.add(edgeId)
           
-          console.log(`✅ Added package edge: ${edgeId}`)
         } else {
-          console.log(`ℹ️ Package edge already exists: ${edgeId}`)
         }
       } catch (pkgError) {
         console.error('❌ Error processing package:', pkgError, pkg)
       }
     })
     
-    console.log(`✅ Finished adding related nodes. Total nodes: ${nodes.value.length}, Total edges: ${edges.value.length}`)
     
     return { limitedRelationships, limitedPackages, addedChildren, addedEdges }
     
@@ -1013,7 +968,6 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
 
 const collapseNode = (nodeId) => {
   try {
-    console.log('🔄 Collapsing node:', nodeId)
     
     const node = nodes.value.find(n => n.id === nodeId)
     if (!node) {
@@ -1029,13 +983,11 @@ const collapseNode = (nodeId) => {
     }
     
     const { children, edges: trackedEdges } = expansionData
-    console.log(`🔄 Collapsing ${children.size} children and ${trackedEdges.size} edges`)
     
     // Remove only the tracked child nodes
     const childrenArray = Array.from(children)
     const removedNodeIds = new Set(childrenArray)
     nodes.value = nodes.value.filter(n => !removedNodeIds.has(n.id))
-    console.log(`✅ Removed ${childrenArray.length} child nodes`)
     
     // Only remove edges that connect to nodes being removed OR are specifically tracked
     // This prevents removing edges between nodes that should remain connected
@@ -1051,7 +1003,6 @@ const collapseNode = (nodeId) => {
                           (connectsToRemovedNode && !isEdgeBetweenRemainingNodes(edge, removedNodeIds))
       
       if (shouldRemove) {
-        console.log(`🗑️ Removing edge: ${edgeId} (tracked: ${isTrackedEdge}, connects to removed: ${connectsToRemovedNode})`)
       }
       
       return !shouldRemove
@@ -1064,7 +1015,6 @@ const collapseNode = (nodeId) => {
     expandedNodes.value.delete(nodeId)
     node.data.expanded = false
     
-    console.log('✅ Node collapsed successfully, updating graph')
     
     // Update graph
     updateGraph()
@@ -1148,7 +1098,6 @@ const toggleLayout = () => {
 
 const onEdgeClick = (event) => {
   // Handle edge click if needed
-  console.log('Edge clicked:', event)
 }
 
 const expandSelectedNode = () => {
@@ -1200,20 +1149,17 @@ const viewSelectedNodeDetails = () => {
 
 const viewPackageDetails = (packageId) => {
   // Navigate to package/file details view
-  console.log('View package details:', packageId)
 }
 
 // Node locking functions
 const lockNode = (nodeId) => {
   if (currentLayout.value === 'Force') {
     lockedNodes.value.add(nodeId)
-    console.log('🔒 Locked node:', nodeId)
   }
 }
 
 const unlockNode = (nodeId) => {
   lockedNodes.value.delete(nodeId)
-  console.log('🔓 Unlocked node:', nodeId)
 }
 
 const isNodeLocked = (nodeId) => {
@@ -1303,7 +1249,6 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
           }
         }
         
-        console.log(`🏷️ Model ${modelId} key property:`, keyProperty)
         
         if (keyProperty) {
           // Check for the key property value in record data
@@ -1311,7 +1256,6 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
           
           if (recordData[keyProperty] !== undefined && recordData[keyProperty] !== null) {
             const keyValue = String(recordData[keyProperty])
-            console.log(`🏷️ Using key property "${keyProperty}" = "${keyValue}" for record ${record.id}`)
             label = keyValue
           }
         }
@@ -1390,7 +1334,6 @@ const initializeGraph = () => {
       
       // Debug logging for visual indicators
       if (isSelected || isExpanded) {
-        console.log(`🎨 Node ${node}: selected=${isSelected}, expanded=${isExpanded}`)
       }
       
       
@@ -1497,7 +1440,6 @@ const initializeGraph = () => {
         // Refresh to show selection visual indicator
         sigmaInstance.value.refresh()
         
-        console.log('🔍 Set selectedNodeProperties:', selectedNodeProperties.value)
       }
     }
   })
@@ -1541,7 +1483,6 @@ const setupDragBehavior = () => {
     hasDraggedDistance = false
     startPosition = { x: event.event?.clientX || 0, y: event.event?.clientY || 0 }
     
-    console.log('🖱️ Started dragging node:', draggedNodeId)
   })
   
   // Mouse move - update node position during drag
@@ -1592,7 +1533,6 @@ const setupDragBehavior = () => {
   // Mouse up - end drag and re-evaluate forces
   const endDrag = () => {
     if (draggedNodeId && isDraggingNode) {
-      console.log('🖱️ Ended dragging node:', draggedNodeId, 'hasDraggedDistance:', hasDraggedDistance)
       
       // Re-enable camera
       sigmaInstance.value.getCamera().enable()
@@ -1631,7 +1571,6 @@ const setupDragBehavior = () => {
   // Also handle mouse leave to end drag
   sigmaInstance.value.getMouseCaptor().on('mouseleave', () => {
     if (draggedNodeId && isDraggingNode) {
-      console.log('🖱️ Mouse left container, ending drag')
       endDrag()
     }
   })
@@ -1651,7 +1590,6 @@ const setupCanvasDragBehavior = () => {
     if (!isDragging.value) {
       isCanvasDragging = true
       dragStartPosition = { x: event.x || 0, y: event.y || 0 }
-      console.log('🖱️ Started potential canvas drag')
     }
   })
   
@@ -1665,7 +1603,6 @@ const setupCanvasDragBehavior = () => {
       
       // If we've moved far enough, start continuous canvas simulation
       if (deltaX > canvasDragThreshold || deltaY > canvasDragThreshold) {
-        console.log('🎯 Canvas drag detected, starting continuous aggressive force simulation')
         isCanvasDragging = false // Prevent multiple triggers
         startCanvasForceSimulation()
       }
@@ -1675,7 +1612,6 @@ const setupCanvasDragBehavior = () => {
   // Mouse up - stop canvas force simulation
   sigmaInstance.value.getMouseCaptor().on('mouseup', () => {
     if (canvasForceRunning.value) {
-      console.log('🖱️ Canvas drag ended, stopping force simulation')
       stopCanvasForceSimulation()
     }
     isCanvasDragging = false
@@ -1685,7 +1621,6 @@ const setupCanvasDragBehavior = () => {
   // Mouse leave - also stop canvas force simulation
   sigmaInstance.value.getMouseCaptor().on('mouseleave', () => {
     if (canvasForceRunning.value) {
-      console.log('🖱️ Mouse left canvas, stopping force simulation')
       stopCanvasForceSimulation()
     }
     isCanvasDragging = false
@@ -1754,11 +1689,9 @@ const startCanvasForceSimulation = () => {
   
   // Don't run force simulation for non-Force layouts (Circle, Random)
   if (currentLayout.value !== 'Force') {
-    console.log('🚫 Skipping force simulation - current layout is not Force:', currentLayout.value)
     return
   }
   
-  console.log('🎬 Starting continuous aggressive canvas force simulation')
   canvasForceRunning.value = true
   
   let frameCount = 0
@@ -1830,7 +1763,6 @@ const startCanvasForceSimulation = () => {
 // Stop continuous canvas force simulation
 const stopCanvasForceSimulation = () => {
   if (canvasForceRunning.value) {
-    console.log('⏹️ Stopping continuous canvas force simulation')
     canvasForceRunning.value = false
   }
 }
@@ -1840,7 +1772,6 @@ const applyDragAdjustment = () => {
   if (!graph.value || graph.value.order === 0) return
   
   try {
-    console.log('🔄 Applying drag adjustment with light ForceAtlas2')
     
     // Very light simulation to adjust connected nodes
     const positions = forceAtlas2(graph.value, {
@@ -1870,7 +1801,6 @@ const applyDragAdjustment = () => {
     })
     
     sigmaInstance.value.refresh()
-    console.log('✅ Drag adjustment completed')
   } catch (error) {
     console.warn('⚠️ Drag adjustment failed:', error)
   }
@@ -1880,7 +1810,6 @@ const applyDragAdjustment = () => {
 const startBackgroundForceSimulation = async () => {
   if (!graph.value || graph.value.order === 0 || forceLayoutRunning.value) return
   
-  console.log('🎬 Starting background force simulation for 1+ seconds')
   forceLayoutRunning.value = true
   
   try {
@@ -1902,7 +1831,6 @@ const startBackgroundForceSimulation = async () => {
       
       // Stop if we've run long enough
       if (elapsed >= maxDuration) {
-        console.log(`⏹️ Force simulation stopped after ${elapsed}ms (max duration reached)`)
         forceLayoutRunning.value = false
         return
       }
@@ -1968,7 +1896,6 @@ const startBackgroundForceSimulation = async () => {
           if (shouldContinue) {
             requestAnimationFrame(animationLoop)
           } else {
-            console.log(`✅ Force simulation completed after ${elapsed}ms with ${iterationCount} iterations`)
             forceLayoutRunning.value = false
           }
         }
@@ -2003,7 +1930,6 @@ const startBackgroundForceSimulation = async () => {
 // Stop any running force simulation
 const stopBackgroundForceSimulation = () => {
   if (forceLayoutRunning.value) {
-    console.log('⏹️ Stopping background force simulation')
     forceLayoutRunning.value = false
   }
 }
@@ -2012,7 +1938,6 @@ const stopBackgroundForceSimulation = () => {
 const startDragForceAnimation = () => {
   if (!graph.value || graph.value.order === 0 || dragForceRunning.value) return
   
-  console.log('🎯 Starting continuous drag force animation')
   dragForceRunning.value = true
   
   // Very aggressive settings for immediate visible dragging response
@@ -2094,7 +2019,6 @@ const startDragForceAnimation = () => {
 // Stop continuous force animation during drag
 const stopDragForceAnimation = () => {
   if (dragForceRunning.value) {
-    console.log('⏹️ Stopping continuous drag force animation')
     dragForceRunning.value = false
   }
 }
@@ -2113,8 +2037,6 @@ const updateGraph = () => {
       const mass = node.type === 'package' ? 0.5 : 1.0 // Packages are lighter
       const nodeSize = node.type === 'package' ? 35 : 25 // Match the nodeReducer sizes
       
-      console.log('📊 Adding node to graph:', node.id, 'with data:', node.data)
-      console.log('📊 Node properties:', node.data?.properties)
       
       graph.value.addNode(node.id, {
         x: node.position?.x || Math.random(),
@@ -2162,7 +2084,6 @@ const applyLayoutToGraph = () => {
   
   try {
     const layoutName = layoutOptions[currentLayout.value]
-    console.log('🎯 Applying layout:', layoutName, 'to', graph.value.order, 'nodes')
     
     // Skip ForceAtlas2 if we have any expanded nodes to preserve their positioning
     const hasExpandedNodes = expandedNodes.value.size > 0
@@ -2202,7 +2123,6 @@ const applyLayoutToGraph = () => {
             }
           })
           
-          console.log(`✅ ForceAtlas2 layout applied successfully (${hasExpandedNodes ? 'gentle' : 'full'} mode)`)
           
           // Step 2: Apply noverlap to prevent node overlaps
           noverlap.assign(graph.value, {
@@ -2214,7 +2134,6 @@ const applyLayoutToGraph = () => {
             }
           })
           
-          console.log(`✅ Noverlap anti-collision applied successfully`)
         } catch (forceError) {
           console.warn('⚠️ ForceAtlas2 failed, falling back to circular:', forceError)
           circular.assign(graph.value)
@@ -2247,12 +2166,10 @@ const applyLayoutToGraph = () => {
         nodeIndex++
       })
       
-      console.log('✅ Circular layout applied with', nodeCount, 'nodes, radius:', radius)
       
       // Ensure camera shows the circular layout
       if (sigmaInstance.value) {
         const camera = sigmaInstance.value.getCamera()
-        console.log('📷 Resetting camera to show circular layout')
         camera.animatedReset({ duration: 300 })
       }
     } else if (layoutName === 'random') {
@@ -2277,7 +2194,6 @@ const applyLayoutToGraph = () => {
         }
       })
       
-      console.log('✅ Random layout applied')
     }
     
     if (sigmaInstance.value) {
@@ -2301,8 +2217,6 @@ const applyLayoutToGraph = () => {
 // Lifecycle
 onMounted(async () => {
   // Debug props
-  console.log('🔧 GraphExplorer props:', props)
-  console.log('🔧 DatasetId:', props.datasetId)
   console.log('🔧 OrgId:', props.orgId)
   console.log('🔧 Route params:', route.params)
   
