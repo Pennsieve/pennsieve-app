@@ -2,7 +2,7 @@
   <div>
     <el-dialog
       :modelValue="dialogVisible"
-      @update:modelValue="dialogVisible = $event"
+      @update:modelValue="$emit('update:dialogVisible', $event)"
       data-cy="bfMoveDialog"
       class="bf-move-dialog"
       :show-close="false"
@@ -23,8 +23,8 @@
           <div class="content-wrap">
             <bf-file-label
               v-for="file in moveConflict.display"
-              :key="folder.content.id"
-              :file="folder"
+              :key="file?.content?.id"
+              :file="file"
               :interactive="false"
             />
           </div>
@@ -51,7 +51,7 @@
             >
               <bf-file-label
                 v-for="folder in folders"
-                :key="folder.content.id"
+                :key="folder?.content?.id"
                 :file="folder"
                 @click-name="onFolderNameClick(folder)"
               />
@@ -265,8 +265,8 @@ export default {
      */
     scrollTopFiles: function () {
       this.$nextTick(() => {
-        const filesList = this.$refs.filesList;
-        filesList.scrollTop = 0;
+        const foldersList = this.$refs.foldersList;
+        foldersList.scrollTop = 0;
       });
     },
 
@@ -310,13 +310,13 @@ export default {
       )
         ? "packages"
         : "datasets";
-      const id = pathOr("", ["content", "id"], destination);
+      const destinationId = pathOr("", ["content", "id"], destination);
 
       useGetToken()
         .then((token) => {
-          const url = `${this.config.apiUrl}/${baseUrl}/${id}?api_key=${token}&includeAncestors=true`;
+          const url = `${this.config.apiUrl}/${baseUrl}/${destinationId}?api_key=${token}&includeAncestors=true`;
           const currentFolderId = pathOr("", ["content", "id"], this.folder);
-          if (id !== currentFolderId) {
+          if (destinationId !== currentFolderId) {
             return this.fetchFiles(url);
           } else {
             return Promise.resolve();

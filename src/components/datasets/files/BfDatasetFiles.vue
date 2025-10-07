@@ -140,9 +140,9 @@
 
     <bf-move-dialog
       ref="moveDialog"
-      :dialog-visible="moveDialogVisible"
+      v-model:dialog-visible="moveDialogVisible"
       :file="file"
-      :move-conflict.sync="moveConflict"
+      v-model:move-conflict="moveConflict"
       :selected-files="selectedFiles"
       @rename-conflicts="onRenameConflicts"
       @completeMove="moveItems"
@@ -881,6 +881,7 @@ export default {
           files: failures,
           destination: propOr(null, "destination", response),
         };
+        this.moveDialogVisible = true;
       }
     },
 
@@ -893,10 +894,8 @@ export default {
       // Rename each file with proposed new name
       const promises = files.map((obj) => {
         const id = propOr("", "id", obj);
-
-        useGetToken().then((token) => {
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -906,10 +905,10 @@ export default {
         });
       });
       Promise.all(promises).then((response) => {
-        // Move files again, now with new name
-        this.moveItems(destination, response);
+        this.moveItems(destination, this.moveConflict.display);
 
         // Reset
+        this.moveDialogVisible = false;
         this.moveConflict = {};
       });
     },
