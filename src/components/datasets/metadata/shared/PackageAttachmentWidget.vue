@@ -47,8 +47,15 @@ const previewSelectedPackage = (packageData) => {
 }
 
 const confirmAttachment = async () => {
-  if (!selectedPackage.value) {
+  if (!selectedPackage.value || !activeAttachment.value) {
     return
+  }
+
+  // Store attachment info before it gets cleared
+  const attachmentInfo = {
+    datasetId: activeAttachment.value.datasetId,
+    modelId: activeAttachment.value.modelId,
+    recordId: activeAttachment.value.recordId
   }
 
   loading.value = true
@@ -56,14 +63,14 @@ const confirmAttachment = async () => {
     await metadataStore.completePackageAttachment(selectedPackage.value.id)
     ElMessage.success('File attached to record successfully')
     
-    // Navigate back to the source record
+    // Navigate back to the source record using stored info
     router.push({
       name: 'record-details',
       params: {
         orgId: router.currentRoute.value.params.orgId,
-        datasetId: activeAttachment.value.datasetId,
-        modelId: activeAttachment.value.modelId,
-        recordId: activeAttachment.value.recordId
+        datasetId: attachmentInfo.datasetId,
+        modelId: attachmentInfo.modelId,
+        recordId: attachmentInfo.recordId
       }
     })
   } catch (error) {

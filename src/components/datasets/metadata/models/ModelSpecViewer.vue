@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, defineComponent, h, onMounted } from 'vue'
-import { ElCard, ElTag, ElTooltip, ElMessage, ElSelect, ElOption, ElButtonGroup, ElButton } from 'element-plus'
+import { ElCard, ElTag, ElTooltip, ElMessage, ElSelect, ElOption, ElButtonGroup, ElButton, ElDialog, ElRadio, ElRadioGroup, ElInput } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
@@ -18,6 +18,11 @@ import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 import IconEyeball from '@/components/icons/IconEyeball.vue'
 import ViewToggle from "@/components/shared/ViewToggle/ViewToggle.vue";
+import IconAddItem from "@/components/icons/IconAddItem.vue";
+import IconPencil from "@/components/icons/IconPencil.vue";
+import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
+import IconPlus from "@/components/icons/IconPlus.vue";
+import IconTrash from "@/components/icons/IconTrash.vue";
 
 const props = defineProps({
   datasetId: {
@@ -191,6 +196,21 @@ const handleMetadataUpdated = async () => {
 
 // Template creation dialog state
 const showTemplateDialog = ref(false)
+
+// Archive all records dialog state
+const showArchiveDialog = ref(false)
+const archiveVersionScope = ref('all') // 'all' or 'specific'
+const archiveVersionNumber = ref(null) // Custom version number input
+const archiveLoading = ref(false)
+
+// Computed property to get available version numbers for validation
+const availableVersionNumbers = computed(() => {
+  if (!availableVersions.value) return []
+  return availableVersions.value
+    .map(v => parseInt(v.value))
+    .filter(v => !isNaN(v) && v !== 'latest')
+    .sort((a, b) => a - b)
+})
 
 const handleSaveAsTemplate = () => {
   if (!modelData.value) {
@@ -374,6 +394,70 @@ const fetchTemplateData = async () => {
 const handleTemplateVersionChange = (version) => {
   selectedTemplateVersion.value = version
   fetchTemplateVersion(version)
+}
+
+// Archive all records functionality
+const handleArchiveAllRecords = () => {
+  if (!props.modelId) {
+    console.warn('No model ID available for archiving')
+    return
+  }
+  
+  showArchiveDialog.value = true
+}
+
+const confirmArchive = async () => {
+  if (!props.modelId || !props.datasetId) {
+    ElMessage.error('Missing required parameters for archiving')
+    return
+  }
+  
+  // Validate custom version input if needed
+  if (archiveVersionScope.value === 'custom') {
+    const versionNumber = parseInt(archiveVersionNumber.value)
+    if (!archiveVersionNumber.value || versionNumber < 1) {
+      ElMessage.error('Please enter a valid version number (1 or greater)')
+      return
+    }
+    
+    // Check if the version exists for this model
+    if (!availableVersionNumbers.value.includes(versionNumber)) {
+      const availableVersionsList = availableVersionNumbers.value.join(', ')
+      ElMessage.error(`Version ${versionNumber} does not exist for this model. Available versions: ${availableVersionsList}`)
+      return
+    }
+  }
+  
+  archiveLoading.value = true
+  
+  try {
+    let version = null
+    
+    // Determine which version to use based on scope
+    if (archiveVersionScope.value === 'current') {
+      version = selectedVersion.value
+    } else if (archiveVersionScope.value === 'custom') {
+      version = parseInt(archiveVersionNumber.value)
+    }
+    // For 'all', version remains null
+    
+    await metadataStore.archiveAllRecords(props.datasetId, props.modelId, version)
+    
+    ElMessage.success('All records have been successfully archived')
+    showArchiveDialog.value = false
+    
+    // Optionally refresh the model data or navigate away
+  } catch (error) {
+    console.error('Error archiving all records:', error)
+    ElMessage.error('Failed to archive records. Please try again.')
+  } finally {
+    archiveLoading.value = false
+  }
+}
+
+const cancelArchive = () => {
+  showArchiveDialog.value = false
+  archiveVersionScope.value = 'all'
 }
 
 onMounted(async () => {
@@ -844,15 +928,31 @@ const PropertyTree = defineComponent({
                 </bf-button>
                 
                 <bf-button @click="goToCreateRecord" class="dropdown-button">
+                  <template #prefix>
+                    <IconPlus class="mr-8" :height="16" :width="16" />
+                  </template>
                   Create Record
                 </bf-button>
                 
                 <bf-button @click="createNewVersion" class="dropdown-button">
+                  <template #prefix>
+                    <IconPencil class="mr-8" :height="16" :width="16" />
+                  </template>
                   Draft New Version
                 </bf-button>
                 
                 <bf-button @click="handleSaveAsTemplate" class="dropdown-button">
+                  <template #prefix>
+                    <IconAddTemplate class="mr-8" :height="16" :width="16" />
+                  </template>
                   Save as Template
+                </bf-button>
+                
+                <bf-button @click="handleArchiveAllRecords" class="red dropdown-button" >
+                  <template #prefix>
+                    <IconTrash class="mr-8" :height="16" :width="16" />
+                  </template>
+                  Archive All Records
                 </bf-button>
               </template>
             </ps-button-dropdown>
@@ -886,10 +986,11 @@ const PropertyTree = defineComponent({
       <div class="model-content">
         <!-- Model metadata -->
         <ModelMetadata
-          :model-data="modelData"
+          :model-data="effectiveModelData"
           :dataset-id="datasetId"
           :model-id="modelId"
           :model="model"
+          :is-template="isTemplate"
           @metadata-updated="handleMetadataUpdated"
         />
         
@@ -917,10 +1018,11 @@ const PropertyTree = defineComponent({
       <div class="model-content">
         <!-- Model metadata -->
         <ModelMetadata
-          :model-data="modelData"
+          :model-data="effectiveModelData"
           :dataset-id="datasetId"
           :model-id="modelId"
           :model="model"
+          :is-template="isTemplate"
           @metadata-updated="handleMetadataUpdated"
         />
         
@@ -1081,6 +1183,75 @@ const PropertyTree = defineComponent({
       :organization-id="orgId"
       @template-created="handleTemplateCreated"
     />
+
+    <!-- Archive All Records Confirmation Dialog -->
+    <el-dialog
+      v-model="showArchiveDialog"
+      title="Archive All Records"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="archive-dialog-content">
+        <p><strong>⚠️ Warning:</strong> This action will permanently archive all records for this model. This action cannot be undone.</p>
+        
+        <div class="version-scope-section">
+          <h4>Archive Scope</h4>
+          <el-radio-group v-model="archiveVersionScope">
+            <el-radio value="all">Archive records from all versions</el-radio>
+            <el-radio value="current" v-if="selectedVersion && selectedVersion !== 'latest'">
+              Archive records only from current version ({{ selectedVersion }})
+            </el-radio>
+            <el-radio value="custom">Archive records from a specific version</el-radio>
+          </el-radio-group>
+          
+          <!-- Custom version input -->
+          <div v-if="archiveVersionScope === 'custom'" class="custom-version-input">
+            <label class="version-input-label">Version number:</label>
+            <div class="version-input-section">
+              <el-input
+                v-model="archiveVersionNumber"
+                type="number"
+                placeholder="Enter version number (e.g., 1, 2, 3...)"
+                size="small"
+                style="width: 200px"
+                :min="1"
+              />
+              <div v-if="availableVersionNumbers.length > 0" class="available-versions-hint">
+                Available versions: {{ availableVersionNumbers.join(', ') }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <p class="confirmation-text">
+          Are you sure you want to proceed with archiving
+          <strong>{{ 
+            archiveVersionScope === 'all' 
+              ? 'all records' 
+              : archiveVersionScope === 'current' 
+                ? `records from version ${selectedVersion}` 
+                : `records from version ${archiveVersionNumber}`
+          }}</strong>
+          for this model?
+        </p>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <bf-button @click="cancelArchive" :disabled="archiveLoading">
+            Cancel
+          </bf-button>
+          <bf-button 
+            type="danger" 
+            @click="confirmArchive" 
+            :loading="archiveLoading"
+            :disabled="archiveLoading"
+          >
+            {{ archiveLoading ? 'Archiving...' : 'Archive All Records' }}
+          </bf-button>
+        </div>
+      </template>
+    </el-dialog>
   </bf-stage>
 </template>
 
@@ -1088,6 +1259,8 @@ const PropertyTree = defineComponent({
 @use '../../../../styles/theme' as theme;
 @use '../../../../styles/element/tag';
 @use '../../../../styles/element/button';
+@use '../../../../styles/element/input';
+
 
 
 .model-spec-viewer {
@@ -1137,9 +1310,6 @@ const PropertyTree = defineComponent({
     color: theme.$gray_6;
   }
 
-  .view-controls {
-    // ViewToggle component handles its own styling
-  }
 }
 
 .view-mode-tabs {
@@ -1558,6 +1728,78 @@ const PropertyTree = defineComponent({
       border: 1px solid #e4e7ed;
     }
   }
+}
+
+// Archive dialog styling
+.archive-dialog-content {
+  .version-scope-section {
+    margin: 20px 0;
+    
+    h4 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: theme.$gray_6;
+    }
+    
+    :deep(.el-radio-group) {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
+      
+      .el-radio {
+        margin-right: 0;
+        
+        .el-radio__label {
+          font-size: 14px;
+          color: theme.$gray_6;
+          text-align: left;
+        }
+      }
+    }
+    
+    .custom-version-input {
+      margin-top: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      
+      .version-input-label {
+        margin-right: 4px;
+        font-size: 14px;
+        color: theme.$gray_6;
+        margin-top: 6px; // Align with input field
+      }
+      
+      .version-input-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        
+        .available-versions-hint {
+          font-size: 12px;
+          color: theme.$gray_5;
+          font-style: italic;
+        }
+      }
+    }
+  }
+  
+  .confirmation-text {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: theme.$gray_1;
+    border-left: 4px solid theme.$orange_2;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 </style>

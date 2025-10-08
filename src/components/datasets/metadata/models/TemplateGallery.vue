@@ -264,7 +264,7 @@
     >
       <div class="name-review-dialog">
         <div class="dialog-description">
-          <p>Review and edit the model names before creation. Names have been automatically cleaned to remove "template" text.</p>
+          <p>Review and edit the model names before creation.</p>
         </div>
         
         <div class="templates-list">
