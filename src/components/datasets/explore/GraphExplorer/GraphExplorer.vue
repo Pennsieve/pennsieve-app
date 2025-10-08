@@ -10,10 +10,10 @@
 
         </template>
         <template #right>
-          <div class="stage-actions-right">
+          <template v-if="quickActionsVisible">
             <!-- Search Button -->
             <bf-button
-              class="primary"
+              class="mr-8 flex"
               :disabled="!canExecuteQuery"
               @click="executeQuery"
             >
@@ -27,7 +27,7 @@
 
             <!-- Clear All Button -->
             <bf-button
-              class="secondary"
+              class="secondary mr-8"
               @click="clearAllQueries"
             >
               Clear All
@@ -41,7 +41,44 @@
               <span v-if="isQuerySectionCollapsed">Show Filters</span>
               <span v-else>Hide Filters</span>
             </bf-button>
-          </div>
+          </template>
+<!--          <ps-button-dropdown-->
+<!--            @click="toggleActionDropdown"-->
+<!--            :menu-open="!quickActionsVisible"-->
+<!--          >-->
+<!--            <template #buttons>-->
+<!--              &lt;!&ndash; Search Button &ndash;&gt;-->
+<!--              <bf-button-->
+<!--                class="dropdown-button primary"-->
+<!--                :disabled="!canExecuteQuery"-->
+<!--                @click="executeQuery"-->
+<!--              >-->
+<!--                <template v-if="loading">-->
+<!--                  <i class="el-icon-loading"></i> Searching...-->
+<!--                </template>-->
+<!--                <template v-else>-->
+<!--                  <i class="el-icon-search"></i> Search-->
+<!--                </template>-->
+<!--              </bf-button>-->
+
+<!--              &lt;!&ndash; Clear All Button &ndash;&gt;-->
+<!--              <bf-button-->
+<!--                class="dropdown-button secondary"-->
+<!--                @click="clearAllQueries"-->
+<!--              >-->
+<!--                Clear All-->
+<!--              </bf-button>-->
+<!--              -->
+<!--              &lt;!&ndash; Collapse Button &ndash;&gt;-->
+<!--              <bf-button-->
+<!--                class="dropdown-button collapse-btn"-->
+<!--                @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"-->
+<!--              >-->
+<!--                <span v-if="isQuerySectionCollapsed">Show Filters</span>-->
+<!--                <span v-else>Hide Filters</span>-->
+<!--              </bf-button>-->
+<!--            </template>-->
+<!--          </ps-button-dropdown>-->
         </template>
       </stage-actions>
     </template>
@@ -211,15 +248,25 @@
       </div>
     </div>
 
-    <!-- Record Details Panel -->
+    <!-- Details Panel - Records or Packages -->
     <el-drawer
       v-model="showDetailsPanel"
-      title='Record Details'
+      :title="isSelectedNodePackage ? 'File Details' : 'Record Details'"
       direction="rtl"
       size="50%"
     >
-      <div v-if="selectedRecord" class="record-details-container">
+      <div v-if="selectedRecord" class="details-container">
+        <!-- Show FileDetails for package nodes -->
+        <FileDetails
+          v-if="isSelectedNodePackage"
+          :datasetId="props.datasetId"
+          :fileId="selectedRecord.package?.node_id || selectedRecord.id"
+          :no-padding="true"
+          :key="selectedRecord.package?.node_id || selectedRecord.id"
+        />
+        <!-- Show RecordSpecViewer for record nodes -->
         <RecordSpecViewer
+          v-else-if="!isSelectedNodePackage && selectedRecord.model && selectedRecord.id"
           :datasetId="props.datasetId"
           :modelId="selectedRecord.model"
           :recordId="selectedRecord.id"
@@ -252,6 +299,8 @@ import IconSizeToFit from '@/components/icons/IconSizeToFit.vue'
 import IconCenter from '@/components/icons/IconCenter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import RecordSpecViewer from '@/components/datasets/metadata/models/RecordSpecViewer.vue'
+import FileDetails from '@/components/datasets/files/FileDetails/FileDetails.vue'
+import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 
 // Props
 const props = defineProps({
@@ -283,6 +332,7 @@ const nodeCount = ref(0)
 const edgeCount = ref(0)
 const recordLimit = ref(50) // Default to 50 records per model
 const isQuerySectionCollapsed = ref(false) // Track query section collapse state
+const quickActionsVisible = ref(true) // Track if actions are shown inline or in dropdown
 const models = computed(() => {
   // Models in store have structure: [{ model: { id, name, display_name, ... } }]
   return (metadataStore.models || [])
@@ -320,6 +370,51 @@ const canExecuteQuery = computed(() => {
   // At least one filter must have a model selected
   // Filters can be executed with just model (no property/operator/value required)
   return queryFilters.value.some(filter => filter.model)
+})
+
+const isSelectedNodePackage = computed(() => {
+  if (!selectedRecord.value) return false
+  
+  console.log('🔍 Checking if selected node is package:', selectedRecord.value)
+  
+  // First check the nodeType which is now preserved from our node structure
+  console.log('📦 Node nodeType:', selectedRecord.value.nodeType)
+  if (selectedRecord.value.nodeType === 'package') {
+    console.log('✅ Detected package by nodeType field')
+    return true
+  }
+  
+  // Fallback: Node ID starts with 'package-'
+  const nodeId = selectedRecord.value.nodeId || selectedRecord.value.id
+  console.log('📦 Node ID:', nodeId)
+  if (typeof nodeId === 'string' && nodeId.startsWith('package-')) {
+    console.log('✅ Detected package by ID pattern')
+    return true
+  }
+  
+  // Fallback: Node has type field set to 'package' (from the data)
+  console.log('📦 Node type:', selectedRecord.value.type)
+  if (selectedRecord.value.type === 'package') {
+    console.log('✅ Detected package by type field')
+    return true
+  }
+  
+  // Fallback: Node lacks model field (packages don't have models, records do)
+  // AND has properties typical of packages
+  console.log('📦 Node model:', selectedRecord.value.model)
+  console.log('📦 Node size:', selectedRecord.value.size)
+  console.log('📦 Node name:', selectedRecord.value.name)
+  if (!selectedRecord.value.model && (
+    selectedRecord.value.size !== undefined || 
+    selectedRecord.value.name !== undefined ||
+    selectedRecord.value.type !== undefined
+  )) {
+    console.log('✅ Detected package by missing model + package properties')
+    return true
+  }
+  
+  console.log('❌ Not detected as package')
+  return false
 })
 
 // Methods
@@ -725,22 +820,28 @@ const fetchRecordRelationships = async (recordId) => {
 
 const fetchRecordPackages = async (recordId) => {
   try {
+    console.log('🔍 Fetching packages for record:', recordId)
     // Use the metadata store method
     const packages = await metadataStore.fetchRecordPackages(props.datasetId, recordId)
     
+    console.log('📦 Raw packages response:', packages)
+    
     // Handle different response structures
     if (Array.isArray(packages)) {
+      console.log('✅ Found packages (array):', packages.length)
       return packages
     } else if (packages && Array.isArray(packages.packages)) {
+      console.log('✅ Found packages (nested):', packages.packages.length)
       return packages.packages
     } else if (packages && Array.isArray(packages.data)) {
+      console.log('✅ Found packages (data):', packages.data.length)
       return packages.data
     } else {
-      console.warn('Unexpected packages structure:', packages)
+      console.warn('⚠️ Unexpected packages structure:', packages)
       return []
     }
   } catch (error) {
-    console.error('Error fetching packages:', error)
+    console.error('❌ Error fetching packages:', error)
     return []
   }
 }
@@ -896,13 +997,16 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
     limitedPackages.forEach((pkg, index) => {
       try {
         
+        // Handle nested package structure from API response
+        const packageData = pkg.package || pkg
+        
         // Validate package has ID
-        if (!pkg.id) {
+        if (!packageData.id) {
           console.warn('⚠️ Skipping package with no ID:', pkg)
           return
         }
         
-        const packageId = `package-${pkg.id}`
+        const packageId = `package-${packageData.id}`
         
         if (!nodes.value.find(n => n.id === packageId)) {
           // Position packages closer to parent using current position
@@ -917,13 +1021,19 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
               y: currentParentPosition.y + Math.sin(packageAngle) * packageRadius
             },
             data: {
-              id: pkg.id,
-              label: pkg.name || '',
-              type: pkg.type,
-              size: pkg.size,
-              expanded: false
+              id: packageData.id,
+              label: packageData.name || '',
+              type: packageData.type,
+              size: packageData.size,
+              expanded: false,
+              // Store the complete package data for API calls
+              package: packageData
             }
           }
+          console.log('📦 Creating package node:', packageId)
+          console.log('📦 Package data being stored:', packageData)
+          console.log('📦 newNode.data.package:', newNode.data.package)
+          console.log('📦 newNode.data.package.node_id:', newNode.data.package?.node_id)
           nodes.value.push(newNode)
           
           // Only track nodes that were actually created during this expansion
@@ -1075,6 +1185,10 @@ const clearAllQueries = () => {
   }
 }
 
+const toggleActionDropdown = () => {
+  quickActionsVisible.value = !quickActionsVisible.value
+}
+
 const fitView = () => {
   if (sigmaInstance.value && graph.value.order > 0) {
     const camera = sigmaInstance.value.getCamera()
@@ -1139,7 +1253,11 @@ const viewSelectedNodeDetails = () => {
     })
     
     if (matchingNode) {
-      selectedRecord.value = matchingNode.data
+      // Preserve node type information just like in the Ctrl+Click handler
+      selectedRecord.value = {
+        ...matchingNode.data,
+        nodeType: matchingNode.type // Preserve the node type
+      }
       showDetailsPanel.value = true
       // Close the properties bar
       selectedNodeProperties.value = null
@@ -1398,17 +1516,57 @@ const initializeGraph = () => {
   
   // Add click handlers
   sigmaInstance.value.on('clickNode', (event) => {
+    console.log('🖱️ Node clicked! isDragging:', isDragging.value)
     if (!isDragging.value) {
       // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
       // The modifier keys are in event.event.original (PointerEvent)
       const originalEvent = event.event?.original
       const hasModifier = originalEvent?.ctrlKey || originalEvent?.metaKey
+      console.log('🔑 Modifier key check - hasModifier:', hasModifier, 'ctrlKey:', originalEvent?.ctrlKey, 'metaKey:', originalEvent?.metaKey)
       
       if (hasModifier) {
         // Modifier + click = open sidebar
         const nodeId = event.node
-        const nodeData = graph.value.getNodeAttributes(nodeId)
-        selectedRecord.value = nodeData
+        const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+        
+        console.log('🔍 Node click debug:')
+        console.log('   - Clicked nodeId:', nodeId, typeof nodeId)
+        console.log('   - Available node IDs:', nodes.value.map(n => n.id))
+        console.log('   - Node attributes:', nodeAttributes)
+        
+        // Find the full node data from our nodes array
+        // Try exact match first, then try package ID pattern match
+        let fullNodeData = nodes.value.find(n => n.id === nodeId)
+        
+        if (!fullNodeData && typeof nodeId === 'number') {
+          // Try to find package node by numeric ID
+          fullNodeData = nodes.value.find(n => n.id === `package-${nodeId}`)
+          console.log('   - Tried package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
+        }
+        
+        if (!fullNodeData && typeof nodeId === 'string') {
+          // Try to extract numeric ID and find package
+          const numericId = nodeId.replace('package-', '')
+          if (numericId !== nodeId) {
+            fullNodeData = nodes.value.find(n => n.id === `package-${numericId}`)
+            console.log('   - Tried reverse package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
+          }
+        }
+        
+        console.log('   - Final fullNodeData:', fullNodeData)
+        console.log('   - fullNodeData.data:', fullNodeData?.data)
+        console.log('   - fullNodeData.data.package:', fullNodeData?.data?.package)
+        
+        // Use the full node data if available, otherwise fall back to attributes
+        selectedRecord.value = fullNodeData ? { 
+          ...nodeAttributes, 
+          ...fullNodeData.data,
+          nodeType: fullNodeData.type // Preserve the node type
+        } : nodeAttributes
+        
+        console.log('   - Final selectedRecord:', selectedRecord.value)
+        console.log('   - selectedRecord.package:', selectedRecord.value?.package)
+        
         showDetailsPanel.value = true
       } else {
         // Regular click = show banner with node properties
@@ -2216,16 +2374,12 @@ const applyLayoutToGraph = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Debug props
-  console.log('🔧 OrgId:', props.orgId)
-  console.log('🔧 Route params:', route.params)
   
   // Initialize store for this dataset
   graphStore.setCurrentDataset(props.datasetId)
   
   // Check if we have existing state to restore
   if (graphStore.hasGraphData) {
-    console.log('🔄 Restoring state from store')
     restoreStateFromStore()
   }
   
@@ -2236,7 +2390,6 @@ onMounted(async () => {
   // Load models for this dataset
   try {
     await metadataStore.fetchModels(props.datasetId)
-    console.log('Models loaded:', models.value)
   } catch (error) {
     console.error('Error loading models:', error)
     ElMessage.error('Failed to load models')
@@ -2270,13 +2423,6 @@ const restoreStateFromStore = () => {
     selectedNodeProperties.value = graphStore.currentSelectedNodeProperties
     showDetailsPanel.value = graphStore.currentShowDetailsPanel
     
-    console.log('✅ State restored from store', {
-      nodes: nodes.value.length,
-      edges: edges.value.length,
-      queryFilters: queryFilters.value.length,
-      recordLimit: recordLimit.value,
-      expandedNodes: expandedNodes.value.size
-    })
     
     // Update graph if we have data
     if (nodes.value.length > 0) {
@@ -2303,7 +2449,6 @@ const saveStateToStore = () => {
     graphStore.updateModelData(displayedModels.value, modelColorAssignment.value)
     graphStore.updateSelection(selectedRecord.value, selectedNodeProperties.value, showDetailsPanel.value)
     
-    console.log('💾 State saved to store')
   } catch (error) {
     console.warn('Failed to save state to store:', error)
   }
@@ -2325,6 +2470,7 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 @use '@/styles/theme' as theme;
+@use "@/styles/spacing";
 
 .btn-add-filter {
   background: none;
@@ -2729,13 +2875,26 @@ onUnmounted(() => {
     }
   }
   
-  .record-details-container {
-
+  .details-container {
     height: calc(100vh - 120px); // Full height minus header space
     overflow: hidden;
     
     // Ensure RecordSpecViewer fills the entire drawer
     :deep(.record-spec-viewer) {
+      height: 100%;
+      
+      .bf-stage {
+        height: 100%;
+        
+        .bf-stage-content {
+          height: 100%;
+          padding: 0;
+        }
+      }
+    }
+    
+    // Ensure FileDetails fills the entire drawer
+    :deep(.file-details) {
       height: 100%;
       
       .bf-stage {

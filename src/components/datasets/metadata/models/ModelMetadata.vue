@@ -81,7 +81,7 @@
       </div>
     </el-descriptions-item>
     
-    <el-descriptions-item label="Model ID">
+    <el-descriptions-item :label="isTemplate ? 'Template ID' : 'Model ID'">
       <div class="editable-field">
         <span style="font-family: Monaco, monospace; font-size: 12px;">{{ modelData.id }}</span>
         <el-button 
@@ -89,7 +89,7 @@
           type="text" 
           size="small" 
           class="edit-btn" 
-          title="Copy Model ID"
+          :title="isTemplate ? 'Copy Template ID' : 'Copy Model ID'"
         >
           <IconCopyDocument />
         </el-button>
@@ -130,6 +130,10 @@ const props = defineProps({
   model: {
     type: Object,
     default: null
+  },
+  isTemplate: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -215,14 +219,15 @@ const saveDescription = async () => {
   }
 }
 
-// Copy Model ID to clipboard
+// Copy Model/Template ID to clipboard
 const copyModelId = async () => {
+  const idType = props.isTemplate ? 'Template ID' : 'Model ID'
   try {
     await navigator.clipboard.writeText(props.modelData.id)
-    ElMessage.success('Model ID copied to clipboard')
+    ElMessage.success(`${idType} copied to clipboard`)
   } catch (error) {
-    console.error('Failed to copy model ID:', error)
-    ElMessage.error('Failed to copy model ID to clipboard')
+    console.error(`Failed to copy ${idType.toLowerCase()}:`, error)
+    ElMessage.error(`Failed to copy ${idType.toLowerCase()} to clipboard`)
   }
 }
 </script>

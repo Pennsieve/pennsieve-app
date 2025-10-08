@@ -12,6 +12,8 @@ import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
+import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
+import IconTrash from "@/components/icons/IconTrash.vue";
 
 const props = defineProps({
   datasetId: {
@@ -42,6 +44,9 @@ const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
 const packages = ref([])
+
+// Dropdown state
+const quickActionsVisible = ref(true)
 
 // Pagination state
 const inboundCurrentPage = ref(1)
@@ -455,6 +460,64 @@ const deletePackage = async (packageItem) => {
   }
 }
 
+// Toggle action dropdown
+const toggleActionDropdown = () => {
+  quickActionsVisible.value = !quickActionsVisible.value
+}
+
+// Delete (archive) the record
+const deleteRecord = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete this record? This action cannot be undone.`,
+      'Delete Record',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+        center: true,
+        lockScroll: true,
+        closeOnClickModal: false,
+        closeOnPressEscape: true,
+        showClose: true,
+        beforeClose: null,
+        distinguishCancelAndClose: true,
+        roundButton: false
+      }
+    )
+
+    loading.value = true
+
+    // Use the metadataStore to delete the record
+    const response = await metadataStore.deleteRecord(props.datasetId, props.modelId, props.recordId)
+
+    if (response.status === 'success') {
+      ElMessage.success('Record deleted successfully')
+      
+      // Navigate back to records list
+      router.push({
+        name: 'model-records-search',
+        params: {
+          orgId: router.currentRoute.value.params.orgId,
+          datasetId: props.datasetId,
+          modelId: props.modelId
+        }
+      })
+    } else {
+      throw new Error('Failed to delete record')
+    }
+  } catch (action) {
+    if (action === 'cancel' || action === 'close') {
+      // User cancelled or closed dialog
+      return
+    }
+    console.error('Error deleting record:', action)
+    ElMessage.error(`Failed to delete record: ${action.message || 'Unknown error'}`)
+  } finally {
+    loading.value = false
+  }
+}
+
 // Delete relationship from record
 const deleteRelationship = async (relationship, direction) => {
   const isOutbound = direction === 'outbound'
@@ -537,12 +600,39 @@ onMounted(async () => {
 <!--          </bf-button>-->
         </template>
         <template #right>
-          <bf-button @click="goToUpdateRecord" size="small">
-            <template #prefix>
-              <IconPencil class="mr-8" :height="16" :width="16" />
+          <template v-if="quickActionsVisible">
+            <bf-button @click="goToUpdateRecord" size="small" class="mr-8">
+              <template #prefix>
+                <IconPencil class="mr-8" :height="16" :width="16" />
+              </template>
+              Update Record
+            </bf-button>
+
+          </template>
+          
+          <ps-button-dropdown
+            @click="toggleActionDropdown"
+            :menu-open="!quickActionsVisible"
+          >
+            <template #buttons>
+              <bf-button @click="goToUpdateRecord" size="small" class="dropdown-button">
+                <template #prefix>
+                  <IconPencil class="mr-8" :height="16" :width="16" />
+                </template>
+                Update Record
+              </bf-button>
+              
+              <bf-button
+                @click="deleteRecord"
+                class="red dropdown-button"
+              >
+                <template #prefix>
+                  <IconTrash class="mr-8" :height="16" :width="16" />
+                </template>
+                Delete Record
+              </bf-button>
             </template>
-            Update Record
-          </bf-button>
+          </ps-button-dropdown>
         </template>
       </stage-actions>
     </template>
@@ -835,6 +925,9 @@ onMounted(async () => {
 @use '../../../../styles/element/dialog';
 @use '../../../../styles/element/tag';
 
+.dropdown-button {
+  margin: 4px 0;
+}
 
 .record-spec-viewer {
   .loading-state,
@@ -1573,6 +1666,15 @@ onMounted(async () => {
         }
       }
     }
+  }
+
+  // Utility classes for spacing
+  .ml-8 {
+    margin-left: 8px;
+  }
+
+  .mr-8 {
+    margin-right: 8px;
   }
 }
 </style>

@@ -84,7 +84,6 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
       
       const key = `graphExplorer_${datasetId}`
       localStorage.setItem(key, JSON.stringify(stateToSave))
-      console.log('💾 Graph state saved for dataset:', datasetId)
     } catch (error) {
       console.warn('Failed to save graph state to localStorage:', error)
     }
@@ -107,7 +106,6 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
         return null
       }
       
-      console.log('🔄 Loaded graph state for dataset:', datasetId)
       return state
     } catch (error) {
       console.warn('Failed to load graph state from localStorage:', error)
@@ -121,7 +119,6 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
   const clearStateFromStorage = (datasetId) => {
     const key = `graphExplorer_${datasetId}`
     localStorage.removeItem(key)
-    console.log('🗑️ Cleared graph state for dataset:', datasetId)
   }
   
   // Update current dataset state
@@ -208,8 +205,6 @@ export const useGraphExplorerStore = defineStore('graphExplorer', () => {
         localStorage.removeItem(key)
       }
     }
-    
-    console.log('🗑️ Cleared all graph explorer states')
   }
   
   // Computed getters for current state

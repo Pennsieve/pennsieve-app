@@ -1075,6 +1075,76 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Delete (archive) a record
+    const deleteRecord = async (datasetId, modelId, recordId) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
+            const token = await useGetToken()
+            const queryParams = toQueryParams({ 
+                dataset_id: datasetId,
+                force: true 
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to delete record: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error deleting record:', error)
+            throw error
+        }
+    }
+
+    // Archive all records for a model
+    const archiveAllRecords = async (datasetId, modelId, version = null) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records`
+            const token = await useGetToken()
+            
+            const queryParams = {
+                dataset_id: datasetId
+            }
+            
+            // Only add version if specified (for specific version archival)
+            if (version !== null) {
+                queryParams.version = version
+            }
+            
+            const url = `${endpoint}?${toQueryParams(queryParams)}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'DELETE',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                return await resp.json()
+            } else {
+                const errorText = await resp.text()
+                throw new Error(`Failed to archive all records: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error archiving all records:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -1124,7 +1194,9 @@ export const useMetadataStore = defineStore('metadata', () => {
         fetchRecordPackages,
         fetchRecordRelationships,
         deletePackageFromRecord,
-        deleteRelationship
+        deleteRelationship,
+        deleteRecord,
+        archiveAllRecords
 
 
     }

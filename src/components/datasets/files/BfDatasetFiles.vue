@@ -102,7 +102,7 @@
                   <IconTrash class="mr-8" :height="20" :width="20" />
                 </template>
 
-                Restore
+                Restore Files
               </bf-button>
             </template>
           </ps-button-dropdown>
