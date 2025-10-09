@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :modelValue="dialogVisible"
-    @update:modelValue="dialogVisible = $event"
+    @update:modelValue="$emit('update:dialogVisible', $event)"
     data-cy="bfPackageDialog"
     class="bf-package-dialog"
     :show-close="false"

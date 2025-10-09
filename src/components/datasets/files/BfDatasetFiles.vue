@@ -141,7 +141,6 @@
     <bf-move-dialog
       ref="moveDialog"
       v-model:dialog-visible="moveDialogVisible"
-      :file="file"
       v-model:move-conflict="moveConflict"
       :selected-files="selectedFiles"
       @rename-conflicts="onRenameConflicts"
@@ -150,7 +149,7 @@
     />
 
     <RenameFileDialog
-      :dialog-visible="renameDialogVisible"
+      v-model:dialog-visible="renameDialogVisible"
       :files="files"
       :file="selectedFileForAction"
       @file-renamed="onFileRenamed"
@@ -828,7 +827,7 @@ export default {
     showMove: function () {
       this.moveDialogVisible = true;
       const moveDialog = this.$refs.moveDialog;
-      moveDialog.folder = this.file;
+      moveDialog.currentFolder = this.file;
     },
     onCloseMoveDialog: function () {
       this.moveDialogVisible = false;

@@ -97,15 +97,12 @@ import EventBus from "../../../../utils/event-bus";
 
 import {
   propOr,
-  path,
   pathOr,
   pathEq,
   equals,
   filter,
-  find,
   isNil,
   propEq,
-  defaultTo,
 } from "ramda";
 import { mapGetters } from "vuex";
 import IconArrowLeft from "../../../icons/IconArrowLeft.vue";
@@ -144,9 +141,9 @@ export default {
   data: function () {
     return {
       sortedFiles: [],
-      folder: {},
+      currentFolder: {},
       isLoading: false,
-      destination: {},
+      sourceFolderId: ""
     };
   },
 
@@ -166,7 +163,7 @@ export default {
      * @returns {String}
      */
     fileName: function () {
-      let fName = pathOr("", ["content", "name"], this.folder);
+      let fName = pathOr("", ["content", "name"], this.currentFolder);
       if (this.isAtDataset) {
         fName = "Files";
       }
@@ -184,14 +181,9 @@ export default {
      */
     dialogTitle: function () {
       let itemLabel = "Conflicts";
-
       if (this.selectedFiles.length) {
-        const destination = defaultTo(
-          {},
-          pathOr(path(["content"], this.folder), ["content"], this.destination)
-        );
+        const destination = pathOr({}, ["content"], this.currentFolder);
         const destinationName = propOr("", "name", destination);
-
         itemLabel = `Move to ${destinationName}`;
 
         if (propEq("packageType", "DataSet")(destination)) {
@@ -206,7 +198,7 @@ export default {
      * Compute if viewing at the dataset level
      */
     isAtDataset: function () {
-      const folderId = pathOr("", ["content", "id"], this.folder);
+      const folderId = pathOr("", ["content", "id"], this.currentFolder);
       const datasetId = pathOr("", ["content", "id"], this.dataset);
       return equals(folderId, datasetId);
     },
@@ -229,18 +221,19 @@ export default {
      * On dialog open
      */
     onOpenDialog: function () {
-      const children = propOr([], "children", this.folder);
+      const children = propOr([], "children", this.currentFolder);
       if (!children.length) {
         return;
       }
       const baseUrl = pathEq(
         ["content", "packageType"],
         "Collection",
-        this.folder
+        this.currentFolder
       )
         ? "packages"
         : "datasets";
-      const id = pathOr("", ["content", "id"], this.folder);
+      const id = pathOr("", ["content", "id"], this.currentFolder);
+      this.setSourceFolderId(this.currentFolder);
 
       useGetToken()
         .then((token) => {
@@ -251,11 +244,20 @@ export default {
     },
 
     /**
+     * Sets the source folder Id where the move is initiated
+     */
+    setSourceFolderId: function (sourceFolder) {
+      // Create a deep copy of the sourceFolder
+      const sourceFolderCopy = JSON.parse(JSON.stringify(sourceFolder));
+      
+      this.sourceFolderId = pathOr("", ["content", "id"], sourceFolderCopy);
+    },
+
+    /**
      * Closes the dialog
      */
     closeDialog: function () {
-      this.folder = {};
-      this.destination = {};
+      this.currentFolder = {};
       this.$emit("update:moveConflict", {});
       this.$emit("close");
     },
@@ -284,11 +286,6 @@ export default {
      * @param {Object} folder
      */
      onFolderNameClick: function (folder) {
-      if (this.destination === folder) {
-        this.destination = {};
-      } else {
-        this.destination = folder;
-      }
       useGetToken()
         .then((token) => {
           const id = pathOr("", ["content", "id"], folder);
@@ -299,10 +296,9 @@ export default {
     },
 
     goUp: function () {
-      const destination = isNil(this.folder.parent) // is this property available ? ".parent"
+      const destination = isNil(this.currentFolder.parent)
         ? this.dataset
-        : this.folder.parent;
-
+        : this.currentFolder.parent;
       const baseUrl = pathEq(
         ["content", "packageType"],
         "Collection",
@@ -315,7 +311,7 @@ export default {
       useGetToken()
         .then((token) => {
           const url = `${this.config.apiUrl}/${baseUrl}/${destinationId}?api_key=${token}&includeAncestors=true`;
-          const currentFolderId = pathOr("", ["content", "id"], this.folder);
+          const currentFolderId = pathOr("", ["content", "id"], this.currentFolder);
           if (destinationId !== currentFolderId) {
             return this.fetchFiles(url);
           } else {
@@ -330,15 +326,13 @@ export default {
      * @param {String} url
      */
     fetchFiles: function (url) {
-      // Reset selected
-      this.destination = {};
-
       return this.sendXhr(url)
         .then((response) => {
-          this.folder = response;
+          this.currentFolder = response;
+
           this.sortedFiles = this.returnSort(
             "content.name",
-            this.folder.children,
+            this.currentFolder.children,
             "asc"
           );
           this.scrollTopFiles();
@@ -352,23 +346,22 @@ export default {
      * Set move to destination and close dialog
      */
     initiateMove: function () {
-      const folderId = pathOr("", ["content", "id"], this.folder);
-      let destinationId = pathOr(folderId, ["content", "id"], this.destination);
-      if (destinationId.indexOf("dataset") >= 0) {
-        destinationId = null;
-      }
-      // Ensure the user isn't moving a folder into itself
-      if (find(pathEq(["content", "id"], destinationId), this.selectedFiles)) {
+      let folderId = pathOr("", ["content", "id"], this.currentFolder);
+
+      if (this.sourceFolderId && this.sourceFolderId === folderId) {
         EventBus.$emit("toast", {
           detail: {
-            type: "ERROR_DETAIL",
-            msg: "Cannot move an item into itself",
+            type: "info",
+            msg: "Cannot move items into the same folder",
           },
         });
         return;
       }
-      
-      this.$emit("completeMove", destinationId, this.selectedFiles);
+
+      if (folderId.indexOf("dataset") >= 0) {
+        folderId = null;
+      }
+      this.$emit("completeMove", folderId, this.selectedFiles);
       this.closeDialog();
     },
   },
