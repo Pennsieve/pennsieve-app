@@ -825,9 +825,9 @@ export default {
      * Show move dialog
      */
     showMove: function () {
-      this.moveDialogVisible = true;
       const moveDialog = this.$refs.moveDialog;
       moveDialog.currentFolder = this.file;
+      this.moveDialogVisible = true;
     },
     onCloseMoveDialog: function () {
       this.moveDialogVisible = false;
