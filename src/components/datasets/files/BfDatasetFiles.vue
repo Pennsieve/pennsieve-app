@@ -151,17 +151,16 @@
 
     <bf-move-dialog
       ref="moveDialog"
-      :dialog-visible="moveDialogVisible"
-      :file="file"
-      :move-conflict.sync="moveConflict"
+      v-model:dialog-visible="moveDialogVisible"
+      v-model:move-conflict="moveConflict"
       :selected-files="selectedFiles"
       @rename-conflicts="onRenameConflicts"
-      @move="moveItems"
+      @completeMove="moveItems"
       @close="onCloseMoveDialog"
     />
 
     <RenameFileDialog
-      :dialog-visible="renameDialogVisible"
+      v-model:dialog-visible="renameDialogVisible"
       :files="files"
       :file="selectedFileForAction"
       @file-renamed="onFileRenamed"
@@ -848,10 +847,9 @@ export default {
      * Show move dialog
      */
     showMove: function () {
-      this.moveDialogVisible = true;
       const moveDialog = this.$refs.moveDialog;
-      moveDialog.file = this.file;
-      moveDialog.visible = true;
+      moveDialog.currentFolder = this.file;
+      this.moveDialogVisible = true;
     },
     onCloseMoveDialog: function () {
       this.moveDialogVisible = false;
@@ -904,9 +902,7 @@ export default {
           files: failures,
           destination: propOr(null, "destination", response),
         };
-
-        // Show user notice of conflicts
-        this.$refs.moveDialog.visible = true;
+        this.moveDialogVisible = true;
       }
     },
 
@@ -919,10 +915,8 @@ export default {
       // Rename each file with proposed new name
       const promises = files.map((obj) => {
         const id = propOr("", "id", obj);
-
-        useGetToken().then((token) => {
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -931,15 +925,13 @@ export default {
           });
         });
       });
-      Promise.all(promises).then((response) => {
+      Promise.all(promises).then(() => {
         // Move files again, now with new name
-        this.moveItems(destination, response);
+        this.moveItems(destination, this.moveConflict.display);
 
         // Reset
+        this.moveDialogVisible = false;
         this.moveConflict = {};
-
-        // Hide user notice of conflicts
-        this.$refs.moveDialog.visible = false;
       });
     },
 

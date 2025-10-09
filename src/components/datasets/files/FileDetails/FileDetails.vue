@@ -53,6 +53,14 @@
                   <el-dropdown-item
                     class="bf-menu-item"
                     :disabled="datasetLocked"
+                    command="rename-file"
+                  >
+                    Rename
+                  </el-dropdown-item>
+                  
+                  <el-dropdown-item
+                    class="bf-menu-item"
+                    :disabled="datasetLocked"
                     command="move-file"
                   >
                     Move
@@ -79,6 +87,23 @@
       :selected-files="selectedFiles"
       @file-delete="onDelete"
       @close="onCloseDeleteDialog"
+    />
+
+    <RenameFileDialog
+      v-model:dialog-visible="renameDialogVisible"
+      :file="proxyRecord"
+      @file-renamed="onFileRenamed"
+      @close="onCloseRenameFileDialog"
+    />
+
+    <bf-move-dialog
+      ref="moveDialog"
+      v-model:dialog-visible="moveDialogVisible"
+      v-model:move-conflict="moveConflict"
+      :selected-files="selectedFiles"
+      @rename-conflicts="onRenameConflicts"
+      @completeMove="moveItems"
+      @close="onCloseMoveDialog"
     />
 
     <div class="concept-instance-section">
@@ -546,7 +571,9 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
-      deleteDialogVisible: false
+      deleteDialogVisible: false,
+      renameDialogVisible: false,
+      moveDialogVisible: false
     };
   },
 
@@ -554,7 +581,6 @@ export default {
     ...mapGetters([
       "config",
       "concepts",
-      "lastRoute",
       "editingInstance",
       "getModelById",
       "hasFeature",
@@ -1372,6 +1398,13 @@ export default {
       });
     },
 
+    onCloseRenameFileDialog: function () {
+      this.renameDialogVisible = false;
+    },
+    showRenameFileDialog: function () {
+      this.renameDialogVisible = true;
+    },
+
     /**
      * Open office 365 file
      */
@@ -1438,12 +1471,6 @@ export default {
           .catch(this.handleXhrError.bind(this));
       });
     },
-
-    // showMove: function() {
-    //   const moveDialog = this.$refs.moveDialog
-    //   moveDialog.file = this.file
-    //   moveDialog.visible = true
-    // },
 
     /**
      * Determines if destination record exists and user can add relationship
@@ -2157,6 +2184,7 @@ export default {
       const commands = {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
+        "rename-file": this.showRenameFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2177,7 +2205,6 @@ export default {
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.selectedFileForAction = {};
       this.deleteDialogVisible = true;
     },
 
@@ -2367,8 +2394,6 @@ export default {
       this.proxyRecord = response;
 
       // Set Active Viewer
-      console.log("Setting active viewer");
-      console.log(this.proxyRecord);
       this.setActiveViewer(this.proxyRecord);
 
       this.selectedFiles.push(response);
@@ -2519,11 +2544,14 @@ export default {
         .then((token) => {
           const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${token}&includeAncestors=true`;
           return this.sendXhr(url).then((response) => {
-            moveDialog.file = response;
-            moveDialog.visible = true;
+            moveDialog.currentFolder = response;
+            this.moveDialogVisible = true;
           });
         })
         .catch((err) => useHandleXhrError(err));
+    },
+    onCloseMoveDialog: function () {
+      this.moveDialogVisible = false;
     },
 
     /**
@@ -2533,7 +2561,7 @@ export default {
      */
     moveItems: function (destination, items) {
       this.moveUrl.then((url) => {
-        const things = items.map(window.R.path(["content", "id"]));
+        const things = items.map((item) => item.content.id);
         this.sendXhr(url, {
           method: "POST",
           body: {
@@ -2542,11 +2570,10 @@ export default {
           },
         })
           .then((response) => {
-            if (response.success.length > 0) {
-              /*
-              Get the file again to update all values of the file.
-              Move response doesn't give as much info as needed
-            */
+              if (response.success.length > 0) {
+                /*
+                Get the file again to update all values of the file.
+              */
               this.getInstanceDetails();
 
               EventBus.$emit("toast", {
@@ -2579,9 +2606,7 @@ export default {
         files: failures,
         destination: propOr("", "destination", response),
       };
-
-      // Show user notice of conflicts
-      this.$refs.moveDialog.visible = true;
+      this.moveDialogVisible = true;
     },
 
     /**
@@ -2591,12 +2616,10 @@ export default {
      */
     onRenameConflicts: function (destination, files) {
       // Rename each file with proposed new name
-
-      useGetToken().then((token) => {
-        const promises = files.map((obj) => {
-          const id = propOr("", "id", obj);
+      const promises = files.map((obj) => {
+        const id = propOr("", "id", obj);
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -2604,19 +2627,15 @@ export default {
             },
           });
         });
-        Promise.all(promises).then((response) => {
-          // Update name
-          this.onFileRenamed(head(response));
+      });
+      Promise.all(promises).then((response) => {
+        // Update name
+        this.onFileRenamed(response[0]);
+        this.moveItems(destination, this.moveConflict.display);
 
-          // Move files again, now with new name
-          this.moveItems(destination, response);
-
-          // Reset
-          this.moveConflict = {};
-
-          // Hide user notice of conflicts
-          this.$refs.moveDialog.visible = false;
-        });
+        // Reset
+        this.moveDialogVisible = false;
+        this.moveConflict = {};
       });
     },
 
@@ -2796,10 +2815,6 @@ export default {
 .highlight-property {
   color: theme.$gray_6;
   font-weight: 500;
-}
-
-.source-files-table {
-  //display: flex;
 }
 
 .concept-instance {
