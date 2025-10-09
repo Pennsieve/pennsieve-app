@@ -7,7 +7,7 @@
         <span class="value">{{ selectedProcessor.name }}</span>
       </div>
       <div class="processor-item">
-        <span class="label">Uuid: </span>
+        <span class="label">UUID: </span>
         <span class="value">{{ selectedProcessor.uuid }}</span>
       </div>
       <div class="processor-item">
@@ -16,14 +16,40 @@
       </div>
       <div class="processor-item">
         <span class="label">Status: </span>
-        <span class="value">{{ selectedProcessor.status }}</span>
+        <span class="value" :class="statusClass">{{
+          selectedProcessor.status
+        }}</span>
       </div>
       <div class="processor-item">
-        <span class="label">Parameters: </span>
-        <span v-if="!hasParams" class="value">none</span>
+        <span class="label">Application Type: </span>
+        <span class="value">{{ selectedProcessor.applicationType }}</span>
       </div>
-      <div class="table-container">
-        <table v-if="hasParams">
+      <div class="processor-item">
+        <span class="label">Environment: </span>
+        <span class="value">{{ selectedProcessor.environment }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">Created At: </span>
+        <span class="value">{{ formatDate(selectedProcessor.createdAt) }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">Started At: </span>
+        <span class="value">{{ formatDate(selectedProcessor.startedAt) }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">Completed At: </span>
+        <span class="value">{{
+          formatDate(selectedProcessor.completedAt)
+        }}</span>
+      </div>
+
+      <!-- Parameters Section -->
+      <div class="section-title">Parameters</div>
+      <div v-if="!hasParams" class="processor-item">
+        <span class="value">none</span>
+      </div>
+      <div class="table-container" v-if="hasParams">
+        <table>
           <thead>
             <tr>
               <th>Name</th>
@@ -37,6 +63,50 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Resources Section -->
+      <div class="section-title">Resources</div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CPU</td>
+              <td>{{ selectedProcessor.resources?.cpu || "N/A" }}</td>
+            </tr>
+            <tr>
+              <td>Memory</td>
+              <td>{{ formatMemory(selectedProcessor.resources?.memory) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Source Information -->
+      <div class="section-title">Source Information</div>
+      <div class="processor-item">
+        <span class="label">Type: </span>
+        <span class="value">{{ selectedProcessor.source?.type }}</span>
+      </div>
+      <div class="processor-item">
+        <span class="label">URL: </span>
+        <span class="value">
+          <a
+            v-if="selectedProcessor.source?.url"
+            :href="formatGitHubUrl(selectedProcessor.source.url)"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ selectedProcessor.source.url }}
+          </a>
+          <span v-else>N/A</span>
+        </span>
       </div>
     </div>
     <div v-else>
@@ -74,25 +144,32 @@ export default {
     ...mapState("analysisModule", [
       "workflowInstances",
       "selectedWorkflowActivity",
-      ,
       "selectedProcessor",
     ]),
     isEmpty() {
-      return Object.keys(this.selectedProcessor).length === 0;
-    },
-    formatParams() {
-      return this.selectedProcessor.params;
+      return (
+        !this.selectedProcessor ||
+        Object.keys(this.selectedProcessor).length === 0
+      );
     },
     hasParams() {
-      return Object.keys(this.selectedProcessor.params).length;
+      return (
+        this.selectedProcessor.params &&
+        Object.keys(this.selectedProcessor.params).length > 0
+      );
+    },
+    statusClass() {
+      if (!this.selectedProcessor.status) return "";
+      const status = this.selectedProcessor.status.toLowerCase();
+      return `status-${status}`;
     },
   },
 
   watch: {
     selectedProcessor: {
-      immediate: true, // Run this watcher immediately on component load
+      immediate: true,
       handler(newProcessor) {
-        this.currentProcessor = { ...newProcessor }; // Update local data when `selectedProcessor` changes
+        this.currentProcessor = { ...newProcessor };
       },
     },
   },
@@ -101,6 +178,27 @@ export default {
     ...mapActions("analysisModule", ["showActivityLogDialog"]),
     handleLogsClick() {
       this.showActivityLogDialog();
+    },
+    formatDate(dateString) {
+      if (!dateString) return "N/A";
+      try {
+        return new Date(dateString).toLocaleString();
+      } catch (error) {
+        return dateString;
+      }
+    },
+    formatMemory(memory) {
+      if (!memory) return "N/A";
+      // Convert MB to GB for better readability if >= 1024 MB
+      if (memory >= 1024) {
+        return `${(memory / 1024).toFixed(1)} GB (${memory} MB)`;
+      }
+      return `${memory} MB`;
+    },
+    formatGitHubUrl(gitUrl) {
+      if (!gitUrl) return "";
+      // Convert git:// URLs to https:// for browser compatibility
+      return gitUrl.replace("git://", "https://");
     },
   },
 };
@@ -112,6 +210,7 @@ export default {
 .table-container {
   min-width: 400px;
   overflow: hidden;
+  margin-bottom: 1rem;
 }
 
 table {
@@ -145,6 +244,16 @@ tr:nth-child(even) {
   gap: 1rem;
 }
 
+.section-title {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: theme.$purple_3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid theme.$purple_3;
+  padding-bottom: 0.25rem;
+}
+
 .label {
   font-weight: bold;
   color: theme.$purple_3;
@@ -153,15 +262,35 @@ tr:nth-child(even) {
 .value {
   color: theme.$black;
   font-weight: normal;
+
+  a {
+    color: theme.$purple_3;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
 }
+
 .processor-item {
   font-weight: bold;
   color: theme.$purple_3;
 }
 
-.processor-value {
-  font-weight: normal;
-  color: inherit;
+.status-succeeded {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-failed {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.status-running {
+  color: #ffc107;
+  font-weight: bold;
 }
 
 li {
@@ -169,5 +298,21 @@ li {
   display: flex;
   font-size: 12px;
   margin-bottom: 8px;
+}
+
+.img-container {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.empty-image {
+  max-width: 200px;
+  opacity: 0.6;
+}
+
+.message {
+  color: theme.$gray_4;
+  font-style: italic;
+  margin-top: 1rem;
 }
 </style>

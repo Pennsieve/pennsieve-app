@@ -174,24 +174,38 @@ function toggleModelsList(event) {
   border-left: 1px solid theme.$gray_2;
   border-bottom: 1px solid theme.$gray_2;
   border-radius: 4px 0 0 4px;
-  height: calc(100% - 94px);
+  /* Use bottom positioning instead of height */
+  top: 72px;
+  bottom: 20px; /* Add some margin from bottom */
+  height: auto;
   position: absolute;
   right: 0;
-  top: 0;
-  transform: translate3d(100%, 72px, 0);
+  transform: translate3d(
+    100%,
+    0,
+    0
+  ); /* Remove Y offset since we're using top: 72px */
   transition: transform 0.3s ease-out;
   width: 500px;
   will-change: transform;
   z-index: 3;
   &.visible {
-    transform: translate3d(0, 72px, 0);
+    transform: translate3d(0, 0, 0); /* Remove Y offset */
   }
 }
+
 .workflows-list-scroll {
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: theme.$gray_1;
   border-radius: 4px 0px 0 4px;
+  padding-bottom: 40px; /* Increased padding */
+  box-sizing: border-box; /* Ensure padding is included in height calculations */
+
+  /* Alternative approach - use flexbox */
+  /* display: flex;
+  flex-direction: column; */
 }
 
 .btn-toggle {
