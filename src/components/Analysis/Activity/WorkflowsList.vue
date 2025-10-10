@@ -35,7 +35,7 @@ import AutoFocus from "../../../mixins/auto-focus/index";
 import WorkflowsListItem from "./WorkflowsListItem.vue";
 
 export default {
-  name: "ModelsList",
+  name: "WorkflowsList",
 
   emits: ["click", "shouldReset"],
 

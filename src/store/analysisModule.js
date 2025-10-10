@@ -627,7 +627,9 @@ setSelectedWorkflowActivity: async ({ commit, dispatch, rootState}, workflow) =>
     workflowLogs: state => state.workflowLogs,
     selectedWorkflowActivity: state => state.selectedWorkflowActivity,
     activityDialogVisible: state => state.activityDialogVisible,
-    selectedProcessor: state => state.selectedProcessor
+    selectedProcessor: state => state.selectedProcessor,
+    applications: state => state.applications,
+    computeNodes: state => state.computeNodes  
   }
   
   const analysisModule = {

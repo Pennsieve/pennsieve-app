@@ -291,7 +291,7 @@ onNodeClick(({ node }) => {
       <div class="vue-flow-title">
         {{ `Workflow Run: ${selectedWorkflowActivity?.name}` }}
       </div>
-      <div class="vue-flow-wrapper">
+      <div class="vue-flow-wrapper activity-monitor-flow">
         <VueFlow
           :nodes="nodes"
           :edges="edges"
@@ -342,16 +342,12 @@ onNodeClick(({ node }) => {
 </template>
 
 <style lang="scss">
-/* this contains the default theme, these are optional styles */
-@use "../../../styles/vueflow_core";
-@use "../../../styles/vueflow.css";
-
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/minimap/dist/style.css";
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 @use "../../../styles/theme";
 
 .modified-stage {
@@ -392,24 +388,43 @@ onNodeClick(({ node }) => {
   margin: 0;
 }
 
-.vue-flow__node.gray-node {
-  border: 2px solid gray;
-}
+/* Target nodes only within activity-monitor-flow */
+.activity-monitor-flow {
+  :deep(.vue-flow__node) {
+    padding: 10px 20px;
+    background: white;
+    border-radius: 3px;
+    min-width: 120px;
+    text-align: center;
+  }
 
-.vue-flow__node.blue-node {
-  border: 2px solid blue;
-}
+  :deep(.vue-flow__node.gray-node) {
+    border: 2px solid gray;
+  }
 
-.vue-flow__node.blue-node.animate {
-  animation: border-glow 5s infinite ease-in-out;
-}
+  :deep(.vue-flow__node.blue-node) {
+    border: 2px solid blue;
+  }
 
-.vue-flow__node.green-node {
-  border: 2px solid theme.$status_green;
-}
+  :deep(.vue-flow__node.blue-node.animate) {
+    animation: border-glow-activity 5s infinite ease-in-out;
+  }
 
-.vue-flow__node.red-node {
-  border: 2px solid red;
+  :deep(.vue-flow__node.green-node) {
+    border: 2px solid theme.$status_green;
+  }
+
+  :deep(.vue-flow__node.red-node) {
+    border: 2px solid red;
+  }
+
+  :deep(.vue-flow__node.selected) {
+    background-color: theme.$gray_2;
+  }
+
+  :deep(.vue-flow__node:hover) {
+    background-color: theme.$gray_2;
+  }
 }
 
 @keyframes pulse {
@@ -426,7 +441,8 @@ onNodeClick(({ node }) => {
     transform: scale(1);
   }
 }
-@keyframes border-glow {
+
+@keyframes border-glow-activity {
   0% {
     border-color: transparent;
     box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
@@ -438,16 +454,6 @@ onNodeClick(({ node }) => {
   100% {
     border-color: transparent;
     box-shadow: 0 0 5px rgba(0, 255, 128, 0.2);
-  }
-}
-
-.vue-flow__node.selected {
-  background-color: theme.$gray_2;
-}
-
-.vue-flow__node {
-  &:hover {
-    background-color: theme.$gray_2;
   }
 }
 </style>
