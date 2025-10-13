@@ -2,7 +2,7 @@
   <div :class="['bf-stage', this.isEditing ? 'editing' : '']">
 
     <template v-if="this.$slots['actions']">
-      <div class="buttons">
+      <div :class="stageButtonsClass">
        <slot name="actions"/>
       </div>
     </template>
@@ -62,6 +62,15 @@
     },
 
     computed: {
+      stageButtonsClass: function() {
+        let classString = "buttons"
+        if (this.noPadding) {
+          classString = classString + " no-padding"
+        }
+
+        return classString
+      },
+
       stageContentClass: function() {
         let classString = "bf-stage-content"
         if (!this.$slots['actions']) {
@@ -126,11 +135,7 @@
       padding: 0;
     }
   }
-  .graph-management {
-    .bf-stage-content {
-      padding: 24px 32px 32px 32px;
-    }
-  }
+
   .bf-sidebar-wrap {
     background-color: theme.$white;
     display: flex;
@@ -172,6 +177,10 @@
     display: flex;
     flex-direction: row;
     justify-content: end;
-    margin: 16px 32px 16px 16px;
+    padding: 16px 32px 16px 16px;
+
+    &.no-padding {
+      padding: 16px 0 16px 0;
+    }
   }
 </style>

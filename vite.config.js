@@ -1,8 +1,6 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-// import ElementPlus from 'unplugin-element-plus/vite'
-
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
@@ -20,6 +18,7 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         additionalData: `@use "./src/styles/index.scss" as *;`,
+        silenceDeprecations: ['global-builtin', 'legacy-js-api', 'new-global', 'color-functions'],
       },
     },
   },
@@ -32,7 +31,7 @@ export default defineConfig({
       resolvers: [ElementPlusResolver()],
     }),
     Components({
-      resolvers: [ElementPlusResolver({importStyle: "sass",})],
+      resolvers: [ElementPlusResolver({importStyle: false})],
     }),
   ],
   define: {

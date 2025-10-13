@@ -16,8 +16,8 @@
         >
           <bf-card
             :class="{ disabled: datasetLocked }"
-            title="Empty Model"
-            card-copy="Create a model for metadata records."
+            title="New Model"
+            card-copy="Create a new model for metadata records."
           >
             <template #icon>
               <icon-add-template
@@ -28,40 +28,29 @@
             </template>
           </bf-card>
         </button>
-        <component
-          :is="galleryLinkComponent"
-          v-if="hasModelTemplatesFeature"
-          class="gallery-link"
-          :class="{ disabled: datasetLocked }"
-          to="model-templates"
+        <button
+          :disabled="datasetLocked"
+          @click="createConcept"
         >
           <bf-card
             :class="{ disabled: datasetLocked }"
             title="Template Gallery"
+            card-copy="Create a model based on a template"
           >
             <template #icon>
-              <IconGallery
+              <IconOverview
+                class="card-icon"
                 :height="48"
                 :width="96"
-              />
-            </template>
+                                />
 
-            <div class="view-templates-link">
-              <div class="view-templates-link-text">
-                View All Templates
-              </div>
-              <icon-arrow-right
-                :height="10"
-                :width="10"
-                color="#2760FF"
-              />
-            </div>
+            </template>
           </bf-card>
-        </component>
+        </button>
       </div>
 
       <div v-if="hasModels">
-        <h2>Models in Your Graph</h2>
+        <h2>Dataset Models</h2>
         <concept-list-item
           v-for="concept in combinedConcepts"
           :key="concept.id"
@@ -109,37 +98,6 @@
         </p>
       </dataset-owner-message>
 
-<!--      <concept-dialog-->
-<!--        :visible.sync="lockDialogVisible"-->
-<!--        confirm-text="Lock"-->
-<!--        title="Lock Model"-->
-<!--        @confirm="setLockModel(true)"-->
-<!--      >-->
-<!--        <IconLockFilled-->
-<!--          :height="32"-->
-<!--          :width="32"-->
-<!--          color="#2760FF"-->
-<!--        />-->
-<!--        <h3>Lock {{ activeModel.displayName }}?</h3>-->
-<!--        <p>By locking this model, members of your organization will no longer be able to create new records in your graph. Existing records will still be seen in your current graph.</p>-->
-<!--      </concept-dialog>-->
-
-<!--      <concept-dialog-->
-<!--        :visible.sync="archiveDialogVisible"-->
-<!--        confirm-text="Delete"-->
-<!--        title="Delete Model"-->
-<!--        primary-btn-class="red"-->
-<!--        @confirm="archiveConcept"-->
-<!--      >-->
-<!--        <IconTrash-->
-<!--          :height="32"-->
-<!--          :width="32"-->
-<!--          color="#e94b4b"-->
-<!--        />-->
-<!--        <h3>Delete {{ activeModel.displayName }}?</h3>-->
-<!--        <p>The will also remove any relationship types and linked properties.</p>-->
-<!--      </concept-dialog>-->
-
       <create-concept-dialog
         :dialog-visible="createConceptDialogVisible"
         @close="closeCreateConceptDialog"
@@ -171,11 +129,19 @@
   import DeleteConceptDialog from "@/components/datasets/management/DeleteConceptDialog/DeleteConceptDialog.vue";
   import {useGetToken} from "@/composables/useGetToken";
   import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+  import IconClinicalTrial from "@/components/icons/IconClinicalTrial.vue";
+  import IconDocument from "@/components/icons/IconDocument.vue";
+  import IconGraph from "@/components/icons/IconGraph.vue";
+  import IconOverview from "@/components/icons/IconOverview.vue";
 
   export default {
     name: 'Models',
 
     components: {
+      IconOverview,
+      IconGraph,
+      IconDocument,
+      IconClinicalTrial,
       DeleteConceptDialog,
       IconTrash,
       IconLockFilled,

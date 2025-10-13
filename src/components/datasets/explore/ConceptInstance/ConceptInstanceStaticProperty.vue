@@ -77,7 +77,13 @@
        * @returns {String}
        */
       userName: function() {
-        const user = find(propEq('id', this.user), this.orgMembers) || find(propEq('intId', this.user), this.orgMembers)
+        // Try different ways to find the user:
+        // 1. By string ID match
+        // 2. By intId string match  
+        // 3. By intId numeric match (this is what works for package owner IDs)
+        const user = find(propEq('id', this.user), this.orgMembers) || 
+                    find(propEq('intId', this.user), this.orgMembers) || 
+                    find(propEq('intId', parseInt(this.user)), this.orgMembers)
 
         const firstName = propOr('', 'firstName', user)
         const lastName = propOr('', 'lastName', user)

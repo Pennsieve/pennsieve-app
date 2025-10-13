@@ -53,8 +53,8 @@ export default {
   z-index: 10;
   margin: 8px 0;
   left: calc(100% - 80px);
-  background: white;
-  padding: 0 8px;
+  background: theme.$purple_tint;
+  padding: 8px;
   width: 32px;
   overflow: hidden;
   visibility: hidden;
@@ -63,7 +63,7 @@ export default {
     visibility: visible;
     transition-property: all;
     transition-duration: 0.25s;
-    left: calc(100% - 200px);
+    left: calc(100% - 192px);
     max-width: 160px;
     width: 160px;
   }
