@@ -204,8 +204,8 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
-@import '../../../styles/element/dialog';
+@use '../../../styles/_theme.scss';
+@use '../../../styles/element/dialog';
 
 
 .api-keys-container {
@@ -213,7 +213,7 @@ onMounted(() => {
 }
 
 h3 {
-  color: $purple_3;
+  color: theme.$purple_3;
   margin-top: 24px;
   font-weight: 300;
   font-size: 16px;
@@ -229,22 +229,22 @@ h2 {
   min-height: 100px;
 }
 .keys-section {
-  color: $purple_2;
+  color: theme.$purple_2;
 }
 
 p {
   margin-bottom: 20px;
   font-weight: 300;
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   max-width: 500px;
 }
 
 .api-key-item {
-  color: $purple_2;
+  color: theme.$purple_2;
   margin: 4px 0;
   padding: 12px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   max-width: 400px;
   display: flex;
   flex-direction: row;

@@ -404,7 +404,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 
 
@@ -417,7 +417,7 @@ export default {
 
   .page-description {
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.6;
     margin: 0 0 24px 0;
     max-width: 800px;
@@ -435,7 +435,7 @@ export default {
 
     &:not(:empty) {
       padding: 20px 24px 0;
-      border-bottom: 1px solid $gray_2;
+      border-bottom: 1px solid theme.$gray_2;
       margin-bottom: 0;
       display: flex;
       justify-content: space-between;
@@ -444,12 +444,12 @@ export default {
       h2 {
         font-size: 18px;
         font-weight: 500;
-        color: $gray_6;
+        color: theme.$gray_6;
         margin: 0 0 20px 0;
       }
 
       .settings-link {
-        color: $purple_2;
+        color: theme.$purple_2;
         text-decoration: none;
         font-size: 14px;
         font-weight: 500;
@@ -481,26 +481,26 @@ export default {
     .spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid $gray_2;
-      border-top: 3px solid $purple_2;
+      border: 3px solid theme.$gray_2;
+      border-top: 3px solid theme.$purple_2;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
   }
 
   p {
-    color: $gray_5;
+    color: theme.$gray_5;
     margin: 0;
   }
 
   .error-message {
-    color: $red_1;
+    color: theme.$red_1;
     margin-bottom: 16px;
   }
 
   .retry-button {
     padding: 8px 16px;
-    background: $purple_2;
+    background: theme.$purple_2;
     color: white;
     border: none;
     border-radius: 4px;
@@ -508,7 +508,7 @@ export default {
     transition: background 0.2s ease;
 
     &:hover {
-      background: $purple_3;
+      background: theme.$purple_3;
     }
   }
 }
@@ -523,12 +523,12 @@ export default {
     h3 {
       font-size: 20px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 16px 0;
     }
 
     p {
-      color: $gray_5;
+      color: theme.$gray_5;
       line-height: 1.6;
       margin-bottom: 24px;
     }
@@ -536,7 +536,7 @@ export default {
     .connect-button {
       display: inline-block;
       padding: 12px 24px;
-      background: $purple_2;
+      background: theme.$purple_2;
       color: white;
       text-decoration: none;
       border-radius: 4px;
@@ -544,7 +544,7 @@ export default {
       transition: background 0.2s ease;
 
       &:hover {
-        background: $purple_3;
+        background: theme.$purple_3;
         text-decoration: none;
       }
     }
@@ -565,12 +565,12 @@ export default {
     h3 {
       font-size: 20px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 0 0 16px 0;
     }
 
     p {
-      color: $gray_5;
+      color: theme.$gray_5;
       line-height: 1.6;
       margin-bottom: 24px;
     }
@@ -580,7 +580,7 @@ export default {
       font-size: 14px;
 
       a {
-        color: $purple_2;
+        color: theme.$purple_2;
         text-decoration: none;
 
         &:hover {
@@ -600,7 +600,7 @@ export default {
     display: flex;
     align-items: center;
     padding: 20px;
-    background: $gray_1;
+    background: theme.$gray_1;
     border-radius: 4px;
     gap: 16px;
 
@@ -610,19 +610,19 @@ export default {
       h3 {
         font-size: 16px;
         font-weight: 500;
-        color: $gray_6;
+        color: theme.$gray_6;
         margin: 0 0 4px 0;
       }
 
       p {
         font-size: 14px;
-        color: $gray_5;
+        color: theme.$gray_5;
         margin: 0 0 8px 0;
       }
 
       .profile-link {
         font-size: 14px;
-        color: $purple_2;
+        color: theme.$purple_2;
         text-decoration: none;
 
         &:hover {
@@ -640,7 +640,7 @@ export default {
       transition: background 0.2s ease;
 
       &:hover {
-        background: $gray_2;
+        background: theme.$gray_2;
       }
     }
   }
@@ -656,7 +656,7 @@ export default {
     h3 {
       font-size: 16px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 0;
     }
 
@@ -667,7 +667,7 @@ export default {
     }
 
     .manage-link {
-      color: $purple_2;
+      color: theme.$purple_2;
       text-decoration: none;
       font-size: 14px;
       font-weight: 500;
@@ -680,7 +680,7 @@ export default {
     .refresh-icon-button {
       background: none;
       border: none;
-      color: $purple_2;
+      color: theme.$purple_2;
       cursor: pointer;
       padding: 4px;
       border-radius: 4px;
@@ -690,7 +690,7 @@ export default {
       transition: background 0.2s ease;
 
       &:hover:not(:disabled) {
-        background: rgba($purple_2, 0.1);
+        background: rgba(theme.$purple_2, 0.1);
       }
 
       &:disabled {
@@ -712,7 +712,7 @@ export default {
   .empty-repos {
     text-align: center;
     padding: 40px 20px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 
   .repos-list {
@@ -730,7 +730,7 @@ export default {
 
     .page-button {
       padding: 8px 16px;
-      background: $purple_2;
+      background: theme.$purple_2;
       color: white;
       border: none;
       border-radius: 4px;
@@ -738,17 +738,17 @@ export default {
       transition: background 0.2s ease;
 
       &:hover:not(:disabled) {
-        background: $purple_3;
+        background: theme.$purple_3;
       }
 
       &:disabled {
-        background: $gray_3;
+        background: theme.$gray_3;
         cursor: not-allowed;
       }
     }
 
     .page-info {
-      color: $gray_5;
+      color: theme.$gray_5;
       font-size: 14px;
     }
   }
@@ -776,12 +776,12 @@ export default {
 
     .dialog-header {
       padding: 20px 24px 0;
-      border-bottom: 1px solid $gray_2;
+      border-bottom: 1px solid theme.$gray_2;
 
       h3 {
         font-size: 18px;
         font-weight: 500;
-        color: $gray_6;
+        color: theme.$gray_6;
         margin: 0 0 20px 0;
       }
     }
@@ -790,7 +790,7 @@ export default {
       padding: 24px;
 
       p {
-        color: $gray_5;
+        color: theme.$gray_5;
         line-height: 1.6;
         margin: 0;
       }
@@ -804,20 +804,20 @@ export default {
 
       .cancel-button {
         padding: 8px 16px;
-        background: $gray_2;
-        border: 1px solid $gray_3;
+        background: theme.$gray_2;
+        border: 1px solid theme.$gray_3;
         border-radius: 4px;
         cursor: pointer;
         transition: background 0.2s ease;
 
         &:hover {
-          background: $gray_3;
+          background: theme.$gray_3;
         }
       }
 
       .disconnect-confirm-button {
         padding: 8px 16px;
-        background: $red_1;
+        background: theme.$red_1;
         color: white;
         border: none;
         border-radius: 4px;
@@ -825,7 +825,7 @@ export default {
         transition: background 0.2s ease;
 
         &:hover:not(:disabled) {
-          background: darken($red_1, 10%);
+          background: darken(theme.$red_1, 10%);
         }
 
         &:disabled {

@@ -125,7 +125,7 @@ function closeDialog() {
 
   
   <style lang="scss" scoped>
-  @import '../../../styles/_theme.scss';
+  @use '../../../styles/_theme.scss';
   
   .el-form {
     display: flex;
@@ -134,7 +134,7 @@ function closeDialog() {
   }
   
   .delete-dataset-title {
-    color: $red_2;
+    color: theme.$red_2;
     margin-top: 0;
   }
   
@@ -150,7 +150,7 @@ function closeDialog() {
   }
   
   .svg-icon {
-    color: $red_1;
+    color: theme.$red_1;
   }
   
   .warning-wrap {
@@ -159,7 +159,7 @@ function closeDialog() {
   }
   
   .warning-message {
-    color: $red_2;
+    color: theme.$red_2;
   }
   
   .el-form-item {

@@ -57,7 +57,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dataset-banner-image {
   width: 86px;
@@ -76,11 +76,11 @@ export default {
   .default-banner {
     width: 100%;
     height: 100%;
-    background: $gray_1;
+    background: theme.$gray_1;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
   }
 }
 </style>

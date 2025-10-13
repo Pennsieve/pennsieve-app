@@ -201,7 +201,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .collections-list {
   min-height: 400px;
@@ -220,15 +220,15 @@ export default {
     .spinner {
       width: 40px;
       height: 40px;
-      border: 4px solid $gray_2;
-      border-top: 4px solid $purple_2;
+      border: 4px solid theme.$gray_2;
+      border-top: 4px solid theme.$purple_2;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
   }
   
   p {
-    color: $gray_5;
+    color: theme.$gray_5;
     font-size: 16px;
   }
 }
@@ -241,7 +241,7 @@ export default {
   padding: 80px 20px;
   
   .error-message {
-    color: $red_1;
+    color: theme.$red_1;
     font-size: 16px;
     margin-bottom: 16px;
     text-align: center;
@@ -249,7 +249,7 @@ export default {
   
   .retry-button {
     padding: 8px 16px;
-    background: $purple_2;
+    background: theme.$purple_2;
     color: white;
     border: none;
     border-radius: 4px;
@@ -257,7 +257,7 @@ export default {
     transition: background 0.2s ease;
     
     &:hover {
-      background: $purple_3;
+      background: theme.$purple_3;
     }
   }
 }
@@ -292,20 +292,20 @@ export default {
     h2 {
       font-size: 24px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 0 0 16px 0;
     }
     
     p {
       font-size: 16px;
-      color: $gray_5;
+      color: theme.$gray_5;
       line-height: 1.6;
       margin: 0 0 24px 0;
     }
     
     .btn-create {
-      background: $purple_2;
-      color: $white;
+      background: theme.$purple_2;
+      color: theme.$white;
       border: none;
       padding: 12px 24px;
       border-radius: 4px;
@@ -314,7 +314,7 @@ export default {
       transition: background 0.2s ease;
 
       &:hover {
-        background: $purple_3;
+        background: theme.$purple_3;
       }
     }
   }

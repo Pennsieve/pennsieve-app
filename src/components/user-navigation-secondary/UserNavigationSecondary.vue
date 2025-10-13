@@ -130,12 +130,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../styles/_theme.scss';
+@use '../../styles/_theme.scss';
 
 .user-navigation {
-  background: $white;
-  border-right: 1px solid $gray_2;
-  color: $gray_6;
+  background: theme.$white;
+  border-right: 1px solid theme.$gray_2;
+  color: theme.$gray_6;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -159,7 +159,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid $gray_2;
+    border-bottom: 1px solid theme.$gray_2;
     min-height: 60px;
 
     .user-section-title {
@@ -168,7 +168,7 @@ export default {
       .title-text {
         font-size: 16px;
         font-weight: 500;
-        color: $gray_6;
+        color: theme.$gray_6;
       }
     }
 
@@ -201,7 +201,7 @@ export default {
     transform: translateY(-50%);
     width: 16px;
     height: 40px;
-    background: $gray_3;
+    background: theme.$gray_3;
     border-radius: 0 8px 8px 0;
     cursor: pointer;
     display: flex;
@@ -210,14 +210,14 @@ export default {
     transition: background 150ms ease-out;
 
     &:hover {
-      background: $gray_4;
+      background: theme.$gray_4;
     }
 
     &::after {
       content: '';
       width: 2px;
       height: 12px;
-      background: $white;
+      background: theme.$white;
       border-radius: 1px;
     }
   }

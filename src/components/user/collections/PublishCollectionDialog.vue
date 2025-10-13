@@ -195,9 +195,9 @@ const closeDialog = () => {
   };
 </script>
 <style lang="scss" scoped>
-@import '../../../styles/_theme.scss';
-@import '../../../styles/element/dialog';
-@import '../../../styles/element/input';
+@use '../../../styles/_theme.scss';
+@use '../../../styles/element/dialog';
+@use '../../../styles/element/input';
 
   .dialog-footer {
     display: flex;

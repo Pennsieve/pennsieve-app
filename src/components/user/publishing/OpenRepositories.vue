@@ -196,7 +196,7 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .open-repositories {
   //padding: 40px;
@@ -211,13 +211,13 @@ onMounted(() => {
   h1 {
     font-size: 28px;
     font-weight: 300;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 16px 0;
   }
 
   .subtitle {
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.6;
     max-width: 800px;
     margin: 0;
@@ -231,21 +231,21 @@ onMounted(() => {
 .loading-state, .error-state, .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 .error-state {
   .retry-button {
     margin-top: 16px;
     padding: 8px 16px;
-    background: $purple_2;
+    background: theme.$purple_2;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     
     &:hover {
-      background: $purple_3;
+      background: theme.$purple_3;
     }
   }
 }
@@ -260,7 +260,7 @@ onMounted(() => {
     padding: 12px 24px;
     font-size: 16px;
     font-weight: 500;
-    background: $purple_2;
+    background: theme.$purple_2;
     color: white;
     border: none;
     border-radius: 6px;
@@ -269,13 +269,13 @@ onMounted(() => {
     min-width: 200px;
     
     &:hover:not(.disabled) {
-      background: $purple_3;
+      background: theme.$purple_3;
       transform: translateY(-1px);
     }
     
     &.disabled {
-      background: $gray_3;
-      color: $gray_5;
+      background: theme.$gray_3;
+      color: theme.$gray_5;
       cursor: not-allowed;
     }
   }
@@ -284,7 +284,7 @@ onMounted(() => {
 .repositories-list {
   background: white;
   border-radius: 8px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   overflow: hidden;
 }
 </style>

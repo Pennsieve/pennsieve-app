@@ -80,21 +80,21 @@ function openInfoPanel(event) {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .repository-list-item {
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   background-color: white;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: $gray_1;
+    background-color: theme.$gray_1;
   }
 
   &.selected {
-    background-color: lighten($purple_2, 40%);
-    border-left: 4px solid $purple_2;
+    background-color: lighten(theme.$purple_2, 40%);
+    border-left: 4px solid theme.$purple_2;
   }
 
   &:first-child {
@@ -125,11 +125,11 @@ function openInfoPanel(event) {
   margin-bottom: 8px;
   
   &.accepting {
-    color: $green_2;
+    color: theme.$green_2;
   }
   
   &.private {
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -143,7 +143,7 @@ function openInfoPanel(event) {
 .repository-title {
   font-size: 18px;
   font-weight: 500;
-  color: $purple_3;
+  color: theme.$purple_3;
   margin: 0;
   
   &.clickable-title {
@@ -159,14 +159,14 @@ function openInfoPanel(event) {
     .title-info-icon {
       opacity: 1;
       transition: all 0.2s ease;
-      color: $gray_4;
+      color: theme.$gray_4;
     }
     
     &:hover {
-      background-color: rgba($purple_2, 0.1);
+      background-color: rgba(theme.$purple_2, 0.1);
       
       .title-info-icon {
-        color: $purple_3;
+        color: theme.$purple_3;
       }
     }
   }
@@ -174,7 +174,7 @@ function openInfoPanel(event) {
 
 .repository-description {
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   line-height: 1.5;
   margin: 0 0 16px 0;
   max-width: 600px;

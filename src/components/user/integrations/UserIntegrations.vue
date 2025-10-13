@@ -220,7 +220,7 @@ async function fetchGithubProfile() {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-integrations-container {
   padding: 40px;
@@ -233,7 +233,7 @@ async function fetchGithubProfile() {
     font-weight: 300;
     font-size: 20px;
     margin-top: 0;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-bottom: 8px;
   }
 }
@@ -245,7 +245,7 @@ async function fetchGithubProfile() {
   margin-bottom: 32px;
   font-weight: 300;
   line-height: 21px;
-  color: $gray_5;
+  color: theme.$gray_5;
   border-left: 4px solid #2196f3;
 }
 
@@ -264,7 +264,7 @@ async function fetchGithubProfile() {
   .btn-configure {
     display: inline-block;
     padding: 12px 16px;
-    background: $purple_2;
+    background: theme.$purple_2;
     color: white;
     text-decoration: none;
     border-radius: 3px;
@@ -272,7 +272,7 @@ async function fetchGithubProfile() {
     line-height: 1;
     outline: none;
     font-weight: 500;
-    border: 1px solid $purple_2;
+    border: 1px solid theme.$purple_2;
     cursor: pointer;
     transition: background 0.2s ease;
     align-content: center;
@@ -280,7 +280,7 @@ async function fetchGithubProfile() {
     &:hover:not(.disabled) {
       &:hover,
       &:focus {
-        background: $purple_3;
+        background: theme.$purple_3;
       }
       &:hover {
         box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
@@ -291,18 +291,18 @@ async function fetchGithubProfile() {
     }
 
     &.secondary {
-      background: $gray_3;
-      color: $gray_6;
+      background: theme.$gray_3;
+      color: theme.$gray_6;
 
       &:hover {
-        background: $gray_4;
+        background: theme.$gray_4;
         color: white;
       }
     }
 
     &.disabled {
-      background: $gray_3;
-      color: $gray_4;
+      background: theme.$gray_3;
+      color: theme.$gray_4;
       cursor: not-allowed;
     }
   }

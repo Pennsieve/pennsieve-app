@@ -147,7 +147,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dialog-overlay {
   position: fixed;
@@ -177,13 +177,13 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
 
   h3 {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .close-btn {
@@ -191,11 +191,11 @@ export default {
     border: none;
     cursor: pointer;
     padding: 4px;
-    color: $gray_1;
+    color: theme.$gray_1;
     transition: color 0.2s ease;
 
     &:hover {
-      color: $gray_2;
+      color: theme.$gray_2;
     }
   }
 }
@@ -211,7 +211,7 @@ export default {
     display: block;
     font-size: 14px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-bottom: 6px;
   }
 
@@ -219,7 +219,7 @@ export default {
   .form-textarea {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     border-radius: 4px;
     font-size: 14px;
     transition: all 0.2s ease;
@@ -227,12 +227,12 @@ export default {
     box-sizing: border-box;
 
     &::placeholder {
-      color: $gray_4;
+      color: theme.$gray_4;
     }
 
     &:focus {
       outline: none;
-      border-color: $purple_2;
+      border-color: theme.$purple_2;
       box-shadow: 0 0 0 2px rgba(77, 98, 140, 0.1);
     }
 
@@ -259,6 +259,6 @@ export default {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 }
 </style>

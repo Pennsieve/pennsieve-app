@@ -159,7 +159,7 @@ async function handleUpdateProfileSubmit() {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-profile-container {
   padding: 40px;
@@ -172,7 +172,7 @@ async function handleUpdateProfileSubmit() {
     font-weight: 300;
     font-size: 20px;
     margin-top: 0;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 
@@ -183,7 +183,7 @@ async function handleUpdateProfileSubmit() {
   margin-bottom: 16px;
   font-weight: 300;
   line-height: 21px;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 // Element Plus form styling
@@ -194,7 +194,7 @@ async function handleUpdateProfileSubmit() {
 
   .el-form-item__label {
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .el-input__inner {
@@ -202,12 +202,12 @@ async function handleUpdateProfileSubmit() {
   }
 
   .el-button--primary {
-    background-color: $purple_2;
-    border-color: $purple_2;
+    background-color: theme.$purple_2;
+    border-color: theme.$purple_2;
 
     &:hover {
-      background-color: $purple_1;
-      border-color: $purple_1;
+      background-color: theme.$purple_1;
+      border-color: theme.$purple_1;
     }
   }
 }

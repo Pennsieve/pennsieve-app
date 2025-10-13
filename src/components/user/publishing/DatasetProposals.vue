@@ -297,7 +297,7 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dataset-proposals {
   //padding: 40px;
@@ -311,13 +311,13 @@ onMounted(async () => {
   h1 {
     font-size: 28px;
     font-weight: 300;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
   
   .page-description {
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.6;
     margin: 0 0 24px 0;
     max-width: 800px;
@@ -346,15 +346,15 @@ onMounted(async () => {
     .spinner {
       width: 40px;
       height: 40px;
-      border: 4px solid $gray_2;
-      border-top: 4px solid $purple_2;
+      border: 4px solid theme.$gray_2;
+      border-top: 4px solid theme.$purple_2;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
   }
   
   p {
-    color: $gray_5;
+    color: theme.$gray_5;
     font-size: 16px;
   }
 }
@@ -381,7 +381,7 @@ onMounted(async () => {
     h2 {
       font-size: 20px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 0;
     }
   }
@@ -411,13 +411,13 @@ onMounted(async () => {
     h2 {
       font-size: 24px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin: 0 0 16px 0;
     }
     
     p {
       font-size: 16px;
-      color: $gray_5;
+      color: theme.$gray_5;
       line-height: 1.6;
       margin: 0 0 24px 0;
     }

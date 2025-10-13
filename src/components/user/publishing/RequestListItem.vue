@@ -275,11 +275,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .request-list-item {
   background: white;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   margin-bottom: 16px;
   transition: all 0.2s ease;
@@ -288,7 +288,7 @@ export default {
     cursor: pointer;
     
     &:hover {
-      border-color: $purple_2;
+      border-color: theme.$purple_2;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
   }
@@ -328,48 +328,48 @@ export default {
   letter-spacing: 0.5px;
   
   &.status-draft {
-    background: $gray_2;
-    color: $gray_6;
+    background: theme.$gray_2;
+    color: theme.$gray_6;
   }
   
   &.status-submitted {
-    background: lighten($purple_2, 35%);
-    color: $purple_2;
+    background: lighten(theme.$purple_2, 35%);
+    color: theme.$purple_2;
   }
   
   &.status-accepted {
-    background: lighten($green_1, 45%);
-    color: darken($green_1, 10%);
+    background: lighten(theme.$green_1, 45%);
+    color: darken(theme.$green_1, 10%);
   }
   
   &.status-rejected {
-    background: lighten($red_1, 35%);
-    color: $red_1;
+    background: lighten(theme.$red_1, 35%);
+    color: theme.$red_1;
   }
   
   &.status-withdrawn {
-    background: lighten($orange_1, 35%);
-    color: darken($orange_1, 10%);
+    background: lighten(theme.$orange_1, 35%);
+    color: darken(theme.$orange_1, 10%);
   }
 }
 
 .request-repository {
   font-size: 13px;
-  color: $gray_5;
+  color: theme.$gray_5;
   font-weight: 500;
 }
 
 .request-title {
   font-size: 18px;
   font-weight: 500;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin: 0 0 8px 0;
   line-height: 1.3;
 }
 
 .request-description {
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   line-height: 1.5;
   margin: 0 0 12px 0;
 }
@@ -382,13 +382,13 @@ export default {
   
   .metadata-item {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     display: flex;
     align-items: center;
     gap: 4px;
     
     .warning-icon {
-      color: $orange_1;
+      color: theme.$orange_1;
     }
   }
 }
@@ -428,7 +428,7 @@ export default {
 .text-button {
   background: none;
   border: none;
-  color: $purple_2;
+  color: theme.$purple_2;
   font-size: 14px;
   cursor: pointer;
   padding: 4px 0;
@@ -437,14 +437,14 @@ export default {
   
   &:hover {
     text-decoration: underline;
-    color: $purple_3;
+    color: theme.$purple_3;
   }
   
   &.danger {
-    color: $red_1;
+    color: theme.$red_1;
     
     &:hover {
-      color: darken($red_1, 10%);
+      color: darken(theme.$red_1, 10%);
     }
   }
 }
@@ -454,14 +454,14 @@ export default {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: $gray_5;
+  color: theme.$gray_5;
   
   &.success {
-    color: $green_1;
+    color: theme.$green_1;
   }
   
   &.error {
-    color: $red_1;
+    color: theme.$red_1;
   }
   
   .status-icon {

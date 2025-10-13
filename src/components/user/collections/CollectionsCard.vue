@@ -132,10 +132,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .collections-card {
-  border: solid 1px $gray_2;
+  border: solid 1px theme.$gray_2;
   border-radius: 3px 3px 0 0;
 }
 
@@ -185,9 +185,9 @@ h3 {
 }
 
 .collection-state-tag {
-  background: $purple_tint;
-  color: $purple_1;
-  border: 1px solid rgba($purple_1, 0.2);
+  background: theme.$purple_tint;
+  color: theme.$purple_1;
+  border: 1px solid rgba(theme.$purple_1, 0.2);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;

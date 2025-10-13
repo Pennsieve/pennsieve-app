@@ -42,26 +42,26 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../styles/_theme.scss';
+@use '../../styles/_theme.scss';
 
 .user-navigation-secondary-item {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  color: $gray_5;
+  color: theme.$gray_5;
   text-decoration: none;
   transition: all 150ms ease-out;
   cursor: pointer;
   position: relative;
 
   &:hover {
-    background: $gray_1;
-    color: $gray_6;
+    background: theme.$gray_1;
+    color: theme.$gray_6;
   }
 
   &.active {
-    background: $purple_tint;
-    color: $purple_2;
+    background: theme.$purple_tint;
+    color: theme.$purple_2;
     
     &::before {
       content: '';
@@ -70,7 +70,7 @@ export default {
       top: 0;
       bottom: 0;
       width: 4px;
-      background: $purple_2;
+      background: theme.$purple_2;
     }
   }
 

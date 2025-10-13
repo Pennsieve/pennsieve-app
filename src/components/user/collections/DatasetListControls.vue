@@ -96,7 +96,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dataset-list-controls {
   align-items: center;
@@ -122,15 +122,15 @@ export default {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   font-size: 14px;
-  color: $gray_6;
+  color: theme.$gray_6;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $purple_1;
-    color: $purple_1;
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
   }
 
   .dropdown-text {
@@ -152,7 +152,7 @@ export default {
   left: 0;
   right: 0;
   background: white;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   z-index: 1000;
@@ -163,11 +163,11 @@ export default {
   padding: 8px 12px;
   cursor: pointer;
   font-size: 14px;
-  color: $gray_6;
+  color: theme.$gray_6;
   transition: background 0.2s ease;
 
   &:hover {
-    background: $gray_1;
+    background: theme.$gray_1;
   }
 
   &:first-child {

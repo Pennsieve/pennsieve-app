@@ -55,14 +55,14 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .card-wrapper {
   width: 200px;
   height: 150px;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 4px 4px $gray_2;
+  box-shadow: 2px 4px 4px theme.$gray_2;
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -72,10 +72,10 @@ export default {
   }
 
   .top {
-    background: $white;
-    border-left: 1px solid $gray_2;
-    border-top: 1px solid $gray_2;
-    border-right: 1px solid $gray_2;
+    background: theme.$white;
+    border-left: 1px solid theme.$gray_2;
+    border-top: 1px solid theme.$gray_2;
+    border-right: 1px solid theme.$gray_2;
     border-radius: 4px 4px 0 0;
   }
 
@@ -91,7 +91,7 @@ export default {
   font-size: 12pt;
   justify-content: center;
   text-align: center;
-  color: $purple_3;
+  color: theme.$purple_3;
 
   a {
     color: inherit;

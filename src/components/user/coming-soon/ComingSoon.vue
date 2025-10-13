@@ -48,7 +48,7 @@ const useIconComponent = computed(() => props.iconComponent !== null)
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .coming-soon-container {
   padding: 80px 40px;
@@ -61,7 +61,7 @@ const useIconComponent = computed(() => props.iconComponent !== null)
   background: white;
   border-radius: 8px;
   padding: 60px 40px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -81,13 +81,13 @@ const useIconComponent = computed(() => props.iconComponent !== null)
 h2 {
   font-weight: 300;
   font-size: 28px;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin: 0 0 16px 0;
 }
 
 .description {
   font-size: 16px;
-  color: $gray_5;
+  color: theme.$gray_5;
   margin-bottom: 32px;
   line-height: 1.5;
   max-width: 500px;
@@ -97,11 +97,11 @@ h2 {
 
 .additional-info {
   padding-top: 24px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
   
   p {
     font-size: 14px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin: 0;
     font-style: italic;
   }

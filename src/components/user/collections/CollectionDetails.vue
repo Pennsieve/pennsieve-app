@@ -350,7 +350,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .collection-details {
   background-color: #ffffff;
@@ -367,7 +367,7 @@ export default {
 
     .loader-header {
       height: 40px;
-      background: $gray_1;
+      background: theme.$gray_1;
       border-radius: 4px;
       margin-bottom: 16px;
       width: 60%;
@@ -376,7 +376,7 @@ export default {
 
     .loader-description {
       height: 20px;
-      background: $gray_1;
+      background: theme.$gray_1;
       border-radius: 4px;
       margin-bottom: 32px;
       width: 80%;
@@ -386,7 +386,7 @@ export default {
     .loader-datasets {
       .loader-dataset {
         height: 120px;
-        background: $gray_1;
+        background: theme.$gray_1;
         border-radius: 4px;
         margin-bottom: 16px;
         animation: pulse 2s infinite;
@@ -408,7 +408,7 @@ export default {
 //}
 
 .discover-content-title {
-  color: $purple_1;
+  color: theme.$purple_1;
   font-size: 16px;
   font-weight: 500;
   line-height: 40px;
@@ -429,14 +429,14 @@ export default {
 
   h5 {
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin-bottom: 24px;
     font-weight: 500;
   }
 
   .btn-browse {
-    background: $purple_1;
-    color: $white;
+    background: theme.$purple_1;
+    color: theme.$white;
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -445,14 +445,14 @@ export default {
     transition: background 0.2s ease;
 
     &:hover {
-      background: $purple_2;
+      background: theme.$purple_2;
     }
   }
 }
 
 .dataset-info {
-  background-color: $gray_1;
-  border-top: 1px solid $gray_2;
+  background-color: theme.$gray_1;
+  border-top: 1px solid theme.$gray_2;
   padding: 40px 0 64px;
   margin-top: 32px;
 
@@ -476,7 +476,7 @@ export default {
   }
 
   h2 {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-size: 28px;
     font-weight: 600;
     line-height: 36px;
@@ -484,7 +484,7 @@ export default {
   }
 
   h3 {
-    color: $gray_5;
+    color: theme.$gray_5;
     font-size: 18px;
     font-weight: 600;
     line-height: 24px;
@@ -503,13 +503,13 @@ export default {
   }
 
   .info-text {
-    color: $gray_5;
+    color: theme.$gray_5;
     font-size: 14px;
     line-height: 20px;
 
     .info-text-caps {
       text-transform: uppercase;
-      color: $gray_4;
+      color: theme.$gray_4;
       font-size: 11px;
       font-weight: 600;
       line-height: 16px;
@@ -528,8 +528,8 @@ export default {
   align-items: center;
 
   .copy-button {
-    background: $white;
-    border: 1px solid $gray_3;
+    background: theme.$white;
+    border: 1px solid theme.$gray_3;
     cursor: pointer;
     padding: 10px 12px;
     border-radius: 6px;
@@ -538,17 +538,17 @@ export default {
     align-items: center;
 
     &:hover {
-      background: $gray_1;
-      border-color: $gray_4;
+      background: theme.$gray_1;
+      border-color: theme.$gray_4;
     }
 
     .icon-upload {
-      color: $gray_5;
+      color: theme.$gray_5;
     }
   }
 
   .copy-success-notification {
-    color: $green_1;
+    color: theme.$green_1;
     margin-left: 12px;
     font-size: 14px;
     font-weight: 500;
@@ -561,9 +561,9 @@ export default {
   gap: 8px;
 
   .tag {
-    background: $purple_tint;
-    color: $purple_1;
-    border: 1px solid rgba($purple_1, 0.2);
+    background: theme.$purple_tint;
+    color: theme.$purple_1;
+    border: 1px solid rgba(theme.$purple_1, 0.2);
     padding: 6px 12px;
     border-radius: 16px;
     font-size: 12px;
@@ -571,8 +571,8 @@ export default {
     transition: all 0.2s ease;
 
     &:hover {
-      background: rgba($purple_1, 0.1);
-      border-color: rgba($purple_1, 0.3);
+      background: rgba(theme.$purple_1, 0.1);
+      border-color: rgba(theme.$purple_1, 0.3);
     }
   }
 }
@@ -583,19 +583,19 @@ export default {
 
   h3 {
     font-size: 24px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin-bottom: 16px;
   }
 
   p {
-    color: $gray_4;
+    color: theme.$gray_4;
     font-size: 16px;
     margin-bottom: 32px;
   }
 
   .btn-back {
-    background: $purple_1;
-    color: $white;
+    background: theme.$purple_1;
+    color: theme.$white;
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -604,7 +604,7 @@ export default {
     transition: background 0.2s ease;
 
     &:hover {
-      background: $purple_2;
+      background: theme.$purple_2;
     }
   }
 }
