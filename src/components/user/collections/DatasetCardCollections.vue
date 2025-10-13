@@ -182,10 +182,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dataset-card {
-  border: solid 1px $gray_2;
+  border: solid 1px theme.$gray_2;
   border-radius: 3px 3px 0 0;
   background: white;
 }
@@ -272,7 +272,7 @@ h3 {
 }
 
 .meta {
-  border-top: solid 1px $gray_2;
+  border-top: solid 1px theme.$gray_2;
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -281,13 +281,13 @@ h3 {
   .author {
     font-size: 12px;
     line-height: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 
   .tags {
     font-size: 12px;
     line-height: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     text-align: right;
   }
 }

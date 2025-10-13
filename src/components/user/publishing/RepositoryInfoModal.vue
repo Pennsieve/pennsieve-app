@@ -104,7 +104,7 @@ watch(() => props.dialogVisible, (isVisible) => {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .image-wrapper {
   display: flex;
@@ -122,7 +122,7 @@ watch(() => props.dialogVisible, (isVisible) => {
 .loading-state {
   text-align: center;
   padding: 40px 20px;
-  color: $gray_5;
+  color: theme.$gray_5;
 }
 
 :deep(.el-dialog) {

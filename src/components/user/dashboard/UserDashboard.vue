@@ -85,7 +85,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-dashboard {
   max-width: 1200px;
@@ -98,13 +98,13 @@ export default {
   h1 {
     font-size: 32px;
     font-weight: 300;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 12px 0;
   }
 
   .subtitle {
     font-size: 16px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin: 0;
   }
 }

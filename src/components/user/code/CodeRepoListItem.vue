@@ -190,18 +190,18 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .repo-list-item {
   background: white;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   margin-bottom: 8px;
   transition: all 0.2s ease;
   overflow: hidden;
 
   &:hover {
-    border-color: $gray_3;
+    border-color: theme.$gray_3;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 }
@@ -241,7 +241,7 @@ export default {
     text-decoration: none;
     
     .repo-name {
-      color: $purple_2;
+      color: theme.$purple_2;
     }
   }
 }
@@ -249,7 +249,7 @@ export default {
 .repo-name {
   font-size: 20px;
   font-weight: 400;
-  color: $purple_2;
+  color: theme.$purple_2;
   margin: 0;
   line-height: 1.3;
   transition: color 0.2s ease;
@@ -270,15 +270,15 @@ export default {
   text-transform: uppercase;
   
   &.private {
-    background: lighten($red_1, 35%);
-    color: $red_1;
+    background: lighten(theme.$red_1, 35%);
+    color: theme.$red_1;
   }
 }
 
 .repo-language {
   font-size: 12px;
-  color: $gray_5;
-  background: $gray_1;
+  color: theme.$gray_5;
+  background: theme.$gray_1;
   padding: 3px 8px;
   border-radius: 12px;
   font-weight: 500;
@@ -307,28 +307,28 @@ export default {
   white-space: nowrap;
 
   &.status-unpublished {
-    background: lighten($gray_4, 25%);
-    color: $gray_4;
+    background: lighten(theme.$gray_4, 25%);
+    color: theme.$gray_4;
   }
 
   &.status-app {
-    background: $purple_1;
-    color: $purple_tint;
+    background: theme.$purple_1;
+    color: theme.$purple_tint;
   }
 
   &.status-discover {
-    background: $orange_1;
-    color: $orange_tint;
+    background: theme.$orange_1;
+    color: theme.$orange_tint;
   }
 
   &.status-both {
-    background: lighten($status_green, 40%);
-    color: $status_green;
+    background: lighten(theme.$status_green, 40%);
+    color: theme.$status_green;
   }
 
   &.status-paused {
-    background: lighten($status_orange, 40%);
-    color: $status_orange;
+    background: lighten(theme.$status_orange, 40%);
+    color: theme.$status_orange;
   }
 }
 
@@ -338,23 +338,23 @@ export default {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   border-radius: 6px;
   background: white;
-  color: $gray_4;
+  color: theme.$gray_4;
   cursor: pointer;
   transition: all 0.2s ease;
   
   &:hover {
-    border-color: $gray_4;
-    color: $gray_5;
-    background: $gray_1;
+    border-color: theme.$gray_4;
+    color: theme.$gray_5;
+    background: theme.$gray_1;
   }
   
   &:focus {
     outline: none;
-    border-color: $purple_2;
-    color: $purple_2;
+    border-color: theme.$purple_2;
+    color: theme.$purple_2;
   }
 }
 
@@ -362,7 +362,7 @@ export default {
 .repo-details {
   .repo-description {
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.5;
     margin: 0 0 16px 0;
     overflow: hidden;
@@ -379,7 +379,7 @@ export default {
     
     .stat-item {
       font-size: 13px;
-      color: $gray_4;
+      color: theme.$gray_4;
       display: flex;
       align-items: center;
       gap: 5px;

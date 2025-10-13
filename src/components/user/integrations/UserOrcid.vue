@@ -221,8 +221,8 @@ const fetchORCIDApiUrl = async () => {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
-@import '../../../styles/element/dialog';
+@use '../../../styles/_theme.scss';
+@use '../../../styles/element/dialog';
 
 
 .user-orcid-container {
@@ -234,7 +234,7 @@ const fetchORCIDApiUrl = async () => {
     font-weight: 300;
     font-size: 20px;
     margin-top: 0;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-bottom: 8px;
   }
 
@@ -242,12 +242,12 @@ const fetchORCIDApiUrl = async () => {
     margin-bottom: 20px;
     font-weight: 300;
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     max-width: 500px;
     line-height: 1.5;
 
     a {
-      color: $purple_2;
+      color: theme.$purple_2;
       text-decoration: none;
 
       &:hover {
@@ -314,7 +314,7 @@ const fetchORCIDApiUrl = async () => {
     flex: 1;
 
     a {
-      color: $purple_2;
+      color: theme.$purple_2;
       text-decoration: none;
       font-family: monospace;
       font-size: 14px;
@@ -328,15 +328,15 @@ const fetchORCIDApiUrl = async () => {
   .orcid-delete-button {
     background: none;
     border: none;
-    color: $gray_4;
+    color: theme.$gray_4;
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
     transition: all 0.2s ease;
 
     &:hover {
-      color: $red_1;
-      background: rgba($red_1, 0.1);
+      color: theme.$red_1;
+      background: rgba(theme.$red_1, 0.1);
     }
   }
 }
@@ -346,7 +346,7 @@ const fetchORCIDApiUrl = async () => {
 
   .orcid-loader {
     text-align: center;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -368,7 +368,7 @@ const fetchORCIDApiUrl = async () => {
 
     li {
       margin-bottom: 8px;
-      color: $gray_5;
+      color: theme.$gray_5;
     }
   }
 }

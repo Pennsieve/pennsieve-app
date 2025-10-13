@@ -283,7 +283,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .shared-with-me {
   padding: 16px;
@@ -298,13 +298,13 @@ export default {
   h1 {
     font-size: 32px;
     font-weight: 300;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 12px 0;
   }
 
   .subtitle {
     font-size: 16px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin: 0;
   }
 }
@@ -323,13 +323,13 @@ export default {
   h2 {
     font-size: 20px;
     font-weight: 300;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
 
   .section-description {
     font-size: 14px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin: 0;
   }
 }
@@ -339,7 +339,7 @@ export default {
   flex-direction: column;
   align-items: center;
   padding: 48px 24px;
-  color: $gray_4;
+  color: theme.$gray_4;
 
   p {
     margin-top: 16px;
@@ -356,13 +356,13 @@ export default {
     h3 {
       font-size: 18px;
       font-weight: 500;
-      color: $gray_5;
+      color: theme.$gray_5;
       margin: 16px 0 8px 0;
     }
 
     p {
       font-size: 14px;
-      color: $gray_4;
+      color: theme.$gray_4;
       margin: 0;
     }
   }
@@ -375,14 +375,14 @@ export default {
 }
 
 .workspace-card {
-  background: $white;
-  border: 1px solid $gray_2;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $purple_2;
+    border-color: theme.$purple_2;
     box-shadow: 0 4px 12px rgba(77, 98, 140, 0.15);
     transform: translateY(-1px);
 
@@ -400,7 +400,7 @@ export default {
 }
 
 .workspace-icon {
-  color: $purple_2;
+  color: theme.$purple_2;
   flex-shrink: 0;
 }
 
@@ -412,7 +412,7 @@ export default {
 .workspace-name {
   font-size: 16px;
   font-weight: 500;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin: 0 0 4px 0;
   white-space: nowrap;
   overflow: hidden;
@@ -422,7 +422,7 @@ export default {
 .workspace-role {
   font-size: 12px;
   font-weight: 600;
-  color: $purple_2;
+  color: theme.$purple_2;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 8px 0;
@@ -430,7 +430,7 @@ export default {
 
 .workspace-description {
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   margin: 0;
   line-height: 1.4;
   display: -webkit-box;
@@ -440,7 +440,7 @@ export default {
 }
 
 .workspace-arrow {
-  color: $gray_4;
+  color: theme.$gray_4;
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -476,7 +476,7 @@ export default {
 
 .dataset-count {
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   white-space: nowrap;
 }
 
@@ -491,14 +491,14 @@ export default {
 }
 
 .dataset-card {
-  background: $white;
-  border: 1px solid $gray_2;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $purple_2;
+    border-color: theme.$purple_2;
     box-shadow: 0 4px 12px rgba(77, 98, 140, 0.15);
     transform: translateY(-1px);
 
@@ -516,7 +516,7 @@ export default {
 }
 
 .dataset-icon {
-  color: $purple_2;
+  color: theme.$purple_2;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -529,7 +529,7 @@ export default {
 .dataset-name {
   font-size: 16px;
   font-weight: 500;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin: 0 0 4px 0;
   white-space: nowrap;
   overflow: hidden;
@@ -539,7 +539,7 @@ export default {
 .dataset-org {
   font-size: 12px;
   font-weight: 600;
-  color: $purple_2;
+  color: theme.$purple_2;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 8px 0;
@@ -547,7 +547,7 @@ export default {
 
 .dataset-description {
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   margin: 0 0 12px 0;
   line-height: 1.4;
   display: -webkit-box;
@@ -560,7 +560,7 @@ export default {
   display: flex;
   gap: 16px;
   font-size: 12px;
-  color: $gray_4;
+  color: theme.$gray_4;
 
   @media (max-width: 480px) {
     flex-direction: column;
@@ -569,7 +569,7 @@ export default {
 }
 
 .dataset-arrow {
-  color: $gray_4;
+  color: theme.$gray_4;
   transition: transform 0.2s ease;
   flex-shrink: 0;
   margin-top: 2px;

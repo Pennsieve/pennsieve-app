@@ -353,7 +353,7 @@ function manageRepo(repo) {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-github-container {
   margin: 0;
@@ -364,14 +364,14 @@ function manageRepo(repo) {
     font-weight: 300;
     font-size: 20px;
     margin-top: 0;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-bottom: 8px;
   }
 
   h3 {
     font-weight: 500;
     font-size: 18px;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 32px 0 16px 0;
   }
 
@@ -379,11 +379,11 @@ function manageRepo(repo) {
     margin-bottom: 20px;
     font-weight: 300;
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.5;
 
     a {
-      color: $purple_2;
+      color: theme.$purple_2;
       text-decoration: none;
 
       &:hover {
@@ -394,7 +394,7 @@ function manageRepo(repo) {
 }
 
 .loading {
-  color: $gray_4;
+  color: theme.$gray_4;
   padding: 16px 0;
   text-align: center;
 }
@@ -412,7 +412,7 @@ function manageRepo(repo) {
 }
 
 .integration-success {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   padding: 16px;
   display: flex;
   align-items: center;
@@ -422,7 +422,7 @@ function manageRepo(repo) {
 
   .link {
     margin-left: 16px;
-    color: $purple_2;
+    color: theme.$purple_2;
     text-decoration: none;
     flex: 1;
     font-family: monospace;
@@ -436,15 +436,15 @@ function manageRepo(repo) {
   .delete-button {
     background: none;
     border: none;
-    color: $gray_4;
+    color: theme.$gray_4;
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
     transition: all 0.2s ease;
 
     &:hover {
-      color: $red_1;
-      background: rgba($red_1, 0.1);
+      color: theme.$red_1;
+      background: rgba(theme.$red_1, 0.1);
     }
   }
 }
@@ -452,7 +452,7 @@ function manageRepo(repo) {
 .repositories-section {
   margin-top: 32px;
   padding-top: 32px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 }
 
 .repo-list {
@@ -464,15 +464,15 @@ function manageRepo(repo) {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   margin-bottom: 12px;
   background: white;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $purple_3;
-    background: $purple_tint;
+    border-color: theme.$purple_3;
+    background: theme.$purple_tint;
   }
 
   .repo-info {
@@ -482,20 +482,20 @@ function manageRepo(repo) {
       margin: 0 0 4px 0;
       font-size: 16px;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
     }
 
     p {
       margin: 0 0 8px 0;
       font-size: 14px;
-      color: $gray_4;
+      color: theme.$gray_4;
     }
 
     .repo-meta {
       display: flex;
       gap: 16px;
       font-size: 12px;
-      color: $gray_4;
+      color: theme.$gray_4;
 
       .language {
         font-weight: 500;
@@ -510,9 +510,9 @@ function manageRepo(repo) {
 
 .no-repos {
   text-align: center;
-  color: $gray_4;
+  color: theme.$gray_4;
   padding: 32px;
-  background: $gray_1;
+  background: theme.$gray_1;
   border-radius: 4px;
   margin-top: 16px;
 }
@@ -531,7 +531,7 @@ function manageRepo(repo) {
 
     li {
       margin-bottom: 8px;
-      color: $gray_5;
+      color: theme.$gray_5;
     }
   }
 }

@@ -168,7 +168,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .dataset-card-selector {
   position: relative;
@@ -183,7 +183,7 @@ export default {
 
   &.selected {
     .dataset-card {
-      border-color: $purple_1;
+      border-color: theme.$purple_1;
       box-shadow: 0 0 0 2px rgba(77, 98, 140, 0.2);
     }
   }
@@ -203,9 +203,9 @@ export default {
 }
 
 .dataset-card {
-  border: solid 1px $gray_3;
+  border: solid 1px theme.$gray_3;
   border-radius: 3px;
-  box-shadow: 1px 2px 2px $gray_2;
+  box-shadow: 1px 2px 2px theme.$gray_2;
   background: white;
   margin-left: 40px;
   transition: all 0.2s ease;
@@ -291,12 +291,12 @@ h3 {
 }
 
 .meta {
-  border-top: solid 1px $gray_3;
+  border-top: solid 1px theme.$gray_3;
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   padding: 8px 16px;
-  background-image: linear-gradient(90deg, $white, rgba(77, 98, 140, 0.05));
+  background-image: linear-gradient(90deg, theme.$white, rgba(77, 98, 140, 0.05));
 
   .author {
     font-size: 12px;

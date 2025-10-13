@@ -160,7 +160,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .contributor-item {
   position: relative;
@@ -176,7 +176,7 @@ export default {
     text-decoration: underline;
     
     &:hover {
-      color: $purple_1;
+      color: theme.$purple_1;
     }
   }
 }
@@ -192,7 +192,7 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   background: white;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -204,7 +204,7 @@ export default {
   .loading, .error {
     text-align: center;
     padding: 8px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 
   .error {
@@ -223,14 +223,14 @@ export default {
       margin: 8px 0;
       font-size: 14px;
       line-height: 1.4;
-      color: $gray_6;
+      color: theme.$gray_6;
 
       strong {
         color: #000;
       }
 
       a {
-        color: $purple_1;
+        color: theme.$purple_1;
         text-decoration: none;
 
         &:hover {
@@ -252,7 +252,7 @@ export default {
     border: none;
     font-size: 18px;
     cursor: pointer;
-    color: $gray_4;
+    color: theme.$gray_4;
     line-height: 1;
     padding: 4px;
 
@@ -280,7 +280,7 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-bottom-color: $gray_2;
+  border-bottom-color: theme.$gray_2;
 }
 
 .orcid-popover::after {

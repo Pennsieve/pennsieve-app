@@ -146,8 +146,8 @@
   </script>
   
   <style scoped lang="scss">
-  @import '../../../styles/_theme.scss';
-  @import '../../../styles/element/dialog';
+  @use '../../../styles/_theme.scss';
+  @use '../../../styles/element/dialog';
 
   .edit-collection-button{
     background: #011F5B;

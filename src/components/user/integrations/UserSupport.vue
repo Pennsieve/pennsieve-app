@@ -257,7 +257,7 @@ function resetForm() {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-support-container {
   padding: 40px;
@@ -268,13 +268,13 @@ function resetForm() {
 h2 {
   font-weight: 300;
   font-size: 24px;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin-bottom: 8px;
 }
 
 .support-intro {
   font-size: 16px;
-  color: $gray_5;
+  color: theme.$gray_5;
   margin-bottom: 32px;
   line-height: 1.5;
 }
@@ -287,14 +287,14 @@ h2 {
 }
 
 .support-option {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   padding: 24px;
   background: white;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $gray_3;
+    border-color: theme.$gray_3;
   }
 }
 
@@ -308,7 +308,7 @@ h2 {
 .option-icon {
   flex-shrink: 0;
   margin-top: 4px;
-  color: $purple_1;
+  color: theme.$purple_1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,13 +320,13 @@ h2 {
   h3 {
     font-size: 18px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
 
   p {
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin: 0;
     line-height: 1.4;
   }
@@ -337,11 +337,11 @@ h2 {
   
   .schedule-item {
     font-size: 13px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin-bottom: 4px;
     
     strong {
-      color: $gray_6;
+      color: theme.$gray_6;
     }
   }
 }
@@ -356,7 +356,7 @@ h2 {
 .support-form {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 }
 
 .support-form-content {
@@ -377,7 +377,7 @@ h2 {
     margin-bottom: 4px;
     font-size: 14px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 }
 
@@ -386,14 +386,14 @@ h2 {
   max-width: 100%;
   box-sizing: border-box;
   padding: 8px 12px;
-  border: 1px solid $gray_3;
+  border: 1px solid theme.$gray_3;
   border-radius: 4px;
   font-size: 14px;
   font-family: inherit;
 
   &:focus {
     outline: none;
-    border-color: $purple_2;
+    border-color: theme.$purple_2;
   }
 }
 
@@ -409,20 +409,20 @@ h2 {
 }
 
 .error-message {
-  color: $red_1;
+  color: theme.$red_1;
   font-size: 14px;
   margin-top: 12px;
   padding: 8px 12px;
-  background: rgba($red_1, 0.1);
+  background: rgba(theme.$red_1, 0.1);
   border-radius: 4px;
-  border: 1px solid rgba($red_1, 0.2);
+  border: 1px solid rgba(theme.$red_1, 0.2);
 }
 
 .success-message {
   margin-top: 16px;
   padding: 24px;
-  background: rgba($green_1, 0.1);
-  border: 1px solid rgba($green_1, 0.2);
+  background: rgba(theme.$green_1, 0.1);
+  border: 1px solid rgba(theme.$green_1, 0.2);
   border-radius: 8px;
   text-align: center;
 
@@ -432,13 +432,13 @@ h2 {
   }
 
   h4 {
-    color: $green_1;
+    color: theme.$green_1;
     font-size: 18px;
     margin: 0 0 12px 0;
   }
 
   p {
-    color: $gray_6;
+    color: theme.$gray_6;
     font-size: 14px;
     margin: 8px 0;
     line-height: 1.4;
@@ -452,7 +452,7 @@ h2 {
   h3 {
     font-size: 20px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin-bottom: 16px;
   }
 }
@@ -466,16 +466,16 @@ h2 {
 .resource-item {
   display: block;
   padding: 16px;
-  background: $gray_1;
+  background: theme.$gray_1;
   border-radius: 6px;
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   text-decoration: none;
   color: inherit;
   transition: all 0.2s ease;
 
   &:hover {
     background: white;
-    border-color: $purple_3;
+    border-color: theme.$purple_3;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     text-decoration: none;
     color: inherit;
@@ -484,13 +484,13 @@ h2 {
   h4 {
     font-size: 14px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
 
   p {
     font-size: 13px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin: 0;
     line-height: 1.3;
   }

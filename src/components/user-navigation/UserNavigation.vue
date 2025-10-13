@@ -208,12 +208,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../styles/_theme.scss';
+@use '../../styles/_theme.scss';
 
 .user-navigation {
-  background: linear-gradient(to top, $purple_2, $purple_1);
+  background: linear-gradient(to top, theme.$purple_2, theme.$purple_1);
   box-sizing: border-box;
-  color: $white;
+  color: theme.$white;
   display: flex;
   flex-direction: column;
   height: 100vh;

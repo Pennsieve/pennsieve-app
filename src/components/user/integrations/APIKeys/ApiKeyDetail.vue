@@ -117,14 +117,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../../../../styles/_theme.scss';
+@use '../../../../styles/_theme.scss';
 
 .api-key-message {
   margin-bottom: 20px;
 }
 
 .copy-text {
-  color: $green_1;
+  color: theme.$green_1;
   height: 24px;
 }
 </style>

@@ -325,7 +325,7 @@ function copyToClipboard() {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-security-container {
   padding: 40px;
@@ -344,11 +344,11 @@ function copyToClipboard() {
   flex-direction: row;
   gap: 16px;
   align-items: center;
-  color: $orange_1;
+  color: theme.$orange_1;
 
   .icon-upload {
     display: flex;
-    color: $purple_3;
+    color: theme.$purple_3;
   }
 }
 
@@ -356,7 +356,7 @@ function copyToClipboard() {
   margin: 8px 0 16px 0;
 
   button {
-    color: $purple_3;
+    color: theme.$purple_3;
     background: none;
     border: none;
     cursor: pointer;
@@ -381,15 +381,15 @@ function copyToClipboard() {
 }
 
 .qr-placeholder {
-  border: 2px dashed $gray_3;
+  border: 2px dashed theme.$gray_3;
   padding: 20px;
   text-align: center;
-  background: $gray_1;
+  background: theme.$gray_1;
   
   p {
     margin: 0;
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -406,7 +406,7 @@ function copyToClipboard() {
 h2 {
   font-weight: 300;
   font-size: 20px;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin-bottom: 8px;
 }
 
@@ -414,13 +414,13 @@ p {
   margin-bottom: 20px;
   font-weight: 300;
   font-size: 14px;
-  color: $gray_5;
+  color: theme.$gray_5;
   max-width: 500px;
   line-height: 1.5;
 }
 
 .copy-success-notification {
-  color: $green_1;
+  color: theme.$green_1;
   font-size: 12px;
 }
 

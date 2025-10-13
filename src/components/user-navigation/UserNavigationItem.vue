@@ -40,13 +40,13 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../styles/_theme.scss';
+@use '../../styles/_theme.scss';
 
 .user-navigation-item {
   align-items: center;
   background: transparent;
   box-sizing: border-box;
-  color: $white;
+  color: theme.$white;
   cursor: pointer;
   display: flex;
   font-size: 14px;
@@ -65,19 +65,19 @@ export default {
     background: rgba(255, 255, 255, 0.1);
     outline: none;
     text-decoration: none;
-    color: $white;
+    color: theme.$white;
     
     .svg-icon {
-      color: $white;
+      color: theme.$white;
     }
   }
 
   &.router-link-active {
     background: rgba(255, 255, 255, 0.15);
-    color: $white !important;
+    color: theme.$white !important;
 
     .svg-icon {
-      color: $white !important;
+      color: theme.$white !important;
     }
     
     &::before {
@@ -105,7 +105,7 @@ export default {
   }
 
   .svg-icon {
-    color: $gray_2;
+    color: theme.$gray_2;
   }
 
   .icon-main {

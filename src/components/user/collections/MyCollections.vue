@@ -88,7 +88,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .my-collections {
   margin: 32px;
@@ -99,7 +99,7 @@ export default {
 
   .page-description {
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
     line-height: 1.6;
     margin: 0 0 24px 0;
     max-width: 800px;
@@ -121,26 +121,26 @@ export default {
       .search-icon {
         position: absolute;
         left: 16px;
-        color: $gray_4;
+        color: theme.$gray_4;
         pointer-events: none;
       }
 
       .search-input {
         width: 100%;
         padding: 10px 16px 10px 48px;
-        border: 1px solid $gray_2;
+        border: 1px solid theme.$gray_2;
         border-radius: 4px;
         font-size: 14px;
         background: white;
         transition: all 0.2s ease;
         
         &::placeholder {
-          color: $gray_4;
+          color: theme.$gray_4;
         }
         
         &:focus {
           outline: none;
-          border-color: $purple_2;
+          border-color: theme.$purple_2;
           box-shadow: 0 0 0 2px rgba(77, 98, 140, 0.1);
         }
       }

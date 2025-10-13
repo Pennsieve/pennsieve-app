@@ -421,8 +421,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
-@import '../../../styles/element/dialog';
+@use '../../../styles/_theme.scss';
+@use '../../../styles/element/dialog';
 
 
 .dataset-finder-backdrop {
@@ -454,19 +454,19 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
 
   h2 {
     margin: 0;
     font-size: 24px;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .close-button {
     background: none;
     border: none;
     font-size: 28px;
-    color: $gray_4;
+    color: theme.$gray_4;
     cursor: pointer;
     padding: 0;
     width: 32px;
@@ -476,7 +476,7 @@ export default {
     justify-content: center;
 
     &:hover {
-      color: $gray_6;
+      color: theme.$gray_6;
     }
   }
 }
@@ -495,14 +495,14 @@ export default {
   .search-input {
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     //border-radius: 8px;
     font-size: 14px;
     box-sizing: border-box;
     
     &:focus {
       outline: none;
-      border-color: $purple_1;
+      border-color: theme.$purple_1;
       box-shadow: 0 0 0 3px rgba(77, 98, 140, 0.1);
     }
   }
@@ -515,8 +515,8 @@ export default {
 
 .loading-state {
   .dataset-loader {
-    background: $white;
-    border: 1px solid $gray_2;
+    background: theme.$white;
+    border: 1px solid theme.$gray_2;
     //border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
@@ -529,7 +529,7 @@ export default {
       .loader-checkbox {
         width: 20px;
         height: 20px;
-        background: $gray_1;
+        background: theme.$gray_1;
         //border-radius: 4px;
         flex-shrink: 0;
       }
@@ -539,7 +539,7 @@ export default {
         
         .loader-title {
           height: 20px;
-          background: $gray_1;
+          background: theme.$gray_1;
           border-radius: 4px;
           margin-bottom: 8px;
           width: 60%;
@@ -547,7 +547,7 @@ export default {
 
         .loader-description {
           height: 16px;
-          background: $gray_1;
+          background: theme.$gray_1;
           border-radius: 4px;
           width: 90%;
         }
@@ -563,12 +563,12 @@ export default {
   p {
     margin: 0 0 8px 0;
     font-size: 16px;
-    color: $gray_5;
+    color: theme.$gray_5;
   }
 
   .help-text {
     font-size: 14px;
-    color: $gray_4;
+    color: theme.$gray_4;
   }
 }
 
@@ -577,7 +577,7 @@ export default {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 
   .btn-cancel, .btn-add {
     padding: 10px 20px;
@@ -590,21 +590,21 @@ export default {
 
   .btn-cancel {
     background: white;
-    border: 1px solid $gray_2;
-    color: $gray_6;
+    border: 1px solid theme.$gray_2;
+    color: theme.$gray_6;
 
     &:hover {
-      background: $gray_1;
+      background: theme.$gray_1;
     }
   }
 
   .btn-add {
-    background: $purple_1;
+    background: theme.$purple_1;
     border: none;
     color: white;
 
     &:hover:not(:disabled) {
-      background: $purple_2;
+      background: theme.$purple_2;
     }
 
     &:disabled {

@@ -288,7 +288,7 @@ function createProposal() {
 </template>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .proposal-content {
   padding: 0;
@@ -300,7 +300,7 @@ function createProposal() {
   justify-content: space-between;
   align-items: flex-start;
   padding: 20px 24px;
-  background: linear-gradient(135deg, lighten($purple_2, 45%) 0%, lighten($purple_2, 50%) 100%);
+  background: linear-gradient(135deg, lighten(theme.$purple_2, 45%) 0%, lighten(theme.$purple_2, 50%) 100%);
   margin-bottom: 24px;
 
   .repo-info {
@@ -322,14 +322,14 @@ function createProposal() {
     .repo-details {
       h2 {
         margin: 0 0 4px 0;
-        color: $purple_3;
+        color: theme.$purple_3;
         font-size: 20px;
         font-weight: 600;
       }
 
       .repo-description {
         margin: 0;
-        color: $gray_5;
+        color: theme.$gray_5;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -343,7 +343,7 @@ function createProposal() {
     padding: 8px 12px;
     background: rgba(white, 0.8);
     border-radius: 6px;
-    border: 1px solid rgba($purple_2, 0.2);
+    border: 1px solid rgba(theme.$purple_2, 0.2);
 
     .indicator-icon {
       font-size: 16px;
@@ -352,7 +352,7 @@ function createProposal() {
     .indicator-text {
       font-size: 12px;
       font-weight: 500;
-      color: $purple_3;
+      color: theme.$purple_3;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -371,7 +371,7 @@ function createProposal() {
 
     h3 {
       margin: 0;
-      color: $gray_6;
+      color: theme.$gray_6;
       font-size: 18px;
       font-weight: 500;
     }
@@ -385,16 +385,16 @@ function createProposal() {
       .completed-count {
         font-size: 20px;
         font-weight: 600;
-        color: $purple_3;
+        color: theme.$purple_3;
       }
 
       .total-count {
-        color: $gray_4;
+        color: theme.$gray_4;
         font-weight: 500;
       }
 
       .progress-label {
-        color: $gray_5;
+        color: theme.$gray_5;
         margin-left: 6px;
       }
     }
@@ -402,13 +402,13 @@ function createProposal() {
 
   .progress-bar {
     height: 8px;
-    background: $gray_1;
+    background: theme.$gray_1;
     border-radius: 4px;
     overflow: hidden;
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, $purple_2 0%, lighten($purple_2, 10%) 100%);
+      background: linear-gradient(90deg, theme.$purple_2 0%, lighten(theme.$purple_2, 10%) 100%);
       transition: width 0.3s ease;
       border-radius: 4px;
     }
@@ -419,20 +419,20 @@ function createProposal() {
 .proposal-form {
   .form-section {
     margin-bottom: 32px;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
     border-radius: 3px;
     overflow: hidden;
     transition: all 0.2s ease;
 
     &:hover {
-      border-color: $purple_2;
-      box-shadow: 0 2px 8px rgba($purple_2, 0.1);
+      border-color: theme.$purple_2;
+      box-shadow: 0 2px 8px rgba(theme.$purple_2, 0.1);
     }
 
     .section-header {
       padding: 16px 20px;
-      background: $gray_1;
-      border-bottom: 1px solid $gray_2;
+      background: theme.$gray_1;
+      border-bottom: 1px solid theme.$gray_2;
 
       h4 {
         margin: 0 0 4px 0;
@@ -441,7 +441,7 @@ function createProposal() {
         gap: 8px;
         font-size: 16px;
         font-weight: 600;
-        color: $gray_6;
+        color: theme.$gray_6;
 
         .field-number {
           display: flex;
@@ -449,7 +449,7 @@ function createProposal() {
           justify-content: center;
           width: 24px;
           height: 24px;
-          background: $purple_2;
+          background: theme.$purple_2;
           color: white;
           border-radius: 50%;
           font-size: 12px;
@@ -464,7 +464,7 @@ function createProposal() {
 
       .field-description {
         margin: 0;
-        color: $gray_5;
+        color: theme.$gray_5;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -475,22 +475,22 @@ function createProposal() {
 
       :deep(.el-input) {
         &.field-completed .el-input__wrapper {
-          border-color: $green_2;
-          box-shadow: 0 0 0 1px rgba($green_2, 0.2);
+          border-color: theme.$green_2;
+          box-shadow: 0 0 0 1px rgba(theme.$green_2, 0.2);
         }
       }
 
       :deep(.el-textarea) {
         &.field-completed .el-textarea__inner {
-          border-color: $green_2;
-          box-shadow: 0 0 0 1px rgba($green_2, 0.2);
+          border-color: theme.$green_2;
+          box-shadow: 0 0 0 1px rgba(theme.$green_2, 0.2);
         }
       }
     }
 
     &.field-completed {
-      border-color: $green_2;
-      background: rgba($green_2, 0.02);
+      border-color: theme.$green_2;
+      background: rgba(theme.$green_2, 0.02);
     }
   }
 }
@@ -500,10 +500,10 @@ function createProposal() {
   .markdown-container {
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid $gray_2;
+    border: 1px solid theme.$gray_2;
 
     &.field-completed {
-      border: 1px solid $green_2;
+      border: 1px solid theme.$green_2;
     }
 
     .markdown-header {
@@ -511,24 +511,24 @@ function createProposal() {
       justify-content: space-between;
       align-items: center;
       padding: 8px 12px;
-      background: $gray_1;
-      border-bottom: 1px solid $gray_2;
+      background: theme.$gray_1;
+      border-bottom: 1px solid theme.$gray_2;
 
       .header-left {
         .completion-badge {
-          color: $green_2;
+          color: theme.$green_2;
           font-size: 14px;
           font-weight: 500;
         }
 
         .editing-badge {
-          color: $purple_3;
+          color: theme.$purple_3;
           font-size: 14px;
           font-weight: 500;
         }
 
         .empty-badge {
-          color: $gray_5;
+          color: theme.$gray_5;
           font-size: 14px;
         }
       }
@@ -537,7 +537,7 @@ function createProposal() {
         .edit-button {
           background: none;
           border: none;
-          color: $purple_2;
+          color: theme.$purple_2;
           cursor: pointer;
           font-size: 14px;
           padding: 4px 8px;
@@ -545,7 +545,7 @@ function createProposal() {
           transition: all 0.2s ease;
 
           &:hover {
-            background: $purple_2;
+            background: theme.$purple_2;
             color: white;
           }
         }
@@ -555,7 +555,7 @@ function createProposal() {
           gap: 8px;
 
           .save-button {
-            background: $green_2;
+            background: theme.$green_2;
             color: white;
             border: none;
             padding: 4px 12px;
@@ -565,14 +565,14 @@ function createProposal() {
             transition: all 0.2s ease;
 
             &:hover {
-              background: darken($green_2, 10%);
+              background: darken(theme.$green_2, 10%);
             }
           }
 
           .cancel-button {
             background: none;
-            border: 1px solid $gray_3;
-            color: $gray_5;
+            border: 1px solid theme.$gray_3;
+            color: theme.$gray_5;
             padding: 4px 12px;
             border-radius: 4px;
             font-size: 14px;
@@ -580,8 +580,8 @@ function createProposal() {
             transition: all 0.2s ease;
 
             &:hover {
-              background: $gray_1;
-              border-color: $gray_4;
+              background: theme.$gray_1;
+              border-color: theme.$gray_4;
             }
           }
         }
@@ -603,12 +603,12 @@ function createProposal() {
     transition: all 0.2s ease;
 
     &:hover {
-      border-color: $purple_2;
+      border-color: theme.$purple_2;
     }
 
     &.field-completed {
-      border-color: $green_2;
-      background: rgba($green_2, 0.02);
+      border-color: theme.$green_2;
+      background: rgba(theme.$green_2, 0.02);
     }
 
     .question-header {
@@ -617,7 +617,7 @@ function createProposal() {
       .question-label {
         font-size: 14px;
         font-weight: 500;
-        color: $gray_6;
+        color: theme.$gray_6;
         display: block;
 
         .required-indicator {
@@ -635,7 +635,7 @@ function createProposal() {
   justify-content: space-between;
   align-items: center;
   padding: 24px 0;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
   margin-top: 32px;
 
   .action-info {
@@ -648,23 +648,23 @@ function createProposal() {
         display: flex;
         align-items: center;
         justify-content: center;
-        color: $purple_1;
+        color: theme.$purple_1;
       }
 
       .status-text {
         .ready-text {
-          color: $green_2;
+          color: theme.$green_2;
           font-weight: 500;
         }
 
         .pending-text {
-          color: $gray_5;
+          color: theme.$gray_5;
         }
       }
 
       &.ready {
         .status-text {
-          color: $green_2;
+          color: theme.$green_2;
         }
       }
     }

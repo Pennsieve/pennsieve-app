@@ -203,7 +203,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .collection-header {
   padding-top: 24px;
@@ -251,7 +251,7 @@ export default {
 }
 
 .header-link {
-  color: $purple_2;
+  color: theme.$purple_2;
   font-size: 14px;
   font-weight: 600;
   line-height: 16px;
@@ -260,12 +260,12 @@ export default {
   align-items: center;
 
   &:hover, &:focus {
-    color: $purple_2;
+    color: theme.$purple_2;
     text-decoration: underline;
   }
 
   .header-link-icon {
-    color: $purple_2;
+    color: theme.$purple_2;
     height: 10px;
     width: 10px;
     margin-right: 8px;
@@ -349,11 +349,11 @@ export default {
 }
 
 .header-stats-section {
-  border-top: 1px solid $gray_2;
-  border-bottom: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
+  border-bottom: 1px solid theme.$gray_2;
   margin: 26px 0 10px;
   padding: 20px;
-  background: rgba($gray_1, 0.3);
+  background: rgba(theme.$gray_1, 0.3);
 }
 
 .stats-container {
@@ -386,17 +386,17 @@ export default {
   gap: 8px;
 
   .status-icon {
-    color: $gray_4;
+    color: theme.$gray_4;
     flex-shrink: 0;
   }
 
   .status-text {
     font-size: 14px;
-    color: $gray_4;
+    color: theme.$gray_4;
     white-space: nowrap;
 
     strong {
-      color: $gray_6;
+      color: theme.$gray_6;
       font-weight: 600;
     }
   }

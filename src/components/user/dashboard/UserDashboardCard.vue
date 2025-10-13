@@ -114,11 +114,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .user-dashboard-card {
-  background: $white;
-  border: 1px solid $gray_2;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   padding: 32px 24px;
   cursor: pointer;
@@ -131,8 +131,8 @@ export default {
   min-height: 200px;
 
   &:hover {
-    border-color: $purple_2;
-    background-color: $purple_tint;
+    border-color: theme.$purple_2;
+    background-color: theme.$purple_tint;
     .card-arrow {
       transform: translateX(4px);
     }
@@ -143,7 +143,7 @@ export default {
     opacity: 0.6;
 
     &:hover {
-      border-color: $gray_2;
+      border-color: theme.$gray_2;
       box-shadow: none;
       transform: none;
 
@@ -155,7 +155,7 @@ export default {
 }
 
 .card-icon {
-  color: $purple_2;
+  color: theme.$purple_2;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -170,13 +170,13 @@ export default {
 .card-title {
   font-size: 18px;
   font-weight: 500;
-  color: $gray_6;
+  color: theme.$gray_6;
   margin: 0 0 8px 0;
 }
 
 .card-description {
   font-size: 14px;
-  color: $gray_4;
+  color: theme.$gray_4;
   line-height: 1.5;
   margin: 0;
 }
@@ -185,8 +185,8 @@ export default {
   position: absolute;
   top: 12px;
   right: 12px;
-  background: $orange_1;
-  color: $white;
+  background: theme.$orange_1;
+  color: theme.$white;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -196,7 +196,7 @@ export default {
 }
 
 .card-arrow {
-  color: $gray_4;
+  color: theme.$gray_4;
   transition: transform 0.2s ease;
   margin-top: auto;
 }

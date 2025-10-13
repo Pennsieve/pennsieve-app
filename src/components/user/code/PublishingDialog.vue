@@ -191,8 +191,8 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
-@import '../../../styles/element/input';
+@use '../../../styles/_theme.scss';
+@use '../../../styles/element/input';
 
 .dialog-overlay {
   position: fixed;
@@ -222,13 +222,13 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid $gray_2;
+  border-bottom: 1px solid theme.$gray_2;
 
   h3 {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: $gray_6;
+    color: theme.$gray_6;
   }
 
   .close-btn {
@@ -236,11 +236,11 @@ export default {
     border: none;
     cursor: pointer;
     padding: 4px;
-    color: $gray_1;
+    color: theme.$gray_1;
     transition: color 0.2s ease;
 
     &:hover {
-      color: $gray_2;
+      color: theme.$gray_2;
     }
   }
 }
@@ -254,7 +254,7 @@ export default {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 
   .btn-secondary,
   .btn-primary {
@@ -274,20 +274,20 @@ export default {
 
   .btn-secondary {
     background: transparent;
-    border: 1px solid $gray_3;
-    color: $gray_6;
+    border: 1px solid theme.$gray_3;
+    color: theme.$gray_6;
 
     &:hover:not(:disabled) {
-      background: $gray_1;
+      background: theme.$gray_1;
     }
   }
 
   .btn-primary {
-    background: $purple_1;
+    background: theme.$purple_1;
     color: white;
 
     &:hover:not(:disabled) {
-      background: darken($purple_1, 10%);
+      background: darken(theme.$purple_1, 10%);
     }
   }
 }
@@ -298,13 +298,13 @@ export default {
   h4 {
     font-size: 16px;
     font-weight: 600;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
 
   .repo-description {
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin: 0;
     line-height: 1.5;
   }
@@ -314,13 +314,13 @@ export default {
   h5 {
     font-size: 16px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
 
   .options-description {
     font-size: 14px;
-    color: $gray_5;
+    color: theme.$gray_5;
     margin: 0 0 20px 0;
     line-height: 1.5;
   }
@@ -328,7 +328,7 @@ export default {
   h6 {
     font-size: 14px;
     font-weight: 500;
-    color: $gray_6;
+    color: theme.$gray_6;
     margin: 16px 0 8px 0;
   }
 }
@@ -344,14 +344,14 @@ export default {
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border: 2px solid $gray_2;
+  border: 2px solid theme.$gray_2;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $gray_3;
-    background: $gray_1;
+    border-color: theme.$gray_3;
+    background: theme.$gray_1;
   }
 
   input[type="checkbox"] {
@@ -372,13 +372,13 @@ export default {
     strong {
       display: block;
       font-weight: 500;
-      color: $gray_6;
+      color: theme.$gray_6;
       margin-bottom: 4px;
     }
 
     p {
       font-size: 13px;
-      color: $gray_5;
+      color: theme.$gray_5;
       margin: 0;
       line-height: 1.4;
     }
@@ -389,7 +389,7 @@ export default {
     cursor: not-allowed;
 
     &:hover {
-      border-color: $gray_2;
+      border-color: theme.$gray_2;
       background: transparent;
     }
 
@@ -399,11 +399,11 @@ export default {
 
     .option-content {
       strong {
-        color: $gray_4;
+        color: theme.$gray_4;
       }
 
       p {
-        color: $gray_4;
+        color: theme.$gray_4;
       }
     }
   }
@@ -412,7 +412,7 @@ export default {
 .publishing-info {
   margin-top: 20px;
   padding: 16px;
-  background: $gray_1;
+  background: theme.$gray_1;
   border-radius: 4px;
 
   ul {
@@ -421,7 +421,7 @@ export default {
 
     li {
       font-size: 13px;
-      color: $gray_5;
+      color: theme.$gray_5;
       margin-bottom: 4px;
       line-height: 1.4;
     }

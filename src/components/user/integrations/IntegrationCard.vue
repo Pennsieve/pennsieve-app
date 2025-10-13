@@ -120,23 +120,23 @@ const statusClass = computed(() => {
 </script>
 
 <style scoped lang="scss">
-@import '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss';
 
 .integration-card {
-  border: 1px solid $gray_2;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   padding: 24px;
   background: white;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: $gray_3;
-    background: $gray_1;
+    border-color: theme.$gray_3;
+    background: theme.$gray_1;
   }
 
   &.coming-soon {
     opacity: 0.7;
-    background: $gray_1;
+    background: theme.$gray_1;
   }
 }
 
@@ -182,13 +182,13 @@ const statusClass = computed(() => {
       margin: 0 0 4px 0;
       font-size: 18px;
       font-weight: 600;
-      color: $gray_6;
+      color: theme.$gray_6;
     }
 
     p {
       margin: 0;
       font-size: 14px;
-      color: $gray_4;
+      color: theme.$gray_4;
       line-height: 1.4;
     }
   }
@@ -208,7 +208,7 @@ const statusClass = computed(() => {
     }
 
     &.disconnected {
-      color: $gray_4;
+      color: theme.$gray_4;
     }
 
     &.info {
@@ -231,7 +231,7 @@ const statusClass = computed(() => {
     }
 
     &.disconnected {
-      background: $gray_3;
+      background: theme.$gray_3;
     }
 
     &.info {
@@ -245,7 +245,7 @@ const statusClass = computed(() => {
 
   .status-detail {
     font-size: 12px;
-    color: $gray_4;
+    color: theme.$gray_4;
     margin-left: 8px;
     font-family: monospace;
   }
@@ -255,7 +255,7 @@ const statusClass = computed(() => {
   .btn-configure {
     display: inline-block;
     padding: 8px 16px;
-    background: $purple_1;
+    background: theme.$purple_1;
     color: white;
     text-decoration: none;
     border-radius: 4px;
@@ -266,14 +266,14 @@ const statusClass = computed(() => {
     transition: background 0.2s ease;
 
     &:hover:not(.disabled) {
-      background: $purple_2;
+      background: theme.$purple_2;
       text-decoration: none;
       color: white;
     }
 
     &.disabled {
-      background: $gray_3;
-      color: $gray_4;
+      background: theme.$gray_3;
+      color: theme.$gray_4;
       cursor: not-allowed;
     }
   }
@@ -282,6 +282,6 @@ const statusClass = computed(() => {
 .integration-body {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid $gray_2;
+  border-top: 1px solid theme.$gray_2;
 }
 </style>
