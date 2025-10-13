@@ -1,5 +1,5 @@
 <template>
-  <bf-stage slot="stage" ref="bfStage" :is-editing="editingInstance">
+  <bf-stage slot="stage" ref="bfStage" :is-editing="editingInstance" :no-padding="noPadding">
     <template #actions>
       <stage-actions>
         <template #right>
@@ -53,6 +53,14 @@
                   <el-dropdown-item
                     class="bf-menu-item"
                     :disabled="datasetLocked"
+                    command="rename-file"
+                  >
+                    Rename
+                  </el-dropdown-item>
+                  
+                  <el-dropdown-item
+                    class="bf-menu-item"
+                    :disabled="datasetLocked"
                     command="move-file"
                   >
                     Move
@@ -79,6 +87,23 @@
       :selected-files="selectedFiles"
       @file-delete="onDelete"
       @close="onCloseDeleteDialog"
+    />
+
+    <RenameFileDialog
+      v-model:dialog-visible="renameDialogVisible"
+      :file="proxyRecord"
+      @file-renamed="onFileRenamed"
+      @close="onCloseRenameFileDialog"
+    />
+
+    <bf-move-dialog
+      ref="moveDialog"
+      v-model:dialog-visible="moveDialogVisible"
+      v-model:move-conflict="moveConflict"
+      :selected-files="selectedFiles"
+      @rename-conflicts="onRenameConflicts"
+      @completeMove="moveItems"
+      @close="onCloseMoveDialog"
     />
 
     <div class="concept-instance-section">
@@ -116,7 +141,7 @@
         <concept-instance-static-property
           label="Created by"
           :user="ownerId"
-          :date="proxyRecord.content.createdAt"
+          :date="proxyRecord.created_at || proxyRecord.content.createdAt"
         />
       </div>
     </div>
@@ -140,220 +165,7 @@
       />
     </el-collapse>
 
-    <!--        &lt;!&ndash; BEGIN PROPERTIES TABLE &ndash;&gt;-->
-    <!--        <div class="property-list"-->
-    <!--           v-if="!isFile && !isRecordsLoading">-->
-    <!--          <concept-instance-property-->
-    <!--            v-for="property in properties"-->
-    <!--            :key="property.name"-->
-    <!--            :property="property"-->
-    <!--            :string-subtypes="stringSubtypes"-->
-    <!--            @edit-instance="enableEditFocus(property.name)"-->
-    <!--          />-->
 
-    <!--          <concept-instance-linked-property-->
-    <!--            v-for="property in linkedProperties"-->
-    <!--            :key="property.to.modelId"-->
-    <!--            :property="property"-->
-    <!--            :label="property.schemaLinkedProperty.displayName"-->
-    <!--            @edit-linked-property="editLinkedProperty"-->
-    <!--            @confirm-remove-linked-property="openLinkedPropertyModal"-->
-    <!--          />-->
-
-    <!--          <div class="static-prop-section">-->
-    <!--            <concept-instance-static-property-->
-    <!--              label="Pennsieve id"-->
-    <!--              :value="instance.id"-->
-    <!--            />-->
-
-    <!--            <concept-instance-static-property-->
-    <!--              label="Created by"-->
-    <!--              :user="instance.createdBy"-->
-    <!--              :date="instance.createdAt"-->
-    <!--            />-->
-
-    <!--            <concept-instance-static-property-->
-    <!--              label="Updated by"-->
-    <!--              :user="instance.updatedBy"-->
-    <!--              :date="instance.updatedAt"-->
-    <!--            />-->
-    <!--          </div>-->
-    <!--        </div>-->
-    <!--        &lt;!&ndash; END PROPERTIES TABLE &ndash;&gt;-->
-
-    <!--        &lt;!&ndash; BEGIN FILES TABLE EMPTY STATE &ndash;&gt;-->
-    <!--        <template-->
-    <!--          v-if="!isFile && !isFilesLoading && !hasFiles && !isRecordsLoading && !datasetLocked"-->
-    <!--        >-->
-    <!--          <el-collapse-->
-    <!--            v-if="getPermission('editor')"-->
-    <!--            key="package"-->
-    <!--            v-model="activeSections"-->
-    <!--            class="concept-instance-section files-empty-state"-->
-    <!--          >-->
-    <!--            <el-collapse-item-->
-    <!--              title="Files"-->
-    <!--              name="package"-->
-    <!--            >-->
-    <!--              <div-->
-    <!--                slot="title"-->
-    <!--                class="relationship-title"-->
-    <!--              >-->
-    <!--                <svg-icon-->
-    <!--                  name="icon-arrow-up"-->
-    <!--                  :dir="arrowDirection('package')"-->
-    <!--                  height="10"-->
-    <!--                  width="10"-->
-    <!--                  color="#404554"-->
-    <!--                />-->
-    <!--                <h2>Files</h2>-->
-    <!--              </div>-->
-
-    <!--              <div-->
-    <!--                class="bf-upload-dropzone"-->
-    <!--                :class="isDraggingFiles ? 'is-dragging' : ''"-->
-    <!--                @dragenter.prevent="setIsDragging(true)"-->
-    <!--                @dragover.prevent="setIsDragging(true)"-->
-    <!--                @dragleave.prevent="setIsDragging(false)"-->
-    <!--                @drop.prevent="onDrop"-->
-    <!--              >-->
-    <!--                <div class="dropzone-content">-->
-    <!--                  <div class="upload-icons-wrap">-->
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item pdf icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('PDF', 'PDF')"-->
-    <!--                    >-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item timeseries icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Timeseries', 'TimeSeries')"-->
-    <!--                    >-->
-
-    <!--                    <iron-icon-->
-    <!--                      class="icon-upload"-->
-    <!--                      icon="blackfynn:icon-upload"-->
-    <!--                    />-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item image icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Image', 'Image')"-->
-    <!--                    >-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item slide icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Microscope', 'Slide')"-->
-    <!--                    >-->
-    <!--                  </div>-->
-    <!--                  <h3>-->
-    <!--                    Drag and drop files here or-->
-    <!--                    <a-->
-    <!--                      href="#"-->
-    <!--                      @click.prevent="handleChooseExistingFiles"-->
-    <!--                    >-->
-    <!--                      choose your files.-->
-    <!--                    </a>-->
-    <!--                  </h3>-->
-    <!--                  <p>-->
-    <!--                    We don’t recommend uploading more than 10GB through the web UI, due to browser-->
-    <!--                    limitations. If you’re uploading large amounts of data, please use the-->
-    <!--                    <a-->
-    <!--                      href="https://docs.pennsieve.io/"-->
-    <!--                      target="_blank"-->
-    <!--                    >-->
-    <!--                      Pennsieve API-->
-    <!--                    </a>-->
-    <!--                    .-->
-    <!--                  </p>-->
-    <!--                </div>-->
-    <!--                <input-->
-    <!--                  ref="inputFile"-->
-    <!--                  class="visuallyhidden"-->
-    <!--                  type="file"-->
-    <!--                  multiple="multiple"-->
-    <!--                  @change="onInputFileChange"-->
-    <!--                >-->
-    <!--              </div>-->
-    <!--            </el-collapse-item>-->
-    <!--          </el-collapse>-->
-    <!--        </template>-->
-    <!--        &lt;!&ndash; END FILES TABLE EMPTY STATE &ndash;&gt;-->
-
-    <!-- BEGIN FILES TABLE -->
-    <!--        <template v-if="!editingInstance && hasFiles">-->
-    <!--          <el-collapse-->
-    <!--            v-model="activeSections"-->
-    <!--            class="concept-instance-section zero-padding no-border"-->
-    <!--          >-->
-    <!--            <relationships-table-->
-    <!--              id="Files"-->
-    <!--              ref="package"-->
-    <!--              :active-sections="activeSections"-->
-    <!--              :relationship="fileRelationship"-->
-    <!--              :show-collapse="true"-->
-    <!--              source-type="recordFile"-->
-    <!--              :url="getRecordFileRelationshipsUrl"-->
-    <!--              @remove-relationships="handleRemoveRelationships"-->
-    <!--              @set-related-files="handleSetRelatedFiles"-->
-    <!--              @unlink-files="handleUnlinkFiles"-->
-    <!--              @delete-files="handleDeleteFiles"-->
-    <!--            />-->
-    <!--          </el-collapse>-->
-    <!--        </template>-->
-    <!-- END FILES TABLE -->
-
-    <!-- Directory View -->
-    <!--        <el-collapse-->
-    <!--          v-if="displayDirectoryViewer"-->
-    <!--          key="filecontent"-->
-    <!--          v-model="activeSections"-->
-    <!--          class="concept-instance-section zero-padding no-border"-->
-    <!--        >-->
-    <!--          <el-collapse-item-->
-    <!--            name="filecontent"-->
-    <!--            title="File Content"-->
-    <!--          >-->
-    <!--            <div-->
-    <!--              slot="title"-->
-    <!--              class="relationship-title"-->
-    <!--            >-->
-    <!--              <svg-icon-->
-    <!--                class="icon-collapse"-->
-    <!--                name="icon-arrow-up"-->
-    <!--                :dir="arrowDirection('filecontent')"-->
-    <!--                height="10"-->
-    <!--                width="10"-->
-    <!--                color="#404554"-->
-    <!--              />-->
-    <!--              <h2>File Content</h2>-->
-    <!--            </div>-->
-    <!--            <directory-viewer :pkg="proxyRecord" />-->
-    <!--          </el-collapse-item>-->
-    <!--        </el-collapse>-->
-
-    <!-- Relationships Table Empty State -->
-    <!--    <div-->
-    <!--      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"-->
-    <!--      class="relationships-empty-state"-->
-    <!--    >-->
-    <!--      <div class="relationships-empty-state-inner">-->
-    <!--        <h3>Create Relationships</h3>-->
-    <!--        <div>-->
-    <!--          <p class="relationship-inner-text">-->
-    <!--            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other-->
-    <!--            objects in your graph by clicking the "Link to ..." button above.-->
-    <!--          </p>-->
-    <!--          <a-->
-    <!--            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"-->
-    <!--            target="_blank"-->
-    <!--          >-->
-    <!--            <bf-button class="primary learn-more"> Learn More </bf-button>-->
-    <!--          </a>-->
-    <!--          <div>-->
-    <!--            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>-->
-    <!--          </div>-->
-    <!--        </div>-->
-    <!--      </div>-->
-    <!--    </div>-->
 
     <!-- BEGIN RELATIONSHIPS TABLE -->
     <template v-if="hasRelationships">
@@ -377,14 +189,6 @@
         />
       </el-collapse>
     </template>
-
-    <!--    <add-relationship-drawer-->
-    <!--      ref="addRelationshipDrawer"-->
-    <!--      :relationship-types="relationshipTypes"-->
-    <!--      :record="proxyRecord.content"-->
-    <!--      :record-name="drawerOriginatingName"-->
-    <!--      :is-file="true"-->
-    <!--    />-->
 
     <div class="viewer-pane-wrap">
       <div class="header">
@@ -489,6 +293,10 @@ export default {
       type: String,
       default: "",
     },
+    noPadding: {
+      type: Boolean,
+      default: false
+    }
   },
 
   data() {
@@ -546,7 +354,9 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
-      deleteDialogVisible: false
+      deleteDialogVisible: false,
+      renameDialogVisible: false,
+      moveDialogVisible: false
     };
   },
 
@@ -554,13 +364,13 @@ export default {
     ...mapGetters([
       "config",
       "concepts",
-      "lastRoute",
       "editingInstance",
       "getModelById",
       "hasFeature",
       "getPermission",
       "datasetLocked",
       "isOrgSynced",
+      "orgMembers",
     ]),
 
     ...mapState(["conceptsHash", "dataset"]),
@@ -611,7 +421,10 @@ export default {
     },
 
     ownerId: function () {
-      return pathOr(0, ["content", "ownerId"], this.proxyRecord);
+      // Try direct owner_id first (for collections), then fallback to content.ownerId (for regular packages)
+      const directOwnerId = pathOr(null, ["owner_id"], this.proxyRecord);
+      const contentOwnerId = pathOr(0, ["content", "ownerId"], this.proxyRecord);
+      return String(directOwnerId || contentOwnerId);
     },
     fileTypeLabel: function () {
       return this.packageSourceFiles.length > 1 ? "Package type" : "File type";
@@ -928,6 +741,17 @@ export default {
      * @returns {Array}
      */
     properties: function () {
+      // For files (packages), check proxyRecord.properties first
+      if (this.isFile && this.proxyRecord && this.proxyRecord.properties) {
+        // The API returns properties in nested format: [{ category: "...", properties: [...] }]
+        // Flatten the nested structure to get all properties
+        const flatProperties = this.proxyRecord.properties
+          .map(categoryGroup => categoryGroup.properties || [])
+          .flat();
+        return flatProperties;
+      }
+      
+      // For records, use the original logic
       const values = propOr([], "values", this.instance);
       return Array.isArray(values) ? values : [];
     },
@@ -977,8 +801,10 @@ export default {
      * @returns {Boolean}
      */
     isFile: function () {
-      const id = pathOr("", ["params", "fileId"], this.$route);
-      return id.indexOf("package") >= 0;
+      // Check prop first (for use in GraphExplorer), then fall back to route param
+      const id = this.fileId || pathOr("", ["params", "fileId"], this.$route);
+      // Match both regular package IDs and collection node IDs
+      return id.indexOf("package") >= 0 || id.indexOf("collection") >= 0;
     },
 
     /**
@@ -1209,6 +1035,15 @@ export default {
   },
 
   watch: {
+    fileId: {
+      handler: function (val, oldVal) {
+        if (val) {
+          this.getInstanceDetails();
+        }
+      },
+      immediate: true,
+    },
+
     packageDetailsUrl: {
       handler: function (val) {
         if (val) {
@@ -1372,6 +1207,13 @@ export default {
       });
     },
 
+    onCloseRenameFileDialog: function () {
+      this.renameDialogVisible = false;
+    },
+    showRenameFileDialog: function () {
+      this.renameDialogVisible = true;
+    },
+
     /**
      * Open office 365 file
      */
@@ -1438,12 +1280,6 @@ export default {
           .catch(this.handleXhrError.bind(this));
       });
     },
-
-    // showMove: function() {
-    //   const moveDialog = this.$refs.moveDialog
-    //   moveDialog.file = this.file
-    //   moveDialog.visible = true
-    // },
 
     /**
      * Determines if destination record exists and user can add relationship
@@ -1618,7 +1454,9 @@ export default {
               this.instance = resp;
             }
           })
-          .catch(this.handleXhrError.bind(this));
+          .catch((error) => {
+            this.handleXhrError.bind(this)(error);
+          });
       });
     },
 
@@ -2157,6 +1995,7 @@ export default {
       const commands = {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
+        "rename-file": this.showRenameFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2177,7 +2016,6 @@ export default {
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.selectedFileForAction = {};
       this.deleteDialogVisible = true;
     },
 
@@ -2363,15 +2201,22 @@ export default {
      * @param {Object} response
      */
     setProxyAsRecord: function (response) {
-      // Set the proxyRecord
-      this.proxyRecord = response;
+      // Handle different response structures from the packages API
+      let packageData = response;
+      
+      // ONLY handle the specific case where we get an array response with nested package data (collections)
+      // This preserves the original behavior for regular packages
+      if (Array.isArray(response) && response.length > 0 && response[0].package) {
+        packageData = response[0].package;
+      }
+      
+      // Set the proxyRecord to the extracted package data
+      this.proxyRecord = packageData;
 
       // Set Active Viewer
-      console.log("Setting active viewer");
-      console.log(this.proxyRecord);
       this.setActiveViewer(this.proxyRecord);
 
-      this.selectedFiles.push(response);
+      this.selectedFiles.push(packageData);
     },
 
     /**
@@ -2519,11 +2364,14 @@ export default {
         .then((token) => {
           const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${token}&includeAncestors=true`;
           return this.sendXhr(url).then((response) => {
-            moveDialog.file = response;
-            moveDialog.visible = true;
+            moveDialog.currentFolder = response;
+            this.moveDialogVisible = true;
           });
         })
         .catch((err) => useHandleXhrError(err));
+    },
+    onCloseMoveDialog: function () {
+      this.moveDialogVisible = false;
     },
 
     /**
@@ -2533,7 +2381,7 @@ export default {
      */
     moveItems: function (destination, items) {
       this.moveUrl.then((url) => {
-        const things = items.map(window.R.path(["content", "id"]));
+        const things = items.map((item) => item.content.id);
         this.sendXhr(url, {
           method: "POST",
           body: {
@@ -2542,11 +2390,10 @@ export default {
           },
         })
           .then((response) => {
-            if (response.success.length > 0) {
-              /*
-              Get the file again to update all values of the file.
-              Move response doesn't give as much info as needed
-            */
+              if (response.success.length > 0) {
+                /*
+                Get the file again to update all values of the file.
+              */
               this.getInstanceDetails();
 
               EventBus.$emit("toast", {
@@ -2579,9 +2426,7 @@ export default {
         files: failures,
         destination: propOr("", "destination", response),
       };
-
-      // Show user notice of conflicts
-      this.$refs.moveDialog.visible = true;
+      this.moveDialogVisible = true;
     },
 
     /**
@@ -2591,12 +2436,10 @@ export default {
      */
     onRenameConflicts: function (destination, files) {
       // Rename each file with proposed new name
-
-      useGetToken().then((token) => {
-        const promises = files.map((obj) => {
-          const id = propOr("", "id", obj);
+      const promises = files.map((obj) => {
+        const id = propOr("", "id", obj);
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -2604,19 +2447,15 @@ export default {
             },
           });
         });
-        Promise.all(promises).then((response) => {
-          // Update name
-          this.onFileRenamed(head(response));
+      });
+      Promise.all(promises).then((response) => {
+        // Update name
+        this.onFileRenamed(response[0]);
+        this.moveItems(destination, this.moveConflict.display);
 
-          // Move files again, now with new name
-          this.moveItems(destination, response);
-
-          // Reset
-          this.moveConflict = {};
-
-          // Hide user notice of conflicts
-          this.$refs.moveDialog.visible = false;
-        });
+        // Reset
+        this.moveDialogVisible = false;
+        this.moveConflict = {};
       });
     },
 
@@ -2779,6 +2618,8 @@ export default {
 @use "../../../../styles/theme";
 @use "../../../../styles/_icon-item-colors";
 @use "../../../../styles/element/dialog";
+@use "../../../../styles/spacing";
+
 
 #file-name-header {
   font-size: 20px;
@@ -2796,10 +2637,6 @@ export default {
 .highlight-property {
   color: theme.$gray_6;
   font-weight: 500;
-}
-
-.source-files-table {
-  //display: flex;
 }
 
 .concept-instance {

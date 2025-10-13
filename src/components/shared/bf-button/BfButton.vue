@@ -213,11 +213,11 @@ export default {
     }
   }
   &.red {
-    background: theme.$red_1;
+    background: theme.$red_2;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$red_2;
+        background: theme.$red_1;
       }
     }
     &.ghost {

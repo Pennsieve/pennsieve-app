@@ -1,25 +1,93 @@
 @use "theme";
+@use "sass:color";
+
 @forward 'element-plus/theme-chalk/src/common/var.scss' with (
   $colors: (
     'white': theme.$white,
     'black': theme.$black,
     'primary': (
       'base': theme.$purple_3,
+      'light-1': theme.$purple_2,
+      'light-2': theme.$purple_1,
+      'light-3': theme.$purple_0_7,
+      'light-4': theme.$purple_tint,
+      'light-5': color.mix(theme.$white, theme.$purple_tint, 20%),
+      'light-6': color.mix(theme.$white, theme.$purple_tint, 40%),
+      'light-7': color.mix(theme.$white, theme.$purple_tint, 60%),
+      'light-8': color.mix(theme.$white, theme.$purple_tint, 80%),
+      'light-9': color.mix(theme.$white, theme.$purple_tint, 90%),
+      'dark-1': color.mix(theme.$black, theme.$purple_3, 10%),
+      'dark-2': color.mix(theme.$black, theme.$purple_3, 20%),
     ),
     'success': (
       'base': theme.$green_1,
+      'light-1': color.mix(theme.$white, theme.$green_1, 10%),
+      'light-2': color.mix(theme.$white, theme.$green_1, 20%),
+      'light-3': color.mix(theme.$white, theme.$green_1, 30%),
+      'light-4': color.mix(theme.$white, theme.$green_1, 40%),
+      'light-5': color.mix(theme.$white, theme.$green_1, 50%),
+      'light-6': color.mix(theme.$white, theme.$green_1, 60%),
+      'light-7': color.mix(theme.$white, theme.$green_1, 70%),
+      'light-8': color.mix(theme.$white, theme.$green_1, 80%),
+      'light-9': theme.$green_tint,
+      'dark-1': theme.$green_2,
+      'dark-2': color.mix(theme.$black, theme.$green_2, 20%),
     ),
     'warning': (
       'base': theme.$orange_1,
+      'light-1': color.mix(theme.$white, theme.$orange_1, 10%),
+      'light-2': color.mix(theme.$white, theme.$orange_1, 20%),
+      'light-3': color.mix(theme.$white, theme.$orange_1, 30%),
+      'light-4': color.mix(theme.$white, theme.$orange_1, 40%),
+      'light-5': color.mix(theme.$white, theme.$orange_1, 50%),
+      'light-6': color.mix(theme.$white, theme.$orange_1, 60%),
+      'light-7': color.mix(theme.$white, theme.$orange_1, 70%),
+      'light-8': color.mix(theme.$white, theme.$orange_1, 80%),
+      'light-9': theme.$orange_tint,
+      'dark-1': theme.$orange_2,
+      'dark-2': color.mix(theme.$black, theme.$orange_2, 20%),
     ),
     'danger': (
       'base': theme.$red_1,
+      'light-1': color.mix(theme.$white, theme.$red_1, 10%),
+      'light-2': color.mix(theme.$white, theme.$red_1, 20%),
+      'light-3': color.mix(theme.$white, theme.$red_1, 30%),
+      'light-4': color.mix(theme.$white, theme.$red_1, 40%),
+      'light-5': color.mix(theme.$white, theme.$red_1, 50%),
+      'light-6': color.mix(theme.$white, theme.$red_1, 60%),
+      'light-7': color.mix(theme.$white, theme.$red_1, 70%),
+      'light-8': color.mix(theme.$white, theme.$red_1, 80%),
+      'light-9': theme.$red_tint,
+      'dark-1': theme.$red_2,
+      'dark-2': color.mix(theme.$black, theme.$red_2, 20%),
     ),
     'error': (
       'base': theme.$red_2,
+      'light-1': color.mix(theme.$white, theme.$red_2, 10%),
+      'light-2': color.mix(theme.$white, theme.$red_2, 20%),
+      'light-3': color.mix(theme.$white, theme.$red_2, 30%),
+      'light-4': color.mix(theme.$white, theme.$red_2, 40%),
+      'light-5': color.mix(theme.$white, theme.$red_2, 50%),
+      'light-6': color.mix(theme.$white, theme.$red_2, 60%),
+      'light-7': color.mix(theme.$white, theme.$red_2, 70%),
+      'light-8': color.mix(theme.$white, theme.$red_2, 80%),
+      'light-9': theme.$red_tint,
+      'dark-1': color.mix(theme.$black, theme.$red_2, 10%),
+      'dark-2': color.mix(theme.$black, theme.$red_2, 20%),
     ),
     'info': (
       'base': theme.$gray_4,
+      'light-1': theme.$gray_3,
+      'light-2': theme.$gray_2,
+      'light-3': theme.$gray_1,
+      'light-4': theme.$gray_0,
+      'light-5': color.mix(theme.$white, theme.$gray_0, 20%),
+      'light-6': color.mix(theme.$white, theme.$gray_0, 40%),
+      'light-7': color.mix(theme.$white, theme.$gray_0, 60%),
+      'light-8': color.mix(theme.$white, theme.$gray_0, 80%),
+      'light-9': color.mix(theme.$white, theme.$gray_0, 90%),
+      'dark-1': theme.$gray_5,
+      'dark-2': theme.$gray_6,
     ),
   ),
   $text-color: (
@@ -47,4 +115,38 @@
     'bg-color': theme.$white,
   ),
 );
+
+// Force Element Plus to use our custom primary color by overriding CSS custom properties
+:root {
+  --el-color-primary: #{theme.$purple_3};
+  --el-color-primary-light-1: #{theme.$purple_2};
+  --el-color-primary-light-2: #{theme.$purple_1};
+  --el-color-primary-light-3: #{theme.$purple_0_7};
+  --el-color-primary-light-4: #{theme.$purple_tint};
+  --el-color-primary-light-5: #{color.mix(theme.$white, theme.$purple_tint, 20%)};
+  --el-color-primary-light-6: #{color.mix(theme.$white, theme.$purple_tint, 40%)};
+  --el-color-primary-light-7: #{color.mix(theme.$white, theme.$purple_tint, 60%)};
+  --el-color-primary-light-8: #{color.mix(theme.$white, theme.$purple_tint, 80%)};
+  --el-color-primary-light-9: #{color.mix(theme.$white, theme.$purple_tint, 90%)};
+  --el-color-primary-dark-1: #{color.mix(theme.$black, theme.$purple_3, 10%)};
+  --el-color-primary-dark-2: #{color.mix(theme.$black, theme.$purple_3, 20%)};
+  
+  // Success colors
+  --el-color-success: #{theme.$green_1};
+  --el-color-success-light-9: #{theme.$green_tint};
+  
+  // Warning colors  
+  --el-color-warning: #{theme.$orange_1};
+  --el-color-warning-light-9: #{theme.$orange_tint};
+  
+  // Danger colors
+  --el-color-danger: #{theme.$red_1};
+  --el-color-danger-light-9: #{theme.$red_tint};
+  
+  // Error colors
+  --el-color-error: #{theme.$red_2};
+  
+  // Info colors
+  --el-color-info: #{theme.$gray_4};
+}
 
