@@ -33,21 +33,21 @@
   }
 
   .el-dialog__header {
-    background: #{theme.$purple_2};
-    color: #{theme.$white};
+    //background: #{theme.$purple_2};
+    //color: #{theme.$white};
     padding: 24px 32px;
     margin: 0;
 
     .el-dialog__headerbtn {
-      color: white;
+      //color: white;
       &:focus, &:hover{
-        color: #{theme.$purple_3};
+        //color: #{theme.$purple_3};
       }
       .el-dialog__close {
-        color: white;
+        //color: white;
 
         &:focus, &:hover {
-          color: #{theme.$purple_3};
+          //color: #{theme.$purple_3};
         }
       }
     }

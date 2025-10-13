@@ -148,7 +148,6 @@ export default {
     ...mapActions("datasetModule", ["updateDatasetTotalCount"]),
     ...mapGetters(["sessionTimer"]),
 
-    ...mapActions("collectionsModule", ["fetchCollections"]),
 
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
     ...mapActions("analysisModule", [

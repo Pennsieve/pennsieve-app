@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 
 import NotFound from './not-found/NotFound.vue'
+import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
@@ -66,6 +67,7 @@ const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
+const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
 
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
@@ -83,17 +85,32 @@ const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 /**
- * Code Repos Components
- */
-const CodeRepos = () => import('./Code/CodeRepos.vue') // view you see at "/code" FE route - redirects to "/code/myRepos" if you hit "/code" directly
-const MyRepos = () => import('../components/Code/MyReposList.vue') // user-specific view -- displays the user's repos to them once they link their Github account, which they can do at FE route "/:orgId/profile"
-const WorkspaceRepos = () => import('../components/Code/WorkspaceReposList.vue') // once a repo is tracked, it shows up here after it is finished processing (doesn't happen immediately)
-const ConfigureRepo = () => import('../components/Code/ConfigureRepo.vue') // a repo-specific settings view 
-
-/**
  * Dataset Settings
  */
 const BfDatasetSettings = () => import('../components/datasets/settings/BfDatasetSettings.vue')
+
+/**
+ * User Components
+ */
+const UserProfile = () => import('../components/user/profile/UserProfile.vue')
+const UserApiKeys = () => import('../components/user/integrations/UserApiKeys.vue')
+const UserSecurity = () => import('../components/user/integrations/UserSecurity.vue')
+const UserSupport = () => import('../components/user/integrations/UserSupport.vue')
+const UserDashboard = () => import('../components/user/dashboard/UserDashboard.vue')
+const UserIntegrations = () => import('../components/user/integrations/UserIntegrations.vue')
+const UserOrcid = () => import('../components/user/integrations/UserOrcid.vue')
+const UserGithubCode = () => import('../components/user/code/UserGithubCode.vue')
+const UserGithubIntegrations = () => import('../components/user/integrations/UserGithubV2.vue')
+const DataPublishingDashboard = () => import('../components/user/publishing/DataPublishingDashboard.vue')
+const SharedWithMe = () => import('../components/user/shared/SharedWithMe.vue')
+const MyCollections = () => import('../components/user/collections/MyCollections.vue')
+const CollectionDetails = () => import('../components/user/collections/CollectionDetails.vue')
+const UserNavigation = () => import('../components/user-navigation/UserNavigation.vue')
+const UserNavigationSecondary = () => import('../components/user-navigation-secondary/UserNavigationSecondary.vue')
+const ComingSoon = () => import('../components/user/coming-soon/ComingSoon.vue')
+const MyAnalysis = () => import('../components/user/analysis/MyAnalysis.vue')
+const OpenRepositories = () => import('../components/user/publishing/OpenRepositories.vue')
+const DatasetProposals = () => import('../components/user/publishing/DatasetProposals.vue')
 
 /**
  * Analytics Components 
@@ -142,6 +159,414 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
+    },
+    {
+      name: 'my-workspace',
+      path: '/my-workspace',
+      components: {
+        page: MyWorkSpacePage,
+        navigation: UserNavigation,
+      },
+      props: {
+        page: (route) => ({
+          title: route.meta?.title || "My Workspace",
+          description: route.meta?.description || "Manage your personal workspace and user settings."
+        }),
+        navigation: true,
+        navigationSecondary: true,
+      },
+      redirect: {
+        name: 'my-settings'
+      },
+      children: [
+        {
+          name: 'my-settings',
+          path: 'settings',
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Settings',
+            description: 'Manage your account settings and preferences.'
+          },
+          components: {
+            stage: UserDashboard,
+            navigation: UserNavigation,
+          },
+          props: true,
+          children: [
+            {
+              name: 'user-profile',
+              path: 'profile',
+              meta: {
+                title: 'Profile',
+                description: 'Manage your personal profile information and details.'
+              },
+              components: {
+                stage: UserProfile,
+                navigation: UserNavigation,
+              },
+              props: true
+            },
+            {
+              name: 'user-integrations',
+              path: 'integrations',
+              meta: {
+                title: 'Platform Integrations',
+                description: 'Connect your account to external platforms to streamline your workflow and enhance your research capabilities.'
+              },
+              components: {
+                stage: UserIntegrations,
+                navigation: UserNavigation,
+              },
+              props: true,
+              children: [
+                {
+                  name: 'user-orcid',
+                  path: 'orcid',
+                  meta: {
+                    title: 'ORCID Integration',
+                    description: 'Connect and manage your ORCID researcher identifier.',
+                    breadcrumbParent: 'user-integrations'
+                  },
+                  components: {
+                    stage: UserOrcid,
+                  },
+                  props: true
+                },
+                {
+                  name: 'user-github',
+                  path: 'github',
+                  meta: {
+                    title: 'GitHub Integration',
+                    description: 'Connect and manage your GitHub account integration.',
+                    breadcrumbParent: 'user-integrations'
+                  },
+                  components: {
+                    stage: UserGithubIntegrations,
+                    navigation: UserNavigation,
+                  },
+                  props: true
+                },
+                {
+                  name: 'user-api',
+                  path: 'api',
+                  meta: {
+                    title: 'API Keys',
+                    description: 'Manage your API keys and access tokens.',
+                    breadcrumbParent: 'user-integrations'
+                  },
+                  components: {
+                    stage: UserApiKeys,
+                    navigation: UserNavigation,
+                  },
+                  props: true
+                }
+              ]
+            },
+            {
+              name: 'user-security',
+              path: 'security',
+              meta: {
+                title: 'Security Settings',
+                description: 'Manage your account security settings, passwords, and two-factor authentication.'
+              },
+              components: {
+                stage: UserSecurity,
+                navigation: UserNavigation,
+              },
+              props: true
+            },
+            {
+              name: 'user-support',
+              path: 'support',
+              meta: {
+                title: 'Support & Help',
+                description: 'Get help, access documentation, and contact our support team.'
+              },
+              components: {
+                stage: UserSupport,
+                navigation: UserNavigation,
+              },
+              props: true
+            }
+          ]
+        },
+        {
+          name: 'data-publishing',
+          path: 'publishing',
+          components: {
+            stage: DataPublishingDashboard,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Data Publishing',
+            description: 'View and manage your data publishing dashboard and submissions.'
+          },
+          children: [
+            {
+              name: 'open-repositories',
+              path: 'repositories',
+              components: {
+                stage: OpenRepositories,
+                navigation: UserNavigation,
+              },
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Pennsieve Repositories',
+                description: 'Browse repositories powered by Pennsieve and submit dataset proposals.',
+                breadcrumbParent: 'data-publishing'
+              }
+            },
+            {
+              name: 'dataset-proposals',
+              path: 'proposals',
+              components: {
+                stage: DatasetProposals,
+                navigation: UserNavigation,
+              },
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Dataset Proposals',
+                description: 'Submit and manage your dataset proposals and requests.',
+                breadcrumbParent: 'data-publishing'
+              }
+            }
+          ]
+        },
+        {
+          name: 'my-code',
+          path: 'code',
+          components: {
+            stage: UserGithubCode,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'My Code',
+            description: 'Connect your GitHub account to track and publish your repositories with DOIs.'
+          }
+        },
+        {
+          name: 'my-analysis',
+          path: 'analysis',
+          components: {
+            stage: MyAnalysis,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'My Analysis',
+            description: 'Advanced data analysis and visualization tools for your research datasets.'
+          }
+        },
+        {
+          name: 'shared-with-me',
+          path: 'shared',
+          components: {
+            stage: SharedWithMe,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'My Data',
+            description: 'Access workspaces and datasets that have been shared with you.'
+          }
+        },
+        {
+          name: 'my-collections',
+          path: 'collections',
+          components: {
+            stage: MyCollectionsStage,
+            navigation: UserNavigation,
+          },
+          props: true,
+          redirect: {
+            name: 'collections-list'
+          },
+          children: [
+              {
+                  name: 'collections-list',
+                  path: 'list',
+                  components: {
+                      stage: MyCollections,
+                      navigation: UserNavigation,
+                  },
+                  props: true,
+                  meta: {
+                      hideSecondaryNav: true,
+                      title: 'My Collections',
+                      description: 'Manage your personal collections and published scientific datasets.'
+                  }
+                  },
+            {
+              name: 'collection-details',
+              path: ':collectionId',
+              components: {
+                stage: CollectionDetails,
+                navigation: UserNavigation,
+              },
+              props: {
+                stage: (route) => ({
+                  collectionId: route.params.collectionId
+                }),
+                navigation: true,
+              },
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Collection Details',
+                description: 'View detailed information about a specific collection.'
+              }
+            }
+          ]
+        }
+        // {
+        //   name: 'my-settings',
+        //   path: '/my-workspace/settings',
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'Settings',
+        //     description: 'Manage your account settings and preferences.'
+        //   },
+        //   components: {
+        //     stage: UserDashboard,
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   children: [
+        //     {
+        //       name: 'user-profile',
+        //       path: 'profile',
+        //       meta: {
+        //         title: 'Profile',
+        //         description: 'Manage your personal profile information and details.'
+        //       },
+        //       components: {
+        //         stage: UserProfile,
+        //         navigation: UserNavigation,
+        //       },
+        //       props: true
+        //     },
+        //     {
+        //       name: 'user-orcid',
+        //       path: 'orcid',
+        //       meta: {
+        //         title: 'ORCID Integration',
+        //         description: 'Connect and manage your ORCID researcher identifier.'
+        //       },
+        //       components: {
+        //         stage: UserProfile,
+        //         navigation: UserNavigation,
+        //       },
+        //       props: true
+        //     },
+        //     {
+        //       name: 'user-github',
+        //       path: 'github',
+        //       meta: {
+        //         title: 'GitHub Integration',
+        //         description: 'Connect and manage your GitHub account integration.'
+        //       },
+        //       components: {
+        //         stage: UserProfile,
+        //         navigation: UserNavigation,
+        //       },
+        //       props: true
+        //     },
+        //     {
+        //       name: 'user-api',
+        //       path: 'api',
+        //       meta: {
+        //         title: 'API Keys',
+        //         description: 'Manage your API keys and access tokens.'
+        //       },
+        //       components: {
+        //         stage: UserProfile,
+        //         navigation: UserNavigation,
+        //       },
+        //       props: true
+        //     }
+        //   ]
+        // },
+        // {
+        //   name: 'data-publishing',
+        //   path: '/my-workspace/publishing',
+        //   components: {
+        //     stage: DataPublishingDashboard,
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'Data Publishing',
+        //     description: 'View and manage your data publishing dashboard and submissions.'
+        //   }
+        // },
+        // {
+        //   name: 'open-repositories',
+        //   path: '/my-workspace/open-repositories',
+        //   components: {
+        //     stage: UserProfile,  // Using UserProfile as placeholder for now
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'Open Repositories',
+        //     description: 'Browse and access open research repositories and datasets.'
+        //   }
+        // },
+        // {
+        //   name: 'dataset-proposals',
+        //   path: '/my-workspace/dataset-proposals',
+        //   components: {
+        //     stage: UserProfile,  // Using UserProfile as placeholder for now
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'Dataset Proposals',
+        //     description: 'Submit and manage your dataset proposals and requests.'
+        //   }
+        // },
+        // {
+        //   name: 'my-repositories',
+        //   path: '/my-workspace/repositories',
+        //   components: {
+        //     stage: UserProfile,  // Using UserProfile as placeholder for now
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'My Repositories',
+        //     description: 'View and manage your personal research repositories.'
+        //   }
+        // },
+        // {
+        //   name: 'shared-with-me',
+        //   path: '/my-workspace/shared',
+        //   components: {
+        //     stage: SharedWithMe,
+        //     navigation: UserNavigation,
+        //   },
+        //   props: true,
+        //   meta: {
+        //     hideSecondaryNav: true,
+        //     title: 'Shared with Me',
+        //     description: 'Access datasets and resources that have been shared with you.'
+        //   }
+        // }
+      ]
     },
     {
       path: '/github-redirect',
@@ -570,44 +995,6 @@ const router = createRouter({
             },
           ]
         },
-      ]
-    },
-    {
-      name: "code",
-      path: '/:orgId/code',
-      components: {
-        page: CodeRepos,
-        navigation: BfNavigation
-      },
-      redirect: {
-        name: 'my-repos'
-      },
-      props: true,
-      children: [
-        {
-          name: 'my-repos',
-          path: 'my-repos',
-          components: {
-            stage: MyRepos,
-          },
-          props: true
-        },
-        {
-          name: 'workspace-repos',
-          path: 'workspace-repos',
-          components: {
-            stage: WorkspaceRepos,
-          },
-          props: true
-        },
-        {
-          name: 'configure-repo',  
-          path: 'configure-repo/:repoId',  
-          components: {
-            stage: ConfigureRepo,  
-          },
-          props: true
-        }
       ]
     },
     {

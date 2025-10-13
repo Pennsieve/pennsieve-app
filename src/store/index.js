@@ -5,7 +5,6 @@ import * as R from "ramda";
 
 import datasetModule from './datasetModule'
 import integrationsModule from './integrationsModule'
-import collectionsModule from './collectionsModule'
 import viewerModule from './viewerModule'
 import repositoryModule from "./repositoryModule"
 import publishingModule from "./publishingModule"
@@ -1032,7 +1031,6 @@ export default createStore({
   modules: {
     datasetModule,
     integrationsModule,
-    collectionsModule,
     viewerModule,
     repositoryModule,
     publishingModule,
