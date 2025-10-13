@@ -3,7 +3,7 @@
     <el-dialog
       :modelValue="dialogVisible"
       @update:modelValue="dialogVisible = $event"
-      :show-close="false"
+      :show-close="true"
       @close="closeDialog"
     >
       <template #header>

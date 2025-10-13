@@ -5,6 +5,8 @@ import { PublicationStatus } from '../../../utils/constants'
 import { PennsieveDashboard, MarkdownWidget, TextWidget } from 'pennsieve-dashboard'
 import 'element-plus/dist/index.css';
 import 'pennsieve-dashboard/style.css'
+import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
 
 
 // props / emits
@@ -141,14 +143,4 @@ function closeDialog () {
      border: solid aliceblue;
 }
 :deep(.grid-stack){height: auto !important;}
-</style>
-<style>
-.full-dialog-db{
-  --el-dialog-width: 90%;
-  --el-dialog-margin-top:2vh;
-  height:90%;
-}
-.el-dialog__title {
-  color: white;
-}
 </style>

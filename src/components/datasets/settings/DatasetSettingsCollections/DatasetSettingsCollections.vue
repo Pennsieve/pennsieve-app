@@ -54,7 +54,7 @@
 </template>
 
 <script>
-import { mapActions, mapState } from 'vuex'
+import { useCollectionsStore } from '@/stores/collectionStore'
 
 import BfTag from '../../../shared/BfTag/BfTag.vue'
 import Request from '../../../../mixins/request'
@@ -72,6 +72,13 @@ export default {
     Request
   ],
 
+  setup() {
+    const collectionsStore = useCollectionsStore()
+    return {
+      collectionsStore
+    }
+  },
+
   data() {
     return {
       inputCollection: null,
@@ -80,15 +87,21 @@ export default {
   },
 
   computed: {
-    ...mapState([
-      'config',
-      'datasetLocked',
-    ]),
+    config() {
+      return this.$store.state.config
+    },
+    
+    datasetLocked() {
+      return this.$store.state.datasetLocked
+    },
 
-    ...mapState('collectionsModule', [
-      'collections',
-      'datasetCollections'
-    ]),
+    collections() {
+      return this.collectionsStore.collections
+    },
+    
+    datasetCollections() {
+      return this.collectionsStore.datasetCollections
+    },
 
     /**
      * Compute the collections that the dataset is not
@@ -102,17 +115,12 @@ export default {
     }
   },
 
-  mounted: function() {
-    this.fetchDatasetCollections(this.$route.params.datasetId)
+  async mounted() {
+    await this.collectionsStore.fetchCollections()
+    await this.collectionsStore.fetchDatasetCollections(this.$route.params.datasetId)
   },
 
   methods: {
-    ...mapActions('collectionsModule', [
-      'addCollection',
-      'createCollection',
-      'fetchDatasetCollections',
-      'removeCollection'
-    ]),
 
     /**
      * Add collection to the dataset
@@ -122,25 +130,32 @@ export default {
 
       const isCreating = this.$refs.inputCollection.showNewOption
       if (isCreating) {
-        // Add collection to vuex
-        this.createCollection({
-          datasetId: this.$route.params.datasetId,
-          collectionName: collection
-        })
-          .catch(() => {
-            this.hasError = true
+        try {
+          await this.collectionsStore.createCollection({
+            datasetId: this.$route.params.datasetId,
+            collectionName: collection
           })
+        } catch (error) {
+          this.hasError = true
+        }
       } else {
-        this.addCollection({
-          datasetId: this.$route.params.datasetId,
-          collectionId: collection.id
-        })
-          .catch(() => {
-            this.hasError = true
+        try {
+          await this.collectionsStore.addCollection({
+            datasetId: this.$route.params.datasetId,
+            collectionId: collection.id
           })
+        } catch (error) {
+          this.hasError = true
+        }
       }
 
       this.inputCollection = ''
+    },
+
+    removeCollection(params) {
+      this.collectionsStore.removeCollection(params).catch(() => {
+        this.hasError = true
+      })
     }
   }
 }
