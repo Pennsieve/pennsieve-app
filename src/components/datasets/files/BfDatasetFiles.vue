@@ -962,7 +962,8 @@ export default {
           });
         });
       });
-      Promise.all(promises).then((response) => {
+      Promise.all(promises).then(() => {
+        // Move files again, now with new name
         this.moveItems(destination, this.moveConflict.display);
 
         // Reset
