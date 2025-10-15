@@ -78,31 +78,38 @@
       </ul>
     </div>
 
-    <!-- Range selection helper for analysis dialog -->
+    <!-- Compact selection toolbar for analysis dialog -->
     <div v-if="withinRunAnalysisDialog" class="range-selection-bar">
-      <div class="range-controls">
-        <span class="selection-info">{{ selection.length }} selected</span>
+      <div class="toolbar-header">
+        <el-button size="small" @click="showRangeSelector = !showRangeSelector">
+          {{ showRangeSelector ? "Hide" : "Select" }} Range
+        </el-button>
+      </div>
+
+      <!-- Expandable range selector -->
+      <div v-if="showRangeSelector" class="range-controls">
         <el-input
           v-model.number="rangeStart"
           size="small"
           placeholder="Start row"
-          style="width: 100px; margin: 0 8px"
+          style="width: 100px; margin-right: 8px"
           @keyup.enter="selectRange"
         />
-        <span>to</span>
+        <span style="margin-right: 8px">to</span>
         <el-input
           v-model.number="rangeEnd"
           size="small"
           placeholder="End row"
-          style="width: 100px; margin: 0 8px"
+          style="width: 100px; margin-right: 8px"
           @keyup.enter="selectRange"
         />
         <el-button
           size="small"
+          type="primary"
           @click="selectRange"
           :disabled="!rangeStart || !rangeEnd"
         >
-          Select Range
+          Apply
         </el-button>
         <el-button size="small" @click="$refs.table.clearSelection()">
           Clear All
@@ -278,6 +285,7 @@ export default {
       checkAll: false,
       rangeStart: null,
       rangeEnd: null,
+      showRangeSelector: false,
     };
   },
   watch: {
@@ -347,7 +355,7 @@ export default {
     /**
      * Select range of rows based on input
      */
-    selectRange: function () {
+    selectRange: async function () {
       if (!this.rangeStart || !this.rangeEnd) return;
 
       // Convert to 0-based indices
@@ -362,25 +370,17 @@ export default {
         return;
       }
 
-      // Clear current selection first to ensure clean state
+      // Clear all existing selections first
       this.$refs.table.clearSelection();
+      await this.$nextTick();
 
-      // Use setTimeout to ensure DOM updates are processed
-      setTimeout(() => {
-        // Select each row individually with a small delay between each
-        let index = start;
-        const selectNext = () => {
-          if (index <= end && this.data[index]) {
-            this.$refs.table.toggleRowSelection(this.data[index], true);
-            index++;
-            if (index <= end) {
-              // Small delay between selections to ensure el-table processes each one
-              setTimeout(selectNext, 10);
-            }
-          }
-        };
-        selectNext();
-      }, 50);
+      // Select each row in the range
+      for (let i = start; i <= end; i++) {
+        if (this.data[i]) {
+          await this.$nextTick();
+          this.$refs.table.toggleRowSelection(this.data[i], true);
+        }
+      }
 
       // Clear inputs after selection
       this.rangeStart = null;
@@ -391,6 +391,7 @@ export default {
       this.$refs.table.clearSelection();
       this.rangeStart = null;
       this.rangeEnd = null;
+      this.showRangeSelector = false;
     },
 
     onOpenOffice365: function (file) {
@@ -595,16 +596,18 @@ export default {
   border: 1px solid #dcdfe6;
   border-bottom: 0;
 
+  .toolbar-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
   .range-controls {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e4e7ed;
     display: flex;
     align-items: center;
-    gap: 8px;
-
-    .selection-info {
-      margin-right: 16px;
-      font-weight: 600;
-      color: #606266;
-    }
   }
 }
 
