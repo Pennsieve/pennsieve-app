@@ -7,7 +7,12 @@
       <div class="collection-content-wrap">
         <div class="collection-header">
           <h3>
-            <router-link :to="{ name: 'collection-details', params: { collectionId: collection.id } }">
+            <router-link
+              :to="{
+                name: 'collection-details',
+                params: { collectionId: collection.id },
+              }"
+            >
               {{ collection.name }}
             </router-link>
           </h3>
@@ -22,23 +27,42 @@
           <div class="details">
             <div class="detail">
               <IconDataset :height="16" :width="16" />
-              <span v-if="collection.datasetCount > 0 && collection.datasetCount !== 1">
-                <strong>{{ formatNumber(collection.datasetCount) }}</strong> Datasets
+              <span
+                v-if="
+                  collection.datasetCount > 0 && collection.datasetCount !== 1
+                "
+              >
+                <strong>{{ formatNumber(collection.datasetCount) }}</strong>
+                Datasets
               </span>
               <span v-else-if="collection.datasetCount === 1">
                 <strong>{{ collection.datasetCount }}</strong> Dataset
               </span>
               <span v-else>No Datasets</span>
             </div>
-            <div v-if="collection.state === 'public' && collection.doi" class="detail">
+            <div class="detail">
+              <IconLicense />
+              <span>
+                <strong>{{ collection.license }}</strong>
+              </span>
+            </div>
+            <div
+              v-if="collection.state === 'public' && collection.doi"
+              class="detail"
+            >
               <IconStorage :height="16" :width="16" />
               <span>
                 <strong>DOI: {{ collection.doi }}</strong>
               </span>
             </div>
-<!--            <div class="detail">-->
-<!--              <span>{{ collectionOwnerName }}</span>-->
-<!--            </div>-->
+            <div class="detail tags">
+              <span>
+                <strong>{{ formatTags(collection.tags) }}</strong>
+              </span>
+            </div>
+            <!--            <div class="detail">-->
+            <!--              <span>{{ collectionOwnerName }}</span>-->
+            <!--            </div>-->
           </div>
         </div>
       </div>
@@ -47,18 +71,19 @@
 </template>
 
 <script>
-import CollectionsBannerImage from './CollectionsBannerImage.vue'
-import IconDataset from '../../icons/IconDataset.vue'
-import IconStorage from '../../icons/IconStorage.vue'
-import * as siteConfig from '@/site-config/site.json'
+import CollectionsBannerImage from "./CollectionsBannerImage.vue";
+import IconDataset from "../../icons/IconDataset.vue";
+import IconLicense from "../../icons/IconLicense.vue";
+import IconStorage from "../../icons/IconStorage.vue";
+import * as siteConfig from "@/site-config/site.json";
 
 export default {
-  name: 'CollectionsCard',
+  name: "CollectionsCard",
 
   components: {
     CollectionsBannerImage,
     IconDataset,
-    IconStorage
+    IconStorage,
   },
 
   props: {
@@ -67,72 +92,77 @@ export default {
       required: true,
       default: () => ({
         id: null,
-        name: '',
-        description: '',
+        name: "",
+        description: "",
         datasetCount: 0,
-        userRole: '',
+        userRole: "",
         banners: [],
-        state: 'private',
-        doi: '',
-        ownerFirstName: '',
-        ownerLastName: '',
-        revisedAt: '',
-        versionPublishedAt: ''
-      })
-    }
+        state: "private",
+        doi: "",
+        ownerFirstName: "",
+        ownerLastName: "",
+        revisedAt: "",
+        versionPublishedAt: "",
+        tags: [],
+      }),
+    },
   },
 
   computed: {
     collectionOwnerName() {
-      const firstName = this.collection.ownerFirstName || ''
-      const lastName = this.collection.ownerLastName || ''
-      const fullName = `${firstName} ${lastName}`.trim()
-      return fullName || 'Unknown'
+      const firstName = this.collection.ownerFirstName || "";
+      const lastName = this.collection.ownerLastName || "";
+      const fullName = `${firstName} ${lastName}`.trim();
+      return fullName || "Unknown";
     },
 
     collectionBanners() {
       // Transform banner URLs to the format expected by CollectionsBannerImage
-      const banners = this.collection.banners || []
-      return banners.map(url => ({ uri: url }))
+      const banners = this.collection.banners || [];
+      return banners.map((url) => ({ uri: url }));
     },
 
     collectionState() {
-      const state = this.collection.state || 'private'
-      if (state === 'completed') {
-        return 'Published'
+      const state = this.collection.state || "private";
+      if (state === "completed") {
+        return "Published";
       }
-      return state.charAt(0).toUpperCase() + state.slice(1)
+      return state.charAt(0).toUpperCase() + state.slice(1);
     },
 
     collectionUrl() {
       // Link to the discover app for viewing the collection
-      return `${siteConfig.discoverAppUrl}/collections/${this.collection.id}`
+      return `${siteConfig.discoverAppUrl}/collections/${this.collection.id}`;
     },
 
     lastUpdatedDate() {
-      const date = this.collection.revisedAt || this.collection.versionPublishedAt
-      if (!date) return 'Unknown'
-      
+      const date =
+        this.collection.revisedAt || this.collection.versionPublishedAt;
+      if (!date) return "Unknown";
+
       // Simple date formatting - you could use a more sophisticated date library
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    }
+      return new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    },
   },
 
   methods: {
     formatNumber(number) {
-      if (!number) return '0'
-      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
-    }
-  }
-}
+      if (!number) return "0";
+      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
+    },
+    formatTags(tags) {
+      return (tags || []).join(", ");
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .collections-card {
   border: solid 1px theme.$gray_2;
@@ -183,7 +213,10 @@ h3 {
     }
   }
 }
-
+.tags {
+  margin-left: auto;
+  padding-right: 0px !important;
+}
 .collection-state-tag {
   background: theme.$purple_tint;
   color: theme.$purple_1;
@@ -208,7 +241,7 @@ h3 {
 .collections-details-wrap {
   display: flex;
   flex-direction: column;
-  
+
   @media (min-width: 992px) {
     align-items: flex-end;
     flex-direction: row;
@@ -221,7 +254,10 @@ h3 {
   flex-wrap: wrap;
   justify-content: flex-start;
   margin-bottom: 0;
-
+  background-image: linear-gradient(90deg, #fff, #e6e9ef);
+  border-top: 1px solid #ccc;
+  padding: 8px 16px;
+  border-radius: 2px;
   .detail {
     align-items: center;
     display: flex;
@@ -238,9 +274,7 @@ h3 {
   }
 }
 
-
 .mr-16 {
   margin-right: 16px;
 }
-
 </style>
