@@ -355,7 +355,7 @@ export default {
     /**
      * Select range of rows based on input
      */
-    selectRange: async function () {
+    selectRange: function () {
       if (!this.rangeStart || !this.rangeEnd) return;
 
       // Convert to 0-based indices
@@ -370,17 +370,27 @@ export default {
         return;
       }
 
-      // Clear all existing selections first
-      this.$refs.table.clearSelection();
-      await this.$nextTick();
+      // Debug logging
+      console.log("Range selection:", {
+        inputStart: this.rangeStart,
+        inputEnd: this.rangeEnd,
+        zeroBasedStart: start,
+        zeroBasedEnd: end,
+        totalRows: this.data.length,
+      });
 
-      // Select each row in the range
-      for (let i = start; i <= end; i++) {
-        if (this.data[i]) {
-          await this.$nextTick();
-          this.$refs.table.toggleRowSelection(this.data[i], true);
+      // Clear all selections first
+      this.$refs.table.clearSelection();
+
+      // Wait for clear to complete, then select the range
+      setTimeout(() => {
+        for (let i = start; i <= end; i++) {
+          if (this.data[i]) {
+            console.log(`Selecting row ${i + 1}:`, this.data[i].content.name);
+            this.$refs.table.toggleRowSelection(this.data[i], true);
+          }
         }
-      }
+      }, 100);
 
       // Clear inputs after selection
       this.rangeStart = null;
