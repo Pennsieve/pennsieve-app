@@ -124,7 +124,7 @@ export default {
 
     collectionState() {
       const state = this.collection.state || "private";
-      if (state === "completed") {
+      if (state.toLowerCase() === "completed") {
         return "Published";
       }
       return state.charAt(0).toUpperCase() + state.slice(1);

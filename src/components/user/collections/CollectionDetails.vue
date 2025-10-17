@@ -279,11 +279,12 @@ function onDatasetFinderError(errorMessage: string) {
   console.error("Dataset finder error:", errorMessage);
 }
 
-function onCollectionUpdated(updated: { name?: string; description?: string }) {
+function onCollectionUpdated(updated: any) {
   if (collection.value && updated) {
-    if (typeof updated.name === "string") collection.value.name = updated.name;
-    if (typeof updated.description === "string")
-      collection.value.description = updated.description;
+    collection.value.name = updated.name;
+    collection.value.description = updated.description;
+    collection.value.license = updated.license;
+    collection.value.tags = updated.tags;
   }
 }
 </script>

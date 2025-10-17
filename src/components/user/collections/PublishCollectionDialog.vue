@@ -32,6 +32,7 @@
           <el-form-item id="inputTags">
             <template #label> Tags </template>
             <el-input
+              disabled
               ref="inputTags"
               v-model="inputTag"
               class="mb-8"
@@ -47,13 +48,14 @@
                 v-for="tag in publishCollectionObject.tags"
                 :key="tag"
                 :label="tag"
+                disabled
                 class="mr-8 mb-8"
-                @remove="removeTag(tag)"
               />
             </div>
           </el-form-item>
           <el-form-item>
             <el-select
+              disabled
               ref="inputLicense"
               v-model="publishCollectionObject.license"
               placeholder="No License Selected"
@@ -170,12 +172,7 @@ const addTag = () => {
     }
   }
 };
-const removeTag = (tag: string) => {
-  const idx = publishCollectionObject.value.tags.indexOf(tag);
-  if (idx > -1) {
-    publishCollectionObject.value.tags.splice(idx, 1);
-  }
-};
+
 const validateForm = () => {
   if (publishCollectionObject.value.tags.length == 0) {
     showError.value = true;

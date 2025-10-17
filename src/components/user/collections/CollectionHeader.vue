@@ -60,6 +60,13 @@
               {{ stateButtonText }}
             </div>
           </div>
+          <div class="status-item">
+            <div>
+              <a :href="discoverLink" target="_blank">{{
+                "Version " + version
+              }}</a>
+            </div>
+          </div>
         </div>
 
         <!-- Right side: Action buttons -->
@@ -86,6 +93,7 @@
 </template>
 
 <script>
+import { mapState } from "vuex";
 import CollectionsBannerImage from "./CollectionsBannerImage.vue";
 import ContributorItem from "./ContributorItem.vue";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
@@ -120,6 +128,7 @@ export default {
   },
 
   computed: {
+    ...mapState(["config"]),
     collectionTitle() {
       return this.collectionDetails?.name || "";
     },
@@ -149,7 +158,41 @@ export default {
         orcid: this.collectionDetails?.ownerOrcid || "",
       };
     },
+    publicationData() {
+      return this.collectionDetails?.publication?.publishedDataset;
+    },
+    version() {
+      return this.publicationData?.version;
+    },
+    discoverLink() {
+      const publicationStatus = this.collectionDetails?.publication?.status;
 
+      if (!publicationStatus.toLowerCase() == "completed") {
+        return "";
+      }
+      const pd = this.publicationData;
+
+      if (pd?.id && pd?.version) {
+        return this.config.environment === "prod"
+          ? `https://discover.pennsieve.io/collections/${pd.id}/version/${pd.version}`
+          : `https://discover.pennsieve.net/collections/${pd.id}/version/${pd.version}`;
+      }
+    },
+    publishedDateText() {
+      // Optional: show "Published on" in the header stats
+      const iso = this.publishedDataset?.lastPublishedDate;
+      if (!iso) return null;
+      try {
+        const d = new Date(iso);
+        return d.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      } catch {
+        return iso;
+      }
+    },
     stateButtonText() {
       const publicationStatus = this.collectionDetails?.publication?.status;
       if (publicationStatus === "Draft") {
@@ -169,10 +212,7 @@ export default {
       } else if (publicationStatus === "Completed") {
         return "published";
       }
-      // Fallback to the old state field if publication status is not available
-      return this.collectionDetails?.state || "private";
     },
-
     showPublishButton() {
       // Show publish button for all collections
       const publicationStatus = this.collectionDetails?.publication?.status;
