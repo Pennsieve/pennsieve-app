@@ -3,16 +3,15 @@
     class="bf-file-label"
     :class="[
       interactive ? 'interactive' : 'non-interactive',
-      shouldShowBtnOpenFile ? 'show-btn-open-file' : ''
+      shouldShowBtnOpen ? 'show-btn-open-file' : ''
     ]"
     @click="onClick('click', $event)"
   >
     <div
-      v-if="shouldShowBtnOpenFile"
+      v-if="shouldShowBtnOpen"
       class="btn-open-file mr-16"
     >
       <button
-        v-if="shouldShowBtnOpenFilePackage"
         class="button-icon btn-icon-viewer"
         @click="openViewerOptions"
       >
@@ -21,29 +20,17 @@
           :width="16"
         />
       </button>
-      <a
-        v-if="packageType === 'ExternalFile' && isExternalFileClickable"
-        :href="fileLocation"
-        target="_blank"
-      >
-        <button class="button-icon btn-icon-viewer">
-          <IconLink
-            :height="16"
-            :width="16"
-          />
-        </button>
-      </a>
     </div>
 
     <div
-      v-if="getFileState === 'Processing' || getFileState === 'Uploading'"
+      v-if="fileState === 'processing' || fileState === 'uploading'"
       class="icon-waiting mr-16"
     >
       <bf-waiting-icon />
     </div>
 
     <img
-      v-if="getFileState !== 'Processing' && getFileState !== 'Uploading'"
+      v-if="fileState !== 'processing' && fileState !== 'uploading'"
       class="svg-icon icon-item mr-16"
       :src="fileIcon(icon, file.content.packageType)"
       alt="package icon"
@@ -156,51 +143,33 @@ export default {
         console.log('yes to viewer')
         hasViewer = true
       }
+      
+      const isTimeseriesFile = packageType.toLowerCase() === 'timeseries';
+      let isFileUnprocessed = false;
+      if (isTimeseriesFile) {
+        isFileUnprocessed = this.isFileUnprocessed(this.file);
+      }
+
+      if (isFileUnprocessed) {
+        hasViewer = false
+      }
 
       return hasViewer
     },
 
-    /**
-     * Gets the state of a file in the table
-     * @returns {String}
-     */
-    getFileState: function() {
+    fileState: function() {
       const states = {
-        'UPLOADED': 'Unprocessed',
-        'PROCESSING': 'Processing',
-        'RUNNING': 'Processing',
-        'UNAVAILABLE': 'Uploading',
-        'PENDING': 'Processing',
-        'ERROR': 'Failed'
+        'UPLOADED': 'unprocessed',
+        'PROCESSING': 'processing',
+        'RUNNING': 'processing',
+        'UNAVAILABLE': 'uploading',
+        'PENDING': 'processing',
+        'ERROR': 'failed',
+        'READY': 'processed'
       }
       const fileState = path(['content', 'state'], this.file)
       return states[fileState] ? states[fileState] : ''
     },
-
-    /**
-     * Compute if external file is a url or local file path
-     * @returns {Boolean}
-     */
-    isExternalFileClickable: function() {
-      return Boolean(validUrl.isUri(this.fileLocation))
-    },
-
-    /**
-     * Compute if package is an external file
-     * @returns {Boolean}
-     */
-    isExternalFile: function() {
-      return this.packageType === 'ExternalFile'
-    },
-
-    /**
-     * Compute external file location
-     * @returns {String}
-     */
-    fileLocation: function() {
-      return pathOr('', ['externalFile', 'location'], this.file)
-    },
-
     /**
      * Compute package type
      * @returns {String}
@@ -220,26 +189,11 @@ export default {
     },
 
     /**
-     * Compute if the open file button
-     * should be visible
-     * @returns {Boolean}
-     */
-    shouldShowBtnOpenFile: function() {
-      if (this.openFileButton) {
-        return this.isExternalFile
-          ? this.isExternalFileClickable
-          : this.shouldShowBtnOpenFilePackage
-      }
-
-      return false
-    },
-
-    /**
      * Compute if the open file button should
      * be visible for a package
      * @returns {Boolean}
      */
-    shouldShowBtnOpenFilePackage: function() {
+    shouldShowBtnOpen: function() {
       return this.packageType != 'Collection' && this.hasViewer
     },
 
@@ -260,6 +214,30 @@ export default {
     ...mapActions('filesModule', [
        'openOffice365File'
     ]),
+
+    isFileUnprocessed: function (file) {
+      const fileState = this.getFileState(file)
+      if (fileState !== 'processed') {
+        return true;
+      } else {
+        return false;
+      }
+    },
+
+    getFileState: function(file) {
+      const states = {
+        'UPLOADED': 'unprocessed',
+        'PROCESSING': 'processing',
+        'RUNNING': 'processing',
+        'UNAVAILABLE': 'uploading',
+        'PENDING': 'processing',
+        'ERROR': 'failed',
+        'READY': 'processed'
+      }
+      const fileState = path(['content', 'state'], file)
+      return states[fileState] ? states[fileState] : ''
+    },
+
     /**
      * Handles click event
      * @param {String} name

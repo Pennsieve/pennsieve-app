@@ -34,9 +34,6 @@
             :data="fileDTOs || packageDTOs"
           >
             <el-table-column prop="content.name">
-              <template slot-scope="scope">
-                <bf-file-label :file="scope.row" />
-              </template>
             </el-table-column>
             <el-table-column prop="storage" align="right">
               <template #default>
@@ -82,7 +79,6 @@ import Request from "../../mixins/request/index";
 import BfDialogHeader from "../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../shared/dialog-body/DialogBody.vue";
 import BfButton from "../shared/bf-button/BfButton.vue";
-import BfFileLabel from "../datasets/files/bf-file/BfFileLabel.vue";
 import BfStorageMetrics from "../../mixins/bf-storage-metrics";
 import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
@@ -98,7 +94,6 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
-    BfFileLabel,
   },
 
   mixins: [Sorter, Request, BfStorageMetrics],
