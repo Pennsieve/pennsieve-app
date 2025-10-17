@@ -112,6 +112,7 @@ PUBLISH collections call POST
         .map((item) => ({
           id: item.nodeId,
           name: item.name,
+          state: item.publication.status,
           description: item.description,
           datasetCount: item.size,
           userRole: item.userRole,
@@ -164,14 +165,13 @@ PUBLISH collections call POST
   const getCollectionDetails = async (collectionID) => {
     try {
       const token = await useGetToken();
-      const url = `${siteConfig.api2Url}/collections/${collectionID}`;
+      const url = `${siteConfig.api2Url}/collections/${collectionID}?includePublishedDataset=true`;
       const response = await useSendXhr(url, {
         method: "GET",
         header: {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const transformed = {
         id: response.nodeId,
         name: response.name,
