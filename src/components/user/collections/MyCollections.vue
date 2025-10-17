@@ -2,9 +2,10 @@
   <div class="my-collections">
     <div class="collections-header">
       <p class="page-description">
-        Browse and manage your collections. Collections help organize and share related datasets.
+        Browse and manage your collections. Collections help organize and share
+        related datasets.
       </p>
-      
+
       <div class="header-actions">
         <div class="search-bar">
           <IconSearch :width="20" :height="20" class="search-icon" />
@@ -15,8 +16,23 @@
             class="search-input"
             @input="onSearch"
           />
+          <div class="mycollections-head-item">
+            <el-tooltip placement="top-start" :teleported="false">
+              <template #content>
+                <p>
+                  Need help? Collections documentation can be found
+                  <a
+                    href="https://docs.pennsieve.io/docs/my-collections"
+                    target="_blank"
+                    >here.</a
+                  >
+                </p>
+              </template>
+              <IconInfo></IconInfo>
+            </el-tooltip>
+          </div>
         </div>
-        
+
         <bf-button class="primary" @click="showCreateDialog">
           Create Collection
         </bf-button>
@@ -24,76 +40,84 @@
     </div>
 
     <!-- Use the CollectionsList component -->
-    <collections-list ref="collectionsList" :user="true" :search-query="searchQuery" />
-    
+    <collections-list
+      ref="collectionsList"
+      :user="true"
+      :search-query="searchQuery"
+      :create-collection="showCreateDialog"
+    />
+
     <!-- Create Collection Dialog -->
     <create-collection-dialog
-      :dialog-visible="createDialogVisible"
+      v-model="createDialogVisible"
       @close="hideCreateDialog"
       @created="onCollectionCreated"
     />
   </div>
 </template>
 
-<script>
-import IconSearch from '../../icons/IconSearch.vue'
-import CollectionsList from './CollectionsList.vue'
-import CreateCollectionDialog from './CreateCollectionDialog.vue'
-import BfButton from "@/components/shared/bf-button/BfButton.vue"
+<script setup lang="ts">
+import { ref } from "vue";
+import { ElMessage } from "element-plus";
+import IconInfo from "@/components/icons/IconInfo.vue";
+import IconSearch from "../../icons/IconSearch.vue";
+import CollectionsList from "./CollectionsList.vue";
+import CreateCollectionDialog from "./CreateCollectionDialog.vue";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
-export default {
-  name: 'MyCollections',
+defineOptions({ name: "MyCollections" });
 
-  components: {
-    IconSearch,
-    CollectionsList,
-    CreateCollectionDialog,
-    BfButton
-  },
+// state
+const searchQuery = ref<string>("");
+const createDialogVisible = ref(false);
 
-  data() {
-    return {
-      searchQuery: '',
-      createDialogVisible: false
-    }
-  },
+// refs
+const collectionsList = ref<InstanceType<typeof CollectionsList> | null>(null);
 
-  methods: {
-    onSearch() {
-      // Search functionality is handled reactively through the searchQuery prop
-    },
+// handlers
+const onSearch = () => {
+  // search is reactive via searchQuery prop to CollectionsList
+};
 
-    showCreateDialog() {
-      this.createDialogVisible = true
-    },
+const showCreateDialog = () => {
+  createDialogVisible.value = true;
+};
 
-    hideCreateDialog() {
-      this.createDialogVisible = false
-    },
+const hideCreateDialog = () => {
+  createDialogVisible.value = false;
+};
 
-    onCollectionCreated(collection) {
-      // Add the new collection to the list without refetching all data
-      if (this.$refs.collectionsList && this.$refs.collectionsList.addNewCollection) {
-        this.$refs.collectionsList.addNewCollection(collection)
-      } else if (this.$refs.collectionsList && this.$refs.collectionsList.getCollections) {
-        // Fallback to refresh if addNewCollection is not available
-        this.$refs.collectionsList.getCollections()
-      }
-      
-      // Show success message
-      this.$message.success(`Collection "${collection.name}" created successfully`)
-    }
+const onCollectionCreated = (collection: { name: string }) => {
+  // Try to insert in-place; otherwise refresh
+  const list = collectionsList.value as any;
+  if (list?.addNewCollection) {
+    list.addNewCollection(collection);
+  } else if (list?.getCollections) {
+    list.getCollections();
   }
-}
+
+  // success toast
+  ElMessage.success(`Collection "${collection.name}" created successfully`);
+};
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .my-collections {
   margin: 32px;
 }
-
+.mycollections-head-item {
+  margin: 5px;
+  display: flex;
+  justify-content: end;
+  a {
+    color: #2760ff;
+  }
+}
+.info-icon {
+  color: #2760ff;
+}
 .collections-header {
   margin-bottom: 32px;
 
@@ -133,11 +157,11 @@ export default {
         font-size: 14px;
         background: white;
         transition: all 0.2s ease;
-        
+
         &::placeholder {
           color: theme.$gray_4;
         }
-        
+
         &:focus {
           outline: none;
           border-color: theme.$purple_2;
@@ -155,7 +179,7 @@ export default {
       flex-direction: column;
       align-items: stretch;
       gap: 12px;
-      
+
       .search-bar {
         max-width: 100%;
       }

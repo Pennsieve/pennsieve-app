@@ -1,6 +1,5 @@
 <template>
   <div class="collection-header">
-    
     <div class="row">
       <div class="col-xs-12 col-sm-6">
         <div class="collection-title-wrap">
@@ -8,7 +7,7 @@
             {{ collectionTitle }}
           </h1>
         </div>
-        
+
         <div v-if="collectionOwner" class="collection-owners">
           <div class="contributor-item-wrap">
             <contributor-item :contributor="correspondingContributor" />
@@ -18,7 +17,7 @@
         <p class="collection-description">
           {{ collectionDescription }}
         </p>
-        
+
         <div v-if="collectionOwner" class="collection-meta">
           <div class="collection-corresponding-contributor">
             <p>Corresponding Contributor:</p>
@@ -26,10 +25,13 @@
           </div>
         </div>
       </div>
-      
+
       <div class="col-xs-12 col-sm-6 first-xs last-sm">
         <div class="header-image-section">
-          <collections-banner-image :banners="collectionBanners" class="collection-image" />
+          <collections-banner-image
+            :banners="collectionBanners"
+            class="collection-image"
+          />
         </div>
       </div>
     </div>
@@ -39,35 +41,42 @@
         <!-- Left side: Status information -->
         <div class="status-items">
           <div class="status-item">
-            <IconFiles class="status-icon" :height="16" :width="16"/>
+            <IconFiles class="status-icon" :height="16" :width="16" />
             <span class="status-text">
               <template v-if="datasetCount > 0">
                 <strong>{{ formatNumber(datasetCount) }}</strong> Datasets
               </template>
-              <template v-else>
-                No Datasets
-              </template>
+              <template v-else> No Datasets </template>
             </span>
           </div>
-          
+          <div class="status-item">
+            <IconLicense />
+            <span class="status-text">
+              <strong>{{ license }}</strong>
+            </span>
+          </div>
           <div class="status-item">
             <div class="state-badge" :class="collectionState">
               {{ stateButtonText }}
             </div>
           </div>
         </div>
-        
+
         <!-- Right side: Action buttons -->
         <div class="action-buttons">
           <bf-button class="secondary" @click="openEditDialog">
             Edit Collection
           </bf-button>
-          
+
           <bf-button class="secondary" @click="openDatasetFinder">
             Select Datasets
           </bf-button>
-          
-          <bf-button v-if="showPublishButton" class="primary" @click="publishCollection">
+
+          <bf-button
+            v-if="showPublishButton"
+            class="primary"
+            @click="publishCollection"
+          >
             {{ publishButtonText }}
           </bf-button>
         </div>
@@ -77,133 +86,136 @@
 </template>
 
 <script>
-import CollectionsBannerImage from './CollectionsBannerImage.vue'
-import ContributorItem from './ContributorItem.vue'
-import IconArrowLeft from '../../icons/IconArrowLeft.vue'
-import IconFiles from '../../icons/IconFiles.vue'
+import CollectionsBannerImage from "./CollectionsBannerImage.vue";
+import ContributorItem from "./ContributorItem.vue";
+import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import IconLicense from "../../icons/IconLicense.vue";
+import IconFiles from "../../icons/IconFiles.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 export default {
-  name: 'CollectionHeader',
+  name: "CollectionHeader",
 
   components: {
     BfButton,
     CollectionsBannerImage,
     ContributorItem,
     IconArrowLeft,
-    IconFiles
+    IconFiles,
   },
 
   props: {
-    collectionDetails: { 
-      type: Object, 
-      default: () => ({}) 
+    collectionDetails: {
+      type: Object,
+      default: () => ({}),
     },
-    lastUpdatedDate: { 
-      type: String, 
-      default: "" 
+    lastUpdatedDate: {
+      type: String,
+      default: "",
     },
-    collectionDescription: { 
-      type: String, 
-      default: "" 
-    }
+    collectionDescription: {
+      type: String,
+      default: "",
+    },
   },
 
   computed: {
     collectionTitle() {
-      return this.collectionDetails?.name || ''
+      return this.collectionDetails?.name || "";
     },
 
     collectionBanners() {
       // Transform banner URLs to the format expected by CollectionsBannerImage
-      const banners = this.collectionDetails?.banners || []
-      return banners.map(url => ({ uri: url }))
+      const banners = this.collectionDetails?.banners || [];
+      return banners.map((url) => ({ uri: url }));
     },
 
     datasetCount() {
-      return this.collectionDetails?.datasetCount || 0
+      return this.collectionDetails?.datasetCount || 0;
     },
 
     collectionOwner() {
-      const firstName = this.collectionDetails?.ownerFirstName || ''
-      const lastName = this.collectionDetails?.ownerLastName || ''
-      return `${firstName} ${lastName}`.trim()
+      const firstName = this.collectionDetails?.ownerFirstName || "";
+      const lastName = this.collectionDetails?.ownerLastName || "";
+      return `${firstName} ${lastName}`.trim();
     },
-
+    license() {
+      return this.collectionDetails?.license || "";
+    },
     correspondingContributor() {
       return {
-        firstName: this.collectionDetails?.ownerFirstName || '',
-        lastName: this.collectionDetails?.ownerLastName || '',
-        orcid: this.collectionDetails?.ownerOrcid || ''
-      }
+        firstName: this.collectionDetails?.ownerFirstName || "",
+        lastName: this.collectionDetails?.ownerLastName || "",
+        orcid: this.collectionDetails?.ownerOrcid || "",
+      };
     },
 
     stateButtonText() {
-      const publicationStatus = this.collectionDetails?.publication?.status
-      if (publicationStatus === 'Draft') {
-        return 'Draft'
-      } else if (publicationStatus === 'Completed') {
-        return 'Published'
+      const publicationStatus = this.collectionDetails?.publication?.status;
+      if (publicationStatus === "Draft") {
+        return "Draft";
+      } else if (publicationStatus === "Completed") {
+        return "Published";
       }
       // Fallback to the old state field if publication status is not available
-      const state = this.collectionDetails?.state || 'private'
-      return state.charAt(0).toUpperCase() + state.slice(1)
+      const state = this.collectionDetails?.state || "private";
+      return state.charAt(0).toUpperCase() + state.slice(1);
     },
 
     collectionState() {
-      const publicationStatus = this.collectionDetails?.publication?.status
-      if (publicationStatus === 'Draft') {
-        return 'draft'
-      } else if (publicationStatus === 'Completed') {
-        return 'published'
+      const publicationStatus = this.collectionDetails?.publication?.status;
+      if (publicationStatus === "Draft") {
+        return "draft";
+      } else if (publicationStatus === "Completed") {
+        return "published";
       }
       // Fallback to the old state field if publication status is not available
-      return this.collectionDetails?.state || 'private'
+      return this.collectionDetails?.state || "private";
     },
 
     showPublishButton() {
       // Show publish button for all collections
-      const publicationStatus = this.collectionDetails?.publication?.status
-      return publicationStatus === 'Draft' || publicationStatus === 'Completed'
+      const publicationStatus = this.collectionDetails?.publication?.status;
+      return publicationStatus === "Draft" || publicationStatus === "Completed";
     },
 
     publishButtonText() {
-      const publicationStatus = this.collectionDetails?.publication?.status
-      if (publicationStatus === 'Completed') {
-        return 'Publish New Version'
+      const publicationStatus = this.collectionDetails?.publication?.status;
+      if (publicationStatus === "Completed") {
+        return "Publish New Version";
       }
-      return 'Publish Collection'
-    }
+      return "Publish Collection";
+    },
   },
 
   methods: {
     formatNumber(number) {
-      if (!number) return '0'
-      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+      if (!number) return "0";
+      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
     },
 
     goToDatasets() {
       // Navigate to datasets - this would depend on your routing structure
-      this.$router.push({ name: 'datasets' })
+      this.$router.push({ name: "datasets" });
     },
 
     openEditDialog() {
-      this.$emit('open-edit-dialog')
+      this.$emit("open-edit-dialog");
     },
 
     openDatasetFinder() {
-      this.$emit('open-dataset-finder')
+      this.$emit("open-dataset-finder");
     },
 
     publishCollection() {
-      this.$emit('publish-collection')
-    }
-  }
-}
+      this.$emit("publish-collection");
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .collection-header {
   padding-top: 24px;
@@ -259,7 +271,8 @@ export default {
   display: inline-flex;
   align-items: center;
 
-  &:hover, &:focus {
+  &:hover,
+  &:focus {
     color: theme.$purple_2;
     text-decoration: underline;
   }
@@ -335,12 +348,12 @@ export default {
   .collection-image {
     height: 200px;
     width: 200px;
-    
+
     @media (max-width: 48em) {
       height: 150px;
       width: 150px;
     }
-    
+
     @media (min-width: 48em) {
       height: 250px;
       width: 250px;

@@ -5,7 +5,7 @@
         <h2>Manage Collection Datasets</h2>
         <button class="close-button" @click="closeDialog">×</button>
       </div>
-      
+
       <div class="dialog-body">
         <!-- Search Bar -->
         <div class="search-section">
@@ -26,7 +26,7 @@
             @update:page-size="updatePageSize"
             @set-list-options="setListOptions"
           />
-          
+
           <div class="pagination-wrapper">
             <el-pagination
               v-show="totalCount > pageSize"
@@ -87,45 +87,45 @@
 </template>
 
 <script>
-import { useCollectionsStore } from '@/stores/collectionStore'
-import DatasetCardSelector from './DatasetCardSelector.vue'
-import DatasetListControls from './DatasetListControls.vue'
+import { useCollectionsStore } from "@/stores/collectionStore";
+import DatasetCardSelector from "./DatasetCardSelector.vue";
+import DatasetListControls from "./DatasetListControls.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 export default {
-  name: 'DatasetFinderDialog',
+  name: "DatasetFinderDialog",
 
   components: {
     BfButton,
     DatasetCardSelector,
-    DatasetListControls
+    DatasetListControls,
   },
 
   props: {
     visible: {
       type: Boolean,
-      default: false
+      default: false,
     },
     collectionId: {
       type: [String, Number],
-      required: true
+      required: true,
     },
     currentDatasets: {
       type: Array,
-      default: () => []
-    }
+      default: () => [],
+    },
   },
 
   setup() {
-    const collectionsStore = useCollectionsStore()
+    const collectionsStore = useCollectionsStore();
     return {
-      collectionsStore
-    }
+      collectionsStore,
+    };
   },
 
   data() {
     return {
-      searchQuery: '',
+      searchQuery: "",
       datasets: [],
       filteredDatasets: [],
       selectedDatasets: [],
@@ -135,295 +135,314 @@ export default {
       currentPage: 1,
       pageSize: 25,
       totalCount: 0,
-      searchTimeout: null // For debouncing search input
-    }
+      searchTimeout: null, // For debouncing search input
+    };
   },
 
   computed: {
     totalPages() {
-      return Math.ceil(this.totalCount / this.pageSize)
+      return Math.ceil(this.totalCount / this.pageSize);
     },
 
     hasChanges() {
       // Check if selected datasets differ from initial selection
-      if (this.selectedDatasets.length !== this.initialSelectedDatasets.length) {
-        return true
+      if (
+        this.selectedDatasets.length !== this.initialSelectedDatasets.length
+      ) {
+        return true;
       }
-      
-      const selectedIds = this.selectedDatasets.map(d => d.id).sort()
-      const initialIds = this.initialSelectedDatasets.map(d => d.id).sort()
-      
-      return selectedIds.some((id, index) => id !== initialIds[index])
+
+      const selectedIds = this.selectedDatasets.map((d) => d.id).sort();
+      const initialIds = this.initialSelectedDatasets.map((d) => d.id).sort();
+
+      return selectedIds.some((id, index) => id !== initialIds[index]);
     },
 
     datasetsToAdd() {
-      return this.selectedDatasets.filter(dataset => 
-        !this.initialSelectedDatasets.some(initial => initial.id === dataset.id)
-      )
+      return this.selectedDatasets.filter(
+        (dataset) =>
+          !this.initialSelectedDatasets.some(
+            (initial) => initial.id === dataset.id
+          )
+      );
     },
 
     datasetsToRemove() {
-      return this.initialSelectedDatasets.filter(dataset => 
-        !this.selectedDatasets.some(selected => selected.id === dataset.id)
-      )
+      return this.initialSelectedDatasets.filter(
+        (dataset) =>
+          !this.selectedDatasets.some((selected) => selected.id === dataset.id)
+      );
     },
 
     updateButtonText() {
-      const toAdd = this.datasetsToAdd.length
-      const toRemove = this.datasetsToRemove.length
-      
+      const toAdd = this.datasetsToAdd.length;
+      const toRemove = this.datasetsToRemove.length;
+
       if (toAdd > 0 && toRemove > 0) {
-        return `Update Collection (${toAdd} to add, ${toRemove} to remove)`
+        return `Update Collection (${toAdd} to add, ${toRemove} to remove)`;
       } else if (toAdd > 0) {
-        return `Add ${toAdd} Dataset${toAdd !== 1 ? 's' : ''}`
+        return `Add ${toAdd} Dataset${toAdd !== 1 ? "s" : ""}`;
       } else if (toRemove > 0) {
-        return `Remove ${toRemove} Dataset${toRemove !== 1 ? 's' : ''}`
+        return `Remove ${toRemove} Dataset${toRemove !== 1 ? "s" : ""}`;
       }
-      
-      return 'Update Collection'
-    }
+
+      return "Update Collection";
+    },
   },
 
   watch: {
     visible(newVal) {
       if (newVal) {
-        this.loadDatasets()
-        this.initializeSelectedDatasets()
-        this.searchQuery = ''
+        this.loadDatasets();
+        this.initializeSelectedDatasets();
+        this.searchQuery = "";
       }
     },
 
     currentDatasets: {
       handler() {
-        this.initializeSelectedDatasets()
+        this.initializeSelectedDatasets();
       },
-      immediate: true
-    }
+      immediate: true,
+    },
   },
 
   mounted() {
     if (this.visible) {
-      this.loadDatasets()
+      this.loadDatasets();
     }
   },
 
   methods: {
     async loadDatasets() {
-      this.isLoading = true
-      
+      this.isLoading = true;
+
       try {
-        const offset = (this.currentPage - 1) * this.pageSize
-        let response
-        
+        const offset = (this.currentPage - 1) * this.pageSize;
+        let response;
+
         // Use search API if there's a search query, otherwise load all datasets
         if (this.searchQuery && this.searchQuery.trim()) {
-          response = await this.collectionsStore.searchDatasets(this.searchQuery.trim(), this.pageSize, offset)
+          response = await this.collectionsStore.searchDatasets(
+            this.searchQuery.trim(),
+            this.pageSize,
+            offset
+          );
         } else {
-          response = await this.collectionsStore.getPublicDatasets(this.pageSize, offset)
+          response = await this.collectionsStore.getPublicDatasets(
+            this.pageSize,
+            offset
+          );
         }
-        
-        this.datasets = response.datasets || []
-        this.filteredDatasets = [...this.datasets]
-        this.totalCount = response.totalCount || 0
+
+        this.datasets = response.datasets || [];
+        this.filteredDatasets = [...this.datasets];
+        this.totalCount = response.totalCount || 0;
       } catch (error) {
-        console.error('Error loading datasets:', error)
-        this.datasets = []
-        this.filteredDatasets = []
-        this.totalCount = 0
+        console.error("Error loading datasets:", error);
+        this.datasets = [];
+        this.filteredDatasets = [];
+        this.totalCount = 0;
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
     initializeSelectedDatasets() {
       // Convert currentDatasets (from collection) to match the dataset structure
-      this.initialSelectedDatasets = this.currentDatasets.map(dataset => {
+      this.initialSelectedDatasets = this.currentDatasets.map((dataset) => {
         // Handle both formats: datasets from collection API and datasets from discover API
-        const datasetObj = dataset.data || dataset
+        const datasetObj = dataset.data || dataset;
         return {
           id: datasetObj.id,
           sourceDatasetId: datasetObj.sourceDatasetId,
           name: datasetObj.name,
-          description: datasetObj.description || '',
-          banner: datasetObj.banner || '',
+          description: datasetObj.description || "",
+          banner: datasetObj.banner || "",
           size: datasetObj.size || 0,
           fileCount: datasetObj.fileCount || 0,
           recordCount: datasetObj.recordCount || 0,
-          owner: `${datasetObj.ownerFirstName || ''} ${datasetObj.ownerLastName || ''}`.trim(),
-          organizationName: datasetObj.organizationName || '',
-          updatedAt: datasetObj.updatedAt || datasetObj.revisedAt || datasetObj.versionPublishedAt,
+          owner: `${datasetObj.ownerFirstName || ""} ${
+            datasetObj.ownerLastName || ""
+          }`.trim(),
+          organizationName: datasetObj.organizationName || "",
+          updatedAt:
+            datasetObj.updatedAt ||
+            datasetObj.revisedAt ||
+            datasetObj.versionPublishedAt,
           doi: datasetObj.doi,
           version: datasetObj.version,
           revision: datasetObj.revision,
           tags: datasetObj.tags || [],
-          license: datasetObj.license
-        }
-      })
-      
+          license: datasetObj.license,
+        };
+      });
+
       // Initialize selected datasets with current datasets
-      this.selectedDatasets = [...this.initialSelectedDatasets]
+      this.selectedDatasets = [...this.initialSelectedDatasets];
     },
 
     async updateDatasets() {
-      if (!this.hasChanges) return
-      
-      this.isUpdating = true
-      
+      if (!this.hasChanges) return;
+
+      this.isUpdating = true;
+
       try {
         // Prepare the DOI operations
         const addDois = this.datasetsToAdd
-          .filter(dataset => dataset.doi)
-          .map(dataset => dataset.doi)
-        
+          .filter((dataset) => dataset.doi)
+          .map((dataset) => dataset.doi);
+
         const removeDois = this.datasetsToRemove
-          .filter(dataset => dataset.doi)
-          .map(dataset => dataset.doi)
-        
+          .filter((dataset) => dataset.doi)
+          .map((dataset) => dataset.doi);
+
         await this.collectionsStore.editCollectionDataset(
           this.collectionId,
           addDois.length > 0 ? addDois : null,
           removeDois.length > 0 ? removeDois : null
-        )
+        );
 
         // Emit event with the changes made
-        this.$emit('datasets-updated', {
+        this.$emit("datasets-updated", {
           added: this.datasetsToAdd,
-          removed: this.datasetsToRemove
-        })
-        this.closeDialog()
+          removed: this.datasetsToRemove,
+        });
+        this.closeDialog();
       } catch (error) {
-        console.error('Error updating collection datasets:', error)
-        this.$emit('error', 'Failed to update collection datasets')
+        console.error("Error updating collection datasets:", error);
+        this.$emit("error", "Failed to update collection datasets");
       } finally {
-        this.isUpdating = false
+        this.isUpdating = false;
       }
     },
 
     onSearch() {
       // Clear previous timeout
       if (this.searchTimeout) {
-        clearTimeout(this.searchTimeout)
+        clearTimeout(this.searchTimeout);
       }
 
       // Debounce search input by 500ms
       this.searchTimeout = setTimeout(() => {
         // Reset to first page when searching
-        this.currentPage = 1
-        this.loadDatasets()
-      }, 500)
+        this.currentPage = 1;
+        this.loadDatasets();
+      }, 500);
     },
 
     toggleDataset(dataset) {
-      const index = this.selectedDatasets.findIndex(d => d.id === dataset.id)
-      
+      const index = this.selectedDatasets.findIndex((d) => d.id === dataset.id);
+
       if (index > -1) {
-        this.selectedDatasets.splice(index, 1)
+        this.selectedDatasets.splice(index, 1);
       } else {
-        this.selectedDatasets.push(dataset)
+        this.selectedDatasets.push(dataset);
       }
     },
 
     isSelected(datasetId) {
-      return this.selectedDatasets.some(d => d.id === datasetId)
+      return this.selectedDatasets.some((d) => d.id === datasetId);
     },
 
     async addDatasets() {
-      if (this.selectedDatasets.length === 0) return
-      
-      this.isAdding = true
-      
+      if (this.selectedDatasets.length === 0) return;
+
+      this.isAdding = true;
+
       try {
-        const token = await useGetToken()
-        const url = `${siteConfig.api2Url}/collections/${this.collectionId}`
-        
+        const token = await useGetToken();
+        const url = `${siteConfig.api2Url}/collections/${this.collectionId}`;
+
         // Extract DOIs from selected datasets
         const dois = this.selectedDatasets
-          .filter(dataset => dataset.doi)
-          .map(dataset => dataset.doi)
-        
+          .filter((dataset) => dataset.doi)
+          .map((dataset) => dataset.doi);
+
         await useSendXhr(url, {
-          method: 'PATCH',
+          method: "PATCH",
           header: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json",
           },
           body: {
             dois: {
-              add: dois
-            }
-          }
-        })
+              add: dois,
+            },
+          },
+        });
 
-        this.$emit('datasets-added', this.selectedDatasets)
-        this.closeDialog()
+        this.$emit("datasets-added", this.selectedDatasets);
+        this.closeDialog();
       } catch (error) {
-        console.error('Error adding datasets to collection:', error)
-        this.$emit('error', 'Failed to add datasets to collection')
+        console.error("Error adding datasets to collection:", error);
+        this.$emit("error", "Failed to add datasets to collection");
       } finally {
-        this.isAdding = false
+        this.isAdding = false;
       }
     },
 
     closeDialog() {
-      this.$emit('close')
+      this.$emit("close");
     },
 
     formatSize(bytes) {
-      if (!bytes) return 'Unknown'
-      
-      const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-      const i = Math.floor(Math.log(bytes) / Math.log(1024))
-      return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+      if (!bytes) return "Unknown";
+
+      const sizes = ["B", "KB", "MB", "GB", "TB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return (
+        Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i]
+      );
     },
 
     formatDate(dateString) {
-      if (!dateString) return 'Unknown'
-      
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+      if (!dateString) return "Unknown";
+
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
     },
 
     formatNumber(number) {
-      if (!number) return '0'
-      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+      if (!number) return "0";
+      return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
     },
 
     changePage(newPage) {
       if (newPage >= 1 && newPage <= this.totalPages) {
-        this.currentPage = newPage
-        this.loadDatasets()
+        this.currentPage = newPage;
+        this.loadDatasets();
       }
     },
 
     updatePageSize(newPageSize) {
-      this.pageSize = newPageSize
-      this.currentPage = 1
-      this.loadDatasets()
+      this.pageSize = newPageSize;
+      this.currentPage = 1;
+      this.loadDatasets();
     },
 
     setListOptions(options) {
       if (options.pageSize) {
-        this.pageSize = options.pageSize
-        this.currentPage = 1
-        this.loadDatasets()
+        this.pageSize = options.pageSize;
+        this.currentPage = 1;
+        this.loadDatasets();
       }
     },
 
     onPaginationChange(newPage) {
-      this.currentPage = newPage
-      this.loadDatasets()
-    }
-  }
-}
+      this.currentPage = newPage;
+      this.loadDatasets();
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
-@use '../../../styles/element/dialog';
-
+@use "../../../styles/_theme.scss";
+@use "../../../styles/element/dialog";
 
 .dataset-finder-backdrop {
   position: fixed;
@@ -499,7 +518,7 @@ export default {
     //border-radius: 8px;
     font-size: 14px;
     box-sizing: border-box;
-    
+
     &:focus {
       outline: none;
       border-color: theme.$purple_1;
@@ -536,7 +555,7 @@ export default {
 
       .loader-text {
         flex: 1;
-        
+
         .loader-title {
           height: 20px;
           background: theme.$gray_1;
@@ -579,7 +598,8 @@ export default {
   padding: 20px 24px;
   border-top: 1px solid theme.$gray_2;
 
-  .btn-cancel, .btn-add {
+  .btn-cancel,
+  .btn-add {
     padding: 10px 20px;
     border-radius: 8px;
     font-size: 14px;
@@ -633,9 +653,9 @@ export default {
   align-items: center;
 }
 
-
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
