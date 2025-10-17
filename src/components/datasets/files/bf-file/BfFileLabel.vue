@@ -158,17 +158,7 @@ export default {
     },
 
     fileState: function() {
-      const states = {
-        'UPLOADED': 'unprocessed',
-        'PROCESSING': 'processing',
-        'RUNNING': 'processing',
-        'UNAVAILABLE': 'uploading',
-        'PENDING': 'processing',
-        'ERROR': 'failed',
-        'READY': 'processed'
-      }
-      const fileState = path(['content', 'state'], this.file)
-      return states[fileState] ? states[fileState] : ''
+      return this.getFileState(this.file)
     },
     /**
      * Compute package type
