@@ -7,6 +7,8 @@
     <template #stage>
       <router-view name="stage" list-type="dataset" />
     </template>
+    
+    <PackageAttachmentWidget />
   </bf-page>
 </template>
 
@@ -28,6 +30,7 @@ import Sorter from "../../mixins/sorter";
 import EventBus from "../../utils/event-bus";
 import GetDatasetDoi from "../../mixins/get-dataset-doi";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
+import PackageAttachmentWidget from "../../components/datasets/metadata/shared/PackageAttachmentWidget.vue";
 import { useGetToken } from "@/composables/useGetToken";
 
 export default {
@@ -49,6 +52,7 @@ export default {
 
   components: {
     BfPage,
+    PackageAttachmentWidget,
   },
 
   data: function () {
@@ -247,8 +251,8 @@ export default {
               }
             })
             .then(() => {
-              this.getConcepts();
-              EventBus.$emit("get-file-proxy-id");
+              // this.getConcepts();
+              // EventBus.$emit("get-file-proxy-id");
             })
             .catch((err) => console.log(err));
         })
