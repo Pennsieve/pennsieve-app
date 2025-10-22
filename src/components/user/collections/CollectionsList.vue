@@ -11,9 +11,7 @@
     <!-- Error state -->
     <div v-else-if="error" class="error-state">
       <p class="error-message">{{ error }}</p>
-      <button @click="getCollections" class="retry-button">
-        Try Again
-      </button>
+      <button @click="getCollections" class="retry-button">Try Again</button>
     </div>
 
     <!-- Collections list -->
@@ -36,12 +34,18 @@
         </div>
         <h2>No Collections Found</h2>
         <p v-if="searchQuery">
-          No collections match your search for "{{ searchQuery }}". Try adjusting your search terms.
+          No collections match your search for "{{ searchQuery }}". Try
+          adjusting your search terms.
         </p>
         <p v-else>
-          You don't have any collections yet. Collections help organize and share related datasets.
+          You don't have any collections yet. Collections help organize and
+          share related datasets.
         </p>
-        <button v-if="!searchQuery" class="btn-create" @click="createCollection">
+        <button
+          v-if="!searchQuery"
+          class="btn-create"
+          @click="createCollection"
+        >
           Create Your First Collection
         </button>
       </div>
@@ -49,159 +53,137 @@
   </div>
 </template>
 
-<script>
-import { useSendXhr } from '@/mixins/request/request_composable.js'
-import { useGetToken } from '@/composables/useGetToken.js'
-import * as siteConfig from '@/site-config/site.json'
-import CollectionsCard from './CollectionsCard.vue'
-import IconCollection from '../../icons/IconCollection.vue'
+<script setup>
+import {
+  ref,
+  watch,
+  onMounted,
+  withDefaults,
+  defineProps,
+  defineExpose,
+} from "vue";
+import { useSendXhr } from "@/mixins/request/request_composable.js";
+import { useGetToken } from "@/composables/useGetToken.js";
+import * as siteConfig from "@/site-config/site.json";
+import { useCollectionsStore } from "@/stores/collectionStore.js";
+import CollectionsCard from "./CollectionsCard.vue";
+import IconCollection from "../../icons/IconCollection.vue";
+import { stringify } from "uuid";
 
-export default {
-  name: 'CollectionsList',
+defineOptions({ name: "CollectionsList" });
 
-  components: {
-    CollectionsCard,
-    IconCollection
+// Props with defaults
+const props = defineProps({
+  user: {
+    type: Boolean,
+    default: false,
   },
-
-  props: {
-    user: {
-      type: Boolean,
-      default: false
-    },
-    searchQuery: {
-      type: String,
-      default: ''
-    }
+  searchQuery: {
+    type: String,
+    default: null,
   },
+});
+//emits
+const emit = defineEmits(["create-collection"]);
+//pinia
+const collectionStore = useCollectionsStore();
+// State
+const collections = ref([]);
+const allCollections = ref([]);
+const isLoading = ref(false);
+const error = ref("");
+const offset = ref(0);
+const pageSize = ref(25);
+const page = ref(1);
+const totalCollectionsCount = ref(0);
 
-  data() {
-    return {
-      collections: [],
-      allCollections: [],
-      isLoading: false,
-      error: '',
-      offset: 0,
-      pageSize: 25,
-      page: 1,
-      totalCollectionsCount: 0
-    }
-  },
+// Methods
+const filterCollections = (query) => {
+  if (!query || query.trim() === "") {
+    collections.value = [...allCollections.value];
+    return;
+  }
+  const searchTerm = query.toLowerCase().trim();
+  collections.value = allCollections.value.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchTerm) ||
+      c.description.toLowerCase().includes(searchTerm) ||
+      `${c.ownerFirstName} ${c.ownerLastName}`
+        .toLowerCase()
+        .includes(searchTerm)
+  );
+};
 
-  mounted() {
-    this.getCollections()
-  },
+const getCollections = async () => {
+  isLoading.value = true;
+  error.value = "";
+  try {
+    const response = await collectionStore.getUserCollections();
+    
+    // Ensure we always have an array
+    const collectionsData = Array.isArray(response) ? response : (response?.collections || []);
+    allCollections.value = collectionsData;
+    
+    filterCollections(props.searchQuery);
+    totalCollectionsCount.value =
+      response?.totalCount || allCollections.value.length;
+  } catch (err) {
+    console.error("Error fetching collections:", err);
+    error.value = "Failed to load collections. Please try again.";
+    collections.value = [];
+    allCollections.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+};
 
-  watch: {
-    searchQuery(newQuery) {
-      this.filterCollections(newQuery)
-    }
-  },
+const createCollection = () => {
+  emit("create-collection");
+};
 
-  methods: {
-    async getCollections() {
-      this.isLoading = true
-      this.error = ''
-      
-      try {
-        const token = await useGetToken()
-        const url = `${siteConfig.api2Url}/collections/`
-        
-        const response = await useSendXhr(url, {
-          method: 'GET',
-          header: {
-              Authorization: `Bearer ${token}`
-          }
-        })
+const addNewCollection = (collection) => {
+  const transformed = {
+    id: collection.nodeId,
+    name: collection.name,
+    description: collection.description || "",
+    datasetCount: collection.size || 0,
+    userRole: collection.userRole || "Owner",
+    banners: collection.banners || [],
+    state: collection.state || "private",
+    doi: collection.doi,
+    ownerFirstName: collection.ownerFirstName || "",
+    ownerLastName: collection.ownerLastName || "",
+    revisedAt: collection.revisedAt,
+    versionPublishedAt: collection.versionPublishedAt,
+  };
 
-        // Transform the response data to match our component structure
-        if (response && response.collections) {
-          this.allCollections = response.collections.map(item => ({
-            id: item.nodeId,
-            name: item.name,
-            description: item.description || '',
-            datasetCount: item.size || 0,
-            userRole: item.userRole,
-            banners: item.banners || [], // Dataset banner URLs from API
-            state: item.publication?.status?.toLowerCase() || 'draft',
-            doi: item.doi,
-            ownerFirstName: item.ownerFirstName || '',
-            ownerLastName: item.ownerLastName || '',
-            revisedAt: item.revisedAt,
-            versionPublishedAt: item.versionPublishedAt
-          }))
-          
-          // Apply initial filter if search query exists
-          this.filterCollections(this.searchQuery)
-          this.totalCollectionsCount = response.totalCount || this.allCollections.length
-        }
-      } catch (err) {
-        console.error('Error fetching collections:', err)
-        this.error = 'Failed to load collections. Please try again.'
-        this.collections = []
-        this.allCollections = []
-      } finally {
-        this.isLoading = false
-      }
-    },
+  allCollections.value.unshift(transformed);
+  filterCollections(props.searchQuery);
+  totalCollectionsCount.value += 1;
+};
 
-    filterCollections(query) {
-      if (!query || query.trim() === '') {
-        this.collections = [...this.allCollections]
-        return
-      }
+// Lifecycle
+onMounted(() => {
+  getCollections();
+});
 
-      const searchTerm = query.toLowerCase().trim()
-      this.collections = this.allCollections.filter(collection => {
-        return (
-          collection.name.toLowerCase().includes(searchTerm) ||
-          collection.description.toLowerCase().includes(searchTerm) ||
-          `${collection.ownerFirstName} ${collection.ownerLastName}`.toLowerCase().includes(searchTerm)
-        )
-      })
-    },
+// Watchers
+watch(
+  () => props.searchQuery,
+  (newQuery) => {
+    filterCollections(newQuery);
+  }
+);
 
-    createCollection() {
-      // Placeholder for create collection functionality
-      console.log('Creating new collection')
-      // This could navigate to a create collection page or open a modal
-    },
-
-    addNewCollection(collection) {
-      // Transform the new collection to match our component structure
-      const transformedCollection = {
-        id: collection.nodeId,
-        name: collection.name,
-        description: collection.description || '',
-        datasetCount: collection.size || 0,
-        userRole: collection.userRole || 'Owner',
-        banners: collection.banners || [],
-        state: collection.state || 'private',
-        doi: collection.doi,
-        ownerFirstName: collection.ownerFirstName || '',
-        ownerLastName: collection.ownerLastName || '',
-        revisedAt: collection.revisedAt,
-        versionPublishedAt: collection.versionPublishedAt
-      }
-      
-      // Add to both arrays
-      this.allCollections.unshift(transformedCollection)
-      
-      // Re-apply the current filter to include the new collection if it matches
-      this.filterCollections(this.searchQuery)
-      
-      // Update total count
-      this.totalCollectionsCount += 1
-    }
-  },
-
-  // Expose methods for parent components
-  expose: ['getCollections', 'addNewCollection']
-}
+// Expose methods to parent
+defineExpose({
+  getCollections,
+  addNewCollection,
+});
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .collections-list {
   min-height: 400px;
@@ -213,10 +195,10 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  
+
   .loading-spinner {
     margin-bottom: 16px;
-    
+
     .spinner {
       width: 40px;
       height: 40px;
@@ -226,7 +208,7 @@ export default {
       animation: spin 1s linear infinite;
     }
   }
-  
+
   p {
     color: theme.$gray_5;
     font-size: 16px;
@@ -239,14 +221,14 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  
+
   .error-message {
     color: theme.$red_1;
     font-size: 16px;
     margin-bottom: 16px;
     text-align: center;
   }
-  
+
   .retry-button {
     padding: 8px 16px;
     background: theme.$purple_2;
@@ -255,7 +237,7 @@ export default {
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.2s ease;
-    
+
     &:hover {
       background: theme.$purple_3;
     }
@@ -280,30 +262,30 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  
+
   .empty-content {
     text-align: center;
     max-width: 500px;
-    
+
     .empty-icon {
       font-size: 64px;
       margin-bottom: 16px;
     }
-    
+
     h2 {
       font-size: 24px;
       font-weight: 500;
       color: theme.$gray_6;
       margin: 0 0 16px 0;
     }
-    
+
     p {
       font-size: 16px;
       color: theme.$gray_5;
       line-height: 1.6;
       margin: 0 0 24px 0;
     }
-    
+
     .btn-create {
       background: theme.$purple_2;
       color: theme.$white;
@@ -323,7 +305,11 @@ export default {
 
 // Animation for spinner
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

@@ -4,6 +4,31 @@ import { useGetToken } from '@/composables/useGetToken.js'
 import { useSendXhr } from '@/mixins/request/request_composable.js'
 import * as siteConfig from '@/site-config/site.json'
 
+// Helper function to derive license from datasets
+const deriveLicenseFromDatasets = (datasets) => {
+  if (!datasets || datasets.length === 0) {
+    return "No license specified";
+  }
+  
+  // Extract licenses from datasets, filtering out empty ones
+  const licenses = datasets
+    .map(dataset => dataset.data?.license || dataset.license)
+    .filter(license => license && license.trim() !== "");
+  
+  if (licenses.length === 0) {
+    return "No license specified";
+  }
+  
+  // Get unique licenses
+  const uniqueLicenses = [...new Set(licenses)];
+  
+  if (uniqueLicenses.length === 1) {
+    return uniqueLicenses[0];
+  } else {
+    return "Mixed licenses";
+  }
+};
+
 export const useCollectionsStore = defineStore('collectionsStore', () => {
 
   //collections state
@@ -95,8 +120,13 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
 
       })).reverse() 
       totalCount.value = response.totalCount || 0
+      
+      // Return the collections array for the component
+      return userCollections.value
     }catch(error){
       console.error("failed to get user's collections", error)
+      // Return empty array on error
+      return []
     }
   }
     /*
@@ -123,10 +153,17 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
           datasets: response.datasets,
           contributors:response.derivedContributors,
           publication: response.publication,
+          // Derive license information from datasets
+          license: deriveLicenseFromDatasets(response.datasets),
         };
           targetCollectionDatasets.value = transformed;
+          
+          // Return the transformed collection data for the component
+          return transformed;
     }catch(error){
       console.error("Failed to Get Colleciton Details", error)
+      // Return null on error to trigger error state in component
+      return null;
     }
     
   }

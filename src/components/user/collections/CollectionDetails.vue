@@ -15,6 +15,7 @@
       <div class="discover-content container-fluid">
         <collection-header
           :collection-details="collection"
+          :collection-contributors="collectionContributors"
           :last-updated-date="lastUpdatedDate"
           :collection-description="collectionDescription"
           @open-edit-dialog="showEditDialog = true"
@@ -25,10 +26,8 @@
 
       <!-- Collection Datasets -->
       <div class="discover-content container-fluid">
-        <h3 class="discover-content-title">
-          Collection Datasets
-        </h3>
-        
+        <h3 class="discover-content-title">Collection Datasets</h3>
+
         <div v-if="datasetList && datasetList.length > 0" class="datasets-list">
           <dataset-card-collections
             v-for="dataset in datasetList"
@@ -37,88 +36,90 @@
             :dataset="dataset.data || dataset"
           />
         </div>
-        
+
         <div v-else class="no-datasets">
           <h5>This collection has no datasets associated with it.</h5>
-          <bf-button class="secondary" @click="goToDatasets">
+          <bf-button class="secondary" @click="showDatasetFinder = true">
             Add Datasets
           </bf-button>
         </div>
       </div>
 
       <!-- Collection Info Section -->
-<!--      <div class="dataset-info">-->
-<!--        <div class="discover-content container-fluid dataset-info-container">-->
-<!--          <div class="row">-->
-<!--            <div class="col-xs-12">-->
-<!--              <h2>About this collection</h2>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          -->
-<!--          <div class="row">-->
-<!--            <div class="col-xs-12">-->
-<!--              <h3>Publishing history</h3>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          -->
-<!--          <div class="row mb-24">-->
-<!--            <div class="col-xs-12 info-publishing-history">-->
-<!--              <div class="info-text">-->
-<!--                <div class="info-text-caps">Originally Published</div>-->
-<!--                <div>{{ originallyPublishedDate }}</div>-->
-<!--              </div>-->
-<!--              <div class="info-text">-->
-<!--                <div class="info-text-caps">Last Updated</div>-->
-<!--                <div>{{ lastUpdatedDate }}</div>-->
-<!--              </div>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          -->
-<!--          <div class="row share-collection">-->
-<!--            <div class="col-xs-12">-->
-<!--              <h3>Share this collection</h3>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          -->
-<!--          <div class="row mb-24">-->
-<!--            <div class="col-xs-12">-->
-<!--              <div class="info-icons">-->
-<!--                <button-->
-<!--                  @click="onClickCopy"-->
-<!--                  title="Copy URL to clipboard"-->
-<!--                  class="copy-button"-->
-<!--                >-->
-<!--                  <IconLink-->
-<!--                    title="Copy To Clipboard Icon"-->
-<!--                    class="icon-upload"-->
-<!--                    :height="18"-->
-<!--                    :width="18"-->
-<!--                  />-->
-<!--                </button>-->
-<!--                <span v-if="showCopySuccess" class="copy-success-notification">-->
-<!--                  Link copied to clipboard!-->
-<!--                </span>-->
-<!--              </div>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--          -->
-<!--          <div v-if="datasetTags && datasetTags.length > 0" class="row">-->
-<!--            <div class="col-xs-12">-->
-<!--              <h3>Tags</h3>-->
-<!--              <div class="tags-list">-->
-<!--                <span v-for="tag in datasetTags" :key="tag" class="tag">-->
-<!--                  {{ tag }}-->
-<!--                </span>-->
-<!--              </div>-->
-<!--            </div>-->
-<!--          </div>-->
-<!--        </div>-->
-<!--      </div>-->
+      <!--      <div class="dataset-info">-->
+      <!--        <div class="discover-content container-fluid dataset-info-container">-->
+      <!--          <div class="row">-->
+      <!--            <div class="col-xs-12">-->
+      <!--              <h2>About this collection</h2>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--          -->
+      <!--          <div class="row">-->
+      <!--            <div class="col-xs-12">-->
+      <!--              <h3>Publishing history</h3>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--          -->
+      <!--          <div class="row mb-24">-->
+      <!--            <div class="col-xs-12 info-publishing-history">-->
+      <!--              <div class="info-text">-->
+      <!--                <div class="info-text-caps">Originally Published</div>-->
+      <!--                <div>{{ originallyPublishedDate }}</div>-->
+      <!--              </div>-->
+      <!--              <div class="info-text">-->
+      <!--                <div class="info-text-caps">Last Updated</div>-->
+      <!--                <div>{{ lastUpdatedDate }}</div>-->
+      <!--              </div>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--          -->
+      <!--          <div class="row share-collection">-->
+      <!--            <div class="col-xs-12">-->
+      <!--              <h3>Share this collection</h3>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--          -->
+      <!--          <div class="row mb-24">-->
+      <!--            <div class="col-xs-12">-->
+      <!--              <div class="info-icons">-->
+      <!--                <button-->
+      <!--                  @click="onClickCopy"-->
+      <!--                  title="Copy URL to clipboard"-->
+      <!--                  class="copy-button"-->
+      <!--                >-->
+      <!--                  <IconLink-->
+      <!--                    title="Copy To Clipboard Icon"-->
+      <!--                    class="icon-upload"-->
+      <!--                    :height="18"-->
+      <!--                    :width="18"-->
+      <!--                  />-->
+      <!--                </button>-->
+      <!--                <span v-if="showCopySuccess" class="copy-success-notification">-->
+      <!--                  Link copied to clipboard!-->
+      <!--                </span>-->
+      <!--              </div>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--          -->
+      <!--          <div v-if="datasetTags && datasetTags.length > 0" class="row">-->
+      <!--            <div class="col-xs-12">-->
+      <!--              <h3>Tags</h3>-->
+      <!--              <div class="tags-list">-->
+      <!--                <span v-for="tag in datasetTags" :key="tag" class="tag">-->
+      <!--                  {{ tag }}-->
+      <!--                </span>-->
+      <!--              </div>-->
+      <!--            </div>-->
+      <!--          </div>-->
+      <!--        </div>-->
+      <!--      </div>-->
     </div>
 
     <div v-else class="error-state">
       <h3>Collection not found</h3>
-      <p>The collection you're looking for doesn't exist or has been removed.</p>
+      <p>
+        The collection you're looking for doesn't exist or has been removed.
+      </p>
       <button class="btn-back" @click="goToCollections">
         Back to Collections
       </button>
@@ -151,206 +152,174 @@
   </div>
 </template>
 
-<script>
-import { useSendXhr } from '@/mixins/request/request_composable.js'
-import { useGetToken } from '@/composables/useGetToken.js'
-import * as siteConfig from '@/site-config/site.json'
-import CollectionHeader from './CollectionHeader.vue'
-import DatasetCardCollections from './DatasetCardCollections.vue'
-import DatasetFinderDialog from './DatasetFinderDialog.vue'
-import PublishCollectionDialog from './PublishCollectionDialog.vue'
-import EditCollectionDialog from './EditCollectionDialog.vue'
-import IconLink from '../../icons/IconLink.vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
+import * as siteConfig from "@/site-config/site.json";
+import { useCollectionsStore } from "@/stores/collectionStore";
+
+// Child components (keep your existing imports in <script> or move them here)
+import CollectionHeader from "./CollectionHeader.vue";
+import DatasetCardCollections from "./DatasetCardCollections.vue";
+import DatasetFinderDialog from "./DatasetFinderDialog.vue";
+import PublishCollectionDialog from "./PublishCollectionDialog.vue";
+import EditCollectionDialog from "./EditCollectionDialog.vue";
+import ContributorItem from "./ContributorItem.vue";
+import IconLink from "../../icons/IconLink.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
-export default {
-  name: 'CollectionDetails',
+// ---------- props ----------
+const props = defineProps<{
+  collectionId: string | number;
+}>();
 
-  components: {
-    BfButton,
-    CollectionHeader,
-    DatasetCardCollections,
-    DatasetFinderDialog,
-    PublishCollectionDialog,
-    EditCollectionDialog,
-    IconLink
-  },
+// ---------- router / store ----------
+const router = useRouter();
+const store = useCollectionsStore();
 
-  props: {
-    collectionId: {
-      type: [String, Number],
-      required: true
-    }
-  },
+// ---------- state ----------
+const collection = ref<any>(null);
+const datasetList = computed(() => collection.value?.datasets);
+const isLoading = ref(false);
+const showCopySuccess = ref(false);
+const showDatasetFinder = ref(false);
+const showPublishDialog = ref(false);
+const showEditDialog = ref(false);
 
-  data() {
-    return {
-      collection: null,
-      datasetList: [],
-      isLoading: false,
-      showCopySuccess: false,
-      showDatasetFinder: false,
-      showPublishDialog: false,
-      showEditDialog: false
-    }
-  },
+// ---------- computed (parity with Options API) ----------
+const collectionDescription = computed(
+  () => collection.value?.description || ""
+);
 
-  computed: {
-    collectionDescription() {
-      return this.collection?.description || ''
-    },
+const originallyPublishedDate = computed(() => {
+  const date =
+    collection.value?.firstPublishedAt || collection.value?.createdAt;
+  return formatDate(date);
+});
 
-    originallyPublishedDate() {
-      const date = this.collection?.firstPublishedAt || this.collection?.createdAt
-      return this.formatDate(date)
-    },
+const lastUpdatedDate = computed(() => {
+  const date =
+    collection.value?.revisedAt ||
+    collection.value?.versionPublishedAt ||
+    collection.value?.updatedAt;
+  return formatDate(date);
+});
 
-    lastUpdatedDate() {
-      const date = this.collection?.revisedAt || this.collection?.versionPublishedAt || this.collection?.updatedAt
-      return this.formatDate(date)
-    },
+const datasetTags = computed<string[]>(() => collection.value?.tags || []);
 
-    datasetTags() {
-      return this.collection?.tags || []
-    },
+const siteUrl = computed(() => {
+  const id = collection.value?.id ?? props.collectionId;
+  return `${siteConfig.discoverAppUrl}/collections/${id}`;
+});
 
-    siteUrl() {
-      return `${siteConfig.discoverAppUrl}/collections/${this.collection?.id || this.collectionId}`
-    }
-  },
-
-  mounted() {
-    this.getCollectionDetails()
-  },
-
-  watch: {
-    collectionId() {
-      this.getCollectionDetails()
-    },
-
-    showCopySuccess(newVal) {
-      if (newVal) {
-        setTimeout(() => {
-          this.showCopySuccess = false
-        }, 3000)
+const collectionContributors = computed(() => {
+  // Get derivedContributors from the collection data
+  const contributors = collection.value?.contributors || collection.value?.derivedContributors || [];
+  
+  // Remove duplicates based on ORCID (if present) or name combination
+  const uniqueContributors = contributors.reduce((unique: any[], contributor: any) => {
+    const existing = unique.find(c => {
+      // If both have ORCID, use that for comparison
+      if (c.orcid && contributor.orcid) {
+        return c.orcid === contributor.orcid;
       }
+      // Otherwise, compare by name
+      return c.firstName === contributor.firstName && 
+             c.lastName === contributor.lastName &&
+             c.middleInitial === contributor.middleInitial;
+    });
+    
+    if (!existing) {
+      unique.push(contributor);
     }
-  },
+    
+    return unique;
+  }, []);
+  
+  return uniqueContributors;
+});
 
-  methods: {
-    async getCollectionDetails() {
-      this.isLoading = true
-      
-      try {
-        const token = await useGetToken()
-        const url = `${siteConfig.api2Url}/collections/${this.collectionId}`
-        
-        const response = await useSendXhr(url, {
-          method: 'GET',
-          header: {
-            Authorization: `Bearer ${token}`
-          }
-        })
+// ---------- effects ----------
+onMounted(() => {
+  getCollectionDetails();
+});
 
-        if (response) {
-          // Transform the response data to match our component structure
-          this.collection = {
-            id: response.nodeId || response.id,
-            name: response.name,
-            description: response.description,
-            datasetCount: response.size || 0,
-            banners: response.banners || [],
-            state: response.state || 'private',
-            publication: response.publication || null,
-            doi: response.doi,
-            ownerFirstName: response.ownerFirstName || '',
-            ownerLastName: response.ownerLastName || '',
-            ownerOrcid: response.ownerOrcid || '',
-            revisedAt: response.revisedAt,
-            versionPublishedAt: response.versionPublishedAt,
-            firstPublishedAt: response.firstPublishedAt,
-            createdAt: response.createdAt,
-            updatedAt: response.updatedAt,
-            tags: response.tags || []
-          }
+watch(
+  () => props.collectionId,
+  () => {
+    getCollectionDetails();
+  }
+);
 
-          // Get the datasets for this collection
-          this.datasetList = response.datasets || []
-        }
-      } catch (error) {
-        console.error('Error fetching collection details:', error)
-        this.collection = null
-      } finally {
-        this.isLoading = false
-      }
-    },
+watch(showCopySuccess, (v) => {
+  if (v) {
+    setTimeout(() => (showCopySuccess.value = false), 3000);
+  }
+});
 
-    formatDate(dateString) {
-      if (!dateString) return 'Unknown'
-      
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
-    },
+// ---------- actions ----------
+async function getCollectionDetails() {
+  isLoading.value = true;
+  try {
+    const resp = await store.getCollectionDetails(props.collectionId as string);
+    collection.value = resp;
+  } catch (err) {
+    console.error("Error fetching collection details:", err);
+    collection.value = null;
+  } finally {
+    isLoading.value = false;
+  }
+}
 
-    onClickCopy() {
-      navigator.clipboard.writeText(this.siteUrl)
-      this.showCopySuccess = true
-    },
+function formatDate(dateString?: string) {
+  if (!dateString) return "Unknown";
+  return new Date(dateString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
-    goToDatasets() {
-      // Navigate to datasets - this would depend on your routing structure
-      this.$router.push({ name: 'datasets' })
-    },
+function onClickCopy() {
+  navigator.clipboard.writeText(siteUrl.value);
+  showCopySuccess.value = true;
+}
 
-    goToCollections() {
-      this.$router.push({ name: 'my-collections' })
-    },
+function goToCollections() {
+  router.push({ name: "my-collections" });
+}
 
-    onDatasetsUpdated(changes) {
-      console.log('Datasets updated in collection:', changes)
-      // Refresh the collection details to show the updated datasets
-      this.getCollectionDetails()
-      
-      // Show success message
-      const { added, removed } = changes
-      let message = ''
-      
-      if (added && added.length > 0 && removed && removed.length > 0) {
-        message = `Successfully updated collection: added ${added.length} and removed ${removed.length} datasets`
-      } else if (added && added.length > 0) {
-        message = `Successfully added ${added.length} dataset${added.length !== 1 ? 's' : ''} to collection`
-      } else if (removed && removed.length > 0) {
-        message = `Successfully removed ${removed.length} dataset${removed.length !== 1 ? 's' : ''} from collection`
-      }
-      
-      if (message) {
-        console.log(message)
-        // You could implement a toast notification here
-      }
-    },
+function onDatasetsUpdated(changes: { added?: any[]; removed?: any[] }) {
+  // Refresh the collection details to reflect updates
+  getCollectionDetails();
 
-    onDatasetFinderError(errorMessage) {
-      console.error('Dataset finder error:', errorMessage)
-      // You could implement a toast notification here
-    },
+  const { added = [], removed = [] } = changes || {};
+  if (added.length || removed.length) {
+    const msg = [
+      added.length ? `added ${added.length}` : "",
+      removed.length ? `removed ${removed.length}` : "",
+    ]
+      .filter(Boolean)
+      .join(" and ");
+  }
+}
 
-    onCollectionUpdated(updatedCollection) {
-      console.log('Collection updated:', updatedCollection)
-      // Update the local collection data with the new values
-      if (this.collection && updatedCollection) {
-        this.collection.name = updatedCollection.name
-        this.collection.description = updatedCollection.description
-      }
-    }
+function onDatasetFinderError(errorMessage: string) {
+  console.error("Dataset finder error:", errorMessage);
+}
+
+function onCollectionUpdated(updated: any) {
+  if (collection.value && updated) {
+    collection.value.name = updated.name;
+    collection.value.description = updated.description;
+    collection.value.license = updated.license;
+    collection.value.tags = updated.tags;
   }
 }
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .collection-details {
   background-color: #ffffff;
@@ -416,6 +385,7 @@ export default {
   letter-spacing: 0.5px;
   margin-top: 32px;
 }
+
 
 .datasets-list {
   .mb-16 {
@@ -610,7 +580,8 @@ export default {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
