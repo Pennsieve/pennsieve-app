@@ -24,6 +24,9 @@
       <template #description>
         <p>{{ pageDescription }}</p>
       </template>
+      <template v-if="showTabs" #tabs>
+        <router-tabs :tabs="tabs" />
+      </template>
     </bf-rafter>
     <router-view
       name="stage"
@@ -36,13 +39,15 @@
 
 
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
+import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 import { mapActions } from 'vuex';
 
 export default {
   name: 'MyCollectionsStage',
 
   components: {
-    BfRafter
+    BfRafter,
+    RouterTabs
   },
 
   props: {
@@ -157,6 +162,50 @@ export default {
       // Check if current route is a child of data-publishing
       const publishingSubPages = ['open-repositories', 'dataset-proposals'];
       return publishingSubPages.includes(this.$route.name);
+    },
+    showTabs() {
+      // Show tabs for publishing sub-pages and settings sub-pages
+      return this.isPublishingSubPage || this.isSettingsSubPage;
+    },
+    tabs() {
+      // Define tabs based on current route section
+      if (this.isPublishingSubPage) {
+        return [
+          {
+            to: 'open-repositories', 
+            name: 'Repositories'
+          },
+          {
+            to: 'dataset-proposals',
+            name: 'Proposals'
+          }
+        ];
+      }
+      
+      // Settings tabs
+      if (this.isSettingsSubPage) {
+        return [
+          {
+            to: 'user-profile',
+            name: 'Profile'
+          },
+          {
+            to: 'user-integrations',
+            name: 'Integrations'
+          },
+          {
+            to: 'user-security',
+            name: 'Security'
+          },
+          {
+            to: 'user-support',
+            name: 'Support'
+          }
+        ];
+      }
+      
+      // Could add tabs for other sections in the future
+      return [];
     }
   }
 }
