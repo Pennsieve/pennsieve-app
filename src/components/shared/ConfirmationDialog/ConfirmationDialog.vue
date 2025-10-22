@@ -52,7 +52,7 @@
 
     <template #footer>
       <bf-button
-        class="secondary"
+        class="secondary mr-8"
         @click="closeDialog"
       >
         {{cancelActionLabel}}
@@ -195,6 +195,7 @@ export default {
 
 <style lang="scss" scoped>
 @use '../../../styles/theme';
+@use '../../../styles/spacing';
 
 .el-form {
   display: flex;

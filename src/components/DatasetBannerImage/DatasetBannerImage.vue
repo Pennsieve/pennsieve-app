@@ -54,3 +54,13 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.dataset-image {
+  width: 86px;
+  height: 86px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+</style>

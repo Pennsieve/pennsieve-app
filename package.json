@@ -71,6 +71,7 @@
     "pinia": "^3.0.3",
     "protobufjs": "^7.2.6",
     "pusher-js": "^8.4.0",
+    "qrcode.vue": "^3.6.0",
     "ramda": "^0.28.0",
     "sigma": "^3.0.2",
     "striptags": "^3.2.0",

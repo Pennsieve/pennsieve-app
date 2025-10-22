@@ -1,4 +1,4 @@
-<template>
+v<template>
   <div>
     <el-dialog
       v-model="dialogVisible"

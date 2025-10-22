@@ -74,12 +74,20 @@
 <script>
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction } from "../../../utils/constants";
-import { mapActions, mapGetters, mapState } from "vuex";
+import { useProposalStore } from '@/stores/proposalStore'
 
 export default {
   name: "PublishingProposalsListItem",
 
   mixins: [FormatDate],
+
+  setup() {
+    const proposalStore = useProposalStore()
+    
+    return {
+      proposalStore
+    }
+  },
 
   props: {
     proposal: {
@@ -142,7 +150,6 @@ export default {
   },
 
   methods: {
-    ...mapActions("repositoryModule", ["acceptProposal", "rejectProposal"]),
     epochToISO: function (seconds) {
       let d = new Date(0);
       d.setUTCSeconds(seconds);
@@ -151,10 +158,10 @@ export default {
 
     triggerRequest: function (request) {
       if (request === "accept") {
-        this.acceptProposal(this.proposal);
+        this.proposalStore.acceptProposal(this.proposal);
       }
       if (request === "reject") {
-        this.rejectProposal(this.proposal);
+        this.proposalStore.rejectProposal(this.proposal);
       }
       this.$emit(request, this.proposal);
     },

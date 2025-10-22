@@ -2,13 +2,14 @@
   <div class="bf-navigation-tertiary">
 
     <bf-navigation-item
-      :link="{ name: 'user-overview', params: {orgId: activeOrganizationId} }"
-      label="Dataset Proposals"
+      v-if="orgId"
+      :link="{ name: 'user-profile', params: {}}"
+      label="My Workspace"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"
     >
       <template #icon>
-        <PennsieveMark
+        <IconPennsieveMark
           :width="20"
           :height="20"
           color="currentColor"
@@ -30,7 +31,7 @@
   import CustomTheme from "../../mixins/custom-theme";
   import IconOrganization from "../icons/IconOrganization.vue";
   import BfNavigationItem from "../bf-navigation/bf-navigation-item/BfNavigationItem.vue";
-  import PennsieveMark from "../icons/IconPennsieveMark.vue";
+  import IconPennsieveMark from "../icons/IconPennsieveMark.vue";
 
   // const SearchMenu = () => import('@/components/bf-navigation/SearchMenu/SearchMenu.vue')
 
@@ -53,7 +54,7 @@
     },
 
     components: {
-      PennsieveMark,
+      IconPennsieveMark,
       HelpMenu,
       UserMenu,
       IconOrganization,
@@ -90,7 +91,7 @@
       },
 
       getThemeColors: function() {
-        return this.getTheme(this.orgId)
+        return this.orgId ? this.getTheme(this.orgId) : ['#2c1b47', '#4a2e7a']
       },
 
       isWorkspaceGuest: function() {
