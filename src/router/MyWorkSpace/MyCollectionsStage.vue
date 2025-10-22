@@ -50,7 +50,7 @@ export default {
   font-weight: 300;
 
   .breadcrumb-link {
-    color: theme.$purple_2;
+    color: theme.$gray_4;
     text-decoration: none;
 
     &:hover {

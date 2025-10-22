@@ -1,480 +1,519 @@
 <template>
-  <div class="request-list-item" :class="{ 'is-clickable': isEditable }" @click="handleItemClick">
+  <div class="request-list-item is-clickable" @click="handleItemClick">
     <div class="request-content">
-      <!-- Left side: Main content -->
-      <div class="request-info">
-        <!-- Status badge and repository name -->
+      <!-- Main content -->
+      <div class="request-main">
+        <!-- Header with title and status -->
         <div class="request-header">
-          <span class="request-status" :class="statusClass">
-            {{ statusDisplay }}
-          </span>
-          <span class="request-repository">
-            {{ repositoryName }}
-          </span>
+          <h3 class="request-title">
+            {{ datasetRequest.name || 'Untitled Proposal' }}
+          </h3>
+          <div class="status-badges">
+            <span class="request-status" :class="statusClass">
+              {{ statusDisplay }}
+            </span>
+            <span v-if="!readyToSubmit && isDraft" class="incomplete-badge">
+              Incomplete
+            </span>
+          </div>
         </div>
         
-        <!-- Proposal name -->
-        <h3 class="request-title">
-          {{ datasetRequest.name || 'Untitled Proposal' }}
-        </h3>
-        
-        <!-- Description preview -->
-        <p class="request-description" v-if="datasetRequest.description">
-          {{ truncatedDescription }}
-        </p>
-        
-        <!-- Metadata row -->
-        <div class="request-metadata">
-          <span class="metadata-item" v-if="datasetRequest.updatedAt">
-            Last updated: {{ formatDate(datasetRequest.updatedAt) }}
-          </span>
-          <span class="metadata-item" v-if="!readyToSubmit && isDraft">
-            <IconWarningCircle :width="14" :height="14" class="warning-icon" />
-            Incomplete proposal
-          </span>
-        </div>
-      </div>
-      
-      <!-- Right side: Actions and logo -->
-      <div class="request-actions">
-        <!-- Repository logo -->
-        <div class="repository-logo" v-if="logoPath">
-          <img
-            :src="logoPath"
-            :alt="`${repositoryName} logo`"
-            class="logo"
-          />
+        <!-- Repository and description -->
+        <div class="request-body">
+          <div class="repository-info">
+            <img
+              v-if="logoPath"
+              :src="logoPath"
+              :alt="`${repositoryName} logo`"
+              class="repository-logo"
+            />
+            <span class="repository-name">{{ repositoryName }}</span>
+          </div>
+          
+          <p class="request-description" v-if="datasetRequest.description">
+            {{ truncatedDescription }}
+          </p>
         </div>
         
-        <!-- Action buttons -->
-        <div class="action-buttons">
-          <!-- Draft actions -->
-          <template v-if="isDraft">
-            <bf-button 
-              v-if="readyToSubmit"
-              class="primary small"
-              @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
-            >
-              Submit Proposal
-            </bf-button>
-            <bf-button 
-              v-else
-              class="secondary small"
-              @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
-            >
-              Complete Proposal
-            </bf-button>
-            <button 
-              class="text-button danger"
-              @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
-            >
-              Remove
-            </button>
-          </template>
+        <!-- Footer with metadata and actions -->
+        <div class="request-footer">
+          <div class="request-metadata">
+            <span v-if="displayDate">
+              {{ displayDate }}
+            </span>
+          </div>
           
-          <!-- Submitted actions -->
-          <template v-else-if="isSubmitted">
-            <div class="status-message">
-              Under Review
-            </div>
-            <button 
-              class="text-button"
-              @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
-            >
-              Withdraw Proposal
-            </button>
-          </template>
+          <!-- Action buttons -->
+          <div class="action-buttons">
+            <!-- Draft actions -->
+            <template v-if="isDraft">
+              <button 
+                v-if="readyToSubmit"
+                class="text-link primary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
+              >
+                Submit
+              </button>
+              <button 
+                v-else
+                class="text-link"
+                @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
+              >
+                Edit
+              </button>
+              <button 
+                class="text-link secondary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
+              >
+                Remove
+              </button>
+            </template>
           
-          <!-- Accepted actions -->
-          <template v-else-if="isAccepted">
-            <bf-button 
-              class="primary small"
-              @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
-            >
-              Open Dataset
-            </bf-button>
-            <div class="status-message success">
-              <IconCheck :width="16" :height="16" class="status-icon" />
-              Accepted
-            </div>
-          </template>
+            <!-- Submitted actions -->
+            <template v-else-if="isSubmitted">
+              <button 
+                class="text-link secondary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
+              >
+                Withdraw
+              </button>
+            </template>
           
-          <!-- Rejected actions -->
-          <template v-else-if="isRejected">
-            <bf-button 
-              class="secondary small"
-              @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
-            >
-              Resubmit to Another Repository
-            </bf-button>
-            <div class="status-message error">
-              <IconXCircle :width="16" :height="16" class="status-icon" />
-              Not Accepted
-            </div>
-          </template>
+            <!-- Accepted actions -->
+            <template v-else-if="isAccepted">
+              <button 
+                class="text-link primary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
+              >
+                Open Dataset
+              </button>
+            </template>
           
-          <!-- Withdrawn actions -->
-          <template v-else-if="isWithdrawn">
-            <bf-button 
-              class="secondary small"
-              @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
-            >
-              Edit & Resubmit
-            </bf-button>
-            <div class="status-message">
-              Withdrawn
-            </div>
-          </template>
+            <!-- Rejected actions -->
+            <template v-else-if="isRejected">
+              <button 
+                class="text-link"
+                @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
+              >
+                Resubmit
+              </button>
+            </template>
+          
+            <!-- Withdrawn actions -->
+            <template v-else-if="isWithdrawn">
+              <button 
+                class="text-link"
+                @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
+              >
+                Edit & Resubmit
+              </button>
+            </template>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { mapActions, mapGetters } from 'vuex'
-import FormatDate from '../../../mixins/format-date'
-import { DatasetProposalAction } from '../../../utils/constants'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import IconWarningCircle from '@/components/icons/IconWarningCircle.vue'
-import IconCheck from '@/components/icons/IconCheck.vue'
-import IconXCircle from '@/components/icons/IconXCircle.vue'
+<script setup>
+import { computed } from 'vue'
+import { useProposalStore } from '@/stores/proposalStore'
+import { DatasetProposalAction } from '@/utils/constants'
 
-export default {
-  name: 'RequestListItem',
-
-  components: {
-    BfButton,
-    IconWarningCircle,
-    IconCheck,
-    IconXCircle
-  },
-
-  mixins: [FormatDate],
-
-  props: {
-    datasetRequest: {
-      type: Object,
-      default: () => ({})
-    }
-  },
-
-  computed: {
-    ...mapGetters('repositoryModule', ['getRepositoryByNodeId']),
-    
-    repository() {
-      if (this.datasetRequest) {
-        return this.getRepositoryByNodeId(this.datasetRequest.organizationNodeId)
-      }
-      return null
-    },
-    
-    repositoryName() {
-      return this.repository?.displayName || 'Unknown Repository'
-    },
-    
-    logoPath() {
-      return this.repository?.logoFile || ''
-    },
-    
-    statusDisplay() {
-      const statusMap = {
-        'DRAFT': 'Draft',
-        'SUBMITTED': 'Submitted',
-        'ACCEPTED': 'Accepted',
-        'REJECTED': 'Rejected',
-        'WITHDRAWN': 'Withdrawn'
-      }
-      return statusMap[this.datasetRequest.proposalStatus] || this.datasetRequest.proposalStatus
-    },
-    
-    statusClass() {
-      const status = this.datasetRequest.proposalStatus?.toLowerCase()
-      return `status-${status}`
-    },
-    
-    isDraft() {
-      return this.datasetRequest.proposalStatus === 'DRAFT'
-    },
-    
-    isSubmitted() {
-      return this.datasetRequest.proposalStatus === 'SUBMITTED'
-    },
-    
-    isAccepted() {
-      return this.datasetRequest.proposalStatus === 'ACCEPTED'
-    },
-    
-    isRejected() {
-      return this.datasetRequest.proposalStatus === 'REJECTED'
-    },
-    
-    isWithdrawn() {
-      return this.datasetRequest.proposalStatus === 'WITHDRAWN'
-    },
-    
-    isEditable() {
-      return this.isDraft || this.isWithdrawn
-    },
-    
-    truncatedDescription() {
-      const desc = this.datasetRequest.description || ''
-      return desc.length > 200 ? desc.substring(0, 200) + '...' : desc
-    },
-    
-    readyToSubmit() {
-      const validName = this.datasetRequest.name !== null && this.datasetRequest.name !== ''
-      const validDescription = this.datasetRequest.description !== null && this.datasetRequest.description !== ''
-      const surveyCompleted = this.surveyComplete()
-      return validName && validDescription && surveyCompleted
-    },
-    
-    DatasetProposalAction() {
-      return DatasetProposalAction
-    }
-  },
-
-  methods: {
-    ...mapActions('repositoryModule', [
-      'updateRequestModalVisible',
-      'setRepositoryDescription'
-    ]),
-    
-    handleItemClick() {
-      if (this.isEditable) {
-        this.triggerRequest(DatasetProposalAction.EDIT)
-      }
-    },
-    
-    surveyComplete() {
-      let result = false
-      const organizationNodeId = this.datasetRequest.organizationNodeId
-      const repository = this.getRepositoryByNodeId(organizationNodeId)
-      
-      if (repository && repository.questions != null && this.datasetRequest && this.datasetRequest.survey != null) {
-        result = repository.questions.map(q => {
-          const answer = this.datasetRequest.survey.find(r => r.questionId === q.id)
-          return answer && answer.response !== ''
-        }).reduce((a, c) => a && c, true)
-      }
-      return result
-    },
-    
-    triggerRequest(action) {
-      this.$emit(action, this.datasetRequest)
-    },
-    
-    formatDate(dateString) {
-      if (!dateString) return ''
-      const date = new Date(dateString)
-      const options = { year: 'numeric', month: 'short', day: 'numeric' }
-      return date.toLocaleDateString('en-US', options)
-    }
+// Props
+const props = defineProps({
+  datasetRequest: {
+    type: Object,
+    default: () => ({})
   }
+})
+
+// Emits
+const emit = defineEmits([
+  'edit',
+  'remove', 
+  'submit',
+  'withdraw',
+  'open-dataset',
+  'resubmit'
+])
+
+// Store
+const proposalStore = useProposalStore()
+
+// Computed properties
+const repository = computed(() => {
+  if (props.datasetRequest?.organizationNodeId) {
+    return proposalStore.getRepositoryByNodeId(props.datasetRequest.organizationNodeId)
+  }
+  return null
+})
+
+const repositoryName = computed(() => {
+  return repository.value?.displayName || 'Unknown Repository'
+})
+
+const logoPath = computed(() => {
+  return repository.value?.logoFile || ''
+})
+
+const statusDisplay = computed(() => {
+  const statusMap = {
+    'DRAFT': 'Draft',
+    'SUBMITTED': 'Submitted',
+    'ACCEPTED': 'Accepted',
+    'REJECTED': 'Rejected',
+    'WITHDRAWN': 'Withdrawn'
+  }
+  return statusMap[props.datasetRequest.proposalStatus] || props.datasetRequest.proposalStatus
+})
+
+const statusClass = computed(() => {
+  const status = props.datasetRequest.proposalStatus?.toLowerCase()
+  return `status-${status}`
+})
+
+const isDraft = computed(() => {
+  return props.datasetRequest.proposalStatus === 'DRAFT'
+})
+
+const isSubmitted = computed(() => {
+  return props.datasetRequest.proposalStatus === 'SUBMITTED'
+})
+
+const isAccepted = computed(() => {
+  return props.datasetRequest.proposalStatus === 'ACCEPTED'
+})
+
+const isRejected = computed(() => {
+  return props.datasetRequest.proposalStatus === 'REJECTED'
+})
+
+const isWithdrawn = computed(() => {
+  return props.datasetRequest.proposalStatus === 'WITHDRAWN'
+})
+
+const isEditable = computed(() => {
+  return isDraft.value || isWithdrawn.value
+})
+
+const truncatedDescription = computed(() => {
+  const desc = props.datasetRequest.description || ''
+  return desc.length > 150 ? desc.substring(0, 150) + '...' : desc
+})
+
+const surveyComplete = computed(() => {
+  let result = false
+  const organizationNodeId = props.datasetRequest.organizationNodeId
+  const repo = repository.value
+  
+  if (repo && repo.questions != null && props.datasetRequest && props.datasetRequest.survey != null) {
+    result = repo.questions.map(q => {
+      const answer = props.datasetRequest.survey.find(r => r.questionId === q.id)
+      return answer && answer.response !== ''
+    }).reduce((a, c) => a && c, true)
+  }
+  return result
+})
+
+const readyToSubmit = computed(() => {
+  const validName = props.datasetRequest.name !== null && props.datasetRequest.name !== ''
+  const validDescription = props.datasetRequest.description !== null && props.datasetRequest.description !== ''
+  return validName && validDescription && surveyComplete.value
+})
+
+// Methods
+const handleItemClick = () => {
+  // Always trigger view/edit action - parent will decide if it's read-only or editable
+  triggerRequest(DatasetProposalAction.EDIT)
 }
+
+const triggerRequest = (action) => {
+  emit(action, props.datasetRequest)
+}
+
+const formatDate = (timestamp) => {
+  if (!timestamp || timestamp === 0) return ''
+  
+  // Handle both Unix timestamps (seconds) and JavaScript timestamps (milliseconds)
+  const date = timestamp > 1000000000000 ? new Date(timestamp) : new Date(timestamp * 1000)
+  const options = { year: 'numeric', month: 'short', day: 'numeric' }
+  return date.toLocaleDateString('en-US', options)
+}
+
+// Computed properties for date displays
+const displayDate = computed(() => {
+  const request = props.datasetRequest
+  
+  // Show submitted date if proposal was submitted
+  if (isSubmitted.value && request.submittedAt && request.submittedAt !== 0) {
+    return `Submitted ${formatDate(request.submittedAt)}`
+  }
+  
+  // Show accepted date if proposal was accepted
+  if (isAccepted.value && request.acceptedAt && request.acceptedAt !== 0) {
+    return `Accepted ${formatDate(request.acceptedAt)}`
+  }
+  
+  // Show rejected date if proposal was rejected
+  if (isRejected.value && request.rejectedAt && request.rejectedAt !== 0) {
+    return `Rejected ${formatDate(request.rejectedAt)}`
+  }
+  
+  // Show withdrawn date if proposal was withdrawn
+  if (isWithdrawn.value && request.withdrawnAt && request.withdrawnAt !== 0) {
+    return `Withdrawn ${formatDate(request.withdrawnAt)}`
+  }
+  
+  // For drafts and other statuses, show updated date or created date
+  if (request.updatedAt && request.updatedAt !== 0 && request.updatedAt !== request.createdAt) {
+    return `Updated ${formatDate(request.updatedAt)}`
+  }
+  
+  if (request.createdAt && request.createdAt !== 0) {
+    return `Created ${formatDate(request.createdAt)}`
+  }
+  
+  return ''
+})
 </script>
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
 .request-list-item {
-  background: white;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  margin-bottom: 16px;
+  border-bottom: 1px solid theme.$gray_2;
+  background-color: white;
   transition: all 0.2s ease;
+  
+  &:first-child {
+    border-top: none;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background-color: theme.$gray_1;
+  }
   
   &.is-clickable {
     cursor: pointer;
-    
-    &:hover {
-      border-color: theme.$purple_2;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
   }
 }
 
 .request-content {
-  display: flex;
-  justify-content: space-between;
-  padding: 20px;
-  gap: 24px;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-  }
+  padding: 16px;
 }
 
-.request-info {
-  flex: 1;
-  min-width: 0; // Allow text truncation
+.request-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .request-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.request-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.status-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .request-status {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 4px 8px;
-  border-radius: 3px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  text-transform: capitalize;
+  white-space: nowrap;
   
   &.status-draft {
-    background: theme.$gray_2;
-    color: theme.$gray_6;
+    background: theme.$gray_1;
+    color: theme.$gray_5;
   }
   
   &.status-submitted {
-    background: lighten(theme.$purple_2, 35%);
-    color: theme.$purple_2;
+    background: rgba(theme.$green_2, 0.1);
+    color: theme.$green_2;
   }
   
   &.status-accepted {
-    background: lighten(theme.$green_1, 45%);
-    color: darken(theme.$green_1, 10%);
+    background: rgba(theme.$green_1, 0.1);
+    color: theme.$green_1;
   }
   
   &.status-rejected {
-    background: lighten(theme.$red_1, 35%);
+    background: rgba(theme.$red_1, 0.1);
     color: theme.$red_1;
   }
   
   &.status-withdrawn {
-    background: lighten(theme.$orange_1, 35%);
-    color: darken(theme.$orange_1, 10%);
+    background: rgba(theme.$orange_1, 0.1);
+    color: theme.$orange_1;
   }
 }
 
-.request-repository {
-  font-size: 13px;
-  color: theme.$gray_5;
+.incomplete-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 500;
+  background: rgba(theme.$purple_1, 0.1);
+  color: theme.$purple_1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.request-title {
-  font-size: 18px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin: 0 0 8px 0;
-  line-height: 1.3;
+.request-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.repository-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  .repository-logo {
+    height: 20px;
+    width: auto;
+    max-width: 80px;
+    object-fit: contain;
+  }
+  
+  .repository-name {
+    font-size: 13px;
+    color: theme.$gray_4;
+    font-weight: 500;
+  }
 }
 
 .request-description {
-  font-size: 14px;
+  font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.5;
-  margin: 0 0 12px 0;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.request-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid theme.$gray_1;
+  
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 
 .request-metadata {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: theme.$gray_4;
   
-  .metadata-item {
-    font-size: 12px;
-    color: theme.$gray_4;
+  .warning-badge {
     display: flex;
     align-items: center;
     gap: 4px;
-    
-    .warning-icon {
-      color: theme.$orange_1;
-    }
-  }
-}
-
-.request-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 16px;
-  min-width: 200px;
-  
-  @media (max-width: 768px) {
-    align-items: stretch;
-  }
-}
-
-.repository-logo {
-  .logo {
-    height: 40px;
-    width: auto;
-    max-width: 150px;
-    object-fit: contain;
+    color: theme.$orange_1;
+    font-weight: 500;
   }
 }
 
 .action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 8px;
+  gap: 4px;
   
-  @media (max-width: 768px) {
-    align-items: stretch;
+  @media (max-width: 640px) {
+    width: 100%;
+    align-items: flex-end;
   }
 }
 
-.text-button {
+.text-link {
   background: none;
   border: none;
   color: theme.$purple_2;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 3px 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  border-radius: 4px;
   text-decoration: none;
-  transition: all 0.2s ease;
   
   &:hover {
-    text-decoration: underline;
     color: theme.$purple_3;
+    background: rgba(theme.$purple_2, 0.05);
   }
   
-  &.danger {
-    color: theme.$red_1;
+  &.primary-action {
+    color: theme.$purple_2;
+    font-weight: 600;
     
     &:hover {
-      color: darken(theme.$red_1, 10%);
+      color: darken(theme.$purple_2, 10%);
+      background: rgba(theme.$purple_2, 0.08);
+    }
+  }
+  
+  &.secondary-action {
+    color: theme.$red_2;
+    
+    &:hover {
+      color: darken(theme.$red_2, 10%);
+      background: rgba(theme.$red_2, 0.05);
     }
   }
 }
 
-.status-message {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: theme.$gray_5;
-  
-  &.success {
-    color: theme.$green_1;
-  }
-  
-  &.error {
-    color: theme.$red_1;
-  }
-  
-  .status-icon {
-    flex-shrink: 0;
-  }
-}
-
-// Button overrides for small size
+// Button overrides for compact size
 :deep(.bf-button) {
-  &.small {
-    padding: 6px 12px;
-    font-size: 14px;
+  &.compact {
+    padding: 5px 12px;
+    font-size: 13px;
     min-width: auto;
+    font-weight: 500;
   }
 }
 </style>

@@ -116,7 +116,7 @@ export default {
   },
 
   async mounted() {
-    await this.collectionsStore.fetchCollections()
+    await this.collectionsStore.getUserCollections()
     await this.collectionsStore.fetchDatasetCollections(this.$route.params.datasetId)
   },
 

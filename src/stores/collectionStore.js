@@ -94,40 +94,12 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
         banners: item.banners
 
       })).reverse() 
-      totalCount.value = response.totalCount|| 0
+      totalCount.value = response.totalCount || 0
     }catch(error){
       console.error("failed to get user's collections", error)
     }
   }
     /*
-  GET call for collections public collections
-  */
-  const getPublicCollections = async ( customLimit = limit.value,customOffset = offset.value) => {
-    isPublicCollection.value = true;
-    const url = `${siteConfig.discoverUrl}/discover/datasets?limit=${customLimit}&offset=${customOffset}&datasetType=collection&orderBy=relevance&orderDirection=desc`
-    const response = await useSendXhr(url, {
-      method: 'GET',
-    })
-    if(!response.datasets){return}
-    publicCollections.value = response.datasets.map(item => ({
-      id: item.id,
-      doi: item.doi,
-      name: item.name,
-      description: item.description,
-      datasetCount: item.doiCollection.size,
-      size:item.size,
-      userRole: item.userRole,
-      banners: item.doiCollection.banners,
-      state: collectionStatus.value.get(item.status),
-      tags:item.tags,
-      ownerFirstName:item.ownerFirstName,
-      ownerLastName:item.ownerLastName,
-      ownerOrcid:item.ownerOrcid,
-      license:item.license
-    }))
-    totalCount.value = response.totalCount || 0;
-  }
-  /*
   GET call for all details about a collection by collectionID
   */
   const getCollectionDetails = async(collectionID)=>{
@@ -151,7 +123,6 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
           datasets: response.datasets,
           contributors:response.derivedContributors,
           publication: response.publication,
-          userRole:response.userRole
         };
           targetCollectionDatasets.value = transformed;
     }catch(error){
@@ -160,48 +131,7 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
     
   }
   
-  /*
-  GET Collections details for PUBLISHED collections
-  */
- const getPublishedCollectionDetails = async(collectionID)=>{
-    try{
-      isPublicCollection.value = true;
-      const url = ` ${siteConfig.discoverUrl}/discover/datasets/${collectionID}`
-      const response = await useSendXhr(url, {
-          method: 'GET'
-        })
-      const transformed = {
-          id: response.id,
-          doi:response.doi,
-          name: response.name,
-          uri:response.uri,
-          description: response.description,
-          datasetCount: response.doiCollection.size,
-          banners: response.doiCollection.banners,
-          datasets: response.datasets,
-          state: collectionStatus.value.get(response.status),
-          version:response.version,
-          publishedPage:true,
-          contributors:response.contributors,
-          tags:response.tags,
-          createdAt:response.createdAt,
-          updatedAt:response.updatedAt,
-          versionPublishedAt:response.versionPublishedAt,
-          firstPublishedAt:response.firstPublishedAt,
-          revisedAt:response.revisedAt,
-          ownerFirstName:response.ownerFirstName,
-          ownerLastName:response.ownerLastName,
-          ownerOrcid:response.ownerOrcid,
-          ownerId:response.ownerId,
-          userRole:response.userRole
-        };
-          targetCollectionDatasets.value = transformed;
-          getPublishedCollectionDOIs(response.id,response.version,0,25);
-          getVersionsOfCollection(response.id);
-    }catch(error){
-      console.error("Failed to Get Colleciton Details", error)
-    }
- }
+
   /*
   GET Collections DOIs for PUBLISHED collections
   */
@@ -250,61 +180,58 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
       throw error;
     }
   };
-/*
-EDIT collections call PATCH
-*/
-const editCollection = async(collectionID, form)=>{
-  try{
-    const token = await useGetToken();
-    const url = `${siteConfig.api2Url}/collections/${collectionID}`;
-    const response = await useSendXhr(url, {
-        method: 'PATCH',
-        header: {
-          Authorization: `Bearer ${token}`
+  /*
+  EDIT collections call PATCH
+  */
+  const editCollection = async(collectionID, form)=>{
+    try{
+      const token = await useGetToken();
+      const url = `${siteConfig.api2Url}/collections/${collectionID}`;
+      const response = await useSendXhr(url, {
+          method: 'PATCH',
+          header: {
+            Authorization: `Bearer ${token}`
+          },
+          body: {
+            name: form.name,
+            description: form.description
+          }
+        })
+      return response;
+    }catch(exception){
+      console.error("Edit collection failed", error)
+      throw error;
+    }
+  }
+
+  const editCollectionDataset = async(collectionID, add, remove)=>{
+    try{
+      const token = await useGetToken();
+      const url = `${siteConfig.api2Url}/collections/${collectionID}`;
+
+      const dois = {};
+      if(add && add.length > 0){ dois.add = add}
+      if(remove && remove.length > 0){ dois.remove = remove}
+      const response = await useSendXhr(url,{
+        method:'PATCH',
+        header:{
+          Authorization:`Bearer ${token}`
         },
-        body: {
-          name: form.name,
-          description: form.description
+        body:{
+          dois: dois
         }
       })
-    return response;
-  }catch(exception){
-    console.error("Edit collection failed", error)
-    throw error;
+      return response;
+    }catch(exception){
+      console.error("editing collection's datasets failed", exception)
+      throw exception
+    }
   }
-}
-
-const editCollectionDataset = async(collectionID, add, remove)=>{
-  try{
-    const token = await useGetToken();
-    const url = `${siteConfig.api2Url}/collections/${collectionID}`;
-
-    const dois = {};
-    if(add && add.length > 0){ dois.add = add} 
-    if(remove && remove.length > 0){ dois.remove = remove}
-    const response = await useSendXhr(url,{
-      method:'PATCH',
-      header:{
-        Authorization:`Bearer ${token}`
-      },
-      body:{
-        dois: dois
-      }
-    })
-    return response;
-  }catch(exception){
-    console.error("editing collection's datasets failed", exception)
-    throw exception
-  }
-}
 
   // Dataset collections management
   const datasetCollections = ref([])
   const collections = computed(() => userCollections.value)
 
-  const fetchCollections = async() => {
-    return getUserCollections()
-  }
 
   const fetchDatasetCollections = async(datasetId) => {
     try {
@@ -501,13 +428,9 @@ const editCollectionDataset = async(collectionID, add, remove)=>{
     publicDatasetDOIs,
     versionHistory,
     // actions
-    clearCollectionsStore,
     createNewCollection,
     getUserCollections,
-    getPublicCollections,
     getCollectionDetails,
-    getPublishedCollectionDetails,
-    deleteCollection,
     editCollection,
     editCollectionDataset,
     publishCollection,
@@ -515,7 +438,6 @@ const editCollectionDataset = async(collectionID, add, remove)=>{
     // Dataset collections methods
     datasetCollections,
     collections,
-    fetchCollections,
     fetchDatasetCollections,
     addCollection,
     removeCollection,

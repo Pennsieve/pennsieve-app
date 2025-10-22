@@ -93,8 +93,7 @@ function openInfoPanel(event) {
   }
 
   &.selected {
-    background-color: lighten(theme.$purple_2, 40%);
-    border-left: 4px solid theme.$purple_2;
+    background-color: theme.$gray_1;
   }
 
   &:first-child {

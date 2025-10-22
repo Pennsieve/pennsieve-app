@@ -161,14 +161,13 @@ export default {
 }
 
 h3 {
-  color: #2760ff;
+  color: theme.$purple_2;
   font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
   margin: 0;
   word-break: break-word;
   flex: 1;
-  margin-right: 16px;
 
   a {
     color: inherit;
@@ -179,7 +178,7 @@ h3 {
     }
 
     &:focus {
-      color: #1c46bd;
+      color: theme.$purple_2;
     }
   }
 }

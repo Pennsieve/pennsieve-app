@@ -41,7 +41,7 @@ const useIconComponent = computed(() => props.iconComponent !== null)
       <h2>{{ pageTitle }}</h2>
       <p class="description">{{ pageDescription }}</p>
       <div class="additional-info">
-        <p>We're working hard to bring you this feature. Stay tuned for updates!</p>
+        <p>We're working hard to bring you this feature. Stay tuned for updates! (Roadmap 2026)</p>
       </div>
     </div>
   </div>

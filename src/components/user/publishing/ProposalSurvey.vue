@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useStore } from 'vuex'
+import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconCheck from '@/components/icons/IconCheck.vue'
 import IconKitchenTimer from '@/components/icons/IconKitchenTimer.vue'
@@ -13,12 +14,21 @@ const props = defineProps({
   repository: {
     type: Object,
     default: () => ({})
+  },
+  proposal: {
+    type: Object,
+    default: () => null
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['close', 'create-proposal', 'update:dialogVisible'])
+const emit = defineEmits(['close', 'create-proposal', 'submit-proposal', 'recreate-proposal', 'recreate-and-submit-proposal', 'update:dialogVisible'])
 
 const store = useStore()
+const proposalStore = useProposalStore()
 
 const proposal = ref({
   name: '',
@@ -26,13 +36,29 @@ const proposal = ref({
   survey: []
 })
 
+const selectedRepository = ref({})
+const surveyAnswersByRepository = ref({})
+
 const profile = computed(() => store.state.profile)
+const availableRepositories = computed(() => proposalStore.repositories)
+
+const currentRepository = computed(() => selectedRepository.value.organizationNodeId ? selectedRepository.value : props.repository)
 
 const repositoryQuestions = computed(() => {
-  return props.repository?.questions || []
+  return currentRepository.value?.questions || []
 })
 
 const readyToSave = computed(() => {
+  // For updating existing proposals, allow saving even if incomplete
+  if (props.proposal) {
+    return true
+  }
+  // For new proposals, require name and description
+  return proposal.value.name && proposal.value.description
+})
+
+const readyToSubmit = computed(() => {
+  // Require all fields including all questions for submission
   return proposal.value.name && 
          proposal.value.description && 
          allRepoQuestionsAnswered.value
@@ -74,7 +100,31 @@ const progressPercentage = computed(() => {
 
 watch(() => props.dialogVisible, (newVal) => {
   if (newVal) {
-    clearForm()
+    populateForm()
+    initializeSelectedRepository()
+  }
+})
+
+// Watch for repository changes and save/restore survey responses
+watch(() => selectedRepository.value.organizationNodeId, (newNodeId, oldNodeId) => {
+  if (oldNodeId && newNodeId !== oldNodeId) {
+    // Save current survey answers before switching
+    if (oldNodeId) {
+      surveyAnswersByRepository.value[oldNodeId] = { ...proposal.value.survey }
+    }
+    
+    // Update the proposal's organizationNodeId to match the new repository
+    if (newNodeId) {
+      // This ensures the proposal will be saved to the correct repository
+      proposal.value.organizationNodeId = newNodeId
+    }
+    
+    // Restore saved answers for the new repository, or start with blank answers
+    if (newNodeId && surveyAnswersByRepository.value[newNodeId]) {
+      proposal.value.survey = { ...surveyAnswersByRepository.value[newNodeId] }
+    } else {
+      proposal.value.survey = {}
+    }
   }
 })
 
@@ -91,6 +141,45 @@ function clearForm() {
   }
 }
 
+function initializeSelectedRepository() {
+  // Set the initial repository from props
+  selectedRepository.value = props.repository || {}
+  
+  // If editing an existing proposal, store its survey answers for the current repository
+  if (props.proposal && props.repository?.organizationNodeId && proposal.value.survey) {
+    surveyAnswersByRepository.value[props.repository.organizationNodeId] = { ...proposal.value.survey }
+  }
+}
+
+function populateForm() {
+  if (props.proposal) {
+    // Editing existing proposal - populate with existing data
+    proposal.value = {
+      name: props.proposal.name || '',
+      description: props.proposal.description || '',
+      survey: {}
+    }
+    
+    // Convert survey array to object format for the form
+    if (props.proposal.survey && Array.isArray(props.proposal.survey)) {
+      const surveyObject = {}
+      props.proposal.survey.forEach(item => {
+        if (item.questionId !== undefined && item.response) {
+          surveyObject[item.questionId] = item.response
+        }
+      })
+      proposal.value.survey = surveyObject
+    }
+  } else {
+    // New proposal - clear form
+    clearForm()
+  }
+}
+
+function handleRepositoryChange(repository) {
+  selectedRepository.value = repository
+}
+
 function handleDialogUpdate(visible) {
   // Allow ESC key and explicit close actions
   if (!visible) {
@@ -100,10 +189,10 @@ function handleDialogUpdate(visible) {
   }
 }
 
-function createProposal() {
+function saveProposal() {
   if (!readyToSave.value) return
 
-  const surveyResponses = repositoryQuestions.value.map((question, index) => ({
+  const surveyResponses = repositoryQuestions.value.map((question) => ({
     questionId: question.id,
     response: proposal.value.survey[question.id] || ''
   })).filter(response => response.response.trim())
@@ -111,7 +200,7 @@ function createProposal() {
   const proposalData = {
     name: proposal.value.name,
     description: proposal.value.description,
-    organizationNodeId: props.repository.organizationNodeId,
+    organizationNodeId: currentRepository.value.organizationNodeId,
     status: 'DRAFT',
     survey: surveyResponses,
     contributors: [],
@@ -119,7 +208,74 @@ function createProposal() {
     ownerName: `${profile.value?.firstName || ''} ${profile.value?.lastName || ''}`.trim()
   }
 
-  emit('create-proposal', proposalData)
+  // Check if this is an existing proposal and if the repository has changed
+  const isExistingProposal = props.proposal && props.proposal.nodeId
+  const hasRepositoryChanged = isExistingProposal && 
+    props.proposal.organizationNodeId !== currentRepository.value.organizationNodeId
+
+  if (hasRepositoryChanged) {
+    // Repository changed - need to delete old proposal and create new one
+    proposalData._originalProposal = props.proposal // Pass original for deletion
+    proposalData._requiresRecreation = true
+    emit('recreate-proposal', proposalData)
+  } else if (isExistingProposal) {
+    // Same repository - normal update
+    proposalData.id = props.proposal.id
+    proposalData.nodeId = props.proposal.nodeId
+    proposalData.datasetNodeId = props.proposal.datasetNodeId
+    proposalData.createdAt = props.proposal.createdAt
+    proposalData.updatedAt = props.proposal.updatedAt
+    emit('create-proposal', proposalData)
+  } else {
+    // New proposal - normal creation
+    emit('create-proposal', proposalData)
+  }
+
+  closeDialog()
+}
+
+function submitProposal() {
+  if (!readyToSubmit.value) return
+
+  const surveyResponses = repositoryQuestions.value.map((question) => ({
+    questionId: question.id,
+    response: proposal.value.survey[question.id] || ''
+  })).filter(response => response.response.trim())
+
+  const proposalData = {
+    name: proposal.value.name,
+    description: proposal.value.description,
+    organizationNodeId: currentRepository.value.organizationNodeId,
+    status: 'DRAFT',
+    survey: surveyResponses,
+    contributors: [],
+    userId: profile.value?.intId,
+    ownerName: `${profile.value?.firstName || ''} ${profile.value?.lastName || ''}`.trim()
+  }
+
+  // Check if this is an existing proposal and if the repository has changed
+  const isExistingProposal = props.proposal && props.proposal.nodeId
+  const hasRepositoryChanged = isExistingProposal && 
+    props.proposal.organizationNodeId !== currentRepository.value.organizationNodeId
+
+  if (hasRepositoryChanged) {
+    // Repository changed - need to delete old proposal and create new one, then submit
+    proposalData._originalProposal = props.proposal // Pass original for deletion
+    proposalData._requiresRecreation = true
+    emit('recreate-and-submit-proposal', proposalData)
+  } else if (isExistingProposal) {
+    // Same repository - normal update then submit
+    proposalData.id = props.proposal.id
+    proposalData.nodeId = props.proposal.nodeId
+    proposalData.datasetNodeId = props.proposal.datasetNodeId
+    proposalData.createdAt = props.proposal.createdAt
+    proposalData.updatedAt = props.proposal.updatedAt
+    emit('submit-proposal', proposalData)
+  } else {
+    // New proposal - create and submit
+    emit('submit-proposal', proposalData)
+  }
+
   closeDialog()
 }
 </script>
@@ -141,35 +297,77 @@ function createProposal() {
       </template>
 
       <div class="proposal-content">
-        <!-- Repository Header -->
-        <div class="repository-header">
-          <div class="repo-info">
-            <div v-if="repository.logoFile" class="repo-logo">
-              <img :src="repository.logoFile" :alt="`${repository.displayName} logo`" />
-            </div>
-            <div class="repo-details">
-              <h2>{{ repository.displayName }}</h2>
-              <p class="repo-description" v-if="repository.description">{{ repository.description }}</p>
-            </div>
-          </div>
-<!--          <div class="submission-indicator">-->
-<!--            <div class="indicator-icon">📄</div>-->
-<!--            <span class="indicator-text">Dataset Proposal</span>-->
-<!--          </div>-->
+
+
+
+
+
+        
+        <!-- Read-only Close Button -->
+        <div class="read-only-actions" v-if="readOnly">
+          <bf-button @click="closeDialog" class="primary">
+            Close
+          </bf-button>
         </div>
 
         <!-- Progress Indicator -->
-        <div class="progress-section">
-          <div class="progress-header">
-            <h3>Complete your proposal</h3>
-            <div class="progress-stats">
-              <span class="completed-count">{{ completedFieldsCount }}</span>
-              <span class="total-count">/ {{ totalRequiredFields }}</span>
-              <span class="progress-label">required fields completed</span>
-            </div>
+        <div class="progress-section" v-if="!readOnly">
+          <div class="progress-info">
+            <span class="progress-text">{{ completedFieldsCount }}/{{ totalRequiredFields }} fields completed</span>
+            <span class="progress-percentage">{{ progressPercentage }}%</span>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+          </div>
+        </div>
+
+        <!-- Repository Header -->
+        <div class="repository-header">
+          <div class="repo-info">
+            <!-- Read-only indicator -->
+            <div v-if="readOnly" class="read-only-tag">
+              <span>Read Only</span>
+            </div>
+            <div v-if="currentRepository.logoFile" class="repo-logo">
+              <img :src="currentRepository.logoFile" :alt="`${currentRepository.displayName} logo`" />
+            </div>
+            <div class="repo-details">
+              <h2>{{ currentRepository.displayName }}</h2>
+              <p class="repo-description" v-if="currentRepository.description">{{ currentRepository.description }}</p>
+            </div>
+          </div>
+
+          <!-- Repository Selector -->
+          <div class="repository-selector" v-if="!readOnly">
+            <label class="selector-label">Submitting to:</label>
+            <el-select
+              v-model="selectedRepository"
+              placeholder="Select repository"
+              class="repository-dropdown"
+              @change="handleRepositoryChange"
+              value-key="organizationNodeId"
+              size="large"
+            >
+              <el-option
+                v-for="repo in availableRepositories"
+                :key="repo.organizationNodeId"
+                :label="repo.displayName"
+                :value="repo"
+                class="repository-option"
+              >
+                <div class="repository-option-content">
+                  <img
+                    v-if="repo.logoFile"
+                    :src="repo.logoFile"
+                    :alt="`${repo.displayName} logo`"
+                    class="option-logo"
+                  />
+                  <div class="option-details">
+                    <span class="option-name">{{ repo.displayName }}</span>
+                  </div>
+                </div>
+              </el-option>
+            </el-select>
           </div>
         </div>
 
@@ -192,6 +390,7 @@ function createProposal() {
                 placeholder="e.g., Neural Activity in Visual Cortex During Object Recognition"
                 size="large"
                 :class="{ 'field-completed': proposal.name }"
+                :readonly="readOnly"
               />
             </div>
           </div>
@@ -214,6 +413,7 @@ function createProposal() {
                 placeholder="Provide a detailed description of your dataset including methodology, objectives, and relevance to the repository..."
                 size="large"
                 :class="{ 'field-completed': proposal.description }"
+                :readonly="readOnly"
               />
             </div>
           </div>
@@ -226,7 +426,7 @@ function createProposal() {
                 Repository Requirements
                 <span class="required-indicator">*</span>
               </h4>
-              <p class="field-description">Answer the following questions specific to {{ repository.displayName }}</p>
+              <p class="field-description">Answer the following questions specific to {{ currentRepository.displayName }}</p>
             </div>
             
             <div class="questions-grid">
@@ -248,6 +448,7 @@ function createProposal() {
                   :rows="3"
                   :placeholder="`Please provide your answer...`"
                   size="large"
+                  :readonly="readOnly"
                 />
               </div>
             </div>
@@ -255,7 +456,7 @@ function createProposal() {
         </el-form>
 
         <!-- Action Section -->
-        <div class="action-section">
+        <div class="action-section" v-if="!readOnly">
           <div class="action-info">
             <div class="completion-status" :class="{ 'ready': readyToSave }">
               <div class="status-icon">
@@ -263,25 +464,35 @@ function createProposal() {
                 <IconKitchenTimer v-else :width="20" :height="20" />
               </div>
               <div class="status-text">
-                <span v-if="readyToSave" class="ready-text">Ready to submit</span>
+                <span v-if="readyToSubmit" class="ready-text">Ready to submit</span>
+                <span v-else-if="readyToSave" class="ready-text">Ready to save draft</span>
                 <span v-else class="pending-text">Complete all required fields to continue</span>
               </div>
             </div>
           </div>
-          
+
           <div class="action-buttons">
             <bf-button @click="closeDialog" class="secondary">
               Cancel
             </bf-button>
             <bf-button
-              class="primary"
+              class="secondary"
               :disabled="!readyToSave"
-              @click="createProposal"
+              @click="saveProposal"
+            >
+              {{ props.proposal ? 'Update Proposal' : 'Save Proposal' }}
+            </bf-button>
+            <bf-button
+              class="primary"
+              :disabled="!readyToSubmit"
+              @click="submitProposal"
             >
               Submit Proposal
             </bf-button>
           </div>
         </div>
+
+
       </div>
     </el-dialog>
   </div>
@@ -336,6 +547,42 @@ function createProposal() {
     }
   }
 
+  .repository-selector {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    min-width: 280px;
+
+    .selector-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: theme.$purple_3;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .repository-dropdown {
+      width: 100%;
+      
+      :deep(.el-select__wrapper) {
+        background: rgba(white, 0.95);
+        border: 1px solid rgba(theme.$purple_2, 0.3);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+
+        &:hover {
+          border-color: theme.$purple_2;
+          box-shadow: 0 2px 8px rgba(theme.$purple_2, 0.1);
+        }
+
+        .el-select__placeholder {
+          color: theme.$gray_4;
+        }
+      }
+    }
+  }
+
   .submission-indicator {
     display: flex;
     align-items: center;
@@ -361,56 +608,38 @@ function createProposal() {
 
 // Progress Section
 .progress-section {
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 
-  .progress-header {
+  .progress-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 
-    h3 {
-      margin: 0;
-      color: theme.$gray_6;
-      font-size: 18px;
+    .progress-text {
+      font-size: 14px;
+      color: theme.$gray_5;
       font-weight: 500;
     }
 
-    .progress-stats {
-      display: flex;
-      align-items: baseline;
-      gap: 2px;
+    .progress-percentage {
       font-size: 14px;
-
-      .completed-count {
-        font-size: 20px;
-        font-weight: 600;
-        color: theme.$purple_3;
-      }
-
-      .total-count {
-        color: theme.$gray_4;
-        font-weight: 500;
-      }
-
-      .progress-label {
-        color: theme.$gray_5;
-        margin-left: 6px;
-      }
+      font-weight: 600;
+      color: theme.$purple_3;
     }
   }
 
   .progress-bar {
-    height: 8px;
+    height: 6px;
     background: theme.$gray_1;
-    border-radius: 4px;
+    border-radius: 3px;
     overflow: hidden;
 
     .progress-fill {
       height: 100%;
       background: linear-gradient(90deg, theme.$purple_2 0%, lighten(theme.$purple_2, 10%) 100%);
       transition: width 0.3s ease;
-      border-radius: 4px;
+      border-radius: 3px;
     }
   }
 }
@@ -634,9 +863,8 @@ function createProposal() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
-  border-top: 1px solid theme.$gray_2;
-  margin-top: 32px;
+  padding: 0 0 24px 0;
+  margin-top: 16px;
 
   .action-info {
     .completion-status {
@@ -703,6 +931,47 @@ function createProposal() {
   transition: all 0.2s ease;
 }
 
+// Repository Option Content Styling (scoped to component)
+.repository-option-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  width: 100%;
+  
+  .option-logo {
+    height: 18px;
+    width: auto;
+    max-width: 40px;
+    object-fit: contain;
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: block;
+  }
+  
+  .option-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+    
+    .option-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: theme.$gray_6;
+      line-height: 1.3;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+  }
+}
+
 // Responsive Design
 @media (max-width: 768px) {
   .repository-header {
@@ -713,6 +982,12 @@ function createProposal() {
     .repo-info {
       flex-direction: column;
       text-align: center;
+    }
+    
+    .repository-selector {
+      align-items: center;
+      min-width: auto;
+      width: 100%;
     }
   }
 
@@ -727,5 +1002,34 @@ function createProposal() {
     gap: 16px;
     text-align: center;
   }
+}
+
+// Read-only specific styles
+.read-only-tag {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 10;
+  
+  span {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: rgba(theme.$orange_1, 0.1);
+    color: theme.$orange_1;
+    border: 1px solid rgba(theme.$orange_1, 0.3);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.read-only-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 24px 0;
+  margin-top: 24px;
 }
 </style>

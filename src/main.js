@@ -257,7 +257,6 @@ async function getPrimaryData() {
                 store.dispatch('updateOrgDatasetStatuses', resp)
             }).catch(err => useHandleXhrError(err))
 
-        const collectionsPromise = store.dispatch('collectionsModule/fetchCollections')
 
         return Promise.all(
             [
@@ -266,7 +265,6 @@ async function getPrimaryData() {
                 contributorPromise,
                 dataUseAgreementPromise,
                 datasetStatusPromise,
-                collectionsPromise
             ])
     })
 }

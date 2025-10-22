@@ -1,17 +1,15 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useStore } from 'vuex'
-import { useGetToken } from '@/composables/useGetToken'
+import { useProposalStore } from '@/stores/proposalStore'
 import RepositoryListItem from './RepositoryListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import RepositoryInfoModal from './RepositoryInfoModal.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 const store = useStore()
+const proposalStore = useProposalStore()
 
-const repositories = ref([])
-const isLoading = ref(false)
-const error = ref('')
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
 const selectedRepositoryForProposal = ref(null)
@@ -19,6 +17,9 @@ const showRepositoryInfo = ref(false)
 const selectedRepositoryForInfo = ref({})
 
 const profile = computed(() => store.state.profile)
+const repositories = computed(() => proposalStore.repositories)
+const isLoading = computed(() => proposalStore.isLoadingRepositories)
+const error = computed(() => proposalStore.repositoriesError)
 
 const canSubmitProposal = computed(() => {
   return selectedRepositoryForProposal.value && selectedRepositoryForProposal.value.isPublic
@@ -36,41 +37,7 @@ const sortRepositories = (repositories) => {
 }
 
 async function fetchRepositories() {
-  isLoading.value = true
-  error.value = ''
-  
-  try {
-    const token = await useGetToken()
-    const response = await fetch('https://api2.pennsieve.net/publishing/repositories', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      const responseJson = await response.json()
-      let count = 0
-      
-      const processedRepositories = responseJson.map((r) => {
-        return {
-          'id': ++count,
-          'isPublic': r.type === "PUBLIC",
-          ...r
-        }
-      })
-      
-      repositories.value = sortRepositories(processedRepositories)
-    } else {
-      throw new Error(response.statusText)
-    }
-  } catch (err) {
-    console.error('Failed to fetch repositories:', err)
-    error.value = 'Failed to load repositories'
-    repositories.value = []
-  } finally {
-    isLoading.value = false
-  }
+  await proposalStore.fetchRepositories()
 }
 
 function handleRepositorySelect(repository) {
@@ -96,28 +63,33 @@ function closeProposalDialog() {
 
 async function createProposal(proposalData) {
   try {
-    const token = await useGetToken()
-    const response = await fetch('https://api2.pennsieve.net/publishing/proposal', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(proposalData)
-    })
-    
-    if (response.ok) {
-      const result = await response.json()
-      console.log('Proposal created successfully:', result)
-      
-      // Show success message or redirect
-      // You might want to emit an event or show a notification here
-      
-    } else {
-      throw new Error(`Failed to create proposal: ${response.statusText}`)
-    }
+    await proposalStore.storeNewProposal(proposalData, profile.value)
+    console.log('Proposal created successfully')
+    closeProposalDialog()
+    // Show success message or redirect
+    // You might want to emit an event or show a notification here
   } catch (err) {
     console.error('Error creating proposal:', err)
+    // Handle error - show error message to user
+  }
+}
+
+async function submitProposal(proposalData) {
+  try {
+    // First save the proposal as DRAFT
+    const response = await proposalStore.storeNewProposal(proposalData, profile.value)
+    
+    // Get the saved proposal with its nodeId from the response
+    if (response?.result?.nodeId) {
+      // Now submit the saved proposal
+      await proposalStore.submitProposal(response.result)
+    }
+    
+    console.log('Proposal submitted successfully')
+    closeProposalDialog()
+    // Show success message or redirect
+  } catch (err) {
+    console.error('Error submitting proposal:', err)
     // Handle error - show error message to user
   }
 }
@@ -185,6 +157,7 @@ onMounted(() => {
       :repository="selectedRepository"
       @close="closeProposalDialog"
       @create-proposal="createProposal"
+      @submit-proposal="submitProposal"
     />
 
     <!-- Repository Information Modal -->
@@ -199,8 +172,6 @@ onMounted(() => {
 @use '../../../styles/_theme.scss';
 
 .open-repositories {
-  //padding: 40px;
-  //max-width: 1000px;
   margin: 0;
 }
 
@@ -283,7 +254,7 @@ onMounted(() => {
 
 .repositories-list {
   background: white;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid theme.$gray_2;
   overflow: hidden;
 }

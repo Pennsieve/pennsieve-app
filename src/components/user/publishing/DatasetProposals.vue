@@ -34,12 +34,12 @@
       </div>
 
       <!-- Proposals List -->
-      <div v-else-if="hasProposals" class="proposals-list">
+      <div v-else-if="hasProposals" class="proposals-section">
         <div class="list-header">
           <h2>Your Proposals ({{ datasetProposals.length }})</h2>
         </div>
         
-        <div class="proposals-grid">
+        <div class="proposals-list">
           <request-list-item
             v-for="proposal in datasetProposals"
             :key="proposal.id"
@@ -77,7 +77,12 @@
     <proposal-survey
       :dialog-visible="showProposalDialog"
       :repository="selectedRepository"
+      :proposal="activeProposal"
+      :read-only="activeProposal && !['DRAFT', 'WITHDRAWN'].includes(activeProposal.proposalStatus)"
       @create-proposal="handleCreateProposal"
+      @submit-proposal="handleSubmitProposal"
+      @recreate-proposal="handleRecreateProposal"
+      @recreate-and-submit-proposal="handleRecreateAndSubmitProposal"
       @close="closeProposalDialog"
     />
 
@@ -102,12 +107,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
 
 const store = useStore()
+const proposalStore = useProposalStore()
 const router = useRouter()
 
 // Reactive data
@@ -128,9 +135,17 @@ const confirmationDialog = ref({
 })
 
 // Computed properties
-const datasetProposals = computed(() => store.state.repositoryModule?.datasetProposals || [])
-const hasProposals = computed(() => datasetProposals.value.length > 0)
-const repositories = computed(() => store.state.repositoryModule?.repositories || [])
+const datasetProposals = computed(() => {
+  // Sort proposals by updatedAt timestamp, most recent first
+  return [...proposalStore.datasetProposals].sort((a, b) => {
+    const aTime = a.updatedAt || a.createdAt || 0
+    const bTime = b.updatedAt || b.createdAt || 0
+    return bTime - aTime // Descending order (newest first)
+  })
+})
+const hasProposals = computed(() => proposalStore.hasProposals)
+const repositories = computed(() => proposalStore.repositories)
+const profile = computed(() => store.state.profile)
 
 // Methods
 const fetchProposals = async () => {
@@ -138,7 +153,7 @@ const fetchProposals = async () => {
   error.value = ''
   
   try {
-    await store.dispatch('repositoryModule/fetchProposals')
+    await proposalStore.fetchProposals()
   } catch (err) {
     error.value = 'Failed to load proposals. Please try again.'
     console.error('Error fetching proposals:', err)
@@ -149,25 +164,99 @@ const fetchProposals = async () => {
 
 const fetchRepositories = async () => {
   try {
-    await store.dispatch('repositoryModule/fetchRepositories')
+    await proposalStore.fetchRepositories()
   } catch (err) {
     console.error('Error fetching repositories:', err)
   }
 }
 
 const startNewProposal = () => {
-  // Navigate to open repositories page to select a repository
-  router.push({ name: 'open-repositories' })
+  // Open ProposalSurvey dialog for new proposal
+  activeProposal.value = null // Clear any existing proposal
+  selectedRepository.value = repositories.value[0] || {} // Default to first available repository
+  showProposalDialog.value = true
 }
 
 const handleCreateProposal = async (proposalData) => {
   try {
-    await store.dispatch('repositoryModule/storeNewProposal', proposalData)
-    await fetchProposals()
+    // Check if we're editing an existing proposal (has nodeId) or creating new
+    if (proposalData.nodeId) {
+      // Editing existing proposal - use PUT API
+      await proposalStore.updateProposal(proposalData, profile.value)
+    } else {
+      // Creating new proposal - use POST API
+      await proposalStore.storeNewProposal(proposalData, profile.value)
+    }
     closeProposalDialog()
   } catch (err) {
-    error.value = 'Failed to create proposal. Please try again.'
-    console.error('Error creating proposal:', err)
+    const action = proposalData.nodeId ? 'update' : 'create'
+    error.value = `Failed to ${action} proposal. Please try again.`
+    console.error(`Error ${action}ing proposal:`, err)
+  }
+}
+
+const handleSubmitProposal = async (proposalData) => {
+  try {
+    let proposalToSubmit = proposalData
+    
+    // If editing existing proposal, first update it
+    if (proposalData.nodeId) {
+      const response = await proposalStore.updateProposal(proposalData, profile.value)
+      proposalToSubmit = response.result
+    } else {
+      // If creating new proposal, first save it as DRAFT
+      const response = await proposalStore.storeNewProposal(proposalData, profile.value)
+      proposalToSubmit = response.result
+    }
+    
+    // Now submit the proposal
+    if (proposalToSubmit?.nodeId) {
+      await proposalStore.submitProposal(proposalToSubmit)
+    }
+    
+    closeProposalDialog()
+  } catch (err) {
+    error.value = 'Failed to submit proposal. Please try again.'
+    console.error('Error submitting proposal:', err)
+  }
+}
+
+const handleRecreateProposal = async (proposalData) => {
+  try {
+    // First delete the original proposal
+    await proposalStore.removeProposal(proposalData._originalProposal)
+    
+    // Then create the new proposal with the new repository
+    delete proposalData._originalProposal
+    delete proposalData._requiresRecreation
+    await proposalStore.storeNewProposal(proposalData, profile.value)
+    
+    closeProposalDialog()
+  } catch (err) {
+    error.value = 'Failed to move proposal to new repository. Please try again.'
+    console.error('Error recreating proposal:', err)
+  }
+}
+
+const handleRecreateAndSubmitProposal = async (proposalData) => {
+  try {
+    // First delete the original proposal
+    await proposalStore.removeProposal(proposalData._originalProposal)
+    
+    // Then create the new proposal with the new repository
+    delete proposalData._originalProposal
+    delete proposalData._requiresRecreation
+    const response = await proposalStore.storeNewProposal(proposalData, profile.value)
+    
+    // Now submit the new proposal
+    if (response.result?.nodeId) {
+      await proposalStore.submitProposal(response.result)
+    }
+    
+    closeProposalDialog()
+  } catch (err) {
+    error.value = 'Failed to move and submit proposal to new repository. Please try again.'
+    console.error('Error recreating and submitting proposal:', err)
   }
 }
 
@@ -255,17 +344,15 @@ const handleConfirmedAction = async (event) => {
   try {
     switch (action) {
       case 'remove':
-        await store.dispatch('repositoryModule/removeProposal', resource)
+        await proposalStore.removeProposal(resource)
         break
       case 'submit':
-        await store.dispatch('repositoryModule/submitProposal', resource)
+        await proposalStore.submitProposal(resource)
         break
       case 'withdraw':
-        await store.dispatch('repositoryModule/withdrawProposal', resource)
+        await proposalStore.withdrawProposal(resource)
         break
     }
-    
-    await fetchProposals()
   } catch (err) {
     error.value = `Failed to ${action} proposal. Please try again.`
     console.error(`Error ${action} proposal:`, err)
@@ -374,7 +461,7 @@ onMounted(async () => {
   }
 }
 
-.proposals-list {
+.proposals-section {
   .list-header {
     margin-bottom: 24px;
     
@@ -385,12 +472,13 @@ onMounted(async () => {
       margin: 0;
     }
   }
-  
-  .proposals-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+}
+
+.proposals-list {
+  background: white;
+  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  overflow: hidden;
 }
 
 .empty-state {

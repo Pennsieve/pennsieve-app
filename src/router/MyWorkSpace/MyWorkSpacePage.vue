@@ -163,13 +163,15 @@ export default {
 </script>
 
 <style scoped lang="scss">
+@use '../../styles/theme';
+
 .breadcrumb-nav {
   display: flex;
   align-items: center;
   font-size: 14px;
   
   .breadcrumb-link {
-    color: #2760ff;
+    color: theme.$gray_4;
     text-decoration: none;
     
     &:hover {

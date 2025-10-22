@@ -70,10 +70,8 @@ const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/Setu
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 
 const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
-const WelcomeInfo = () => import('../components/welcome/Welcome.vue')
 const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
-const SubmitDatasets = () => import('../components/welcome/SubmitDatasets.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
 
@@ -667,54 +665,61 @@ const router = createRouter({
     //     },
     //   ]
     // },
-    /**
-     * Welcome Org routes
-     */
+    // /**
+    //  * Welcome Org routes
+    //  */
+    // {
+    //   path: '/:orgId/overview',
+    //   name: 'user-overview',
+    //   components: {
+    //     page: WelcomePage,
+    //     navigation: BfNavigation
+    //   },
+    //   props: {
+    //     page: true,
+    //     navigation: true,
+    //   },
+    //   redirect: {
+    //     name: 'submit'
+    //   },
+    //   children: [
+    //
+    //     // {
+    //     //   name: 'my-settings-container',
+    //     //   path: '/:orgId/profile',
+    //     //   components: {
+    //     //     stage: MySettingsContainer
+    //     //   }
+    //     // },
+    //     {
+    //       name: 'welcome',
+    //       path: 'welcome',
+    //       components: {
+    //         stage: WelcomeInfo
+    //       }
+    //     },
+    //     {
+    //       name: 'submit',
+    //       path: '/:orgId/submit',
+    //       components: {
+    //         stage: SubmitDatasets
+    //       }
+    //     },
+    //   ],
+    // },
+
     {
-      path: '/:orgId/overview',
-      name: 'user-overview',
-      components: {
-        page: WelcomePage,
-        navigation: BfNavigation
-      },
-      props: {
-        page: true,
-        navigation: true,
-      },
+      path: '/:orgId',
       redirect: {
-        name: 'submit'
-      },
-      children: [
-
-        // {
-        //   name: 'my-settings-container',
-        //   path: '/:orgId/profile',
-        //   components: {
-        //     stage: MySettingsContainer
-        //   }
-        // },
-        {
-          name: 'welcome',
-          path: 'welcome',
-          components: {
-            stage: WelcomeInfo
-          }
-        },
-        {
-          name: 'submit',
-          path: '/:orgId/submit',
-          components: {
-            stage: SubmitDatasets
-          }
-        },
-      ],
+        name: 'datasets-list',
+      }
     },
-
     /**
      * Datasets routes
      */
     {
       path: '/:orgId/datasets',
+      name: 'workspace-datasets',
       components: {
         page: Datasets,
         navigation: BfNavigation,
@@ -726,6 +731,9 @@ const router = createRouter({
         navigationSecondary: true,
       },
       meta: { hideSecondaryNav: false },
+      redirect: {
+        name: 'datasets-list',
+      },
       children: [
 
         {
