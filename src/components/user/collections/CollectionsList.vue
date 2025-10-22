@@ -16,9 +16,9 @@
       </button>
     </div>
 
-    <!-- Collections grid -->
+    <!-- Collections list -->
     <div v-else-if="collections.length > 0" class="collections-section">
-      <div class="collections-grid">
+      <div class="collections-list-container">
         <collections-card
           v-for="collection in collections"
           :key="collection.id"
@@ -263,10 +263,11 @@ export default {
 }
 
 .collections-section {
-  .collections-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+  .collections-list-container {
+    background: white;
+    border-radius: 4px;
+    border: 1px solid theme.$gray_2;
+    overflow: hidden;
 
     .collection-item {
       width: 100%;

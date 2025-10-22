@@ -6,21 +6,30 @@ let route = useRoute();
 <template>
   <header
     class="bf-rafter"
-    :class="[$slots['tabs'] ? 'with-tabs' : '', isEditing ? 'editing' : '']"
+    :class="[$slots['tabs'] ? 'with-tabs' : '', isEditing ? 'editing' : '', compact ? 'compact' : '']"
   >
     <div
       :class="[$slots['tabs'] ? 'rafter-inset with-tabs' : 'rafter-inset']"
     >
 
-      <!-- Header Navigation Section -->
-      <div v-if="datasetNameVisible || showBreadcrumbs || showLinkBack" class="rafter-navigation">
-        <!-- Navigation layout with breadcrumbs on left, dataset on right -->
-        <div class="nav-primary">
-          <!-- Left side: Breadcrumbs or back link -->
-          <div class="nav-left">
-            <!-- Breadcrumb Navigation (new feature) -->
+      <!-- Compact Mode: Single header row -->
+      <template v-if="compact">
+        <!-- Custom breadcrumb slot for non-compact mode compatibility -->
+        <div
+          v-if="$slots.breadcrumb"
+          class="row bf-rafter-breadcrumb compact"
+          :class="[$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
+        >
+          <slot name="breadcrumb" />
+        </div>
+        
+        <!-- Compact header row -->
+        <div class="row compact-header">
+          <!-- Left: Navigation (breadcrumbs/back link) -->
+          <div class="compact-nav">
+            <!-- Breadcrumb Navigation -->
             <template v-if="showBreadcrumbs">
-              <div class="breadcrumb-nav">
+              <div class="breadcrumb-nav compact">
                 <template v-for="(crumb, index) in breadcrumbs" :key="index">
                   <span v-if="index > 0" class="breadcrumb-separator">/</span>
                   <template v-if="index === breadcrumbs.length - 1">
@@ -35,21 +44,44 @@ let route = useRoute();
               </div>
             </template>
 
-            <!-- Legacy Back Link (backward compatibility) -->
+            <!-- Legacy Back Link -->
             <template v-else-if="showLinkBack">
-              <a @click="backRoute" class="link-back">
-                <IconArrowLeft
-                  :height="10"
-                  :width="10"
-                />
+              <a @click="backRoute" class="link-back compact">
+                <IconArrowLeft :height="10" :width="10" />
                 Back to {{ linkBack.name }}
               </a>
             </template>
           </div>
-          
-          <!-- Right side: Dataset context -->
-          <div v-if="datasetNameVisible" class="nav-right">
-            <div class="dataset-context">
+
+          <!-- Center: Title and Description (smaller, combined) -->
+          <div class="compact-title">
+            <div v-if="title || $slots['description']" class="title-description-combo">
+              <span v-if="$slots['description']" class="compact-description-inline">
+                <slot name="description" />
+              </span>
+            </div>
+            <div v-if="$slots['heading']" class="bf-rafter-heading compact">
+              <slot name="heading" />
+              <button v-if='!isDatasetOverview && slug' @click="toggleHelp">
+                <component
+                  :is="showHelp ? 'IconArrowUp': 'IconHelp'"
+                  :width="showHelp? 16: 20"
+                  :height="showHelp? 16: 20"
+                  color="white"
+                />
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Buttons, Dataset Context -->
+          <div class="compact-actions">
+            <!-- Buttons -->
+            <div v-if="$slots['buttons']" class="compact-buttons">
+              <slot name="buttons" />
+            </div>
+            
+            <!-- Dataset context -->
+            <div v-if="datasetNameVisible" class="dataset-context compact">
               <span class="dataset-label">Dataset:</span>
               <a @click="navigateToDatasetOverview" class="dataset-name clickable">{{ datasetNameDisplay }}</a>
               <button 
@@ -62,58 +94,128 @@ let route = useRoute();
             </div>
           </div>
         </div>
-      </div>
 
-      <div
-        v-if="$slots.breadcrumb"
-        class="row bf-rafter-breadcrumb"
-        :class="[$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
-      >
-        <slot name="breadcrumb" />
-      </div>
-
-      <div class="row main">
-        <div class="col">
-          <h1 v-if="title">{{ title }}</h1>
-
-          <div v-if="$slots['heading']" class="bf-rafter-heading">
-            <slot name="heading" />
-            <button v-if='!isDatasetOverview && slug' @click="toggleHelp">
-              <component
-                :is="showHelp?  'IconArrowUp': 'IconHelp' "
-                :width="showHelp? 16: 24"
-                :height="showHelp? 16: 24"
-                color="white"
-              />
-            </button>
-          </div>
-
-          <div v-if="$slots['description']" class="bf-rafter-description">
-            <slot name="description" />
-          </div>
-        </div>
-        <div v-if="$slots['buttons']" class="col bf-rafter-buttons">
-          <slot name="buttons" />
-        </div>
-      </div>
-
-      <div v-if="$slots['bottom']" class="row bf-rafter-bottom">
-        <slot name="bottom" />
-      </div>
-
-      <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
-        <readme-doc :slug="slug" :show-header=true />
-      </div>
-
-
-      <div class="tabs-stats-wrap">
-        <div v-if="$slots['tabs']" class="row bf-rafter-tabs">
+        <!-- Tabs moved to bottom left -->
+        <div v-if="$slots['tabs']" class="compact-tabs-bottom">
           <slot name="tabs" />
         </div>
 
-        <div v-if="$slots['stats']" class="col bf-rafter-stats mb-16">
-          <slot name="stats" />
+        <!-- Bottom and stats in compact mode -->
+        <div v-if="$slots['bottom'] || $slots['stats']" class="compact-bottom">
+          <div v-if="$slots['bottom']">
+            <slot name="bottom" />
+          </div>
+          <div v-if="$slots['stats']" class="compact-stats">
+            <slot name="stats" />
+          </div>
         </div>
+      </template>
+
+      <!-- Non-compact Mode: Original layout -->
+      <template v-else>
+        <!-- Header Navigation Section -->
+        <div v-if="datasetNameVisible || showBreadcrumbs || showLinkBack" class="rafter-navigation">
+          <!-- Navigation layout with breadcrumbs on left, dataset on right -->
+          <div class="nav-primary">
+            <!-- Left side: Breadcrumbs or back link -->
+            <div class="nav-left">
+              <!-- Breadcrumb Navigation (new feature) -->
+              <template v-if="showBreadcrumbs">
+                <div class="breadcrumb-nav">
+                  <template v-for="(crumb, index) in breadcrumbs" :key="index">
+                    <span v-if="index > 0" class="breadcrumb-separator">/</span>
+                    <template v-if="index === breadcrumbs.length - 1">
+                      <span class="breadcrumb-current">{{ crumb.name }}</span>
+                    </template>
+                    <template v-else>
+                      <a @click="navigateToBreadcrumb(crumb)" class="breadcrumb-link">
+                        {{ crumb.name }}
+                      </a>
+                    </template>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Legacy Back Link (backward compatibility) -->
+              <template v-else-if="showLinkBack">
+                <a @click="backRoute" class="link-back">
+                  <IconArrowLeft
+                    :height="10"
+                    :width="10"
+                  />
+                  Back to {{ linkBack.name }}
+                </a>
+              </template>
+            </div>
+            
+            <!-- Right side: Dataset context -->
+            <div v-if="datasetNameVisible" class="nav-right">
+              <div class="dataset-context">
+                <span class="dataset-label">Dataset:</span>
+                <a @click="navigateToDatasetOverview" class="dataset-name clickable">{{ datasetNameDisplay }}</a>
+                <button 
+                  @click="copyDatasetId" 
+                  class="copy-dataset-btn"
+                  title="Copy Dataset ID"
+                >
+                  <IconCopyDocument :width="14" :height="14" color="white" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="$slots.breadcrumb"
+          class="row bf-rafter-breadcrumb"
+          :class="[$slots['breadcrumb'] ? 'has-breadcrumb' : 'no-breadcrumb']"
+        >
+          <slot name="breadcrumb" />
+        </div>
+
+        <div class="row main">
+          <div class="col">
+            <h1 v-if="title">{{ title }}</h1>
+
+            <div v-if="$slots['heading']" class="bf-rafter-heading">
+              <slot name="heading" />
+              <button v-if='!isDatasetOverview && slug' @click="toggleHelp">
+                <component
+                  :is="showHelp?  'IconArrowUp': 'IconHelp' "
+                  :width="showHelp? 16: 24"
+                  :height="showHelp? 16: 24"
+                  color="white"
+                />
+              </button>
+            </div>
+
+            <div v-if="$slots['description']" class="bf-rafter-description">
+              <slot name="description" />
+            </div>
+          </div>
+          <div v-if="$slots['buttons']" class="col bf-rafter-buttons">
+            <slot name="buttons" />
+          </div>
+        </div>
+
+        <div v-if="$slots['bottom']" class="row bf-rafter-bottom">
+          <slot name="bottom" />
+        </div>
+
+        <div class="tabs-stats-wrap">
+          <div v-if="$slots['tabs']" class="row bf-rafter-tabs">
+            <slot name="tabs" />
+          </div>
+
+          <div v-if="$slots['stats']" class="col bf-rafter-stats mb-16">
+            <slot name="stats" />
+          </div>
+        </div>
+      </template>
+
+      <!-- Help section (shared) -->
+      <div :class="[ showHelp ? 'help-wrapper open' : 'help-wrapper']">
+        <readme-doc :slug="slug" :show-header=true />
       </div>
 
     </div>
@@ -174,6 +276,10 @@ export default {
       default: ''
     },
     hideDatasetName: {
+      type: Boolean,
+      default: false
+    },
+    compact: {
       type: Boolean,
       default: false
     }
@@ -829,6 +935,212 @@ export default {
     max-height: 250px;
     transition: max-height 0.25s ease-in, padding-top 0.25s ease-in;
     border-radius: 4px;
+  }
+}
+
+// Compact Mode Styles
+.bf-rafter.compact {
+  padding: 4px 8px 4px 16px; // Reduced padding
+  
+  &.primary {
+    padding-top: 12px;
+    padding-bottom: 0;
+  }
+  
+  // Compact header row
+  .compact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px; // Fixed height for consistency
+    
+    .compact-nav {
+      flex-shrink: 0;
+      min-width: 0;
+      
+      .breadcrumb-nav.compact {
+        font-size: 13px; // Slightly smaller
+        
+        .breadcrumb-separator {
+          margin: 0 6px; // Reduced margin
+        }
+      }
+      
+      .link-back.compact {
+        font-size: 12px;
+      }
+    }
+    
+    .compact-title {
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+      
+      .title-description-combo {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+
+
+
+        .compact-title-text {
+          margin: 0;
+          font-size: 16px; // Smaller than h1
+          font-weight: 600;
+          line-height: 1.2;
+        }
+        
+        .compact-description-inline {
+          font-size: 14px;
+          color: theme.$gray_5;
+          line-height: 1.3;
+          
+          :deep(p) {
+            margin: 0;
+            display: inline;
+          }
+        }
+      }
+      
+      h1 {
+        margin: 0;
+        font-size: 20px; // Slightly smaller than default 24px
+        line-height: 1.2;
+      }
+      
+      .bf-rafter-heading.compact {
+        margin-top: 2px;
+        
+        button {
+          padding: 2px;
+        }
+      }
+    }
+    
+    .compact-actions {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .compact-tabs {
+        // Inline tabs styling
+        :deep(.tabs) {
+          li {
+            margin-left: 16px; // Reduced from 32px
+            &:first-child {
+              margin: 0;
+            }
+          }
+          
+          a {
+            padding: 0 0 8px; // Reduced bottom padding
+            font-size: 13px; // Slightly smaller
+          }
+        }
+      }
+      
+      .compact-buttons {
+        .bf-button {
+          padding: 6px 12px; // Smaller buttons
+          font-size: 13px;
+          margin-left: 4px !important; // Reduced margin
+        }
+      }
+      
+      .dataset-context.compact {
+        gap: 6px; // Reduced gap
+        
+        .dataset-label {
+          font-size: 11px; // Smaller label
+        }
+        
+        .dataset-name {
+          font-size: 13px; // Smaller name
+        }
+        
+        .copy-dataset-btn {
+          padding: 2px; // Smaller button
+        }
+      }
+    }
+  }
+  
+  // Compact description
+  .compact-description {
+    margin-top: 4px; // Reduced margin
+    margin-bottom: 8px;
+    text-align: left;
+    
+    p {
+      font-size: 14px; // Slightly smaller
+      color: theme.$gray_5;
+      margin: 0;
+      line-height: 1.4;
+    }
+  }
+  
+  // Compact bottom section
+  .compact-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px; // Reduced margin
+    
+    .compact-stats {
+      font-size: 13px; // Smaller stats
+    }
+  }
+  
+  // Compact breadcrumb slot
+  .bf-rafter-breadcrumb.compact {
+    margin-bottom: 4px; // Reduced margin
+    font-size: 13px; // Smaller font
+    min-height: 16px; // Reduced height
+  }
+  
+  // Compact tabs at bottom
+  .compact-tabs-bottom {
+    margin-top: 8px; // Small gap from header
+    
+    :deep(.tabs) {
+      li {
+        margin-left: 32px; // Standard tab spacing
+        &:first-child {
+          margin: 0;
+        }
+      }
+      
+      a {
+        padding: 0 0 8px; // Bottom padding for underline
+        font-size: 14px; // Standard tab font size
+      }
+    }
+  }
+}
+
+// Primary variant compact mode
+.bf-rafter.compact.primary {
+  .compact-title {
+    h1 {
+      color: theme.$purple_3;
+      font-size: 22px; // Slightly larger for primary
+    }
+    
+    .title-description-combo {
+      .compact-title-text {
+        color: theme.$purple_3;
+        font-size: 18px; // Slightly larger for primary
+      }
+      
+      .compact-description-inline {
+        color: theme.$gray_5;
+      }
+    }
+  }
+  
+  .compact-description p {
+    color: theme.$gray_5;
   }
 }
 

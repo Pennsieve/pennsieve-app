@@ -1,6 +1,6 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" :title="pageTitle" class="primary">
+    <bf-rafter slot="heading" :title="pageTitle" class="primary" :compact="true">
       <template #breadcrumb>
         <div class="breadcrumb-nav" v-if="showBreadcrumb">
           <!-- Root workspace link -->

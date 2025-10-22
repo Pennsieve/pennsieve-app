@@ -1,23 +1,20 @@
 <template>
-  <div class="collections-card">
+  <div class="collections-card" @click="navigateToCollection">
     <div class="collections-content">
-      <div class="image mr-16">
-        <collections-banner-image :banners="collectionBanners" />
-      </div>
-      <div class="collection-content-wrap">
-        <div class="collection-header">
-          <h3>
-            <router-link :to="{ name: 'collection-details', params: { collectionId: collection.id } }">
-              {{ collection.name }}
-            </router-link>
+      <div class="collection-info">
+        <div class="collection-status">
+          {{ collectionState }}
+        </div>
+        
+        <div class="collection-title-wrapper">
+          <h3 class="collection-title">
+            {{ collection.name }}
           </h3>
-          <div class="collection-state-tag">
-            {{ collectionState }}
-          </div>
         </div>
-        <div class="subtitle">
+        
+        <p class="collection-description">
           {{ collection.description }}
-        </div>
+        </p>
         <div class="collections-details-wrap">
           <div class="details">
             <div class="detail">
@@ -36,11 +33,12 @@
                 <strong>DOI: {{ collection.doi }}</strong>
               </span>
             </div>
-<!--            <div class="detail">-->
-<!--              <span>{{ collectionOwnerName }}</span>-->
-<!--            </div>-->
           </div>
         </div>
+      </div>
+      
+      <div class="collection-banner" v-if="collectionBanners.length > 0">
+        <collections-banner-image :banners="collectionBanners" />
       </div>
     </div>
   </div>
@@ -126,6 +124,15 @@ export default {
     formatNumber(number) {
       if (!number) return '0'
       return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+    },
+
+    navigateToCollection() {
+      this.$router.push({
+        name: 'collection-details',
+        params: {
+          collectionId: this.collection.id
+        }
+      })
     }
   }
 }
@@ -135,73 +142,71 @@ export default {
 @use '../../../styles/_theme.scss';
 
 .collections-card {
-  border: solid 1px theme.$gray_2;
-  border-radius: 3px 3px 0 0;
+  border-bottom: 1px solid theme.$gray_2;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: theme.$gray_1;
+  }
+
+  &:first-child {
+    border-top: none;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .collections-content {
   display: flex;
-  flex-direction: row;
-  padding: 16px;
+  align-items: center;
+  padding: 24px;
+  gap: 24px;
 
   .image {
-    margin-right: 16px;
+    margin-right: 0;
   }
 }
 
-.collection-content-wrap {
+.collection-info {
   flex: 1;
 }
 
-.collection-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-h3 {
-  color: theme.$purple_2;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.2;
-  margin: 0;
-  word-break: break-word;
-  flex: 1;
-
-  a {
-    color: inherit;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-
-    &:focus {
-      color: theme.$purple_2;
-    }
-  }
-}
-
-.collection-state-tag {
-  background: theme.$purple_tint;
-  color: theme.$purple_1;
-  border: 1px solid rgba(theme.$purple_1, 0.2);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  white-space: nowrap;
+.collection-banner {
   flex-shrink: 0;
 }
 
-.subtitle {
-  color: #000;
+.collection-status {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  color: theme.$purple_1;
+}
+
+.collection-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.collection-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: theme.$purple_3;
+  margin: 0;
+}
+
+.collection-description {
   font-size: 14px;
-  font-weight: normal;
-  line-height: 20px;
-  margin-bottom: 12px;
+  color: theme.$gray_5;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+  max-width: 600px;
 }
 
 .collections-details-wrap {
@@ -238,8 +243,17 @@ h3 {
 }
 
 
-.mr-16 {
-  margin-right: 16px;
+// Responsive design
+@media (max-width: 768px) {
+  .collections-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+  
+  .collection-description {
+    max-width: none;
+  }
 }
 
 </style>

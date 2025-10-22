@@ -3,6 +3,8 @@
     <div class="collections-header">
       <p class="page-description">
         Browse and manage your collections. Collections help organize and share related datasets.
+
+        Collections can only datasets that have been published using the Pennsieve platform.
       </p>
       
       <div class="header-actions">

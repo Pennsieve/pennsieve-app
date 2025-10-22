@@ -5,6 +5,7 @@ import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconCheck from '@/components/icons/IconCheck.vue'
 import IconKitchenTimer from '@/components/icons/IconKitchenTimer.vue'
+import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
 
 const props = defineProps({
   dialogVisible: {
@@ -289,11 +290,11 @@ function submitProposal() {
       :max-width="900"
       :close-on-click-modal="false"
       :close-on-press-escape="true"
-      :show-close="false"
+      :show-close="true"
       class="proposal-dialog"
     >
       <template #header>
-<!--        <bf-dialog-header title="Submit Dataset Proposal" />-->
+        <bf-dialog-header title="Submit Dataset Proposal" class="dialog-header" />
       </template>
 
       <div class="proposal-content">
@@ -503,6 +504,10 @@ function submitProposal() {
 
 .proposal-content {
   padding: 0;
+}
+
+.dialog-header {
+  margin: 0 0 24px 0;
 }
 
 // Repository Header
@@ -913,6 +918,7 @@ function submitProposal() {
 
 :deep(.el-dialog__header) {
   padding: 20px 24px 0;
+  position: relative;
 }
 
 :deep(.el-dialog__body) {
@@ -1032,4 +1038,5 @@ function submitProposal() {
   padding: 0 0 24px 0;
   margin-top: 24px;
 }
+
 </style>

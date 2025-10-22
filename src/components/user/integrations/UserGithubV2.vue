@@ -26,16 +26,26 @@
         </div>
 
         <div v-else class="github-connected">
-          <p class="github-success-text">
-            You have successfully linked your GitHub Account and installed the
-            Pennsieve Github Application.
-            <a
-              href="https://docs.pennsieve.io/docs/github-integration"
-              target="_blank"
-            >
-              Learn More
-            </a>
-          </p>
+          <div class="github-header">
+            <div class="github-header-content">
+              <p class="github-success-text">
+                You have successfully linked your GitHub Account and installed the
+                Pennsieve Github Application.
+                <a
+                  href="https://docs.pennsieve.io/docs/github-integration"
+                  target="_blank"
+                >
+                  Learn More
+                </a>
+              </p>
+            </div>
+            <div class="github-header-actions">
+              <router-link :to="{ name: 'my-code' }" class="view-repositories-link">
+                View My Repositories
+              </router-link>
+            </div>
+          </div>
+          
           <div class="integration-success">
             <IconGitHub :height="30" :width="30" />
             <a class="link" :href="displayGithubProfile.html_url" target="_blank">
@@ -48,42 +58,6 @@
         </div>
       </div>
 
-      <!-- Repository List (if connected) -->
-      <div v-if="hasGithubProfile && showRepositories" class="repositories-section">
-        <h3>My GitHub Repositories</h3>
-        <p>
-          Repositories can be published publically to Discover and/or to the
-          App Store for users to include as part of analytic pipelines.
-        </p>
-        
-        <div v-if="repoLoading" class="loading">
-          Loading repositories...
-        </div>
-        <div v-else-if="repositories.length > 0" class="repo-list">
-          <div 
-            v-for="repo in repositories" 
-            :key="repo.id" 
-            class="repo-item"
-          >
-            <div class="repo-info">
-              <h4>{{ repo.name }}</h4>
-              <p>{{ repo.description || 'No description' }}</p>
-              <div class="repo-meta">
-                <span class="language">{{ repo.language }}</span>
-                <span class="stars">⭐ {{ repo.stargazers_count }}</span>
-              </div>
-            </div>
-            <div class="repo-actions">
-              <el-button size="small" @click="manageRepo(repo)">
-                Manage
-              </el-button>
-            </div>
-          </div>
-        </div>
-        <div v-else class="no-repos">
-          No repositories found.
-        </div>
-      </div>
 
       <el-dialog 
         v-model="isDeleteDialogVisible" 
@@ -125,10 +99,7 @@ const instance = getCurrentInstance()
 
 const profile = computed(() => store.state.profile)
 const loading = ref(false)
-const repoLoading = ref(false)
 const isDeleteDialogVisible = ref(false)
-const showRepositories = ref(true)
-const repositories = ref([])
 const githubProfile = ref({})
 const oauthWindow = ref(null)
 
@@ -162,10 +133,6 @@ async function initializeGithubData() {
     githubProfile.value = profile.value.githubProfile
   }
   
-  // Load repositories if we have GitHub profile
-  if (hasGithubProfile.value && showRepositories.value) {
-    await fetchRepositories()
-  }
   
   loading.value = false
 }
@@ -207,30 +174,6 @@ async function fetchGithubProfile() {
   }
 }
 
-async function fetchRepositories() {
-  if (!hasGithubProfile.value) return
-  
-  repoLoading.value = true
-  try {
-    const token = await useGetToken()
-    const response = await useSendXhr('https://api2.pennsieve.net/accounts/github/repositories', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    })
-    
-    if (response && Array.isArray(response)) {
-      repositories.value = response
-    }
-  } catch (error) {
-    console.error('Failed to fetch repositories:', error)
-    repositories.value = []
-  } finally {
-    repoLoading.value = false
-  }
-}
 
 function openGitHub() {
   const redirectUri = `${window.location.origin}/github-redirect`
@@ -283,9 +226,6 @@ const messageEventListener = async (event) => {
         store.dispatch('updateProfile', updatedProfile)
         console.log('Updated store with GitHub profile after registration:', response)
 
-        if (showRepositories.value) {
-          await fetchRepositories()
-        }
       } catch (error) {
         console.error('GitHub registration error:', error)
         instance.proxy.$message({
@@ -305,14 +245,13 @@ async function confirmDelete() {
     const token = await useGetToken()
     await useSendXhr('https://api2.pennsieve.net/accounts/github/user', {
       method: "DELETE",
-      headers: {
+      header: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
       }
     })
 
     githubProfile.value = {}
-    repositories.value = []
     isDeleteDialogVisible.value = false
 
     // Update store
@@ -340,16 +279,6 @@ async function confirmDelete() {
   }
 }
 
-function manageRepo(repo) {
-  // Placeholder for repository management functionality
-  instance.proxy.$message({
-    message: `Repository management for ${repo.name} coming soon!`,
-    type: 'info',
-    center: true,
-    duration: 3000,
-    showClose: true
-  })
-}
 </script>
 
 <style scoped lang="scss">
@@ -405,9 +334,42 @@ function manageRepo(repo) {
 
 .github-connected {
   margin: 32px 0;
+}
 
-  .github-success-text {
-    margin-bottom: 16px;
+.github-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 16px;
+
+  .github-header-content {
+    flex: 1;
+    
+    .github-success-text {
+      margin: 0;
+    }
+  }
+
+  .github-header-actions {
+    flex-shrink: 0;
+    
+    .view-repositories-link {
+      color: theme.$purple_2;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        color: theme.$purple_1;
+        text-decoration: underline;
+      }
+      
+      &:active {
+        color: theme.$purple_3;
+      }
+    }
   }
 }
 
@@ -449,73 +411,6 @@ function manageRepo(repo) {
   }
 }
 
-.repositories-section {
-  margin-top: 32px;
-  padding-top: 32px;
-  border-top: 1px solid theme.$gray_2;
-}
-
-.repo-list {
-  margin-top: 16px;
-}
-
-.repo-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  margin-bottom: 12px;
-  background: white;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$purple_3;
-    background: theme.$purple_tint;
-  }
-
-  .repo-info {
-    flex: 1;
-
-    h4 {
-      margin: 0 0 4px 0;
-      font-size: 16px;
-      font-weight: 500;
-      color: theme.$gray_6;
-    }
-
-    p {
-      margin: 0 0 8px 0;
-      font-size: 14px;
-      color: theme.$gray_4;
-    }
-
-    .repo-meta {
-      display: flex;
-      gap: 16px;
-      font-size: 12px;
-      color: theme.$gray_4;
-
-      .language {
-        font-weight: 500;
-      }
-    }
-  }
-
-  .repo-actions {
-    margin-left: 16px;
-  }
-}
-
-.no-repos {
-  text-align: center;
-  color: theme.$gray_4;
-  padding: 32px;
-  background: theme.$gray_1;
-  border-radius: 4px;
-  margin-top: 16px;
-}
 
 // Element Plus dialog styling
 :deep(.el-dialog__header) {
