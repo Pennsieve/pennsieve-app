@@ -13,6 +13,9 @@ import AWSConfig from './utils/aws-exports.js'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
+// Import Element Plus CSS manually to ensure proper theming
+import 'element-plus/dist/index.css'
+
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"
@@ -27,7 +30,8 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+
+
 
 import Pusher from 'pusher-js'
 
@@ -46,8 +50,11 @@ app.directive('click-outside', ClickOutside)
 
 app.use(store);
 
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
+app.use(ElementPlus)
 
+//Import Dashboard
 
 app.use(VueClipboard, {
     autoSetContainer: true,
@@ -66,7 +73,6 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 
-app.use(ElementPlus)
 // In your main.js or App.vue
 window.addEventListener('beforeunload', () => {
     store.dispatch('resetState');
@@ -80,8 +86,6 @@ app.config.globalProperties.$message = ElMessage;
 app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
     cluster: siteConfig.pusherConfig.region
 });
-
-const viewerStore = useViewerStore()
 
 
 // Top level routes allowList
