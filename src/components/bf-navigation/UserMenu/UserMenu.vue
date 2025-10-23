@@ -15,22 +15,30 @@
           v-if="!pageNotFound"
           class="user-menu bf-navigation-item"
           :class="{ active : menuOpen }"
+          :disabled="!isDataLoaded"
           @focus="onUserMenuMouseenter"
           @blur="onUserMenuMouseleave"
           @mouseenter="onUserMenuMouseenter"
           @mouseleave="onUserMenuMouseleave"
         >
 
-          <avatar/>
+          <avatar v-if="isDataLoaded"/>
+          <div v-else class="avatar-circle loading-avatar">
+            <span class="avatar-initials">...</span>
+          </div>
 
           <div class="info">
-            <span id="user-name">
+            <span v-if="isDataLoaded" id="user-name">
               {{ displayName }}
             </span>
-                <span id="organization-name">
+            <span v-else id="user-name" class="loading-text">&nbsp;</span>
+
+            <span v-if="isDataLoaded" id="organization-name">
               {{ organizationName }}
             </span>
-                <span v-if="isWorkspaceGuest" id="workspace-guest">
+            <span v-else id="organization-name" class="loading-text">&nbsp;</span>
+
+            <span v-if="isWorkspaceGuest && isDataLoaded" id="workspace-guest">
               (workspace guest)
             </span>
           </div>
@@ -151,6 +159,15 @@ export default {
     ]),
 
     /**
+     * Check if profile and organization data is loaded
+     * @returns {Boolean}
+     */
+    isDataLoaded: function() {
+      return Object.keys(this.profile).length > 0 &&
+             Object.keys(this.activeOrganization).length > 0
+    },
+
+    /**
        * Checks if route is a 404 page
        * @returns {Boolean}
        */
@@ -203,7 +220,8 @@ export default {
     displayName: function() {
       const firstName = propOr('', 'firstName', this.profile)
       const lastName = propOr('', 'lastName', this.profile)
-      return `${firstName} ${lastName}`;
+      const fullName = `${firstName} ${lastName}`.trim()
+      return fullName || ''
     },
 
     /**
@@ -211,7 +229,7 @@ export default {
      * @returns {String}
      */
     organizationName: function() {
-      return pathOr('----', ['organization', 'name'], this.activeOrganization)
+      return pathOr('', ['organization', 'name'], this.activeOrganization)
     },
 
     isWorkspaceGuest: function() {
@@ -426,5 +444,34 @@ export default {
     margin-top: -4px;
     float: right;
     color: theme.$gray_4;
+  }
+
+  .loading-avatar {
+    background: theme.$gray_3;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: theme.$gray_4;
+  }
+
+  .loading-text {
+    display: block;
+    background: theme.$gray_3;
+    border-radius: 4px;
+    height: 1em;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 </style>

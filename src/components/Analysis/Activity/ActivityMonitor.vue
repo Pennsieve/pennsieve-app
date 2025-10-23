@@ -18,7 +18,7 @@ import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import EventBus from "../../../utils/event-bus";
 
-const { onNodeClick } = useVueFlow();
+const { onNodeClick, onNodeDragStop } = useVueFlow();
 
 /*
 Local State
@@ -30,6 +30,7 @@ const sidePanelVisible = ref(true);
 const isDetailsPanelOpen = ref(false);
 const selectedNode = ref({});
 let intervalId = null;
+const userModifiedPositions = ref(new Map()); // Track user-modified positions
 
 /*
 Global State
@@ -128,20 +129,31 @@ const generateNodesAndEdges = (workflowActivity) => {
   const baseX = 150; // Base X position with slight variation
 
   // Generate nodes
-  const newNodes = processors.map((processor, index) => ({
-    id: `${index + 1}`,
-    type: index === processors.length - 1 ? "output" : "default",
-    data: {
-      label: getLabel(processor, "Processor", index),
-      status: processor.status,
-    },
-    position: {
-      x: baseX + index * 20, // Slight horizontal offset for visual appeal
+  const newNodes = processors.map((processor, index) => {
+    const nodeId = `${index + 1}`;
+
+    // Use user-modified position if it exists, otherwise calculate default position
+    const defaultPosition = {
+      x: baseX + index * 20,
       y: startY + index * nodeSpacing,
-    },
-    class: getClass(workflowActivity, index),
-    selected: selectedProcessor.value.uuid === processor.uuid,
-  }));
+    };
+
+    const position = userModifiedPositions.value.has(nodeId)
+      ? userModifiedPositions.value.get(nodeId)
+      : defaultPosition;
+
+    return {
+      id: nodeId,
+      type: index === processors.length - 1 ? "output" : "default",
+      data: {
+        label: getLabel(processor, "Processor", index),
+        status: processor.status,
+      },
+      position,
+      class: getClass(workflowActivity, index),
+      selected: selectedProcessor.value.uuid === processor.uuid,
+    };
+  });
 
   // Generate edges (connections between consecutive nodes)
   const newEdges = processors.slice(0, -1).map((_, index) => ({
@@ -221,12 +233,19 @@ onBeforeUnmount(() => {
 
 onUnmounted(async () => {
   await store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
+  // Clear user positions when component unmounts
+  userModifiedPositions.value.clear();
 });
 
 /*
 Watch
 */
 watch(selectedWorkflowActivity, (newVal, oldVal) => {
+  // If switching to a different workflow, clear saved positions
+  if (newVal?.uuid !== oldVal?.uuid) {
+    userModifiedPositions.value.clear();
+  }
+
   // Update Nodes and Edges to render processors for selected workflow
   const { nodes: newNodes, edges: newEdges } = generateNodesAndEdges(newVal);
   nodes.value = newNodes;
@@ -261,6 +280,13 @@ onNodeClick(({ node }) => {
     selectedNode.value = selectedApplication;
     openDetailsPanel(selectedApplication);
   }
+});
+
+/*
+Event Handler for Node Drag Stop - Save user-modified positions
+*/
+onNodeDragStop(({ node }) => {
+  userModifiedPositions.value.set(node.id, { ...node.position });
 });
 </script>
 

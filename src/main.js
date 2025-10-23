@@ -73,12 +73,6 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 
-// In your main.js or App.vue
-window.addEventListener('beforeunload', () => {
-    store.dispatch('resetState');
-  });
-
-
 app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
