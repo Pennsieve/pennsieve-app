@@ -66,7 +66,6 @@
               <template #default="scope">
                 <bf-file-label
                   :file="scope.row"
-                  :open-file-button="true"
                   :search-all-data-menu="true"
                   :is-name-link="false"
                   @click-name="onFileLabelClick(scope.row)"

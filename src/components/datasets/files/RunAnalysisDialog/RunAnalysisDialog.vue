@@ -83,7 +83,7 @@
             @change="setSelectedWorkflow(workflowValue)"
           >
             <el-option
-              v-for="(item, i) in workflows"
+              v-for="(item, i) in activeWorkflows"
               :key="i"
               :label="item.label"
               :value="item.name"
@@ -438,6 +438,9 @@ export default {
     },
     stepBackText: function () {
       return this.processStep > 1 ? "Back" : "Cancel";
+    },
+    activeWorkflows: function () {
+      return this.workflows.filter((workflow) => workflow.isActive);
     },
   },
 
@@ -1001,7 +1004,7 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../../styles/theme";
-
+@use "../../../../styles/element/dialog";
 .form-section {
   margin-bottom: 20px;
 

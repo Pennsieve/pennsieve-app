@@ -198,9 +198,9 @@ export default {
      * Compute if viewing at the dataset level
      */
     isAtDataset: function () {
-      const folderId = pathOr("", ["content", "id"], this.currentFolder);
+      const currentFolderId = pathOr("", ["content", "id"], this.currentFolder);
       const datasetId = pathOr("", ["content", "id"], this.dataset);
-      return equals(folderId, datasetId);
+      return equals(currentFolderId, datasetId);
     },
 
     /**
@@ -208,6 +208,7 @@ export default {
      * @returns {Array}
      */
     folders: function () {
+      
       return filter(
         pathEq(["content", "packageType"], "Collection"),
         this.sortedFiles
