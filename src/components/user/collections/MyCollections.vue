@@ -30,9 +30,9 @@
     
     <!-- Create Collection Dialog -->
     <create-collection-dialog
-      :dialog-visible="createDialogVisible"
+      v-model="createDialogVisible"
       @close="hideCreateDialog"
-      @created="onCollectionCreated"
+      @collectionAdded="onCollectionCreated"
     />
   </div>
 </template>

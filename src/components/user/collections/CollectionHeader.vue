@@ -57,10 +57,10 @@
               <template v-else> No Datasets </template>
             </span>
           </div>
-          <div class="status-item">
+          <div v-if="license" class="status-item">
             <IconLicense />
             <span class="status-text">
-              <strong>{{ license }}</strong>
+              <strong>{{ abbreviatedLicense }}</strong>
             </span>
           </div>
           <div class="status-item">
@@ -162,6 +162,31 @@ export default {
     },
     license() {
       return this.collectionDetails?.license || "";
+    },
+    
+    abbreviatedLicense() {
+      const license = this.license;
+      if (!license) return "";
+      
+      // Map full license names to their abbreviations
+      const licenseAbbreviations = {
+        'Community Data License Agreement – Permissive': 'CDLA-Permissive-1.0',
+        'Community Data License Agreement – Sharing': 'CDLA-Sharing-1.0',
+        'Open Data Commons Open Database': 'ODbL',
+        'Open Data Commons Attribution': 'ODC-By',
+        'Open Data Commons Public Domain Dedication and License': 'PDDL',
+        'Creative Commons Zero 1.0 Universal': 'CC-0',
+        'Creative Commons Attribution': 'CC-BY',
+        'Creative Commons Attribution - ShareAlike': 'CC-BY-SA',
+        'Creative Commons Attribution - NonCommercial-ShareAlike': 'CC-BY-NC-SA',
+        'Apache 2.0': 'Apache-2.0',
+        'GNU General Public License v3.0': 'GPL-3.0',
+        'GNU Lesser General Public License': 'LGPL',
+        'MIT': 'MIT',
+        'Mozilla Public License 2.0': 'MPL-2.0'
+      };
+      
+      return licenseAbbreviations[license] || license;
     },
     correspondingContributor() {
       return {

@@ -33,7 +33,7 @@
       <div class="section">
         <div class="section-header">
           <h2>Shared Datasets</h2>
-          <p class="section-description">Shared datasets from external workspaces.</p>
+          <p class="section-description">Coming soon! -- Shared datasets from external workspaces.</p>
         </div>
 
         <div v-if="isLoadingDatasets" class="loading-state" v-loading="isLoadingDatasets">

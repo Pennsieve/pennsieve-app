@@ -116,7 +116,10 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
         description: item.description,
         datasetCount: item.size,
         userRole: item.userRole,
-        banners: item.banners
+        banners: item.banners,
+        tags: item.tags || [],
+        license: item.license || '',
+        state: item.publication?.status?.toLowerCase() || 'draft'
 
       })).reverse() 
       totalCount.value = response.totalCount || 0
@@ -153,8 +156,9 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
           datasets: response.datasets,
           contributors:response.derivedContributors,
           publication: response.publication,
-          // Derive license information from datasets
-          license: deriveLicenseFromDatasets(response.datasets),
+          tags: response.tags || [],
+          // Use license from API response if available, otherwise default to empty string
+          license: response.license || '',
         };
           targetCollectionDatasets.value = transformed;
           
@@ -231,13 +235,15 @@ export const useCollectionsStore = defineStore('collectionsStore', () => {
           },
           body: {
             name: form.name,
-            description: form.description
+            description: form.description,
+            tags: form.tags,
+            license: form.license
           }
         })
       return response;
     }catch(exception){
-      console.error("Edit collection failed", error)
-      throw error;
+      console.error("Edit collection failed", exception)
+      throw exception;
     }
   }
 

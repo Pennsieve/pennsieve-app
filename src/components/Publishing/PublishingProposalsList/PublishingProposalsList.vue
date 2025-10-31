@@ -130,7 +130,7 @@ import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.
 import PublishingProposalsListItem from "./PublishingProposalsListItem.vue";
 import DatasetSortMenu from '../../datasets/DatasetSortMenu/DatasetSortMenu.vue'
 import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
-import RequestSurvey from "../../welcome/request-survey/RequestSurvey.vue";
+import RequestSurvey from "../../user/publishing/ProposalSurvey.vue";
 import ConfirmationDialog from "../../shared/ConfirmationDialog/ConfirmationDialog.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";

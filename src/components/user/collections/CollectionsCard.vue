@@ -15,23 +15,23 @@
         <p class="collection-description">
           {{ collection.description }}
         </p>
+        
         <div class="collections-details-wrap">
           <div class="details">
             <div class="detail">
-              <IconDataset :height="16" :width="16" />
-              <span v-if="collection.datasetCount > 0 && collection.datasetCount !== 1">
-                <strong>{{ formatNumber(collection.datasetCount) }}</strong> Datasets
-              </span>
-              <span v-else-if="collection.datasetCount === 1">
-                <strong>{{ collection.datasetCount }}</strong> Dataset
-              </span>
-              <span v-else>No Datasets</span>
+              <IconFiles :height="14" :width="14" class="detail-icon" />
+              <span class="detail-label">Datasets:</span>
+              <span class="detail-value">{{ formatNumber(collection.datasetCount) }}</span>
             </div>
             <div v-if="collection.state === 'public' && collection.doi" class="detail">
-              <IconStorage :height="16" :width="16" />
-              <span>
-                <strong>DOI: {{ collection.doi }}</strong>
-              </span>
+              <IconLicense :height="14" :width="14" class="detail-icon" />
+              <span class="detail-label">DOI:</span>
+              <span class="detail-value">{{ collection.doi }}</span>
+            </div>
+            <div v-if="collection.tags && collection.tags.length > 0" class="detail">
+              <IconTag :height="14" :width="14" class="detail-icon" />
+              <span class="detail-label">Tags:</span>
+              <span class="detail-value">{{ collection.tags.join(', ') }}</span>
             </div>
           </div>
         </div>
@@ -46,8 +46,9 @@
 
 <script>
 import CollectionsBannerImage from './CollectionsBannerImage.vue'
-import IconDataset from '../../icons/IconDataset.vue'
-import IconStorage from '../../icons/IconStorage.vue'
+import IconFiles from '../../icons/IconFiles.vue'
+import IconTag from '../../icons/IconTag.vue'
+import IconLicense from '../../icons/IconLicense.vue'
 import * as siteConfig from '@/site-config/site.json'
 
 export default {
@@ -55,8 +56,9 @@ export default {
 
   components: {
     CollectionsBannerImage,
-    IconDataset,
-    IconStorage
+    IconFiles,
+    IconTag,
+    IconLicense
   },
 
   props: {
@@ -225,19 +227,33 @@ export default {
   flex-wrap: wrap;
   justify-content: flex-start;
   margin-bottom: 0;
+  gap: 24px;
 
   .detail {
     align-items: center;
     display: flex;
-    padding-right: 20px;
-    color: #404554;
-    font-size: 12px;
-    font-weight: 400;
-    letter-spacing: 0;
+    gap: 6px;
+    font-size: 13px;
     line-height: 16px;
 
-    svg {
-      margin-right: 6px;
+    .detail-icon {
+      color: theme.$gray_4;
+      flex-shrink: 0;
+    }
+
+    .detail-label {
+      color: theme.$gray_4;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: theme.$gray_6;
+    }
+    
+    // Special styling for tags (when it's the third detail item)
+    &:nth-child(3) .detail-value {
+      font-style: italic;
+      color: theme.$purple_2;
     }
   }
 }
