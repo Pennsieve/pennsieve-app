@@ -55,8 +55,8 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: theme.$white;
-  padding: 15px;
+  //color: theme.$white;
+  //padding: 15px;
 }
 .tabs {
   bottom: -25px;

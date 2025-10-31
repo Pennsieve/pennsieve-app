@@ -1,14 +1,12 @@
 <template>
   <svg
-    v-show="isVisible"
     xmlns="http://www.w3.org/2000/svg"
     :width="width"
     :height="height"
-    viewBox="0 0 6 10"
     :fill="color"
+    viewBox="0 0 24 24"
   >
-    <path pid="0" d="M1 10c-.3 0-.5-.1-.7-.3-.4-.4-.4-1 0-1.4L3.6 5 .3 1.7C-.1 1.3-.1.7.3.3s1-.4 1.4 0l4 4c.4.4.4 1 0 1.4l-4 4c-.2.2-.4.3-.7.3z"/>
-
+    <path d="M9.29 15.88L13.17 12 9.29 8.12c-.39-.39-.39-1.02 0-1.41.39-.39 1.02-.39 1.41 0l4.59 4.59c.39.39.39 1.02 0 1.41L10.7 17.3c-.39.39-1.02.39-1.41 0-.38-.39-.39-1.03 0-1.42z"/>
   </svg>
 </template>
 
@@ -18,30 +16,16 @@ export default {
   props: {
     width: {
       type: Number,
-      default: 16,
+      default: 24,
     },
     height: {
       type: Number,
-      default: 16,
+      default: 24,
     },
     color: {
       type: String,
       default: "currentColor",
     },
-    isVisible: {
-      type: Boolean,
-      default: true,
-    }
   },
 };
 </script>
-
-<style scoped lang="scss">
-  .svg-flip {
-    transform: rotate(0deg) scaleX(-1);
-  }
-
-</style>
-
-
-

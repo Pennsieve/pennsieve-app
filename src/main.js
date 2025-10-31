@@ -113,6 +113,24 @@ const allowList = [
     'create-account'
 ]
 
+// Routes that don't require organization context
+const userRoutes = [
+    'publishing',
+    'my-workspace',
+    'my-settings',
+    'user-profile',
+    'user-orcid',
+    'user-github',
+    'user-api',
+    'data-publishing',
+    'data-publishing-dashboard',
+    'open-repositories',
+    'dataset-proposals',
+    'my-workspaces',
+    'my-repositories',
+    'shared-with-me'
+]
+
 router.beforeEach(async (to, from, next) => {
 
     // ==== CHECK FOR TOKEN ====
@@ -127,6 +145,10 @@ router.beforeEach(async (to, from, next) => {
     }
 
     const savedOrgId = Cookies.get('preferred_org_id')
+    
+    // Check if this is a user-specific route (no organization context needed)
+    const isUserRoute = userRoutes.indexOf(to.name) >= 0
+    
     if (to.name === 'home' && token && savedOrgId) {
         // Special case for 'home' page; if previously logged in, and session stored, then
         // forward to dataset listing page for the organization.
@@ -135,9 +157,17 @@ router.beforeEach(async (to, from, next) => {
     } else if (allowList.indexOf(to.name) >= 0) {
         // ==== Support Unauthenticated Access for AllowList Routes including 'home' ====
         next()
+    } else if (isUserRoute) {
+        // ==== USER-SPECIFIC ROUTES (no org context needed) ====
+        // Only get Profile if not already fetched
+        if (Object.keys(store.getters.profile).length === 0) {
+            await useGetProfileAndOrg(store)
+                .catch(err => useHandleXhrError(err))
+        }
+        next()
     } else {
 
-        // ==== GOING TO AUTHENTICATED PAGE ====
+        // ==== GOING TO AUTHENTICATED PAGE WITH ORG CONTEXT ====
         // ==== GET PROFILE/ORGS AND CHECK PREFERRED ORG ====
         // ==== Only get Profile and Workspaces if they have not been fetched before ====
         if (Object.keys(store.getters.profile).length  === 0) {
@@ -227,7 +257,6 @@ async function getPrimaryData() {
                 store.dispatch('updateOrgDatasetStatuses', resp)
             }).catch(err => useHandleXhrError(err))
 
-        const collectionsPromise = store.dispatch('collectionsModule/fetchCollections')
 
         return Promise.all(
             [
@@ -236,7 +265,6 @@ async function getPrimaryData() {
                 contributorPromise,
                 dataUseAgreementPromise,
                 datasetStatusPromise,
-                collectionsPromise
             ])
     })
 }
