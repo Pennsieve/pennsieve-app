@@ -74,13 +74,11 @@ import DatasetActivityDetail from '../DatasetActivity/DatasetActivityDetail/Data
 
 import formatDateRange from '../../../mixins/format-date'
 import { ChangelogMessage } from '../../../utils/constants'
-import RequestSurvey from "../../welcome/request-survey/RequestSurvey.vue";
 
 export default {
   name: 'DatasetActivityDialog',
 
   components: {
-    RequestSurvey,
     BfButton,
     BfDialogHeader,
     DialogBody,
