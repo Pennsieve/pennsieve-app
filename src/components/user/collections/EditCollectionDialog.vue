@@ -142,7 +142,7 @@ watch(
     if (newVal) {
       form.value.name = newVal.name || "";
       form.value.description = newVal.description || "";
-      form.value.tags = newVal.tags || [];
+      form.value.tags = [...(newVal.tags || [])];
       form.value.license = newVal.license || "";
     }
   },
