@@ -73,7 +73,7 @@
               {{ stateButtonText }}
             </div>
           </div>
-          <div v-if="publicationData" class="status-item">
+          <div v-if="version" class="status-item">
             <div>
               <a :href="discoverLink" target="_blank">View Latest</a>
             </div>
