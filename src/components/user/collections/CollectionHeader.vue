@@ -9,10 +9,15 @@
         </div>
 
         <!-- Collection Authors -->
-        <div v-if="collectionContributors && collectionContributors.length > 0" class="collection-authors">
+        <div
+          v-if="collectionContributors && collectionContributors.length > 0"
+          class="collection-authors"
+        >
           <div
             v-for="(contributor, idx) in collectionContributors"
-            :key="`${contributor.firstName}-${contributor.lastName}-${contributor.orcid || idx}`"
+            :key="`${contributor.firstName}-${contributor.lastName}-${
+              contributor.orcid || idx
+            }`"
             class="contributor-item-wrap"
           >
             <contributor-item :contributor="contributor" />
@@ -68,11 +73,9 @@
               {{ stateButtonText }}
             </div>
           </div>
-          <div v-if="version" class="status-item">
+          <div v-if="publicationData" class="status-item">
             <div>
-              <a :href="discoverLink" target="_blank">{{
-                "Version " + version
-              }}</a>
+              <a :href="discoverLink" target="_blank">View Latest</a>
             </div>
           </div>
         </div>
@@ -163,29 +166,30 @@ export default {
     license() {
       return this.collectionDetails?.license || "";
     },
-    
+
     abbreviatedLicense() {
       const license = this.license;
       if (!license) return "";
-      
+
       // Map full license names to their abbreviations
       const licenseAbbreviations = {
-        'Community Data License Agreement – Permissive': 'CDLA-Permissive-1.0',
-        'Community Data License Agreement – Sharing': 'CDLA-Sharing-1.0',
-        'Open Data Commons Open Database': 'ODbL',
-        'Open Data Commons Attribution': 'ODC-By',
-        'Open Data Commons Public Domain Dedication and License': 'PDDL',
-        'Creative Commons Zero 1.0 Universal': 'CC-0',
-        'Creative Commons Attribution': 'CC-BY',
-        'Creative Commons Attribution - ShareAlike': 'CC-BY-SA',
-        'Creative Commons Attribution - NonCommercial-ShareAlike': 'CC-BY-NC-SA',
-        'Apache 2.0': 'Apache-2.0',
-        'GNU General Public License v3.0': 'GPL-3.0',
-        'GNU Lesser General Public License': 'LGPL',
-        'MIT': 'MIT',
-        'Mozilla Public License 2.0': 'MPL-2.0'
+        "Community Data License Agreement – Permissive": "CDLA-Permissive-1.0",
+        "Community Data License Agreement – Sharing": "CDLA-Sharing-1.0",
+        "Open Data Commons Open Database": "ODbL",
+        "Open Data Commons Attribution": "ODC-By",
+        "Open Data Commons Public Domain Dedication and License": "PDDL",
+        "Creative Commons Zero 1.0 Universal": "CC-0",
+        "Creative Commons Attribution": "CC-BY",
+        "Creative Commons Attribution - ShareAlike": "CC-BY-SA",
+        "Creative Commons Attribution - NonCommercial-ShareAlike":
+          "CC-BY-NC-SA",
+        "Apache 2.0": "Apache-2.0",
+        "GNU General Public License v3.0": "GPL-3.0",
+        "GNU Lesser General Public License": "LGPL",
+        MIT: "MIT",
+        "Mozilla Public License 2.0": "MPL-2.0",
       };
-      
+
       return licenseAbbreviations[license] || license;
     },
     correspondingContributor() {
@@ -199,6 +203,7 @@ export default {
       return this.collectionDetails?.publication?.publishedDataset;
     },
     version() {
+      //this version does not reflect latests
       return this.publicationData?.version;
     },
     discoverLink() {
@@ -211,12 +216,11 @@ export default {
 
       if (pd?.id && pd?.version) {
         return this.config.environment === "prod"
-          ? `https://discover.pennsieve.io/collections/${pd.id}/version/${pd.version}`
-          : `https://discover.pennsieve.net/collections/${pd.id}/version/${pd.version}`;
+          ? `https://discover.pennsieve.io/collections/${pd.id}` ///version/${pd.version}`
+          : `https://discover.pennsieve.net/collections/${pd.id}`; ///version/${pd.version}`;
       }
     },
     publishedDateText() {
-      // Optional: show "Published on" in the header stats
       const iso = this.publishedDataset?.lastPublishedDate;
       if (!iso) return null;
       try {
@@ -394,7 +398,7 @@ export default {
   font-size: 14px;
   line-height: 24px;
   margin-bottom: 16px;
-  
+
   .contributor-item-wrap {
     display: inline-flex;
     margin-right: 4px;

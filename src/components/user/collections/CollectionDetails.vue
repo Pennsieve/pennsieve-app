@@ -214,28 +214,36 @@ const siteUrl = computed(() => {
 
 const collectionContributors = computed(() => {
   // Get derivedContributors from the collection data
-  const contributors = collection.value?.contributors || collection.value?.derivedContributors || [];
-  
+  const contributors =
+    collection.value?.contributors ||
+    collection.value?.derivedContributors ||
+    [];
+
   // Remove duplicates based on ORCID (if present) or name combination
-  const uniqueContributors = contributors.reduce((unique: any[], contributor: any) => {
-    const existing = unique.find(c => {
-      // If both have ORCID, use that for comparison
-      if (c.orcid && contributor.orcid) {
-        return c.orcid === contributor.orcid;
+  const uniqueContributors = contributors.reduce(
+    (unique: any[], contributor: any) => {
+      const existing = unique.find((c) => {
+        // If both have ORCID, use that for comparison
+        if (c.orcid && contributor.orcid) {
+          return c.orcid === contributor.orcid;
+        }
+        // Otherwise, compare by name
+        return (
+          c.firstName === contributor.firstName &&
+          c.lastName === contributor.lastName &&
+          c.middleInitial === contributor.middleInitial
+        );
+      });
+
+      if (!existing) {
+        unique.push(contributor);
       }
-      // Otherwise, compare by name
-      return c.firstName === contributor.firstName && 
-             c.lastName === contributor.lastName &&
-             c.middleInitial === contributor.middleInitial;
-    });
-    
-    if (!existing) {
-      unique.push(contributor);
-    }
-    
-    return unique;
-  }, []);
-  
+
+      return unique;
+    },
+    []
+  );
+
   return uniqueContributors;
 });
 
@@ -385,7 +393,6 @@ function onCollectionUpdated(updated: any) {
   letter-spacing: 0.5px;
   margin-top: 32px;
 }
-
 
 .datasets-list {
   .mb-16 {

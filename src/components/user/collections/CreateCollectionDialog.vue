@@ -19,7 +19,7 @@
           <el-input
             v-model="form.name"
             placeholder="Enter collection name"
-            maxlength="255"
+            maxlength="150"
             @keyup.enter="submit"
           />
         </el-form-item>
