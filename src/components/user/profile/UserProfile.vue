@@ -1,31 +1,31 @@
 <script setup>
-import { ref, computed, onMounted, watch, getCurrentInstance } from 'vue'
-import { useRoute } from 'vue-router'
-import { useStore } from 'vuex'
-import DegreeSelect from '@/components/shared/DegreeSelect.vue'
-import { useGetToken } from '@/composables/useGetToken'
-import { useSendXhr } from '@/mixins/request/request_composable'
-import * as siteConfig from '@/site-config/site.json'
+import { ref, computed, onMounted, watch, getCurrentInstance } from "vue";
+import { useRoute } from "vue-router";
+import { useStore } from "vuex";
+import DegreeSelect from "@/components/shared/DegreeSelect.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
+import * as siteConfig from "@/site-config/site.json";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
-const store = useStore()
-const route = useRoute()
-const instance = getCurrentInstance()
+const store = useStore();
+const route = useRoute();
+const instance = getCurrentInstance();
 
 // Remove the navigation states since we're removing the left menu
 
-const userId = computed(() => route.params.userId)
-const userProfile = computed(() => store.state.profile)
+const userId = computed(() => route.params.userId);
+const userProfile = computed(() => store.state.profile);
 
 // Profile form setup
-const profileFormRef = ref(null)
+const profileFormRef = ref(null);
 const ruleForm = ref({
   firstName: "",
   middleInitial: "",
   lastName: "",
   credential: "",
   degree: null,
-})
+});
 
 const rules = ref({
   firstName: [
@@ -42,15 +42,19 @@ const rules = ref({
       trigger: "blur",
     },
   ],
-})
+});
 
 onMounted(() => {
-  setRuleFormData(store.state.profile)
-})
+  setRuleFormData(store.state.profile);
+});
 
-watch(() => store.state.profile, (newProfile) => {
-  setRuleFormData(newProfile)
-}, { deep: true })
+watch(
+  () => store.state.profile,
+  (newProfile) => {
+    setRuleFormData(newProfile);
+  },
+  { deep: true }
+);
 
 function setRuleFormData(profile) {
   if (!profile) {
@@ -69,47 +73,49 @@ function setRuleFormData(profile) {
 
 // Profile update functionality
 async function handleUpdateProfileSubmit() {
+  console.log("here");
   if (!profileFormRef.value) return;
-  
+
   try {
-    const valid = await profileFormRef.value.validate()
+    const valid = await profileFormRef.value.validate();
     if (!valid) {
       return;
     }
 
-    const token = await useGetToken()
-    const profileUrl = `${siteConfig.apiUrl}/user?api_key=${token}`
+    const token = await useGetToken();
+    const profileUrl = `${siteConfig.apiUrl}/user?api_key=${token}`;
 
     await useSendXhr(profileUrl, {
       method: "PUT",
       body: {
         ...ruleForm.value,
-      }
-    })
+      },
+    });
 
-    // Update the store with new profile data
-    store.dispatch('updateProfile', { ...store.state.profile, ...ruleForm.value })
-    
+    await store.dispatch("updateProfile", {
+      ...store.state.profile,
+      ...ruleForm.value,
+    });
+
     // Show success notification using the app's message system
     instance.proxy.$message({
-      message: 'Your profile has been updated successfully',
-      type: 'success',
+      message: "Your profile has been updated successfully",
+      type: "success",
       center: true,
       duration: 3000,
-      showClose: true
-    })
-    
+      showClose: true,
+    });
   } catch (error) {
-    console.error('Error updating profile:', error)
-    
+    console.error("Error updating profile:", error);
+
     // Show error notification using the app's message system
     instance.proxy.$message({
-      message: error.message || 'Failed to update profile. Please try again.',
-      type: 'error',
+      message: error.message || "Failed to update profile. Please try again.",
+      type: "error",
       center: true,
       duration: 5000,
-      showClose: true
-    })
+      showClose: true,
+    });
   }
 }
 </script>
@@ -119,7 +125,9 @@ async function handleUpdateProfileSubmit() {
     <div class="profile-content">
       <h2>Update your user profile</h2>
       <div class="author-note">
-        Your profile is used to generate the dataset reference when datasets are published. Make sure your profile matches how you want to be cited in any dataset publication.
+        Your profile is used to generate the dataset reference when datasets are
+        published. Make sure your profile matches how you want to be cited in
+        any dataset publication.
       </div>
       <el-form
         id="update-profile-form"
@@ -159,7 +167,7 @@ async function handleUpdateProfileSubmit() {
 </template>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .user-profile-container {
   padding: 40px;
