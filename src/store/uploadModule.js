@@ -29,7 +29,7 @@ const initialState = () => ({
     savedDatasetId:"",
     manifestFiles: [],
     uploadFileMap: new Map(),
-    uploadDestination: '',
+    uploadDestination: {},
     identityCreds: {},
     isUploading: false,
     uploadComplete: false,
@@ -59,8 +59,7 @@ const helpers = {
                     prepend(rootNode),
                     map(ancestor => {
                         return ancestor.content.name
-                    }),
-                    reverse()
+                    })
                 )(ancestors)
             }
 
@@ -127,7 +126,7 @@ export const mutations = {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
         state.uploadProgress = {total: 0, loaded:0}
-        state.uploadDestination = ''
+        state.uploadDestination = {}
         state.isUploading = false
         state.uploadComplete = false
     }
@@ -408,7 +407,6 @@ export const actions = {
             const s3Key = state.manifestNodeId + '/' + uploadId
 
             const curFile = state.manifestFiles[mf]
-
             let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length-curFile.name.length)
             fileLocation = fileLocation.replace(/^\//, '') // remove leading '/' if it exists
             fileLocation = fileLocation.replace(/\/$/, '') // remove trailing '/' if it exists
