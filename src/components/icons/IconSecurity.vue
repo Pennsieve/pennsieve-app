@@ -1,0 +1,31 @@
+<template>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    :width="width"
+    :height="height"
+    :fill="color"
+    viewBox="0 0 24 24"
+  >
+    <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.6 14.8,10V11C15.4,11 16,11.4 16,12V16C16,16.6 15.6,17 15,17H9C8.4,17 8,16.6 8,16V12C8,11.4 8.4,11 9,11V10C9,8.6 10.6,7 12,7M12,8.2C11.2,8.2 10.2,9.2 10.2,10V11H13.8V10C13.8,9.2 12.8,8.2 12,8.2Z"/>
+  </svg>
+</template>
+
+<script>
+export default {
+  name: "IconSecurity",
+  props: {
+    width: {
+      type: Number,
+      default: 24,
+    },
+    height: {
+      type: Number,
+      default: 24,
+    },
+    color: {
+      type: String,
+      default: "currentColor",
+    },
+  },
+};
+</script>

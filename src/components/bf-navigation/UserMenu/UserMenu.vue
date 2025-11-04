@@ -225,11 +225,18 @@ export default {
     },
 
     /**
-     * Compute active organization name
+     * Compute active organization name or user email for my-workspace
      * @returns {String}
      */
     organizationName: function() {
-      return pathOr('', ['organization', 'name'], this.activeOrganization)
+      // Check if we're in my-workspace (no active organization)
+      const orgId = pathOr('', ['organization', 'id'], this.activeOrganization)
+      if (!orgId || orgId === '') {
+        // Return user email when in my-workspace
+        return propOr('', 'email', this.profile)
+      }
+      // Return organization name when in an organization
+      return pathOr('----', ['organization', 'name'], this.activeOrganization)
     },
 
     isWorkspaceGuest: function() {
