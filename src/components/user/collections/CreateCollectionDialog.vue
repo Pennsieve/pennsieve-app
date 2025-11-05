@@ -128,6 +128,7 @@ import { ref, reactive, computed, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import { useCollectionsStore } from "@/stores/collectionStore";
+import { useStore } from "vuex";
 import licenses from "../../datasets/settings/dataset-licenses";
 import IconLicense from "../../icons/IconLicense.vue";
 import IconTag from "../../icons/IconTag.vue";
@@ -140,7 +141,6 @@ import orgTagMap from "./orgMap.js";
  */
 const props = defineProps<{
   modelValue: boolean;
-  orgs?: Array<any>;
 }>();
 
 const emit = defineEmits<{
@@ -151,6 +151,8 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const store = useCollectionsStore();
+const vstore = useStore();
+const orginizations = computed(() => vstore.state.organizations);
 
 // Bridge to v-model
 const visible = computed({
@@ -200,12 +202,14 @@ const isSubmitDisabled = computed(() => {
 });
 
 // Suggested workspace tags from orgs
-const workspaceTags = computed<string[]>(() => {
-  const arr = (props.orgs || [])
-    .map((o: any) => orgTagMap.get(o?.organization?.id))
-    .filter(Boolean);
-  return Array.from(new Set(arr));
-});
+const workspaceTags = computed(() => [
+  ...new Set(
+    orginizations.value
+      .map((o) => orgTagMap.get(o.organization.id))
+      .filter(Boolean)
+  ),
+]);
+
 const isTagSelected = (tag: string) => form.tagsList.includes(tag);
 
 // Tag input
