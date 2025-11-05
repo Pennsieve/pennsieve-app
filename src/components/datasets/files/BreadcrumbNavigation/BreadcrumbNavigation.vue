@@ -32,21 +32,6 @@
 
       </el-dropdown>
 
-<!--      <span>Files <IconArrowRight-->
-<!--        class="breadcrumb-caret"-->
-<!--        :height="10"-->
-<!--        :width="10"-->
-<!--      /> </span>-->
-<!--      <span v-for="p in breadcrumbs.slice().reverse()">-->
-<!--        {{p.content.name}}-->
-<!--        <IconArrowRight-->
-<!--          class="breadcrumb-caret"-->
-<!--          :height="10"-->
-<!--          :width="10"-->
-<!--        />-->
-<!--      </span>-->
-
-
       <span>
         <IconArrowRight
           class="breadcrumb-caret"
@@ -94,7 +79,7 @@ export default {
      * @returns {Array}
      */
     breadcrumbs: function() {
-      return defaultTo([], this.ancestors).reverse()
+      return JSON.parse(JSON.stringify(defaultTo([], this.ancestors))).reverse()
     }
   },
 

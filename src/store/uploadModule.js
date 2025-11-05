@@ -29,7 +29,7 @@ const initialState = () => ({
     savedDatasetId:"",
     manifestFiles: [],
     uploadFileMap: new Map(),
-    uploadDestination: '',
+    uploadDestination: {},
     identityCreds: {},
     isUploading: false,
     uploadComplete: false,
@@ -59,8 +59,7 @@ const helpers = {
                     prepend(rootNode),
                     map(ancestor => {
                         return ancestor.content.name
-                    }),
-                    reverse()
+                    })
                 )(ancestors)
             }
 
@@ -127,7 +126,7 @@ export const mutations = {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
         state.uploadProgress = {total: 0, loaded:0}
-        state.uploadDestination = ''
+        state.uploadDestination = {}
         state.isUploading = false
         state.uploadComplete = false
     }
