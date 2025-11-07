@@ -21,13 +21,13 @@
                 <i class="el-icon-loading"></i> Searching...
               </template>
               <template v-else>
-                <i class="el-icon-search"></i> Search
+                <i class="el-icon-search"></i> Create View
               </template>
             </bf-button>
 
             <!-- Clear All Button -->
             <bf-button
-              class="secondary mr-8"
+              class="secondary mr-8 flex"
               @click="clearAllQueries"
             >
               Clear All
@@ -38,47 +38,10 @@
               class="collapse-btn"
               @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"
             >
-              <span v-if="isQuerySectionCollapsed">Show Filters</span>
-              <span v-else>Hide Filters</span>
+              <span v-if="isQuerySectionCollapsed">Show Query Builder</span>
+              <span v-else>Hide Query Builder</span>
             </bf-button>
           </template>
-<!--          <ps-button-dropdown-->
-<!--            @click="toggleActionDropdown"-->
-<!--            :menu-open="!quickActionsVisible"-->
-<!--          >-->
-<!--            <template #buttons>-->
-<!--              &lt;!&ndash; Search Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button primary"-->
-<!--                :disabled="!canExecuteQuery"-->
-<!--                @click="executeQuery"-->
-<!--              >-->
-<!--                <template v-if="loading">-->
-<!--                  <i class="el-icon-loading"></i> Searching...-->
-<!--                </template>-->
-<!--                <template v-else>-->
-<!--                  <i class="el-icon-search"></i> Search-->
-<!--                </template>-->
-<!--              </bf-button>-->
-
-<!--              &lt;!&ndash; Clear All Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button secondary"-->
-<!--                @click="clearAllQueries"-->
-<!--              >-->
-<!--                Clear All-->
-<!--              </bf-button>-->
-<!--              -->
-<!--              &lt;!&ndash; Collapse Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button collapse-btn"-->
-<!--                @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"-->
-<!--              >-->
-<!--                <span v-if="isQuerySectionCollapsed">Show Filters</span>-->
-<!--                <span v-else>Hide Filters</span>-->
-<!--              </bf-button>-->
-<!--            </template>-->
-<!--          </ps-button-dropdown>-->
         </template>
       </stage-actions>
     </template>
@@ -108,7 +71,7 @@
             class="btn-add-filter"
             @click="addFilter"
           >
-            + Add Filter
+            + Add Query
           </button>
 
           <!-- Record Limit Dropdown -->
@@ -504,72 +467,77 @@ const executeQuery = async () => {
   
   loading.value = true
   try {
-    
-    // Group filters by model for optimization
-    const filtersByModel = new Map()
-    
-    queryFilters.value
+    // Create one API call per MultiModelFilter instance
+    const queryPromises = queryFilters.value
       .filter(filter => filter.model) // Only process filters with a model selected
-      .forEach(filter => {
-        if (!filtersByModel.has(filter.model)) {
-          filtersByModel.set(filter.model, [])
-        }
-        filtersByModel.get(filter.model).push(filter)
-      })
-    
-    
-    // Prepare query promises - one per unique model
-    const queryPromises = Array.from(filtersByModel.entries()).map(async ([modelId, filters]) => {
-      try {
-        let options = { limit: recordLimit.value }
-        let combinedFilters = []
-        let hasValidFilters = false
-        
-        // Collect all valid filters for this model
-        filters.forEach(filter => {
-          if (filter.property && filter.operator && filter.value) {
-            const filterPredicate = {
-              property: `/${filter.property}`, // JSON Pointer format
-              operator: filter.operator,
-              value: parseValue(filter.value, filter.operator, filter.property, filter.modelProperties)
+      .map(async (multiModelFilter, index) => {
+        try {
+          let options = { limit: recordLimit.value }
+          
+          // Handle multiple filters within each MultiModelFilter
+          if (multiModelFilter.hasMultipleFilters && multiModelFilter.subFilters) {
+            // MultiModelFilter has multiple sub-filters
+            const validSubFilters = multiModelFilter.subFilters.filter(subFilter => 
+              subFilter.property && subFilter.operator && subFilter.value
+            )
+            
+            if (validSubFilters.length === 0) {
+              // No valid filters - fetch all records for the model (don't set options.filter)
+              console.log(`No valid sub-filters for model ${multiModelFilter.model}, fetching all records`)
+            } else if (validSubFilters.length === 1) {
+              // Single sub-filter - use it directly
+              const subFilter = validSubFilters[0]
+              options.filter = {
+                property: `/${subFilter.property}`,
+                operator: subFilter.operator,
+                value: parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties)
+              }
+            } else {
+              // Multiple sub-filters - combine with the logical operator using the correct API format
+              const subFilterPredicates = validSubFilters.map(subFilter => ({
+                property: `/${subFilter.property}`,
+                operator: subFilter.operator,
+                value: parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties)
+              }))
+              
+              // Use the logical operator as the key (and/or)
+              const logicalOp = multiModelFilter.logicalOperator || 'and'
+              options.filter = {
+                [logicalOp]: subFilterPredicates
+              }
             }
-            combinedFilters.push(filterPredicate)
-            hasValidFilters = true
-          }
-        })
-        
-        // Apply combined filters if any exist
-        if (hasValidFilters) {
-          if (combinedFilters.length === 1) {
-            // Single filter - use it directly
-            options.filter = combinedFilters[0]
           } else {
-            // Multiple filters - combine with OR logic for broader results
-            options.filter = {
-              operator: 'or',
-              filters: combinedFilters
+            // Single filter (legacy format or single filter in new format)
+            if (multiModelFilter.property && multiModelFilter.operator && multiModelFilter.value) {
+              options.filter = {
+                property: `/${multiModelFilter.property}`,
+                operator: multiModelFilter.operator,
+                value: parseValue(multiModelFilter.value, multiModelFilter.operator, multiModelFilter.property, multiModelFilter.modelProperties)
+              }
+            } else {
+              // No valid single filter - fetch all records for the model (don't set options.filter)
+              console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
             }
           }
-        } else {
+          
+          const response = await metadataStore.fetchRecords(props.datasetId, multiModelFilter.model, options)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: response.records || [],
+            multiModelFilter: multiModelFilter
+          }
+        } catch (error) {
+          console.error(`Query error for MultiModelFilter ${index} (model ${multiModelFilter.model}):`, error)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: [],
+            multiModelFilter: multiModelFilter,
+            error: error
+          }
         }
-        
-        const response = await metadataStore.fetchRecords(props.datasetId, modelId, options)
-        return {
-          modelId: modelId,
-          records: response.records || [],
-          filters: filters,
-          combinedFilterCount: combinedFilters.length
-        }
-      } catch (error) {
-        console.error(`Query error for model ${modelId}:`, error)
-        return {
-          modelId: modelId,
-          records: [],
-          filters: filters,
-          error: error
-        }
-      }
-    })
+      })
     
     // Execute all queries in parallel
     const results = await Promise.all(queryPromises)
@@ -577,22 +545,20 @@ const executeQuery = async () => {
     // Combine and display results
     const allRecords = []
     let errorCount = 0
-    let totalApiCalls = results.length
-    let totalOriginalFilters = queryFilters.value.filter(f => f.model).length
+    let successfulCalls = 0
     
     results.forEach(result => {
       if (result.error) {
         errorCount++
+        console.warn(`MultiModelFilter ${result.multiModelFilterIndex} failed:`, result.error)
       } else {
         allRecords.push(...result.records)
+        successfulCalls++
       }
     })
     
-    
     if (errorCount > 0) {
-      ElMessage.warning(`${errorCount} queries failed, showing results from successful queries`)
-    } else if (totalApiCalls < totalOriginalFilters) {
-      ElMessage.success(`Query optimized: ${totalOriginalFilters} filters executed as ${totalApiCalls} API calls`)
+      ElMessage.warning(`${errorCount} queries failed, showing results from ${successfulCalls} successful queries`)
     }
     
     displayQueryResults(allRecords)
@@ -769,9 +735,7 @@ const expandNode = async (nodeId) => {
     if (currentLayout.value === 'Force') {
       await startBackgroundForceSimulation()
     }
-    
-    ElMessage.success(`Expanded node: added ${limitedRelationships.length} relationships and ${limitedPackages.length} files`)
-    
+
   } catch (error) {
     console.error('❌ Error expanding node:', error)
     ElMessage.error(`Failed to expand node: ${error.message}`)
