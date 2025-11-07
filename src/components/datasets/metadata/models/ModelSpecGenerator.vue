@@ -118,12 +118,12 @@ const propertyForm = ref({
 
 // Property types with format support
 const propertyTypes = [
-  { value: 'string', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'integer', label: 'Integer' },
-  { value: 'boolean', label: 'True/False' },
-  { value: 'array', label: 'List' },
-  { value: 'object', label: 'Object' }
+  { value: 'string', label: 'Text', description: 'Text data with optional format validation' },
+  { value: 'number', label: 'Number', description: 'Decimal numbers (e.g., 3.14, 42.0)' },
+  { value: 'integer', label: 'Integer', description: 'Whole numbers only (e.g., 1, 42, 100)' },
+  { value: 'boolean', label: 'True/False', description: 'Boolean values (true or false)' },
+  { value: 'array', label: 'Array', description: 'List of values' },
+  { value: 'object', label: 'Object', description: 'Nested object with properties' }
 ]
 
 const stringFormats = [

@@ -28,6 +28,14 @@ const props = defineProps({
   datasetId: {
     type: String,
     required: true
+  },
+  enableAutocomplete: {
+    type: Boolean,
+    default: true
+  },
+  hideEmptyModelSelector: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -53,7 +61,7 @@ const autocompleteState = ref({
   error: null
 })
 
-// Available operators by property type (same as RecordFilterStyled)
+// Available operators by property type - optimized for PostgreSQL JSON querying
 const operatorsByType = {
   string: [
     { value: '=', label: 'equals' },
@@ -85,8 +93,8 @@ const operatorsByType = {
     { value: 'in', label: 'in list' }
   ],
   boolean: [
-    { value: '=', label: 'equals' },
-    { value: '!=', label: 'not equals' }
+    { value: '=', label: 'is' },
+    { value: '!=', label: 'is not' }
   ],
   array: [
     { value: 'contains', label: 'contains' },
@@ -95,6 +103,27 @@ const operatorsByType = {
     { value: 'length=', label: 'length equals' },
     { value: 'length<', label: 'length less than' },
     { value: 'length>', label: 'length greater than' }
+  ],
+  // Date/datetime specific operators - more semantic for temporal queries
+  date: [
+    { value: '=', label: 'on' },
+    { value: '!=', label: 'not on' },
+    { value: '<', label: 'before' },
+    { value: '<=', label: 'on or before' },
+    { value: '>', label: 'after' },
+    { value: '>=', label: 'on or after' },
+    { value: 'between', label: 'between dates' },
+    { value: 'in', label: 'on dates' }
+  ],
+  datetime: [
+    { value: '=', label: 'at' },
+    { value: '!=', label: 'not at' },
+    { value: '<', label: 'before' },
+    { value: '<=', label: 'at or before' },
+    { value: '>', label: 'after' },
+    { value: '>=', label: 'at or after' },
+    { value: 'between', label: 'between times' },
+    { value: 'in', label: 'at times' }
   ]
 }
 
@@ -141,19 +170,109 @@ const filteredModels = computed(() => {
   )
 })
 
+// Extract nested properties from JSON schema using dot notation
+const extractNestedProperties = (schema, prefix = '', maxDepth = 5, currentDepth = 0) => {
+  const properties = []
+  
+  if (!schema || !schema.properties || currentDepth >= maxDepth) {
+    if (currentDepth >= maxDepth) {
+      console.log('🔄 Max depth reached at level', currentDepth, 'for prefix:', prefix)
+    }
+    return properties
+  }
+  
+  console.log('🔍 Extracting properties at depth', currentDepth, 'prefix:', prefix, 'properties:', Object.keys(schema.properties))
+  
+  Object.entries(schema.properties).forEach(([key, propertySchema]) => {
+    const fullPath = prefix ? `${prefix}.${key}` : key
+    const displayName = propertySchema.title || key
+    const fullDisplayName = prefix ? `${prefix.replace(/\./g, ' → ')} → ${displayName}` : displayName
+    
+    // Add the current property
+    properties.push({
+      name: fullPath,
+      display_name: fullDisplayName,
+      type: Array.isArray(propertySchema.type) ? propertySchema.type[0] : propertySchema.type || 'string',
+      format: propertySchema.format || '',
+      description: propertySchema.description || '',
+      // Include full schema for enhanced validation
+      schema: propertySchema,
+      isNested: prefix !== ''
+    })
+    
+    // Recursively extract nested object properties
+    if (propertySchema.type === 'object' && propertySchema.properties) {
+      properties.push(...extractNestedProperties(propertySchema, fullPath, maxDepth, currentDepth + 1))
+    }
+    
+    // Handle array items that are objects
+    if (propertySchema.type === 'array' && propertySchema.items?.type === 'object' && propertySchema.items.properties) {
+      properties.push(...extractNestedProperties(propertySchema.items, `${fullPath}[]`, maxDepth, currentDepth + 1))
+    }
+  })
+  
+  return properties
+}
+
+// Get all properties (including nested) from the current model
+const getAllModelProperties = computed(() => {
+  // First try to get the full model from metadataStore using the modelId
+  const modelId = props.filter.model
+  if (!modelId) return []
+  
+  console.log('🔍 Getting model properties for modelId:', modelId)
+  
+  try {
+    // Find the model in the store
+    const model = metadataStore.models.find(m => m.model?.id === modelId)?.model
+    console.log('🔍 Found model:', model?.name, 'has schema:', !!model?.latest_version?.schema)
+    
+    if (!model?.latest_version?.schema) {
+      // Fallback to the simple properties if full schema isn't available
+      console.log('🔄 Falling back to simple properties:', props.filter.modelProperties?.length)
+      return props.filter.modelProperties || []
+    }
+    
+    // Log the schema structure
+    console.log('🔍 Schema properties:', Object.keys(model.latest_version.schema.properties || {}))
+    
+    // Extract nested properties from the full schema
+    const extracted = extractNestedProperties(model.latest_version.schema)
+    console.log('🔍 Total extracted properties:', extracted.length, extracted.map(p => p.name))
+    return extracted
+  } catch (error) {
+    console.warn('Failed to extract nested properties, falling back to simple properties:', error)
+    return props.filter.modelProperties || []
+  }
+})
+
 // Get filtered properties based on search term for a specific filter
 const getFilteredProperties = () => {
-  if (!propertySearchTerm.value) return props.filter.modelProperties || []
-  return (props.filter.modelProperties || []).filter(prop => 
-    prop.display_name.toLowerCase().includes(propertySearchTerm.value.toLowerCase())
+  const allProperties = getAllModelProperties.value
+  if (!propertySearchTerm.value) return allProperties
+  return allProperties.filter(prop => 
+    prop.display_name.toLowerCase().includes(propertySearchTerm.value.toLowerCase()) ||
+    prop.name.toLowerCase().includes(propertySearchTerm.value.toLowerCase())
   )
 }
 
-// Get filtered operators based on search term for current property type
+// Get filtered operators based on search term for current property type and format
 const getFilteredOperators = (filter) => {
-  const property = props.filter.modelProperties?.find(p => p.name === filter.property)
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
   const propertyType = property?.type || 'string'
-  const operators = operatorsByType[propertyType] || operatorsByType.string
+  const propertyFormat = property?.format || ''
+  
+  // Use format-specific operators for dates/times
+  let operatorKey = propertyType
+  if (propertyType === 'string' && propertyFormat) {
+    if (propertyFormat === 'date') {
+      operatorKey = 'date'
+    } else if (propertyFormat === 'date-time') {
+      operatorKey = 'datetime'
+    }
+  }
+  
+  const operators = operatorsByType[operatorKey] || operatorsByType.string
   
   if (!operatorSearchTerm.value) return operators
   return operators.filter(op => 
@@ -169,15 +288,27 @@ const currentModelName = computed(() => {
 
 // Get current property name for a filter
 const getCurrentPropertyName = (filter) => {
-  const property = props.filter.modelProperties?.find(p => p.name === filter.property)
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
   return property?.display_name || ''
 }
 
 // Get current operator name for a filter
 const getCurrentOperatorName = (filter) => {
-  const property = props.filter.modelProperties?.find(p => p.name === filter.property)
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
   const propertyType = property?.type || 'string'
-  const operators = operatorsByType[propertyType] || operatorsByType.string
+  const propertyFormat = property?.format || ''
+  
+  // Use format-specific operators for dates/times
+  let operatorKey = propertyType
+  if (propertyType === 'string' && propertyFormat) {
+    if (propertyFormat === 'date') {
+      operatorKey = 'date'
+    } else if (propertyFormat === 'date-time') {
+      operatorKey = 'datetime'
+    }
+  }
+  
+  const operators = operatorsByType[operatorKey] || operatorsByType.string
   const operator = operators.find(op => op.value === filter.operator)
   return operator?.label || ''
 }
@@ -336,8 +467,14 @@ const onValueInput = (event, filterIndex) => {
     emit('update-filter', props.index, updatedFilter)
   }
   
-  // Trigger autocomplete if we have enough context
-  if (value && value.length >= 2 && filter.property && filter.operator && props.filter.model) {
+  // Trigger autocomplete if enabled and we have enough context
+  // Only enable autocomplete for string properties
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
+  const propertyType = property?.type || 'string'
+  const propertyFormat = property?.format || ''
+  const isStringProperty = propertyType === 'string' && !propertyFormat // Exclude formatted strings like dates
+  
+  if (props.enableAutocomplete && value && value.length >= 2 && filter.property && filter.operator && props.filter.model && isStringProperty) {
     debouncedFetchAutocomplete(value, filter.property, filter.operator, filter.id)
   } else {
     // Clear autocomplete state
@@ -356,11 +493,20 @@ const fetchAutocomplete = async (value, property, operator, filterId) => {
     autocompleteState.value.loading = true
     autocompleteState.value.error = null
     
+    // For 'equals' operator (=), use 'contains' for autocomplete to enable partial matching
+    // Other operators like 'startsWith', '>', '<', etc. should keep their original operator
+    const autocompleteOperator = operator === '=' ? 'contains' : operator
+    
+    // Convert dot notation to JSON path format
+    const jsonPathProperty = property.includes('.') ? 
+      `/${property.replace(/\./g, '/')}` : 
+      `/${property}`
+    
     const results = await metadataStore.getAutocompleteValues(
       props.datasetId,
       props.filter.model,
-      `/${property}`, // API expects property with leading slash
-      operator,
+      jsonPathProperty, // API expects JSON path format
+      autocompleteOperator,
       value
     )
     
@@ -406,7 +552,7 @@ const selectAutocompleteSuggestion = (suggestion, filterIndex) => {
 
 // Handle value input focus
 const handleValueFocus = (filter) => {
-  if (autocompleteState.value.suggestions.length > 0 && filter.value && filter.value.length >= 2) {
+  if (props.enableAutocomplete && autocompleteState.value.suggestions.length > 0 && filter.value && filter.value.length >= 2) {
     activePopover.value = `autocomplete-${filter.id}`
   }
 }
@@ -473,7 +619,7 @@ const onLogicalOperatorChange = () => {
 
 // Get placeholder text for value input
 const getValuePlaceholder = (filter) => {
-  const property = props.filter.modelProperties?.find(p => p.name === filter.property)
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
   const propertyType = property?.type || 'string'
   const operator = filter.operator
   
@@ -493,6 +639,143 @@ const getValuePlaceholder = (filter) => {
     return 'Enter a number'
   }
   return 'Enter a value'
+}
+
+// Get input type based on property type and format
+const getInputType = (filter) => {
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
+  const propertyType = property?.type || 'string'
+  const propertyFormat = property?.format || ''
+  const operator = filter.operator
+  
+  // Array-based operators and length operators always use text input for comma-separated values
+  if (operator === 'in' || operator === 'overlap' || operator === 'containedIn' || operator === 'between' || 
+      (operator && operator.startsWith('length'))) {
+    return 'text'
+  }
+  
+  // Handle specific string formats that need special input types
+  if (propertyType === 'string' && propertyFormat) {
+    switch (propertyFormat) {
+      case 'date':
+        return 'date'
+      case 'date-time':
+        return 'datetime-local'
+      case 'time':
+        return 'time'
+      case 'email':
+        return 'email'
+      case 'uri':
+        return 'url'
+      default:
+        return 'text'
+    }
+  }
+  
+  // Map property types to input types
+  if (propertyType === 'number' || propertyType === 'integer') {
+    return 'number'
+  }
+  
+  return 'text'
+}
+
+// Enhanced validation using full schema constraints
+const validateValue = (value, filter) => {
+  if (!value || value.trim() === '') return true // Empty values are handled elsewhere
+  
+  const property = getAllModelProperties.value.find(p => p.name === filter.property)
+  const propertyType = property?.type || 'string'
+  const propertySchema = property?.schema || {}
+  const operator = filter.operator
+  
+  // Skip validation for array-based operators as they're handled by comma separation
+  if (operator === 'in' || operator === 'overlap' || operator === 'containedIn') {
+    return true
+  }
+  
+  // Handle between operator - should have two values
+  if (operator === 'between') {
+    const parts = value.split(',').map(v => v.trim())
+    if (parts.length !== 2) return false
+    
+    if (propertyType === 'number' || propertyType === 'integer') {
+      return parts.every(part => !isNaN(Number(part)) && part !== '')
+    }
+    return true
+  }
+  
+  // Handle length operators - should be numeric
+  if (operator && operator.startsWith('length')) {
+    return !isNaN(Number(value)) && value.trim() !== ''
+  }
+  
+  // Enhanced type-specific validation with schema constraints
+  if (propertyType === 'integer') {
+    const numValue = Number(value)
+    if (!Number.isInteger(numValue) || isNaN(numValue)) return false
+    
+    // Check min/max constraints from schema
+    if (propertySchema.minimum !== undefined && numValue < propertySchema.minimum) return false
+    if (propertySchema.maximum !== undefined && numValue > propertySchema.maximum) return false
+    
+    return true
+  }
+  
+  if (propertyType === 'number') {
+    const numValue = Number(value)
+    if (isNaN(numValue) || value.trim() === '') return false
+    
+    // Check min/max constraints from schema
+    if (propertySchema.minimum !== undefined && numValue < propertySchema.minimum) return false
+    if (propertySchema.maximum !== undefined && numValue > propertySchema.maximum) return false
+    if (propertySchema.multipleOf !== undefined && numValue % propertySchema.multipleOf !== 0) return false
+    
+    return true
+  }
+  
+  if (propertyType === 'string') {
+    // Check string length constraints from schema
+    if (propertySchema.minLength !== undefined && value.length < propertySchema.minLength) return false
+    if (propertySchema.maxLength !== undefined && value.length > propertySchema.maxLength) return false
+    
+    // Check pattern constraint from schema
+    if (propertySchema.pattern) {
+      try {
+        const regex = new RegExp(propertySchema.pattern)
+        if (!regex.test(value)) return false
+      } catch (error) {
+        console.warn('Invalid regex pattern in schema:', propertySchema.pattern, error)
+      }
+    }
+    
+    return true
+  }
+  
+  if (propertyType === 'boolean') {
+    const lowerValue = value.toLowerCase().trim()
+    return lowerValue === 'true' || lowerValue === 'false'
+  }
+  
+  return true // Default to valid for unknown types
+}
+
+// Handle value input with validation
+const onValidatedValueInput = (event, filterIndex) => {
+  const value = event.target.value
+  const filter = filters.value[filterIndex]
+  
+  // Update the value regardless of validation for better UX
+  filter.value = value
+  
+  // Visual feedback for validation (optional - could add error styling)
+  const isValid = validateValue(value, filter)
+  
+  // Only emit updates for valid values or empty values
+  if (isValid || value.trim() === '') {
+    // Call original value input handler
+    onValueInput(event, filterIndex)
+  }
 }
 
 // Handle keyboard navigation
@@ -535,8 +818,8 @@ const onKeydown = (event, type, filterIndex = 0) => {
           <div class="primary-filter-row">
             <!-- Model segment -->
             <div 
-              v-if="!filter.model"
-              class="filter-segment"
+              v-if="!filter.model && !hideEmptyModelSelector"
+              class="filter-segment model"
             >
               <el-popover
                 :visible="activePopover === `model-${filter.id}`"
@@ -578,8 +861,8 @@ const onKeydown = (event, type, filterIndex = 0) => {
               </el-popover>
             </div>
             <div 
-              v-else
-              class="filter-segment selected"
+              v-else-if="!hideEmptyModelSelector"
+              class="filter-segment selected model"
               @click="activePopover = `model-${filter.id}`"
             >
               <span class="segment-label">{{ currentModelName }}</span>
@@ -612,7 +895,7 @@ const onKeydown = (event, type, filterIndex = 0) => {
                         v-model="propertySearchTerm"
                         type="text"
                         class="segment-input"
-                        placeholder="Property (optional)..."
+                        placeholder="Filter (optional)..."
                         @focus="activePopover = `property-${filters[0].id}`"
                         @click.stop="activePopover = `property-${filters[0].id}`"
                         @keydown="onKeydown($event, 'property', 0)"
@@ -725,11 +1008,11 @@ const onKeydown = (event, type, filterIndex = 0) => {
                       <template #reference>
                         <input
                           :value="filters[0].value"
-                          type="text"
+                          :type="getInputType(filters[0])"
                           class="segment-input value-input"
                           :data-filter-id="filters[0].id"
                           :placeholder="getValuePlaceholder(filters[0])"
-                          @input="onValueInput($event, 0)"
+                          @input="onValidatedValueInput($event, 0)"
                           @focus="handleValueFocus(filters[0])"
                         />
                       </template>
@@ -941,11 +1224,11 @@ const onKeydown = (event, type, filterIndex = 0) => {
                   <template #reference>
                     <input
                       :value="subFilter.value"
-                      type="text"
+                      :type="getInputType(subFilter)"
                       class="segment-input value-input"
                       :data-filter-id="subFilter.id"
                       :placeholder="getValuePlaceholder(subFilter)"
-                      @input="onValueInput($event, subIndex + 1)"
+                      @input="onValidatedValueInput($event, subIndex + 1)"
                       @focus="handleValueFocus(subFilter)"
                     />
                   </template>
@@ -1052,7 +1335,7 @@ const onKeydown = (event, type, filterIndex = 0) => {
   .filter-icon {
     color: theme.$purple_3;
     margin-right: 12px;
-    margin-top: 12px; // Align with first row
+    align-self: anchor-center;
     flex-shrink: 0;
   }
   
@@ -1126,6 +1409,10 @@ const onKeydown = (event, type, filterIndex = 0) => {
     align-items: center;
     position: relative;
     border-radius: 16px;
+
+    &.model {
+      font-weight: 500;
+    }
 
     &.selected {
       background: theme.$purple_tint;
