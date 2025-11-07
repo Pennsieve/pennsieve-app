@@ -291,7 +291,7 @@ const getValuePlaceholder = (operator, propertyType) => {
 }
 
 // Handle value input
-const onValueInput = (filter) => {
+const onValueInput = () => {
   buildPredicate()
 }
 
@@ -488,7 +488,7 @@ onMounted(() => {
                   class="segment-input value-input"
                   :data-filter-id="filter.id"
                   :placeholder="getValuePlaceholder(filter.operator, filter.propertyType)"
-                  @input="onValueInput(filter)"
+                  @input="onValueInput"
                   @keyup.enter="buildPredicate"
                 />
                 <IconRemove
@@ -778,6 +778,10 @@ onMounted(() => {
     text-align: center;
     color: theme.$gray_4;
     font-size: 14px;
+    
+    &.error {
+      color: theme.$red_2;
+    }
   }
 }
 

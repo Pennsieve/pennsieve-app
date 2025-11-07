@@ -4,7 +4,7 @@
       <stage-actions>
         <template #left>
           <div>
-            <h3 class="stage-title">Graph Explorer</h3>
+            <h3 class="stage-title">Explorer</h3>
             <div>Select one or more models to generate a view over the dataset</div>
           </div>
 
@@ -94,6 +94,7 @@
             :filter="query"
             :index="index"
             :can-remove="queryFilters.length > 1"
+            :dataset-id="props.datasetId"
             @update-filter="updateFilter"
             @remove-filter="removeFilter"
             @model-change="onModelChange"

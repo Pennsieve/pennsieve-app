@@ -4,6 +4,8 @@ import { ElPopover } from 'element-plus'
 import IconFilterFilled from '@/components/icons/IconFilterFilled.vue'
 import IconTrash from '@/components/icons/IconTrash.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
+import { useMetadataStore } from '@/stores/metadataStore'
+import { createThrottle } from '@/utils/throttle'
 
 const props = defineProps({
   models: {
@@ -21,16 +23,30 @@ const props = defineProps({
   canRemove: {
     type: Boolean,
     default: false
+  },
+  datasetId: {
+    type: String,
+    required: true
   }
 })
 
 const emit = defineEmits(['update-filter', 'remove-filter', 'model-change'])
+
+// Store
+const metadataStore = useMetadataStore()
 
 // Popover states
 const activePopover = ref(null)
 const modelSearchTerm = ref('')
 const propertySearchTerm = ref('')
 const operatorSearchTerm = ref('')
+
+// Autocomplete state
+const autocompleteState = ref({
+  suggestions: [],
+  loading: false,
+  error: null
+})
 
 // Available operators by property type (same as RecordFilterStyled)
 const operatorsByType = {
@@ -211,11 +227,75 @@ const clearSegment = (segment) => {
 
 // Handle value input
 const onValueInput = (event) => {
+  const value = event.target.value
   const updatedFilter = {
     ...props.filter,
-    value: event.target.value
+    value: value
   }
   emit('update-filter', props.index, updatedFilter)
+  
+  // Trigger autocomplete if we have enough context
+  if (value && value.length >= 2 && props.filter.property && props.filter.operator && props.filter.model) {
+    debouncedFetchAutocomplete(value, props.filter.property, props.filter.operator)
+  } else {
+    // Clear autocomplete state
+    autocompleteState.value.suggestions = []
+    if (activePopover.value === `autocomplete-${props.filter.id}`) {
+      activePopover.value = null
+    }
+  }
+}
+
+// Fetch autocomplete suggestions
+const fetchAutocomplete = async (value, property, operator) => {
+  try {
+    autocompleteState.value.loading = true
+    autocompleteState.value.error = null
+    
+    const results = await metadataStore.getAutocompleteValues(
+      props.datasetId,
+      props.filter.model,
+      `/${property}`, // API expects property with leading slash
+      operator,
+      value
+    )
+    
+    autocompleteState.value.suggestions = results
+    autocompleteState.value.loading = false
+    
+    // Show autocomplete popover if we have suggestions
+    if (results.length > 0) {
+      activePopover.value = `autocomplete-${props.filter.id}`
+    }
+  } catch (error) {
+    console.error('Error fetching autocomplete suggestions:', error)
+    autocompleteState.value.error = error.message
+    autocompleteState.value.suggestions = []
+    autocompleteState.value.loading = false
+  }
+}
+
+// Debounced autocomplete fetch
+const debouncedFetchAutocomplete = createThrottle(fetchAutocomplete, 300)
+
+// Select autocomplete suggestion
+const selectAutocompleteSuggestion = (suggestion) => {
+  const updatedFilter = {
+    ...props.filter,
+    value: suggestion
+  }
+  emit('update-filter', props.index, updatedFilter)
+  activePopover.value = null
+  
+  // Clear autocomplete state
+  autocompleteState.value.suggestions = []
+}
+
+// Handle value input focus
+const handleValueFocus = () => {
+  if (autocompleteState.value.suggestions.length > 0 && props.filter.value && props.filter.value.length >= 2) {
+    activePopover.value = `autocomplete-${props.filter.id}`
+  }
 }
 
 // Get placeholder text for value input
@@ -456,14 +536,56 @@ const onKeydown = (event, type) => {
           <!-- Value segment -->
           <template v-if="filter.operator">
             <div class="filter-segment value-segment">
-              <input
-                :value="filter.value"
-                type="text"
-                class="segment-input value-input"
-                :data-filter-id="filter.id"
-                :placeholder="getValuePlaceholder()"
-                @input="onValueInput"
-              />
+              <el-popover
+                :visible="activePopover === `autocomplete-${filter.id}`"
+                placement="bottom-start"
+                :width="300"
+                trigger="manual"
+                :show-arrow="false"
+                @update:visible="(val) => !val && (activePopover = null)"
+              >
+                <template #reference>
+                  <input
+                    :value="filter.value"
+                    type="text"
+                    class="segment-input value-input"
+                    :data-filter-id="filter.id"
+                    :placeholder="getValuePlaceholder()"
+                    @input="onValueInput"
+                    @focus="handleValueFocus"
+                  />
+                </template>
+                <div class="popover-content">
+                  <div class="popover-list">
+                    <div 
+                      v-if="autocompleteState.loading"
+                      class="popover-empty"
+                    >
+                      Loading suggestions...
+                    </div>
+                    <div 
+                      v-else-if="autocompleteState.error"
+                      class="popover-empty error"
+                    >
+                      Error loading suggestions
+                    </div>
+                    <div
+                      v-for="suggestion in autocompleteState.suggestions"
+                      :key="suggestion"
+                      class="popover-item"
+                      @click="selectAutocompleteSuggestion(suggestion)"
+                    >
+                      <span class="item-label">{{ suggestion }}</span>
+                    </div>
+                    <div 
+                      v-if="!autocompleteState.loading && !autocompleteState.error && autocompleteState.suggestions.length === 0 && filter.value && filter.value.length >= 2"
+                      class="popover-empty"
+                    >
+                      No suggestions found
+                    </div>
+                  </div>
+                </div>
+              </el-popover>
               <IconRemove
                 v-if="filter.value"
                 class="segment-clear"
@@ -657,6 +779,10 @@ const onKeydown = (event, type) => {
     text-align: center;
     color: theme.$gray_4;
     font-size: 14px;
+    
+    &.error {
+      color: theme.$red_2;
+    }
   }
 }
 

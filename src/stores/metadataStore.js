@@ -849,6 +849,79 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     /**
+     * Get autocomplete suggestions for a property value
+     * @param {string} datasetId - The dataset ID
+     * @param {string} modelId - The model ID
+     * @param {string} property - The property name (e.g., "/name")
+     * @param {string} operator - The filter operator (e.g., "startsWith")
+     * @param {string} value - The partial value to search for
+     * @param {number} limit - Maximum number of suggestions to return
+     * @returns {Promise<Array>} Array of autocomplete suggestions
+     */
+    const getAutocompleteValues = async (datasetId, modelId, property, operator, value, limit = 10) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/query`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId
+            })
+            
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            // Build the query payload to match your curl example structure
+            const payload = {
+                select: {
+                    select: [
+                        {
+                            expression: {
+                                property: property
+                            }
+                        }
+                    ],
+                    where: {
+                        property: property,
+                        operator: operator,
+                        value: value
+                    },
+                    limit: limit
+                }
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                const data = await resp.json()
+                // Extract unique values from the response
+                const values = data.map(item => item[property]).filter(Boolean)
+                return [...new Set(values)] // Remove duplicates
+            } else {
+                const errorText = await resp.text()
+                console.error('Autocomplete API Error:', {
+                    status: resp.status,
+                    statusText: resp.statusText,
+                    error: errorText,
+                    url,
+                    payload
+                })
+                throw new Error(`Failed to get autocomplete values: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error getting autocomplete values:', error)
+            throw error
+        }
+    }
+
+    /**
      * Attach a package (file/folder) to a record
      * @param {string} datasetId - The dataset ID
      * @param {string} recordId - The record ID to attach package to
@@ -1172,6 +1245,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         updateRecord,
         createRelationship,
         searchRecords,
+        getAutocompleteValues,
         createModel,
         createModels,
         createModelFromTemplate,
