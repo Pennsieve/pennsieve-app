@@ -4,18 +4,18 @@
       v-if="selection.length > 0 && !withinRunAnalysisDialog"
       class="selection-menu-wrap mb-16"
     >
-      <!-- Hide the redundant checkbox since the table header already has one -->
-      <!-- <el-checkbox
-        class="slim-checkbox"
-        id="check-all"
-        v-model="checkAll"
-        :indeterminate="isIndeterminate"
-        @change="onCheckAllChange"
-      /> -->
-
-      <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
-        selectionCountLabel
-      }}</span>
+      <div class="selection-info">
+        <el-checkbox
+          class="slim-checkbox"
+          id="check-all"
+          v-model="checkAll"
+          :indeterminate="isIndeterminate"
+          @change="onCheckAllChange"
+        />
+        <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
+          selectionCountLabel
+        }}</span>
+      </div>
       <ul class="selection-actions unstyled">
         <template v-if="withinDeleteMenu || withinRunAnalysisDialog">
           <li class="mr-24">
@@ -103,19 +103,16 @@
           <span class="select-column-header">Select</span>
         </template>
         <template #default="scope">
-          <div 
+          <div
             class="select-package-btn"
             @click.stop="onSelectForAttachment(scope.row)"
             title="Select for attachment"
           >
-            <IconPlus 
-              :height="14" 
-              :width="14"
-            />
+            <IconPlus :height="14" :width="14" />
           </div>
         </template>
       </el-table-column>
-      
+
       <!-- Normal selection column (when package attachment is not active) -->
       <el-table-column
         v-else
@@ -179,7 +176,6 @@
           {{ formatDate(scope.row.content.createdAt) }}
         </template>
       </el-table-column>
-      
     </el-table>
   </div>
 </template>
@@ -583,6 +579,14 @@ export default {
   font-weight: 700;
   transform: translateY(1px);
 }
+.btn-clear-selection {
+  font-size: 12px;
+  margin-left: 12px;
+  color: theme.$app-primary-color;
+  &:hover {
+    text-decoration: underline;
+  }
+}
 .selection-menu-wrap {
   background: #e9edf6;
   //border: 1px solid theme.$gray_2;
@@ -595,6 +599,11 @@ export default {
   width: 100%;
   z-index: 10;
   align-items: center;
+}
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .selection-actions {
   display: flex;
