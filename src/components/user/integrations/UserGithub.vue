@@ -227,8 +227,9 @@ async function savePublishingSettings() {
       </div>
       <div class="card-content">
         <p>
-          Repositories can be published publically to Discover and/ or to the
-          App Store for users to include as part of analytic pipelines
+          Publish your repositories publicly to Discover for anyone to access,
+          or privately to the App Store for use within your organization's
+          analytic pipelines.
         </p>
 
         <div v-if="myProfileStatus === 'pending'" class="loading">
