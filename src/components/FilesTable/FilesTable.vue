@@ -79,6 +79,45 @@
       </ul>
     </div>
 
+    <!-- Compact selection toolbar for analysis dialog -->
+    <div v-if="withinRunAnalysisDialog" class="range-selection-bar">
+      <div class="toolbar-header">
+        <el-button size="small" @click="showRangeSelector = !showRangeSelector">
+          {{ showRangeSelector ? "Hide" : "Select" }} Range
+        </el-button>
+      </div>
+
+      <!-- Expandable range selector -->
+      <div v-if="showRangeSelector" class="range-controls">
+        <el-input
+          v-model.number="rangeStart"
+          size="small"
+          placeholder="Start row"
+          style="width: 100px; margin-right: 8px"
+          @keyup.enter="selectRange"
+        />
+        <span style="margin-right: 8px">to</span>
+        <el-input
+          v-model.number="rangeEnd"
+          size="small"
+          placeholder="End row"
+          style="width: 100px; margin-right: 8px"
+          @keyup.enter="selectRange"
+        />
+        <el-button
+          size="small"
+          type="primary"
+          @click="selectRange"
+          :disabled="!rangeStart || !rangeEnd"
+        >
+          Apply
+        </el-button>
+        <el-button size="small" @click="$refs.table.clearSelection()">
+          Clear All
+        </el-button>
+      </div>
+    </div>
+
     <el-table
       ref="table"
       v-loading="
@@ -122,6 +161,18 @@
         fixed
         width="50"
       />
+
+      <!-- Row number column for analysis dialog -->
+      <el-table-column
+        v-if="withinRunAnalysisDialog"
+        label="#"
+        width="50"
+        align="center"
+      >
+        <template #default="scope">
+          <span class="row-number">{{ scope.$index + 1 }}</span>
+        </template>
+      </el-table-column>
 
       <el-table-column
         prop="content.name"
@@ -264,6 +315,9 @@ export default {
       selection: [],
       sortOrders: ["ascending", "descending"],
       checkAll: false,
+      rangeStart: null,
+      rangeEnd: null,
+      showRangeSelector: false,
     };
   },
   watch: {
@@ -330,8 +384,56 @@ export default {
     ...mapActions("filesModule", ["openOffice365File"]),
     ...mapActions("analysisModule", ["clearSelectedFiles", "updateFileCount"]),
 
+    /**
+     * Select range of rows based on input
+     */
+    selectRange: function () {
+      if (!this.rangeStart || !this.rangeEnd) return;
+
+      // Convert to 0-based indices
+      const start = Math.min(this.rangeStart - 1, this.rangeEnd - 1);
+      const end = Math.max(this.rangeStart - 1, this.rangeEnd - 1);
+
+      // Validate range
+      if (start < 0 || end >= this.data.length) {
+        this.$message.warning(
+          `Please enter row numbers between 1 and ${this.data.length}`
+        );
+        return;
+      }
+
+      // Debug logging
+      console.log("Range selection:", {
+        inputStart: this.rangeStart,
+        inputEnd: this.rangeEnd,
+        zeroBasedStart: start,
+        zeroBasedEnd: end,
+        totalRows: this.data.length,
+      });
+
+      // Clear all selections first
+      this.$refs.table.clearSelection();
+
+      // Wait for clear to complete, then select the range
+      setTimeout(() => {
+        for (let i = start; i <= end; i++) {
+          if (this.data[i]) {
+            console.log(`Selecting row ${i + 1}:`, this.data[i].content.name);
+            this.$refs.table.toggleRowSelection(this.data[i], true);
+          }
+        }
+      }, 100);
+
+      // Clear inputs after selection
+      this.rangeStart = null;
+      this.rangeEnd = null;
+    },
+
     handleCloseModal: function () {
       this.$refs.table.clearSelection();
+      this.rangeStart = null;
+      this.rangeEnd = null;
+      this.showRangeSelector = false;
     },
 
     onOpenOffice365: function (file) {
@@ -538,26 +640,32 @@ export default {
   }
 }
 
-.column-header {
+.range-selection-bar {
+  padding: 10px;
+  background: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-bottom: 0;
+
+  .toolbar-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .range-controls {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e4e7ed;
+    display: flex;
+    align-items: center;
+  }
 }
 
-//.el-table {
-//  width: 100%;
-//}
-//
-//.el-table--border {
-//  border: none;
-//}
-//
-//.el-table--border td {
-//  //border: none;
-//  border-right: 1px solid transparent;
-//}
-//
-//.el-table--border tr {
-//  border: none;
-//  //border-right: 1px solid transparent;
-//}
+.row-number {
+  color: #909399;
+  font-size: 12px;
+  margin-right: 8px;
+}
 
 .btn-selection-action {
   align-items: center;
@@ -589,7 +697,6 @@ export default {
 }
 .selection-menu-wrap {
   background: #e9edf6;
-  //border: 1px solid theme.$gray_2;
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   display: flex;
@@ -611,36 +718,6 @@ export default {
   justify-content: flex-end;
   align-items: center;
 }
-//.el-table {
-//  border-radius: 4px;
-//  tr {
-//    transition: background-color 0.3s ease-in-out;
-//  }
-//  td,
-//  th {
-//    padding: 8px 0;
-//  }
-//
-//  .disable-select {
-//    pointer-events: none;
-//  }
-//
-//  .allow-file-navigation button {
-//    pointer-events: auto;
-//  }
-//
-//  .cell {
-//    padding-left: 16px;
-//    padding-right: 16px;
-//  }
-//
-//  .caret-wrapper {
-//    display: none;
-//  }
-//  .highlight {
-//    background-color: theme.$status_yellow;
-//  }
-//}
 .file-actions-wrap {
   display: flex;
   justify-content: flex-end;
