@@ -4,7 +4,7 @@
       <stage-actions>
         <template #left>
           <div>
-            <h3 class="stage-title">Graph Explorer</h3>
+            <h3 class="stage-title">Explorer</h3>
             <div>Select one or more models to generate a view over the dataset</div>
           </div>
 
@@ -21,13 +21,13 @@
                 <i class="el-icon-loading"></i> Searching...
               </template>
               <template v-else>
-                <i class="el-icon-search"></i> Search
+                <i class="el-icon-search"></i> Create View
               </template>
             </bf-button>
 
             <!-- Clear All Button -->
             <bf-button
-              class="secondary mr-8"
+              class="secondary mr-8 flex"
               @click="clearAllQueries"
             >
               Clear All
@@ -38,47 +38,10 @@
               class="collapse-btn"
               @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"
             >
-              <span v-if="isQuerySectionCollapsed">Show Filters</span>
-              <span v-else>Hide Filters</span>
+              <span v-if="isQuerySectionCollapsed">Show Query Builder</span>
+              <span v-else>Hide Query Builder</span>
             </bf-button>
           </template>
-<!--          <ps-button-dropdown-->
-<!--            @click="toggleActionDropdown"-->
-<!--            :menu-open="!quickActionsVisible"-->
-<!--          >-->
-<!--            <template #buttons>-->
-<!--              &lt;!&ndash; Search Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button primary"-->
-<!--                :disabled="!canExecuteQuery"-->
-<!--                @click="executeQuery"-->
-<!--              >-->
-<!--                <template v-if="loading">-->
-<!--                  <i class="el-icon-loading"></i> Searching...-->
-<!--                </template>-->
-<!--                <template v-else>-->
-<!--                  <i class="el-icon-search"></i> Search-->
-<!--                </template>-->
-<!--              </bf-button>-->
-
-<!--              &lt;!&ndash; Clear All Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button secondary"-->
-<!--                @click="clearAllQueries"-->
-<!--              >-->
-<!--                Clear All-->
-<!--              </bf-button>-->
-<!--              -->
-<!--              &lt;!&ndash; Collapse Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button collapse-btn"-->
-<!--                @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"-->
-<!--              >-->
-<!--                <span v-if="isQuerySectionCollapsed">Show Filters</span>-->
-<!--                <span v-else>Hide Filters</span>-->
-<!--              </bf-button>-->
-<!--            </template>-->
-<!--          </ps-button-dropdown>-->
         </template>
       </stage-actions>
     </template>
@@ -94,6 +57,7 @@
             :filter="query"
             :index="index"
             :can-remove="queryFilters.length > 1"
+            :dataset-id="props.datasetId"
             @update-filter="updateFilter"
             @remove-filter="removeFilter"
             @model-change="onModelChange"
@@ -107,12 +71,12 @@
             class="btn-add-filter"
             @click="addFilter"
           >
-            + Add Filter
+            + Add Query
           </button>
 
           <!-- Record Limit Dropdown -->
           <div class="limit-selector">
-            <label class="limit-label">Records per model:</label>
+            <label class="limit-label">Records per query:</label>
             <select 
               v-model="recordLimit"
               class="limit-select"
@@ -165,47 +129,6 @@
         </div>
       </div>
       
-      <!-- Legend -->
-      <div class="control-group legend">
-        <span class="legend-title">Legend:</span>
-        
-        <!-- Model Colors (if any models are displayed) -->
-        <div v-if="displayedModels.length > 0" class="legend-models">
-          <div
-            v-for="modelId in displayedModels.slice(0, 5)"
-            :key="modelId"
-            class="legend-item model-legend"
-          >
-            <div 
-              class="legend-dot" 
-              :style="{
-                backgroundColor: getModelColorForLegend(modelId).background,
-                borderColor: getModelColorForLegend(modelId).border
-              }"
-            ></div>
-            <span class="model-name">{{ getModelName(modelId) }}</span>
-          </div>
-          <span v-if="displayedModels.length > 5" class="legend-more">
-            +{{ displayedModels.length - 5 }} more
-          </span>
-        </div>
-        
-        <!-- Relationship Legend -->
-        <div class="legend-relationships">
-          <div class="legend-item">
-            <div class="legend-line outbound"></div>
-            <span>Outbound →</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line inbound"></div>
-            <span>Inbound ←</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line package"></div>
-            <span>Files</span>
-          </div>
-        </div>
-      </div>
       
       <div class="control-group">
         <span class="node-count">{{ nodeCount }} nodes, {{ edgeCount }} relationships</span>
@@ -215,7 +138,7 @@
     <!-- Graph Visualization -->
     <div class="graph-container">
       <div ref="sigmaContainer" class="sigma-container"></div>
-      
+
       <!-- Minimal Properties Bar - Bottom of graph container -->
       <div v-if="selectedNodeProperties" class="properties-bar">
         <div class="properties-content">
@@ -244,6 +167,65 @@
             View Details
           </button>
           <button class="close-btn" @click="selectedNodeProperties = null; sigmaInstance?.refresh()">×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend - positioned below graph, above record details -->
+    <div v-if="displayedModels.length > 0 || nodes.length > 0" class="legend-section">
+      <div class="legend-container">
+        <span class="legend-title">Legend:</span>
+        
+        <!-- Model Colors (if any models are displayed) -->
+        <div v-if="displayedModels.length > 0" class="legend-models">
+          <!-- Always visible models (first 5 or all if expanded) -->
+          <div
+            v-for="modelId in (isLegendExpanded ? displayedModels : displayedModels.slice(0, 5))"
+            :key="modelId"
+            class="legend-item model-legend"
+            :class="{ 'hidden': hiddenModels.has(modelId) }"
+            @click="toggleModelVisibility(modelId)"
+          >
+            <div 
+              class="legend-dot" 
+              :style="{
+                backgroundColor: getModelColorForLegend(modelId).background,
+                borderColor: getModelColorForLegend(modelId).border,
+                opacity: hiddenModels.has(modelId) ? 0.3 : 1
+              }"
+            ></div>
+            <span class="model-name" :style="{ opacity: hiddenModels.has(modelId) ? 0.5 : 1 }">{{ getModelName(modelId) }}</span>
+          </div>
+          
+          <!-- Show more/less button when there are more than 5 models -->
+          <button 
+            v-if="displayedModels.length > 5" 
+            class="legend-expand-btn"
+            @click="toggleLegendExpansion"
+          >
+            <span v-if="!isLegendExpanded">
+              +{{ displayedModels.length - 5 }} more
+            </span>
+            <span v-else>
+              Show less
+            </span>
+          </button>
+        </div>
+        
+        <!-- Relationship Legend -->
+        <div class="legend-relationships">
+          <div class="legend-item">
+            <div class="legend-line outbound"></div>
+            <span>Outbound → (from selected)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line inbound"></div>
+            <span>Inbound ← (to selected)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line package"></div>
+            <span>Files</span>
+          </div>
         </div>
       </div>
     </div>
@@ -498,77 +480,146 @@ const removeFilter = (index) => {
   }
 }
 
+// Helper function to convert dot notation to JSON path format
+const convertToJsonPath = (property, modelId) => {
+  if (!property) return ''
+  
+  // Convert dot notation to JSON path format: availability.quantity -> /availability/quantity
+  let jsonPath = property.includes('.') ? 
+    `/${property.replace(/\./g, '/')}` : 
+    `/${property}`
+  
+  // Check if this property is an array and append /* if needed
+  if (modelId) {
+    const model = models.value.find(m => m.id === modelId)
+    if (model && model.latest_version && model.latest_version.schema) {
+      const schema = model.latest_version.schema
+      
+      // Navigate to the property in the schema to check its type
+      const pathParts = property.split('.')
+      let currentSchema = schema.properties
+      
+      for (let i = 0; i < pathParts.length && currentSchema; i++) {
+        const part = pathParts[i]
+        if (currentSchema[part]) {
+          if (i === pathParts.length - 1) {
+            // This is the final property - check if it's an array
+            if (currentSchema[part].type === 'array') {
+              jsonPath += '/*'
+            }
+          } else {
+            // Navigate deeper into the schema
+            if (currentSchema[part].type === 'object' && currentSchema[part].properties) {
+              currentSchema = currentSchema[part].properties
+            } else {
+              break // Can't navigate deeper
+            }
+          }
+        } else {
+          break // Property not found
+        }
+      }
+    }
+  }
+  
+  return jsonPath
+}
+
 const executeQuery = async () => {
   if (!canExecuteQuery.value) return
   
   loading.value = true
   try {
-    
-    // Group filters by model for optimization
-    const filtersByModel = new Map()
-    
-    queryFilters.value
+    // Create one API call per MultiModelFilter instance
+    const queryPromises = queryFilters.value
       .filter(filter => filter.model) // Only process filters with a model selected
-      .forEach(filter => {
-        if (!filtersByModel.has(filter.model)) {
-          filtersByModel.set(filter.model, [])
-        }
-        filtersByModel.get(filter.model).push(filter)
-      })
-    
-    
-    // Prepare query promises - one per unique model
-    const queryPromises = Array.from(filtersByModel.entries()).map(async ([modelId, filters]) => {
-      try {
-        let options = { limit: recordLimit.value }
-        let combinedFilters = []
-        let hasValidFilters = false
-        
-        // Collect all valid filters for this model
-        filters.forEach(filter => {
-          if (filter.property && filter.operator && filter.value) {
-            const filterPredicate = {
-              property: `/${filter.property}`, // JSON Pointer format
-              operator: filter.operator,
-              value: parseValue(filter.value, filter.operator, filter.property, filter.modelProperties)
+      .map(async (multiModelFilter, index) => {
+        try {
+          let options = { limit: recordLimit.value }
+          
+          // Handle multiple filters within each MultiModelFilter
+          if (multiModelFilter.hasMultipleFilters && multiModelFilter.subFilters) {
+            // MultiModelFilter has multiple sub-filters
+            const validSubFilters = multiModelFilter.subFilters.filter(subFilter => 
+              subFilter.property && subFilter.operator && subFilter.value
+            )
+            
+            if (validSubFilters.length === 0) {
+              // No valid filters - fetch all records for the model (don't set options.filter)
+              console.log(`No valid sub-filters for model ${multiModelFilter.model}, fetching all records`)
+            } else if (validSubFilters.length === 1) {
+              // Single sub-filter - use it directly
+              const subFilter = validSubFilters[0]
+              options.filter = {
+                property: convertToJsonPath(subFilter.property, multiModelFilter.model),
+                operator: subFilter.operator,
+                value: parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+              }
+            } else {
+              // Multiple sub-filters - combine with the logical operator using the correct API format
+              const subFilterPredicates = validSubFilters.map(subFilter => {
+                console.log('🔍 Processing subFilter:', {
+                  property: subFilter.property,
+                  operator: subFilter.operator,
+                  originalValue: subFilter.value,
+                  valueType: typeof subFilter.value,
+                  modelProperties: multiModelFilter.modelProperties?.map(p => ({ name: p.name, type: p.type, description: p.description }))
+                })
+                const parsedValue = parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+                console.log('🔍 After parseValue:', {
+                  property: subFilter.property,
+                  parsedValue,
+                  parsedValueType: typeof parsedValue
+                })
+                const predicate = {
+                  property: convertToJsonPath(subFilter.property, multiModelFilter.model),
+                  operator: subFilter.operator,
+                  value: parsedValue
+                }
+                console.log('🔍 Final predicate:', predicate)
+                return predicate
+              }).filter(predicate => predicate.value !== null) // Filter out null values
+              
+              
+              // Use the logical operator as the key (and/or)
+              const logicalOp = multiModelFilter.logicalOperator || 'and'
+              options.filter = {
+                [logicalOp]: subFilterPredicates
+              }
+              
             }
-            combinedFilters.push(filterPredicate)
-            hasValidFilters = true
-          }
-        })
-        
-        // Apply combined filters if any exist
-        if (hasValidFilters) {
-          if (combinedFilters.length === 1) {
-            // Single filter - use it directly
-            options.filter = combinedFilters[0]
           } else {
-            // Multiple filters - combine with OR logic for broader results
-            options.filter = {
-              operator: 'or',
-              filters: combinedFilters
+            // Single filter (legacy format or single filter in new format)
+            if (multiModelFilter.property && multiModelFilter.operator && multiModelFilter.value) {
+              options.filter = {
+                property: convertToJsonPath(multiModelFilter.property),
+                operator: multiModelFilter.operator,
+                value: parseValue(multiModelFilter.value, multiModelFilter.operator, multiModelFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+              }
+            } else {
+              // No valid single filter - fetch all records for the model (don't set options.filter)
+              console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
             }
           }
-        } else {
+          
+          const response = await metadataStore.fetchRecords(props.datasetId, multiModelFilter.model, options)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: response.records || [],
+            multiModelFilter: multiModelFilter
+          }
+        } catch (error) {
+          console.error(`Query error for MultiModelFilter ${index} (model ${multiModelFilter.model}):`, error)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: [],
+            multiModelFilter: multiModelFilter,
+            error: error
+          }
         }
-        
-        const response = await metadataStore.fetchRecords(props.datasetId, modelId, options)
-        return {
-          modelId: modelId,
-          records: response.records || [],
-          filters: filters,
-          combinedFilterCount: combinedFilters.length
-        }
-      } catch (error) {
-        console.error(`Query error for model ${modelId}:`, error)
-        return {
-          modelId: modelId,
-          records: [],
-          filters: filters,
-          error: error
-        }
-      }
-    })
+      })
     
     // Execute all queries in parallel
     const results = await Promise.all(queryPromises)
@@ -576,22 +627,20 @@ const executeQuery = async () => {
     // Combine and display results
     const allRecords = []
     let errorCount = 0
-    let totalApiCalls = results.length
-    let totalOriginalFilters = queryFilters.value.filter(f => f.model).length
+    let successfulCalls = 0
     
     results.forEach(result => {
       if (result.error) {
         errorCount++
+        console.warn(`MultiModelFilter ${result.multiModelFilterIndex} failed:`, result.error)
       } else {
         allRecords.push(...result.records)
+        successfulCalls++
       }
     })
     
-    
     if (errorCount > 0) {
-      ElMessage.warning(`${errorCount} queries failed, showing results from successful queries`)
-    } else if (totalApiCalls < totalOriginalFilters) {
-      ElMessage.success(`Query optimized: ${totalOriginalFilters} filters executed as ${totalApiCalls} API calls`)
+      ElMessage.warning(`${errorCount} queries failed, showing results from ${successfulCalls} successful queries`)
     }
     
     displayQueryResults(allRecords)
@@ -605,12 +654,69 @@ const executeQuery = async () => {
 }
 
 // Parse value based on operator type (similar to RecordFilter)
-const parseValue = (value, operator, propertyName, modelProperties) => {
+// Helper function to get nested property type from schema
+const getNestedPropertyType = (propertyPath, modelId) => {
+  if (!propertyPath || !modelId) return 'string'
+  
+  const model = models.value.find(m => m.id === modelId)
+  if (!model || !model.latest_version || !model.latest_version.schema) return 'string'
+  
+  const schema = model.latest_version.schema
+  if (!schema.properties) return 'string'
+  
+  // Handle dot notation for nested properties
+  const pathParts = propertyPath.split('.')
+  let currentSchema = schema.properties
+  
+  for (let i = 0; i < pathParts.length; i++) {
+    const part = pathParts[i]
+    if (currentSchema[part]) {
+      if (i === pathParts.length - 1) {
+        // Last part - return the type
+        return currentSchema[part].type || 'string'
+      } else {
+        // Navigate deeper
+        if (currentSchema[part].type === 'object' && currentSchema[part].properties) {
+          currentSchema = currentSchema[part].properties
+        } else {
+          return 'string' // Can't navigate deeper
+        }
+      }
+    } else {
+      return 'string' // Property not found
+    }
+  }
+  
+  return 'string'
+}
+
+const parseValue = (value, operator, propertyName, modelProperties, modelId) => {
   if (!value) return value
   
   // Get property type for better value parsing
-  const property = modelProperties?.find(p => p.name === propertyName)
-  const propertyType = property?.type || 'string'
+  // First try to find the property directly (for simple properties from GraphExplorer)
+  let property = modelProperties?.find(p => p.name === propertyName)
+  let propertyType = property?.type
+  
+  // If not found, try nested property lookup using the schema
+  if (!property && propertyName && propertyName.includes('.') && modelId) {
+    propertyType = getNestedPropertyType(propertyName, modelId)
+    console.log('🔍 Nested property lookup:', {
+      propertyName,
+      modelId,
+      resolvedType: propertyType,
+      originalValue: value
+    })
+  }
+  
+  // Fallback to simple property name lookup
+  if (!propertyType && propertyName && propertyName.includes('.')) {
+    const simplePropertyName = propertyName.split('.').pop()
+    property = modelProperties?.find(p => p.name === simplePropertyName)
+    propertyType = property?.type
+  }
+  
+  propertyType = propertyType || 'string'
   
   // Handle operators that expect arrays
   if (['in', 'overlap', 'containedIn'].includes(operator)) {
@@ -646,8 +752,18 @@ const parseValue = (value, operator, propertyName, modelProperties) => {
   }
   
   if (propertyType === 'boolean') {
+    console.log('🔍 Boolean conversion debug:', {
+      propertyName,
+      originalValue: value,
+      valueType: typeof value,
+      property,
+      propertyType,
+      modelProperties: modelProperties?.map(p => ({ name: p.name, type: p.type })),
+      convertedValue: value === 'true' || value === true
+    })
     return value === 'true' || value === true
   }
+  
   
   return value
 }
@@ -769,8 +885,9 @@ const expandNode = async (nodeId) => {
       await startBackgroundForceSimulation()
     }
     
-    ElMessage.success(`Expanded node: added ${limitedRelationships.length} relationships and ${limitedPackages.length} files`)
-    
+    // Debug: Log locked nodes after expansion
+    console.log('🔒 Locked nodes after expansion:', Array.from(lockedNodes.value))
+
   } catch (error) {
     console.error('❌ Error expanding node:', error)
     ElMessage.error(`Failed to expand node: ${error.message}`)
@@ -939,11 +1056,9 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
         // Create edge with direction-based coloring (always create edge, even to existing nodes)
         const edgeId = `${parentId}-${targetId}-${rel.direction || 'unknown'}`
         if (!edges.value.find(e => e.id === edgeId)) {
-          // Color coding: 
-          // - Green for outbound (this record points to another)
-          // - Blue for inbound (another record points to this)
+          // Store direction information but use grey color by default
+          // Colors will be applied dynamically in edgeReducer based on selection
           const isOutbound = rel.direction === 'outbound'
-          const edgeColor = isOutbound ? '#22C55E' : '#3B82F6' // green : blue
           const edgeLabel = `${rel.relationship_type || 'related'} ${isOutbound ? '→' : '←'}`
           
           edges.value.push({
@@ -953,12 +1068,13 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             label: edgeLabel,
             type: 'default',
             style: { 
-              stroke: edgeColor,
+              stroke: '#d1d5db', // Default grey color
               strokeWidth: 2
             },
             data: {
               direction: rel.direction,
-              relationshipType: rel.relationship_type
+              relationshipType: rel.relationship_type,
+              parentNodeId: parentId // Store which node this edge was expanded from
             }
           })
           
@@ -1320,6 +1436,8 @@ const formatPropertyValue = (value) => {
 // Model color assignment for consistent colors across the session
 const modelColorAssignment = ref(new Map())
 const displayedModels = ref([])
+const hiddenModels = ref(new Set()) // Track which models are hidden from view
+const isLegendExpanded = ref(false) // Track whether legend shows all models
 
 // Track which nodes are expanded and their children for proper collapse behavior
 const nodeExpansionMap = ref(new Map()) // nodeId -> { children: Set<nodeId>, edges: Set<edgeId> }
@@ -1333,6 +1451,23 @@ const getModelName = (modelId) => {
 // Get model color for legend
 const getModelColorForLegend = (modelId) => {
   return modelColorAssignment.value.get(modelId) || getModelColor(modelId)
+}
+
+// Toggle model visibility in legend
+const toggleModelVisibility = (modelId) => {
+  if (hiddenModels.value.has(modelId)) {
+    hiddenModels.value.delete(modelId)
+  } else {
+    hiddenModels.value.add(modelId)
+  }
+  
+  // Update the graph to apply filtering changes
+  updateGraph()
+}
+
+// Toggle legend expansion
+const toggleLegendExpansion = () => {
+  isLegendExpanded.value = !isLegendExpanded.value
 }
 
 // Get record label using model's key property (with character limit)
@@ -1402,12 +1537,84 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
 // State for drag functionality
 const draggedNode = ref(null)
 const isDragging = ref(false)
+const nodeInfluenceMap = ref(new Map()) // Tracks influence levels for nodes during drag
 
 // State for force layout animation
 const forceLayoutRunning = ref(false)
 const forceLayoutWorker = ref(null)
 const dragForceRunning = ref(false)
 const canvasForceRunning = ref(false)
+
+// Utility functions for dynamic node movement
+const calculateNodeInfluence = (draggedNodeId) => {
+  if (!graph.value) return new Map()
+  
+  const influence = new Map()
+  const visited = new Set()
+  const queue = [{ nodeId: draggedNodeId, distance: 0 }]
+  
+  while (queue.length > 0) {
+    const { nodeId, distance } = queue.shift()
+    
+    if (visited.has(nodeId) || distance > 1) continue // Limit to 3 hops max
+    visited.add(nodeId)
+    
+    // Calculate influence based on distance (1.0 = full influence, decreases with distance)
+    let influence_level = 0.9
+    if (distance > 1) {
+      influence_level = Math.max(0, 1.0 - (distance * 0.3))
+    }
+
+
+    influence.set(nodeId, influence_level)
+    
+    // Add neighbors to queue
+    if (distance < 3) {
+      graph.value.neighbors(nodeId).forEach(neighborId => {
+        if (!visited.has(neighborId)) {
+          queue.push({ nodeId: neighborId, distance: distance + 1 })
+        }
+      })
+    }
+  }
+  
+  return influence
+}
+
+const applyDynamicNodeMovement = (draggedNodeId, movement) => {
+  const influences = nodeInfluenceMap.value
+  if (!influences || influences.size === 0) return
+  
+  // Apply movement to influenced nodes
+  influences.forEach((influence_level, nodeId) => {
+    if (nodeId === draggedNodeId) return // Skip the dragged node itself
+    if (isNodeLocked(nodeId)) return // Skip locked nodes - they should not move at all
+    
+    // Calculate movement based on influence level
+    const scaledMovement = {
+      x: movement.x * influence_level,
+      y: movement.y * influence_level
+    }
+    
+    // Get current position
+    const currentX = graph.value.getNodeAttribute(nodeId, 'x') || 0
+    const currentY = graph.value.getNodeAttribute(nodeId, 'y') || 0
+    
+    // Apply scaled movement
+    const newX = currentX + scaledMovement.x
+    const newY = currentY + scaledMovement.y
+    
+    // Update node position
+    graph.value.setNodeAttribute(nodeId, 'x', newX)
+    graph.value.setNodeAttribute(nodeId, 'y', newY)
+    
+    // Update internal nodes array
+    const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
+    if (nodeIndex !== -1) {
+      nodes.value[nodeIndex].position = { x: newX, y: newY }
+    }
+  })
+}
 
 // Initialize Sigma.js
 const initializeGraph = () => {
@@ -1430,6 +1637,7 @@ const initializeGraph = () => {
     enableEdgeClickEvents: true,
     enableEdgeWheelEvents: true,
     enableEdgeHoverEvents: true,
+    enableNodeHoverEvents: false, // Disable hover events completely to prevent override of our nodeReducer styling
     // Zoom sensitivity settings for smoother scroll
     zoomingRatio: 1.3, // Reduced from default ~1.5 for smaller zoom steps
     mouseZoomDuration: 200, // Smooth zoom animation duration in ms
@@ -1449,11 +1657,6 @@ const initializeGraph = () => {
       const isSelected = selectedNodeProperties.value && 
         selectedNodeProperties.value.nodeId === node
       const isExpanded = expandedNodes.value.has(node)
-      
-      // Debug logging for visual indicators
-      if (isSelected || isExpanded) {
-      }
-      
       
       // Base size calculation
       let baseSize = 8
@@ -1475,13 +1678,15 @@ const initializeGraph = () => {
         const modelColor = modelColorAssignment.value.has(data.model) 
           ? modelColorAssignment.value.get(data.model)
           : getModelColor(data.model)
+        
         res.color = modelColor.border
         res.borderColor = modelColor.border  
         res.backgroundColor = modelColor.background
+        res.size = baseSize * sizeFactor // Scale size based on zoom
+        
         // Limit record label length
         const originalLabel = data.label || 'record'
         res.label = originalLabel.length > 20 ? originalLabel.substring(0, 17) + '...' : originalLabel
-        res.size = baseSize * sizeFactor // Scale size based on zoom
       }
       
       // Handle visual indicators for selection and expansion states
@@ -1495,21 +1700,61 @@ const initializeGraph = () => {
       
       return res
     },
-    edgeReducer: (edge, data) => {
+    edgeReducer: (edgeKey, data) => {
       const res = { ...data }
       
-      // Color edges based on direction
-      if (data.direction === 'outbound') {
-        res.color = '#22c55e' // green
-      } else if (data.direction === 'inbound') {
-        res.color = '#3b82f6' // blue
-      } else if (data.type === 'package') {
-        res.color = '#6b7280' // gray
-      } else {
-        res.color = '#d1d5db' // default gray
+      // Default color for all relationships is grey
+      let baseColor = '#b3bcce' // default gray
+      
+      // Only show colored relationships if there's a selected node
+      if (selectedNodeProperties.value) {
+        const selectedNodeId = selectedNodeProperties.value.nodeId
+        
+        // Get the edge from the graph to access source and target
+        let edgeSource, edgeTarget
+        if (graph.value && graph.value.hasEdge(edgeKey)) {
+          edgeSource = graph.value.source(edgeKey)
+          edgeTarget = graph.value.target(edgeKey)
+        }
+        
+        // Check if this edge connects to the selected node
+        const connectsToSelected = edgeSource === selectedNodeId || edgeTarget === selectedNodeId
+        
+        console.log('🔍 Edge coloring debug:', {
+          edgeKey,
+          edgeSource,
+          edgeTarget,
+          selectedNodeId,
+          connectsToSelected,
+          direction: data.direction,
+          dataType: data.type
+        })
+        
+        if (connectsToSelected && edgeSource && edgeTarget) {
+          // Determine direction relative to the selected node
+          // If the edge source is the selected node, it's outbound from selected
+          // If the edge target is the selected node, it's inbound to selected
+          const isOutboundFromSelected = edgeSource === selectedNodeId
+          const isInboundToSelected = edgeTarget === selectedNodeId
+          
+          if (isOutboundFromSelected) {
+            baseColor = '#22c55e' // green for outbound from selected node
+            console.log('✅ Coloring edge green (outbound from selected)')
+          } else if (isInboundToSelected) {
+            baseColor = '#3b82f6' // blue for inbound to selected node
+            console.log('✅ Coloring edge blue (inbound to selected)')
+          }
+        }
       }
       
+      // Package edges stay grey regardless of selection
+      if (data.type === 'package') {
+        baseColor = '#6b7280' // gray for package edges
+      }
+      
+      res.color = baseColor
       res.size = data.size || 2
+      
       return res
     }
   })
@@ -1518,6 +1763,19 @@ const initializeGraph = () => {
   sigmaInstance.value.on('clickNode', (event) => {
     console.log('🖱️ Node clicked! isDragging:', isDragging.value)
     if (!isDragging.value) {
+      const nodeId = event.node
+      const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+      
+      // Check if this node belongs to a hidden model
+      const isPackage = nodeId.startsWith('package-')
+      const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
+      
+      // Block interaction with hidden model nodes
+      if (isHiddenModel) {
+        console.log('🚫 Blocked click on hidden model node:', nodeId)
+        return
+      }
+      
       // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
       // The modifier keys are in event.event.original (PointerEvent)
       const originalEvent = event.event?.original
@@ -1526,9 +1784,6 @@ const initializeGraph = () => {
       
       if (hasModifier) {
         // Modifier + click = open sidebar
-        const nodeId = event.node
-        const nodeAttributes = graph.value.getNodeAttributes(nodeId)
-        
         console.log('🔍 Node click debug:')
         console.log('   - Clicked nodeId:', nodeId, typeof nodeId)
         console.log('   - Available node IDs:', nodes.value.map(n => n.id))
@@ -1570,7 +1825,6 @@ const initializeGraph = () => {
         showDetailsPanel.value = true
       } else {
         // Regular click = show banner with node properties
-        const nodeId = event.node
         const nodeData = graph.value.getNodeAttributes(nodeId)
         
         
@@ -1608,14 +1862,61 @@ const initializeGraph = () => {
     event.event.original.preventDefault()
     event.event.original.stopPropagation()
     
+    const nodeId = event.node
+    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+    
+    // Check if this node belongs to a hidden model
+    const isPackage = nodeId.startsWith('package-')
+    const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
+    
+    // Block interaction with hidden model nodes
+    if (isHiddenModel) {
+      console.log('🚫 Blocked double-click on hidden model node:', nodeId)
+      return
+    }
+    
     expandNode(event.node)
   })
+  
+  // Note: Node hover events are disabled at the Sigma configuration level
+  // (enableNodeHoverEvents: false) to completely prevent hover styling on hidden nodes
   
   // Add drag functionality  
   setupDragBehavior()
   
   // Add canvas drag detection
   setupCanvasDragBehavior()
+  
+  // CRITICAL: Completely disable ALL hover detection and rendering
+  // Step 1: Disable hover renderer completely
+  sigmaInstance.value.setSetting('hoverRenderer', () => {}) // Set to empty function instead of null
+  
+  // Step 2: Disable hover cursor changes  
+  sigmaInstance.value.setSetting('defaultHoverCursor', 'default')
+  sigmaInstance.value.setSetting('defaultGrabCursor', 'default')
+  sigmaInstance.value.setSetting('defaultClickCursor', 'default')
+  
+  // Step 3: Override the hover detection entirely
+  // Create a custom renderer that ignores hover completely for hidden nodes
+  sigmaInstance.value.setSetting('hoverRenderer', (context, data, settings) => {
+    // Check if this is a hidden model node
+    const isHiddenModel = !data.key.startsWith('package-') && hiddenModels.value.has(data.model)
+    
+    if (isHiddenModel) {
+      // Return immediately without any hover rendering for hidden nodes
+      return
+    }
+    
+    // For non-hidden nodes, use minimal hover rendering
+    if (data.highlighted) {
+      const size = settings.labelSize
+      const x = Math.round(data.x)
+      const y = Math.round(data.y - size / 2 - 2)
+      
+      context.fillStyle = '#000'
+      context.fillText(data.label, x, y)
+    }
+  })
   
   // Add camera update listener to refresh node sizes on zoom
   sigmaInstance.value.getCamera().on('updated', () => {
@@ -1636,11 +1937,26 @@ const setupDragBehavior = () => {
   
   // Mouse down on node - start drag
   sigmaInstance.value.on('downNode', (event) => {
+    const nodeId = event.node
+    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+    
+    // Check if this node belongs to a hidden model
+    const isPackage = nodeId.startsWith('package-')
+    const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
+    
+    // Block drag interaction with hidden model nodes
+    if (isHiddenModel) {
+      console.log('🚫 Blocked drag on hidden model node:', nodeId)
+      return
+    }
+    
     draggedNodeId = event.node
     isDraggingNode = true
     hasDraggedDistance = false
     startPosition = { x: event.event?.clientX || 0, y: event.event?.clientY || 0 }
     
+    // Calculate initial influence map for connected nodes
+    nodeInfluenceMap.value = calculateNodeInfluence(draggedNodeId)
   })
   
   // Mouse move - update node position during drag
@@ -1672,6 +1988,10 @@ const setupDragBehavior = () => {
       // Always move the node when we have a dragged node, regardless of threshold
       // Convert current mouse position to graph coordinates
       const currentGraphPos = sigmaInstance.value.viewportToGraph(event)
+      
+      // Store previous position to calculate movement delta
+      const previousX = graph.value.getNodeAttribute(draggedNodeId, 'x') || 0
+      const previousY = graph.value.getNodeAttribute(draggedNodeId, 'y') || 0
 
       // Update node position directly to the cursor position
       graph.value.setNodeAttribute(draggedNodeId, 'x', currentGraphPos.x)
@@ -1681,6 +2001,15 @@ const setupDragBehavior = () => {
       const nodeIndex = nodes.value.findIndex(n => n.id === draggedNodeId)
       if (nodeIndex !== -1) {
         nodes.value[nodeIndex].position = { x: currentGraphPos.x, y: currentGraphPos.y }
+      }
+      
+      // Calculate movement delta and apply dynamic node movement to connected nodes
+      if (hasDraggedDistance && nodeInfluenceMap.value.size > 0) {
+        const movement = {
+          x: currentGraphPos.x - previousX,
+          y: currentGraphPos.y - previousY
+        }
+        applyDynamicNodeMovement(draggedNodeId, movement)
       }
 
       // Refresh display
@@ -1714,6 +2043,7 @@ const setupDragBehavior = () => {
       setTimeout(() => {
         draggedNode.value = null
         isDragging.value = false
+        nodeInfluenceMap.value.clear() // Clear the influence map
       }, 100)
       
       draggedNodeId = null
@@ -2188,13 +2518,32 @@ const updateGraph = () => {
   // Clear the graph
   graph.value.clear()
   
-  // Add nodes from nodes array
-  nodes.value.forEach(node => {
+  // Filter nodes to exclude hidden model nodes
+  const visibleNodes = nodes.value.filter(node => {
+    // Always show package nodes
+    if (node.id.startsWith('package-')) {
+      return true
+    }
+    
+    // For record nodes, check if their model is hidden
+    const isHiddenModel = hiddenModels.value.has(node.data?.model)
+    return !isHiddenModel
+  })
+  
+  // Create a set of visible node IDs for edge filtering
+  const visibleNodeIds = new Set(visibleNodes.map(node => node.id))
+  
+  // Filter edges to only include those connecting visible nodes
+  const visibleEdges = edges.value.filter(edge => {
+    return visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+  })
+  
+  // Add visible nodes to the graph
+  visibleNodes.forEach(node => {
     try {
       // Assign different masses based on node type to influence layout
       const mass = node.type === 'package' ? 0.5 : 1.0 // Packages are lighter
       const nodeSize = node.type === 'package' ? 35 : 25 // Match the nodeReducer sizes
-      
       
       graph.value.addNode(node.id, {
         x: node.position?.x || Math.random(),
@@ -2210,8 +2559,8 @@ const updateGraph = () => {
     }
   })
   
-  // Add edges from edges array
-  edges.value.forEach(edge => {
+  // Add visible edges to the graph
+  visibleEdges.forEach(edge => {
     try {
       graph.value.addEdge(edge.source, edge.target, {
         label: edge.label,
@@ -2689,6 +3038,35 @@ onUnmounted(() => {
         margin-right: 20px;
         padding-right: 20px;
         border-right: 1px solid theme.$gray_2;
+        flex-wrap: wrap;
+
+        .legend-expand-btn {
+          background: none;
+          border: 1px solid theme.$gray_3;
+          border-radius: 4px;
+          padding: 2px 8px;
+          font-size: 11px;
+          color: theme.$gray_5;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          margin-left: 8px;
+
+          &:hover {
+            background: theme.$gray_1;
+            border-color: theme.$gray_4;
+            color: theme.$gray_6;
+          }
+
+          &:active {
+            background: theme.$gray_2;
+          }
+        }
+
+        .visibility-indicator {
+          margin-left: 4px;
+          font-size: 10px;
+          opacity: 0.7;
+        }
       }
       
       .legend-relationships {
@@ -2767,6 +3145,45 @@ onUnmounted(() => {
       flex: 1;
       width: 100%;
       min-height: 400px; // Ensure sigma container has minimum height
+      
+      // Force disable all pointer events and hover states on hidden nodes
+      // by using CSS to block all interactions at the DOM level
+      :deep(canvas) {
+        // Override any hover cursor styles that might be applied
+        cursor: default !important;
+        
+        // Force disable hover effects for hidden nodes using canvas styling
+        &.has-hidden-models {
+          // This will be applied when we have hidden models
+          pointer-events: none !important;
+          
+          &:hover {
+            cursor: default !important;
+          }
+        }
+      }
+      
+      // Disable pointer events on the entire Sigma canvas when nodes are hidden
+      &.disable-hover-effects {
+        pointer-events: none;
+        cursor: none !important;
+        
+        * {
+          pointer-events: none !important;
+          cursor: none !important;
+        }
+      }
+      
+      // CSS-level hover suppression for hidden model states
+      &.suppress-hidden-hover {
+        :deep(canvas) {
+          pointer-events: auto !important;
+          
+          &:hover {
+            cursor: crosshair !important;
+          }
+        }
+      }
     }
     
     .properties-bar {
@@ -2904,6 +3321,98 @@ onUnmounted(() => {
           height: 100%;
           padding: 0;
         }
+      }
+    }
+  }
+
+  // Legend section - positioned at the bottom
+  .legend-section {
+    background: theme.$white;
+    border-top: 1px solid theme.$gray_2;
+    padding: 16px 20px;
+
+    .legend-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      
+      .legend-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: theme.$gray_6;
+        margin-right: 12px;
+      }
+      
+      .legend-models {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-right: 20px;
+        padding-right: 20px;
+        border-right: 1px solid theme.$gray_2;
+      }
+      
+      .legend-relationships {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: theme.$gray_5;
+        
+        &.model-legend {
+          .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid;
+          }
+          
+          .model-name {
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+          }
+        }
+        
+        .legend-line {
+          width: 20px;
+          height: 2px;
+          border-radius: 1px;
+          
+          &.outbound {
+            background-color: #22C55E;
+          }
+          
+          &.inbound {
+            background-color: #3B82F6;
+          }
+          
+          &.package {
+            background-color: #6B7280;
+            background-image: repeating-linear-gradient(
+              to right,
+              #6B7280,
+              #6B7280 3px,
+              transparent 3px,
+              transparent 7px
+            );
+          }
+        }
+      }
+      
+      .legend-more {
+        font-size: 11px;
+        color: theme.$gray_4;
+        font-style: italic;
       }
     }
   }
