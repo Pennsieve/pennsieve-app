@@ -333,7 +333,7 @@ import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
-import { useGetToken } from "@/composables/useGetToken";
+import { useGetToken, useGetTokens } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
@@ -784,12 +784,13 @@ export default {
       }
 
       try {
-        const userToken = await useGetToken();
+        const tokens = await useGetTokens();
         const response = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
+            Authorization: `Bearer ${tokens.accessToken}`,
+            "X-Refresh-Token": tokens.refreshToken,
           },
           body: JSON.stringify(body),
         });
