@@ -1,6 +1,6 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import * as siteConfig from '@/site-config/site.json'
+import Cookies from 'js-cookie'
 
 
 export async function useGetToken() {
@@ -18,13 +18,22 @@ export async function useGetTokens() {
     try {
         const session = await fetchAuthSession();
 
-        // Get the refresh token from the token provider's storage
-        const tokens = await cognitoUserPoolsTokenProvider.getTokens();
+        // Get the refresh token from cookie storage
+        // The key format is: CognitoIdentityServiceProvider.<clientId>.<username>.refreshToken
+        let refreshToken = null;
+
+        // Get all cookies and find the one with refreshToken
+        const allCookies = Cookies.get();
+        const refreshTokenKey = Object.keys(allCookies).find(key => key.includes('refreshToken'));
+
+        if (refreshTokenKey) {
+            refreshToken = Cookies.get(refreshTokenKey);
+        }
 
         return {
             accessToken: session?.tokens?.accessToken.toString(),
             idToken: session?.tokens?.idToken.toString(),
-            refreshToken: tokens?.refreshToken?.toString()
+            refreshToken: refreshToken
         };
     } catch (error) {
         console.log(error);
