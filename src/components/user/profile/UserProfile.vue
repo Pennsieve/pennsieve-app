@@ -44,7 +44,7 @@ const rules = ref({
   ],
 });
 
-onMounted(() => {
+onMounted(async () => {
   setRuleFormData(store.state.profile);
 });
 
