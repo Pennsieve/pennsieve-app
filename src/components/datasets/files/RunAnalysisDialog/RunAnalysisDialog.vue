@@ -333,7 +333,7 @@ import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
-import { useGetToken, useGetTokens } from "@/composables/useGetToken";
+import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
@@ -784,7 +784,7 @@ export default {
       }
 
       try {
-        const tokens = await useGetTokens();
+        const tokens = await useGetAllTokens();
         const response = await fetch(url, {
           method: "POST",
           headers: {
