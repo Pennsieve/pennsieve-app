@@ -40,6 +40,7 @@ const router = useRouter()
 // Reactive data
 const record = ref(null)
 const model = ref(null)
+const relationships = ref({ inbound: [], outbound: [] })
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
@@ -98,15 +99,8 @@ const recordMetadata = computed(() => {
   }
 })
 
-const relationships = computed(() => {
-  if (!record.value?.relationships) return { inbound: [], outbound: [] }
-  
-  // Ensure both arrays exist, defaulting to empty arrays if not present
-  return {
-    inbound: record.value.relationships.inbound || [],
-    outbound: record.value.relationships.outbound || []
-  }
-})
+// Remove the old computed property that relied on record.relationships
+// Now we use the separate relationships ref that's fetched independently
 
 const hasRelationships = computed(() => {
   const rels = relationships.value
@@ -192,6 +186,17 @@ const fetchPackages = async () => {
     console.error('Error fetching packages:', err)
     // Don't show error for packages as it's not critical
     packages.value = []
+  }
+}
+
+const fetchRelationships = async () => {
+  try {
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId)
+    relationships.value = response || { inbound: [], outbound: [] }
+  } catch (err) {
+    console.error('Error fetching relationships:', err)
+    // Don't show error for relationships, just leave empty
+    relationships.value = { inbound: [], outbound: [] }
   }
 }
 
@@ -553,8 +558,8 @@ const deleteRelationship = async (relationship, direction) => {
 
     ElMessage.success('Relationship removed successfully')
 
-    // Refresh the record to get updated relationships
-    await fetchRecord()
+    // Refresh relationships to get updated list
+    await fetchRelationships()
   } catch (action) {
     if (action === 'cancel' || action === 'close') {
       // User cancelled or closed dialog
@@ -571,6 +576,7 @@ watch([() => props.modelId, () => props.recordId], async () => {
   // Clear current data
   record.value = null
   model.value = null
+  relationships.value = { inbound: [], outbound: [] }
   error.value = ''
   
   // Reset pagination when loading new record
@@ -578,12 +584,12 @@ watch([() => props.modelId, () => props.recordId], async () => {
   outboundCurrentPage.value = 1
   
   // Fetch new data
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
 })
 
 // Initialize
 onMounted(async () => {
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
 })
 </script>
 
