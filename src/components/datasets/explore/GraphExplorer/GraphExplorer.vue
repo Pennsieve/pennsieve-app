@@ -165,47 +165,6 @@
         </div>
       </div>
       
-      <!-- Legend -->
-      <div class="control-group legend">
-        <span class="legend-title">Legend:</span>
-        
-        <!-- Model Colors (if any models are displayed) -->
-        <div v-if="displayedModels.length > 0" class="legend-models">
-          <div
-            v-for="modelId in displayedModels.slice(0, 5)"
-            :key="modelId"
-            class="legend-item model-legend"
-          >
-            <div 
-              class="legend-dot" 
-              :style="{
-                backgroundColor: getModelColorForLegend(modelId).background,
-                borderColor: getModelColorForLegend(modelId).border
-              }"
-            ></div>
-            <span class="model-name">{{ getModelName(modelId) }}</span>
-          </div>
-          <span v-if="displayedModels.length > 5" class="legend-more">
-            +{{ displayedModels.length - 5 }} more
-          </span>
-        </div>
-        
-        <!-- Relationship Legend -->
-        <div class="legend-relationships">
-          <div class="legend-item">
-            <div class="legend-line outbound"></div>
-            <span>Outbound →</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line inbound"></div>
-            <span>Inbound ←</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line package"></div>
-            <span>Files</span>
-          </div>
-        </div>
-      </div>
       
       <div class="control-group">
         <span class="node-count">{{ nodeCount }} nodes, {{ edgeCount }} relationships</span>
@@ -215,6 +174,99 @@
     <!-- Graph Visualization -->
     <div class="graph-container">
       <div ref="sigmaContainer" class="sigma-container"></div>
+      
+      <!-- Graph Legend - Bottom of graph container -->
+      <div class="graph-legend" :class="{ 'expanded': legendExpanded }">
+        <div class="legend-header" @click="legendExpanded = !legendExpanded">
+          <span class="legend-title">Legend</span>
+          <button class="legend-toggle" :class="{ 'expanded': legendExpanded }">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M6 9l-4-4h8l-4 4z" />
+            </svg>
+          </button>
+        </div>
+        
+        <div class="legend-content">
+          <!-- Compact view - single line -->
+          <div v-if="!legendExpanded" class="legend-compact">
+            <!-- Show first few models only -->
+            <div v-if="displayedModels.length > 0" class="legend-models-compact">
+              <div
+                v-for="modelId in displayedModels.slice(0, 3)"
+                :key="modelId"
+                class="legend-item model-legend"
+              >
+                <div 
+                  class="legend-dot" 
+                  :style="{
+                    backgroundColor: getModelColorForLegend(modelId).background,
+                    borderColor: getModelColorForLegend(modelId).border
+                  }"
+                ></div>
+                <span class="model-name">{{ getModelName(modelId) }}</span>
+              </div>
+              <span v-if="displayedModels.length > 3" class="legend-more">
+                +{{ displayedModels.length - 3 }} more
+              </span>
+            </div>
+            
+            <!-- Essential relationship types -->
+            <div class="legend-relationships-compact">
+              <div class="legend-item">
+                <div class="legend-line outbound"></div>
+                <span>Relations</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line package"></div>
+                <span>Files</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Expanded view - full legend -->
+          <div v-else class="legend-expanded">
+            <!-- All model colors -->
+            <div v-if="displayedModels.length > 0" class="legend-section">
+              <div class="legend-section-title">Models</div>
+              <div class="legend-models-grid">
+                <div
+                  v-for="modelId in displayedModels"
+                  :key="modelId"
+                  class="legend-item model-legend"
+                >
+                  <div 
+                    class="legend-dot" 
+                    :style="{
+                      backgroundColor: getModelColorForLegend(modelId).background,
+                      borderColor: getModelColorForLegend(modelId).border
+                    }"
+                  ></div>
+                  <span class="model-name">{{ getModelName(modelId) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- All relationship types -->
+            <div class="legend-section">
+              <div class="legend-section-title">Relationships</div>
+              <div class="legend-relationships-grid">
+                <div class="legend-item">
+                  <div class="legend-line outbound"></div>
+                  <span>Outbound →</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line inbound"></div>
+                  <span>Inbound ←</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line package"></div>
+                  <span>Files</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <!-- Minimal Properties Bar - Bottom of graph container -->
       <div v-if="selectedNodeProperties" class="properties-bar">
@@ -333,6 +385,7 @@ const edgeCount = ref(0)
 const recordLimit = ref(50) // Default to 50 records per model
 const isQuerySectionCollapsed = ref(false) // Track query section collapse state
 const quickActionsVisible = ref(true) // Track if actions are shown inline or in dropdown
+const legendExpanded = ref(false) // Track legend expansion state
 const models = computed(() => {
   // Models in store have structure: [{ model: { id, name, display_name, ... } }]
   return (metadataStore.models || [])
@@ -2928,6 +2981,192 @@ onUnmounted(() => {
       flex: 1;
       width: 100%;
       min-height: 400px; // Ensure sigma container has minimum height
+    }
+    
+    .graph-legend {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: theme.$white;
+      border-top: 1px solid theme.$gray_2;
+      z-index: 999; // Just below properties bar
+      transition: all 0.3s ease;
+      
+      .legend-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 20px;
+        cursor: pointer;
+        background: theme.$gray_1;
+        border-bottom: 1px solid theme.$gray_2;
+        
+        &:hover {
+          background: theme.$gray_2;
+        }
+        
+        .legend-title {
+          font-size: 13px;
+          font-weight: 500;
+          color: theme.$gray_6;
+        }
+        
+        .legend-toggle {
+          background: none;
+          border: none;
+          color: theme.$gray_5;
+          cursor: pointer;
+          padding: 2px;
+          border-radius: 2px;
+          transition: all 0.2s ease;
+          transform: rotate(0deg);
+          
+          &.expanded {
+            transform: rotate(180deg);
+          }
+          
+          &:hover {
+            color: theme.$gray_6;
+            background: theme.$gray_3;
+          }
+          
+          svg {
+            display: block;
+          }
+        }
+      }
+      
+      .legend-content {
+        overflow: hidden;
+        transition: all 0.3s ease;
+        
+        .legend-compact {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          padding: 8px 20px;
+          
+          .legend-models-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-right: 20px;
+            padding-right: 20px;
+            border-right: 1px solid theme.$gray_2;
+          }
+          
+          .legend-relationships-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+        }
+        
+        .legend-expanded {
+          padding: 16px 20px;
+          
+          .legend-section {
+            margin-bottom: 16px;
+            
+            &:last-child {
+              margin-bottom: 0;
+            }
+            
+            .legend-section-title {
+              font-size: 12px;
+              font-weight: 600;
+              color: theme.$gray_6;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            
+            .legend-models-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+              gap: 8px 16px;
+            }
+            
+            .legend-relationships-grid {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+              flex-wrap: wrap;
+            }
+          }
+        }
+        
+        // Shared legend item styles
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: theme.$gray_5;
+          
+          &.model-legend {
+            .legend-dot {
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              border: 2px solid;
+              flex-shrink: 0;
+            }
+            
+            .model-name {
+              max-width: 150px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              font-size: 11px;
+              color: theme.$gray_6;
+            }
+          }
+          
+          .legend-line {
+            width: 20px;
+            height: 2px;
+            border-radius: 1px;
+            flex-shrink: 0;
+            
+            &.outbound {
+              background-color: #22C55E;
+            }
+            
+            &.inbound {
+              background-color: #3B82F6;
+            }
+            
+            &.package {
+              background-color: #6B7280;
+              background-image: repeating-linear-gradient(
+                to right,
+                #6B7280,
+                #6B7280 3px,
+                transparent 3px,
+                transparent 7px
+              );
+            }
+          }
+        }
+        
+        .legend-more {
+          font-size: 11px;
+          color: theme.$gray_4;
+          font-style: italic;
+        }
+      }
+      
+      // Compact mode (default)
+      &:not(.expanded) .legend-content {
+        max-height: 40px;
+      }
+      
+      // Expanded mode
+      &.expanded .legend-content {
+        max-height: 300px; // Generous height for expanded content
+      }
     }
     
     .properties-bar {
