@@ -1053,12 +1053,16 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
-     // Fetch relationships for a record
-    const fetchRecordRelationships = async (datasetId, recordId) => {
+     // Fetch relationships for a record with pagination support
+    const fetchRecordRelationships = async (datasetId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/records/${recordId}/relationships`
             const token = await useGetToken()
-            const queryParams = toQueryParams({ dataset_id: datasetId })
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                ...options // includes page_size, cursor, etc.
+            })
             const url = `${endpoint}?${queryParams}`
             
             const myHeaders = new Headers()
@@ -1071,17 +1075,57 @@ export const useMetadataStore = defineStore('metadata', () => {
             })
             
             if (resp.ok) {
-                return await resp.json()
+                const response = await resp.json()
+                return {
+                    relationships: response.relationships || { inbound: [], outbound: [] },
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
             } else {
-                // Return empty array for 404 (no relationships) instead of throwing error
+                // Return empty relationships for 404 (no relationships) instead of throwing error
                 if (resp.status === 404) {
-                    return []
+                    return {
+                        relationships: { inbound: [], outbound: [] },
+                        cursor: null,
+                        hasMore: false
+                    }
                 }
                 const errorText = await resp.text()
                 throw new Error(`Failed to fetch record relationships: ${resp.status} - ${errorText}`)
             }
         } catch (error) {
             console.error('Error fetching record relationships:', error)
+            throw error
+        }
+    }
+
+    // Fetch all relationships for a record (handles pagination automatically)
+    const fetchAllRecordRelationships = async (datasetId, recordId) => {
+        try {
+            let allRelationships = { inbound: [], outbound: [] }
+            let cursor = null
+            let hasMore = true
+            const pageSize = 50 // Reasonable page size for fetching all
+            
+            while (hasMore) {
+                const options = { page_size: pageSize }
+                if (cursor) {
+                    options.cursor = cursor
+                }
+                
+                const result = await fetchRecordRelationships(datasetId, recordId, options)
+                
+                // Append relationships
+                allRelationships.inbound.push(...(result.relationships.inbound || []))
+                allRelationships.outbound.push(...(result.relationships.outbound || []))
+                
+                cursor = result.cursor
+                hasMore = result.hasMore
+            }
+            
+            return allRelationships
+        } catch (error) {
+            console.error('Error fetching all record relationships:', error)
             throw error
         }
     }
@@ -1267,6 +1311,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         completePackageAttachment,
         fetchRecordPackages,
         fetchRecordRelationships,
+        fetchAllRecordRelationships,
         deletePackageFromRecord,
         deleteRelationship,
         deleteRecord,
