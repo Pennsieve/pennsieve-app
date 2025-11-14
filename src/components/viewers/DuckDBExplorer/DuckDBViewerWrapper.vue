@@ -32,9 +32,15 @@ onMounted(async () => {
   try {
     // get Viewer Assets
     await getViewerAssets()
+<<<<<<< Updated upstream
 
     // Extract stable file ID
     fileId.value = viewAssets.value[0].content.id
+=======
+    //
+    // Extract stable file ID and convert to string
+    fileId.value = String(viewAssets.value[0].content.id)
+>>>>>>> Stashed changes
     console.log('Using stable file ID:', fileId.value)
 
     // Get presigned URL

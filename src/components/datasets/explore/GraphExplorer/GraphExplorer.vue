@@ -129,7 +129,7 @@
         </div>
       </div>
       
-      
+
       <div class="control-group">
         <span class="node-count">{{ nodeCount }} nodes, {{ edgeCount }} relationships</span>
       </div>
@@ -139,6 +139,99 @@
     <div class="graph-container">
       <div ref="sigmaContainer" class="sigma-container"></div>
 
+      <!-- Graph Legend - Bottom of graph container -->
+      <div class="graph-legend" :class="{ 'expanded': legendExpanded }">
+        <div class="legend-header" @click="legendExpanded = !legendExpanded">
+          <span class="legend-title">Legend</span>
+          <button class="legend-toggle" :class="{ 'expanded': legendExpanded }">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M6 9l-4-4h8l-4 4z" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="legend-content">
+          <!-- Compact view - single line -->
+          <div v-if="!legendExpanded" class="legend-compact">
+            <!-- Show first few models only -->
+            <div v-if="displayedModels.length > 0" class="legend-models-compact">
+              <div
+                v-for="modelId in displayedModels.slice(0, 3)"
+                :key="modelId"
+                class="legend-item model-legend"
+              >
+                <div
+                  class="legend-dot"
+                  :style="{
+                    backgroundColor: getModelColorForLegend(modelId).background,
+                    borderColor: getModelColorForLegend(modelId).border
+                  }"
+                ></div>
+                <span class="model-name">{{ getModelName(modelId) }}</span>
+              </div>
+              <span v-if="displayedModels.length > 3" class="legend-more">
+                +{{ displayedModels.length - 3 }} more
+              </span>
+            </div>
+
+            <!-- Essential relationship types -->
+            <div class="legend-relationships-compact">
+              <div class="legend-item">
+                <div class="legend-line outbound"></div>
+                <span>Relations</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line package"></div>
+                <span>Files</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expanded view - full legend -->
+          <div v-else class="legend-expanded">
+            <!-- All model colors -->
+            <div v-if="displayedModels.length > 0" class="legend-section">
+              <div class="legend-section-title">Models</div>
+              <div class="legend-models-grid">
+                <div
+                  v-for="modelId in displayedModels"
+                  :key="modelId"
+                  class="legend-item model-legend"
+                >
+                  <div
+                    class="legend-dot"
+                    :style="{
+                      backgroundColor: getModelColorForLegend(modelId).background,
+                      borderColor: getModelColorForLegend(modelId).border
+                    }"
+                  ></div>
+                  <span class="model-name">{{ getModelName(modelId) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- All relationship types -->
+            <div class="legend-section">
+              <div class="legend-section-title">Relationships</div>
+              <div class="legend-relationships-grid">
+                <div class="legend-item">
+                  <div class="legend-line outbound"></div>
+                  <span>Outbound →</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line inbound"></div>
+                  <span>Inbound ←</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line package"></div>
+                  <span>Files</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- Minimal Properties Bar - Bottom of graph container -->
       <div v-if="selectedNodeProperties" class="properties-bar">
         <div class="properties-content">
@@ -167,65 +260,6 @@
             View Details
           </button>
           <button class="close-btn" @click="selectedNodeProperties = null; sigmaInstance?.refresh()">×</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Legend - positioned below graph, above record details -->
-    <div v-if="displayedModels.length > 0 || nodes.length > 0" class="legend-section">
-      <div class="legend-container">
-        <span class="legend-title">Legend:</span>
-        
-        <!-- Model Colors (if any models are displayed) -->
-        <div v-if="displayedModels.length > 0" class="legend-models">
-          <!-- Always visible models (first 5 or all if expanded) -->
-          <div
-            v-for="modelId in (isLegendExpanded ? displayedModels : displayedModels.slice(0, 5))"
-            :key="modelId"
-            class="legend-item model-legend"
-            :class="{ 'hidden': hiddenModels.has(modelId) }"
-            @click="toggleModelVisibility(modelId)"
-          >
-            <div 
-              class="legend-dot" 
-              :style="{
-                backgroundColor: getModelColorForLegend(modelId).background,
-                borderColor: getModelColorForLegend(modelId).border,
-                opacity: hiddenModels.has(modelId) ? 0.3 : 1
-              }"
-            ></div>
-            <span class="model-name" :style="{ opacity: hiddenModels.has(modelId) ? 0.5 : 1 }">{{ getModelName(modelId) }}</span>
-          </div>
-          
-          <!-- Show more/less button when there are more than 5 models -->
-          <button 
-            v-if="displayedModels.length > 5" 
-            class="legend-expand-btn"
-            @click="toggleLegendExpansion"
-          >
-            <span v-if="!isLegendExpanded">
-              +{{ displayedModels.length - 5 }} more
-            </span>
-            <span v-else>
-              Show less
-            </span>
-          </button>
-        </div>
-        
-        <!-- Relationship Legend -->
-        <div class="legend-relationships">
-          <div class="legend-item">
-            <div class="legend-line outbound"></div>
-            <span>Outbound → (from selected)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line inbound"></div>
-            <span>Inbound ← (to selected)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line package"></div>
-            <span>Files</span>
-          </div>
         </div>
       </div>
     </div>
@@ -315,6 +349,7 @@ const edgeCount = ref(0)
 const recordLimit = ref(50) // Default to 50 records per model
 const isQuerySectionCollapsed = ref(false) // Track query section collapse state
 const quickActionsVisible = ref(true) // Track if actions are shown inline or in dropdown
+const legendExpanded = ref(false) // Track legend expansion state
 const models = computed(() => {
   // Models in store have structure: [{ model: { id, name, display_name, ... } }]
   return (metadataStore.models || [])
@@ -483,22 +518,22 @@ const removeFilter = (index) => {
 // Helper function to convert dot notation to JSON path format
 const convertToJsonPath = (property, modelId) => {
   if (!property) return ''
-  
+
   // Convert dot notation to JSON path format: availability.quantity -> /availability/quantity
-  let jsonPath = property.includes('.') ? 
-    `/${property.replace(/\./g, '/')}` : 
+  let jsonPath = property.includes('.') ?
+    `/${property.replace(/\./g, '/')}` :
     `/${property}`
-  
+
   // Check if this property is an array and append /* if needed
   if (modelId) {
     const model = models.value.find(m => m.id === modelId)
     if (model && model.latest_version && model.latest_version.schema) {
       const schema = model.latest_version.schema
-      
+
       // Navigate to the property in the schema to check its type
       const pathParts = property.split('.')
       let currentSchema = schema.properties
-      
+
       for (let i = 0; i < pathParts.length && currentSchema; i++) {
         const part = pathParts[i]
         if (currentSchema[part]) {
@@ -521,7 +556,7 @@ const convertToJsonPath = (property, modelId) => {
       }
     }
   }
-  
+
   return jsonPath
 }
 
@@ -536,14 +571,14 @@ const executeQuery = async () => {
       .map(async (multiModelFilter, index) => {
         try {
           let options = { limit: recordLimit.value }
-          
+
           // Handle multiple filters within each MultiModelFilter
           if (multiModelFilter.hasMultipleFilters && multiModelFilter.subFilters) {
             // MultiModelFilter has multiple sub-filters
-            const validSubFilters = multiModelFilter.subFilters.filter(subFilter => 
+            const validSubFilters = multiModelFilter.subFilters.filter(subFilter =>
               subFilter.property && subFilter.operator && subFilter.value
             )
-            
+
             if (validSubFilters.length === 0) {
               // No valid filters - fetch all records for the model (don't set options.filter)
               console.log(`No valid sub-filters for model ${multiModelFilter.model}, fetching all records`)
@@ -579,14 +614,14 @@ const executeQuery = async () => {
                 console.log('🔍 Final predicate:', predicate)
                 return predicate
               }).filter(predicate => predicate.value !== null) // Filter out null values
-              
-              
+
+
               // Use the logical operator as the key (and/or)
               const logicalOp = multiModelFilter.logicalOperator || 'and'
               options.filter = {
                 [logicalOp]: subFilterPredicates
               }
-              
+
             }
           } else {
             // Single filter (legacy format or single filter in new format)
@@ -601,7 +636,7 @@ const executeQuery = async () => {
               console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
             }
           }
-          
+
           const response = await metadataStore.fetchRecords(props.datasetId, multiModelFilter.model, options)
           return {
             multiModelFilterIndex: index,
@@ -657,17 +692,17 @@ const executeQuery = async () => {
 // Helper function to get nested property type from schema
 const getNestedPropertyType = (propertyPath, modelId) => {
   if (!propertyPath || !modelId) return 'string'
-  
+
   const model = models.value.find(m => m.id === modelId)
   if (!model || !model.latest_version || !model.latest_version.schema) return 'string'
-  
+
   const schema = model.latest_version.schema
   if (!schema.properties) return 'string'
-  
+
   // Handle dot notation for nested properties
   const pathParts = propertyPath.split('.')
   let currentSchema = schema.properties
-  
+
   for (let i = 0; i < pathParts.length; i++) {
     const part = pathParts[i]
     if (currentSchema[part]) {
@@ -686,7 +721,7 @@ const getNestedPropertyType = (propertyPath, modelId) => {
       return 'string' // Property not found
     }
   }
-  
+
   return 'string'
 }
 
@@ -697,7 +732,7 @@ const parseValue = (value, operator, propertyName, modelProperties, modelId) => 
   // First try to find the property directly (for simple properties from GraphExplorer)
   let property = modelProperties?.find(p => p.name === propertyName)
   let propertyType = property?.type
-  
+
   // If not found, try nested property lookup using the schema
   if (!property && propertyName && propertyName.includes('.') && modelId) {
     propertyType = getNestedPropertyType(propertyName, modelId)
@@ -708,14 +743,14 @@ const parseValue = (value, operator, propertyName, modelProperties, modelId) => 
       originalValue: value
     })
   }
-  
+
   // Fallback to simple property name lookup
   if (!propertyType && propertyName && propertyName.includes('.')) {
     const simplePropertyName = propertyName.split('.').pop()
     property = modelProperties?.find(p => p.name === simplePropertyName)
     propertyType = property?.type
   }
-  
+
   propertyType = propertyType || 'string'
   
   // Handle operators that expect arrays
@@ -764,7 +799,7 @@ const parseValue = (value, operator, propertyName, modelProperties, modelId) => 
     return value === 'true' || value === true
   }
   
-  
+
   return value
 }
 
@@ -775,6 +810,11 @@ const displayQueryResults = (records) => {
   edges.value = []
   expandedNodes.value.clear()
   nodeExpansionMap.value.clear()
+  
+  // Clear selected nodes
+  selectedNodeProperties.value = null
+  selectedRecord.value = null
+  showDetailsPanel.value = false
   
   if (!records || records.length === 0) {
     ElMessage.info('No records found matching your query')
@@ -908,9 +948,26 @@ const fetchRecordRelationships = async (recordId) => {
       return relationships.relationships
     } else if (relationships && Array.isArray(relationships.data)) {
       return relationships.data
+    } else if (relationships && relationships.relationships && (relationships.relationships.inbound || relationships.relationships.outbound)) {
+      // Handle new API structure: {relationships: {inbound: [...], outbound: [...]}}
+      const relationshipData = relationships.relationships
+      const allRelationships = [
+        ...(Array.isArray(relationshipData.inbound) ? relationshipData.inbound.map(rel => ({
+          ...rel,
+          direction: 'inbound'
+        })) : []),
+        ...(Array.isArray(relationshipData.outbound) ? relationshipData.outbound.map(rel => ({
+          ...rel,
+          direction: 'outbound'
+        })) : [])
+      ]
+      // Debug the structure of individual relationships
+      if (allRelationships.length > 0) {
+        console.log('🔍 Found relationships with new API structure:', allRelationships.length)
+      }
+      return allRelationships
     } else if (relationships && (relationships.inbound || relationships.outbound)) {
-      // Handle {inbound: [...], outbound: [...]} structure with direction tracking
-      // Either inbound or outbound can be null/undefined
+      // Handle legacy {inbound: [...], outbound: [...]} structure (fallback)
       const allRelationships = [
         ...(Array.isArray(relationships.inbound) ? relationships.inbound.map(rel => ({
           ...rel,
@@ -1436,8 +1493,6 @@ const formatPropertyValue = (value) => {
 // Model color assignment for consistent colors across the session
 const modelColorAssignment = ref(new Map())
 const displayedModels = ref([])
-const hiddenModels = ref(new Set()) // Track which models are hidden from view
-const isLegendExpanded = ref(false) // Track whether legend shows all models
 
 // Track which nodes are expanded and their children for proper collapse behavior
 const nodeExpansionMap = ref(new Map()) // nodeId -> { children: Set<nodeId>, edges: Set<edgeId> }
@@ -1451,23 +1506,6 @@ const getModelName = (modelId) => {
 // Get model color for legend
 const getModelColorForLegend = (modelId) => {
   return modelColorAssignment.value.get(modelId) || getModelColor(modelId)
-}
-
-// Toggle model visibility in legend
-const toggleModelVisibility = (modelId) => {
-  if (hiddenModels.value.has(modelId)) {
-    hiddenModels.value.delete(modelId)
-  } else {
-    hiddenModels.value.add(modelId)
-  }
-  
-  // Update the graph to apply filtering changes
-  updateGraph()
-}
-
-// Toggle legend expansion
-const toggleLegendExpansion = () => {
-  isLegendExpanded.value = !isLegendExpanded.value
 }
 
 // Get record label using model's key property (with character limit)
@@ -1537,84 +1575,13 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
 // State for drag functionality
 const draggedNode = ref(null)
 const isDragging = ref(false)
-const nodeInfluenceMap = ref(new Map()) // Tracks influence levels for nodes during drag
+const connectedNodeOffsets = ref(new Map()) // Store relative positions of connected nodes
 
 // State for force layout animation
 const forceLayoutRunning = ref(false)
 const forceLayoutWorker = ref(null)
 const dragForceRunning = ref(false)
 const canvasForceRunning = ref(false)
-
-// Utility functions for dynamic node movement
-const calculateNodeInfluence = (draggedNodeId) => {
-  if (!graph.value) return new Map()
-  
-  const influence = new Map()
-  const visited = new Set()
-  const queue = [{ nodeId: draggedNodeId, distance: 0 }]
-  
-  while (queue.length > 0) {
-    const { nodeId, distance } = queue.shift()
-    
-    if (visited.has(nodeId) || distance > 1) continue // Limit to 3 hops max
-    visited.add(nodeId)
-    
-    // Calculate influence based on distance (1.0 = full influence, decreases with distance)
-    let influence_level = 0.9
-    if (distance > 1) {
-      influence_level = Math.max(0, 1.0 - (distance * 0.3))
-    }
-
-
-    influence.set(nodeId, influence_level)
-    
-    // Add neighbors to queue
-    if (distance < 3) {
-      graph.value.neighbors(nodeId).forEach(neighborId => {
-        if (!visited.has(neighborId)) {
-          queue.push({ nodeId: neighborId, distance: distance + 1 })
-        }
-      })
-    }
-  }
-  
-  return influence
-}
-
-const applyDynamicNodeMovement = (draggedNodeId, movement) => {
-  const influences = nodeInfluenceMap.value
-  if (!influences || influences.size === 0) return
-  
-  // Apply movement to influenced nodes
-  influences.forEach((influence_level, nodeId) => {
-    if (nodeId === draggedNodeId) return // Skip the dragged node itself
-    if (isNodeLocked(nodeId)) return // Skip locked nodes - they should not move at all
-    
-    // Calculate movement based on influence level
-    const scaledMovement = {
-      x: movement.x * influence_level,
-      y: movement.y * influence_level
-    }
-    
-    // Get current position
-    const currentX = graph.value.getNodeAttribute(nodeId, 'x') || 0
-    const currentY = graph.value.getNodeAttribute(nodeId, 'y') || 0
-    
-    // Apply scaled movement
-    const newX = currentX + scaledMovement.x
-    const newY = currentY + scaledMovement.y
-    
-    // Update node position
-    graph.value.setNodeAttribute(nodeId, 'x', newX)
-    graph.value.setNodeAttribute(nodeId, 'y', newY)
-    
-    // Update internal nodes array
-    const nodeIndex = nodes.value.findIndex(n => n.id === nodeId)
-    if (nodeIndex !== -1) {
-      nodes.value[nodeIndex].position = { x: newX, y: newY }
-    }
-  })
-}
 
 // Initialize Sigma.js
 const initializeGraph = () => {
@@ -1657,7 +1624,7 @@ const initializeGraph = () => {
       const isSelected = selectedNodeProperties.value && 
         selectedNodeProperties.value.nodeId === node
       const isExpanded = expandedNodes.value.has(node)
-      
+
       // Base size calculation
       let baseSize = 8
       if (isExpanded) {
@@ -1678,12 +1645,12 @@ const initializeGraph = () => {
         const modelColor = modelColorAssignment.value.has(data.model) 
           ? modelColorAssignment.value.get(data.model)
           : getModelColor(data.model)
-        
+
         res.color = modelColor.border
         res.borderColor = modelColor.border  
         res.backgroundColor = modelColor.background
         res.size = baseSize * sizeFactor // Scale size based on zoom
-        
+
         // Limit record label length
         const originalLabel = data.label || 'record'
         res.label = originalLabel.length > 20 ? originalLabel.substring(0, 17) + '...' : originalLabel
@@ -1705,21 +1672,21 @@ const initializeGraph = () => {
       
       // Default color for all relationships is grey
       let baseColor = '#b3bcce' // default gray
-      
+
       // Only show colored relationships if there's a selected node
       if (selectedNodeProperties.value) {
         const selectedNodeId = selectedNodeProperties.value.nodeId
-        
+
         // Get the edge from the graph to access source and target
         let edgeSource, edgeTarget
         if (graph.value && graph.value.hasEdge(edgeKey)) {
           edgeSource = graph.value.source(edgeKey)
           edgeTarget = graph.value.target(edgeKey)
         }
-        
+
         // Check if this edge connects to the selected node
         const connectsToSelected = edgeSource === selectedNodeId || edgeTarget === selectedNodeId
-        
+
         console.log('🔍 Edge coloring debug:', {
           edgeKey,
           edgeSource,
@@ -1729,14 +1696,14 @@ const initializeGraph = () => {
           direction: data.direction,
           dataType: data.type
         })
-        
+
         if (connectsToSelected && edgeSource && edgeTarget) {
           // Determine direction relative to the selected node
           // If the edge source is the selected node, it's outbound from selected
           // If the edge target is the selected node, it's inbound to selected
           const isOutboundFromSelected = edgeSource === selectedNodeId
           const isInboundToSelected = edgeTarget === selectedNodeId
-          
+
           if (isOutboundFromSelected) {
             baseColor = '#22c55e' // green for outbound from selected node
             console.log('✅ Coloring edge green (outbound from selected)')
@@ -1751,10 +1718,10 @@ const initializeGraph = () => {
       if (data.type === 'package') {
         baseColor = '#6b7280' // gray for package edges
       }
-      
+
       res.color = baseColor
       res.size = data.size || 2
-      
+
       return res
     }
   })
@@ -1765,17 +1732,8 @@ const initializeGraph = () => {
     if (!isDragging.value) {
       const nodeId = event.node
       const nodeAttributes = graph.value.getNodeAttributes(nodeId)
-      
-      // Check if this node belongs to a hidden model
-      const isPackage = nodeId.startsWith('package-')
-      const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
-      
-      // Block interaction with hidden model nodes
-      if (isHiddenModel) {
-        console.log('🚫 Blocked click on hidden model node:', nodeId)
-        return
-      }
-      
+
+
       // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
       // The modifier keys are in event.event.original (PointerEvent)
       const originalEvent = event.event?.original
@@ -1856,6 +1814,15 @@ const initializeGraph = () => {
     }
   })
   
+  // Add click handler for canvas (empty space)
+  sigmaInstance.value.on('clickStage', (event) => {
+    // Clear selected node when clicking on empty canvas
+    if (selectedNodeProperties.value) {
+      selectedNodeProperties.value = null
+      sigmaInstance.value.refresh()
+    }
+  })
+  
   sigmaInstance.value.on('doubleClickNode', (event) => {
     // Prevent default camera zoom behavior
     event.preventSigmaDefault()
@@ -1864,59 +1831,19 @@ const initializeGraph = () => {
     
     const nodeId = event.node
     const nodeAttributes = graph.value.getNodeAttributes(nodeId)
-    
-    // Check if this node belongs to a hidden model
-    const isPackage = nodeId.startsWith('package-')
-    const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
-    
-    // Block interaction with hidden model nodes
-    if (isHiddenModel) {
-      console.log('🚫 Blocked double-click on hidden model node:', nodeId)
-      return
-    }
-    
+
+
     expandNode(event.node)
   })
   
   // Note: Node hover events are disabled at the Sigma configuration level
   // (enableNodeHoverEvents: false) to completely prevent hover styling on hidden nodes
-  
-  // Add drag functionality  
+
+  // Add drag functionality
   setupDragBehavior()
   
   // Add canvas drag detection
   setupCanvasDragBehavior()
-  
-  // CRITICAL: Completely disable ALL hover detection and rendering
-  // Step 1: Disable hover renderer completely
-  sigmaInstance.value.setSetting('hoverRenderer', () => {}) // Set to empty function instead of null
-  
-  // Step 2: Disable hover cursor changes  
-  sigmaInstance.value.setSetting('defaultHoverCursor', 'default')
-  sigmaInstance.value.setSetting('defaultGrabCursor', 'default')
-  sigmaInstance.value.setSetting('defaultClickCursor', 'default')
-  
-  // Step 3: Override the hover detection entirely
-  // Create a custom renderer that ignores hover completely for hidden nodes
-  sigmaInstance.value.setSetting('hoverRenderer', (context, data, settings) => {
-    // Check if this is a hidden model node
-    const isHiddenModel = !data.key.startsWith('package-') && hiddenModels.value.has(data.model)
-    
-    if (isHiddenModel) {
-      // Return immediately without any hover rendering for hidden nodes
-      return
-    }
-    
-    // For non-hidden nodes, use minimal hover rendering
-    if (data.highlighted) {
-      const size = settings.labelSize
-      const x = Math.round(data.x)
-      const y = Math.round(data.y - size / 2 - 2)
-      
-      context.fillStyle = '#000'
-      context.fillText(data.label, x, y)
-    }
-  })
   
   // Add camera update listener to refresh node sizes on zoom
   sigmaInstance.value.getCamera().on('updated', () => {
@@ -1937,26 +1864,20 @@ const setupDragBehavior = () => {
   
   // Mouse down on node - start drag
   sigmaInstance.value.on('downNode', (event) => {
-    const nodeId = event.node
-    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
-    
-    // Check if this node belongs to a hidden model
-    const isPackage = nodeId.startsWith('package-')
-    const isHiddenModel = !isPackage && hiddenModels.value.has(nodeAttributes.model)
-    
-    // Block drag interaction with hidden model nodes
-    if (isHiddenModel) {
-      console.log('🚫 Blocked drag on hidden model node:', nodeId)
+    // Disable dragging in Circle mode
+    if (currentLayout.value === 'Circle') {
       return
     }
     
+    const nodeId = event.node
+    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+
+
     draggedNodeId = event.node
     isDraggingNode = true
     hasDraggedDistance = false
     startPosition = { x: event.event?.clientX || 0, y: event.event?.clientY || 0 }
     
-    // Calculate initial influence map for connected nodes
-    nodeInfluenceMap.value = calculateNodeInfluence(draggedNodeId)
   })
   
   // Mouse move - update node position during drag
@@ -1981,17 +1902,20 @@ const setupDragBehavior = () => {
           // Now we know it's a real drag, update global state
           draggedNode.value = draggedNodeId
           isDragging.value = true
-          // No force simulation during node drag - just move the node
+          
+          // Disable camera zoom/pan during drag
+          sigmaInstance.value.getCamera().disable()
+          
+          // Store initial positions of connected nodes for dragging
+          if (currentLayout.value === 'Force') {
+            initializeConnectedNodeDragging(draggedNodeId)
+          }
         }
       }
 
       // Always move the node when we have a dragged node, regardless of threshold
       // Convert current mouse position to graph coordinates
       const currentGraphPos = sigmaInstance.value.viewportToGraph(event)
-      
-      // Store previous position to calculate movement delta
-      const previousX = graph.value.getNodeAttribute(draggedNodeId, 'x') || 0
-      const previousY = graph.value.getNodeAttribute(draggedNodeId, 'y') || 0
 
       // Update node position directly to the cursor position
       graph.value.setNodeAttribute(draggedNodeId, 'x', currentGraphPos.x)
@@ -2002,14 +1926,10 @@ const setupDragBehavior = () => {
       if (nodeIndex !== -1) {
         nodes.value[nodeIndex].position = { x: currentGraphPos.x, y: currentGraphPos.y }
       }
-      
-      // Calculate movement delta and apply dynamic node movement to connected nodes
-      if (hasDraggedDistance && nodeInfluenceMap.value.size > 0) {
-        const movement = {
-          x: currentGraphPos.x - previousX,
-          y: currentGraphPos.y - previousY
-        }
-        applyDynamicNodeMovement(draggedNodeId, movement)
+
+      // Move connected nodes if we have dragged distance and are in Force mode
+      if (hasDraggedDistance && currentLayout.value === 'Force') {
+        moveConnectedNodes(draggedNodeId, currentGraphPos)
       }
 
       // Refresh display
@@ -2043,7 +1963,6 @@ const setupDragBehavior = () => {
       setTimeout(() => {
         draggedNode.value = null
         isDragging.value = false
-        nodeInfluenceMap.value.clear() // Clear the influence map
       }, 100)
       
       draggedNodeId = null
@@ -2511,6 +2430,141 @@ const stopDragForceAnimation = () => {
   }
 }
 
+// Initialize connected node dragging by storing initial positions
+const initializeConnectedNodeDragging = (draggedNodeId) => {
+  if (!graph.value || !draggedNodeId) return
+
+  // Clear previous offsets
+  connectedNodeOffsets.value.clear()
+
+  try {
+    // Get the current position of the dragged node
+    const draggedNodePos = {
+      x: graph.value.getNodeAttribute(draggedNodeId, 'x'),
+      y: graph.value.getNodeAttribute(draggedNodeId, 'y')
+    }
+
+    // Find all directly connected nodes
+    const connectedNodeIds = new Set()
+
+    // Check all edges to find connected nodes
+    edges.value.forEach(edge => {
+      if (edge.source === draggedNodeId) {
+        connectedNodeIds.add(edge.target)
+      } else if (edge.target === draggedNodeId) {
+        connectedNodeIds.add(edge.source)
+      }
+    })
+
+    // Store the relative offset of each connected node to the dragged node
+    connectedNodeIds.forEach(connectedNodeId => {
+      if (graph.value.hasNode(connectedNodeId)) {
+        const connectedNodePos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+
+        // Calculate and store the offset
+        const offset = {
+          x: connectedNodePos.x - draggedNodePos.x,
+          y: connectedNodePos.y - draggedNodePos.y
+        }
+
+        connectedNodeOffsets.value.set(connectedNodeId, offset)
+      }
+    })
+
+    console.log(`🔗 Initialized dragging for ${connectedNodeOffsets.value.size} connected nodes`)
+  } catch (error) {
+    console.warn('⚠️ Error initializing connected node dragging:', error)
+    connectedNodeOffsets.value.clear()
+  }
+}
+
+// Move connected nodes based on the dragged node's new position
+const moveConnectedNodes = (draggedNodeId, newDraggedNodePos) => {
+  if (!connectedNodeOffsets.value.size || !graph.value) return
+
+  try {
+    // Move each connected node with asymmetric behavior
+    connectedNodeOffsets.value.forEach((offset, connectedNodeId) => {
+      // Skip locked nodes - they should not move with the dragged node
+      if (isNodeLocked(connectedNodeId)) {
+        return
+      }
+
+      if (graph.value.hasNode(connectedNodeId)) {
+        // Get current position of the connected node
+        const currentPos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+
+        // Calculate current distance between dragged node and connected node
+        const currentDistance = Math.sqrt(
+          Math.pow(currentPos.x - newDraggedNodePos.x, 2) +
+          Math.pow(currentPos.y - newDraggedNodePos.y, 2)
+        )
+
+        // Use the original stored offset distance as the reference
+        const originalDistance = Math.sqrt(
+          Math.pow(offset.x, 2) + Math.pow(offset.y, 2)
+        )
+
+        let newConnectedPos
+
+        // Add small tolerance to prevent jittering at the boundary
+        const tolerance = 5 // pixels
+
+        if (currentDistance <= originalDistance + tolerance) {
+          // Moving closer or at original distance: don't push connected node away
+          // Keep the connected node where it is (no resistance when shortening)
+          newConnectedPos = {
+            x: currentPos.x,
+            y: currentPos.y
+          }
+        } else {
+          // Moving away: connected node follows to maintain the original distance
+          // Calculate the direction vector from dragged node to connected node
+          const directionX = currentPos.x - newDraggedNodePos.x
+          const directionY = currentPos.y - newDraggedNodePos.y
+
+          // Normalize the direction vector
+          const directionLength = Math.sqrt(directionX * directionX + directionY * directionY)
+          const normalizedDirX = directionLength > 0 ? directionX / directionLength : 0
+          const normalizedDirY = directionLength > 0 ? directionY / directionLength : 0
+
+          // Calculate target position at original distance in the current direction
+          const targetPos = {
+            x: newDraggedNodePos.x + normalizedDirX * originalDistance,
+            y: newDraggedNodePos.y + normalizedDirY * originalDistance
+          }
+
+          // Apply follow factor for elastic behavior
+          const followFactor = 0.4 // How much the connected node follows (0 = doesn't follow, 1 = follows completely)
+
+          newConnectedPos = {
+            x: currentPos.x + (targetPos.x - currentPos.x) * followFactor,
+            y: currentPos.y + (targetPos.y - currentPos.y) * followFactor
+          }
+        }
+
+        // Update the connected node's position
+        graph.value.setNodeAttribute(connectedNodeId, 'x', newConnectedPos.x)
+        graph.value.setNodeAttribute(connectedNodeId, 'y', newConnectedPos.y)
+
+        // Update internal nodes array
+        const nodeIndex = nodes.value.findIndex(n => n.id === connectedNodeId)
+        if (nodeIndex !== -1) {
+          nodes.value[nodeIndex].position = { x: newConnectedPos.x, y: newConnectedPos.y }
+        }
+      }
+    })
+  } catch (error) {
+    console.warn('⚠️ Error moving connected nodes:', error)
+  }
+}
+
 // Update graph with new data
 const updateGraph = () => {
   if (!graph.value || !sigmaInstance.value) return
@@ -2518,33 +2572,13 @@ const updateGraph = () => {
   // Clear the graph
   graph.value.clear()
   
-  // Filter nodes to exclude hidden model nodes
-  const visibleNodes = nodes.value.filter(node => {
-    // Always show package nodes
-    if (node.id.startsWith('package-')) {
-      return true
-    }
-    
-    // For record nodes, check if their model is hidden
-    const isHiddenModel = hiddenModels.value.has(node.data?.model)
-    return !isHiddenModel
-  })
-  
-  // Create a set of visible node IDs for edge filtering
-  const visibleNodeIds = new Set(visibleNodes.map(node => node.id))
-  
-  // Filter edges to only include those connecting visible nodes
-  const visibleEdges = edges.value.filter(edge => {
-    return visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-  })
-  
-  // Add visible nodes to the graph
-  visibleNodes.forEach(node => {
+  // Add nodes from nodes array
+  nodes.value.forEach(node => {
     try {
       // Assign different masses based on node type to influence layout
       const mass = node.type === 'package' ? 0.5 : 1.0 // Packages are lighter
       const nodeSize = node.type === 'package' ? 35 : 25 // Match the nodeReducer sizes
-      
+
       graph.value.addNode(node.id, {
         x: node.position?.x || Math.random(),
         y: node.position?.y || Math.random(),
@@ -2559,8 +2593,8 @@ const updateGraph = () => {
     }
   })
   
-  // Add visible edges to the graph
-  visibleEdges.forEach(edge => {
+  // Add edges from edges array
+  edges.value.forEach(edge => {
     try {
       graph.value.addEdge(edge.source, edge.target, {
         label: edge.label,
@@ -3038,35 +3072,6 @@ onUnmounted(() => {
         margin-right: 20px;
         padding-right: 20px;
         border-right: 1px solid theme.$gray_2;
-        flex-wrap: wrap;
-
-        .legend-expand-btn {
-          background: none;
-          border: 1px solid theme.$gray_3;
-          border-radius: 4px;
-          padding: 2px 8px;
-          font-size: 11px;
-          color: theme.$gray_5;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          margin-left: 8px;
-
-          &:hover {
-            background: theme.$gray_1;
-            border-color: theme.$gray_4;
-            color: theme.$gray_6;
-          }
-
-          &:active {
-            background: theme.$gray_2;
-          }
-        }
-
-        .visibility-indicator {
-          margin-left: 4px;
-          font-size: 10px;
-          opacity: 0.7;
-        }
       }
       
       .legend-relationships {
@@ -3145,47 +3150,194 @@ onUnmounted(() => {
       flex: 1;
       width: 100%;
       min-height: 400px; // Ensure sigma container has minimum height
-      
-      // Force disable all pointer events and hover states on hidden nodes
-      // by using CSS to block all interactions at the DOM level
-      :deep(canvas) {
-        // Override any hover cursor styles that might be applied
-        cursor: default !important;
-        
-        // Force disable hover effects for hidden nodes using canvas styling
-        &.has-hidden-models {
-          // This will be applied when we have hidden models
-          pointer-events: none !important;
-          
-          &:hover {
-            cursor: default !important;
-          }
-        }
-      }
-      
-      // Disable pointer events on the entire Sigma canvas when nodes are hidden
-      &.disable-hover-effects {
-        pointer-events: none;
-        cursor: none !important;
-        
-        * {
-          pointer-events: none !important;
-          cursor: none !important;
-        }
-      }
-      
-      // CSS-level hover suppression for hidden model states
-      &.suppress-hidden-hover {
-        :deep(canvas) {
-          pointer-events: auto !important;
-          
-          &:hover {
-            cursor: crosshair !important;
-          }
-        }
-      }
     }
     
+    .graph-legend {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: theme.$white;
+      border-top: 1px solid theme.$gray_2;
+      z-index: 999; // Just below properties bar
+      transition: all 0.3s ease;
+
+      .legend-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 20px;
+        cursor: pointer;
+        background: theme.$gray_1;
+        border-bottom: 1px solid theme.$gray_2;
+
+        &:hover {
+          background: theme.$gray_2;
+        }
+
+        .legend-title {
+          font-size: 13px;
+          font-weight: 500;
+          color: theme.$gray_6;
+        }
+
+        .legend-toggle {
+          background: none;
+          border: none;
+          color: theme.$gray_5;
+          cursor: pointer;
+          padding: 2px;
+          border-radius: 2px;
+          transition: all 0.2s ease;
+          transform: rotate(0deg);
+
+          &.expanded {
+            transform: rotate(180deg);
+          }
+
+          &:hover {
+            color: theme.$gray_6;
+            background: theme.$gray_3;
+          }
+
+          svg {
+            display: block;
+          }
+        }
+      }
+
+      .legend-content {
+        overflow: hidden;
+        transition: all 0.3s ease;
+
+        .legend-compact {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          padding: 8px 20px;
+
+          .legend-models-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-right: 20px;
+            padding-right: 20px;
+            border-right: 1px solid theme.$gray_2;
+          }
+
+          .legend-relationships-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+        }
+
+        .legend-expanded {
+          padding: 16px 20px;
+
+          .legend-section {
+            margin-bottom: 16px;
+
+            &:last-child {
+              margin-bottom: 0;
+            }
+
+            .legend-section-title {
+              font-size: 12px;
+              font-weight: 600;
+              color: theme.$gray_6;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+
+            .legend-models-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+              gap: 8px 16px;
+            }
+
+            .legend-relationships-grid {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+              flex-wrap: wrap;
+            }
+          }
+        }
+
+        // Shared legend item styles
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: theme.$gray_5;
+
+          &.model-legend {
+            .legend-dot {
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              border: 2px solid;
+              flex-shrink: 0;
+            }
+
+            .model-name {
+              max-width: 150px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              font-size: 11px;
+              color: theme.$gray_6;
+            }
+          }
+
+          .legend-line {
+            width: 20px;
+            height: 2px;
+            border-radius: 1px;
+            flex-shrink: 0;
+
+            &.outbound {
+              background-color: #22C55E;
+            }
+
+            &.inbound {
+              background-color: #3B82F6;
+            }
+
+            &.package {
+              background-color: #6B7280;
+              background-image: repeating-linear-gradient(
+                to right,
+                #6B7280,
+                #6B7280 3px,
+                transparent 3px,
+                transparent 7px
+              );
+            }
+          }
+        }
+
+        .legend-more {
+          font-size: 11px;
+          color: theme.$gray_4;
+          font-style: italic;
+        }
+      }
+
+      // Compact mode (default)
+      &:not(.expanded) .legend-content {
+        max-height: 40px;
+      }
+
+      // Expanded mode
+      &.expanded .legend-content {
+        max-height: 300px; // Generous height for expanded content
+      }
+    }
+
     .properties-bar {
       position: absolute;
       bottom: 0;
@@ -3321,98 +3473,6 @@ onUnmounted(() => {
           height: 100%;
           padding: 0;
         }
-      }
-    }
-  }
-
-  // Legend section - positioned at the bottom
-  .legend-section {
-    background: theme.$white;
-    border-top: 1px solid theme.$gray_2;
-    padding: 16px 20px;
-
-    .legend-container {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-      
-      .legend-title {
-        font-size: 13px;
-        font-weight: 500;
-        color: theme.$gray_6;
-        margin-right: 12px;
-      }
-      
-      .legend-models {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-right: 20px;
-        padding-right: 20px;
-        border-right: 1px solid theme.$gray_2;
-      }
-      
-      .legend-relationships {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      
-      .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 12px;
-        color: theme.$gray_5;
-        
-        &.model-legend {
-          .legend-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 2px solid;
-          }
-          
-          .model-name {
-            max-width: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-size: 11px;
-          }
-        }
-        
-        .legend-line {
-          width: 20px;
-          height: 2px;
-          border-radius: 1px;
-          
-          &.outbound {
-            background-color: #22C55E;
-          }
-          
-          &.inbound {
-            background-color: #3B82F6;
-          }
-          
-          &.package {
-            background-color: #6B7280;
-            background-image: repeating-linear-gradient(
-              to right,
-              #6B7280,
-              #6B7280 3px,
-              transparent 3px,
-              transparent 7px
-            );
-          }
-        }
-      }
-      
-      .legend-more {
-        font-size: 11px;
-        color: theme.$gray_4;
-        font-style: italic;
       }
     }
   }
