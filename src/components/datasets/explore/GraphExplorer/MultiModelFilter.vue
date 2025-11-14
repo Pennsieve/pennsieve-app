@@ -112,8 +112,8 @@ const operatorsByType = {
     { value: '<=', label: 'on or before' },
     { value: '>', label: 'after' },
     { value: '>=', label: 'on or after' },
-    { value: 'between', label: 'between dates' },
-    { value: 'in', label: 'on dates' }
+    // { value: 'between', label: 'between dates' },
+    // { value: 'in', label: 'on dates' }
   ],
   datetime: [
     { value: '=', label: 'at' },
