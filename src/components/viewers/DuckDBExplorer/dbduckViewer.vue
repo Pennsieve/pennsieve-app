@@ -299,7 +299,13 @@ const loadFile = async () => {
       tableId, // Stable table name
       csvOptions.value,
       props.viewerId, // Pass viewer ID for tracking
+<<<<<<< Updated upstream
       props.fileId // Pass stable file ID
+=======
+      props.fileId, // Pass stable file ID
+      props.packageId, // Pass package ID for CloudFront signing
+      props.datasetId // Pass dataset ID for CloudFront signing
+>>>>>>> Stashed changes
     );
 
     tableName.value = loadedTableName;
@@ -377,6 +383,7 @@ const executeQuery = async () => {
     console.log(
       `Query executed successfully, returned ${queryResults.value.length} rows`
     );
+    console.log("Query result data:", queryResults.value);
   } catch (err) {
     console.error("Query execution failed:", err);
     error.value = `Query execution failed: ${err.message}`;

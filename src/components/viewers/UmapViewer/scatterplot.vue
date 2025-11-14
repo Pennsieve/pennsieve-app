@@ -25,8 +25,7 @@ const props = defineProps({
   },
   colorMode: {
     type: String,
-    default: 'random',
-    validator: (value) => ['random', 'gradient', 'single', 'species', 'sex'].includes(value)
+    default: 'random'
   },
   startColor: {
     type: String,
@@ -316,36 +315,47 @@ function generateData(count, colorMode, startColor, endColor, singleColor) {
         break;
 
       default:
-        color = [Math.random(), Math.random(), Math.random()];switch (colorMode) {
-        case 'random':
+        // For any other colorMode (column-based coloring), use colorMap
+        if (props.colorMap && props.colorMap.size > 0) {
+          // Find the column index based on colorMode name
+          let columnIndex = -1;
+          if (props.metaData && props.metaData.schema) {
+            const schemaEntry = props.metaData.schema.find(col => col.name === colorMode);
+            if (schemaEntry) {
+              columnIndex = schemaEntry.index;
+            }
+          }
+          
+          if (i === 0) { // Debug logging for first point only
+            console.log('generateData default case:', {
+              colorMode,
+              columnIndex, 
+              dataLength: props.data[i].length,
+              colorMapSize: props.colorMap.size,
+              schema: props.metaData?.schema
+            });
+          }
+          
+          if (columnIndex >= 0 && columnIndex < props.data[i].length) {
+            const cellValue = props.data[i][columnIndex];
+            const mappedColor = props.colorMap.get(cellValue);
+            if (i === 0) {
+              console.log('First point mapping:', { cellValue, mappedColor });
+            }
+            color = mappedColor || [Math.random(), Math.random(), Math.random()];
+          } else {
+            if (i === 0) {
+              console.log('Column index invalid, using random color');
+            }
+            color = [Math.random(), Math.random(), Math.random()];
+          }
+        } else {
+          if (i === 0) {
+            console.log('No colorMap available, using random color');
+          }
           color = [Math.random(), Math.random(), Math.random()];
-          break;
-
-        case 'gradient':
-          // Use position as factor for gradient (normalized to 0-1)
-          const factor = (x + 50) / 100;
-          color = [
-            lerp(startRGB[0], endRGB[0], factor),
-            lerp(startRGB[1], endRGB[1], factor),
-            lerp(startRGB[2], endRGB[2], factor)
-          ];
-          break;
-
-        case 'single':
-          color = [...singleRGB];
-          break;
-
-        // case 'species':
-        //   color = [...speciesColors[speciesValue]];
-        //   break;
-
-        case 'Type':
-          color = [...colorMap.get(props.data[i][5])];
-          break;
-
-        default:
-          color = [Math.random(), Math.random(), Math.random()];
-      }
+        }
+        break;
     }
 
     data.push({
@@ -632,27 +642,30 @@ function drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint
 function updateColors() {
   if (!gl || !programInfo || !data.length) return;
 
-  let valueIndex = 0
-  for (let i in props.metaData.schema) {
-    if (props.metaData.schema[i].name === props.colorMode) {
-      valueIndex = i - 1
-    }
+  console.log('updateColors called with colorMode:', props.colorMode);
+  console.log('Available colorMap:', props.colorMap);
+  
+  // Regenerate data with new color mode - this ensures proper color assignment
+  data = generateData(
+    props.pointCount,
+    props.colorMode,
+    props.startColor,
+    props.endColor,
+    props.singleColor
+  );
+
+  // Update buffers with new data
+  if (programInfo) {
+    gl.deleteBuffer(programInfo.positionBuffer);
+    gl.deleteBuffer(programInfo.colorBuffer);
   }
 
-  // Update colors based on selected mode
-  const colors = new Float32Array(props.data.flatMap(d => {
+  programInfo = prepareBuffers(gl, program, data);
 
-    return props.colorMap.get(d[valueIndex])
-  }));
-
-  // Update buffer
-  gl.deleteBuffer(programInfo.colorBuffer);
-  const colorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-
-  // Update program info
-  programInfo.colorBuffer = colorBuffer;
+  if (!programInfo) {
+    console.error('Failed to prepare buffers during color update');
+    return;
+  }
 
   // Redraw
   drawScatterplot(gl, programInfo, transform, pointSize, highlightedPoint);
@@ -866,14 +879,25 @@ function handleMouseLeave() {
 
 // Watch for changes to props and update visualization accordingly
 watch(() => props.colorMode, (newMode, oldMode) => {
+  console.log('ColorMode changed from', oldMode, 'to', newMode);
   if (!gl || !programInfo) {
     console.warn('WebGL not initialized yet');
     return;
   }
 
   updateColors();
-
 });
+
+// Watch for changes to colorMap
+watch(() => props.colorMap, (newColorMap, oldColorMap) => {
+  console.log('ColorMap changed:', newColorMap);
+  if (!gl || !programInfo) {
+    console.warn('WebGL not initialized yet');
+    return;
+  }
+
+  updateColors();
+}, { deep: true });
 
 // Watch for changes to color values
 watch([() => props.startColor, () => props.endColor, () => props.singleColor], () => {

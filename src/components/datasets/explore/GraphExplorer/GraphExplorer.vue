@@ -791,9 +791,26 @@ const fetchRecordRelationships = async (recordId) => {
       return relationships.relationships
     } else if (relationships && Array.isArray(relationships.data)) {
       return relationships.data
+    } else if (relationships && relationships.relationships && (relationships.relationships.inbound || relationships.relationships.outbound)) {
+      // Handle new API structure: {relationships: {inbound: [...], outbound: [...]}}
+      const relationshipData = relationships.relationships
+      const allRelationships = [
+        ...(Array.isArray(relationshipData.inbound) ? relationshipData.inbound.map(rel => ({
+          ...rel,
+          direction: 'inbound'
+        })) : []),
+        ...(Array.isArray(relationshipData.outbound) ? relationshipData.outbound.map(rel => ({
+          ...rel,
+          direction: 'outbound'
+        })) : [])
+      ]
+      // Debug the structure of individual relationships
+      if (allRelationships.length > 0) {
+        console.log('🔍 Found relationships with new API structure:', allRelationships.length)
+      }
+      return allRelationships
     } else if (relationships && (relationships.inbound || relationships.outbound)) {
-      // Handle {inbound: [...], outbound: [...]} structure with direction tracking
-      // Either inbound or outbound can be null/undefined
+      // Handle legacy {inbound: [...], outbound: [...]} structure (fallback)
       const allRelationships = [
         ...(Array.isArray(relationships.inbound) ? relationships.inbound.map(rel => ({
           ...rel,
@@ -1402,6 +1419,7 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
 // State for drag functionality
 const draggedNode = ref(null)
 const isDragging = ref(false)
+const connectedNodeOffsets = ref(new Map()) // Store relative positions of connected nodes
 
 // State for force layout animation
 const forceLayoutRunning = ref(false)
@@ -1665,7 +1683,10 @@ const setupDragBehavior = () => {
           // Now we know it's a real drag, update global state
           draggedNode.value = draggedNodeId
           isDragging.value = true
-          // No force simulation during node drag - just move the node
+          // Store initial positions of connected nodes for dragging
+          if (currentLayout.value === 'Force') {
+            initializeConnectedNodeDragging(draggedNodeId)
+          }
         }
       }
 
@@ -1681,6 +1702,11 @@ const setupDragBehavior = () => {
       const nodeIndex = nodes.value.findIndex(n => n.id === draggedNodeId)
       if (nodeIndex !== -1) {
         nodes.value[nodeIndex].position = { x: currentGraphPos.x, y: currentGraphPos.y }
+      }
+
+      // Move connected nodes if we have dragged distance and are in Force mode
+      if (hasDraggedDistance && currentLayout.value === 'Force') {
+        moveConnectedNodes(draggedNodeId, currentGraphPos)
       }
 
       // Refresh display
@@ -2178,6 +2204,141 @@ const startDragForceAnimation = () => {
 const stopDragForceAnimation = () => {
   if (dragForceRunning.value) {
     dragForceRunning.value = false
+  }
+}
+
+// Initialize connected node dragging by storing initial positions
+const initializeConnectedNodeDragging = (draggedNodeId) => {
+  if (!graph.value || !draggedNodeId) return
+  
+  // Clear previous offsets
+  connectedNodeOffsets.value.clear()
+  
+  try {
+    // Get the current position of the dragged node
+    const draggedNodePos = {
+      x: graph.value.getNodeAttribute(draggedNodeId, 'x'),
+      y: graph.value.getNodeAttribute(draggedNodeId, 'y')
+    }
+    
+    // Find all directly connected nodes
+    const connectedNodeIds = new Set()
+    
+    // Check all edges to find connected nodes
+    edges.value.forEach(edge => {
+      if (edge.source === draggedNodeId) {
+        connectedNodeIds.add(edge.target)
+      } else if (edge.target === draggedNodeId) {
+        connectedNodeIds.add(edge.source)
+      }
+    })
+    
+    // Store the relative offset of each connected node to the dragged node
+    connectedNodeIds.forEach(connectedNodeId => {
+      if (graph.value.hasNode(connectedNodeId)) {
+        const connectedNodePos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+        
+        // Calculate and store the offset
+        const offset = {
+          x: connectedNodePos.x - draggedNodePos.x,
+          y: connectedNodePos.y - draggedNodePos.y
+        }
+        
+        connectedNodeOffsets.value.set(connectedNodeId, offset)
+      }
+    })
+    
+    console.log(`🔗 Initialized dragging for ${connectedNodeOffsets.value.size} connected nodes`)
+  } catch (error) {
+    console.warn('⚠️ Error initializing connected node dragging:', error)
+    connectedNodeOffsets.value.clear()
+  }
+}
+
+// Move connected nodes based on the dragged node's new position
+const moveConnectedNodes = (draggedNodeId, newDraggedNodePos) => {
+  if (!connectedNodeOffsets.value.size || !graph.value) return
+  
+  try {
+    // Move each connected node with asymmetric behavior
+    connectedNodeOffsets.value.forEach((offset, connectedNodeId) => {
+      // Skip locked nodes - they should not move with the dragged node
+      if (isNodeLocked(connectedNodeId)) {
+        return
+      }
+      
+      if (graph.value.hasNode(connectedNodeId)) {
+        // Get current position of the connected node
+        const currentPos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+        
+        // Calculate current distance between dragged node and connected node
+        const currentDistance = Math.sqrt(
+          Math.pow(currentPos.x - newDraggedNodePos.x, 2) + 
+          Math.pow(currentPos.y - newDraggedNodePos.y, 2)
+        )
+        
+        // Use the original stored offset distance as the reference
+        const originalDistance = Math.sqrt(
+          Math.pow(offset.x, 2) + Math.pow(offset.y, 2)
+        )
+        
+        let newConnectedPos
+        
+        // Add small tolerance to prevent jittering at the boundary
+        const tolerance = 5 // pixels
+        
+        if (currentDistance <= originalDistance + tolerance) {
+          // Moving closer or at original distance: don't push connected node away
+          // Keep the connected node where it is (no resistance when shortening)
+          newConnectedPos = {
+            x: currentPos.x,
+            y: currentPos.y
+          }
+        } else {
+          // Moving away: connected node follows to maintain the original distance
+          // Calculate the direction vector from dragged node to connected node
+          const directionX = currentPos.x - newDraggedNodePos.x
+          const directionY = currentPos.y - newDraggedNodePos.y
+          
+          // Normalize the direction vector
+          const directionLength = Math.sqrt(directionX * directionX + directionY * directionY)
+          const normalizedDirX = directionLength > 0 ? directionX / directionLength : 0
+          const normalizedDirY = directionLength > 0 ? directionY / directionLength : 0
+          
+          // Calculate target position at original distance in the current direction
+          const targetPos = {
+            x: newDraggedNodePos.x + normalizedDirX * originalDistance,
+            y: newDraggedNodePos.y + normalizedDirY * originalDistance
+          }
+          
+          // Apply follow factor for elastic behavior
+          const followFactor = 0.4 // How much the connected node follows (0 = doesn't follow, 1 = follows completely)
+          
+          newConnectedPos = {
+            x: currentPos.x + (targetPos.x - currentPos.x) * followFactor,
+            y: currentPos.y + (targetPos.y - currentPos.y) * followFactor
+          }
+        }
+        
+        // Update the connected node's position
+        graph.value.setNodeAttribute(connectedNodeId, 'x', newConnectedPos.x)
+        graph.value.setNodeAttribute(connectedNodeId, 'y', newConnectedPos.y)
+        
+        // Update internal nodes array
+        const nodeIndex = nodes.value.findIndex(n => n.id === connectedNodeId)
+        if (nodeIndex !== -1) {
+          nodes.value[nodeIndex].position = { x: newConnectedPos.x, y: newConnectedPos.y }
+        }
+      }
+    })
+  } catch (error) {
+    console.warn('⚠️ Error moving connected nodes:', error)
   }
 }
 
