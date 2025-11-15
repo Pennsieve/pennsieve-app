@@ -1024,12 +1024,16 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
-    // Fetch packages attached to a record
-    const fetchRecordPackages = async (datasetId, recordId) => {
+    // Fetch packages attached to a record with pagination support
+    const fetchRecordPackages = async (datasetId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
             const token = await useGetToken()
-            const queryParams = toQueryParams({ dataset_id: datasetId })
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                ...options // includes page_size, cursor, etc.
+            })
             const url = `${endpoint}?${queryParams}`
             
             const myHeaders = new Headers()
@@ -1042,13 +1046,56 @@ export const useMetadataStore = defineStore('metadata', () => {
             })
             
             if (resp.ok) {
-                return await resp.json()
+                const response = await resp.json()
+                return {
+                    packages: response.packages || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
             } else {
+                // Return empty packages for 404 (no packages) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        packages: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
                 const errorText = await resp.text()
                 throw new Error(`Failed to fetch record packages: ${resp.status} - ${errorText}`)
             }
         } catch (error) {
             console.error('Error fetching record packages:', error)
+            throw error
+        }
+    }
+
+    // Fetch all packages for a record (handles pagination automatically)
+    const fetchAllRecordPackages = async (datasetId, recordId) => {
+        try {
+            let allPackages = []
+            let cursor = null
+            let hasMore = true
+            const pageSize = 50 // Reasonable page size for fetching all
+            
+            while (hasMore) {
+                const options = { page_size: pageSize }
+                if (cursor) {
+                    options.cursor = cursor
+                }
+                
+                const result = await fetchRecordPackages(datasetId, recordId, options)
+                
+                // Append packages
+                allPackages.push(...(result.packages || []))
+                
+                cursor = result.cursor
+                hasMore = result.hasMore
+            }
+            
+            return allPackages
+        } catch (error) {
+            console.error('Error fetching all record packages:', error)
             throw error
         }
     }
@@ -1310,6 +1357,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         cancelPackageAttachment,
         completePackageAttachment,
         fetchRecordPackages,
+        fetchAllRecordPackages,
         fetchRecordRelationships,
         fetchAllRecordRelationships,
         deletePackageFromRecord,

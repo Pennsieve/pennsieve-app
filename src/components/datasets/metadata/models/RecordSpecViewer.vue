@@ -52,6 +52,7 @@ const quickActionsVisible = ref(true)
 // Pagination state
 const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
+const packagesCurrentPage = ref(1)
 const pageSize = 25
 
 
@@ -152,6 +153,24 @@ const outboundPagination = computed(() => {
   }
 })
 
+// Paginated packages
+const paginatedPackages = computed(() => {
+  const start = (packagesCurrentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return packages.value.slice(start, end)
+})
+
+// Package pagination info
+const packagesPagination = computed(() => {
+  const total = packages.value.length
+  return {
+    total,
+    totalPages: Math.ceil(total / pageSize),
+    currentPage: packagesCurrentPage.value,
+    showPagination: total > pageSize
+  }
+})
+
 // Methods
 const fetchRecord = async () => {
   loading.value = true
@@ -180,7 +199,7 @@ const fetchModel = async () => {
 
 const fetchPackages = async () => {
   try {
-    const response = await metadataStore.fetchRecordPackages(props.datasetId, props.recordId)
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId)
     packages.value = response || []
   } catch (err) {
     console.error('Error fetching packages:', err)
@@ -376,6 +395,10 @@ const handleInboundPageChange = (page) => {
 
 const handleOutboundPageChange = (page) => {
   outboundCurrentPage.value = page
+}
+
+const handlePackagesPageChange = (page) => {
+  packagesCurrentPage.value = page
 }
 
 // Relationship creation methods
@@ -582,6 +605,7 @@ watch([() => props.modelId, () => props.recordId], async () => {
   // Reset pagination when loading new record
   inboundCurrentPage.value = 1
   outboundCurrentPage.value = 1
+  packagesCurrentPage.value = 1
   
   // Fetch new data
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
@@ -878,7 +902,7 @@ onMounted(async () => {
             <!-- Files exist -->
             <div v-if="packages.length > 0" class="file-items">
               <div
-                v-for="(packageItem, index) in packages"
+                v-for="(packageItem, index) in paginatedPackages"
                 :key="`package-${index}`"
                 class="file-item"
                 :title="'Click to view file details'"
@@ -897,6 +921,19 @@ onMounted(async () => {
                 >
                   ✕
                 </el-button>
+              </div>
+              
+              <!-- Packages Pagination -->
+              <div v-if="packagesPagination.showPagination" class="relationship-pagination">
+                <el-pagination
+                  v-model:current-page="packagesCurrentPage"
+                  :page-size="pageSize"
+                  :total="packagesPagination.total"
+                  layout="prev, pager, next"
+                  @current-change="handlePackagesPageChange"
+                  size="small"
+                  hide-on-single-page
+                />
               </div>
             </div>
 
