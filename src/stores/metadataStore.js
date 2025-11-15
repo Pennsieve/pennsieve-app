@@ -1100,6 +1100,53 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Fetch record history with pagination support
+    const fetchRecordHistory = async (datasetId, recordId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/history`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                page_size: 5, // Default to 5 items per page
+                ...options // includes cursor, etc.
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                const response = await resp.json()
+                return {
+                    records: response.records || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
+            } else {
+                // Return empty records for 404 instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        records: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record history: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record history:', error)
+            throw error
+        }
+    }
+
      // Fetch relationships for a record with pagination support
     const fetchRecordRelationships = async (datasetId, recordId, options = {}) => {
         try {
@@ -1358,6 +1405,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         completePackageAttachment,
         fetchRecordPackages,
         fetchAllRecordPackages,
+        fetchRecordHistory,
         fetchRecordRelationships,
         fetchAllRecordRelationships,
         deletePackageFromRecord,

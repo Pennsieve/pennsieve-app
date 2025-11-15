@@ -41,6 +41,10 @@ const router = useRouter()
 const record = ref(null)
 const model = ref(null)
 const relationships = ref({ inbound: [], outbound: [] })
+const recordHistory = ref([])
+const historyHasMore = ref(false)
+const historyLoading = ref(false)
+const historyCursor = ref(null)
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
@@ -171,6 +175,83 @@ const packagesPagination = computed(() => {
   }
 })
 
+// Timeline computed properties
+const timelineData = computed(() => {
+  if (!recordHistory.value.length) return []
+  
+  // API returns records in reverse chronological order (newest first)
+  // We need to sort them by created_at ascending (oldest to newest) to position correctly
+  const sortedHistory = [...recordHistory.value].sort((a, b) => 
+    new Date(a.created_at) - new Date(b.created_at)
+  )
+  
+  // Calculate positions based on actual time differences with current version on the right side
+  if (sortedHistory.length === 1) {
+    // Single version - position at 95% (right side)
+    const historyRecord = sortedHistory[0]
+    const isCurrent = historyRecord.provenance_id === record.value?.provenance_id
+    
+    return [{
+      ...historyRecord,
+      position: 95,
+      isCurrent,
+      index: 0
+    }]
+  }
+  
+  // Multiple versions - distribute based on actual time differences
+  const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+  const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
+  const totalTimespan = newestTime - oldestTime
+  
+  return sortedHistory.map((historyRecord, index) => {
+    const recordTime = new Date(historyRecord.created_at).getTime()
+    
+    let position
+    if (totalTimespan === 0) {
+      // All records have the same timestamp - use equal spacing
+      position = 5 + ((index / (sortedHistory.length - 1)) * 90)
+    } else {
+      // Position based on actual time difference from oldest
+      const timeFromOldest = recordTime - oldestTime
+      position = 5 + ((timeFromOldest / totalTimespan) * 90)
+    }
+    
+    const isCurrent = historyRecord.provenance_id === record.value?.provenance_id
+    
+    return {
+      ...historyRecord,
+      position,
+      isCurrent,
+      index
+    }
+  })
+})
+
+const hasHistory = computed(() => recordHistory.value.length > 0)
+
+// Timeline timespan for left and right date labels
+const timelineTimespan = computed(() => {
+  if (!recordHistory.value.length) return null
+  
+  // Sort history by created_at ascending (oldest to newest)
+  const sortedHistory = [...recordHistory.value].sort((a, b) => 
+    new Date(a.created_at) - new Date(b.created_at)
+  )
+  
+  if (sortedHistory.length === 1) {
+    // Single version - show same date on both sides
+    const date = new Date(sortedHistory[0].created_at).toLocaleDateString()
+    return { startDate: date, endDate: date }
+  }
+  
+  // Multiple versions - show oldest and newest dates
+  const startDate = new Date(sortedHistory[0].created_at).toLocaleDateString()
+  const endDate = new Date(sortedHistory[sortedHistory.length - 1].created_at).toLocaleDateString()
+  
+  return { startDate, endDate }
+})
+
 // Methods
 const fetchRecord = async () => {
   loading.value = true
@@ -216,6 +297,35 @@ const fetchRelationships = async () => {
     console.error('Error fetching relationships:', err)
     // Don't show error for relationships, just leave empty
     relationships.value = { inbound: [], outbound: [] }
+  }
+}
+
+const fetchRecordHistory = async (cursor = null) => {
+  try {
+    historyLoading.value = true
+    const options = cursor ? { cursor } : {}
+    const response = await metadataStore.fetchRecordHistory(props.datasetId, props.recordId, options)
+    
+    if (cursor) {
+      // Append older versions to existing history
+      recordHistory.value = [...recordHistory.value, ...(response.records || [])]
+    } else {
+      // Initial load - replace history
+      recordHistory.value = response.records || []
+    }
+    
+    historyHasMore.value = response.hasMore || false
+    historyCursor.value = response.cursor || null
+  } catch (err) {
+    console.error('Error fetching record history:', err)
+    if (!cursor) {
+      // Don't show error for history, just leave empty on initial load
+      recordHistory.value = []
+    }
+    historyHasMore.value = false
+    historyCursor.value = null
+  } finally {
+    historyLoading.value = false
   }
 }
 
@@ -399,6 +509,20 @@ const handleOutboundPageChange = (page) => {
 
 const handlePackagesPageChange = (page) => {
   packagesCurrentPage.value = page
+}
+
+// Load more history versions
+const loadMoreHistory = async () => {
+  if (!historyHasMore.value || historyLoading.value) return
+  
+  await fetchRecordHistory(historyCursor.value)
+}
+
+// Timeline navigation - for now just placeholder (will be implemented when API is provided)
+const goToHistoryRecord = (historyRecord) => {
+  console.log('Navigate to history record:', historyRecord)
+  // TODO: Implement navigation to historical version when API is provided
+  ElMessage.info(`Timeline navigation will be implemented when API is provided`)
 }
 
 // Relationship creation methods
@@ -608,12 +732,12 @@ watch([() => props.modelId, () => props.recordId], async () => {
   packagesCurrentPage.value = 1
   
   // Fetch new data
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
 })
 
 // Initialize
 onMounted(async () => {
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
 })
 </script>
 
@@ -772,7 +896,62 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Record History Timeline Section -->
+        <div v-if="hasHistory" class="section">
+          <div class="section-header">
+            <h3>Record History</h3>
+            <div class="header-actions">
+<!--              <el-tag size="small" class="record-tag history-tag">-->
+<!--                {{ recordHistory.length > 0 ? `${recordHistory.length} versions` : 'No versions' }}-->
+<!--              </el-tag>-->
+            </div>
+          </div>
 
+          <div class="timeline-container">
+            <!-- Timeline date range labels -->
+<!--            <div v-if="timelineTimespan" class="timeline-dates">-->
+<!--              <span class="timeline-start-date">{{ timelineTimespan.startDate }}</span>-->
+<!--              <span class="timeline-end-date">{{ timelineTimespan.endDate }}</span>-->
+<!--            </div>-->
+            
+            <div class="timeline-track">
+              <!-- Load more history button (left side) -->
+              <div v-if="historyHasMore" class="load-more-history-inline">
+                <el-button 
+                  @click="loadMoreHistory"
+                  :loading="historyLoading"
+                  link
+                  size="small"
+                  class="load-more-btn-inline"
+                  :title="historyLoading ? 'Loading older versions...' : 'Fetch older versions'"
+                >
+                  <span v-if="historyLoading">⟳</span>
+                  <span v-else>⋯</span>
+                </el-button>
+              </div>
+              
+              <!-- Timeline nodes -->
+              <div
+                v-for="(historyItem, index) in timelineData"
+                :key="`history-${index}`"
+                class="timeline-node"
+                :class="{
+                  'is-current': historyItem.isCurrent,
+                  'clickable': !historyItem.isCurrent
+                }"
+                :style="{ left: `${historyItem.position}%` }"
+                :title="`${historyItem.isCurrent ? 'Current version' : 'Previous version'} - ${new Date(historyItem.created_at).toLocaleString()}`"
+                @click="!historyItem.isCurrent && goToHistoryRecord(historyItem)"
+              >
+                <div class="timeline-dot"></div>
+                <div class="timeline-label">
+                  <span class="timeline-date">{{ new Date(historyItem.created_at).toLocaleDateString() }}</span>
+                  <span v-if="historyItem.isCurrent" class="timeline-current-indicator">Current</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Relationships Section -->
         <div class="section">
@@ -1159,6 +1338,13 @@ onMounted(async () => {
               background-color: theme.$teal_tint !important;
               border-color: theme.$teal_1 !important;
               color: theme.$teal_2 !important;
+            }
+            
+            // History Group
+            &.history-tag {
+              background-color: theme.$purple_tint !important;
+              border-color: theme.$purple_1 !important;
+              color: theme.$purple_2 !important;
             }
           }
         }
@@ -1709,6 +1895,256 @@ onMounted(async () => {
         }
       }
     }
+  }
+
+  // Timeline styling
+  .timeline-container {
+    margin: 16px 0;
+    padding: 20px 0;
+  }
+
+  // Timeline date range labels
+  .timeline-dates {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0 15px; // Align with timeline track padding
+    
+    .timeline-start-date,
+    .timeline-end-date {
+      font-size: 12px;
+      font-weight: 500;
+      color: theme.$gray_4;
+      padding: 2px 6px;
+      background: theme.$gray_1;
+      border-radius: 3px;
+      border: 1px solid theme.$gray_2;
+    }
+  }
+
+  .timeline-track {
+    position: relative;
+    height: 60px;
+
+    // Timeline baseline
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      background: theme.$gray_3;
+      transform: translateY(-50%);
+    }
+  }
+
+  .timeline-node {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+
+    &.clickable {
+      cursor: pointer;
+      
+      &:hover {
+        .timeline-dot {
+          transform: scale(1.2);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .timeline-label {
+          opacity: 1;
+        }
+      }
+    }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: theme.$gray_4;
+      border: 2px solid white;
+      transition: all 0.2s ease;
+      margin: 0 auto;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    &.is-current .timeline-dot {
+      background: theme.$purple_2;
+      border-color: theme.$purple_2;
+      width: 16px;
+      height: 16px;
+      box-shadow: 0 2px 6px rgba(102, 76, 204, 0.3);
+    }
+
+    .timeline-label {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+
+      .timeline-date {
+        display: block;
+        font-weight: 500;
+      }
+
+      .timeline-current-indicator {
+        display: block;
+        color: theme.$purple_1;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+    }
+
+    &.is-current .timeline-label {
+      opacity: 1;
+      top: 25px; // Below the timeline for current version
+      color: theme.$white;
+      background: theme.$purple_2;
+
+      // Arrow pointing up for labels below timeline
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 4px solid theme.$purple_2;
+      }
+
+      .timeline-current-indicator {
+        color: white;
+      }
+    }
+
+    // Show labels on hover for non-current nodes
+    &:not(.is-current):hover {
+      z-index: 1000 !important; // Much higher than any other element
+      
+      .timeline-label {
+        opacity: 1;
+        z-index: 1000 !important;
+        top: -45px; // Position above the timeline instead of below
+        color: theme.$purple_2;
+        background: transparent;
+        
+        // Arrow pointing down for labels above timeline
+        &::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+          border-top: 4px solid theme.$purple_2;
+        }
+      }
+    }
+  }
+
+  // Inline load more history button styling
+  .load-more-history-inline {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+
+    .load-more-btn-inline {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: theme.$gray_1 !important;
+      border: 1px solid theme.$gray_3 !important;
+      color: theme.$gray_5 !important;
+      font-size: 14px;
+      font-weight: 400;
+      padding: 0 !important;
+      min-height: unset !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        background: theme.$purple_tint !important;
+        border-color: theme.$purple_2 !important;
+        color: theme.$purple_2 !important;
+        transform: scale(1.1);
+      }
+      
+      &:disabled {
+        color: theme.$gray_4 !important;
+        background-color: theme.$gray_1 !important;
+        border-color: theme.$gray_3 !important;
+        cursor: not-allowed;
+      }
+      
+      span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        animation: none;
+      }
+      
+      // Rotating animation for loading state
+      &:disabled span:first-child {
+        animation: spin 1s linear infinite;
+      }
+    }
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  // Load more history button styling (legacy - keeping for now)
+  .load-more-history {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+
+    .load-more-btn {
+      color: theme.$purple_2 !important;
+      font-size: 13px;
+      font-weight: 500;
+      
+      &:hover {
+        color: theme.$purple_1 !important;
+        background-color: theme.$purple_tint !important;
+      }
+      
+      &:disabled {
+        color: theme.$gray_4 !important;
+        background-color: transparent !important;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  // History tag styling
+  .history-tag {
+    background: theme.$gray_1 !important;
+    border-color: theme.$gray_3 !important;
+    color: theme.$gray_5 !important;
   }
 
   // Utility classes for spacing
