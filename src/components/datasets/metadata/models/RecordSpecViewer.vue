@@ -40,6 +40,7 @@ const router = useRouter()
 // Reactive data
 const record = ref(null)
 const model = ref(null)
+const relationships = ref({ inbound: [], outbound: [] })
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
@@ -51,6 +52,7 @@ const quickActionsVisible = ref(true)
 // Pagination state
 const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
+const packagesCurrentPage = ref(1)
 const pageSize = 25
 
 
@@ -98,15 +100,8 @@ const recordMetadata = computed(() => {
   }
 })
 
-const relationships = computed(() => {
-  if (!record.value?.relationships) return { inbound: [], outbound: [] }
-  
-  // Ensure both arrays exist, defaulting to empty arrays if not present
-  return {
-    inbound: record.value.relationships.inbound || [],
-    outbound: record.value.relationships.outbound || []
-  }
-})
+// Remove the old computed property that relied on record.relationships
+// Now we use the separate relationships ref that's fetched independently
 
 const hasRelationships = computed(() => {
   const rels = relationships.value
@@ -158,6 +153,24 @@ const outboundPagination = computed(() => {
   }
 })
 
+// Paginated packages
+const paginatedPackages = computed(() => {
+  const start = (packagesCurrentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return packages.value.slice(start, end)
+})
+
+// Package pagination info
+const packagesPagination = computed(() => {
+  const total = packages.value.length
+  return {
+    total,
+    totalPages: Math.ceil(total / pageSize),
+    currentPage: packagesCurrentPage.value,
+    showPagination: total > pageSize
+  }
+})
+
 // Methods
 const fetchRecord = async () => {
   loading.value = true
@@ -186,12 +199,23 @@ const fetchModel = async () => {
 
 const fetchPackages = async () => {
   try {
-    const response = await metadataStore.fetchRecordPackages(props.datasetId, props.recordId)
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId)
     packages.value = response || []
   } catch (err) {
     console.error('Error fetching packages:', err)
     // Don't show error for packages as it's not critical
     packages.value = []
+  }
+}
+
+const fetchRelationships = async () => {
+  try {
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId)
+    relationships.value = response || { inbound: [], outbound: [] }
+  } catch (err) {
+    console.error('Error fetching relationships:', err)
+    // Don't show error for relationships, just leave empty
+    relationships.value = { inbound: [], outbound: [] }
   }
 }
 
@@ -371,6 +395,10 @@ const handleInboundPageChange = (page) => {
 
 const handleOutboundPageChange = (page) => {
   outboundCurrentPage.value = page
+}
+
+const handlePackagesPageChange = (page) => {
+  packagesCurrentPage.value = page
 }
 
 // Relationship creation methods
@@ -553,8 +581,8 @@ const deleteRelationship = async (relationship, direction) => {
 
     ElMessage.success('Relationship removed successfully')
 
-    // Refresh the record to get updated relationships
-    await fetchRecord()
+    // Refresh relationships to get updated list
+    await fetchRelationships()
   } catch (action) {
     if (action === 'cancel' || action === 'close') {
       // User cancelled or closed dialog
@@ -571,19 +599,21 @@ watch([() => props.modelId, () => props.recordId], async () => {
   // Clear current data
   record.value = null
   model.value = null
+  relationships.value = { inbound: [], outbound: [] }
   error.value = ''
   
   // Reset pagination when loading new record
   inboundCurrentPage.value = 1
   outboundCurrentPage.value = 1
+  packagesCurrentPage.value = 1
   
   // Fetch new data
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
 })
 
 // Initialize
 onMounted(async () => {
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships()])
 })
 </script>
 
@@ -872,7 +902,7 @@ onMounted(async () => {
             <!-- Files exist -->
             <div v-if="packages.length > 0" class="file-items">
               <div
-                v-for="(packageItem, index) in packages"
+                v-for="(packageItem, index) in paginatedPackages"
                 :key="`package-${index}`"
                 class="file-item"
                 :title="'Click to view file details'"
@@ -891,6 +921,19 @@ onMounted(async () => {
                 >
                   ✕
                 </el-button>
+              </div>
+              
+              <!-- Packages Pagination -->
+              <div v-if="packagesPagination.showPagination" class="relationship-pagination">
+                <el-pagination
+                  v-model:current-page="packagesCurrentPage"
+                  :page-size="pageSize"
+                  :total="packagesPagination.total"
+                  layout="prev, pager, next"
+                  @current-change="handlePackagesPageChange"
+                  size="small"
+                  hide-on-single-page
+                />
               </div>
             </div>
 
