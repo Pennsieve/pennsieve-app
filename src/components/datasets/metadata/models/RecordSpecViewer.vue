@@ -50,6 +50,9 @@ const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
 const packages = ref([])
 
+// Template refs
+const timelineTrackRef = ref(null)
+
 // Dropdown state
 const quickActionsVisible = ref(true)
 
@@ -230,27 +233,132 @@ const timelineData = computed(() => {
 
 const hasHistory = computed(() => recordHistory.value.length > 0)
 
-// Timeline timespan for left and right date labels
-const timelineTimespan = computed(() => {
-  if (!recordHistory.value.length) return null
+// Timeline tick marks based on time span
+const timelineTicks = computed(() => {
+  if (!recordHistory.value.length || recordHistory.value.length < 2) return []
   
-  // Sort history by created_at ascending (oldest to newest)
   const sortedHistory = [...recordHistory.value].sort((a, b) => 
     new Date(a.created_at) - new Date(b.created_at)
   )
   
-  if (sortedHistory.length === 1) {
-    // Single version - show same date on both sides
-    const date = new Date(sortedHistory[0].created_at).toLocaleDateString()
-    return { startDate: date, endDate: date }
+  const startTime = new Date(sortedHistory[0].created_at)
+  const endTime = new Date(sortedHistory[sortedHistory.length - 1].created_at)
+  const totalSpan = endTime.getTime() - startTime.getTime()
+  
+  // Define time spans in milliseconds
+  const MINUTE = 60 * 1000
+  const HOUR = 60 * MINUTE
+  const DAY = 24 * HOUR
+  const MONTH = 30 * DAY
+  const YEAR = 365 * DAY
+  
+  // Get actual timeline width from DOM element
+  const actualTimelineWidth = timelineTrackRef.value?.clientWidth || 800
+  // Timeline spans from 5% to 95% = 90% of the actual timeline width  
+  const usableTimelineWidth = actualTimelineWidth * 0.9
+  const minTickSpacing = 50 // minimum 50px between ticks
+  const maxTicks = Math.floor(usableTimelineWidth / minTickSpacing)
+  
+  // Define possible intervals in order from smallest to largest
+  const intervals = [
+    { span: MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 5 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 10 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 15 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 30 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 2 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 3 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 6 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: 12 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+    { span: DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
+    { span: 2 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
+    { span: 3 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
+    { span: 7 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
+    { span: 14 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
+    { span: MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
+    { span: 2 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
+    { span: 3 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
+    { span: 6 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
+    { span: YEAR, format: (date) => date.getFullYear().toString() },
+    { span: 2 * YEAR, format: (date) => date.getFullYear().toString() },
+    { span: 5 * YEAR, format: (date) => date.getFullYear().toString() },
+    { span: 10 * YEAR, format: (date) => date.getFullYear().toString() }
+  ]
+  
+  // Find the best interval that gives us <= maxTicks
+  let bestInterval = intervals[intervals.length - 1] // default to largest interval
+  for (const interval of intervals) {
+    const estimatedTicks = Math.ceil(totalSpan / interval.span)
+    if (estimatedTicks <= maxTicks) {
+      bestInterval = interval
+      break
+    }
   }
   
-  // Multiple versions - show oldest and newest dates
-  const startDate = new Date(sortedHistory[0].created_at).toLocaleDateString()
-  const endDate = new Date(sortedHistory[sortedHistory.length - 1].created_at).toLocaleDateString()
+  const tickInterval = bestInterval.span
+  const tickFormat = bestInterval.format
   
-  return { startDate, endDate }
+  // Generate tick marks - start from proper time boundaries
+  let currentTick = new Date(startTime)
+  let ticks = []
+  
+  // Align to appropriate time boundary based on interval
+  if (tickInterval >= YEAR) {
+    // Year-based intervals - align to January 1st
+    currentTick.setMonth(0, 1)
+    currentTick.setHours(0, 0, 0, 0)
+    currentTick.setFullYear(currentTick.getFullYear() + 1)
+  } else if (tickInterval >= MONTH) {
+    // Month-based intervals - align to 1st of month
+    currentTick.setDate(1)
+    currentTick.setHours(0, 0, 0, 0)
+    currentTick.setMonth(currentTick.getMonth() + 1)
+  } else if (tickInterval >= DAY) {
+    // Day-based intervals - align to midnight
+    currentTick.setHours(0, 0, 0, 0)
+    currentTick.setTime(currentTick.getTime() + DAY)
+  } else if (tickInterval >= HOUR) {
+    // Hour-based intervals - align to top of hour
+    currentTick.setMinutes(0, 0, 0)
+    currentTick.setTime(currentTick.getTime() + HOUR)
+  } else {
+    // Minute-based intervals - align to top of minute
+    currentTick.setSeconds(0, 0)
+    currentTick.setTime(currentTick.getTime() + MINUTE)
+  }
+  
+  // Generate ticks without arbitrary cap - let density control handle it
+  while (currentTick.getTime() <= endTime.getTime()) {
+    const timeRatio = (currentTick.getTime() - startTime.getTime()) / totalSpan
+    const position = 5 + (timeRatio * 90)
+    
+    // Only add tick if it's within the timeline range (don't go beyond 95%)
+    if (position <= 95) {
+      ticks.push({
+        date: new Date(currentTick),
+        position,
+        label: tickFormat(currentTick)
+      })
+    }
+    
+    // Move to next tick based on interval
+    if (tickInterval >= YEAR) {
+      currentTick.setFullYear(currentTick.getFullYear() + (tickInterval / YEAR))
+    } else if (tickInterval >= MONTH) {
+      currentTick.setMonth(currentTick.getMonth() + (tickInterval / MONTH))
+    } else {
+      // For sub-month intervals, use millisecond addition
+      currentTick.setTime(currentTick.getTime() + tickInterval)
+    }
+    
+    // Safety break to prevent infinite loops
+    if (ticks.length > 100) break
+  }
+  
+  return ticks
 })
+
 
 // Methods
 const fetchRecord = async () => {
@@ -908,13 +1016,8 @@ onMounted(async () => {
           </div>
 
           <div class="timeline-container">
-            <!-- Timeline date range labels -->
-<!--            <div v-if="timelineTimespan" class="timeline-dates">-->
-<!--              <span class="timeline-start-date">{{ timelineTimespan.startDate }}</span>-->
-<!--              <span class="timeline-end-date">{{ timelineTimespan.endDate }}</span>-->
-<!--            </div>-->
             
-            <div class="timeline-track">
+            <div class="timeline-track" ref="timelineTrackRef">
               <!-- Load more history button (left side) -->
               <div v-if="historyHasMore" class="load-more-history-inline">
                 <el-button 
@@ -928,6 +1031,17 @@ onMounted(async () => {
                   <span v-if="historyLoading">⟳</span>
                   <span v-else>⋯</span>
                 </el-button>
+              </div>
+              
+              <!-- Timeline tick marks -->
+              <div
+                v-for="(tick, index) in timelineTicks"
+                :key="`tick-${index}`"
+                class="timeline-tick"
+                :style="{ left: `${tick.position}%` }"
+                :title="tick.label"
+              >
+                <div class="timeline-tick-mark"></div>
               </div>
               
               <!-- Timeline nodes -->
@@ -1903,25 +2017,6 @@ onMounted(async () => {
     padding: 20px 0;
   }
 
-  // Timeline date range labels
-  .timeline-dates {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    padding: 0 15px; // Align with timeline track padding
-    
-    .timeline-start-date,
-    .timeline-end-date {
-      font-size: 12px;
-      font-weight: 500;
-      color: theme.$gray_4;
-      padding: 2px 6px;
-      background: theme.$gray_1;
-      border-radius: 3px;
-      border: 1px solid theme.$gray_2;
-    }
-  }
 
   .timeline-track {
     position: relative;
@@ -1937,6 +2032,30 @@ onMounted(async () => {
       height: 2px;
       background: theme.$gray_3;
       transform: translateY(-50%);
+    }
+  }
+
+  // Timeline tick marks styling
+  .timeline-tick {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    
+    .timeline-tick-mark {
+      width: 1px;
+      height: 8px;
+      background: theme.$gray_4;
+      opacity: 0.6;
+      transition: all 0.2s ease;
+    }
+    
+    &:hover {
+      .timeline-tick-mark {
+        opacity: 1;
+        background: theme.$gray_5;
+        height: 12px;
+      }
     }
   }
 
