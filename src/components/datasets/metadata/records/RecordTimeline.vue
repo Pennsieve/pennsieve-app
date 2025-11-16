@@ -74,8 +74,8 @@
             class="timeline-mode-toggle-btn-inline"
             :title="timelineMode === 'history' ? 'Expand to now' : 'Switch to history mode'"
           >
-            <span v-if="timelineMode === 'history'">⤵⤴</span>
-            <span v-else>⤴⤵</span>
+            <IconFullScreen v-if="timelineMode === 'history'" :width="12" :height="12" />
+            <IconMinimize v-else :width="12" :height="12" />
           </el-button>
         </div>
 
@@ -153,6 +153,8 @@
 <script setup>
 import { ref, computed, toRefs } from 'vue'
 import { ElButton } from 'element-plus'
+import IconFullScreen from '@/components/icons/IconFullScreen.vue'
+import IconMinimize from '@/components/icons/IconMinimize.vue'
 
 const props = defineProps({
   recordHistory: {
