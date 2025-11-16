@@ -283,11 +283,11 @@ const activeTimepoint = computed(() => {
   let startTime, endTime, totalSpan
   
   if (timelineMode.value === 'future') {
-    // In future mode, timeline spans from oldest record to current time  
-    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+    // Future mode: Latest node on left, timeline extends to now() on right
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
     const currentTime = new Date().getTime()
-    startTime = oldestTime
-    endTime = currentTime
+    startTime = newestTime  // Latest record at left
+    endTime = currentTime   // Current time at right
     totalSpan = endTime - startTime
     
     // Ensure minimum span
@@ -372,28 +372,28 @@ const timelineData = computed(() => {
     }]
   }
   
-  // Multiple versions - distribute based on actual time differences
-  const oldestTime = new Date(sortedHistory[0].created_at).getTime()
-  const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-  const currentTime = new Date().getTime()
-  
+  // Multiple versions - distribute based on actual time differences  
   let totalTimespan
   let startTime
   let endTime
   
   if (timelineMode.value === 'future') {
-    // Future mode: latest node on left, timeline extends to current time
-    startTime = newestTime
-    endTime = currentTime
+    // Future mode: Latest node on left (with margin), timeline extends to now() on right
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
+    const currentTime = new Date().getTime()
+    startTime = newestTime  // Latest record at left
+    endTime = currentTime   // Current time at right
     totalTimespan = endTime - startTime
     
-    // If the latest record is from the future or very recent, ensure we have some timeline span
+    // Ensure minimum span
     if (totalTimespan <= 0) {
       totalTimespan = 24 * 60 * 60 * 1000 // 24 hours minimum span
       endTime = startTime + totalTimespan
     }
   } else {
     // History mode: oldest to newest (original behavior)
+    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
     startTime = oldestTime
     endTime = newestTime
     totalTimespan = endTime - startTime
@@ -404,25 +404,15 @@ const timelineData = computed(() => {
     
     let position
     if (timelineMode.value === 'future') {
-      // Future mode positioning: latest record at left (5%), timeline extends to current time
+      // Future mode positioning: use same logic as tick marks for consistency
       if (totalTimespan === 0) {
         // All records are at the same time - position at left
         position = 5
       } else {
-        // In future mode, older records should still be positioned to the left of newer records
-        // So we need to calculate their position relative to the oldest record, not the newest
-        const timeFromOldest = recordTime - oldestTime
-        const historicalTimespan = newestTime - oldestTime
-        
-        if (historicalTimespan === 0) {
-          // All historical records have same timestamp, position them at left
-          position = 5
-        } else {
-          // Position historical records proportionally within the left portion of timeline
-          // Use only a small portion (like 20%) for historical records, rest extends to future
-          const historicalPortion = Math.min(0.2, historicalTimespan / (historicalTimespan + (currentTime - newestTime)))
-          position = 5 + (timeFromOldest / historicalTimespan) * (historicalPortion * 83)
-        }
+        // Position nodes using the same proportional calculation as timeline ticks
+        // This ensures nodes align perfectly with tick marks
+        const timeFromStart = recordTime - startTime // startTime is oldestTime in future mode
+        position = 5 + ((timeFromStart / totalTimespan) * 83)
       }
     } else {
       // History mode positioning (original behavior)
@@ -441,13 +431,10 @@ const timelineData = computed(() => {
     let isCurrent = false
     let isHighlighted = false
     
-    console.log(`Node ${historyRecord.created_at}: preview=${props.previewTimestamp}, asOf=${props.asOf}`)
-    
     // ABSOLUTE PRIORITY: Only the first matching condition executes
     if (props.previewTimestamp && historyRecord.created_at === props.previewTimestamp) {
       // Case 1: Exact preview match - gets isCurrent
       isCurrent = true
-      console.log(`Node ${historyRecord.created_at}: CURRENT (preview exact)`)
     }
     else if (props.previewTimestamp) {
       // Case 2: Preview exists but this node doesn't match - check if nearest
@@ -461,21 +448,18 @@ const timelineData = computed(() => {
         
         if (nearestNode?.created_at === historyRecord.created_at) {
           isHighlighted = true
-          console.log(`Node ${historyRecord.created_at}: HIGHLIGHTED (preview nearest)`)
         }
       }
     }
     else if (props.asOf && historyRecord.created_at === props.asOf) {
       // Case 3: AsOf exact match - gets isCurrent
       isCurrent = true
-      console.log(`Node ${historyRecord.created_at}: CURRENT (asOf exact)`)
     }
     else if (!props.previewTimestamp && !props.asOf) {
       // Case 4: Current mode - behave like as_of=now(), highlight latest chronological node
       const latestNode = sortedHistory[sortedHistory.length - 1]
       if (latestNode.created_at === historyRecord.created_at) {
         isHighlighted = true
-        console.log(`Node ${historyRecord.created_at}: HIGHLIGHTED (current latest)`)
       }
     }
     
@@ -515,17 +499,17 @@ const timelineTicks = computed(() => {
   let startTime, endTime, totalSpan
   
   if (timelineMode.value === 'future') {
-    // In future mode, timeline spans from oldest record to current time
-    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+    // Future mode: Latest node on left, timeline extends to now() on right
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
     const currentTime = new Date().getTime()
-    startTime = new Date(oldestTime)
-    endTime = new Date(currentTime)
-    totalSpan = endTime.getTime() - startTime.getTime()
+    startTime = newestTime  // Latest record at left (raw milliseconds)
+    endTime = currentTime   // Current time at right (raw milliseconds)
+    totalSpan = endTime - startTime
     
     // Ensure minimum span for tick generation
     if (totalSpan <= 0) {
       totalSpan = 24 * 60 * 60 * 1000 // 24 hours minimum
-      endTime = new Date(startTime.getTime() + totalSpan)
+      endTime = startTime + totalSpan
     }
   } else {
     // History mode: original behavior
@@ -617,9 +601,9 @@ const timelineTicks = computed(() => {
     currentTick.setTime(currentTick.getTime() + MINUTE)
   }
   
-  // Generate ticks without arbitrary cap - let density control handle it
-  while (currentTick.getTime() <= endTime.getTime()) {
-    const timeRatio = (currentTick.getTime() - startTime.getTime()) / totalSpan
+  // Generate ticks without arbitrary cap - let density control handle it  
+  while (currentTick.getTime() <= endTime) {
+    const timeRatio = (currentTick.getTime() - startTime) / totalSpan
     const position = 5 + (timeRatio * 83)  // Match timeline node positioning (83% range)
     
     // Only add tick if it's within the timeline range (don't go beyond 88%)
@@ -676,11 +660,11 @@ const calculateTimestampFromPosition = (mouseX, timelineElement) => {
   let startTime, endTime, totalSpan
   
   if (timelineMode.value === 'future') {
-    // In future mode, timeline spans from oldest record to current time
-    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+    // Future mode: Latest node on left, timeline extends to now() on right
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
     const currentTime = new Date().getTime()
-    startTime = oldestTime
-    endTime = currentTime
+    startTime = newestTime  // Latest record at left
+    endTime = currentTime   // Current time at right
     totalSpan = endTime - startTime
     
     // Ensure minimum span
