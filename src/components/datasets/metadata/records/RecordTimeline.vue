@@ -584,10 +584,22 @@ const calculateTimelinePosition = (targetTimestamp, sortedHistory = null) => {
       totalTimespan = endTime - startTime
     } else {
       // No cutoff - extend from latest record to current time
+      // Add some margin on the left so latest node isn't at the very edge (5%)
       const currentTime = new Date().getTime()
-      startTime = newestTime  // Latest record at left
-      endTime = currentTime   // Current time at right
-      totalTimespan = endTime - startTime
+      const baseTimespan = currentTime - newestTime
+      
+      if (baseTimespan > 0) {
+        // Add 5% margin on the left side for the latest node
+        const leftMargin = baseTimespan * 0.05
+        startTime = newestTime - leftMargin  // Start a bit before latest record
+        endTime = currentTime                // Current time at right
+        totalTimespan = endTime - startTime
+      } else {
+        // Fallback for edge cases
+        startTime = newestTime
+        endTime = currentTime
+        totalTimespan = endTime - startTime
+      }
     }
     
     // Ensure minimum span
