@@ -280,33 +280,10 @@ const activeTimepoint = computed(() => {
     new Date(a.created_at) - new Date(b.created_at)
   )
   
-  let startTime, endTime, totalSpan
+  const positionData = calculateTimelinePosition(props.previewTimestamp, sortedHistory)
+  if (!positionData) return null
   
-  if (timelineMode.value === 'future') {
-    // Future mode: Latest node on left, timeline extends to now() on right
-    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    const currentTime = new Date().getTime()
-    startTime = newestTime  // Latest record at left
-    endTime = currentTime   // Current time at right
-    totalSpan = endTime - startTime
-    
-    // Ensure minimum span
-    if (totalSpan <= 0) {
-      totalSpan = 24 * 60 * 60 * 1000 // 24 hours minimum
-      endTime = startTime + totalSpan
-    }
-  } else {
-    // History mode: original behavior
-    startTime = new Date(sortedHistory[0].created_at).getTime()
-    endTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    totalSpan = endTime - startTime
-  }
-  
-  if (totalSpan === 0) return null
-  
-  const previewTime = new Date(props.previewTimestamp).getTime()
-  const timeFromStart = previewTime - startTime
-  const position = 5 + ((timeFromStart / totalSpan) * 83)  // Match timeline node positioning
+  const { position } = positionData
   
   // Only show if position is within timeline bounds
   if (position < 5 || position > 88) return null
@@ -372,58 +349,17 @@ const timelineData = computed(() => {
     }]
   }
   
-  // Multiple versions - distribute based on actual time differences  
-  let totalTimespan
-  let startTime
-  let endTime
-  
-  if (timelineMode.value === 'future') {
-    // Future mode: Latest node on left (with margin), timeline extends to now() on right
-    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    const currentTime = new Date().getTime()
-    startTime = newestTime  // Latest record at left
-    endTime = currentTime   // Current time at right
-    totalTimespan = endTime - startTime
-    
-    // Ensure minimum span
-    if (totalTimespan <= 0) {
-      totalTimespan = 24 * 60 * 60 * 1000 // 24 hours minimum span
-      endTime = startTime + totalTimespan
-    }
-  } else {
-    // History mode: oldest to newest (original behavior)
-    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
-    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    startTime = oldestTime
-    endTime = newestTime
-    totalTimespan = endTime - startTime
-  }
-  
+  // Multiple versions - use shared positioning function for consistency
   return sortedHistory.map((historyRecord, index) => {
-    const recordTime = new Date(historyRecord.created_at).getTime()
-    
+    // Use shared positioning function to ensure consistency with tick marks
+    const positionData = calculateTimelinePosition(historyRecord.created_at, sortedHistory)
     let position
-    if (timelineMode.value === 'future') {
-      // Future mode positioning: use same logic as tick marks for consistency
-      if (totalTimespan === 0) {
-        // All records are at the same time - position at left
-        position = 5
-      } else {
-        // Position nodes using the same proportional calculation as timeline ticks
-        // This ensures nodes align perfectly with tick marks
-        const timeFromStart = recordTime - startTime // startTime is oldestTime in future mode
-        position = 5 + ((timeFromStart / totalTimespan) * 83)
-      }
+    
+    if (positionData) {
+      position = positionData.position
     } else {
-      // History mode positioning (original behavior)
-      if (totalTimespan === 0) {
-        // All records have the same timestamp - use equal spacing within reduced timeline width
-        position = 5 + ((index / (sortedHistory.length - 1)) * 83)
-      } else {
-        // Position based on actual time difference from oldest within timeline width
-        const timeFromOldest = recordTime - startTime
-        position = 5 + ((timeFromOldest / totalTimespan) * 83)
-      }
+      // Fallback: equal spacing if positioning fails (same timestamp edge case)
+      position = 5 + ((index / Math.max(sortedHistory.length - 1, 1)) * 83)
     }
     
     // Determine if this node should appear as current or highlighted
@@ -492,31 +428,12 @@ const showTimelineContinuation = computed(() => {
 const timelineTicks = computed(() => {
   if (!props.recordHistory.length || props.recordHistory.length < 2) return []
   
-  const sortedHistory = [...props.recordHistory].sort((a, b) => 
-    new Date(a.created_at) - new Date(b.created_at)
-  )
+  // Use shared positioning function to get consistent timeline parameters
+  const positionData = calculateTimelinePosition(null)  // null means use default filtered history
+  if (!positionData) return []
   
-  let startTime, endTime, totalSpan
-  
-  if (timelineMode.value === 'future') {
-    // Future mode: Latest node on left, timeline extends to now() on right
-    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    const currentTime = new Date().getTime()
-    startTime = newestTime  // Latest record at left (raw milliseconds)
-    endTime = currentTime   // Current time at right (raw milliseconds)
-    totalSpan = endTime - startTime
-    
-    // Ensure minimum span for tick generation
-    if (totalSpan <= 0) {
-      totalSpan = 24 * 60 * 60 * 1000 // 24 hours minimum
-      endTime = startTime + totalSpan
-    }
-  } else {
-    // History mode: original behavior
-    startTime = new Date(sortedHistory[0].created_at)
-    endTime = new Date(sortedHistory[sortedHistory.length - 1].created_at)
-    totalSpan = endTime.getTime() - startTime.getTime()
-  }
+  const { startTime, endTime, totalTimespan } = positionData
+  const totalSpan = totalTimespan
   
   // Define time spans in milliseconds
   const MINUTE = 60 * 1000
@@ -632,6 +549,98 @@ const timelineTicks = computed(() => {
   return ticks
 })
 
+// Shared timeline positioning calculation
+const calculateTimelinePosition = (targetTimestamp, sortedHistory = null) => {
+  // Use provided sortedHistory or create our own with same filtering logic as timelineData
+  if (!sortedHistory) {
+    sortedHistory = [...props.recordHistory].sort((a, b) => 
+      new Date(a.created_at) - new Date(b.created_at)
+    )
+    
+    // Apply cutoff timestamp if set (same as timelineData)
+    if (props.timelineCutoffTimestamp) {
+      const cutoffTime = new Date(props.timelineCutoffTimestamp).getTime()
+      sortedHistory = sortedHistory.filter(h => 
+        new Date(h.created_at).getTime() <= cutoffTime
+      )
+    }
+  }
+  
+  if (!sortedHistory.length) return null
+  
+  let startTime, endTime, totalTimespan
+  
+  if (timelineMode.value === 'future') {
+    // Future mode: Latest node on left, timeline extends to now() on right
+    // BUT if we have a timeline cutoff, don't extend to now() - just use cutoff range
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
+    
+    if (props.timelineCutoffTimestamp) {
+      // When there's a cutoff, timeline should be from oldest filtered record to the cutoff timestamp
+      const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+      const cutoffTime = new Date(props.timelineCutoffTimestamp).getTime()
+      startTime = oldestTime
+      endTime = cutoffTime
+      totalTimespan = endTime - startTime
+    } else {
+      // No cutoff - extend from latest record to current time
+      const currentTime = new Date().getTime()
+      startTime = newestTime  // Latest record at left
+      endTime = currentTime   // Current time at right
+      totalTimespan = endTime - startTime
+    }
+    
+    // Ensure minimum span
+    if (totalTimespan <= 0) {
+      totalTimespan = 24 * 60 * 60 * 1000 // 24 hours minimum
+      endTime = startTime + totalTimespan
+    }
+  } else {
+    // History mode: oldest to newest (respecting cutoff filtering)
+    // The filtered sortedHistory already respects the cutoff, so use its range
+    const oldestTime = new Date(sortedHistory[0].created_at).getTime()
+    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
+    startTime = oldestTime
+    endTime = newestTime
+    totalTimespan = endTime - startTime
+    
+    // Add margin on the right side to prevent overlap with expand button
+    // Extend timeline by ~8px worth of time to create visual spacing
+    if (totalTimespan > 0) {
+      const marginRatio = 0.03 // ~3% margin on the right side
+      const marginTime = totalTimespan * marginRatio
+      endTime = newestTime + marginTime
+      totalTimespan = endTime - startTime
+    }
+    
+    // Note: In history mode, when you double-click a node, sortedHistory is already filtered
+    // to only include records up to the cutoff timestamp, so newestTime = cutoff time
+  }
+  
+  if (totalTimespan === 0) return null
+  
+  // If no target timestamp provided, just return timeline parameters
+  if (!targetTimestamp) {
+    return {
+      position: null,
+      startTime,
+      endTime,
+      totalTimespan
+    }
+  }
+  
+  const targetTime = new Date(targetTimestamp).getTime()
+  const timeFromStart = targetTime - startTime
+  const position = 5 + ((timeFromStart / totalTimespan) * 83) // 5% to 88% range
+  
+  return {
+    position,
+    startTime,
+    endTime,
+    totalTimespan
+  }
+}
+
 // Methods
 const formatTimestamp = (timestamp) => {
   try {
@@ -652,36 +661,15 @@ const calculateTimestampFromPosition = (mouseX, timelineElement) => {
   // Clamp percentage to extended timeline bounds (5% to 92% to match extended baseline)
   const clampedPercentage = Math.max(5, Math.min(92, percentage))
   
-  // Convert percentage to timestamp - need different logic for future vs history mode
-  const sortedHistory = [...props.recordHistory].sort((a, b) => 
-    new Date(a.created_at) - new Date(b.created_at)
-  )
+  // Use shared positioning function to get consistent timeline parameters
+  const positionData = calculateTimelinePosition(null) // Get timeline params
+  if (!positionData) return null
   
-  let startTime, endTime, totalSpan
-  
-  if (timelineMode.value === 'future') {
-    // Future mode: Latest node on left, timeline extends to now() on right
-    const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    const currentTime = new Date().getTime()
-    startTime = newestTime  // Latest record at left
-    endTime = currentTime   // Current time at right
-    totalSpan = endTime - startTime
-    
-    // Ensure minimum span
-    if (totalSpan <= 0) {
-      totalSpan = 24 * 60 * 60 * 1000 // 24 hours minimum
-      endTime = startTime + totalSpan
-    }
-  } else {
-    // History mode: original behavior
-    startTime = new Date(sortedHistory[0].created_at).getTime()
-    endTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-    totalSpan = endTime - startTime
-  }
+  const { startTime, endTime, totalTimespan } = positionData
   
   // Convert from visual percentage (5-88%) to time ratio (0-100%)
   const timeRatio = (clampedPercentage - 5) / 83
-  const timestamp = new Date(startTime + (totalSpan * timeRatio))
+  const timestamp = new Date(startTime + (totalTimespan * timeRatio))
   
   return {
     timestamp: timestamp.toISOString(),
