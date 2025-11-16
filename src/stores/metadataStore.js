@@ -647,13 +647,14 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch a specific record by ID
-    const fetchRecord = async (datasetId, modelId, recordId) => {
+    const fetchRecord = async (datasetId, modelId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
             const token = await useGetToken()
 
             const queryParams = toQueryParams({
-                dataset_id: datasetId
+                dataset_id: datasetId,
+                ...options.as_of && { as_of: options.as_of }
             })
 
             const url = `${endpoint}?${queryParams}`
@@ -1071,7 +1072,7 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch all packages for a record (handles pagination automatically)
-    const fetchAllRecordPackages = async (datasetId, recordId) => {
+    const fetchAllRecordPackages = async (datasetId, recordId, userOptions = {}) => {
         try {
             let allPackages = []
             let cursor = null
@@ -1079,7 +1080,10 @@ export const useMetadataStore = defineStore('metadata', () => {
             const pageSize = 50 // Reasonable page size for fetching all
             
             while (hasMore) {
-                const options = { page_size: pageSize }
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
                 if (cursor) {
                     options.cursor = cursor
                 }
@@ -1194,7 +1198,7 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch all relationships for a record (handles pagination automatically)
-    const fetchAllRecordRelationships = async (datasetId, recordId) => {
+    const fetchAllRecordRelationships = async (datasetId, recordId, userOptions = {}) => {
         try {
             let allRelationships = { inbound: [], outbound: [] }
             let cursor = null
@@ -1202,7 +1206,10 @@ export const useMetadataStore = defineStore('metadata', () => {
             const pageSize = 50 // Reasonable page size for fetching all
             
             while (hasMore) {
-                const options = { page_size: pageSize }
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
                 if (cursor) {
                     options.cursor = cursor
                 }

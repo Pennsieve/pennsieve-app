@@ -3,17 +3,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useRecordData } from '@/composables/useRecordData.js'
 
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
-import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
-import IconTrash from "@/components/icons/IconTrash.vue";
+import IconTrash from "@/components/icons/IconTrash.vue"
+import RecordTimeline from './RecordTimeline.vue'
+import RecordHeader from './RecordHeader.vue'
 
 const props = defineProps({
   datasetId: {
@@ -28,6 +29,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  as_of: {
+    type: String,
+    required: false
+  },
   noPadding: {
     type: Boolean,
     default: false
@@ -36,6 +41,7 @@ const props = defineProps({
 
 const metadataStore = useMetadataStore()
 const router = useRouter()
+const route = useRoute()
 
 // Reactive data
 const record = ref(null)
@@ -50,8 +56,17 @@ const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
 const packages = ref([])
 
-// Template refs
-const timelineTrackRef = ref(null)
+// Timeline preview state
+const previewTimestamp = ref(null) // For single-click preview without navigation
+const previewRecord = ref(null) // Preview record data
+const previewRelationships = ref({ inbound: [], outbound: [] }) // Preview relationships
+const previewPackages = ref([]) // Preview packages
+const previewLoading = ref(false) // Preview loading state
+let clickTimeout = null // For handling click vs double-click
+
+// Timeline cutoff state for double-click behavior
+const timelineCutoffTimestamp = ref(null)
+
 
 // Dropdown state
 const quickActionsVisible = ref(true)
@@ -69,10 +84,14 @@ const currentRecordDisplayName = computed(() => {
   return getRecordDisplayValue(record.value)
 })
 
-// Computed properties
+// Computed properties with preview support
+const currentRecord = computed(() => {
+  return previewRecord.value || record.value
+})
+
 const recordData = computed(() => {
-  if (!record.value) return null
-  return record.value.value || {}
+  if (!currentRecord.value) return null
+  return currentRecord.value.value || {}
 })
 
 const modelSchema = computed(() => {
@@ -95,28 +114,36 @@ const recordProperties = computed(() => {
 })
 
 const recordMetadata = computed(() => {
-  if (!record.value) return null
+  if (!currentRecord.value) return null
   
   return {
-    id: record.value.id,
-    created_at: record.value.created_at,
-    updated_at: record.value.updated_at,
-    model_version: record.value.model_version,
-    created_by: record.value.created_by,
-    updated_by: record.value.updated_by
+    id: currentRecord.value.id,
+    created_at: currentRecord.value.created_at,
+    updated_at: currentRecord.value.updated_at,
+    model_version: currentRecord.value.model_version,
+    created_by: currentRecord.value.created_by,
+    updated_by: currentRecord.value.updated_by
   }
 })
 
 // Remove the old computed property that relied on record.relationships
-// Now we use the separate relationships ref that's fetched independently
+// Now we use the separate relationships ref that's fetched independently with preview support
+
+const currentRelationships = computed(() => {
+  return previewTimestamp.value ? previewRelationships.value : relationships.value
+})
+
+const currentPackages = computed(() => {
+  return previewTimestamp.value ? previewPackages.value : packages.value
+})
 
 const hasRelationships = computed(() => {
-  const rels = relationships.value
+  const rels = currentRelationships.value
   return (rels.inbound && rels.inbound.length > 0) || (rels.outbound && rels.outbound.length > 0)
 })
 
 const relationshipsSummary = computed(() => {
-  const rels = relationships.value
+  const rels = currentRelationships.value
   return {
     inbound: rels.inbound ? rels.inbound.length : 0,
     outbound: rels.outbound ? rels.outbound.length : 0,
@@ -126,14 +153,14 @@ const relationshipsSummary = computed(() => {
 
 // Paginated relationships
 const paginatedInboundRelationships = computed(() => {
-  const rels = relationships.value.inbound || []
+  const rels = currentRelationships.value.inbound || []
   const start = (inboundCurrentPage.value - 1) * pageSize
   const end = start + pageSize
   return rels.slice(start, end)
 })
 
 const paginatedOutboundRelationships = computed(() => {
-  const rels = relationships.value.outbound || []
+  const rels = currentRelationships.value.outbound || []
   const start = (outboundCurrentPage.value - 1) * pageSize
   const end = start + pageSize
   return rels.slice(start, end)
@@ -141,7 +168,7 @@ const paginatedOutboundRelationships = computed(() => {
 
 // Pagination info
 const inboundPagination = computed(() => {
-  const total = relationships.value.inbound?.length || 0
+  const total = currentRelationships.value.inbound?.length || 0
   return {
     total,
     totalPages: Math.ceil(total / pageSize),
@@ -151,7 +178,7 @@ const inboundPagination = computed(() => {
 })
 
 const outboundPagination = computed(() => {
-  const total = relationships.value.outbound?.length || 0
+  const total = currentRelationships.value.outbound?.length || 0
   return {
     total,
     totalPages: Math.ceil(total / pageSize),
@@ -164,12 +191,12 @@ const outboundPagination = computed(() => {
 const paginatedPackages = computed(() => {
   const start = (packagesCurrentPage.value - 1) * pageSize
   const end = start + pageSize
-  return packages.value.slice(start, end)
+  return currentPackages.value.slice(start, end)
 })
 
 // Package pagination info
 const packagesPagination = computed(() => {
-  const total = packages.value.length
+  const total = currentPackages.value.length
   return {
     total,
     totalPages: Math.ceil(total / pageSize),
@@ -178,186 +205,7 @@ const packagesPagination = computed(() => {
   }
 })
 
-// Timeline computed properties
-const timelineData = computed(() => {
-  if (!recordHistory.value.length) return []
-  
-  // API returns records in reverse chronological order (newest first)
-  // We need to sort them by created_at ascending (oldest to newest) to position correctly
-  const sortedHistory = [...recordHistory.value].sort((a, b) => 
-    new Date(a.created_at) - new Date(b.created_at)
-  )
-  
-  // Calculate positions based on actual time differences with current version on the right side
-  if (sortedHistory.length === 1) {
-    // Single version - position at 95% (right side)
-    const historyRecord = sortedHistory[0]
-    const isCurrent = historyRecord.provenance_id === record.value?.provenance_id
-    
-    return [{
-      ...historyRecord,
-      position: 95,
-      isCurrent,
-      index: 0
-    }]
-  }
-  
-  // Multiple versions - distribute based on actual time differences
-  const oldestTime = new Date(sortedHistory[0].created_at).getTime()
-  const newestTime = new Date(sortedHistory[sortedHistory.length - 1].created_at).getTime()
-  const totalTimespan = newestTime - oldestTime
-  
-  return sortedHistory.map((historyRecord, index) => {
-    const recordTime = new Date(historyRecord.created_at).getTime()
-    
-    let position
-    if (totalTimespan === 0) {
-      // All records have the same timestamp - use equal spacing
-      position = 5 + ((index / (sortedHistory.length - 1)) * 90)
-    } else {
-      // Position based on actual time difference from oldest
-      const timeFromOldest = recordTime - oldestTime
-      position = 5 + ((timeFromOldest / totalTimespan) * 90)
-    }
-    
-    const isCurrent = historyRecord.provenance_id === record.value?.provenance_id
-    
-    return {
-      ...historyRecord,
-      position,
-      isCurrent,
-      index
-    }
-  })
-})
-
 const hasHistory = computed(() => recordHistory.value.length > 0)
-
-// Timeline tick marks based on time span
-const timelineTicks = computed(() => {
-  if (!recordHistory.value.length || recordHistory.value.length < 2) return []
-  
-  const sortedHistory = [...recordHistory.value].sort((a, b) => 
-    new Date(a.created_at) - new Date(b.created_at)
-  )
-  
-  const startTime = new Date(sortedHistory[0].created_at)
-  const endTime = new Date(sortedHistory[sortedHistory.length - 1].created_at)
-  const totalSpan = endTime.getTime() - startTime.getTime()
-  
-  // Define time spans in milliseconds
-  const MINUTE = 60 * 1000
-  const HOUR = 60 * MINUTE
-  const DAY = 24 * HOUR
-  const MONTH = 30 * DAY
-  const YEAR = 365 * DAY
-  
-  // Get actual timeline width from DOM element
-  const actualTimelineWidth = timelineTrackRef.value?.clientWidth || 800
-  // Timeline spans from 5% to 95% = 90% of the actual timeline width  
-  const usableTimelineWidth = actualTimelineWidth * 0.9
-  const minTickSpacing = 50 // minimum 50px between ticks
-  const maxTicks = Math.floor(usableTimelineWidth / minTickSpacing)
-  
-  // Define possible intervals in order from smallest to largest
-  const intervals = [
-    { span: MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 5 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 10 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 15 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 30 * MINUTE, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 2 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 3 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 6 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: 12 * HOUR, format: (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { span: DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
-    { span: 2 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
-    { span: 3 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
-    { span: 7 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
-    { span: 14 * DAY, format: (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) },
-    { span: MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
-    { span: 2 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
-    { span: 3 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
-    { span: 6 * MONTH, format: (date) => date.toLocaleDateString([], { month: 'short', year: 'numeric' }) },
-    { span: YEAR, format: (date) => date.getFullYear().toString() },
-    { span: 2 * YEAR, format: (date) => date.getFullYear().toString() },
-    { span: 5 * YEAR, format: (date) => date.getFullYear().toString() },
-    { span: 10 * YEAR, format: (date) => date.getFullYear().toString() }
-  ]
-  
-  // Find the best interval that gives us <= maxTicks
-  let bestInterval = intervals[intervals.length - 1] // default to largest interval
-  for (const interval of intervals) {
-    const estimatedTicks = Math.ceil(totalSpan / interval.span)
-    if (estimatedTicks <= maxTicks) {
-      bestInterval = interval
-      break
-    }
-  }
-  
-  const tickInterval = bestInterval.span
-  const tickFormat = bestInterval.format
-  
-  // Generate tick marks - start from proper time boundaries
-  let currentTick = new Date(startTime)
-  let ticks = []
-  
-  // Align to appropriate time boundary based on interval
-  if (tickInterval >= YEAR) {
-    // Year-based intervals - align to January 1st
-    currentTick.setMonth(0, 1)
-    currentTick.setHours(0, 0, 0, 0)
-    currentTick.setFullYear(currentTick.getFullYear() + 1)
-  } else if (tickInterval >= MONTH) {
-    // Month-based intervals - align to 1st of month
-    currentTick.setDate(1)
-    currentTick.setHours(0, 0, 0, 0)
-    currentTick.setMonth(currentTick.getMonth() + 1)
-  } else if (tickInterval >= DAY) {
-    // Day-based intervals - align to midnight
-    currentTick.setHours(0, 0, 0, 0)
-    currentTick.setTime(currentTick.getTime() + DAY)
-  } else if (tickInterval >= HOUR) {
-    // Hour-based intervals - align to top of hour
-    currentTick.setMinutes(0, 0, 0)
-    currentTick.setTime(currentTick.getTime() + HOUR)
-  } else {
-    // Minute-based intervals - align to top of minute
-    currentTick.setSeconds(0, 0)
-    currentTick.setTime(currentTick.getTime() + MINUTE)
-  }
-  
-  // Generate ticks without arbitrary cap - let density control handle it
-  while (currentTick.getTime() <= endTime.getTime()) {
-    const timeRatio = (currentTick.getTime() - startTime.getTime()) / totalSpan
-    const position = 5 + (timeRatio * 90)
-    
-    // Only add tick if it's within the timeline range (don't go beyond 95%)
-    if (position <= 95) {
-      ticks.push({
-        date: new Date(currentTick),
-        position,
-        label: tickFormat(currentTick)
-      })
-    }
-    
-    // Move to next tick based on interval
-    if (tickInterval >= YEAR) {
-      currentTick.setFullYear(currentTick.getFullYear() + (tickInterval / YEAR))
-    } else if (tickInterval >= MONTH) {
-      currentTick.setMonth(currentTick.getMonth() + (tickInterval / MONTH))
-    } else {
-      // For sub-month intervals, use millisecond addition
-      currentTick.setTime(currentTick.getTime() + tickInterval)
-    }
-    
-    // Safety break to prevent infinite loops
-    if (ticks.length > 100) break
-  }
-  
-  return ticks
-})
 
 
 // Methods
@@ -366,7 +214,11 @@ const fetchRecord = async () => {
   error.value = ''
   
   try {
-    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId)
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId, options)
     record.value = response
   } catch (err) {
     console.error('Error fetching record:', err)
@@ -388,7 +240,11 @@ const fetchModel = async () => {
 
 const fetchPackages = async () => {
   try {
-    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId)
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId, options)
     packages.value = response || []
   } catch (err) {
     console.error('Error fetching packages:', err)
@@ -399,7 +255,11 @@ const fetchPackages = async () => {
 
 const fetchRelationships = async () => {
   try {
-    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId)
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId, options)
     relationships.value = response || { inbound: [], outbound: [] }
   } catch (err) {
     console.error('Error fetching relationships:', err)
@@ -412,6 +272,8 @@ const fetchRecordHistory = async (cursor = null) => {
   try {
     historyLoading.value = true
     const options = cursor ? { cursor } : {}
+    // Never use as_of for initial load - always fetch the full timeline
+    // Only use as_of when loading more via the loadMoreHistory function
     const response = await metadataStore.fetchRecordHistory(props.datasetId, props.recordId, options)
     
     if (cursor) {
@@ -623,14 +485,220 @@ const handlePackagesPageChange = (page) => {
 const loadMoreHistory = async () => {
   if (!historyHasMore.value || historyLoading.value) return
   
-  await fetchRecordHistory(historyCursor.value)
+  try {
+    historyLoading.value = true
+    // Use current preview timestamp as as_of if we're in preview mode
+    const options = { cursor: historyCursor.value }
+    if (previewTimestamp.value) {
+      options.as_of = previewTimestamp.value
+    }
+    
+    const response = await metadataStore.fetchRecordHistory(props.datasetId, props.recordId, options)
+    
+    // Append older versions to existing history
+    recordHistory.value = [...recordHistory.value, ...(response.records || [])]
+    
+    historyHasMore.value = response.hasMore || false
+    historyCursor.value = response.cursor || null
+  } catch (err) {
+    console.error('Error loading more history:', err)
+    historyHasMore.value = false
+    historyCursor.value = null
+  } finally {
+    historyLoading.value = false
+  }
 }
 
-// Timeline navigation - for now just placeholder (will be implemented when API is provided)
+
+// Timeline preview - update current node display without navigation (single click)
+const previewHistoryRecord = async (historyRecord) => {
+  console.log('Preview history record:', historyRecord)
+  previewTimestamp.value = historyRecord.created_at
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: historyRecord.created_at }
+  })
+  
+  try {
+    // Fetch historical record, relationships, and packages in parallel
+    await Promise.all([
+      fetchPreviewRecord(historyRecord.created_at),
+      fetchPreviewRelationships(historyRecord.created_at),
+      fetchPreviewPackages(historyRecord.created_at)
+    ])
+  } catch (err) {
+    console.error('Error fetching preview data:', err)
+    // Clear preview state on error
+    previewTimestamp.value = null
+    previewRecord.value = null
+    previewRelationships.value = { inbound: [], outbound: [] }
+    previewPackages.value = []
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+// Fetch preview data functions
+const fetchPreviewRecord = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId, { as_of: timestamp })
+    previewRecord.value = response
+  } catch (err) {
+    console.error('Error fetching preview record:', err)
+    previewRecord.value = null
+  }
+}
+
+const fetchPreviewRelationships = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId, { as_of: timestamp })
+    previewRelationships.value = response || { inbound: [], outbound: [] }
+  } catch (err) {
+    console.error('Error fetching preview relationships:', err)
+    previewRelationships.value = { inbound: [], outbound: [] }
+  }
+}
+
+const fetchPreviewPackages = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId, { as_of: timestamp })
+    previewPackages.value = response || []
+  } catch (err) {
+    console.error('Error fetching preview packages:', err)
+    previewPackages.value = []
+  }
+}
+
+// Timeline navigation - set cutoff to selected timestamp (double click)
 const goToHistoryRecord = (historyRecord) => {
-  console.log('Navigate to history record:', historyRecord)
-  // TODO: Implement navigation to historical version when API is provided
-  ElMessage.info(`Timeline navigation will be implemented when API is provided`)
+  console.log('Set timeline cutoff to:', historyRecord)
+  
+  // Cancel any pending preview timeout
+  if (clickTimeout) {
+    clearTimeout(clickTimeout)
+    clickTimeout = null
+  }
+  
+  // Set cutoff timestamp to hide newer nodes and reposition timeline
+  timelineCutoffTimestamp.value = historyRecord.created_at
+  
+  // Set preview to the selected node
+  previewTimestamp.value = historyRecord.created_at
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: historyRecord.created_at }
+  })
+  
+  try {
+    // Fetch historical record, relationships, and packages in parallel
+    Promise.all([
+      fetchPreviewRecord(historyRecord.created_at),
+      fetchPreviewRelationships(historyRecord.created_at),
+      fetchPreviewPackages(historyRecord.created_at)
+    ]).finally(() => {
+      previewLoading.value = false
+    })
+  } catch (err) {
+    console.error('Error fetching cutoff data:', err)
+    previewLoading.value = false
+  }
+}
+
+// Navigate to the latest version of the record (remove as_of parameter)
+const goToLatestVersion = async () => {
+  console.log('Navigate to latest version')
+  
+  // Clear preview state if in preview mode
+  if (previewTimestamp.value) {
+    clearPreview()
+  }
+  
+  // Clear timeline cutoff if set
+  if (timelineCutoffTimestamp.value) {
+    timelineCutoffTimestamp.value = null
+  }
+  
+  // Check if we need to refresh data - either we have as_of param or we were in preview mode
+  const hasAsOfParam = route.query.as_of && route.query.as_of !== ''
+  const wasInPreviewMode = previewTimestamp.value !== null
+  
+  if (!hasAsOfParam && !wasInPreviewMode) {
+    // Already on current version and not in preview, no need to refresh
+    return
+  }
+  
+  // Update URL to remove as_of parameter without page navigation
+  const query = { ...route.query }
+  delete query.as_of
+  await router.replace({ query })
+  
+  // Always refresh all data to show latest version when clicking Current
+  console.log('Refreshing data to latest version')
+  await Promise.all([
+    fetchRecord(),
+    fetchRelationships(),  
+    fetchPackages(),
+    fetchRecordHistory() // Also refresh history to ensure we have latest timeline
+  ])
+}
+
+// Format timestamp for display
+const formatTimestamp = (timestamp) => {
+  try {
+    return new Date(timestamp).toLocaleString()
+  } catch {
+    return timestamp
+  }
+}
+
+// Handle timeline track click for preview at timestamp - now handled by RecordTimeline component
+const handleTimelineTrackClick = async (timestamp) => {
+  console.log('Timeline track click at timestamp:', timestamp)
+  
+  // Set preview timestamp
+  previewTimestamp.value = timestamp
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: timestamp }
+  })
+  
+  try {
+    // Fetch all preview data including record metadata for timeline track clicks
+    await Promise.all([
+      fetchPreviewRecord(timestamp),
+      fetchPreviewRelationships(timestamp),
+      fetchPreviewPackages(timestamp)
+    ])
+  } catch (err) {
+    console.error('Error fetching timeline preview data:', err)
+    // Clear preview state on error
+    previewTimestamp.value = null
+    previewRecord.value = null
+    previewRelationships.value = { inbound: [], outbound: [] }
+    previewPackages.value = []
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+// Clear preview mode and return to current data
+const clearPreview = () => {
+  previewTimestamp.value = null
+  previewRecord.value = null
+  previewRelationships.value = { inbound: [], outbound: [] }
+  previewPackages.value = []
+  timelineCutoffTimestamp.value = null // Clear timeline cutoff
+  
+  // Update URL to remove as_of parameter
+  const query = { ...route.query }
+  delete query.as_of
+  router.replace({ query })
 }
 
 // Relationship creation methods
@@ -825,19 +893,29 @@ const deleteRelationship = async (relationship, direction) => {
   }
 }
 
-// Watch for prop changes to refetch data when navigating between records
+// Watch for prop changes to refetch data when navigating between records (not as_of changes)
 watch([() => props.modelId, () => props.recordId], async () => {
   console.log('Props changed - refetching data for:', props.modelId, props.recordId)
   // Clear current data
   record.value = null
   model.value = null
   relationships.value = { inbound: [], outbound: [] }
+  packages.value = []
+  recordHistory.value = []
   error.value = ''
+  
+  // Clear preview state when navigating to different records
+  previewTimestamp.value = null
+  timelineCutoffTimestamp.value = null // Clear timeline cutoff
   
   // Reset pagination when loading new record
   inboundCurrentPage.value = 1
   outboundCurrentPage.value = 1
   packagesCurrentPage.value = 1
+  
+  // Reset history pagination
+  historyHasMore.value = false
+  historyCursor.value = null
   
   // Fetch new data
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
@@ -846,11 +924,21 @@ watch([() => props.modelId, () => props.recordId], async () => {
 // Initialize
 onMounted(async () => {
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
+  
+  // If we have an as_of parameter, set up preview state to match
+  if (props.as_of) {
+    previewTimestamp.value = props.as_of
+    // The initial data fetches above already used as_of, so we just need to set up the preview refs
+    previewRecord.value = record.value
+    previewRelationships.value = relationships.value
+    previewPackages.value = packages.value
+  }
 })
 </script>
 
 <template>
   <bf-stage class="record-spec-viewer" :no-padding="noPadding" >
+    
     <template #actions>
       <stage-actions>
         <template #left>
@@ -920,71 +1008,16 @@ onMounted(async () => {
     <!-- Record Content -->
     <div v-else-if="record && model" class="record-content">
       <!-- Record Header -->
-      <div class="record-header">
-        <div class="record-info">
-          <div class="title-row">
-            <h2>{{ model.display_name || model.name }} Record</h2>
-            <ViewToggle v-model:viewMode="viewMode" size="small" />
-          </div>
-          
-          <!-- Record Metadata (hidden in JSON mode) -->
-          <div v-if="viewMode === 'ui'" class="record-metadata">
-            <div class="metadata-item">
-              <span class="metadata-label">Record ID:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ record.id }}</span>
-                <el-button
-                  @click="copyRecordId"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Copy Record ID"
-                >
-                  <IconCopyDocument :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Model ID:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ modelId }}</span>
-                <el-button
-                  @click="copyModelId"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Copy Model ID"
-                >
-                  <IconCopyDocument :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Model Version:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ recordMetadata.model_version }}</span>
-                <el-button
-                  @click="goToModelDetails"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Go to Model Details"
-                >
-                  <IconArrowRight :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Created At:</span>
-              <span class="metadata-value">{{ new Date(recordMetadata.created_at).toLocaleString() }}</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <RecordHeader
+        :record="currentRecord"
+        :model="model"
+        :model-id="modelId"
+        :preview-timestamp="previewTimestamp"
+        :view-mode="viewMode"
+        @clear-preview="clearPreview"
+        @update:view-mode="viewMode = $event"
+        @go-to-model="goToModelDetails"
+      />
 
       <!-- Enhanced View -->
       <div v-if="viewMode === 'ui'" class="enhanced-view">
@@ -1004,68 +1037,23 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Record History Timeline Section -->
-        <div v-if="hasHistory" class="section">
-          <div class="section-header">
-            <h3>Record History</h3>
-            <div class="header-actions">
-<!--              <el-tag size="small" class="record-tag history-tag">-->
-<!--                {{ recordHistory.length > 0 ? `${recordHistory.length} versions` : 'No versions' }}-->
-<!--              </el-tag>-->
-            </div>
-          </div>
-
-          <div class="timeline-container">
-            
-            <div class="timeline-track" ref="timelineTrackRef">
-              <!-- Load more history button (left side) -->
-              <div v-if="historyHasMore" class="load-more-history-inline">
-                <el-button 
-                  @click="loadMoreHistory"
-                  :loading="historyLoading"
-                  link
-                  size="small"
-                  class="load-more-btn-inline"
-                  :title="historyLoading ? 'Loading older versions...' : 'Fetch older versions'"
-                >
-                  <span v-if="historyLoading">⟳</span>
-                  <span v-else>⋯</span>
-                </el-button>
-              </div>
-              
-              <!-- Timeline tick marks -->
-              <div
-                v-for="(tick, index) in timelineTicks"
-                :key="`tick-${index}`"
-                class="timeline-tick"
-                :style="{ left: `${tick.position}%` }"
-                :title="tick.label"
-              >
-                <div class="timeline-tick-mark"></div>
-              </div>
-              
-              <!-- Timeline nodes -->
-              <div
-                v-for="(historyItem, index) in timelineData"
-                :key="`history-${index}`"
-                class="timeline-node"
-                :class="{
-                  'is-current': historyItem.isCurrent,
-                  'clickable': !historyItem.isCurrent
-                }"
-                :style="{ left: `${historyItem.position}%` }"
-                :title="`${historyItem.isCurrent ? 'Current version' : 'Previous version'} - ${new Date(historyItem.created_at).toLocaleString()}`"
-                @click="!historyItem.isCurrent && goToHistoryRecord(historyItem)"
-              >
-                <div class="timeline-dot"></div>
-                <div class="timeline-label">
-                  <span class="timeline-date">{{ new Date(historyItem.created_at).toLocaleDateString() }}</span>
-                  <span v-if="historyItem.isCurrent" class="timeline-current-indicator">Current</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Record History Timeline -->
+        <RecordTimeline
+          v-if="hasHistory"
+          :record-history="recordHistory"
+          :history-has-more="historyHasMore"
+          :history-loading="historyLoading"
+          :preview-timestamp="previewTimestamp"
+          :timeline-cutoff-timestamp="timelineCutoffTimestamp"
+          :as-of="as_of"
+          :record="record"
+          @preview-record="previewHistoryRecord"
+          @go-to-history-record="goToHistoryRecord"
+          @load-more-history="loadMoreHistory"
+          @go-to-latest-version="goToLatestVersion"
+          @clear-timeline-cutoff="timelineCutoffTimestamp = null"
+          @timeline-track-click="handleTimelineTrackClick"
+        />
 
         <!-- Relationships Section -->
         <div class="section">
@@ -1093,7 +1081,7 @@ onMounted(async () => {
             <!-- Show relationship lists when there are relationships -->
             <div v-else class="relationships-list">
               <!-- Inbound Relationships (only show if there are inbound relationships) -->
-              <div v-if="relationships.inbound.length > 0" class="relationship-section">
+              <div v-if="currentRelationships.inbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title inbound">← Inbound</h4>
                 
                 <div class="relationship-items">
@@ -1134,7 +1122,7 @@ onMounted(async () => {
               </div>
 
               <!-- Outbound Relationships (only show if there are outbound relationships) -->
-              <div v-if="relationships.outbound.length > 0" class="relationship-section">
+              <div v-if="currentRelationships.outbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title outbound">Outbound →</h4>
                 
                 <div class="relationship-items">
@@ -1183,7 +1171,7 @@ onMounted(async () => {
             <h3>Attached Files</h3>
             <div class="header-actions">
               <el-tag size="small" class="record-tag files-tag">
-                {{ packages.length > 0 ? `${packages.length} files` : 'No files' }}
+                {{ currentPackages.length > 0 ? `${currentPackages.length} files` : 'No files' }}
               </el-tag>
               <span class="attach-file-link" @click="startPackageAttachment">
                 Attach File
@@ -1193,7 +1181,7 @@ onMounted(async () => {
 
           <div class="files-container">
             <!-- Files exist -->
-            <div v-if="packages.length > 0" class="file-items">
+            <div v-if="currentPackages.length > 0" class="file-items">
               <div
                 v-for="(packageItem, index) in paginatedPackages"
                 :key="`package-${index}`"
@@ -1256,7 +1244,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use 'sass:color';
-@use '../../../../styles/theme' as theme;
+@use '../../../../styles/theme';
 @use '../../../../styles/element/select';
 @use '../../../../styles/element/dialog';
 @use '../../../../styles/element/tag';
@@ -1309,11 +1297,27 @@ onMounted(async () => {
           align-items: center;
           margin: 8px 0 12px 0;
           
-          h2 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-            color: theme.$gray_6;
+          .title-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            
+            h2 {
+              margin: 0;
+              font-size: 24px;
+              font-weight: 600;
+              color: theme.$gray_6;
+            }
+            
+            .preview-tag {
+              cursor: pointer;
+              font-size: 11px;
+              padding: 4px 8px;
+              
+              &:hover {
+                opacity: 0.8;
+              }
+            }
           }
         }
 
@@ -2011,260 +2015,6 @@ onMounted(async () => {
     }
   }
 
-  // Timeline styling
-  .timeline-container {
-    margin: 16px 0;
-    padding: 20px 0;
-  }
-
-
-  .timeline-track {
-    position: relative;
-    height: 60px;
-
-    // Timeline baseline
-    &::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 10px;
-      right: 10px;
-      height: 2px;
-      background: theme.$gray_3;
-      transform: translateY(-50%);
-    }
-  }
-
-  // Timeline tick marks styling
-  .timeline-tick {
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-    
-    .timeline-tick-mark {
-      width: 1px;
-      height: 8px;
-      background: theme.$gray_4;
-      opacity: 0.6;
-      transition: all 0.2s ease;
-    }
-    
-    &:hover {
-      .timeline-tick-mark {
-        opacity: 1;
-        background: theme.$gray_5;
-        height: 12px;
-      }
-    }
-  }
-
-  .timeline-node {
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 2;
-
-    &.clickable {
-      cursor: pointer;
-      
-      &:hover {
-        .timeline-dot {
-          transform: scale(1.2);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-        
-        .timeline-label {
-          opacity: 1;
-        }
-      }
-    }
-
-    .timeline-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: theme.$gray_4;
-      border: 2px solid white;
-      transition: all 0.2s ease;
-      margin: 0 auto;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    &.is-current .timeline-dot {
-      background: theme.$purple_2;
-      border-color: theme.$purple_2;
-      width: 16px;
-      height: 16px;
-      box-shadow: 0 2px 6px rgba(102, 76, 204, 0.3);
-    }
-
-    .timeline-label {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 4px 8px;
-      font-size: 11px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 10;
-
-      .timeline-date {
-        display: block;
-        font-weight: 500;
-      }
-
-      .timeline-current-indicator {
-        display: block;
-        color: theme.$purple_1;
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-      }
-    }
-
-    &.is-current .timeline-label {
-      opacity: 1;
-      top: 25px; // Below the timeline for current version
-      color: theme.$white;
-      background: theme.$purple_2;
-
-      // Arrow pointing up for labels below timeline
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 0;
-        height: 0;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-bottom: 4px solid theme.$purple_2;
-      }
-
-      .timeline-current-indicator {
-        color: white;
-      }
-    }
-
-    // Show labels on hover for non-current nodes
-    &:not(.is-current):hover {
-      z-index: 1000 !important; // Much higher than any other element
-      
-      .timeline-label {
-        opacity: 1;
-        z-index: 1000 !important;
-        top: -45px; // Position above the timeline instead of below
-        color: theme.$purple_2;
-        background: transparent;
-        
-        // Arrow pointing down for labels above timeline
-        &::after {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 0;
-          height: 0;
-          border-left: 4px solid transparent;
-          border-right: 4px solid transparent;
-          border-top: 4px solid theme.$purple_2;
-        }
-      }
-    }
-  }
-
-  // Inline load more history button styling
-  .load-more-history-inline {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
-
-    .load-more-btn-inline {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: theme.$gray_1 !important;
-      border: 1px solid theme.$gray_3 !important;
-      color: theme.$gray_5 !important;
-      font-size: 14px;
-      font-weight: 400;
-      padding: 0 !important;
-      min-height: unset !important;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-      
-      &:hover {
-        background: theme.$purple_tint !important;
-        border-color: theme.$purple_2 !important;
-        color: theme.$purple_2 !important;
-        transform: scale(1.1);
-      }
-      
-      &:disabled {
-        color: theme.$gray_4 !important;
-        background-color: theme.$gray_1 !important;
-        border-color: theme.$gray_3 !important;
-        cursor: not-allowed;
-      }
-      
-      span {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-        animation: none;
-      }
-      
-      // Rotating animation for loading state
-      &:disabled span:first-child {
-        animation: spin 1s linear infinite;
-      }
-    }
-  }
-  
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  // Load more history button styling (legacy - keeping for now)
-  .load-more-history {
-    margin-top: 16px;
-    display: flex;
-    justify-content: center;
-
-    .load-more-btn {
-      color: theme.$purple_2 !important;
-      font-size: 13px;
-      font-weight: 500;
-      
-      &:hover {
-        color: theme.$purple_1 !important;
-        background-color: theme.$purple_tint !important;
-      }
-      
-      &:disabled {
-        color: theme.$gray_4 !important;
-        background-color: transparent !important;
-        cursor: not-allowed;
-      }
-    }
-  }
-
-  // History tag styling
-  .history-tag {
-    background: theme.$gray_1 !important;
-    border-color: theme.$gray_3 !important;
-    color: theme.$gray_5 !important;
-  }
 
   // Utility classes for spacing
   .ml-8 {
