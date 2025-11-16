@@ -314,7 +314,7 @@ import MultiModelFilter from './MultiModelFilter.vue'
 import IconSizeToFit from '@/components/icons/IconSizeToFit.vue'
 import IconCenter from '@/components/icons/IconCenter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
-import RecordSpecViewer from '@/components/datasets/metadata/models/RecordSpecViewer.vue'
+import RecordSpecViewer from '@/components/datasets/metadata/records/RecordSpecViewer.vue'
 import FileDetails from '@/components/datasets/files/FileDetails/FileDetails.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 

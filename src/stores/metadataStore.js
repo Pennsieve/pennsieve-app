@@ -647,13 +647,14 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch a specific record by ID
-    const fetchRecord = async (datasetId, modelId, recordId) => {
+    const fetchRecord = async (datasetId, modelId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
             const token = await useGetToken()
 
             const queryParams = toQueryParams({
-                dataset_id: datasetId
+                dataset_id: datasetId,
+                ...options.as_of && { as_of: options.as_of }
             })
 
             const url = `${endpoint}?${queryParams}`
@@ -1024,12 +1025,16 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
-    // Fetch packages attached to a record
-    const fetchRecordPackages = async (datasetId, recordId) => {
+    // Fetch packages attached to a record with pagination support
+    const fetchRecordPackages = async (datasetId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
             const token = await useGetToken()
-            const queryParams = toQueryParams({ dataset_id: datasetId })
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                ...options // includes page_size, cursor, etc.
+            })
             const url = `${endpoint}?${queryParams}`
             
             const myHeaders = new Headers()
@@ -1042,13 +1047,106 @@ export const useMetadataStore = defineStore('metadata', () => {
             })
             
             if (resp.ok) {
-                return await resp.json()
+                const response = await resp.json()
+                return {
+                    packages: response.packages || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
             } else {
+                // Return empty packages for 404 (no packages) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        packages: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
                 const errorText = await resp.text()
                 throw new Error(`Failed to fetch record packages: ${resp.status} - ${errorText}`)
             }
         } catch (error) {
             console.error('Error fetching record packages:', error)
+            throw error
+        }
+    }
+
+    // Fetch all packages for a record (handles pagination automatically)
+    const fetchAllRecordPackages = async (datasetId, recordId, userOptions = {}) => {
+        try {
+            let allPackages = []
+            let cursor = null
+            let hasMore = true
+            const pageSize = 50 // Reasonable page size for fetching all
+            
+            while (hasMore) {
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
+                if (cursor) {
+                    options.cursor = cursor
+                }
+                
+                const result = await fetchRecordPackages(datasetId, recordId, options)
+                
+                // Append packages
+                allPackages.push(...(result.packages || []))
+                
+                cursor = result.cursor
+                hasMore = result.hasMore
+            }
+            
+            return allPackages
+        } catch (error) {
+            console.error('Error fetching all record packages:', error)
+            throw error
+        }
+    }
+
+    // Fetch record history with pagination support
+    const fetchRecordHistory = async (datasetId, recordId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/history`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                page_size: 5, // Default to 5 items per page
+                ...options // includes cursor, etc.
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                const response = await resp.json()
+                return {
+                    records: response.records || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
+            } else {
+                // Return empty records for 404 instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        records: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record history: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record history:', error)
             throw error
         }
     }
@@ -1100,7 +1198,7 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch all relationships for a record (handles pagination automatically)
-    const fetchAllRecordRelationships = async (datasetId, recordId) => {
+    const fetchAllRecordRelationships = async (datasetId, recordId, userOptions = {}) => {
         try {
             let allRelationships = { inbound: [], outbound: [] }
             let cursor = null
@@ -1108,7 +1206,10 @@ export const useMetadataStore = defineStore('metadata', () => {
             const pageSize = 50 // Reasonable page size for fetching all
             
             while (hasMore) {
-                const options = { page_size: pageSize }
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
                 if (cursor) {
                     options.cursor = cursor
                 }
@@ -1310,6 +1411,8 @@ export const useMetadataStore = defineStore('metadata', () => {
         cancelPackageAttachment,
         completePackageAttachment,
         fetchRecordPackages,
+        fetchAllRecordPackages,
+        fetchRecordHistory,
         fetchRecordRelationships,
         fetchAllRecordRelationships,
         deletePackageFromRecord,

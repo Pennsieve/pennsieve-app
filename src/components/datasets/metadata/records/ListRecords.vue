@@ -4,7 +4,7 @@ import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
-import ModelSelectorDialog from './ModelSelectorDialog.vue'
+import ModelSelectorDialog from '../models/ModelSelectorDialog.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";

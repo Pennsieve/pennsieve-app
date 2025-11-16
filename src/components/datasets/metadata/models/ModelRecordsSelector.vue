@@ -6,7 +6,7 @@ import { useMetadataStore } from '@/stores/metadataStore.js'
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
-import ListRecords from './ListRecords.vue'
+import ListRecords from '../records/ListRecords.vue'
 
 const props = defineProps({
   datasetId: {
