@@ -1004,7 +1004,7 @@ export default {
 
 <style scoped lang="scss">
 @use "../../../../styles/theme";
-
+@use "../../../../styles/element/dialog";
 .form-section {
   margin-bottom: 20px;
 

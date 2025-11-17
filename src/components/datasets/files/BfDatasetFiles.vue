@@ -102,7 +102,7 @@
                   <IconTrash class="mr-8" :height="20" :width="20" />
                 </template>
 
-                Restore
+                Restore Files
               </bf-button>
             </template>
           </ps-button-dropdown>
@@ -116,12 +116,14 @@
           :data="files"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
+          :is-package-attachment-active="isPackageAttachmentActive"
           @move="showMove"
           @delete="showDeleteDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
           @click-file-label="onClickLabel"
+          @select-for-attachment="onSelectForAttachment"
         />
         <div class="loading-spinner-container" v-if="filesLoading && !lastPage">
           <!-- <el-spinner class="loading-spinner" /> -->
@@ -230,6 +232,7 @@ import EventBus from "../../../utils/event-bus";
 import GetFileProperty from "../../../mixins/get-file-property";
 import FileMetadataInfo from "./Metadata/FileMetadataInfo.vue";
 import LockedBanner from "../LockedBanner/LockedBanner.vue";
+import { useMetadataStore } from "../../../stores/metadataStore.js";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
@@ -410,6 +413,15 @@ export default {
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
+    
+    /**
+     * Check if package attachment is active
+     * @returns {Boolean}
+     */
+    isPackageAttachmentActive: function () {
+      const metadataStore = this.getMetadataStore();
+      return !!metadataStore.activePackageAttachment;
+    },
   },
 
   watch: {
@@ -543,6 +555,11 @@ export default {
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
+
+    // Helper method to get metadataStore instance
+    getMetadataStore() {
+      return useMetadataStore();
+    },
 
     generateManifest: function () {
       this.createDatasetManifest();
@@ -721,6 +738,7 @@ export default {
      * @param {Object} file
      */
     onClickLabel: function (file) {
+      // Normal file navigation logic
       this.files = [];
       this.offset = 0;
       const id = pathOr("", ["content", "id"], file);
@@ -737,6 +755,25 @@ export default {
           params: { fileId: id },
         });
       }
+    },
+
+    /**
+     * Handler for selecting file/folder for package attachment
+     * @param {Object} file
+     */
+    onSelectForAttachment: function (file) {
+      // Dispatch package selection event for the PackageAttachmentWidget
+      const packageData = {
+        id: pathOr("", ["content", "id"], file),
+        name: pathOr("", ["content", "name"], file),
+        type: pathOr("", ["content", "packageType"], file),
+        path: pathOr("", ["content", "path"], file)
+      };
+      
+      const event = new CustomEvent('package-selected', {
+        detail: packageData
+      });
+      window.dispatchEvent(event);
     },
 
     /**

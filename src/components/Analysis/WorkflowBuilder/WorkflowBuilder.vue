@@ -173,12 +173,27 @@ const saveWorkflow = async () => {
     return;
   }
 
+  const processors = nodes.value.map((node, index) => {
+    const dependsOn = [];
+
+    // Add dependsOn if this is not the first node
+    if (index > 0) {
+      const previousNode = nodes.value[index - 1];
+      dependsOn.push({
+        sourceUrl: previousNode.data.application?.source?.url,
+      });
+    }
+
+    return {
+      sourceUrl: node.data.application?.source?.url,
+      dependsOn: dependsOn,
+    };
+  });
+
   const workflowData = {
     name: workflowName.value,
     description: workflowDescription.value,
-    processors: nodes.value.map((node) => ({
-      sourceUrl: node.data.application?.source?.url,
-    })),
+    processors: processors,
   };
 
   try {
@@ -186,15 +201,18 @@ const saveWorkflow = async () => {
     EventBus.$emit("toast", {
       detail: {
         type: "success",
-        msg: "Workflow created successfully!",
+        msg: "Your request to create a Workflow has been initiated.",
+        duration: 8000,
       },
     });
     clearWorkflow();
   } catch (error) {
+    console.error(error);
     EventBus.$emit("toast", {
       detail: {
         type: "error",
-        msg: "Failed to create workflow. Please try again.",
+        msg: "There was a problem submitting your request.",
+        duration: 6000,
       },
     });
   }

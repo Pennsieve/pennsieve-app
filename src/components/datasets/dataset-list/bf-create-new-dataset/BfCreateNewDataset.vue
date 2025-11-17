@@ -423,7 +423,7 @@
           })
 
           const id = pathOr('', ['content', 'id'], response)
-          this.$router.push({ name: 'dataset', params: { datasetId: id }})
+          this.$router.push({ name: 'dataset-overview', params: { datasetId: id }})
           this.isCreating = false
         })
       },

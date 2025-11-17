@@ -4,17 +4,18 @@
       v-if="selection.length > 0 && !withinRunAnalysisDialog"
       class="selection-menu-wrap mb-16"
     >
-      <el-checkbox
-        class="slim-checkbox"
-        id="check-all"
-        v-model="checkAll"
-        :indeterminate="isIndeterminate"
-        @change="onCheckAllChange"
-      />
-
-      <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
-        selectionCountLabel
-      }}</span>
+      <div class="selection-info">
+        <el-checkbox
+          class="slim-checkbox"
+          id="check-all"
+          v-model="checkAll"
+          :indeterminate="isIndeterminate"
+          @change="onCheckAllChange"
+        />
+        <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
+          selectionCountLabel
+        }}</span>
+      </div>
       <ul class="selection-actions unstyled">
         <template v-if="withinDeleteMenu || withinRunAnalysisDialog">
           <li class="mr-24">
@@ -90,7 +91,31 @@
       @sort-change="onSortChange"
       @row-click="onRowClick"
     >
+      <!-- Package Attachment Select Column (replaces selection when active) -->
       <el-table-column
+        v-if="isPackageAttachmentActive"
+        label=""
+        width="50"
+        align="center"
+        fixed
+      >
+        <template #header>
+          <span class="select-column-header">Select</span>
+        </template>
+        <template #default="scope">
+          <div
+            class="select-package-btn"
+            @click.stop="onSelectForAttachment(scope.row)"
+            title="Select for attachment"
+          >
+            <IconPlus :height="14" :width="14" />
+          </div>
+        </template>
+      </el-table-column>
+
+      <!-- Normal selection column (when package attachment is not active) -->
+      <el-table-column
+        v-else
         type="selection"
         align="center"
         :selectable="withinDeleteMenu ? canSelectRow : null"
@@ -172,14 +197,18 @@ import IconMoveFile from "../icons/IconMoveFile.vue";
 import IconDoneCheckCircle from "../icons/IconDoneCheckCircle.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import IconMenu from "../icons/IconMenu.vue";
+import IconPlus from "../icons/IconPlus.vue";
+import IconTrash from "@/components/icons/IconTrash.vue";
 
 export default {
   name: "FilesTable",
 
   components: {
+    IconTrash,
     IconUpload,
     IconDoneCheckCircle,
     IconMoveFile,
+    IconPlus,
     BfFileLabel,
     TableMenu,
     IconMenu,
@@ -221,6 +250,10 @@ export default {
       default: false,
     },
     clearSelectedValues: {
+      type: Boolean,
+      default: false,
+    },
+    isPackageAttachmentActive: {
       type: Boolean,
       default: false,
     },
@@ -363,6 +396,14 @@ export default {
      */
     onFileLabelClick: function (file) {
       this.$emit("click-file-label", file);
+    },
+
+    /**
+     * Handle package selection for attachment
+     * @param {Object} file
+     */
+    onSelectForAttachment: function (file) {
+      this.$emit("select-for-attachment", file);
     },
 
     /**
@@ -538,6 +579,14 @@ export default {
   font-weight: 700;
   transform: translateY(1px);
 }
+.btn-clear-selection {
+  font-size: 12px;
+  margin-left: 12px;
+  color: theme.$app-primary-color;
+  &:hover {
+    text-decoration: underline;
+  }
+}
 .selection-menu-wrap {
   background: #e9edf6;
   //border: 1px solid theme.$gray_2;
@@ -550,6 +599,11 @@ export default {
   width: 100%;
   z-index: 10;
   align-items: center;
+}
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .selection-actions {
   display: flex;
@@ -590,5 +644,42 @@ export default {
 .file-actions-wrap {
   display: flex;
   justify-content: flex-end;
+}
+
+.select-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+
+.select-column-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  text-align: center;
+}
+
+.select-package-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid theme.$teal_1;
+  border-radius: 50%;
+  background: theme.$white;
+  color: theme.$teal_2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: theme.$teal_tint;
+    border-color: theme.$teal_2;
+  }
+
+  &:active {
+    background: theme.$teal_tint;
+    transform: scale(0.95);
+  }
 }
 </style>

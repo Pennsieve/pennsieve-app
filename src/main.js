@@ -13,6 +13,9 @@ import AWSConfig from './utils/aws-exports.js'
 import VueClipboard from 'vue3-clipboard'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
+// Import Element Plus CSS manually to ensure proper theming
+import 'element-plus/dist/index.css'
+
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
 import { Amplify } from "aws-amplify"
@@ -27,7 +30,8 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+
+
 
 import Pusher from 'pusher-js'
 
@@ -46,8 +50,11 @@ app.directive('click-outside', ClickOutside)
 
 app.use(store);
 
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
+app.use(ElementPlus)
 
+//Import Dashboard
 
 app.use(VueClipboard, {
     autoSetContainer: true,
@@ -66,13 +73,6 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 
-app.use(ElementPlus)
-// In your main.js or App.vue
-window.addEventListener('beforeunload', () => {
-    store.dispatch('resetState');
-  });
-
-
 app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
@@ -80,8 +80,6 @@ app.config.globalProperties.$message = ElMessage;
 app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
     cluster: siteConfig.pusherConfig.region
 });
-
-const viewerStore = useViewerStore()
 
 
 // Top level routes allowList
@@ -109,6 +107,24 @@ const allowList = [
     'create-account'
 ]
 
+// Routes that don't require organization context
+const userRoutes = [
+    'publishing',
+    'my-workspace',
+    'my-settings',
+    'user-profile',
+    'user-orcid',
+    'user-github',
+    'user-api',
+    'data-publishing',
+    'data-publishing-dashboard',
+    'open-repositories',
+    'dataset-proposals',
+    'my-workspaces',
+    'my-repositories',
+    'shared-with-me'
+]
+
 router.beforeEach(async (to, from, next) => {
 
     // ==== CHECK FOR TOKEN ====
@@ -123,6 +139,10 @@ router.beforeEach(async (to, from, next) => {
     }
 
     const savedOrgId = Cookies.get('preferred_org_id')
+    
+    // Check if this is a user-specific route (no organization context needed)
+    const isUserRoute = userRoutes.indexOf(to.name) >= 0
+    
     if (to.name === 'home' && token && savedOrgId) {
         // Special case for 'home' page; if previously logged in, and session stored, then
         // forward to dataset listing page for the organization.
@@ -131,9 +151,17 @@ router.beforeEach(async (to, from, next) => {
     } else if (allowList.indexOf(to.name) >= 0) {
         // ==== Support Unauthenticated Access for AllowList Routes including 'home' ====
         next()
+    } else if (isUserRoute) {
+        // ==== USER-SPECIFIC ROUTES (no org context needed) ====
+        // Only get Profile if not already fetched
+        if (Object.keys(store.getters.profile).length === 0) {
+            await useGetProfileAndOrg(store)
+                .catch(err => useHandleXhrError(err))
+        }
+        next()
     } else {
 
-        // ==== GOING TO AUTHENTICATED PAGE ====
+        // ==== GOING TO AUTHENTICATED PAGE WITH ORG CONTEXT ====
         // ==== GET PROFILE/ORGS AND CHECK PREFERRED ORG ====
         // ==== Only get Profile and Workspaces if they have not been fetched before ====
         if (Object.keys(store.getters.profile).length  === 0) {
@@ -223,7 +251,6 @@ async function getPrimaryData() {
                 store.dispatch('updateOrgDatasetStatuses', resp)
             }).catch(err => useHandleXhrError(err))
 
-        const collectionsPromise = store.dispatch('collectionsModule/fetchCollections')
 
         return Promise.all(
             [
@@ -232,7 +259,6 @@ async function getPrimaryData() {
                 contributorPromise,
                 dataUseAgreementPromise,
                 datasetStatusPromise,
-                collectionsPromise
             ])
     })
 }

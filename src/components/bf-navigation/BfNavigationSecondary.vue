@@ -84,11 +84,12 @@
         </template>
       </div>
 
-      <template v-if="getPermission('editor')">
-        <create-button :condensed="secondaryNavCondensed" />
-        <hr />
-      </template>
+<!--      <template v-if="getPermission('editor')">-->
+<!--        <create-button :condensed="secondaryNavCondensed" />-->
+<!--        <hr />-->
+<!--      </template>-->
 
+      <hr/>
       <bf-navigation-item
         :link="{ name: 'dataset-overview' }"
         label="Overview"
@@ -139,6 +140,7 @@
           <IconGraph color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
+
 
       <bf-navigation-item
         :link="{ name: 'dataset-activity' }"
