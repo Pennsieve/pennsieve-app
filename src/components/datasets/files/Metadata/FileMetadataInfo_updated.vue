@@ -35,6 +35,37 @@
           />
         </div>
       </div>
+      <div
+        class="record-info"
+        v-for="item in curPackageMetaData"
+        :key="item.id"
+      >
+        <div class="record-header">
+          <div>{{ item.model }}</div>
+          <el-popover
+            placement="top-start"
+            title="Information"
+            width="260"
+            trigger="hover"
+            :content="getMessage(item.origin.node_id, item.model)"
+          >
+            <template #reference>
+              <IconInfo :width="14" :height="14" />
+            </template>
+          </el-popover>
+        </div>
+
+        <div
+          class="record-props"
+          v-for="(value, propertyName) in item.props"
+          :key="value"
+        >
+          <div class="record-prop-item">
+            <div class="prop-label">{{ propertyName }}</div>
+            <div>{{ value }}</div>
+          </div>
+        </div>
+      </div>
     </template>
 
     <template v-else-if="showDatasetInfo">
@@ -116,7 +147,6 @@ import IconInfo from "../../../icons/IconInfo.vue";
 import { copyText } from "vue3-clipboard";
 import { ref } from "vue";
 import { useMetadataStore } from "../../../../stores/metadataStore";
-import { useRecordKeyProperties } from "../../../../composables/useRecordKeyProperties";
 
 export default {
   name: "FileMetadataInfo",
@@ -124,16 +154,6 @@ export default {
   components: { IconInfo, IconAnnotation },
 
   mixins: [BfStorageMetrics, FormatDate],
-
-  setup() {
-    const { getKeyProperties, hasKeyProperties, getRecordTitle } = useRecordKeyProperties();
-    
-    return {
-      getKeyProperties,
-      hasKeyProperties,
-      getRecordTitle
-    };
-  },
 
   props: {
     selectedFiles: {
@@ -158,7 +178,19 @@ export default {
   },
 
   computed: {
+    ...mapGetters("filesModule", ["curPackageMetaData"]),
     ...mapGetters(["dataset"]),
+
+    groupedRecords: function () {
+      const grouped = {};
+      this.connectedRecords.forEach(record => {
+        if (!grouped[record.model_id]) {
+          grouped[record.model_id] = [];
+        }
+        grouped[record.model_id].push(record);
+      });
+      return grouped;
+    },
 
     fileLocation: function () {
       const ancestors = this.folder.ancestors;
@@ -270,24 +302,15 @@ export default {
         return false;
       }
     },
-    
-    groupedRecords: function () {
-      const grouped = {};
-      this.connectedRecords.forEach(record => {
-        if (!grouped[record.model_id]) {
-          grouped[record.model_id] = [];
-        }
-        grouped[record.model_id].push(record);
-      });
-      return grouped;
-    },
   },
 
   watch: {
     selectedFiles(newSelectedFiles, oldQuestion) {
       if (newSelectedFiles.length == 1) {
+        this.fetchMetadataForPackage(newSelectedFiles[0].content.nodeId);
         this.fetchConnectedRecords(newSelectedFiles[0].content.nodeId);
       } else if (newSelectedFiles.length == 0) {
+        this.fetchMetadataForPackage(this.folder.content.id);
         this.fetchConnectedRecords(this.folder.content.id);
       }
     },
@@ -298,6 +321,7 @@ export default {
   unmounted: function () {},
 
   methods: {
+    ...mapActions("filesModule", ["fetchMetadataForPackage"]),
 
     /**
      * Fetch connected records for a package
@@ -338,29 +362,6 @@ export default {
     },
 
     /**
-     * Get display name for a record
-     * @param {Object} record - The record object
-     * @returns {String} Display name
-     */
-    getRecordDisplayName(record) {
-      const metadataStore = useMetadataStore();
-      const model = metadataStore.modelById(record.model_id);
-      const modelName = model?.display_name || model?.name || 'Record';
-      
-      // Try to get a meaningful display name from key properties
-      const keyProperties = this.getKeyProperties(record);
-      const keyEntries = Object.entries(keyProperties);
-      
-      if (keyEntries.length > 0) {
-        const [firstKey, firstValue] = keyEntries[0];
-        return `${modelName}: ${firstValue}`;
-      }
-      
-      // Fallback to the record ID
-      return `${modelName}: ${record.id ? record.id.substring(0, 8) + '...' : 'Unknown'}`;
-    },
-
-    /**
      * Ensure model schemas are loaded in the metadata store for all unique models in the records
      * @param {Array} records - Array of records
      * @param {Object} metadataStore - The metadata store instance
@@ -391,20 +392,43 @@ export default {
       }
     },
 
-
     /**
-     * Group connected records by model
-     * @returns {Object} Records grouped by model_id
+     * Get only the key properties from a record based on model schema
+     * @param {Object} record - The record object
+     * @returns {Object} Object with only key properties
      */
-    groupedRecords() {
-      const grouped = {};
-      this.connectedRecords.forEach(record => {
-        if (!grouped[record.model_id]) {
-          grouped[record.model_id] = [];
+    getKeyProperties(record) {
+      const metadataStore = useMetadataStore();
+      const model = metadataStore.modelById(record.model_id);
+      
+      console.log('getKeyProperties - record:', record);
+      console.log('getKeyProperties - model from store:', model);
+      
+      // Get schema from model.schema or model.latest_version.schema
+      const schema = model?.schema || model?.latest_version?.schema;
+      
+      if (!schema || !schema.properties) {
+        console.log('getKeyProperties - no schema found in model');
+        return {};
+      }
+      
+      console.log('getKeyProperties - using schema:', schema);
+      console.log('getKeyProperties - schema properties:', schema.properties);
+      
+      const keyProperties = {};
+      const recordValue = record.value || {};
+      
+      // Find properties marked with x-pennsieve-key: true
+      Object.entries(schema.properties).forEach(([propertyName, propertySchema]) => {
+        console.log(`getKeyProperties - checking property ${propertyName}:`, propertySchema);
+        if (propertySchema['x-pennsieve-key'] === true && recordValue[propertyName] !== undefined) {
+          console.log(`getKeyProperties - found key property ${propertyName}:`, recordValue[propertyName]);
+          keyProperties[propertyName] = recordValue[propertyName];
         }
-        grouped[record.model_id].push(record);
       });
-      return grouped;
+      
+      console.log('getKeyProperties - final key properties:', keyProperties);
+      return keyProperties;
     },
 
     /**
@@ -418,6 +442,33 @@ export default {
       return model?.display_name || model?.name || 'Records';
     },
 
+    /**
+     * Get a concise title for a record
+     * @param {Object} record - The record object
+     * @returns {String} Record title
+     */
+    getRecordTitle(record) {
+      const keyProperties = this.getKeyProperties(record);
+      const keyEntries = Object.entries(keyProperties);
+      
+      if (keyEntries.length > 0) {
+        const [firstKey, firstValue] = keyEntries[0];
+        return firstValue;
+      }
+      
+      // Fallback to truncated record ID
+      return record.id ? record.id.substring(0, 8) + '...' : 'Record';
+    },
+
+    /**
+     * Check if record has key properties to display
+     * @param {Object} record - The record object
+     * @returns {Boolean} Whether record has key properties
+     */
+    hasKeyProperties(record) {
+      const keyProperties = this.getKeyProperties(record);
+      return Object.keys(keyProperties).length > 1; // More than just the title property
+    },
 
     /**
      * Navigate to record details page
@@ -434,7 +485,7 @@ export default {
         });
       }
     },
-    removeThisEntireFunction_getMessage(itemId, modelName) {
+    getMessage(itemId, modelName) {
       // Get Folder Name
       var fName = "";
       var curNodeId = "";
@@ -445,8 +496,7 @@ export default {
       }
 
       if (curNodeId == itemId) {
-        // Legacy code removed - this.curPackageMetaData no longer exists
-        if (false) { // modelName == this.curPackageMetaData[0].model) {
+        if (modelName == this.curPackageMetaData[0].model) {
           fName =
             "the selected file is directly associated with the '" +
             modelName +
@@ -596,19 +646,21 @@ export default {
   margin: 4px 8px 24px 4px;
 
   .model-group {
-    margin-bottom: 8px;
+    margin-bottom: 16px;
 
     .model-group-header {
       font-size: 13px;
       font-weight: 500;
-      color: theme.$purple_2;
+      color: theme.$purple_1;
       padding: 4px 8px;
       border-bottom: 1px solid theme.$gray_2;
+      margin-bottom: 8px;
     }
 
     .record-item {
       padding: 6px 8px;
       margin: 2px 0;
+      border-radius: 3px;
       transition: background-color 0.2s ease;
 
       &.clickable-record {
@@ -622,13 +674,13 @@ export default {
       .record-content {
         .record-title {
           font-size: 12px;
-          font-weight: 300;
+          font-weight: 500;
           color: theme.$gray_6;
           margin-bottom: 2px;
         }
 
         .record-keys {
-          font-size: 12px;
+          font-size: 11px;
           color: theme.$gray_5;
           
           .key-value-pair {

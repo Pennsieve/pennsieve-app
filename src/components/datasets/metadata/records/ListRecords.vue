@@ -141,8 +141,7 @@ const versionOptions = computed(() => {
 })
 
 const modelOptions = computed(() => {
-  const rawModels = metadataStore.models || []
-  const models = rawModels.map(item => item.model || item).filter(Boolean)
+  const models = metadataStore.models || []
   
   return models.map(model => ({
     label: model.display_name || model.name,
@@ -599,6 +598,23 @@ const goToRecordDetails = async (record) => {
   // Check if we're in relationship creation mode
   if (metadataStore.activeRelationshipCreation) {
     // Create a custom event to trigger relationship creation with complete record data
+    const recordData = {
+      id: record.id,
+      name: getRecordDisplayName(record),
+      modelId: props.modelId,
+      modelName: model.value?.display_name || model.value?.name || 'Unknown Model'
+    }
+    
+    const event = new CustomEvent('record-selected', { 
+      detail: recordData
+    })
+    window.dispatchEvent(event)
+    return
+  }
+  
+  // Check if we're in record attachment mode
+  if (metadataStore.activeRecordAttachment) {
+    // Create a custom event to trigger record attachment with complete record data
     const recordData = {
       id: record.id,
       name: getRecordDisplayName(record),

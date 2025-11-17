@@ -764,11 +764,8 @@ const loadModelForEdit = async () => {
       // Check if we can find the model directly
       const directModel = allModels.find(item => {
         // Try different possible structures
-        return (item.model?.id === props.modelId) || 
-               (item.id === props.modelId) ||
-               (item.model?.id === parseInt(props.modelId)) ||
-               (item.id === parseInt(props.modelId))
-      })
+        return (item.id === props.modelId) ||
+               (item.id === parseInt(props.modelId)) })
       
       if (directModel) {
         console.log('Found model directly:', directModel)
