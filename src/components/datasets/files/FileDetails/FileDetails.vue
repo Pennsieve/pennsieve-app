@@ -191,7 +191,7 @@
     </template>
 
     <!-- CONNECTED RECORDS SECTION -->
-    <div v-if="connectedRecords && connectedRecords.length > 0" class="concept-instance-section connected-records-section">
+    <div class="concept-instance-section connected-records-section">
       <div class="header">
         <div>Connected Records</div>
         <div class="header-actions">
@@ -203,7 +203,7 @@
           </span>
         </div>
       </div>
-      <div class="connected-records-container">
+      <div v-if="connectedRecords && connectedRecords.length > 0" class="connected-records-container">
         <div
           v-for="(records, modelId) in groupedConnectedRecords"
           :key="modelId"
@@ -2806,8 +2806,13 @@ export default {
      * Start record attachment flow - placeholder for future implementation
      */
     startRecordAttachment() {
-      // TODO: Implement record attachment functionality
-      console.log('Attach Record clicked - functionality to be implemented next');
+      // Get the package info from the current file
+      const packageId = this.proxyRecord.content.id
+      const datasetId = this.$route.params.datasetId
+      const packageName = this.proxyRecord.content.name || this.proxyRecord.content.filename || 'Unknown File'
+      
+      // Start the record attachment process
+      this.metadataStore.startRecordAttachment(packageId, datasetId, packageName)
     },
 
   },

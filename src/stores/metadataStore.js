@@ -25,6 +25,9 @@ export const useMetadataStore = defineStore('metadata', () => {
     
     // Package attachment state
     const activePackageAttachment = ref(null) // { recordId, modelId, datasetId, recordName }
+    
+    // Record attachment state (inverse of package attachment)
+    const activeRecordAttachment = ref(null) // { packageId, datasetId, packageName }
 
     // RecordFilter are used to filter records in Record list
     const createFilter = () => {
@@ -1025,6 +1028,36 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Record attachment actions (inverse of package attachment)
+    const startRecordAttachment = (packageId, datasetId, packageName) => {
+        activeRecordAttachment.value = {
+            packageId,
+            datasetId,
+            packageName
+        }
+    }
+
+    const cancelRecordAttachment = () => {
+        activeRecordAttachment.value = null
+    }
+
+    const completeRecordAttachment = async (recordId) => {
+        if (!activeRecordAttachment.value) {
+            throw new Error('No active record attachment in progress')
+        }
+
+        const { packageId, datasetId } = activeRecordAttachment.value
+
+        try {
+            const result = await attachPackageToRecord(datasetId, recordId, packageId)
+            activeRecordAttachment.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
     // Fetch packages attached to a record with pagination support
     const fetchRecordPackages = async (datasetId, recordId, options = {}) => {
         try {
@@ -1420,6 +1453,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         recordFilterParams,
         activeRelationshipCreation,
         activePackageAttachment,
+        activeRecordAttachment,
 
         // Getters
         modelById,
@@ -1457,6 +1491,12 @@ export const useMetadataStore = defineStore('metadata', () => {
         startPackageAttachment,
         cancelPackageAttachment,
         completePackageAttachment,
+        
+        // Record attachment actions
+        startRecordAttachment,
+        cancelRecordAttachment,
+        completeRecordAttachment,
+        
         fetchRecordPackages,
         fetchAllRecordPackages,
         fetchRecordHistory,

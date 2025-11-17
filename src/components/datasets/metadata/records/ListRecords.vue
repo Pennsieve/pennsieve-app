@@ -612,6 +612,23 @@ const goToRecordDetails = async (record) => {
     return
   }
   
+  // Check if we're in record attachment mode
+  if (metadataStore.activeRecordAttachment) {
+    // Create a custom event to trigger record attachment with complete record data
+    const recordData = {
+      id: record.id,
+      name: getRecordDisplayName(record),
+      modelId: props.modelId,
+      modelName: model.value?.display_name || model.value?.name || 'Unknown Model'
+    }
+    
+    const event = new CustomEvent('record-selected', { 
+      detail: recordData
+    })
+    window.dispatchEvent(event)
+    return
+  }
+  
   // Normal record navigation
   router.push({
     name: 'record-details',
