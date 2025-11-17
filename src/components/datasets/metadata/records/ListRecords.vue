@@ -141,8 +141,7 @@ const versionOptions = computed(() => {
 })
 
 const modelOptions = computed(() => {
-  const rawModels = metadataStore.models || []
-  const models = rawModels.map(item => item.model || item).filter(Boolean)
+  const models = metadataStore.models || []
   
   return models.map(model => ({
     label: model.display_name || model.name,

@@ -190,6 +190,52 @@
       </el-collapse>
     </template>
 
+    <!-- CONNECTED RECORDS SECTION -->
+    <div v-if="connectedRecords && connectedRecords.length > 0" class="concept-instance-section connected-records-section">
+      <div class="header">
+        <div>Connected Records</div>
+        <div class="header-actions">
+          <el-tag size="small" class="record-tag connected-records-tag">
+            {{ connectedRecords.length > 0 ? `${connectedRecords.length} records` : 'No records' }}
+          </el-tag>
+          <span class="attach-record-link" @click="startRecordAttachment">
+            Attach Record
+          </span>
+        </div>
+      </div>
+      <div class="connected-records-container">
+        <div
+          v-for="(records, modelId) in groupedConnectedRecords"
+          :key="modelId"
+          class="model-group"
+        >
+          <div class="record-items">
+            <div
+              v-for="record in records"
+              :key="record.id"
+              class="record-item"
+              :title="'Click to view record details'"
+            >
+              <div class="record-content clickable" @click="navigateToConnectedRecord(record)">
+                <el-tag size="small" class="record-type">{{ getModelDisplayName(modelId) }}</el-tag>
+                <span class="record-details">{{ formatRecordKeyValues(record) }}</span>
+                <IconArrowRight class="nav-icon" :width="12" :height="12" />
+              </div>
+              <el-button
+                @click.stop="deleteConnectedRecord(record)"
+                link
+                size="small"
+                class="delete-record-btn"
+                title="Remove record connection"
+              >
+                ✕
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="viewer-pane-wrap">
       <div class="header">
         <div>Preview</div>
@@ -266,6 +312,9 @@ import {
   useHandleXhrError,
   useSendXhr,
 } from "@/mixins/request/request_composable";
+import { useMetadataStore } from '@/stores/metadataStore';
+import IconArrowRight from '@/components/icons/IconArrowRight.vue';
+import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
 
 export default {
   name: "FileDetails",
@@ -275,6 +324,7 @@ export default {
     SourceFilesTable,
     StageActions,
     IconMenu,
+    IconArrowRight,
     BfButton,
     ConceptInstanceStaticProperty,
     LinkRecordMenu,
@@ -297,6 +347,14 @@ export default {
       type: Boolean,
       default: false
     }
+  },
+
+  setup() {
+    const { formatRecordKeyValues } = useRecordKeyProperties();
+    
+    return {
+      formatRecordKeyValues
+    };
   },
 
   data() {
@@ -356,7 +414,9 @@ export default {
       stringSubtypes: [],
       deleteDialogVisible: false,
       renameDialogVisible: false,
-      moveDialogVisible: false
+      moveDialogVisible: false,
+      connectedRecords: [],
+      metadataStore: useMetadataStore()
     };
   },
 
@@ -1032,6 +1092,25 @@ export default {
         return `${this.config.apiUrl}/models/datasets/${this.datasetId}/properties/strings?api_key=${token}`;
       });
     },
+
+    /**
+     * Group connected records by model
+     * @returns {Object}
+     */
+    groupedConnectedRecords: function() {
+      const grouped = {};
+      if (Array.isArray(this.connectedRecords)) {
+        this.connectedRecords.forEach(record => {
+          if (record && record.model_id) {
+            if (!grouped[record.model_id]) {
+              grouped[record.model_id] = [];
+            }
+            grouped[record.model_id].push(record);
+          }
+        });
+      }
+      return grouped;
+    },
   },
 
   watch: {
@@ -1039,6 +1118,7 @@ export default {
       handler: function (val, oldVal) {
         if (val) {
           this.getInstanceDetails();
+          this.fetchConnectedRecords();
         }
       },
       immediate: true,
@@ -1152,6 +1232,10 @@ export default {
 
     // Fetch new data for a given table
     EventBus.$on("refresh-table-data", this.refreshTableData);
+    
+    // Fetch connected records when component mounts
+    console.log('Component mounted, calling fetchConnectedRecords');
+    this.fetchConnectedRecords();
 
     // Open proper drawer component
     EventBus.$on("add-relationship", this.handleAddRelationship);
@@ -2610,6 +2694,122 @@ export default {
         ? this.onRemoveLinkedProperty(property)
         : this.openLinkedPropertyModal(property);
     },
+
+    /**
+     * Fetch connected records for the current package
+     */
+    async fetchConnectedRecords() {
+      console.log('fetchConnectedRecords called', { fileId: this.fileId, datasetId: this.datasetId });
+      
+      if (!this.fileId || !this.datasetId) {
+        console.log('Missing fileId or datasetId, skipping fetch');
+        this.connectedRecords = [];
+        return;
+      }
+
+      try {
+        console.log('Calling metadataStore.fetchPackageConnectedRecords...');
+        const response = await this.metadataStore.fetchPackageConnectedRecords(
+          this.datasetId,
+          this.fileId
+        );
+        
+        console.log('API Response:', response);
+        
+        // Handle the response format from metadataStore: { records, cursor, hasMore }
+        if (response && response.records) {
+          this.connectedRecords = response.records || [];
+        } else if (Array.isArray(response)) {
+          this.connectedRecords = response;
+        } else {
+          this.connectedRecords = [];
+        }
+        
+        console.log('Connected records set to:', this.connectedRecords);
+        console.log('Number of connected records:', this.connectedRecords.length);
+      } catch (error) {
+        console.error('Error fetching connected records:', error);
+        this.connectedRecords = [];
+      }
+    },
+
+    /**
+     * Get model display name for connected records
+     * @param {String} modelId
+     * @returns {String}
+     */
+    getModelDisplayName(modelId) {
+      const model = this.metadataStore.models.find(m => m.id === modelId);
+      return model ? (model.display_name || model.name) : modelId;
+    },
+
+    /**
+     * Navigate to record details page
+     * @param {Object} record
+     */
+    navigateToConnectedRecord(record) {
+      this.$router.push({
+        name: 'record-details',
+        params: {
+          datasetId: this.datasetId,
+          modelId: record.model_id,
+          recordId: record.id
+        }
+      });
+    },
+
+    /**
+     * Delete connected record from package
+     * @param {Object} record
+     */
+    async deleteConnectedRecord(record) {
+      try {
+        await this.$confirm(
+          `Are you sure you want to remove the connection to "${this.formatRecordKeyValues(record)}"? This will not delete the record from the dataset.`,
+          'Remove Record Connection',
+          {
+            confirmButtonText: 'Remove',
+            cancelButtonText: 'Cancel',
+            type: 'warning',
+            center: true,
+            lockScroll: true,
+            closeOnClickModal: false,
+            closeOnPressEscape: true,
+            showClose: true,
+            beforeClose: null,
+            distinguishCancelAndClose: true,
+            roundButton: false
+          }
+        )
+
+        await this.metadataStore.deletePackageFromRecord(
+          this.datasetId,
+          record.id,
+          this.fileId
+        )
+
+        this.$message.success('Record connection removed successfully')
+
+        // Refresh the connected records list
+        await this.fetchConnectedRecords()
+      } catch (action) {
+        if (action === 'cancel' || action === 'close') {
+          // User cancelled or closed dialog
+          return
+        }
+        console.error('Error deleting connected record:', action)
+        this.$message.error(`Failed to remove connection: ${action.message || 'Unknown error'}`)
+      }
+    },
+
+    /**
+     * Start record attachment flow - placeholder for future implementation
+     */
+    startRecordAttachment() {
+      // TODO: Implement record attachment functionality
+      console.log('Attach Record clicked - functionality to be implemented next');
+    },
+
   },
 };
 </script>
@@ -2922,5 +3122,160 @@ export default {
   color: theme.$gray_4;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+// Connected Records Section Styling - matching recordSpecViewer attached files
+.connected-records-section {
+  background: white;
+  padding: 8px;
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid theme.$gray_2;
+    
+    div:first-child {
+      font-size: 14px;
+      font-weight: 500;
+      color: theme.$gray_6;
+      margin: 0;
+    }
+    
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .record-tag {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        
+        &.connected-records-tag {
+          background-color: theme.$teal_tint !important;
+          border-color: theme.$teal_1 !important;
+          color: theme.$teal_2 !important;
+        }
+      }
+      
+      .attach-record-link {
+        color: theme.$teal_2;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          color: theme.$teal_1;
+          text-decoration: underline;
+        }
+        
+        &:active {
+          color: theme.$teal_1;
+        }
+      }
+    }
+  }
+
+  .connected-records-container {
+    .model-group {
+      margin-bottom: 8px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .record-items {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .record-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          background: white;
+          border: 1px solid theme.$gray_2;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          justify-content: space-between;
+
+          .record-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+
+            &.clickable {
+              cursor: pointer;
+            }
+          }
+
+          &:hover {
+            border-color: theme.$purple_1;
+            background-color: theme.$gray_1;
+
+            .nav-icon {
+              color: theme.$purple_2;
+            }
+
+            .delete-record-btn {
+              opacity: 1;
+            }
+          }
+
+          .delete-record-btn {
+            opacity: 0;
+            transition: all 0.2s ease;
+            padding: 2px 4px !important;
+            min-height: unset !important;
+            height: 18px !important;
+            width: 18px !important;
+            font-size: 12px;
+            color: theme.$gray_4;
+            flex-shrink: 0;
+            
+            &:hover {
+              color: theme.$red_2 !important;
+              background-color: theme.$red_tint !important;
+            }
+          }
+
+          .record-type {
+            font-size: 10px;
+            font-weight: 500;
+            padding: 2px 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            background: theme.$gray_1 !important;
+            border-color: theme.$gray_3 !important;
+            color: theme.$gray_5 !important;
+          }
+
+          .record-details {
+            flex: 1;
+            font-size: 13px;
+            color: theme.$gray_6;
+            font-weight: 400;
+            line-height: 1.3;
+          }
+
+          .nav-icon {
+            color: theme.$gray_4;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+          }
+        }
+      }
+    }
+  }
 }
 </style>

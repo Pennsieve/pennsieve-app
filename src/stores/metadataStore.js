@@ -51,7 +51,8 @@ export const useMetadataStore = defineStore('metadata', () => {
         if(!models) {
             models.value = []
         } else {
-            models.value = newModels
+            // Flatten the nested model structure for easier access
+            models.value = newModels.map(item => item.model || item)
         }
     }
 
@@ -94,10 +95,9 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     const modelById = (id) => {
-
-        for (const item of models.value) {
-            if (item.model.id === id) {
-                return item.model
+        for (const model of models.value) {
+            if (model.id === id) {
+                return model
             }
         }
 
@@ -1363,6 +1363,53 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Fetch connected records for a package
+    const fetchPackageConnectedRecords = async (datasetId, packageId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/packages/${encodeURIComponent(packageId)}/records`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                page_size: options.page_size || 50,
+                ...options.cursor && { cursor: options.cursor }
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                const response = await resp.json()
+                return {
+                    records: response.records || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
+            } else {
+                // Return empty records for 404 (no connected records) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        records: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch package connected records: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching package connected records:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -1418,8 +1465,10 @@ export const useMetadataStore = defineStore('metadata', () => {
         deletePackageFromRecord,
         deleteRelationship,
         deleteRecord,
-        archiveAllRecords
+        archiveAllRecords,
 
+        // Package records fetching
+        fetchPackageConnectedRecords
 
     }
 

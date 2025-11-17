@@ -224,7 +224,7 @@ const getAllModelProperties = computed(() => {
   
   try {
     // Find the model in the store
-    const model = metadataStore.models.find(m => m.model?.id === modelId)?.model
+    const model = metadataStore.models.find(m => m.id === modelId)
     console.log('🔍 Found model:', model?.name, 'has schema:', !!model?.latest_version?.schema)
     
     if (!model?.latest_version?.schema) {

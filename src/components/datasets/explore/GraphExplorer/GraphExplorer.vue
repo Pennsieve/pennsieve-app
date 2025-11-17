@@ -351,9 +351,8 @@ const isQuerySectionCollapsed = ref(false) // Track query section collapse state
 const quickActionsVisible = ref(true) // Track if actions are shown inline or in dropdown
 const legendExpanded = ref(false) // Track legend expansion state
 const models = computed(() => {
-  // Models in store have structure: [{ model: { id, name, display_name, ... } }]
+  // Models are now flattened in store: [{ id, name, display_name, ... }]
   return (metadataStore.models || [])
-    .map(item => item.model)
     .filter(model => model && model.id && model.name) // Filter out invalid models
 })
 const showDetailsPanel = ref(false)
