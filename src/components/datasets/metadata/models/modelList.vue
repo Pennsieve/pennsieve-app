@@ -48,7 +48,7 @@
           <h2>Dataset Models</h2>
           <model-list-item
             v-for="item in models"
-            :model="item.model"
+            :model="item"
           />
         </div>
 

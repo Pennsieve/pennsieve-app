@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
-import RecordFilter from './RecordFilterStyled.vue'
-import ModelSelectorDialog from './ModelSelectorDialog.vue'
+import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
+import ModelSelectorDialog from '../models/ModelSelectorDialog.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
@@ -42,6 +42,20 @@ const hasNextPage = ref(false)
 const hasPreviousPage = ref(false)
 const currentPageNumber = ref(1)
 const selectedVersion = ref(null) // Currently selected model version
+
+// Filter data for MultiModelFilter
+const filters = ref([{
+  id: 1,
+  model: null, // Will be set from route params
+  modelProperties: [],
+  property: '',
+  operator: '',
+  value: '',
+  logicalOperator: 'and'
+}])
+
+// Debouncing for filter updates
+let filterUpdateTimeout = null
 
 // Model data
 const model = ref(null)
@@ -127,8 +141,7 @@ const versionOptions = computed(() => {
 })
 
 const modelOptions = computed(() => {
-  const rawModels = metadataStore.models || []
-  const models = rawModels.map(item => item.model || item).filter(Boolean)
+  const models = metadataStore.models || []
   
   return models.map(model => ({
     label: model.display_name || model.name,
@@ -249,6 +262,9 @@ const fetchModel = async () => {
           selectedVersion.value = 'all'
         }
       }
+      
+      // Initialize filter with model information for MultiModelFilter
+      initializeFilter()
     } else {
       const errorMsg = 'Model schema not found'
       modelError.value = errorMsg
@@ -340,6 +356,116 @@ const fetchVersions = async () => {
 const onFilterChange = (newFilter) => {
   activeFilter.value = newFilter
   fetchRecords(null, 'forward', true)
+}
+
+// Initialize filter with model data for MultiModelFilter
+const initializeFilter = () => {
+  if (model.value && modelSchema.value) {
+    // Convert schema properties to the format expected by MultiModelFilter
+    const modelProperties = Object.entries(modelSchema.value.properties).map(([key, property]) => ({
+      name: key,
+      display_name: property.title || key,
+      type: property.type || 'string'
+    }))
+    
+    filters.value[0] = {
+      ...filters.value[0],
+      model: props.modelId,
+      modelProperties
+    }
+  }
+}
+
+// Debounced function to trigger API fetch
+const debouncedFetchRecords = () => {
+  // Clear any existing timeout
+  if (filterUpdateTimeout) {
+    clearTimeout(filterUpdateTimeout)
+  }
+  
+  // Set a new timeout to debounce rapid filter updates
+  filterUpdateTimeout = setTimeout(() => {
+    console.log('🔍 Debounced fetch triggered with filter:', activeFilter.value)
+    fetchRecords(null, 'forward', true)
+  }, 500) // 500ms debounce
+}
+
+// Handle MultiModelFilter events
+const onMultiFilterUpdate = (index, updatedFilter) => {
+  const previousFilter = activeFilter.value
+  
+  
+  // Handle multiple filters structure
+  if (updatedFilter && updatedFilter.hasMultipleFilters && updatedFilter.subFilters) {
+    // Multiple filters - convert each subfilter to API format
+    const validSubFilters = updatedFilter.subFilters.filter(f => 
+      f.property && f.operator && f.value !== ''
+    )
+    
+    if (validSubFilters.length === 0) {
+      activeFilter.value = null
+      // Immediately fetch for clearing filters (don't debounce clears)
+      if (previousFilter) {
+        if (filterUpdateTimeout) clearTimeout(filterUpdateTimeout)
+        fetchRecords(null, 'forward', true)
+      }
+      return
+    }
+    
+    // Convert each subfilter to API predicate format
+    const predicates = validSubFilters.map(filter => ({
+      property: `/${filter.property}`, // JSON pointer format
+      operator: filter.operator,
+      value: filter.value
+    }))
+    
+    // Create combined predicate structure
+    if (predicates.length === 1) {
+      activeFilter.value = predicates[0]
+    } else {
+      // Use logical operator (AND/OR) to combine multiple predicates
+      const logicalOp = updatedFilter.logicalOperator || 'and'
+      activeFilter.value = {
+        [logicalOp]: predicates
+      }
+    }
+    
+    // Use debounced fetch for filter updates
+    debouncedFetchRecords()
+  }
+  // Handle single filter (backward compatibility)
+  else if (updatedFilter && updatedFilter.property && updatedFilter.operator && updatedFilter.value) {
+    const apiFilter = {
+      property: `/${updatedFilter.property}`, // JSON pointer format - must start with '/'
+      operator: updatedFilter.operator,
+      value: updatedFilter.value
+    }
+    activeFilter.value = apiFilter
+    
+    // Use debounced fetch for filter updates
+    debouncedFetchRecords()
+  } else {
+    activeFilter.value = null
+    // Immediately fetch for clearing filters (don't debounce clears)
+    if (previousFilter) {
+      if (filterUpdateTimeout) clearTimeout(filterUpdateTimeout)
+      fetchRecords(null, 'forward', true)
+    }
+  }
+}
+
+const onMultiFilterRemove = (index) => {
+  // Not applicable for single model filter, but required by MultiModelFilter
+  activeFilter.value = null
+  fetchRecords(null, 'forward', true)
+}
+
+const onMultiModelChange = (index, modelId) => {
+  // Model selection should be disabled, but handle it just in case
+  // Navigate to the new model if somehow triggered
+  if (modelId !== props.modelId) {
+    selectModel(modelId)
+  }
 }
 
 const onNextPage = () => {
@@ -486,6 +612,23 @@ const goToRecordDetails = async (record) => {
     return
   }
   
+  // Check if we're in record attachment mode
+  if (metadataStore.activeRecordAttachment) {
+    // Create a custom event to trigger record attachment with complete record data
+    const recordData = {
+      id: record.id,
+      name: getRecordDisplayName(record),
+      modelId: props.modelId,
+      modelName: model.value?.display_name || model.value?.name || 'Unknown Model'
+    }
+    
+    const event = new CustomEvent('record-selected', { 
+      detail: recordData
+    })
+    window.dispatchEvent(event)
+    return
+  }
+  
   // Normal record navigation
   router.push({
     name: 'record-details',
@@ -596,12 +739,20 @@ onMounted(async () => {
       @cancel="modelSelectorVisible = false"
     />
 
-    <!-- Record Filters - Always show when schema is available -->
-    <record-filter
+    <!-- Record Filters - Use MultiModelFilter with fixed model -->
+    <multi-model-filter
+      v-if="filters[0].model && !error"
       class="record-filter-section"
-      v-if="modelSchema && !error"
-      :model-schema="modelSchema"
-      @filter-change="onFilterChange"
+      :models="modelOptions"
+      :filter="filters[0]"
+      :index="0"
+      :can-remove="false"
+      :dataset-id="datasetId"
+      @update-filter="onMultiFilterUpdate"
+      @remove-filter="onMultiFilterRemove"
+      @model-change="onMultiModelChange"
+      :hide-empty-model-selector="true"
+      :enable-autocomplete="true"
     />
 
     <!-- Loading and Error States -->
