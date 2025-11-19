@@ -175,6 +175,26 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
   };
 
   /*
+  GET Collection DOI
+  */
+  const getCollectionDOI = async (nodeId) => {
+    try {
+      const token = await useGetToken();
+      const url = `${siteConfig.api2Url}/collections/${nodeId}/doi`;
+      const response = await useSendXhr(url, {
+        method: "GET",
+        header: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response;
+    } catch (error) {
+      console.error("Failed to get collection DOI", error);
+      throw error;
+    }
+  };
+
+  /*
   GET Collections DOIs for PUBLISHED collections
   */
   const getPublishedCollectionDOIs = async (
@@ -497,6 +517,7 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
     createNewCollection,
     getUserCollections,
     getCollectionDetails,
+    getCollectionDOI,
     editCollection,
     editCollectionDataset,
     publishCollection,
