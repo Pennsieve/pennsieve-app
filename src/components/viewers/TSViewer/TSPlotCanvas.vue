@@ -605,9 +605,9 @@ onChannelDetails((channelDetails) => {
   console.log('📡 RECEIVED CHANNEL DETAILS:', {
     channelCount: channelDetails.length,
     channels: channelDetails.map(ch => ({
-      id: ch.content?.id,
-      name: ch.content?.name,
-      type: ch.content?.channelType
+      id:ch?.id,
+      name:ch?.name,
+      type:ch?.channelType
     }))
   })
 

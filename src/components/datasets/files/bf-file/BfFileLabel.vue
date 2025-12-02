@@ -263,11 +263,11 @@ export default {
         const collectionProperties = propOr([], 'properties', this.file)
         const collectionSubtype = this.getFilePropertyVal(
           collectionProperties,
-          'subtype'
+          'subtype',
+          'Viewer'
         ).toLowerCase()
-
-      const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'mef timeseries';
-
+        
+        const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
       if (isTimeseriesCollection) {
         isCollectionProcessed = this.isCollectionProcessed(this.file);
       }
