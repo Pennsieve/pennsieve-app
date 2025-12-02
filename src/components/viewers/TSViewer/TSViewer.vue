@@ -515,7 +515,7 @@ const onAnnotationCreated = () => {
 };
 
 const onCreateAnnotationLayer = (newLayer) => {
-  viewerCanvas.value.createAnnotationLayer(newLayer);
+  viewerCanvas.value.createAnnotationLayer(newLayer, activeViewer.value);
 };
 
 const onCloseAnnotationLayerWindow = () => {

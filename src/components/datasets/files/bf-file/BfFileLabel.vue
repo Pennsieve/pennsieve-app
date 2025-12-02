@@ -127,7 +127,7 @@ export default {
      * Compute if the file type has a viewer associate with it
      * @returns {Boolean}
      */
-    hasViewer: function() {
+    packageHasViewer: function() {
       const packageType = pathOr('', ['content', 'packageType'], this.file)
 
       let hasViewer = isNil(this.typeMapper[packageType]) === false
@@ -138,9 +138,7 @@ export default {
         'subtype'
       ).toLowerCase()
 
-      console.log('subtype is: ' + subtype)
       if (this.whitelist.indexOf(subtype) >= 0) {
-        console.log('yes to viewer')
         hasViewer = true
       }
       
@@ -184,7 +182,12 @@ export default {
      * @returns {Boolean}
      */
     shouldShowBtnOpen: function() {
-      return this.packageType != 'Collection' && this.hasViewer
+      return this.collectionHasViewer || this.packageHasViewer
+    },
+
+    collectionHasViewer: function() {
+      const isTimeseriesCollectionProcessed = this.isTimeseriesCollectionProcessed(this.file)
+      return isTimeseriesCollectionProcessed
     },
 
     /**
@@ -214,6 +217,15 @@ export default {
       }
     },
 
+    isCollectionProcessed: function (collection) {
+      const collectionState = this.getCollectionState(collection)
+      if (collectionState === 'processed') {
+        return true;
+      } else {
+        return false;
+      }
+    },
+
     getFileState: function(file) {
       const states = {
         'UPLOADED': 'unprocessed',
@@ -228,6 +240,41 @@ export default {
       return states[fileState] ? states[fileState] : ''
     },
 
+    getCollectionState: function(collection) {
+      const states = {
+        'UPLOADED': 'unprocessed',
+        'PROCESSING': 'processing',
+        'RUNNING': 'processing',
+        'UNAVAILABLE': 'uploading',
+        'PENDING': 'processing',
+        'ERROR': 'failed',
+        'READY': 'processed'
+      }
+      const collectionState = path(['content', 'state'], collection)
+      return states[collectionState] ? states[collectionState] : ''
+    },
+
+    isTimeseriesCollectionProcessed: function(datasetPackage) {
+      let isCollectionProcessed = false;
+      const packageType = pathOr('', ['content', 'packageType'], datasetPackage)
+      const isCollectionPackageType = packageType === 'Collection'
+
+      if(isCollectionPackageType) {
+        const collectionProperties = propOr([], 'properties', this.file)
+        const collectionSubtype = this.getFilePropertyVal(
+          collectionProperties,
+          'subtype',
+          'Viewer'
+        ).toLowerCase()
+        
+        const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
+      if (isTimeseriesCollection) {
+        isCollectionProcessed = this.isCollectionProcessed(this.file);
+      }
+
+      return isCollectionProcessed;
+      }
+    },
     /**
      * Handles click event
      * @param {String} name
