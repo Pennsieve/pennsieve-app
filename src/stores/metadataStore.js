@@ -25,6 +25,9 @@ export const useMetadataStore = defineStore('metadata', () => {
     
     // Package attachment state
     const activePackageAttachment = ref(null) // { recordId, modelId, datasetId, recordName }
+    
+    // Record attachment state (inverse of package attachment)
+    const activeRecordAttachment = ref(null) // { packageId, datasetId, packageName }
 
     // RecordFilter are used to filter records in Record list
     const createFilter = () => {
@@ -51,7 +54,8 @@ export const useMetadataStore = defineStore('metadata', () => {
         if(!models) {
             models.value = []
         } else {
-            models.value = newModels
+            // Flatten the nested model structure for easier access
+            models.value = newModels.map(item => item.model || item)
         }
     }
 
@@ -94,10 +98,9 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     const modelById = (id) => {
-
-        for (const item of models.value) {
-            if (item.model.id === id) {
-                return item.model
+        for (const model of models.value) {
+            if (model.id === id) {
+                return model
             }
         }
 
@@ -647,13 +650,14 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     // Fetch a specific record by ID
-    const fetchRecord = async (datasetId, modelId, recordId) => {
+    const fetchRecord = async (datasetId, modelId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/${recordId}`
             const token = await useGetToken()
 
             const queryParams = toQueryParams({
-                dataset_id: datasetId
+                dataset_id: datasetId,
+                ...options.as_of && { as_of: options.as_of }
             })
 
             const url = `${endpoint}?${queryParams}`
@@ -849,6 +853,79 @@ export const useMetadataStore = defineStore('metadata', () => {
     }
 
     /**
+     * Get autocomplete suggestions for a property value
+     * @param {string} datasetId - The dataset ID
+     * @param {string} modelId - The model ID
+     * @param {string} property - The property name (e.g., "/name")
+     * @param {string} operator - The filter operator (e.g., "startsWith")
+     * @param {string} value - The partial value to search for
+     * @param {number} limit - Maximum number of suggestions to return
+     * @returns {Promise<Array>} Array of autocomplete suggestions
+     */
+    const getAutocompleteValues = async (datasetId, modelId, property, operator, value, limit = 10) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/models/${modelId}/records/query`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId
+            })
+            
+            const url = `${endpoint}?${queryParams}`
+
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            myHeaders.append('Content-Type', 'application/json')
+
+            // Build the query payload to match your curl example structure
+            const payload = {
+                select: {
+                    select: [
+                        {
+                            expression: {
+                                property: property
+                            }
+                        }
+                    ],
+                    where: {
+                        property: property,
+                        operator: operator,
+                        value: value
+                    },
+                    limit: limit
+                }
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: myHeaders,
+                body: JSON.stringify(payload)
+            })
+
+            if (resp.ok) {
+                const data = await resp.json()
+                // Extract unique values from the response
+                const values = data.map(item => item[property]).filter(Boolean)
+                return [...new Set(values)] // Remove duplicates
+            } else {
+                const errorText = await resp.text()
+                console.error('Autocomplete API Error:', {
+                    status: resp.status,
+                    statusText: resp.statusText,
+                    error: errorText,
+                    url,
+                    payload
+                })
+                throw new Error(`Failed to get autocomplete values: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error getting autocomplete values:', error)
+            throw error
+        }
+    }
+
+    /**
      * Attach a package (file/folder) to a record
      * @param {string} datasetId - The dataset ID
      * @param {string} recordId - The record ID to attach package to
@@ -951,12 +1028,46 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
-    // Fetch packages attached to a record
-    const fetchRecordPackages = async (datasetId, recordId) => {
+    // Record attachment actions (inverse of package attachment)
+    const startRecordAttachment = (packageId, datasetId, packageName) => {
+        activeRecordAttachment.value = {
+            packageId,
+            datasetId,
+            packageName
+        }
+    }
+
+    const cancelRecordAttachment = () => {
+        activeRecordAttachment.value = null
+    }
+
+    const completeRecordAttachment = async (recordId) => {
+        if (!activeRecordAttachment.value) {
+            throw new Error('No active record attachment in progress')
+        }
+
+        const { packageId, datasetId } = activeRecordAttachment.value
+
+        try {
+            const result = await attachPackageToRecord(datasetId, recordId, packageId)
+            activeRecordAttachment.value = null // Clear state after success
+            return result
+        } catch (error) {
+            // Keep state on error so user can retry
+            throw error
+        }
+    }
+
+    // Fetch packages attached to a record with pagination support
+    const fetchRecordPackages = async (datasetId, recordId, options = {}) => {
         try {
             const endpoint = `${site.api2Url}/metadata/records/${recordId}/packages`
             const token = await useGetToken()
-            const queryParams = toQueryParams({ dataset_id: datasetId })
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                ...options // includes page_size, cursor, etc.
+            })
             const url = `${endpoint}?${queryParams}`
             
             const myHeaders = new Headers()
@@ -969,8 +1080,21 @@ export const useMetadataStore = defineStore('metadata', () => {
             })
             
             if (resp.ok) {
-                return await resp.json()
+                const response = await resp.json()
+                return {
+                    packages: response.packages || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
             } else {
+                // Return empty packages for 404 (no packages) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        packages: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
                 const errorText = await resp.text()
                 throw new Error(`Failed to fetch record packages: ${resp.status} - ${errorText}`)
             }
@@ -980,12 +1104,50 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
-     // Fetch relationships for a record
-    const fetchRecordRelationships = async (datasetId, recordId) => {
+    // Fetch all packages for a record (handles pagination automatically)
+    const fetchAllRecordPackages = async (datasetId, recordId, userOptions = {}) => {
         try {
-            const endpoint = `${site.api2Url}/metadata/records/${recordId}/relationships`
+            let allPackages = []
+            let cursor = null
+            let hasMore = true
+            const pageSize = 50 // Reasonable page size for fetching all
+            
+            while (hasMore) {
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
+                if (cursor) {
+                    options.cursor = cursor
+                }
+                
+                const result = await fetchRecordPackages(datasetId, recordId, options)
+                
+                // Append packages
+                allPackages.push(...(result.packages || []))
+                
+                cursor = result.cursor
+                hasMore = result.hasMore
+            }
+            
+            return allPackages
+        } catch (error) {
+            console.error('Error fetching all record packages:', error)
+            throw error
+        }
+    }
+
+    // Fetch record history with pagination support
+    const fetchRecordHistory = async (datasetId, recordId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/history`
             const token = await useGetToken()
-            const queryParams = toQueryParams({ dataset_id: datasetId })
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                page_size: 5, // Default to 5 items per page
+                ...options // includes cursor, etc.
+            })
             const url = `${endpoint}?${queryParams}`
             
             const myHeaders = new Headers()
@@ -998,17 +1160,106 @@ export const useMetadataStore = defineStore('metadata', () => {
             })
             
             if (resp.ok) {
-                return await resp.json()
+                const response = await resp.json()
+                return {
+                    records: response.records || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
             } else {
-                // Return empty array for 404 (no relationships) instead of throwing error
+                // Return empty records for 404 instead of throwing error
                 if (resp.status === 404) {
-                    return []
+                    return {
+                        records: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch record history: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching record history:', error)
+            throw error
+        }
+    }
+
+     // Fetch relationships for a record with pagination support
+    const fetchRecordRelationships = async (datasetId, recordId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/records/${recordId}/relationships`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                ...options // includes page_size, cursor, etc.
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                const response = await resp.json()
+                return {
+                    relationships: response.relationships || { inbound: [], outbound: [] },
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
+            } else {
+                // Return empty relationships for 404 (no relationships) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        relationships: { inbound: [], outbound: [] },
+                        cursor: null,
+                        hasMore: false
+                    }
                 }
                 const errorText = await resp.text()
                 throw new Error(`Failed to fetch record relationships: ${resp.status} - ${errorText}`)
             }
         } catch (error) {
             console.error('Error fetching record relationships:', error)
+            throw error
+        }
+    }
+
+    // Fetch all relationships for a record (handles pagination automatically)
+    const fetchAllRecordRelationships = async (datasetId, recordId, userOptions = {}) => {
+        try {
+            let allRelationships = { inbound: [], outbound: [] }
+            let cursor = null
+            let hasMore = true
+            const pageSize = 50 // Reasonable page size for fetching all
+            
+            while (hasMore) {
+                const options = { 
+                    page_size: pageSize,
+                    ...userOptions // Pass through user options like as_of
+                }
+                if (cursor) {
+                    options.cursor = cursor
+                }
+                
+                const result = await fetchRecordRelationships(datasetId, recordId, options)
+                
+                // Append relationships
+                allRelationships.inbound.push(...(result.relationships.inbound || []))
+                allRelationships.outbound.push(...(result.relationships.outbound || []))
+                
+                cursor = result.cursor
+                hasMore = result.hasMore
+            }
+            
+            return allRelationships
+        } catch (error) {
+            console.error('Error fetching all record relationships:', error)
             throw error
         }
     }
@@ -1145,6 +1396,53 @@ export const useMetadataStore = defineStore('metadata', () => {
         }
     }
 
+    // Fetch connected records for a package
+    const fetchPackageConnectedRecords = async (datasetId, packageId, options = {}) => {
+        try {
+            const endpoint = `${site.api2Url}/metadata/packages/${encodeURIComponent(packageId)}/records`
+            const token = await useGetToken()
+            
+            const queryParams = toQueryParams({
+                dataset_id: datasetId,
+                page_size: options.page_size || 50,
+                ...options.cursor && { cursor: options.cursor }
+            })
+            const url = `${endpoint}?${queryParams}`
+            
+            const myHeaders = new Headers()
+            myHeaders.append('Authorization', 'Bearer ' + token)
+            myHeaders.append('Accept', 'application/json')
+            
+            const resp = await fetch(url, {
+                method: 'GET',
+                headers: myHeaders
+            })
+            
+            if (resp.ok) {
+                const response = await resp.json()
+                return {
+                    records: response.records || [],
+                    cursor: response.cursor,
+                    hasMore: !!response.cursor
+                }
+            } else {
+                // Return empty records for 404 (no connected records) instead of throwing error
+                if (resp.status === 404) {
+                    return {
+                        records: [],
+                        cursor: null,
+                        hasMore: false
+                    }
+                }
+                const errorText = await resp.text()
+                throw new Error(`Failed to fetch package connected records: ${resp.status} - ${errorText}`)
+            }
+        } catch (error) {
+            console.error('Error fetching package connected records:', error)
+            throw error
+        }
+    }
+
     return {
         // State
         models,
@@ -1155,6 +1453,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         recordFilterParams,
         activeRelationshipCreation,
         activePackageAttachment,
+        activeRecordAttachment,
 
         // Getters
         modelById,
@@ -1172,6 +1471,7 @@ export const useMetadataStore = defineStore('metadata', () => {
         updateRecord,
         createRelationship,
         searchRecords,
+        getAutocompleteValues,
         createModel,
         createModels,
         createModelFromTemplate,
@@ -1191,13 +1491,24 @@ export const useMetadataStore = defineStore('metadata', () => {
         startPackageAttachment,
         cancelPackageAttachment,
         completePackageAttachment,
+        
+        // Record attachment actions
+        startRecordAttachment,
+        cancelRecordAttachment,
+        completeRecordAttachment,
+        
         fetchRecordPackages,
+        fetchAllRecordPackages,
+        fetchRecordHistory,
         fetchRecordRelationships,
+        fetchAllRecordRelationships,
         deletePackageFromRecord,
         deleteRelationship,
         deleteRecord,
-        archiveAllRecords
+        archiveAllRecords,
 
+        // Package records fetching
+        fetchPackageConnectedRecords
 
     }
 

@@ -9,6 +9,7 @@
     </template>
     
     <PackageAttachmentWidget />
+    <RecordAttachmentWidget />
   </bf-page>
 </template>
 
@@ -31,6 +32,7 @@ import EventBus from "../../utils/event-bus";
 import GetDatasetDoi from "../../mixins/get-dataset-doi";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import PackageAttachmentWidget from "../../components/datasets/metadata/shared/PackageAttachmentWidget.vue";
+import RecordAttachmentWidget from "../../components/datasets/metadata/shared/RecordAttachmentWidget.vue";
 import { useGetToken } from "@/composables/useGetToken";
 
 export default {
@@ -53,6 +55,7 @@ export default {
   components: {
     BfPage,
     PackageAttachmentWidget,
+    RecordAttachmentWidget,
   },
 
   data: function () {
