@@ -83,7 +83,7 @@
               :label="item.label"
               :value="item.value"
             />
-            </el-select>
+          </el-select>
         </el-form-item>
 
         <el-form-item prop="resources.memory">
@@ -104,7 +104,19 @@
               :label="item.label"
               :value="item.value"
             />
-            </el-select>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item prop="resources.gpu">
+          <el-checkbox v-model="application.resources.gpu">
+            Run on GPU
+            <el-tooltip
+              content="If you leave this unchecked, we will default to CPU"
+              placement="top"
+            >
+              <el-icon class="info-icon"><InfoFilled /></el-icon>
+            </el-tooltip>
+          </el-checkbox>
         </el-form-item>
 
         <el-form-item prop="computeNode">
@@ -126,53 +138,59 @@
             />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item prop="parameters" id="paramsInput">
           <template #label>
             <div>
-              <span > Parameters </span>
+              <span> Parameters </span>
               <span class="label-helper"> optional </span>
             </div>
           </template>
-        <el-table :data="application.parameters" max-height="250" :border="true">
-          <el-table-column label="Name">
-            <template #default="scope">
-              <el-input
-                v-model="scope.row.name"
-                placeholder="Enter name"
-                maxlength="50"
-                show-word-limit
-                type="text"
-              ></el-input>
-            </template>
-          </el-table-column>
-          <el-table-column label="Value">
-            <template #default="scope">
-              <el-input
-                v-model="scope.row.value"
-                placeholder="Enter value"
-                maxlength="50"
-                show-word-limit
-                type="text"
-              ></el-input>
-            </template>
-          </el-table-column>
-          <el-table-column width="70">
-            <template #default="scope">
-              <el-button
-                :size="'default'"
-                @click.prevent="deleteParameterRow(scope.$index)"
-              >
-                <el-icon>
-                  <CircleClose />
-                </el-icon>
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div id="addParamButtonWrapper">
-            <el-button @click="addParameterRow" type="primary" plain>Add param<el-icon class="el-icon--right"><Plus /></el-icon></el-button>
-        </div>
+          <el-table
+            :data="application.parameters"
+            max-height="250"
+            :border="true"
+          >
+            <el-table-column label="Name">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.name"
+                  placeholder="Enter name"
+                  maxlength="50"
+                  show-word-limit
+                  type="text"
+                ></el-input>
+              </template>
+            </el-table-column>
+            <el-table-column label="Value">
+              <template #default="scope">
+                <el-input
+                  v-model="scope.row.value"
+                  placeholder="Enter value"
+                  maxlength="50"
+                  show-word-limit
+                  type="text"
+                ></el-input>
+              </template>
+            </el-table-column>
+            <el-table-column width="70">
+              <template #default="scope">
+                <el-button
+                  :size="'default'"
+                  @click.prevent="deleteParameterRow(scope.$index)"
+                >
+                  <el-icon>
+                    <CircleClose />
+                  </el-icon>
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div id="addParamButtonWrapper">
+            <el-button @click="addParameterRow" type="primary" plain
+              >Add param<el-icon class="el-icon--right"><Plus /></el-icon
+            ></el-button>
+          </div>
         </el-form-item>
 
         <el-form-item prop="source.type">
@@ -224,8 +242,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
 import EventBus from "../../../utils/event-bus";
-import { CircleClose, Plus } from "@element-plus/icons-vue";
-
+import { CircleClose, Plus, InfoFilled } from "@element-plus/icons-vue";
 
 /**
  * Returns the default values for a property
@@ -238,6 +255,7 @@ const defaultApplicationFormValues = () => ({
   resources: {
     cpu: "",
     memory: "",
+    gpu: false,
   },
   computeNode: {
     value: "",
@@ -260,7 +278,8 @@ export default {
     DialogBody,
     BfButton,
     Plus,
-    CircleClose
+    CircleClose,
+    InfoFilled,
   },
 
   props: {
@@ -284,7 +303,7 @@ export default {
           label: "Postprocessor",
         },
       ],
-      cpuItems:[
+      cpuItems: [
         {
           value: 1024,
           label: "1 CPU",
@@ -300,19 +319,18 @@ export default {
         {
           value: 8192,
           label: "8 CPU",
-        }
+        },
       ],
-      memoryItems:[],
-      //form memory options in GB, maps to cpu value above. Keeping unsurfaced values for future options. 
+      memoryItems: [],
+      //form memory options in GB, maps to cpu value above. Keeping unsurfaced values for future options.
       memoryItemMap: new Map([
-        [256,{"start":1,"end":2,"i":1}],
-        [512,{"start":1,"end":4,"i":1}],
-        [1024,{"start":2,"end":8,"i":1}],
-        [2048,{"start":4,"end":16,"i":1}],
-        [4096,{"start":8,"end":30,"i":1}],
-        [8192,{"start":16,"end":60,"i":4}],
-        [16384,{"start":32,"end":120,"i":8}]
-
+        [256, { start: 1, end: 2, i: 1 }],
+        [512, { start: 1, end: 4, i: 1 }],
+        [1024, { start: 2, end: 8, i: 1 }],
+        [2048, { start: 4, end: 16, i: 1 }],
+        [4096, { start: 8, end: 30, i: 1 }],
+        [8192, { start: 16, end: 60, i: 4 }],
+        [16384, { start: 32, end: 120, i: 8 }],
       ]),
       sourceItems: [
         {
@@ -385,17 +403,17 @@ export default {
 
   computed: {
     ...mapState(["userToken", "config"]),
-    ...mapState("analysisModule", ["computeNodes"])
+    ...mapState("analysisModule", ["computeNodes"]),
   },
-    watch:{
-      "application.resources.cpu": {
-      handler: function(val) {
+  watch: {
+    "application.resources.cpu": {
+      handler: function (val) {
         const vm = this;
-        createMemoryItems(val,vm);
+        createMemoryItems(val, vm);
       },
-      immediate: true
-    }
+      immediate: true,
     },
+  },
   mounted() {
     this.fetchComputeNodes();
   },
@@ -420,23 +438,23 @@ export default {
     },
 
     addParameterRow() {
-      this.application.parameters.push({name: null, value: null});
+      this.application.parameters.push({ name: null, value: null });
     },
 
     deleteParameterRow(index) {
-      this.application.parameters.splice(index,1)
+      this.application.parameters.splice(index, 1);
     },
 
     getApplicationParams() {
       if (this.application.parameters.length > 0) {
-        let paramsEntries = []
+        let paramsEntries = [];
         this.application.parameters.forEach((param) => {
-          paramsEntries.push([param.name, param.value])
-        })
-        let paramsObject = Object.fromEntries(paramsEntries)
-        return paramsObject
+          paramsEntries.push([param.name, param.value]);
+        });
+        let paramsObject = Object.fromEntries(paramsEntries);
+        return paramsObject;
       } else {
-        return null
+        return null;
       }
     },
 
@@ -464,7 +482,7 @@ export default {
             url: `git://${this.application.source.url}`,
           };
 
-          const formattedParams = this.getApplicationParams()
+          const formattedParams = this.getApplicationParams();
 
           const formattedNewApplication = {
             ...this.application,
@@ -473,10 +491,11 @@ export default {
             resources: formattedResources,
             source: formattedSource,
             params: formattedParams,
+            ...(this.application.resources.gpu && { RunOnGPU: true }),
           };
 
           // remove formattedNewApplication.parameters ('params' is what is stored)
-          delete formattedNewApplication.parameters
+          delete formattedNewApplication.parameters;
 
           try {
             await this.createApplication(formattedNewApplication);
@@ -503,7 +522,6 @@ export default {
   },
 };
 
-
 function createMemoryItems(cpu, comp) {
   if (!cpu || !comp) return;
 
@@ -518,7 +536,7 @@ function createMemoryItems(cpu, comp) {
   }
 
   for (let value = start; value <= end; value += i) {
-    memoryArray.push({ value:value*1024, label: value.toString()+" GB" });
+    memoryArray.push({ value: value * 1024, label: value.toString() + " GB" });
   }
 
   comp.memoryItems = memoryArray;
@@ -615,6 +633,13 @@ function createMemoryItems(cpu, comp) {
     color: theme.$gray_4;
     line-height: 16px;
   }
+
+  .info-icon {
+    margin-left: 4px;
+    color: theme.$gray_4;
+    cursor: help;
+    vertical-align: middle;
+  }
   .info {
     font-size: 12px;
     color: theme.$gray_4;
@@ -684,13 +709,11 @@ function createMemoryItems(cpu, comp) {
   }
 
   .el-table .el-table__body td.el-table__cell {
-    border-right: 1px solid #e5e5e5
+    border-right: 1px solid #e5e5e5;
   }
 
   .el-table {
     border-collapse: collapse;
   }
-
 }
-
 </style>
