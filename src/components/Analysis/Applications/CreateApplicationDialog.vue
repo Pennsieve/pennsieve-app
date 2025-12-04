@@ -491,7 +491,7 @@ export default {
             resources: formattedResources,
             source: formattedSource,
             params: formattedParams,
-            ...(this.application.resources.gpu && { RunOnGPU: true }),
+            ...(this.application.resources.gpu && { runOnGPU: true }),
           };
 
           // remove formattedNewApplication.parameters ('params' is what is stored)
