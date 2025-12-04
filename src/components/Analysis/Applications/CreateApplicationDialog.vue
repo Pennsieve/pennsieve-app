@@ -107,8 +107,8 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item prop="resources.gpu">
-          <el-checkbox v-model="application.resources.gpu">
+        <el-form-item prop="runOnGpu">
+          <el-checkbox v-model="application.runOnGpu">
             Run on GPU
             <el-tooltip
               content="If you leave this unchecked, we will default to CPU"
@@ -252,10 +252,10 @@ const defaultApplicationFormValues = () => ({
   name: "",
   description: "",
   applicationType: "",
+  runOnGpu: false,
   resources: {
     cpu: "",
     memory: "",
-    gpu: false,
   },
   computeNode: {
     value: "",
@@ -491,7 +491,7 @@ export default {
             resources: formattedResources,
             source: formattedSource,
             params: formattedParams,
-            ...(this.application.resources.gpu && { runOnGPU: true }),
+            ...(this.application.runOnGpu && { runOnGPU: true }),
           };
 
           // remove formattedNewApplication.parameters ('params' is what is stored)
