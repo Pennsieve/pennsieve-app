@@ -151,7 +151,7 @@
               <el-input
                 v-model="scope.row.value"
                 placeholder="Enter value"
-                maxlength="50"
+                maxlength="200"
                 show-word-limit
                 type="text"
               ></el-input>
