@@ -27,6 +27,30 @@
   border-bottom: 1px solid theme.$gray_3;
   border-left-color: transparent;
   font-weight: 300;
+  position: relative;
+
+  // Visual indicator for column resize handle
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 50%;
+    background-color: theme.$gray_3;
+    transition: background-color 0.2s ease, height 0.2s ease;
+  }
+
+  &:hover::after {
+    background-color: theme.$purple_2;
+    height: 70%;
+  }
+
+  // Hide separator on last column
+  &:last-child::after {
+    display: none;
+  }
 }
 
 :deep(.el-table .ascending .sort-caret.ascending) {
