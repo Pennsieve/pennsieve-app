@@ -18,7 +18,7 @@ export function useAnnotationLayers() {
 
     const config = computed(() => viewerStore.config)
 
-    const initializeLayers = async (response, emit) => {
+    const initializeLayers = async (response, activeViewerId, emit) => {
         const annLayers = []
 
         // If no layers exist, create a default layer
@@ -28,7 +28,7 @@ export function useAnnotationLayers() {
                 color: '#18BA62',
                 description: 'Default Annotation Layer'
             }
-            await createAnnotationLayer(payload, null, emit)
+            await createAnnotationLayer(payload, activeViewerId, emit)
         } else {
             // Process existing layers
             for (let i = 0; i < response.results.length; i++) {
@@ -58,10 +58,10 @@ export function useAnnotationLayers() {
         annLayerInfo.value = response.results
     }
 
-    const createAnnotationLayer = async (newLayer, activeViewer, emit) => {
+    const createAnnotationLayer = async (newLayer, activeViewerId, emit) => {
         try {
             const token = await useGetToken()
-            const url = `${config.value.apiUrl}/timeseries/${activeViewer?.content?.id}/layers?api_key=${token}`
+            const url = `${config.value.apiUrl}/timeseries/${activeViewerId}/layers?api_key=${token}`
 
             const response = await useSendXhr(url, {
                 method: "POST",
@@ -195,7 +195,7 @@ export function useAnnotationLayers() {
             const token = await useGetToken()
             const url = `${config.value.apiUrl}/timeseries/${activeViewer.content.id}/layers?api_key=${token}`
             const response = await useSendXhr(url)
-            await initializeLayers(response, emit)
+            await initializeLayers(response, activeViewer.content.id, emit)
             return response
         } catch (error) {
             useHandleXhrError(error)
