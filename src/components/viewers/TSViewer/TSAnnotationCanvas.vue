@@ -111,11 +111,7 @@ const selectFocusedAnn = () => {
 }
 
 const createLayer = async (newLayer) => {
-  try {
-    await createAnnotationLayer(newLayer, props.activeViewer, emit)
-  } catch (error) {
-    console.error('Error creating layer:', error)
-  }
+  await createAnnotationLayer(newLayer, props.activeViewer, emit)
 }
 
 // Watch for activeViewer changes
