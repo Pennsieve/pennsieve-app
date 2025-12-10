@@ -36,18 +36,20 @@ const handleModeChange = (mode) => {
     <el-button-group class="view-toggle">
       <el-button 
         :size="buttonSize"
-        :type="viewMode === 'ui' || viewMode === 'enhanced' ? 'primary' : ''"
+        :type="viewMode === 'ui' || viewMode === 'enhanced' || viewMode === 'edit' ? 'primary' : ''"
         @click="handleModeChange('ui')"
       >
-        <span v-if="!minimal">Enhanced</span>
+        <span v-if="!minimal && (viewMode === 'edit' || viewMode === 'preview')">Edit</span>
+        <span v-else-if="!minimal">Enhanced</span>
         <span v-else>👁</span>
       </el-button>
       <el-button 
         :size="buttonSize"
-        :type="viewMode === 'json' ? 'primary' : ''"
+        :type="viewMode === 'json' || viewMode === 'preview' ? 'primary' : ''"
         @click="handleModeChange('json')"
       >
-        <span v-if="!minimal">JSON</span>
+        <span v-if="!minimal && (viewMode === 'edit' || viewMode === 'preview')">Preview</span>
+        <span v-else-if="!minimal">JSON</span>
         <span v-else>{ }</span>
       </el-button>
     </el-button-group>

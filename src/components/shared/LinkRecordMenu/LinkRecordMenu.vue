@@ -10,9 +10,9 @@
       :visible-arrow="false"
     >
       <template #reference>
-        <bf-button :disabled="datasetLocked" @click="onMenuClick">
-          Link to...
-        </bf-button>
+<!--        <bf-button :disabled="datasetLocked" @click="onMenuClick">-->
+<!--          Link to...-->
+<!--        </bf-button>-->
       </template>
       <div v-if="showExistingFile" class="bf-menu existing-file-menu">
         <ul>

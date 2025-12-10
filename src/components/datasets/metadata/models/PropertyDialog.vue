@@ -11,6 +11,20 @@
       </template>
 
       <dialog-body>
+        <!-- Informational Note -->
+        <div class="info-note">
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #title>
+              <span class="alert-title">Form-Based Property Creation</span>
+            </template>
+            This form provides the most common property configuration options. For advanced JSON Schema functionality (constraints, conditional schemas, etc.), you can define the full specification by directly editing the model definition as JSON.
+          </el-alert>
+        </div>
+
         <el-form ref="formRef" :model="propertyForm" :rules="propertyRules" label-position="top" class="property-form">
           <!-- Basic Information Section -->
           <div class="form-section">
@@ -37,7 +51,6 @@
               <el-form-item prop="type" label="Data Type">
                 <el-select 
                   v-model="propertyForm.type" 
-                  style="width: 100%" 
                   @change="onTypeChange"
                   popper-class="property-dialog-dropdown"
                 >
@@ -59,6 +72,7 @@
                 <el-select 
                   v-model="propertyForm.format" 
                   clearable 
+                  placeholder="Select text format"
                   style="width: 100%"
                   popper-class="property-dialog-dropdown"
                 >
@@ -86,15 +100,62 @@
               />
             </el-form-item>
 
+            <!-- Object Template Selector -->
+            <div v-if="propertyForm.type === 'object'" class="object-template-section">
+              <h4 class="template-section-title">Object Structure Templates</h4>
+              <div class="template-info">
+                <el-alert
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                >
+                  <template #title>
+                    Object properties require JSON Schema editing
+                  </template>
+                  Objects with nested properties are complex and require direct JSON Schema editing. Choose a template below to get started, then switch to JSON mode to customize the structure.
+                </el-alert>
+              </div>
+
+              <el-form-item label="Choose Template">
+                <el-select 
+                  v-model="selectedObjectTemplate" 
+                  placeholder="Select an object template"
+                  style="width: 100%"
+                  popper-class="property-dialog-dropdown"
+                  @change="onTemplateSelect"
+                >
+                  <el-option
+                    v-for="template in objectTemplates"
+                    :key="template.id"
+                    :value="template.id"
+                    :label="template.name"
+                  >
+                    <div class="option-content">
+                      <span class="option-label">{{ template.name }}</span>
+                      <span class="option-description">{{ template.description }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+
+            </div>
+
             <!-- Property Options -->
             <div class="property-options">
               <h4 class="options-title">Property Options</h4>
               <div class="options-grid">
                 <el-form-item>
-                  <el-checkbox v-model="propertyForm.required">
+                  <el-checkbox 
+                    v-model="propertyForm.required"
+                    :disabled="propertyForm.isKey"
+                  >
                     Required Property
                   </el-checkbox>
-                  <div class="field-help">Mark this property as mandatory</div>
+                  <div class="field-help">
+                    {{ propertyForm.isKey 
+                       ? 'Required because this property is marked as part of key' 
+                       : 'Mark this property as mandatory' }}
+                  </div>
                 </el-form-item>
 
                 <el-form-item>
@@ -111,7 +172,14 @@
                   <div class="field-help">Mark this property as containing sensitive information</div>
                 </el-form-item>
 
-                <el-form-item v-if="propertyForm.required">
+                <el-form-item v-show="propertyForm.type !== 'object'">
+                  <el-checkbox v-model="propertyForm.isArray">
+                    Array Property
+                  </el-checkbox>
+                  <div class="field-help">Make this an array of {{ propertyForm.type }} values</div>
+                </el-form-item>
+
+                <el-form-item v-show="propertyForm.required">
                   <el-checkbox v-model="propertyForm.allowNull">
                     Allow Null Values
                   </el-checkbox>
@@ -176,8 +244,9 @@
               </div>
             </div>
 
-            <!-- Array constraints -->
-            <div v-if="propertyForm.type === 'array'" class="constraints-content">
+            <!-- Array constraints (when isArray is checked) -->
+            <div v-if="propertyForm.isArray" class="constraints-content array-constraints">
+              <h4 class="constraint-subsection-title">Array Constraints</h4>
               <div class="constraint-row">
                 <el-form-item label="Min Items">
                   <el-input 
@@ -200,7 +269,13 @@
                 <el-checkbox v-model="propertyForm.uniqueItems">
                   Require unique items
                 </el-checkbox>
+                <div class="field-help">Each item in the array must be unique</div>
               </el-form-item>
+              
+              <div v-if="propertyForm.type === 'string' || isNumericType" class="item-constraints">
+                <h4 class="constraint-subsection-title">Item Constraints</h4>
+                <div class="field-help">These constraints apply to each individual {{ propertyForm.type }} in the array</div>
+              </div>
             </div>
           </div>
 
@@ -220,10 +295,14 @@
             </el-form-item>
 
             <!-- Default value -->
-            <el-form-item label="Default Value">
+            <el-form-item 
+              label="Default Value" 
+              :class="{ 'disabled-section': propertyForm.type === 'object' }"
+            >
               <el-select 
                 v-if="propertyForm.type === 'boolean'"
                 v-model="propertyForm.default"
+                :disabled="propertyForm.type === 'object'"
                 clearable
                 style="width: 100%"
                 placeholder="Select default value"
@@ -234,6 +313,7 @@
               <el-input 
                 v-else
                 v-model="propertyForm.default" 
+                :disabled="propertyForm.type === 'object'"
                 :type="defaultInputType"
                 :placeholder="defaultPlaceholder"
               />
@@ -277,7 +357,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['update:visible', 'save', 'cancel'])
+const emit = defineEmits(['update:visible', 'save', 'cancel', 'template-selected'])
 
 // Form ref
 const formRef = ref(null)
@@ -308,21 +388,25 @@ const propertyForm = ref({
   required: false,
   isKey: false,
   isSensitive: false,
-  allowNull: false
+  allowNull: false,
+  isArray: false
 })
 
-// Property types with enhanced descriptions
+// Object template state
+const selectedObjectTemplate = ref('')
+const showTemplateDocumentation = ref(false)
+
+// Property types with enhanced descriptions (Array removed - now handled as modifier)
 const propertyTypes = [
   { value: 'string', label: 'Text', description: 'Text data with optional format validation' },
   { value: 'number', label: 'Number', description: 'Decimal numbers (e.g., 3.14, 42.0)' },
   { value: 'integer', label: 'Integer', description: 'Whole numbers only (e.g., 1, 42, 100)' },
   { value: 'boolean', label: 'True/False', description: 'Boolean values (true or false)' },
-  { value: 'array', label: 'Array', description: 'List of values' },
   { value: 'object', label: 'Object', description: 'Nested object with properties' }
 ]
 
 const stringFormats = [
-  { value: '', label: 'Plain text', description: 'Any text content without validation' },
+  { value: 'plain', label: 'Plain text', description: 'Any text content without validation' },
   { value: 'date', label: 'Date', description: 'Date in YYYY-MM-DD format (e.g., 2023-12-25)' },
   { value: 'date-time', label: 'Date & Time', description: 'ISO 8601 format (e.g., 2023-12-25T10:30:00Z)' },
   { value: 'time', label: 'Time', description: 'Time in HH:MM:SS format (e.g., 14:30:00)' },
@@ -332,6 +416,154 @@ const stringFormats = [
   { value: 'ipv4', label: 'IPv4 Address', description: 'IPv4 format (e.g., 192.168.1.1)' },
   { value: 'ipv6', label: 'IPv6 Address', description: 'IPv6 format' },
   { value: 'hostname', label: 'Hostname', description: 'Valid hostname format' }
+]
+
+const objectTemplates = [
+  {
+    id: 'empty',
+    name: 'Empty Object',
+    description: 'Minimal object structure to customize',
+    schema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    }
+  },
+  {
+    id: 'person',
+    name: 'Person',
+    description: 'Person with name, age, and contact information',
+    schema: {
+      type: "object",
+      properties: {
+        firstName: {
+          type: "string",
+          title: "First Name",
+          minLength: 1
+        },
+        lastName: {
+          type: "string", 
+          title: "Last Name",
+          minLength: 1
+        },
+        age: {
+          type: "integer",
+          title: "Age",
+          minimum: 0,
+          maximum: 150
+        },
+        email: {
+          type: "string",
+          title: "Email Address",
+          format: "email"
+        }
+      },
+      required: ["firstName", "lastName"],
+      additionalProperties: false
+    }
+  },
+  {
+    id: 'address',
+    name: 'Address',
+    description: 'Physical address with validation',
+    schema: {
+      type: "object",
+      properties: {
+        street: {
+          type: "string",
+          title: "Street Address",
+          minLength: 1
+        },
+        city: {
+          type: "string",
+          title: "City",
+          minLength: 1
+        },
+        state: {
+          type: "string",
+          title: "State/Province",
+          minLength: 2,
+          maxLength: 3
+        },
+        zipCode: {
+          type: "string",
+          title: "ZIP/Postal Code",
+          pattern: "^[0-9]{5}(-[0-9]{4})?$"
+        },
+        country: {
+          type: "string",
+          title: "Country",
+          enum: ["US", "CA", "UK", "DE", "FR", "AU"]
+        }
+      },
+      required: ["street", "city", "country"],
+      additionalProperties: false
+    }
+  },
+  {
+    id: 'measurement',
+    name: 'Measurement',
+    description: 'Numeric measurement with units and metadata',
+    schema: {
+      type: "object",
+      properties: {
+        value: {
+          type: "number",
+          title: "Measurement Value"
+        },
+        unit: {
+          type: "string",
+          title: "Unit of Measurement",
+          enum: ["mm", "cm", "m", "km", "in", "ft", "yd", "mi", "mg", "g", "kg", "oz", "lb"]
+        },
+        precision: {
+          type: "number",
+          title: "Measurement Precision",
+          minimum: 0
+        },
+        timestamp: {
+          type: "string",
+          title: "Measurement Time",
+          format: "date-time"
+        }
+      },
+      required: ["value", "unit"],
+      additionalProperties: false
+    }
+  },
+  {
+    id: 'coordinates',
+    name: 'Geographic Coordinates',
+    description: 'Latitude/longitude with optional elevation',
+    schema: {
+      type: "object",
+      properties: {
+        latitude: {
+          type: "number",
+          title: "Latitude",
+          minimum: -90,
+          maximum: 90
+        },
+        longitude: {
+          type: "number", 
+          title: "Longitude",
+          minimum: -180,
+          maximum: 180
+        },
+        elevation: {
+          type: "number",
+          title: "Elevation (meters)"
+        },
+        accuracy: {
+          type: "number",
+          title: "Accuracy (meters)",
+          minimum: 0
+        }
+      },
+      required: ["latitude", "longitude"],
+      additionalProperties: false
+    }
+  }
 ]
 
 const propertyRules = {
@@ -350,7 +582,7 @@ const propertyRules = {
 // Computed properties for reactive form behavior
 const showFormatField = computed(() => propertyForm.value.type === 'string')
 const showConstraintsSection = computed(() => 
-  ['string', 'number', 'integer', 'array'].includes(propertyForm.value.type)
+  ['string', 'number', 'integer'].includes(propertyForm.value.type) || propertyForm.value.isArray
 )
 const isNumericType = computed(() => 
   ['number', 'integer'].includes(propertyForm.value.type)
@@ -367,11 +599,13 @@ const availableFormats = computed(() => {
 })
 
 const constraintsSectionTitle = computed(() => {
+  if (propertyForm.value.isArray) {
+    return `${propertyForm.value.type} Array Constraints`
+  }
   switch (propertyForm.value.type) {
     case 'string': return 'Text Constraints'
     case 'number':
     case 'integer': return 'Numeric Constraints'
-    case 'array': return 'Array Constraints'
     default: return 'Constraints'
   }
 })
@@ -445,7 +679,8 @@ watch(() => props.initialPropertyData, (newData) => {
       required: false,
       isKey: false,
       isSensitive: false,
-      allowNull: false
+      allowNull: false,
+      isArray: false
     }
   }
 }, { deep: true, immediate: true })
@@ -464,7 +699,6 @@ const generatePropertyName = () => {
 
 const onTypeChange = () => {
   // Clear type-specific fields when type changes
-  propertyForm.value.format = ''
   propertyForm.value.minLength = ''
   propertyForm.value.maxLength = ''
   propertyForm.value.pattern = ''
@@ -475,6 +709,13 @@ const onTypeChange = () => {
   propertyForm.value.uniqueItems = false
   propertyForm.value.enumInput = ''
   propertyForm.value.default = ''
+  
+  // Set default format for string type, clear for others
+  if (propertyForm.value.type === 'string') {
+    propertyForm.value.format = 'plain' // This corresponds to "Plain text" option
+  } else {
+    propertyForm.value.format = ''
+  }
 }
 
 // Watch for changes to the required property to clear allowNull when not required
@@ -489,14 +730,41 @@ watch(() => propertyForm.value.isKey, (newIsKey) => {
   if (newIsKey) {
     propertyForm.value.required = true
   }
+  // Note: We don't automatically unset required when unchecking isKey
+  // because the user might want to keep it required for other reasons
 })
 
-// Watch for changes to the isSensitive property to automatically set required
-watch(() => propertyForm.value.isSensitive, (newIsSensitive) => {
-  if (newIsSensitive) {
-    propertyForm.value.required = true
+// Note: Sensitive data properties are not automatically required
+// Users can choose whether sensitive properties should be required or optional
+
+// Object template methods
+const onTemplateSelect = (templateId) => {
+  const template = objectTemplates.find(t => t.id === templateId)
+  if (template) {
+    // Store template schema for JSON mode
+    emit('template-selected', {
+      propertyName: propertyForm.value.name || 'untitled_object',
+      template: template
+    })
   }
-})
+}
+
+const emitSwitchToJson = () => {
+  // Get selected template or empty object template
+  const template = selectedObjectTemplate.value 
+    ? objectTemplates.find(t => t.id === selectedObjectTemplate.value)
+    : objectTemplates[0] // Default to empty object
+  
+  emit('switch-to-json', {
+    propertyName: propertyForm.value.name || 'untitled_object',
+    displayName: propertyForm.value.displayName || 'Untitled Object',
+    description: propertyForm.value.description || '',
+    required: propertyForm.value.required,
+    isKey: propertyForm.value.isKey,
+    isSensitive: propertyForm.value.isSensitive,
+    template: template
+  })
+}
 
 const validateForm = () => {
   const errors = []
@@ -630,19 +898,35 @@ const handleSave = () => {
     return
   }
 
-  if (propertyForm.value.isSensitive && !propertyForm.value.required) {
-    ElMessage.error(`Property "${propertyForm.value.name}" has "Sensitive Data" set but is not marked as required`)
-    return
-  }
+  // Note: Sensitive data properties are allowed to be optional
+  // This is different from key properties which must be required
 
   // Build property schema
   const property = {}
   
-  // Handle type - if allowNull is true, use array format [type, "null"]
-  if (propertyForm.value.allowNull) {
-    property.type = [propertyForm.value.type, "null"]
+  // Handle array properties vs. single properties
+  if (propertyForm.value.isArray) {
+    // This is an array property
+    property.type = 'array'
+    
+    // Create items schema for the array elements
+    const itemsSchema = {}
+    
+    // Set the base type for array items
+    if (propertyForm.value.allowNull) {
+      itemsSchema.type = [propertyForm.value.type, "null"]
+    } else {
+      itemsSchema.type = propertyForm.value.type
+    }
+    
+    property.items = itemsSchema
   } else {
-    property.type = propertyForm.value.type
+    // This is a single (non-array) property
+    if (propertyForm.value.allowNull) {
+      property.type = [propertyForm.value.type, "null"]
+    } else {
+      property.type = propertyForm.value.type
+    }
   }
 
   property.title = propertyForm.value.displayName
@@ -651,33 +935,13 @@ const handleSave = () => {
     property.description = propertyForm.value.description
   }
 
-  if (propertyForm.value.format && propertyForm.value.type === 'string') {
+  if (propertyForm.value.format && propertyForm.value.type === 'string' && propertyForm.value.format !== 'plain') {
     property.format = propertyForm.value.format
   }
 
-  // Add constraints based on type
-  if (propertyForm.value.type === 'string') {
-    if (propertyForm.value.minLength !== undefined && propertyForm.value.minLength !== '') {
-      property.minLength = parseInt(propertyForm.value.minLength)
-    }
-    if (propertyForm.value.maxLength !== undefined && propertyForm.value.maxLength !== '') {
-      property.maxLength = parseInt(propertyForm.value.maxLength)
-    }
-    if (propertyForm.value.pattern) {
-      property.pattern = propertyForm.value.pattern
-    }
-  }
-
-  if (propertyForm.value.type === 'number' || propertyForm.value.type === 'integer') {
-    if (propertyForm.value.minimum !== undefined && propertyForm.value.minimum !== '') {
-      property.minimum = parseFloat(propertyForm.value.minimum)
-    }
-    if (propertyForm.value.maximum !== undefined && propertyForm.value.maximum !== '') {
-      property.maximum = parseFloat(propertyForm.value.maximum)
-    }
-  }
-
-  if (propertyForm.value.type === 'array') {
+  // Add constraints based on whether this is an array or single property
+  if (propertyForm.value.isArray) {
+    // Array-level constraints
     if (propertyForm.value.minItems !== undefined && propertyForm.value.minItems !== '') {
       property.minItems = parseInt(propertyForm.value.minItems)
     }
@@ -687,15 +951,91 @@ const handleSave = () => {
     if (propertyForm.value.uniqueItems) {
       property.uniqueItems = true
     }
-  }
+    
+    // Item-level constraints go into the items schema
+    if (propertyForm.value.type === 'string') {
+      if (propertyForm.value.minLength !== undefined && propertyForm.value.minLength !== '') {
+        property.items.minLength = parseInt(propertyForm.value.minLength)
+      }
+      if (propertyForm.value.maxLength !== undefined && propertyForm.value.maxLength !== '') {
+        property.items.maxLength = parseInt(propertyForm.value.maxLength)
+      }
+      if (propertyForm.value.pattern) {
+        property.items.pattern = propertyForm.value.pattern
+      }
+      if (propertyForm.value.format && propertyForm.value.format !== 'plain') {
+        property.items.format = propertyForm.value.format
+      }
+    }
 
-  // Handle enum values
-  if (propertyForm.value.enumInput) {
-    const enumValues = String(propertyForm.value.enumInput).split(',').map(v => v.trim()).filter(v => v)
-    if (enumValues.length > 0) {
-      property.enum = enumValues
+    if (propertyForm.value.type === 'number' || propertyForm.value.type === 'integer') {
+      if (propertyForm.value.minimum !== undefined && propertyForm.value.minimum !== '') {
+        property.items.minimum = parseFloat(propertyForm.value.minimum)
+      }
+      if (propertyForm.value.maximum !== undefined && propertyForm.value.maximum !== '') {
+        property.items.maximum = parseFloat(propertyForm.value.maximum)
+      }
+    }
+    
+    // Handle enum values for array items
+    if (propertyForm.value.enumInput) {
+      const enumValues = String(propertyForm.value.enumInput).split(',').map(v => v.trim()).filter(v => v)
+      if (enumValues.length > 0) {
+        property.items.enum = enumValues
+      }
+    }
+  } else {
+    // Single property constraints
+    if (propertyForm.value.type === 'string') {
+      if (propertyForm.value.minLength !== undefined && propertyForm.value.minLength !== '') {
+        property.minLength = parseInt(propertyForm.value.minLength)
+      }
+      if (propertyForm.value.maxLength !== undefined && propertyForm.value.maxLength !== '') {
+        property.maxLength = parseInt(propertyForm.value.maxLength)
+      }
+      if (propertyForm.value.pattern) {
+        property.pattern = propertyForm.value.pattern
+      }
+      if (propertyForm.value.format) {
+        property.format = propertyForm.value.format
+      }
+    }
+
+    if (propertyForm.value.type === 'number' || propertyForm.value.type === 'integer') {
+      if (propertyForm.value.minimum !== undefined && propertyForm.value.minimum !== '') {
+        property.minimum = parseFloat(propertyForm.value.minimum)
+      }
+      if (propertyForm.value.maximum !== undefined && propertyForm.value.maximum !== '') {
+        property.maximum = parseFloat(propertyForm.value.maximum)
+      }
+    }
+    
+    // Handle object type with template
+    if (propertyForm.value.type === 'object' && selectedObjectTemplate.value) {
+      const template = objectTemplates.find(t => t.id === selectedObjectTemplate.value)
+      if (template && template.schema) {
+        // Copy the template's properties and other schema attributes
+        if (template.schema.properties) {
+          property.properties = template.schema.properties
+        }
+        if (template.schema.required) {
+          property.required = template.schema.required
+        }
+        if (template.schema.additionalProperties !== undefined) {
+          property.additionalProperties = template.schema.additionalProperties
+        }
+      }
+    }
+    
+    // Handle enum values for single properties
+    if (propertyForm.value.enumInput) {
+      const enumValues = String(propertyForm.value.enumInput).split(',').map(v => v.trim()).filter(v => v)
+      if (enumValues.length > 0) {
+        property.enum = enumValues
+      }
     }
   }
+
 
   // Handle default value
   if (propertyForm.value.default !== undefined && propertyForm.value.default !== '') {
@@ -811,7 +1151,7 @@ const handleSave = () => {
       font-size: 12px;
       color: theme.$gray_4;
       margin-top: 4px;
-      font-style: italic;
+      line-height: 1.1em;
     }
     
     .option-content {
@@ -851,7 +1191,28 @@ const handleSave = () => {
         @media (min-width: 768px) {
           grid-template-columns: repeat(3, 1fr);
         }
+        
+        // Smooth transition for conditional items
+        .el-form-item {
+          transition: opacity 0.2s ease, transform 0.2s ease;
+        }
       }
+    }
+  }
+
+  // Disabled section styling for object types
+  .disabled-section {
+    opacity: 0.6;
+    pointer-events: none;
+    
+    :deep(.el-form-item__label) {
+      color: theme.$gray_4 !important;
+    }
+    
+    :deep(.el-input__inner),
+    :deep(.el-select .el-input__inner) {
+      background-color: theme.$gray_1 !important;
+      color: theme.$gray_4 !important;
     }
   }
   
@@ -925,6 +1286,103 @@ const handleSave = () => {
     &.selected {
       color: theme.$purple_2;
       font-weight: 500;
+    }
+  }
+}
+
+// Info note styling
+.info-note {
+  margin-bottom: 24px;
+  
+  :deep(.el-alert) {
+    .el-alert__title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .el-alert__content {
+      font-size: 13px;
+      line-height: 1.5;
+      color: theme.$gray_5;
+      margin-top: 4px;
+    }
+  }
+}
+
+// Custom dropdown styling to fix width issues
+// Object template section styling
+.object-template-section {
+  background-color: theme.$gray_1;
+  padding: 20px;
+  border-left: 4px solid theme.$orange_2;
+  margin-top: 20px;
+
+  .template-section-title {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: theme.$gray_6;
+  }
+
+  .template-info {
+    margin-bottom: 20px;
+
+    :deep(.el-alert) {
+      .el-alert__title {
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .el-alert__content {
+        font-size: 13px;
+        line-height: 1.5;
+        color: theme.$gray_5;
+        margin-top: 4px;
+      }
+    }
+  }
+
+  .template-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+}
+
+// Custom dropdown styling to fix width issues
+:deep(.property-dialog-dropdown) {
+  max-width: 320px !important;
+
+  .el-select-dropdown__item {
+    height: auto !important;
+    line-height: normal !important;
+    padding: 8px 12px !important;
+    white-space: normal !important;
+
+    &:hover {
+      background-color: theme.$gray_1 !important;
+    }
+
+    &.selected {
+      color: theme.$purple_2 !important;
+      font-weight: 500 !important;
+    }
+  }
+
+  .option-content {
+    display: flex !important;
+    flex-direction: column !important;
+
+    .option-label {
+      font-weight: 500 !important;
+      color: theme.$gray_6 !important;
+    }
+
+    .option-description {
+      font-size: 12px !important;
+      color: theme.$gray_4 !important;
+      margin-top: 2px !important;
     }
   }
 }

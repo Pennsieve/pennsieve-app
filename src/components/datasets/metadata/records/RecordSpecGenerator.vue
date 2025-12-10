@@ -43,6 +43,9 @@ const viewMode = ref('ui') // 'ui' or 'json'
 const formData = ref({})
 const validationErrors = ref([])
 const nullKeyFields = ref({}) // Track which nullable fields should be set to null
+const jsonContent = ref('')
+const jsonError = ref('')
+const jsonEditor = ref(null)
 
 // Form validation - configure AJV for JSON Schema Draft 2020-12
 const ajv = new Ajv({ 
@@ -616,9 +619,203 @@ const renderFormField = (property) => {
   return renderFormFieldInput(property)
 }
 
+// Create minimal JSON structure with only required properties
+const createMinimalJsonStructure = () => {
+  const minimalData = {}
+  
+  // Get all required properties
+  const requiredProperties = schemaProperties.value.filter(prop => 
+    prop.required && !prop.isObjectHeader
+  )
+  
+  requiredProperties.forEach(prop => {
+    const keyParts = prop.key.split('.')
+    let current = minimalData
+    
+    // Navigate/create nested structure
+    for (let i = 0; i < keyParts.length - 1; i++) {
+      const part = keyParts[i]
+      if (!current[part]) {
+        current[part] = {}
+      }
+      current = current[part]
+    }
+    
+    // Set empty default value based on property type
+    const finalKey = keyParts[keyParts.length - 1]
+    switch (prop.type) {
+      case 'string':
+        current[finalKey] = ''
+        break
+      case 'number':
+      case 'integer':
+        current[finalKey] = null
+        break
+      case 'boolean':
+        current[finalKey] = null
+        break
+      case 'array':
+        current[finalKey] = []
+        break
+      case 'object':
+        current[finalKey] = {}
+        break
+      default:
+        current[finalKey] = null
+    }
+  })
+  
+  return minimalData
+}
+
+// Update JSON content from form data
+const updateJsonContent = () => {
+  if (!isUpdateMode.value && Object.keys(recordJson.value).length === 0) {
+    // For new records with no data, create minimal structure with required fields only
+    const minimalStructure = createMinimalJsonStructure()
+    jsonContent.value = JSON.stringify(minimalStructure, null, 2)
+  } else {
+    // For existing records or records with data, use the current recordJson
+    jsonContent.value = JSON.stringify(recordJson.value, null, 2)
+  }
+  jsonError.value = ''
+}
+
+// Validate and parse JSON content 
+const validateAndParseJson = () => {
+  if (!jsonContent.value.trim()) {
+    jsonError.value = 'JSON content cannot be empty'
+    return false
+  }
+
+  try {
+    const parsed = JSON.parse(jsonContent.value)
+    
+    // Basic validation - should be an object
+    if (typeof parsed !== 'object' || parsed === null) {
+      jsonError.value = 'Record data must be a valid JSON object'
+      return false
+    }
+
+    // Update form data from parsed JSON
+    updateFormDataFromJson(parsed)
+    jsonError.value = ''
+    return true
+  } catch (e) {
+    jsonError.value = `Invalid JSON: ${e.message}`
+    return false
+  }
+}
+
+// Update form data from JSON object
+const updateFormDataFromJson = (jsonData) => {
+  // Flatten the JSON data to match form structure
+  const flattenJsonData = (obj, prefix = '') => {
+    const flattened = {}
+    Object.entries(obj).forEach(([key, value]) => {
+      const fullKey = prefix ? `${prefix}.${key}` : key
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        Object.assign(flattened, flattenJsonData(value, fullKey))
+      } else {
+        flattened[fullKey] = value
+      }
+    })
+    return flattened
+  }
+
+  const flatData = flattenJsonData(jsonData)
+  
+  // Reset form data and null fields
+  const newFormData = {}
+  const newNullFields = {}
+  
+  // Initialize with default values for all schema properties
+  schemaProperties.value.forEach(prop => {
+    if (!prop.isObjectHeader) {
+      // Set default values
+      switch (prop.type) {
+        case 'string':
+          newFormData[prop.key] = ''
+          break
+        case 'number':
+        case 'integer':
+          newFormData[prop.key] = null
+          break
+        case 'boolean':
+          newFormData[prop.key] = 'unspecified'
+          break
+        case 'array':
+          newFormData[prop.key] = []
+          break
+        case 'object':
+          newFormData[prop.key] = {}
+          break
+        default:
+          newFormData[prop.key] = null
+      }
+    }
+  })
+  
+  // Overlay values from JSON
+  Object.entries(flatData).forEach(([key, value]) => {
+    if (value === null) {
+      // Handle null values
+      const property = schemaProperties.value.find(p => p.key === key)
+      const isNullable = property?.property && Array.isArray(property.property.type) && property.property.type.includes('null')
+      
+      if (isNullable) {
+        newNullFields[key] = true
+        // Set appropriate default value for the form
+        newFormData[key] = property.type === 'boolean' ? 'unspecified' : 
+                          property.type === 'number' || property.type === 'integer' ? null :
+                          property.type === 'array' ? [] :
+                          property.type === 'object' ? {} : ''
+      }
+    } else {
+      newFormData[key] = value
+    }
+  })
+  
+  formData.value = newFormData
+  nullKeyFields.value = newNullFields
+}
+
+// Handle JSON content changes
+const onJsonContentChange = () => {
+  validateAndParseJson()
+}
+
+// Handle TAB key in JSON editor
+const onJsonEditorKeydown = (event) => {
+  if (event.key === 'Tab') {
+    event.preventDefault()
+    
+    const textarea = jsonEditor.value?.$refs?.textarea || jsonEditor.value?.textarea
+    if (!textarea) return
+    
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const currentValue = jsonContent.value
+    
+    // Insert 2 spaces at cursor position
+    const newValue = currentValue.substring(0, start) + '  ' + currentValue.substring(end)
+    
+    jsonContent.value = newValue
+    
+    // Move cursor to after inserted spaces
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + 2
+    }, 0)
+  }
+}
+
 // View mode handler
 const handleViewModeChange = (mode) => {
   viewMode.value = mode
+  if (mode === 'json') {
+    // Update JSON content when switching to JSON mode
+    updateJsonContent()
+  }
 }
 
 // Handle clicking on invalid status tag
@@ -940,7 +1137,7 @@ onMounted(async () => {
         <el-card shadow="never" class="json-card">
           <template #header>
             <div class="json-header">
-              <h3>Record JSON Preview</h3>
+              <h3>Record JSON Editor</h3>
               <el-tag 
                 :type="isValidRecord ? 'success' : 'danger'" 
                 size="small"
@@ -952,7 +1149,20 @@ onMounted(async () => {
             </div>
           </template>
           
-          <pre class="json-content">{{ JSON.stringify(recordJson, null, 2) }}</pre>
+          <div class="json-editor">
+            <el-input
+              ref="jsonEditor"
+              v-model="jsonContent"
+              type="textarea"
+              :rows="20"
+              placeholder="Enter record JSON here..."
+              @input="onJsonContentChange"
+              @keydown="onJsonEditorKeydown"
+            />
+            <div v-if="jsonError" class="json-error">
+              {{ jsonError }}
+            </div>
+          </div>
           
           <!-- Validation Status -->
           <div v-if="!isValidRecord" class="validation-section">
@@ -1359,17 +1569,27 @@ onMounted(async () => {
           padding: 0;
         }
 
-        .json-content {
+        .json-editor {
           padding: 24px;
-          margin: 0;
-          background: theme.$gray_1;
-          color: theme.$gray_6;
-          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-          font-size: 13px;
-          line-height: 1.5;
-          overflow-x: auto;
-          white-space: pre-wrap;
-          word-break: break-word;
+          
+          :deep(.el-textarea) {
+            .el-textarea__inner {
+              font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+              font-size: 13px;
+              line-height: 1.5;
+              resize: none;
+              min-height: 400px;
+            }
+          }
+          
+          .json-error {
+            color: theme.$red_1;
+            background-color: theme.$red_tint;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 13px;
+          }
         }
 
         .validation-section {
