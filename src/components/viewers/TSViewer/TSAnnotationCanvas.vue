@@ -75,7 +75,6 @@ const {
 } = useAnnotationInteraction(focusedAnn, renderAnn, hoverOffsets)
 
 const {
-  createAnnotationLayer,
   loadLayers
 } = useAnnotationLayers()
 
@@ -110,14 +109,15 @@ const selectFocusedAnn = () => {
   }
 }
 
-const createLayer = async (newLayer) => {
-  await createAnnotationLayer(newLayer, props.activeViewer, emit)
-}
-
 // Watch for activeViewer changes
 watch(
   () => props.activeViewer,
-  async (newValue) => {
+  async (newValue, oldValue) => {
+    // Skip if the viewer ID hasn't actually changed
+    if (!oldValue || newValue?.content?.id === oldValue?.content?.id) {
+      return
+    }
+    
     try {
       await loadLayers(newValue, emit)
       await checkAnnotationRange(
@@ -175,7 +175,6 @@ defineExpose({
   checkAnnotationRange: (start, end) =>
     checkAnnotationRange(start, end, props, props.activeViewer, emit),
   selectFocusedAnn,
-  createAnnotationLayer: createLayer,
   onMouseDown,
   onMouseMove,
   onMouseUp
