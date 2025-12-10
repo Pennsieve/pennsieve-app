@@ -160,6 +160,15 @@ const effectiveModelData = computed(() => {
   return modelData.value
 })
 
+// Computed schema for JSON view - uses the correct schema for both models and templates
+const effectiveSchema = computed(() => {
+  return effectiveModelData.value?.latest_version?.schema || {
+    "type": "object",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {}
+  }
+})
+
 const {
   formatPropertyType,
   getConstraintInfo,
@@ -1009,7 +1018,7 @@ const PropertyTree = defineComponent({
         
         <!-- JSON Schema display -->
         <el-card shadow="never">
-          <pre class="json-content">{{ JSON.stringify(displaySchema, null, 2) }}</pre>
+          <pre class="json-content">{{ JSON.stringify(effectiveSchema, null, 2) }}</pre>
         </el-card>
       </div>
     </div>

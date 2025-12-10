@@ -39,7 +39,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update-filter', 'remove-filter', 'model-change'])
+const emit = defineEmits(['update-filter', 'remove-filter', 'model-change', 'clear-filter'])
 
 // Store
 const metadataStore = useMetadataStore()
@@ -432,24 +432,17 @@ const clearSegment = (filterIndex, segment) => {
 
 // Clear model (special case)
 const clearModel = () => {
-  let updatedFilter = { ...props.filter }
-  updatedFilter = {
-    ...updatedFilter,
-    model: '',
-    property: '',
-    operator: '',
-    value: '',
-    modelProperties: []
-  }
-  // Clear all sub-filters when model is cleared
+  // Reset local state
   filters.value = [{
     id: Date.now(),
     property: '',
     operator: '',
     value: ''
   }]
-  emit('update-filter', props.index, updatedFilter)
-  emitFilterUpdate()
+  
+  // Emit a dedicated clear event instead of trying to update
+  console.log('📤 Emitting clear-filter event for index:', props.index)
+  emit('clear-filter', props.index)
 }
 
 // Handle value input for a specific filter
@@ -474,7 +467,7 @@ const onValueInput = (event, filterIndex) => {
   const propertyFormat = property?.format || ''
   const isStringProperty = propertyType === 'string' && !propertyFormat // Exclude formatted strings like dates
   
-  if (props.enableAutocomplete && value && value.length >= 2 && filter.property && filter.operator && props.filter.model && isStringProperty) {
+  if (props.enableAutocomplete && value && value.length >= 1 && filter.property && filter.operator && props.filter.model && isStringProperty) {
     debouncedFetchAutocomplete(value, filter.property, filter.operator, filter.id)
   } else {
     // Clear autocomplete state
@@ -608,6 +601,14 @@ const emitFilterUpdate = () => {
     multiFilterData.operator = validFilters[0].operator
     multiFilterData.value = validFilters[0].value
   }
+  
+  console.log('🔄 Emitting multi-filter update:', {
+    index: props.index,
+    hasMultipleFilters: multiFilterData.hasMultipleFilters,
+    subFiltersCount: multiFilterData.subFilters.length,
+    logicalOperator: multiFilterData.logicalOperator,
+    subFilters: JSON.stringify(multiFilterData.subFilters, null, 2)
+  })
   
   emit('update-filter', props.index, multiFilterData)
 }
@@ -787,7 +788,7 @@ const onKeydown = (event, type, filterIndex = 0) => {
     operatorSearchTerm.value = ''
     event.preventDefault()
   }
-  
+
   if (event.key === 'Enter') {
     const filter = filters.value[filterIndex]
     if (type === 'model' && filteredModels.value.length > 0) {
