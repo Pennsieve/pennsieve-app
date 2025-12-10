@@ -109,30 +109,6 @@ const selectFocusedAnn = () => {
   }
 }
 
-// Watch for activeViewer changes
-watch(
-  () => props.activeViewer,
-  async (newValue, oldValue) => {
-    // Skip if the viewer ID hasn't actually changed
-    if (!oldValue || newValue?.content?.id === oldValue?.content?.id) {
-      return
-    }
-    
-    try {
-      await loadLayers(newValue, emit)
-      await checkAnnotationRange(
-        props.start,
-        props.start + props.duration,
-        props,
-        newValue,
-        emit
-      )
-    } catch (error) {
-      console.error('Error loading annotations for new viewer:', error)
-    }
-  }
-)
-
 // Lifecycle
 onMounted(async () => {
   console.log('TSAnnotationCanvas mounted with props:', {
