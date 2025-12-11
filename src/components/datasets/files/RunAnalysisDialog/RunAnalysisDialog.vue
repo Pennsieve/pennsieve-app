@@ -297,11 +297,9 @@
             />
           </div>
           <div class="table-container">
-            <files-table
+            <analysis-files-table
               :data="files"
               :clear-selected-values="clearSelectedValues"
-              withinRunAnalysisDialog
-              :enable-download="false"
               @selection-change="onFileSelect"
               @click-file-label="onClickLabel"
             />
@@ -332,7 +330,7 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
-import FilesTable from "../../../FilesTable/FilesTable.vue";
+import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
@@ -342,7 +340,7 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
-    FilesTable,
+    AnalysisFilesTable,
     BfButton,
   },
 
