@@ -427,14 +427,17 @@ export default {
   watch: {
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit("toast", {
-          detail: {
-            type: "warning",
-            msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
-            duration: 0,
-            showClose: true,
-          },
-        });
+        // Only show toast if we have a valid URL (prevents banner on mount with empty state)
+        if (newValue && newValue.url) {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "warning",
+              msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
+              duration: 0,
+              showClose: true,
+            },
+          });
+        }
       },
       deep: true,
     },
