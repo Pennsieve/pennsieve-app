@@ -345,7 +345,7 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
+    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete", "getUploadMap"]),
 
     ...mapGetters("datasetModule", [
       "getPusherChannel",
@@ -353,7 +353,8 @@ export default {
     ]),
 
     showUploadInfo: function () {
-      return this.getUploadComplete() || this.getIsUploading();
+      const hasFiles = this.getUploadMap().size > 0;
+      return hasFiles && (this.getUploadComplete() || this.getIsUploading());
     },
 
     /**
