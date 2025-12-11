@@ -446,8 +446,14 @@ export default {
         (item) => item.content.id === row.content.id
       );
 
+      // If deselecting, clear lastClickedRow to prevent accidental range selection
+      if (!wasSelected) {
+        this.lastClickedRow = null;
+        return;
+      }
+
       // Shift+click for range selection
-      if (this.shiftKeyPressed && this.lastClickedRow !== null && wasSelected) {
+      if (this.shiftKeyPressed && this.lastClickedRow !== null) {
         const sortedData = this.getTableData();
 
         const lastIndex = sortedData.findIndex(
@@ -483,17 +489,70 @@ export default {
         }
       }
 
-      // Always update last clicked row
+      // Update last clicked row for selected items
       this.lastClickedRow = row;
     },
 
-    onRowClick: function (row, selected) {
-      setTimeout(
-        function () {
-          this.$refs.table?.toggleRowSelection(row, selected);
-        }.bind(this),
-        100
+    /**
+     * Handle row click for shift+click range selection anywhere in the row
+     */
+    onRowClick: function (row, column) {
+      // Ignore clicks on the checkbox column - onSelect handles those
+      if (column?.type === 'selection') {
+        return;
+      }
+
+      // Check if row is currently selected
+      const isCurrentlySelected = this.selection.some(
+        (item) => item.content.id === row.content.id
       );
+
+      // Shift+click for range selection
+      if (this.shiftKeyPressed && this.lastClickedRow !== null) {
+        const sortedData = this.getTableData();
+
+        const lastIndex = sortedData.findIndex(
+          (item) => item.content.id === this.lastClickedRow.content.id
+        );
+        const currentIndex = sortedData.findIndex(
+          (item) => item.content.id === row.content.id
+        );
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+
+          // Collect all rows to select first
+          const rowsToSelect = [];
+          for (let i = start; i <= end; i++) {
+            const sortedRow = sortedData[i];
+            const originalRow = this.data.find(
+              (item) => item.content.id === sortedRow.content.id
+            );
+            if (originalRow) {
+              rowsToSelect.push(originalRow);
+            }
+          }
+
+          // Select all rows in nextTick to batch updates
+          this.$nextTick(() => {
+            rowsToSelect.forEach((r) => {
+              this.$refs.table?.toggleRowSelection(r, true);
+            });
+          });
+        }
+        // Update last clicked row
+        this.lastClickedRow = row;
+      } else {
+        // Normal click - toggle single row
+        this.$refs.table?.toggleRowSelection(row, !isCurrentlySelected);
+        // Update lastClickedRow only when selecting
+        if (!isCurrentlySelected) {
+          this.lastClickedRow = row;
+        } else {
+          this.lastClickedRow = null;
+        }
+      }
     },
 
     /**
