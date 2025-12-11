@@ -1,7 +1,7 @@
 <template>
   <div class="files-table" :class="withinDeleteMenu && 'undelete-modal'">
     <div
-      v-if="selection.length > 0 && !withinRunAnalysisDialog"
+      v-if="selection.length > 0"
       class="selection-menu-wrap mb-16"
     >
       <div class="selection-info">
@@ -12,15 +12,15 @@
           :indeterminate="isIndeterminate"
           @change="onCheckAllChange"
         />
-        <span v-if="!withinRunAnalysisDialog" id="selection-count-label">{{
+        <span id="selection-count-label">{{
           selectionCountLabel
         }}</span>
       </div>
       <ul class="selection-actions unstyled">
-        <template v-if="withinDeleteMenu || withinRunAnalysisDialog">
+        <template v-if="withinDeleteMenu">
           <li class="mr-24">
             <button
-              v-if="!searchAllDataMenu && !withinRunAnalysisDialog"
+              v-if="!searchAllDataMenu"
               class="linked btn-selection-action"
               :disabled="datasetLocked"
               @click="$emit('restore')"
@@ -54,7 +54,6 @@
         </template>
         <li>
           <button
-            v-if="!withinRunAnalysisDialog"
             class="linked btn-selection-action mr-8"
             @click="onDownloadClick"
           >
@@ -62,7 +61,7 @@
             Download
           </button>
         </li>
-        <li v-if="!withinRunAnalysisDialog">
+        <li>
           <table-menu
             v-if="getPermission('editor') || searchAllDataMenu"
             :selection="selection"
@@ -81,15 +80,14 @@
 
     <el-table
       ref="table"
-      v-loading="
-        withinDeleteMenu || withinRunAnalysisDialog ? false : tableLoading
-      "
+      v-loading="withinDeleteMenu ? false : tableLoading"
       :border="true"
       :data="data"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
       @selection-change="handleTableSelectionChange"
       @sort-change="onSortChange"
       @row-click="onRowClick"
+      @select="onSelect"
     >
       <!-- Package Attachment Select Column (replaces selection when active) -->
       <el-table-column
@@ -142,7 +140,7 @@
         </template>
       </el-table-column>
       <el-table-column
-        v-if="!withinDeleteMenu && !withinRunAnalysisDialog"
+        v-if="!withinDeleteMenu"
         prop="subtype"
         label="Kind"
         :sortable="!isSearchResults"
@@ -245,10 +243,6 @@ export default {
       type: Boolean,
       default: true,
     },
-    withinRunAnalysisDialog: {
-      type: Boolean,
-      default: false,
-    },
     clearSelectedValues: {
       type: Boolean,
       default: false,
@@ -264,7 +258,31 @@ export default {
       selection: [],
       sortOrders: ["ascending", "descending"],
       checkAll: false,
+      lastClickedRow: null,
+      shiftKeyPressed: false,
+      selectionChangeTimeout: null,
     };
+  },
+
+  mounted() {
+    // Track shift key state globally for range selection
+    this.handleKeyDown = (e) => {
+      if (e.key === 'Shift') {
+        this.shiftKeyPressed = true;
+      }
+    };
+    this.handleKeyUp = (e) => {
+      if (e.key === 'Shift') {
+        this.shiftKeyPressed = false;
+      }
+    };
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
   },
   watch: {
     clearSelectedValues(newVal) {
@@ -272,40 +290,13 @@ export default {
         this.handleCloseModal();
       }
     },
-    data: {
-      handler: function (newVal, oldVal) {
-        if (this.withinRunAnalysisDialog) {
-          const filesToSelect = [];
-          const dataFilesToSelect = [];
-          for (const parentId in this.selectedFilesForAnalysis) {
-            this.selectedFilesForAnalysis[parentId].forEach((file) => {
-              filesToSelect.push(file);
-            });
-          }
-          filesToSelect.forEach((elem) => {
-            this.data.forEach((dataElem) => {
-              if (elem.content.id === dataElem.content.id) {
-                dataFilesToSelect.push(dataElem);
-              }
-            });
-          });
-          dataFilesToSelect.forEach((elem) => {
-            this.onRowClick(elem, true);
-          });
-        }
-      },
-      deep: true,
-    },
   },
 
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
     ...mapState(["dataset", "filesProxyId"]),
-    ...mapState("analysisModule", ["selectedFilesForAnalysis", "fileCount"]),
-    selectedFiles() {
-      return this.selectedFilesForAnalysis;
-    },
+
     /**
      * Compute if the checkbox is indeterminate
      * @returns {Boolean}
@@ -328,7 +319,6 @@ export default {
   },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
-    ...mapActions("analysisModule", ["clearSelectedFiles", "updateFileCount"]),
 
     handleCloseModal: function () {
       this.$refs.table.clearSelection();
@@ -365,14 +355,22 @@ export default {
 
     /**
      * Handle table selection change
+     * Debounced to prevent multiple rapid updates during shift+click range selection
      * @param {Array} selection
      */
     handleTableSelectionChange: function (selection) {
       if (this.data[0] && this.data[0].content) {
         this.selection = selection;
-        const parentId = this.data[0].content.parentId || "root";
-        this.$emit("selection-change", selection, parentId);
-        this.checkAll = this.data.length === selection.length;
+
+        // Debounce the emit to batch rapid selection changes
+        if (this.selectionChangeTimeout) {
+          clearTimeout(this.selectionChangeTimeout);
+        }
+        this.selectionChangeTimeout = setTimeout(() => {
+          const parentId = this.data[0].content.parentId || "root";
+          this.$emit("selection-change", this.selection, parentId);
+          this.checkAll = this.data.length === this.selection.length;
+        }, 50);
       }
     },
 
@@ -428,13 +426,133 @@ export default {
       this.$refs.table.clearSelection();
     },
 
-    onRowClick: function (row, selected) {
-      setTimeout(
-        function () {
-          this.$refs.table?.toggleRowSelection(row, selected);
-        }.bind(this),
-        100
+    /**
+     * Get data sorted by name (matching el-table's default-sort)
+     */
+    getTableData: function () {
+      return [...this.data].sort((a, b) => {
+        const nameA = (a.content?.name || '').toLowerCase();
+        const nameB = (b.content?.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    },
+
+    /**
+     * Handle checkbox selection with Shift+click range selection support
+     */
+    onSelect: function (selection, row) {
+      // Check if this row was just selected (it's now in the selection)
+      const wasSelected = selection.some(
+        (item) => item.content.id === row.content.id
       );
+
+      // If deselecting, clear lastClickedRow to prevent accidental range selection
+      if (!wasSelected) {
+        this.lastClickedRow = null;
+        return;
+      }
+
+      // Shift+click for range selection
+      if (this.shiftKeyPressed && this.lastClickedRow !== null) {
+        const sortedData = this.getTableData();
+
+        const lastIndex = sortedData.findIndex(
+          (item) => item.content.id === this.lastClickedRow.content.id
+        );
+        const currentIndex = sortedData.findIndex(
+          (item) => item.content.id === row.content.id
+        );
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+
+          // Collect all rows to select first
+          const rowsToSelect = [];
+          for (let i = start; i <= end; i++) {
+            const sortedRow = sortedData[i];
+            // Find the matching row in the original this.data array
+            const originalRow = this.data.find(
+              (item) => item.content.id === sortedRow.content.id
+            );
+            if (originalRow) {
+              rowsToSelect.push(originalRow);
+            }
+          }
+
+          // Select all rows in nextTick to batch updates
+          this.$nextTick(() => {
+            rowsToSelect.forEach((r) => {
+              this.$refs.table?.toggleRowSelection(r, true);
+            });
+          });
+        }
+      }
+
+      // Update last clicked row for selected items
+      this.lastClickedRow = row;
+    },
+
+    /**
+     * Handle row click for shift+click range selection anywhere in the row
+     */
+    onRowClick: function (row, column) {
+      // Ignore clicks on the checkbox column - onSelect handles those
+      if (column?.type === 'selection') {
+        return;
+      }
+
+      // Check if row is currently selected
+      const isCurrentlySelected = this.selection.some(
+        (item) => item.content.id === row.content.id
+      );
+
+      // Shift+click for range selection
+      if (this.shiftKeyPressed && this.lastClickedRow !== null) {
+        const sortedData = this.getTableData();
+
+        const lastIndex = sortedData.findIndex(
+          (item) => item.content.id === this.lastClickedRow.content.id
+        );
+        const currentIndex = sortedData.findIndex(
+          (item) => item.content.id === row.content.id
+        );
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+
+          // Collect all rows to select first
+          const rowsToSelect = [];
+          for (let i = start; i <= end; i++) {
+            const sortedRow = sortedData[i];
+            const originalRow = this.data.find(
+              (item) => item.content.id === sortedRow.content.id
+            );
+            if (originalRow) {
+              rowsToSelect.push(originalRow);
+            }
+          }
+
+          // Select all rows in nextTick to batch updates
+          this.$nextTick(() => {
+            rowsToSelect.forEach((r) => {
+              this.$refs.table?.toggleRowSelection(r, true);
+            });
+          });
+        }
+        // Update last clicked row
+        this.lastClickedRow = row;
+      } else {
+        // Normal click - toggle single row
+        this.$refs.table?.toggleRowSelection(row, !isCurrentlySelected);
+        // Update lastClickedRow only when selecting
+        if (!isCurrentlySelected) {
+          this.lastClickedRow = row;
+        } else {
+          this.lastClickedRow = null;
+        }
+      }
     },
 
     /**
