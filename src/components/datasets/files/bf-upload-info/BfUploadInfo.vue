@@ -52,20 +52,6 @@ export default {
     return {};
   },
 
-  watch: {
-    /**
-     * Auto-dismiss when all files have been processed and removed from the list
-     */
-    'getUploadMap': {
-      handler(newMap) {
-        if (newMap.size === 0 && !this.getIsUploading()) {
-          this.onDismiss();
-        }
-      },
-      deep: true
-    }
-  },
-
   computed: {
     ...mapGetters("uploadModule", [
       "getUploadProgress",
