@@ -94,8 +94,12 @@ User archives manifest -> remove activeManifest from memory
       </div>
 
       <template #footer>
-        <bf-button class="secondary" @click="cancelQueue">
-          {{ cancelBtnText }}
+        <bf-button
+          v-if="!isUploading && !uploadComplete"
+          class="secondary"
+          @click="cancelQueue"
+        >
+          Reset
         </bf-button>
         <bf-button
           v-if="!isUploading && !uploadComplete"
