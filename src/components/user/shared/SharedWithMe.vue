@@ -160,10 +160,10 @@ export default {
       if (!this.organizations || !Array.isArray(this.organizations)) {
         return []
       }
-      
+
       // Debug: Let's see all organizations for now
       console.log('Organizations from Vuex:', this.organizations)
-      
+
       // For now, return all organizations to see the structure
       // TODO: Properly filter for shared workspaces once we understand the data structure
       return this.organizations

@@ -129,6 +129,41 @@ export const mutations = {
         state.uploadDestination = {}
         state.isUploading = false
         state.uploadComplete = false
+    },
+    REMOVE_COMPLETED_FILE(state, key) {
+        const fileEntry = state.uploadFileMap.get(key)
+        if (fileEntry) {
+            // Subtract from total progress
+            state.uploadProgress.total -= fileEntry.file.size
+            state.uploadProgress.loaded -= fileEntry.progress.loaded
+            state.uploadFileMap.delete(key)
+
+            // If no files left, reset the upload state
+            if (state.uploadFileMap.size === 0) {
+                state.isUploading = false
+                state.uploadComplete = false
+                state.manifestFiles = []
+            }
+        }
+    },
+    CLEAR_COMPLETED_FILES(state) {
+        const newMap = new Map()
+        for (const [key, value] of state.uploadFileMap) {
+            if (value.status !== 'processing') {
+                newMap.set(key, value)
+            } else {
+                // Subtract completed file from progress totals
+                state.uploadProgress.total -= value.file.size
+                state.uploadProgress.loaded -= value.progress.loaded
+            }
+        }
+        state.uploadFileMap = newMap
+        // If no files left, reset the upload state
+        if (state.uploadFileMap.size === 0) {
+            state.isUploading = false
+            state.uploadComplete = false
+            state.manifestFiles = []
+        }
     }
 }
 
@@ -470,14 +505,29 @@ export const actions = {
         let s3_key = state.manifestNodeId + "/" + fileInfo.key
 
         if (state.uploadFileMap.get(s3_key)) {
-            commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
+            // If file is complete (appeared in file browser), remove it from the upload list
+            if (fileInfo.status === 'complete') {
+                commit('REMOVE_COMPLETED_FILE', s3_key)
+            } else {
+                commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
+            }
         }
 
     },
 
     // Reset upload action
-    resetUpload: async({ commit}, evt ) => {
+    resetUpload: async({ commit}) => {
         commit("RESET_UPLOADER")
+    },
+
+    // Remove a single completed file from the upload map
+    removeCompletedFile: async({ commit }, key) => {
+        commit("REMOVE_COMPLETED_FILE", key)
+    },
+
+    // Clear all completed files from the upload map
+    clearCompletedFiles: async({ commit }) => {
+        commit("CLEAR_COMPLETED_FILES")
     }
 
 }

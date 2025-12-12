@@ -474,6 +474,8 @@ export default {
     },
     clearAllSelected: function () {
       this.$refs.table.clearSelection();
+      this.selection = [];
+      this.checkAll = false;
     },
 
     /**
