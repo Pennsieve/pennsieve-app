@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="upload-file">
-      {{uploadObject?.file.name}}
+      <div class="file-name">{{uploadObject?.file.name}}</div>
       <div class="right">
         <div :class="['status', statusClass]">
           {{statusText}}
@@ -73,9 +73,18 @@ const statusClass = computed(() => {
   align-items: center;
   position: relative;
 
+  .file-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 16px;
+  }
+
   .right {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 
     .status {
       margin-right: 8px;
@@ -97,6 +106,8 @@ const statusClass = computed(() => {
 
   .storage-value {
     font-size: 12px;
+    min-width: 60px;
+    text-align: right;
   }
 }
 
