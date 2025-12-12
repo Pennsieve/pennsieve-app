@@ -519,7 +519,7 @@ export const actions = {
                 commit('REMOVE_COMPLETED_FILE', s3_key)
 
                 // Show success toast when all files have been uploaded
-                if (isLastFile) {
+                if (isLastFile && typeof window !== 'undefined') {
                     const fileWord = totalFiles === 1 ? 'file has' : 'files have'
                     EventBus.$emit('toast', {
                         detail: {
