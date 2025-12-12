@@ -34,7 +34,8 @@ const initialState = () => ({
     isUploading: false,
     uploadComplete: false,
     uploadProgress: {total: 0, loaded:0},
-    currentTargetPackage: {}
+    currentTargetPackage: {},
+    totalFilesInBatch: 0
 })
 
 export const state = initialState()
@@ -122,6 +123,9 @@ export const mutations = {
     SET_UPLOAD_COMPLETE(state, value) {
         state.uploadComplete = value
     },
+    SET_TOTAL_FILES_IN_BATCH(state, count) {
+        state.totalFilesInBatch = count
+    },
     RESET_UPLOADER(state) {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
@@ -129,6 +133,7 @@ export const mutations = {
         state.uploadDestination = {}
         state.isUploading = false
         state.uploadComplete = false
+        state.totalFilesInBatch = 0
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -365,6 +370,7 @@ export const actions = {
         const poolResource = authSession.tokens.accessToken.payload.iss.replace("https://","");
         logins[poolResource] =authSession.tokens.idToken.toString();
         commit('SET_IS_UPLOADING', true)
+        commit('SET_TOTAL_FILES_IN_BATCH', state.uploadFileMap.size)
 
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
@@ -509,13 +515,15 @@ export const actions = {
             if (fileInfo.status === 'complete') {
                 // Check if this is the last file before removing
                 const isLastFile = state.uploadFileMap.size === 1
+                const totalFiles = state.totalFilesInBatch
                 commit('REMOVE_COMPLETED_FILE', s3_key)
 
                 // Show success toast when all files have been uploaded
                 if (isLastFile) {
+                    const fileWord = totalFiles === 1 ? 'file has' : 'files have'
                     EventBus.$emit('toast', {
                         detail: {
-                            msg: 'Your files have been successfully uploaded',
+                            msg: `${totalFiles} ${fileWord} been successfully uploaded`,
                             type: 'success'
                         }
                     })
@@ -562,6 +570,9 @@ export const getters = {
     },
     getUploadProgress: state => () => {
         return state.uploadProgress
+    },
+    getTotalFilesInBatch: state => () => {
+        return state.totalFilesInBatch
     }
 }
 

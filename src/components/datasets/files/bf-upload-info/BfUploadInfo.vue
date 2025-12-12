@@ -58,6 +58,7 @@ export default {
       "getIsUploading",
       "getUploadMap",
       "getUploadComplete",
+      "getTotalFilesInBatch",
     ]),
 
     /**
@@ -68,8 +69,9 @@ export default {
       if (this.getUploadComplete()) {
         return "";
       }
-      const file = this.getUploadMap().size > 1 ? "files" : "file";
-      return `Uploading ${this.getUploadMap().size} ${file}`;
+      const totalFiles = this.getTotalFilesInBatch();
+      const file = totalFiles > 1 ? "files" : "file";
+      return `Uploading ${totalFiles} ${file}`;
     },
 
     loadedStr: function () {

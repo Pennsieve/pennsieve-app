@@ -148,6 +148,9 @@ const isUploading = computed(() =>
 const uploadComplete = computed(() =>
   store.getters["uploadModule/getUploadComplete"]()
 );
+const totalFilesInBatch = computed(() =>
+  store.getters["uploadModule/getTotalFilesInBatch"]()
+);
 const cancelBtnText = computed(() => (isUploading.value ? "Hide" : "Reset"));
 
 const allFilesComplete = computed(() => {
@@ -163,7 +166,8 @@ const allFilesComplete = computed(() => {
 
 const dialogTitle = computed(() => {
   if (allFilesComplete.value || isUploading.value) {
-    return "Uploading Files";
+    const fileWord = totalFilesInBatch.value === 1 ? "File" : "Files";
+    return `Uploading ${totalFilesInBatch.value} ${fileWord}`;
   }
   return "Add Files to Upload";
 });
