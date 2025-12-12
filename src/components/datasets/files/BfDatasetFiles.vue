@@ -113,6 +113,7 @@
     <div class="file-meta-wrapper">
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
+          ref="filesTable"
           :data="files"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
@@ -652,6 +653,8 @@ export default {
     resetSelectedFiles: function () {
       this.selectedFiles = [];
       this.lastSelectedFile = {};
+      // Clear the table's internal selection state
+      this.$refs.filesTable?.clearAllSelected();
     },
 
     /**
