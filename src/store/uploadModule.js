@@ -507,7 +507,19 @@ export const actions = {
         if (state.uploadFileMap.get(s3_key)) {
             // If file is complete (appeared in file browser), remove it from the upload list
             if (fileInfo.status === 'complete') {
+                // Check if this is the last file before removing
+                const isLastFile = state.uploadFileMap.size === 1
                 commit('REMOVE_COMPLETED_FILE', s3_key)
+
+                // Show success toast when all files have been uploaded
+                if (isLastFile) {
+                    EventBus.$emit('toast', {
+                        detail: {
+                            msg: 'Your files have been successfully uploaded',
+                            type: 'success'
+                        }
+                    })
+                }
             } else {
                 commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
             }
