@@ -80,6 +80,8 @@ const statusClass = computed(() => {
     .status {
       margin-right: 8px;
       color: theme.$purple_3;
+      min-width: 80px;
+      text-align: right;
 
       &.complete {
         color: theme.$green_1;
