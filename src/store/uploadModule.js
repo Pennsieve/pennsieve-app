@@ -34,7 +34,8 @@ const initialState = () => ({
     isUploading: false,
     uploadComplete: false,
     uploadProgress: {total: 0, loaded:0},
-    currentTargetPackage: {}
+    currentTargetPackage: {},
+    totalFilesInBatch: 0
 })
 
 export const state = initialState()
@@ -122,6 +123,9 @@ export const mutations = {
     SET_UPLOAD_COMPLETE(state, value) {
         state.uploadComplete = value
     },
+    SET_TOTAL_FILES_IN_BATCH(state, count) {
+        state.totalFilesInBatch = count
+    },
     RESET_UPLOADER(state) {
         state.uploadFileMap = new Map()
         state.manifestFiles = []
@@ -129,6 +133,42 @@ export const mutations = {
         state.uploadDestination = {}
         state.isUploading = false
         state.uploadComplete = false
+        state.totalFilesInBatch = 0
+    },
+    REMOVE_COMPLETED_FILE(state, key) {
+        const fileEntry = state.uploadFileMap.get(key)
+        if (fileEntry) {
+            // Subtract from total progress
+            state.uploadProgress.total -= fileEntry.file.size
+            state.uploadProgress.loaded -= fileEntry.progress.loaded
+            state.uploadFileMap.delete(key)
+
+            // If no files left, reset the upload state
+            if (state.uploadFileMap.size === 0) {
+                state.isUploading = false
+                state.uploadComplete = false
+                state.manifestFiles = []
+            }
+        }
+    },
+    CLEAR_COMPLETED_FILES(state) {
+        const newMap = new Map()
+        for (const [key, value] of state.uploadFileMap) {
+            if (value.status !== 'processing') {
+                newMap.set(key, value)
+            } else {
+                // Subtract completed file from progress totals
+                state.uploadProgress.total -= value.file.size
+                state.uploadProgress.loaded -= value.progress.loaded
+            }
+        }
+        state.uploadFileMap = newMap
+        // If no files left, reset the upload state
+        if (state.uploadFileMap.size === 0) {
+            state.isUploading = false
+            state.uploadComplete = false
+            state.manifestFiles = []
+        }
     }
 }
 
@@ -330,6 +370,7 @@ export const actions = {
         const poolResource = authSession.tokens.accessToken.payload.iss.replace("https://","");
         logins[poolResource] =authSession.tokens.idToken.toString();
         commit('SET_IS_UPLOADING', true)
+        commit('SET_TOTAL_FILES_IN_BATCH', state.uploadFileMap.size)
 
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
@@ -470,14 +511,43 @@ export const actions = {
         let s3_key = state.manifestNodeId + "/" + fileInfo.key
 
         if (state.uploadFileMap.get(s3_key)) {
-            commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
+            // If file is complete (appeared in file browser), remove it from the upload list
+            if (fileInfo.status === 'complete') {
+                // Check if this is the last file before removing
+                const isLastFile = state.uploadFileMap.size === 1
+                const totalFiles = state.totalFilesInBatch
+                commit('REMOVE_COMPLETED_FILE', s3_key)
+
+                // Show success toast when all files have been uploaded
+                if (isLastFile && typeof window !== 'undefined') {
+                    const fileWord = totalFiles === 1 ? 'file has' : 'files have'
+                    EventBus.$emit('toast', {
+                        detail: {
+                            msg: `${totalFiles} ${fileWord} been successfully uploaded`,
+                            type: 'success'
+                        }
+                    })
+                }
+            } else {
+                commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
+            }
         }
 
     },
 
     // Reset upload action
-    resetUpload: async({ commit}, evt ) => {
+    resetUpload: async({ commit}) => {
         commit("RESET_UPLOADER")
+    },
+
+    // Remove a single completed file from the upload map
+    removeCompletedFile: async({ commit }, key) => {
+        commit("REMOVE_COMPLETED_FILE", key)
+    },
+
+    // Clear all completed files from the upload map
+    clearCompletedFiles: async({ commit }) => {
+        commit("CLEAR_COMPLETED_FILES")
     }
 
 }
@@ -500,6 +570,9 @@ export const getters = {
     },
     getUploadProgress: state => () => {
         return state.uploadProgress
+    },
+    getTotalFilesInBatch: state => () => {
+        return state.totalFilesInBatch
     }
 }
 

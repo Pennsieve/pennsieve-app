@@ -42,9 +42,6 @@ User archives manifest -> remove activeManifest from memory
         >
       </p>
 
-      <div class="clear-action-wrapper">
-        <div class="clear-action" @click="clearQueue">Clear</div>
-      </div>
 
       <div v-if="!isUploading" v-bind="getRootProps()">
         <input v-bind="getInputProps()" />
@@ -87,7 +84,7 @@ User archives manifest -> remove activeManifest from memory
           :key="key"
           class="manifest-file-wrapper"
         >
-          <PsUploadFile :upload-object="value" />
+          <PsUploadFile :upload-object="value" :file-key="key" />
         </div>
       </div>
       <div v-else>
@@ -97,10 +94,19 @@ User archives manifest -> remove activeManifest from memory
       </div>
 
       <template #footer>
-        <bf-button class="secondary" @click="cancelQueue">
-          {{ cancelBtnText }}
+        <bf-button
+          v-if="!isUploading && !uploadComplete"
+          class="secondary"
+          @click="cancelQueue"
+        >
+          Reset
         </bf-button>
-        <bf-button @click="startUpload"> Start Upload </bf-button>
+        <bf-button
+          v-if="!isUploading && !uploadComplete"
+          @click="startUpload"
+        >
+          Start Upload
+        </bf-button>
       </template>
     </el-dialog>
   </div>
@@ -142,18 +148,29 @@ const isUploading = computed(() =>
 const uploadComplete = computed(() =>
   store.getters["uploadModule/getUploadComplete"]()
 );
+const totalFilesInBatch = computed(() =>
+  store.getters["uploadModule/getTotalFilesInBatch"]()
+);
 const cancelBtnText = computed(() => (isUploading.value ? "Hide" : "Reset"));
-const dialogTitle = computed(() => {
-  return "Add Files to Upload";
+
+const allFilesComplete = computed(() => {
+  const map = uploadMap.value;
+  if (map.size === 0) return false;
+  for (const [, value] of map) {
+    if (value.status !== "processing") {
+      return false;
+    }
+  }
+  return true;
 });
 
-function hasItems(list) {
-  return list && list.length > 0;
-}
-
-function clearQueue() {
-  store.dispatch("uploadModule/resetUpload");
-}
+const dialogTitle = computed(() => {
+  if (allFilesComplete.value || isUploading.value) {
+    const fileWord = totalFilesInBatch.value === 1 ? "File" : "Files";
+    return `Uploading ${totalFilesInBatch.value} ${fileWord}`;
+  }
+  return "Add Files to Upload";
+});
 
 function cancelQueue() {
   if (isUploading.value) {

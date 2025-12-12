@@ -113,6 +113,7 @@
     <div class="file-meta-wrapper">
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
+          ref="filesTable"
           :data="files"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
@@ -345,7 +346,7 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
+    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete", "getUploadMap"]),
 
     ...mapGetters("datasetModule", [
       "getPusherChannel",
@@ -353,7 +354,8 @@ export default {
     ]),
 
     showUploadInfo: function () {
-      return this.getUploadComplete() || this.getIsUploading();
+      const hasFiles = this.getUploadMap().size > 0;
+      return hasFiles && (this.getUploadComplete() || this.getIsUploading());
     },
 
     /**
@@ -651,6 +653,8 @@ export default {
     resetSelectedFiles: function () {
       this.selectedFiles = [];
       this.lastSelectedFile = {};
+      // Clear the table's internal selection state
+      this.$refs.filesTable?.clearAllSelected();
     },
 
     /**
