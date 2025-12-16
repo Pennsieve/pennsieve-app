@@ -174,9 +174,33 @@ const recordJson = computed(() => {
         current = current[part]
       }
       
-      // Set the final value (null if explicitly set, otherwise the actual value)
+      // Set the final value
       const finalKey = keyParts[keyParts.length - 1]
-      current[finalKey] = shouldSetNull ? null : value
+      
+      if (shouldSetNull) {
+        current[finalKey] = null
+      } else {
+        // Find the property schema to determine type
+        const property = schemaProperties.value.find(p => p.key === key)
+        
+        // Parse JSON strings for array and object types
+        if (property && (property.type === 'array' || property.type === 'object')) {
+          try {
+            // Try to parse if it's a string
+            if (typeof value === 'string' && value.trim()) {
+              current[finalKey] = JSON.parse(value)
+            } else {
+              current[finalKey] = value
+            }
+          } catch (e) {
+            // If parsing fails, keep as string (will be caught by validation)
+            console.warn(`Failed to parse JSON for field ${key}:`, e)
+            current[finalKey] = value
+          }
+        } else {
+          current[finalKey] = value
+        }
+      }
     }
   })
   
@@ -1107,9 +1131,17 @@ onMounted(async () => {
                   <el-tag 
                     size="small"
                     effect="plain"
-                    class="tag-type"
+                    :class="property.type === 'array' ? 'tag-array' : 'tag-type'"
                   >
                     {{ property.type }}
+                  </el-tag>
+                  <el-tag 
+                    v-if="property.type === 'array' && property.property?.items?.type"
+                    size="small"
+                    effect="plain"
+                    class="tag-array-items"
+                  >
+                    {{ Array.isArray(property.property.items.type) ? property.property.items.type[0] : property.property.items.type }}[]
                   </el-tag>
                 </div>
               </div>
@@ -1464,6 +1496,19 @@ onMounted(async () => {
                     background-color: theme.$gray_1;
                     border-color: theme.$gray_3;
                     color: theme.$gray_5;
+                  }
+                  
+                  :deep(.tag-array) {
+                    background-color: theme.$purple_tint;
+                    border-color: theme.$purple_0_7;
+                    color: theme.$purple_2;
+                  }
+                  
+                  :deep(.tag-array-items) {
+                    background-color: #f5f6f8;
+                    border-color: theme.$purple_0_7;
+                    color: theme.$purple_1;
+                    font-style: italic;
                   }
                 }
               }

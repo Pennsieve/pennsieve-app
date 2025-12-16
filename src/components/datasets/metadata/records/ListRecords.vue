@@ -568,6 +568,45 @@ const formatCellValue = (value, column) => {
     }
   }
   
+  // Handle arrays
+  if (column.type === 'array' || Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return '[]'
+      }
+      // For arrays, show count and preview of first few items
+      const preview = value.slice(0, 3).map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return '{...}'
+        }
+        return JSON.stringify(item)
+      }).join(', ')
+      
+      const suffix = value.length > 3 ? `, ... +${value.length - 3} more` : ''
+      return `[${preview}${suffix}]`
+    }
+    return String(value)
+  }
+  
+  // Handle objects
+  if (column.type === 'object' || (typeof value === 'object' && value !== null && !Array.isArray(value))) {
+    const keys = Object.keys(value)
+    if (keys.length === 0) {
+      return '{}'
+    }
+    // For objects, show key count and preview of first few keys
+    const preview = keys.slice(0, 2).map(key => {
+      const val = value[key]
+      const displayVal = val === null ? 'null' : 
+                        typeof val === 'object' ? '{...}' : 
+                        JSON.stringify(val)
+      return `${key}: ${displayVal}`
+    }).join(', ')
+    
+    const suffix = keys.length > 2 ? `, ... +${keys.length - 2} more` : ''
+    return `{${preview}${suffix}}`
+  }
+  
   return String(value)
 }
 

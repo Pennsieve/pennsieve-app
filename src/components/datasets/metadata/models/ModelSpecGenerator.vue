@@ -617,10 +617,8 @@ const handlePropertySave = ({ propertyName, propertySchema, required, oldPropert
       return
     }
 
-    if (propertySchema['x-pennsieve-sensitive'] === true && !required) {
-      ElMessage.error(`Property "${propertyName}" has x-pennsieve-sensitive set but is not marked as required`)
-      return
-    }
+    // Note: Sensitive data properties (x-pennsieve-sensitive) are allowed to be optional
+    // Only key properties must be required
 
     // Update schema
     const newProperties = { ...modelData.value.latest_version.schema.properties }
