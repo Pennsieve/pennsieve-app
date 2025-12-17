@@ -22,6 +22,8 @@
         fixed="left"
         min-width="200"
         :resizable="true"
+        sortable
+        :sort-orders="sortOrders"
       >
         <template #header> Name </template>
         <template #default="scope">
@@ -36,6 +38,8 @@
       <el-table-column
         prop="storage"
         label="Size"
+        sortable
+        :sort-orders="sortOrders"
       >
         <template #header> Size </template>
         <template #default="scope">
@@ -47,6 +51,8 @@
         prop="content.createdAt"
         label="Date Created"
         width="180"
+        sortable
+        :sort-orders="sortOrders"
       >
         <template #header> Date Created </template>
         <template #default="scope">
@@ -87,6 +93,7 @@ export default {
   data() {
     return {
       selection: [],
+      sortOrders: ["ascending", "descending"],
       lastClickedRow: null,
       shiftKeyPressed: false,
       selectionChangeTimeout: null,
