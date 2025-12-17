@@ -1006,7 +1006,7 @@ onMounted(async () => {
         padding: 6px 12px;
         color: theme.$purple_3;
         font-weight: 500;
-        font-size: 16px;
+        font-size: 14px;
         cursor: pointer;
         border-radius: 4px;
         transition: all 0.2s ease;
