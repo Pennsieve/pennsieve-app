@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage } from 'element-plus'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider } from 'element-plus'
+import { ArrowDown, View } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
-import ModelSelectorDialog from '../models/ModelSelectorDialog.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
@@ -65,7 +65,6 @@ const loadingVersions = ref(false)
 const loadingModels = ref(false)
 const modelError = ref('')
 const versionError = ref('')
-const modelSelectorVisible = ref(false)
 
 // Computed properties
 const tableColumns = computed(() => {
@@ -414,7 +413,7 @@ const onMultiFilterUpdate = (index, updatedFilter) => {
     
     // Convert each subfilter to API predicate format
     const predicates = validSubFilters.map(filter => ({
-      property: `/${filter.property}`, // JSON pointer format
+      property: `/${filter.property.replace(/\./g, '/')}`, // JSON pointer format: convert dots to slashes
       operator: filter.operator,
       value: filter.value
     }))
@@ -436,7 +435,7 @@ const onMultiFilterUpdate = (index, updatedFilter) => {
   // Handle single filter (backward compatibility)
   else if (updatedFilter && updatedFilter.property && updatedFilter.operator && updatedFilter.value) {
     const apiFilter = {
-      property: `/${updatedFilter.property}`, // JSON pointer format - must start with '/'
+      property: `/${updatedFilter.property.replace(/\./g, '/')}`, // JSON pointer format: convert dots to slashes
       operator: updatedFilter.operator,
       value: updatedFilter.value
     }
@@ -524,20 +523,30 @@ const onVersionChange = (version) => {
   fetchRecords(null, 'forward', true)
 }
 
-const openModelSelector = () => {
-  modelSelectorVisible.value = true
-}
+// Breadcrumb model selector doesn't need this function anymore
 
-const selectModel = (newModelId) => {
-  modelSelectorVisible.value = false
+const selectModel = (command) => {
+  // Check if it's a special command
+  if (typeof command === 'string' && command.startsWith('view-details:')) {
+    const targetModelId = command.split(':')[1]
+    router.push({
+      name: 'model-details',
+      params: {
+        orgId: router.currentRoute.value.params.orgId,
+        datasetId: props.datasetId,
+        modelId: targetModelId
+      }
+    })
+    return
+  }
   
-  // Navigate to the new model's records route
+  // Otherwise, it's a model selection - navigate to the new model's records route
   router.push({
     name: 'model-records-search',
     params: {
       orgId: router.currentRoute.value.params.orgId,
       datasetId: props.datasetId,
-      modelId: newModelId
+      modelId: command
     }
   })
 }
@@ -711,48 +720,79 @@ onMounted(async () => {
       <stage-actions>
         <template #left>
           <div class="left-wrapper">
-            <!-- Model Selector -->
-            <div class="model-selector-section">
-              <!--            <div class="model-label">Model</div>-->
-              <div class="model-title-content" @click="openModelSelector" :class="{ 'loading': loadingModels }">
-                <h3 v-if="model" class="model-title">{{ model.display_name || model.name }}</h3>
-                <div class="model-selector-icon" :class="{ 'loading': loadingModels }">
-                  <svg v-if="!loadingModels" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5H7z"/>
-                  </svg>
-                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="loading-spinner">
-                    <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
-                    <path d="M12,4a8,8,0,0,1,8,8" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <!-- Version Selector -->
-            <div class="version-selector-section">
-              <!--            <label class="selector-label">Version</label>-->
-              <el-select
-                :model-value="selectedVersion"
-                @update:model-value="onVersionChange"
-                placeholder="Choose version..."
-                :loading="loadingVersions"
-                :disabled="!versionOptions.length && !loadingVersions"
-                class="version-dropdown-compact"
-              >
-                <el-option
-                  v-for="version in versionOptions"
-                  :key="version.value"
-                  :label="version.label"
-                  :value="version.value"
-                >
-                  <div class="version-option">
-                    <div class="version-info">
-                      <span class="version-label">{{ version.label }}</span>
-                      <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
-                    </div>
-                  </div>
-                </el-option>
-              </el-select>
+            <!-- Breadcrumb Navigation with Model and Version Selectors -->
+            <div class="breadcrumb-nav">
+              <span class="breadcrumb-item">Models</span>
+              <span class="breadcrumb-separator">/</span>
+              
+              <!-- Model Dropdown -->
+              <el-dropdown trigger="click" @command="selectModel" :disabled="loadingModels">
+                <span class="breadcrumb-dropdown" :class="{ 'loading': loadingModels }">
+                  <span v-if="model">{{ model.display_name || model.name }}</span>
+                  <span v-else>Loading...</span>
+                  <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <!-- View Details option for current model -->
+                    <el-dropdown-item 
+                      :command="`view-details:${modelId}`"
+                      class="model-action-item"
+                    >
+                      <el-icon style="margin-right: 8px"><View /></el-icon>
+                      <span style="font-weight: 500">View Model Details</span>
+                    </el-dropdown-item>
+                    <el-divider style="margin: 6px 0" />
+                    
+                    <!-- Model selection items -->
+                    <el-dropdown-item 
+                      v-for="option in modelOptions" 
+                      :key="option.value"
+                      :command="option.value"
+                      :class="{ 'is-active': option.value === modelId }"
+                    >
+                      <div class="model-dropdown-item">
+                        <span class="model-name">{{ option.label }}</span>
+<!--                        <el-tag size="small" type="info">{{ option.count }} records</el-tag>-->
+                      </div>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <span class="breadcrumb-separator">/</span>
+              
+              <!-- Version Dropdown -->
+              <el-dropdown trigger="click" @command="onVersionChange" :disabled="loadingVersions || !versionOptions.length">
+                <span class="breadcrumb-dropdown version-dropdown" :class="{ 'loading': loadingVersions }">
+                  <span v-if="selectedVersion === 'all'">All Versions</span>
+                  <span v-else-if="selectedVersion === 'latest'">Latest (v{{ model?.latest_version?.version || 1 }})</span>
+                  <span v-else>Version {{ selectedVersion }}</span>
+                  <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item 
+                      v-for="version in versionOptions"
+                      :key="version.value"
+                      :command="version.value"
+                      :class="{ 'is-active': version.value === selectedVersion }"
+                    >
+                      <div class="version-dropdown-item">
+                        <div class="version-info-breadcrumb">
+                          <span class="version-name">{{ version.label }}</span>
+                          <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
+                        </div>
+                        <el-tag v-if="version.isAll" size="small" type="info">All</el-tag>
+                        <el-tag v-else-if="version.isLatest" size="small" type="info">Current</el-tag>
+                      </div>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <span class="breadcrumb-separator">/</span>
+              <span class="breadcrumb-item">Records</span>
             </div>
           </div>
 
@@ -768,15 +808,6 @@ onMounted(async () => {
         </template>
       </stage-actions>
     </template>
-    <!-- Model Selector Dialog -->
-    <ModelSelectorDialog
-      v-model:visible="modelSelectorVisible"
-      :models="modelOptions"
-      :current-model-id="modelId"
-      :loading="loadingModels"
-      @select="selectModel"
-      @cancel="modelSelectorVisible = false"
-    />
 
     <!-- Record Filters - Use MultiModelFilter with fixed model -->
     <multi-model-filter
@@ -948,7 +979,71 @@ onMounted(async () => {
       align-items: center;
       display: flex;
       flex-direction: row;
+      gap: 20px;
     }
+
+    // Breadcrumb navigation styling
+    .breadcrumb-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      
+      .breadcrumb-item {
+        color: theme.$gray_5;
+        font-weight: 500;
+      }
+      
+      .breadcrumb-separator {
+        color: theme.$gray_4;
+        font-size: 16px;
+      }
+      
+      .breadcrumb-dropdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        color: theme.$purple_3;
+        font-weight: 500;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        user-select: none;
+        
+        &:hover:not(.loading) {
+          background-color: theme.$gray_1;
+          color: theme.$purple_2;
+        }
+        
+        &.loading {
+          cursor: default;
+          opacity: 0.6;
+        }
+        
+        .el-icon {
+          font-size: 14px;
+          transition: transform 0.2s ease;
+        }
+        
+        &:hover:not(.loading) .el-icon {
+          transform: translateY(1px);
+        }
+      }
+      
+      // Dropdown is open
+      :deep(.el-dropdown.is-active) {
+        .breadcrumb-dropdown {
+          background-color: theme.$gray_1;
+          
+          .el-icon {
+            transform: rotate(180deg);
+          }
+        }
+      }
+    }
+    
 
     .model-selector-section,
     .version-selector-section {
@@ -1371,6 +1466,78 @@ onMounted(async () => {
     color: theme.$gray_4;
     font-style: italic;
     text-transform: lowercase;
+  }
+}
+
+// Custom dropdown styling for model selector breadcrumb
+:deep(.el-dropdown__popper) {
+  .el-dropdown-menu__item {
+    &.is-active {
+      background-color: theme.$purple_tint;
+      color: theme.$purple_3;
+      
+      .model-name, .version-name {
+        font-weight: 600;
+      }
+    }
+    
+    &:hover {
+      background-color: theme.$gray_1;
+    }
+  }
+}
+
+// Model dropdown item styling - separate selector to ensure it applies
+:deep(.model-dropdown-item) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 250px;
+  padding: 4px 0;
+  
+  .model-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .el-tag {
+    flex-shrink: 0;
+  }
+}
+
+// Version dropdown item styling - separate selector to ensure it applies
+:deep(.version-dropdown-item) {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 250px;
+  padding: 4px 0;
+  
+  .version-info-breadcrumb {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    
+    .version-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .version-date {
+      font-size: 12px;
+      color: theme.$gray_4;
+    }
+  }
+  
+  .el-tag {
+    flex-shrink: 0;
   }
 }
 </style>
