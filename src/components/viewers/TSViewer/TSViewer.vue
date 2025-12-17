@@ -114,7 +114,6 @@
     <TsViewerLayerWindow
       :visible="annotationLayerWindowOpen"
       @close-window="onCloseAnnotationLayerWindow"
-      @create-layer="onCreateAnnotationLayer"
     />
   </div>
 </template>
@@ -512,10 +511,6 @@ const onAddAnnotation = (
 
 const onAnnotationCreated = () => {
   viewerCanvas.value.renderAnnotationCanvas();
-};
-
-const onCreateAnnotationLayer = (newLayer) => {
-  viewerCanvas.value.createAnnotationLayer(newLayer, activeViewer.value);
 };
 
 const onCloseAnnotationLayerWindow = () => {
