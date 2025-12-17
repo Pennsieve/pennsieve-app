@@ -1,9 +1,5 @@
 <script setup>
 
-import {onMounted} from "vue";
-import {useStore} from "vuex";
-import RelationshipCreationWidget from '@/components/datasets/metadata/shared/RelationshipCreationWidget.vue'
-
 const props = defineProps({
   orgId: {
     type: String,

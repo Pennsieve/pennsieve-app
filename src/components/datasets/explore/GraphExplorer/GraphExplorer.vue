@@ -61,6 +61,7 @@
             @update-filter="updateFilter"
             @remove-filter="removeFilter"
             @model-change="onModelChange"
+            @clear-filter="clearFilter"
           />
         </div>
         
@@ -391,45 +392,33 @@ const canExecuteQuery = computed(() => {
 const isSelectedNodePackage = computed(() => {
   if (!selectedRecord.value) return false
   
-  console.log('🔍 Checking if selected node is package:', selectedRecord.value)
   
   // First check the nodeType which is now preserved from our node structure
-  console.log('📦 Node nodeType:', selectedRecord.value.nodeType)
   if (selectedRecord.value.nodeType === 'package') {
-    console.log('✅ Detected package by nodeType field')
     return true
   }
   
   // Fallback: Node ID starts with 'package-'
   const nodeId = selectedRecord.value.nodeId || selectedRecord.value.id
-  console.log('📦 Node ID:', nodeId)
   if (typeof nodeId === 'string' && nodeId.startsWith('package-')) {
-    console.log('✅ Detected package by ID pattern')
     return true
   }
   
   // Fallback: Node has type field set to 'package' (from the data)
-  console.log('📦 Node type:', selectedRecord.value.type)
   if (selectedRecord.value.type === 'package') {
-    console.log('✅ Detected package by type field')
     return true
   }
   
   // Fallback: Node lacks model field (packages don't have models, records do)
   // AND has properties typical of packages
-  console.log('📦 Node model:', selectedRecord.value.model)
-  console.log('📦 Node size:', selectedRecord.value.size)
-  console.log('📦 Node name:', selectedRecord.value.name)
   if (!selectedRecord.value.model && (
     selectedRecord.value.size !== undefined || 
     selectedRecord.value.name !== undefined ||
     selectedRecord.value.type !== undefined
   )) {
-    console.log('✅ Detected package by missing model + package properties')
     return true
   }
   
-  console.log('❌ Not detected as package')
   return false
 })
 
@@ -452,7 +441,31 @@ const onModelChange = async (filterIndex, modelId) => {
 // Update filter helper
 const updateFilter = (filterIndex, updatedFilter) => {
   if (queryFilters.value[filterIndex]) {
-    queryFilters.value[filterIndex] = updatedFilter
+    // If the model is cleared and we have multiple filters, remove this filter
+    if (!updatedFilter.model && updatedFilter.model !== 0 && queryFilters.value.length > 1) {
+      removeFilter(filterIndex)
+    } else {
+      // For single filter or when updating, replace the entire queryFilters array
+      // to ensure Vue detects the change
+      queryFilters.value = queryFilters.value.map((filter, idx) => {
+        if (idx === filterIndex) {
+          // Return a completely new filter object, preserving multi-filter properties
+          return {
+            id: updatedFilter.model ? updatedFilter.id : Date.now(), // Force new ID when model is cleared
+            model: updatedFilter.model || '',
+            property: updatedFilter.property || '',
+            operator: updatedFilter.operator || '',
+            value: updatedFilter.value || '',
+            modelProperties: updatedFilter.modelProperties || [],
+            // Preserve multi-filter properties
+            hasMultipleFilters: updatedFilter.hasMultipleFilters || false,
+            subFilters: updatedFilter.subFilters || null,
+            logicalOperator: updatedFilter.logicalOperator || null
+          }
+        }
+        return filter
+      })
+    }
   }
 }
 
@@ -511,6 +524,24 @@ const addFilter = () => {
 const removeFilter = (index) => {
   if (queryFilters.value.length > 1) {
     queryFilters.value.splice(index, 1)
+  }
+}
+
+// Clear a specific filter (for when X is clicked on model)
+const clearFilter = (index) => {
+  // If this is the only filter, reset it to empty state
+  if (queryFilters.value.length === 1) {
+    queryFilters.value[0] = {
+      id: Date.now(),
+      model: '',
+      property: '',
+      operator: '',
+      value: '',
+      modelProperties: []
+    }
+  } else {
+    // If there are multiple filters, remove this one
+    removeFilter(index)
   }
 }
 
@@ -580,7 +611,6 @@ const executeQuery = async () => {
 
             if (validSubFilters.length === 0) {
               // No valid filters - fetch all records for the model (don't set options.filter)
-              console.log(`No valid sub-filters for model ${multiModelFilter.model}, fetching all records`)
             } else if (validSubFilters.length === 1) {
               // Single sub-filter - use it directly
               const subFilter = validSubFilters[0]
@@ -592,25 +622,12 @@ const executeQuery = async () => {
             } else {
               // Multiple sub-filters - combine with the logical operator using the correct API format
               const subFilterPredicates = validSubFilters.map(subFilter => {
-                console.log('🔍 Processing subFilter:', {
-                  property: subFilter.property,
-                  operator: subFilter.operator,
-                  originalValue: subFilter.value,
-                  valueType: typeof subFilter.value,
-                  modelProperties: multiModelFilter.modelProperties?.map(p => ({ name: p.name, type: p.type, description: p.description }))
-                })
                 const parsedValue = parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
-                console.log('🔍 After parseValue:', {
-                  property: subFilter.property,
-                  parsedValue,
-                  parsedValueType: typeof parsedValue
-                })
                 const predicate = {
                   property: convertToJsonPath(subFilter.property, multiModelFilter.model),
                   operator: subFilter.operator,
                   value: parsedValue
                 }
-                console.log('🔍 Final predicate:', predicate)
                 return predicate
               }).filter(predicate => predicate.value !== null) // Filter out null values
 
@@ -620,7 +637,7 @@ const executeQuery = async () => {
               options.filter = {
                 [logicalOp]: subFilterPredicates
               }
-
+              
             }
           } else {
             // Single filter (legacy format or single filter in new format)
@@ -632,7 +649,7 @@ const executeQuery = async () => {
               }
             } else {
               // No valid single filter - fetch all records for the model (don't set options.filter)
-              console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
+              // console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
             }
           }
 
@@ -735,12 +752,6 @@ const parseValue = (value, operator, propertyName, modelProperties, modelId) => 
   // If not found, try nested property lookup using the schema
   if (!property && propertyName && propertyName.includes('.') && modelId) {
     propertyType = getNestedPropertyType(propertyName, modelId)
-    console.log('🔍 Nested property lookup:', {
-      propertyName,
-      modelId,
-      resolvedType: propertyType,
-      originalValue: value
-    })
   }
 
   // Fallback to simple property name lookup
@@ -786,15 +797,6 @@ const parseValue = (value, operator, propertyName, modelProperties, modelId) => 
   }
   
   if (propertyType === 'boolean') {
-    console.log('🔍 Boolean conversion debug:', {
-      propertyName,
-      originalValue: value,
-      valueType: typeof value,
-      property,
-      propertyType,
-      modelProperties: modelProperties?.map(p => ({ name: p.name, type: p.type })),
-      convertedValue: value === 'true' || value === true
-    })
     return value === 'true' || value === true
   }
   
@@ -890,28 +892,174 @@ const expandNode = async (nodeId) => {
       return
     }
     
-    
     loading.value = true
     
-    // Fetch relationships for this record
-    const relationships = await fetchRecordRelationships(node.data.id)
+    // Handle package nodes differently from record nodes
+    if (node.type === 'package') {
+      await expandPackageNode(node)
+    } else {
+      // Fetch relationships for this record
+      const relationships = await fetchRecordRelationships(node.data.id)
+      
+      // Fetch packages for this record
+      const packages = await fetchRecordPackages(node.data.id)
+      
+      // Add new nodes and edges
+      const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
+      
+      // Track expansion for proper collapse behavior
+      nodeExpansionMap.value.set(nodeId, {
+        children: addedChildren,
+        edges: addedEdges
+      })
+      
+      // Mark as expanded
+      expandedNodes.value.add(nodeId)
+      node.data.expanded = true
+      
+      // Update the graph display
+      updateGraph()
+      
+      // Save state after node expansion
+      saveStateToStore()
+      
+      // Start animated force simulation after node expansion (only in Force mode)
+      if (currentLayout.value === 'Force') {
+        await startBackgroundForceSimulation()
+      }
+      
+    }
+
+  } catch (error) {
+    console.error('❌ Error expanding node:', error)
+    ElMessage.error(`Failed to expand node: ${error.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const expandPackageNode = async (packageNode) => {
+  try {
     
-    // Fetch packages for this record
-    const packages = await fetchRecordPackages(node.data.id)
+    // Check if package node is already expanded
+    if (expandedNodes.value.has(packageNode.id)) {
+      collapseNode(packageNode.id)
+      return
+    }
     
-    // Add new nodes and edges
-    const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
+    // Extract package ID from the node data
+    const packageId = packageNode.data.package?.node_id || packageNode.data.id
+    
+    if (!packageId) {
+      console.error('❌ No package ID found for expansion')
+      ElMessage.error('Package ID not found')
+      return
+    }
+    
+    
+    // Fetch connected records for this package using the metadata store
+    const response = await metadataStore.fetchPackageConnectedRecords(props.datasetId, packageId)
+    const connectedRecords = response?.records || response || []
+    
+    
+    if (!connectedRecords.length) {
+      ElMessage.info('No connected records found for this package')
+      return
+    }
+    
+    // Add connected records as nodes around the package
+    const addedChildren = new Set()
+    const addedEdges = new Set()
+    
+    // Get current position of parent package node from Sigma graph
+    const currentPackageAttrs = graph.value.getNodeAttributes(packageNode.id)
+    const currentPackagePosition = {
+      x: currentPackageAttrs.x || packageNode.position?.x || 0,
+      y: currentPackageAttrs.y || packageNode.position?.y || 0
+    }
+    
+    // Add color assignment for any new models
+    const uniqueModelIds = [...new Set(connectedRecords.map(r => r.model_id).filter(id => id))]
+    if (uniqueModelIds.length > 0) {
+      const existingModels = new Set(Array.from(modelColorAssignment.value.keys() || []))
+      const newModels = uniqueModelIds.filter(id => !existingModels.has(id))
+      if (newModels.length > 0) {
+        const newColorAssignment = createModelColorAssignment([...displayedModels.value, ...newModels])
+        // Preserve existing color assignments
+        modelColorAssignment.value.forEach((color, modelId) => {
+          if (newColorAssignment.has(modelId)) {
+            newColorAssignment.set(modelId, color)
+          }
+        })
+        modelColorAssignment.value = newColorAssignment
+        displayedModels.value = [...displayedModels.value, ...newModels]
+      }
+    }
+    
+    // Position connected records in a circle around the package
+    const recordRadius = Math.min(120, Math.max(80, connectedRecords.length * 20))
+    
+    connectedRecords.forEach((record, index) => {
+      const recordId = `record-${record.id}`
+      const existingNode = nodes.value.find(n => n.id === recordId)
+      
+      // Create node only if it doesn't exist
+      if (!existingNode) {
+        const recordAngle = (index / connectedRecords.length) * 2 * Math.PI
+        
+        const newNode = {
+          id: recordId,
+          type: 'record',
+          position: {
+            x: currentPackagePosition.x + Math.cos(recordAngle) * recordRadius,
+            y: currentPackagePosition.y + Math.sin(recordAngle) * recordRadius
+          },
+          data: {
+            id: record.id,
+            label: getRecordLabel(record, record.model_id),
+            model: record.model_id,
+            properties: record.value || record.properties || record.values || {},
+            relationships: [],
+            expanded: false
+          }
+        }
+        
+        nodes.value.push(newNode)
+        addedChildren.add(recordId)
+      } else {
+      }
+      
+      // Always create edge from record to package (record "has" package)
+      const edgeId = `${recordId}-${packageNode.id}`
+      
+      // Check if edge already exists
+      if (!edges.value.find(e => e.id === edgeId)) {
+        const newEdge = {
+          id: edgeId,
+          source: recordId,
+          target: packageNode.id,
+          type: 'package-record',
+          data: {
+            type: 'package-record',
+            direction: 'inbound' // From package perspective: package is owned by record
+          }
+        }
+        
+        edges.value.push(newEdge)
+        addedEdges.add(edgeId)
+      } else {
+      }
+    })
     
     // Track expansion for proper collapse behavior
-    nodeExpansionMap.value.set(nodeId, {
+    nodeExpansionMap.value.set(packageNode.id, {
       children: addedChildren,
       edges: addedEdges
     })
     
     // Mark as expanded
-    expandedNodes.value.add(nodeId)
-    node.data.expanded = true
-    
+    expandedNodes.value.add(packageNode.id)
+    packageNode.data.expanded = true
     
     // Update the graph display
     updateGraph()
@@ -924,14 +1072,11 @@ const expandNode = async (nodeId) => {
       await startBackgroundForceSimulation()
     }
     
-    // Debug: Log locked nodes after expansion
-    console.log('🔒 Locked nodes after expansion:', Array.from(lockedNodes.value))
-
+    ElMessage.success(`Added ${connectedRecords.length} connected records`)
+    
   } catch (error) {
-    console.error('❌ Error expanding node:', error)
-    ElMessage.error(`Failed to expand node: ${error.message}`)
-  } finally {
-    loading.value = false
+    console.error('❌ Error expanding package node:', error)
+    ElMessage.error(`Failed to expand package: ${error.message}`)
   }
 }
 
@@ -962,7 +1107,6 @@ const fetchRecordRelationships = async (recordId) => {
       ]
       // Debug the structure of individual relationships
       if (allRelationships.length > 0) {
-        console.log('🔍 Found relationships with new API structure:', allRelationships.length)
       }
       return allRelationships
     } else if (relationships && (relationships.inbound || relationships.outbound)) {
@@ -993,21 +1137,18 @@ const fetchRecordRelationships = async (recordId) => {
 
 const fetchRecordPackages = async (recordId) => {
   try {
-    console.log('🔍 Fetching packages for record:', recordId)
     // Use the metadata store method
     const packages = await metadataStore.fetchRecordPackages(props.datasetId, recordId)
     
-    console.log('📦 Raw packages response:', packages)
     
     // Handle different response structures
     if (Array.isArray(packages)) {
-      console.log('✅ Found packages (array):', packages.length)
       return packages
     } else if (packages && Array.isArray(packages.packages)) {
-      console.log('✅ Found packages (nested):', packages.packages.length)
+      // console.log('✅ Found packages (nested):', packages.packages.length)
       return packages.packages
     } else if (packages && Array.isArray(packages.data)) {
-      console.log('✅ Found packages (data):', packages.data.length)
+      // console.log('✅ Found packages (data):', packages.data.length)
       return packages.data
     } else {
       console.warn('⚠️ Unexpected packages structure:', packages)
@@ -1202,10 +1343,7 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
               package: packageData
             }
           }
-          console.log('📦 Creating package node:', packageId)
-          console.log('📦 Package data being stored:', packageData)
-          console.log('📦 newNode.data.package:', newNode.data.package)
-          console.log('📦 newNode.data.package.node_id:', newNode.data.package?.node_id)
+
           nodes.value.push(newNode)
           
           // Only track nodes that were actually created during this expansion
@@ -1226,6 +1364,10 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
               stroke: '#6B7280', // gray for packages
               strokeWidth: 1,
               strokeDasharray: '5,5' // dashed line for packages
+            },
+            data: {
+              type: 'record-package',
+              direction: 'outbound' // From record perspective: record "has" package
             }
           })
           
@@ -1504,6 +1646,11 @@ const getModelName = (modelId) => {
 
 // Get model color for legend
 const getModelColorForLegend = (modelId) => {
+  // Defensive check to ensure modelColorAssignment is a Map
+  if (!modelColorAssignment.value || typeof modelColorAssignment.value.get !== 'function') {
+    console.warn('⚠️ modelColorAssignment is not a Map, reinitializing')
+    modelColorAssignment.value = new Map()
+  }
   return modelColorAssignment.value.get(modelId) || getModelColor(modelId)
 }
 
@@ -1686,15 +1833,6 @@ const initializeGraph = () => {
         // Check if this edge connects to the selected node
         const connectsToSelected = edgeSource === selectedNodeId || edgeTarget === selectedNodeId
 
-        console.log('🔍 Edge coloring debug:', {
-          edgeKey,
-          edgeSource,
-          edgeTarget,
-          selectedNodeId,
-          connectsToSelected,
-          direction: data.direction,
-          dataType: data.type
-        })
 
         if (connectsToSelected && edgeSource && edgeTarget) {
           // Determine direction relative to the selected node
@@ -1705,16 +1843,16 @@ const initializeGraph = () => {
 
           if (isOutboundFromSelected) {
             baseColor = '#22c55e' // green for outbound from selected node
-            console.log('✅ Coloring edge green (outbound from selected)')
+            // console.log('✅ Coloring edge green (outbound from selected)')
           } else if (isInboundToSelected) {
             baseColor = '#3b82f6' // blue for inbound to selected node
-            console.log('✅ Coloring edge blue (inbound to selected)')
+            // console.log('✅ Coloring edge blue (inbound to selected)')
           }
         }
       }
       
       // Package edges stay grey regardless of selection
-      if (data.type === 'package') {
+      if (data.type === 'record-package') {
         baseColor = '#6b7280' // gray for package edges
       }
 
@@ -1727,7 +1865,6 @@ const initializeGraph = () => {
   
   // Add click handlers
   sigmaInstance.value.on('clickNode', (event) => {
-    console.log('🖱️ Node clicked! isDragging:', isDragging.value)
     if (!isDragging.value) {
       const nodeId = event.node
       const nodeAttributes = graph.value.getNodeAttributes(nodeId)
@@ -1737,15 +1874,9 @@ const initializeGraph = () => {
       // The modifier keys are in event.event.original (PointerEvent)
       const originalEvent = event.event?.original
       const hasModifier = originalEvent?.ctrlKey || originalEvent?.metaKey
-      console.log('🔑 Modifier key check - hasModifier:', hasModifier, 'ctrlKey:', originalEvent?.ctrlKey, 'metaKey:', originalEvent?.metaKey)
-      
+
       if (hasModifier) {
         // Modifier + click = open sidebar
-        console.log('🔍 Node click debug:')
-        console.log('   - Clicked nodeId:', nodeId, typeof nodeId)
-        console.log('   - Available node IDs:', nodes.value.map(n => n.id))
-        console.log('   - Node attributes:', nodeAttributes)
-        
         // Find the full node data from our nodes array
         // Try exact match first, then try package ID pattern match
         let fullNodeData = nodes.value.find(n => n.id === nodeId)
@@ -1753,7 +1884,6 @@ const initializeGraph = () => {
         if (!fullNodeData && typeof nodeId === 'number') {
           // Try to find package node by numeric ID
           fullNodeData = nodes.value.find(n => n.id === `package-${nodeId}`)
-          console.log('   - Tried package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
         }
         
         if (!fullNodeData && typeof nodeId === 'string') {
@@ -1761,13 +1891,8 @@ const initializeGraph = () => {
           const numericId = nodeId.replace('package-', '')
           if (numericId !== nodeId) {
             fullNodeData = nodes.value.find(n => n.id === `package-${numericId}`)
-            console.log('   - Tried reverse package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
           }
         }
-        
-        console.log('   - Final fullNodeData:', fullNodeData)
-        console.log('   - fullNodeData.data:', fullNodeData?.data)
-        console.log('   - fullNodeData.data.package:', fullNodeData?.data?.package)
         
         // Use the full node data if available, otherwise fall back to attributes
         selectedRecord.value = fullNodeData ? { 
@@ -1775,9 +1900,6 @@ const initializeGraph = () => {
           ...fullNodeData.data,
           nodeType: fullNodeData.type // Preserve the node type
         } : nodeAttributes
-        
-        console.log('   - Final selectedRecord:', selectedRecord.value)
-        console.log('   - selectedRecord.package:', selectedRecord.value?.package)
         
         showDetailsPanel.value = true
       } else {
@@ -2473,7 +2595,6 @@ const initializeConnectedNodeDragging = (draggedNodeId) => {
       }
     })
 
-    console.log(`🔗 Initialized dragging for ${connectedNodeOffsets.value.size} connected nodes`)
   } catch (error) {
     console.warn('⚠️ Error initializing connected node dragging:', error)
     connectedNodeOffsets.value.clear()
@@ -2798,7 +2919,18 @@ const restoreStateFromStore = () => {
     
     // Restore model data
     displayedModels.value = graphStore.currentDisplayedModels
-    modelColorAssignment.value = graphStore.currentModelColorAssignment
+    // Ensure modelColorAssignment is restored as a Map
+    const storedModelColors = graphStore.currentModelColorAssignment
+    if (storedModelColors && typeof storedModelColors === 'object') {
+      if (storedModelColors instanceof Map) {
+        modelColorAssignment.value = storedModelColors
+      } else {
+        // Convert plain object to Map
+        modelColorAssignment.value = new Map(Object.entries(storedModelColors))
+      }
+    } else {
+      modelColorAssignment.value = new Map()
+    }
     
     // Restore selection state
     selectedRecord.value = graphStore.currentSelectedRecord
