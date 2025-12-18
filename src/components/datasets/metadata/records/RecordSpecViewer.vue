@@ -3,17 +3,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useRecordData } from '@/composables/useRecordData.js'
 
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
-import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
-import IconTrash from "@/components/icons/IconTrash.vue";
+import IconTrash from "@/components/icons/IconTrash.vue"
+import RecordTimeline from './RecordTimeline.vue'
+import RecordHeader from './RecordHeader.vue'
 
 const props = defineProps({
   datasetId: {
@@ -28,6 +29,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  as_of: {
+    type: String,
+    required: false
+  },
   noPadding: {
     type: Boolean,
     default: false
@@ -36,14 +41,32 @@ const props = defineProps({
 
 const metadataStore = useMetadataStore()
 const router = useRouter()
+const route = useRoute()
 
 // Reactive data
 const record = ref(null)
 const model = ref(null)
+const relationships = ref({ inbound: [], outbound: [] })
+const recordHistory = ref([])
+const historyHasMore = ref(false)
+const historyLoading = ref(false)
+const historyCursor = ref(null)
 const loading = ref(false)
 const error = ref('')
 const viewMode = ref('ui') // 'ui' or 'json'
 const packages = ref([])
+
+// Timeline preview state
+const previewTimestamp = ref(null) // For single-click preview without navigation
+const previewRecord = ref(null) // Preview record data
+const previewRelationships = ref({ inbound: [], outbound: [] }) // Preview relationships
+const previewPackages = ref([]) // Preview packages
+const previewLoading = ref(false) // Preview loading state
+let clickTimeout = null // For handling click vs double-click
+
+// Timeline cutoff state for double-click behavior
+const timelineCutoffTimestamp = ref(null)
+
 
 // Dropdown state
 const quickActionsVisible = ref(true)
@@ -51,6 +74,7 @@ const quickActionsVisible = ref(true)
 // Pagination state
 const inboundCurrentPage = ref(1)
 const outboundCurrentPage = ref(1)
+const packagesCurrentPage = ref(1)
 const pageSize = 25
 
 
@@ -60,10 +84,14 @@ const currentRecordDisplayName = computed(() => {
   return getRecordDisplayValue(record.value)
 })
 
-// Computed properties
+// Computed properties with preview support
+const currentRecord = computed(() => {
+  return previewRecord.value || record.value
+})
+
 const recordData = computed(() => {
-  if (!record.value) return null
-  return record.value.value || {}
+  if (!currentRecord.value) return null
+  return currentRecord.value.value || {}
 })
 
 const modelSchema = computed(() => {
@@ -86,35 +114,36 @@ const recordProperties = computed(() => {
 })
 
 const recordMetadata = computed(() => {
-  if (!record.value) return null
+  if (!currentRecord.value) return null
   
   return {
-    id: record.value.id,
-    created_at: record.value.created_at,
-    updated_at: record.value.updated_at,
-    model_version: record.value.model_version,
-    created_by: record.value.created_by,
-    updated_by: record.value.updated_by
+    id: currentRecord.value.id,
+    created_at: currentRecord.value.created_at,
+    updated_at: currentRecord.value.updated_at,
+    model_version: currentRecord.value.model_version,
+    created_by: currentRecord.value.created_by,
+    updated_by: currentRecord.value.updated_by
   }
 })
 
-const relationships = computed(() => {
-  if (!record.value?.relationships) return { inbound: [], outbound: [] }
-  
-  // Ensure both arrays exist, defaulting to empty arrays if not present
-  return {
-    inbound: record.value.relationships.inbound || [],
-    outbound: record.value.relationships.outbound || []
-  }
+// Remove the old computed property that relied on record.relationships
+// Now we use the separate relationships ref that's fetched independently with preview support
+
+const currentRelationships = computed(() => {
+  return previewTimestamp.value ? previewRelationships.value : relationships.value
+})
+
+const currentPackages = computed(() => {
+  return previewTimestamp.value ? previewPackages.value : packages.value
 })
 
 const hasRelationships = computed(() => {
-  const rels = relationships.value
+  const rels = currentRelationships.value
   return (rels.inbound && rels.inbound.length > 0) || (rels.outbound && rels.outbound.length > 0)
 })
 
 const relationshipsSummary = computed(() => {
-  const rels = relationships.value
+  const rels = currentRelationships.value
   return {
     inbound: rels.inbound ? rels.inbound.length : 0,
     outbound: rels.outbound ? rels.outbound.length : 0,
@@ -124,14 +153,14 @@ const relationshipsSummary = computed(() => {
 
 // Paginated relationships
 const paginatedInboundRelationships = computed(() => {
-  const rels = relationships.value.inbound || []
+  const rels = currentRelationships.value.inbound || []
   const start = (inboundCurrentPage.value - 1) * pageSize
   const end = start + pageSize
   return rels.slice(start, end)
 })
 
 const paginatedOutboundRelationships = computed(() => {
-  const rels = relationships.value.outbound || []
+  const rels = currentRelationships.value.outbound || []
   const start = (outboundCurrentPage.value - 1) * pageSize
   const end = start + pageSize
   return rels.slice(start, end)
@@ -139,7 +168,7 @@ const paginatedOutboundRelationships = computed(() => {
 
 // Pagination info
 const inboundPagination = computed(() => {
-  const total = relationships.value.inbound?.length || 0
+  const total = currentRelationships.value.inbound?.length || 0
   return {
     total,
     totalPages: Math.ceil(total / pageSize),
@@ -149,7 +178,7 @@ const inboundPagination = computed(() => {
 })
 
 const outboundPagination = computed(() => {
-  const total = relationships.value.outbound?.length || 0
+  const total = currentRelationships.value.outbound?.length || 0
   return {
     total,
     totalPages: Math.ceil(total / pageSize),
@@ -158,13 +187,38 @@ const outboundPagination = computed(() => {
   }
 })
 
+// Paginated packages
+const paginatedPackages = computed(() => {
+  const start = (packagesCurrentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return currentPackages.value.slice(start, end)
+})
+
+// Package pagination info
+const packagesPagination = computed(() => {
+  const total = currentPackages.value.length
+  return {
+    total,
+    totalPages: Math.ceil(total / pageSize),
+    currentPage: packagesCurrentPage.value,
+    showPagination: total > pageSize
+  }
+})
+
+const hasHistory = computed(() => recordHistory.value.length > 0)
+
+
 // Methods
 const fetchRecord = async () => {
   loading.value = true
   error.value = ''
   
   try {
-    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId)
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId, options)
     record.value = response
   } catch (err) {
     console.error('Error fetching record:', err)
@@ -186,12 +240,62 @@ const fetchModel = async () => {
 
 const fetchPackages = async () => {
   try {
-    const response = await metadataStore.fetchRecordPackages(props.datasetId, props.recordId)
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId, options)
     packages.value = response || []
   } catch (err) {
     console.error('Error fetching packages:', err)
     // Don't show error for packages as it's not critical
     packages.value = []
+  }
+}
+
+const fetchRelationships = async () => {
+  try {
+    const options = {}
+    if (props.as_of) {
+      options.as_of = props.as_of
+    }
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId, options)
+    relationships.value = response || { inbound: [], outbound: [] }
+  } catch (err) {
+    console.error('Error fetching relationships:', err)
+    // Don't show error for relationships, just leave empty
+    relationships.value = { inbound: [], outbound: [] }
+  }
+}
+
+const fetchRecordHistory = async (cursor = null) => {
+  try {
+    historyLoading.value = true
+    const options = cursor ? { cursor } : {}
+    // Never use as_of for initial load - always fetch the full timeline
+    // Only use as_of when loading more via the loadMoreHistory function
+    const response = await metadataStore.fetchRecordHistory(props.datasetId, props.recordId, options)
+    
+    if (cursor) {
+      // Append older versions to existing history
+      recordHistory.value = [...recordHistory.value, ...(response.records || [])]
+    } else {
+      // Initial load - replace history
+      recordHistory.value = response.records || []
+    }
+    
+    historyHasMore.value = response.hasMore || false
+    historyCursor.value = response.cursor || null
+  } catch (err) {
+    console.error('Error fetching record history:', err)
+    if (!cursor) {
+      // Don't show error for history, just leave empty on initial load
+      recordHistory.value = []
+    }
+    historyHasMore.value = false
+    historyCursor.value = null
+  } finally {
+    historyLoading.value = false
   }
 }
 
@@ -371,6 +475,230 @@ const handleInboundPageChange = (page) => {
 
 const handleOutboundPageChange = (page) => {
   outboundCurrentPage.value = page
+}
+
+const handlePackagesPageChange = (page) => {
+  packagesCurrentPage.value = page
+}
+
+// Load more history versions
+const loadMoreHistory = async () => {
+  if (!historyHasMore.value || historyLoading.value) return
+  
+  try {
+    historyLoading.value = true
+    // Use current preview timestamp as as_of if we're in preview mode
+    const options = { cursor: historyCursor.value }
+    if (previewTimestamp.value) {
+      options.as_of = previewTimestamp.value
+    }
+    
+    const response = await metadataStore.fetchRecordHistory(props.datasetId, props.recordId, options)
+    
+    // Append older versions to existing history
+    recordHistory.value = [...recordHistory.value, ...(response.records || [])]
+    
+    historyHasMore.value = response.hasMore || false
+    historyCursor.value = response.cursor || null
+  } catch (err) {
+    console.error('Error loading more history:', err)
+    historyHasMore.value = false
+    historyCursor.value = null
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+
+// Timeline preview - update current node display without navigation (single click)
+const previewHistoryRecord = async (historyRecord) => {
+  console.log('Preview history record:', historyRecord)
+  previewTimestamp.value = historyRecord.created_at
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: historyRecord.created_at }
+  })
+  
+  try {
+    // Fetch historical record, relationships, and packages in parallel
+    await Promise.all([
+      fetchPreviewRecord(historyRecord.created_at),
+      fetchPreviewRelationships(historyRecord.created_at),
+      fetchPreviewPackages(historyRecord.created_at)
+    ])
+  } catch (err) {
+    console.error('Error fetching preview data:', err)
+    // Clear preview state on error
+    previewTimestamp.value = null
+    previewRecord.value = null
+    previewRelationships.value = { inbound: [], outbound: [] }
+    previewPackages.value = []
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+// Fetch preview data functions
+const fetchPreviewRecord = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchRecord(props.datasetId, props.modelId, props.recordId, { as_of: timestamp })
+    previewRecord.value = response
+  } catch (err) {
+    console.error('Error fetching preview record:', err)
+    previewRecord.value = null
+  }
+}
+
+const fetchPreviewRelationships = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchAllRecordRelationships(props.datasetId, props.recordId, { as_of: timestamp })
+    previewRelationships.value = response || { inbound: [], outbound: [] }
+  } catch (err) {
+    console.error('Error fetching preview relationships:', err)
+    previewRelationships.value = { inbound: [], outbound: [] }
+  }
+}
+
+const fetchPreviewPackages = async (timestamp) => {
+  try {
+    const response = await metadataStore.fetchAllRecordPackages(props.datasetId, props.recordId, { as_of: timestamp })
+    previewPackages.value = response || []
+  } catch (err) {
+    console.error('Error fetching preview packages:', err)
+    previewPackages.value = []
+  }
+}
+
+// Timeline navigation - set cutoff to selected timestamp (double click)
+const goToHistoryRecord = (historyRecord) => {
+  console.log('Set timeline cutoff to:', historyRecord)
+  
+  // Cancel any pending preview timeout
+  if (clickTimeout) {
+    clearTimeout(clickTimeout)
+    clickTimeout = null
+  }
+  
+  // Set cutoff timestamp to hide newer nodes and reposition timeline
+  timelineCutoffTimestamp.value = historyRecord.created_at
+  
+  // Set preview to the selected node
+  previewTimestamp.value = historyRecord.created_at
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: historyRecord.created_at }
+  })
+  
+  try {
+    // Fetch historical record, relationships, and packages in parallel
+    Promise.all([
+      fetchPreviewRecord(historyRecord.created_at),
+      fetchPreviewRelationships(historyRecord.created_at),
+      fetchPreviewPackages(historyRecord.created_at)
+    ]).finally(() => {
+      previewLoading.value = false
+    })
+  } catch (err) {
+    console.error('Error fetching cutoff data:', err)
+    previewLoading.value = false
+  }
+}
+
+// Navigate to the latest version of the record (remove as_of parameter)
+const goToLatestVersion = async () => {
+  console.log('Navigate to latest version')
+  
+  // Clear preview state if in preview mode
+  if (previewTimestamp.value) {
+    clearPreview()
+  }
+  
+  // Clear timeline cutoff if set
+  if (timelineCutoffTimestamp.value) {
+    timelineCutoffTimestamp.value = null
+  }
+  
+  // Check if we need to refresh data - either we have as_of param or we were in preview mode
+  const hasAsOfParam = route.query.as_of && route.query.as_of !== ''
+  const wasInPreviewMode = previewTimestamp.value !== null
+  
+  if (!hasAsOfParam && !wasInPreviewMode) {
+    // Already on current version and not in preview, no need to refresh
+    return
+  }
+  
+  // Update URL to remove as_of parameter without page navigation
+  const query = { ...route.query }
+  delete query.as_of
+  await router.replace({ query })
+  
+  // Always refresh all data to show latest version when clicking Current
+  console.log('Refreshing data to latest version')
+  await Promise.all([
+    fetchRecord(),
+    fetchRelationships(),  
+    fetchPackages(),
+    fetchRecordHistory() // Also refresh history to ensure we have latest timeline
+  ])
+}
+
+// Format timestamp for display
+const formatTimestamp = (timestamp) => {
+  try {
+    return new Date(timestamp).toLocaleString()
+  } catch {
+    return timestamp
+  }
+}
+
+// Handle timeline track click for preview at timestamp - now handled by RecordTimeline component
+const handleTimelineTrackClick = async (timestamp) => {
+  console.log('Timeline track click at timestamp:', timestamp)
+  
+  // Set preview timestamp
+  previewTimestamp.value = timestamp
+  previewLoading.value = true
+  
+  // Update URL with as_of parameter without triggering navigation
+  router.replace({
+    query: { ...route.query, as_of: timestamp }
+  })
+  
+  try {
+    // Fetch all preview data including record metadata for timeline track clicks
+    await Promise.all([
+      fetchPreviewRecord(timestamp),
+      fetchPreviewRelationships(timestamp),
+      fetchPreviewPackages(timestamp)
+    ])
+  } catch (err) {
+    console.error('Error fetching timeline preview data:', err)
+    // Clear preview state on error
+    previewTimestamp.value = null
+    previewRecord.value = null
+    previewRelationships.value = { inbound: [], outbound: [] }
+    previewPackages.value = []
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+// Clear preview mode and return to current data
+const clearPreview = () => {
+  previewTimestamp.value = null
+  previewRecord.value = null
+  previewRelationships.value = { inbound: [], outbound: [] }
+  previewPackages.value = []
+  timelineCutoffTimestamp.value = null // Clear timeline cutoff
+  
+  // Update URL to remove as_of parameter
+  const query = { ...route.query }
+  delete query.as_of
+  router.replace({ query })
 }
 
 // Relationship creation methods
@@ -553,8 +881,8 @@ const deleteRelationship = async (relationship, direction) => {
 
     ElMessage.success('Relationship removed successfully')
 
-    // Refresh the record to get updated relationships
-    await fetchRecord()
+    // Refresh relationships to get updated list
+    await fetchRelationships()
   } catch (action) {
     if (action === 'cancel' || action === 'close') {
       // User cancelled or closed dialog
@@ -565,30 +893,52 @@ const deleteRelationship = async (relationship, direction) => {
   }
 }
 
-// Watch for prop changes to refetch data when navigating between records
+// Watch for prop changes to refetch data when navigating between records (not as_of changes)
 watch([() => props.modelId, () => props.recordId], async () => {
   console.log('Props changed - refetching data for:', props.modelId, props.recordId)
   // Clear current data
   record.value = null
   model.value = null
+  relationships.value = { inbound: [], outbound: [] }
+  packages.value = []
+  recordHistory.value = []
   error.value = ''
+  
+  // Clear preview state when navigating to different records
+  previewTimestamp.value = null
+  timelineCutoffTimestamp.value = null // Clear timeline cutoff
   
   // Reset pagination when loading new record
   inboundCurrentPage.value = 1
   outboundCurrentPage.value = 1
+  packagesCurrentPage.value = 1
+  
+  // Reset history pagination
+  historyHasMore.value = false
+  historyCursor.value = null
   
   // Fetch new data
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
 })
 
 // Initialize
 onMounted(async () => {
-  await Promise.all([fetchModel(), fetchRecord(), fetchPackages()])
+  await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
+  
+  // If we have an as_of parameter, set up preview state to match
+  if (props.as_of) {
+    previewTimestamp.value = props.as_of
+    // The initial data fetches above already used as_of, so we just need to set up the preview refs
+    previewRecord.value = record.value
+    previewRelationships.value = relationships.value
+    previewPackages.value = packages.value
+  }
 })
 </script>
 
 <template>
   <bf-stage class="record-spec-viewer" :no-padding="noPadding" >
+    
     <template #actions>
       <stage-actions>
         <template #left>
@@ -658,71 +1008,16 @@ onMounted(async () => {
     <!-- Record Content -->
     <div v-else-if="record && model" class="record-content">
       <!-- Record Header -->
-      <div class="record-header">
-        <div class="record-info">
-          <div class="title-row">
-            <h2>{{ model.display_name || model.name }} Record</h2>
-            <ViewToggle v-model:viewMode="viewMode" size="small" />
-          </div>
-          
-          <!-- Record Metadata (hidden in JSON mode) -->
-          <div v-if="viewMode === 'ui'" class="record-metadata">
-            <div class="metadata-item">
-              <span class="metadata-label">Record ID:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ record.id }}</span>
-                <el-button
-                  @click="copyRecordId"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Copy Record ID"
-                >
-                  <IconCopyDocument :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Model ID:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ modelId }}</span>
-                <el-button
-                  @click="copyModelId"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Copy Model ID"
-                >
-                  <IconCopyDocument :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Model Version:</span>
-              <div class="metadata-value-container">
-                <span class="metadata-value">{{ recordMetadata.model_version }}</span>
-                <el-button
-                  @click="goToModelDetails"
-                  link
-                  size="small"
-                  class="metadata-action-btn"
-                  title="Go to Model Details"
-                >
-                  <IconArrowRight :width="12" :height="12" />
-                </el-button>
-              </div>
-            </div>
-
-            <div class="metadata-item">
-              <span class="metadata-label">Created At:</span>
-              <span class="metadata-value">{{ new Date(recordMetadata.created_at).toLocaleString() }}</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <RecordHeader
+        :record="currentRecord"
+        :model="model"
+        :model-id="modelId"
+        :preview-timestamp="previewTimestamp"
+        :view-mode="viewMode"
+        @clear-preview="clearPreview"
+        @update:view-mode="viewMode = $event"
+        @go-to-model="goToModelDetails"
+      />
 
       <!-- Enhanced View -->
       <div v-if="viewMode === 'ui'" class="enhanced-view">
@@ -742,7 +1037,23 @@ onMounted(async () => {
           </div>
         </div>
 
-
+        <!-- Record History Timeline -->
+        <RecordTimeline
+          v-if="hasHistory"
+          :record-history="recordHistory"
+          :history-has-more="historyHasMore"
+          :history-loading="historyLoading"
+          :preview-timestamp="previewTimestamp"
+          :timeline-cutoff-timestamp="timelineCutoffTimestamp"
+          :as-of="as_of"
+          :record="record"
+          @preview-record="previewHistoryRecord"
+          @go-to-history-record="goToHistoryRecord"
+          @load-more-history="loadMoreHistory"
+          @go-to-latest-version="goToLatestVersion"
+          @clear-timeline-cutoff="timelineCutoffTimestamp = null"
+          @timeline-track-click="handleTimelineTrackClick"
+        />
 
         <!-- Relationships Section -->
         <div class="section">
@@ -770,7 +1081,7 @@ onMounted(async () => {
             <!-- Show relationship lists when there are relationships -->
             <div v-else class="relationships-list">
               <!-- Inbound Relationships (only show if there are inbound relationships) -->
-              <div v-if="relationships.inbound.length > 0" class="relationship-section">
+              <div v-if="currentRelationships.inbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title inbound">← Inbound</h4>
                 
                 <div class="relationship-items">
@@ -811,7 +1122,7 @@ onMounted(async () => {
               </div>
 
               <!-- Outbound Relationships (only show if there are outbound relationships) -->
-              <div v-if="relationships.outbound.length > 0" class="relationship-section">
+              <div v-if="currentRelationships.outbound.length > 0" class="relationship-section">
                 <h4 class="relationship-section-title outbound">Outbound →</h4>
                 
                 <div class="relationship-items">
@@ -860,7 +1171,7 @@ onMounted(async () => {
             <h3>Attached Files</h3>
             <div class="header-actions">
               <el-tag size="small" class="record-tag files-tag">
-                {{ packages.length > 0 ? `${packages.length} files` : 'No files' }}
+                {{ currentPackages.length > 0 ? `${currentPackages.length} files` : 'No files' }}
               </el-tag>
               <span class="attach-file-link" @click="startPackageAttachment">
                 Attach File
@@ -870,9 +1181,9 @@ onMounted(async () => {
 
           <div class="files-container">
             <!-- Files exist -->
-            <div v-if="packages.length > 0" class="file-items">
+            <div v-if="currentPackages.length > 0" class="file-items">
               <div
-                v-for="(packageItem, index) in packages"
+                v-for="(packageItem, index) in paginatedPackages"
                 :key="`package-${index}`"
                 class="file-item"
                 :title="'Click to view file details'"
@@ -891,6 +1202,19 @@ onMounted(async () => {
                 >
                   ✕
                 </el-button>
+              </div>
+              
+              <!-- Packages Pagination -->
+              <div v-if="packagesPagination.showPagination" class="relationship-pagination">
+                <el-pagination
+                  v-model:current-page="packagesCurrentPage"
+                  :page-size="pageSize"
+                  :total="packagesPagination.total"
+                  layout="prev, pager, next"
+                  @current-change="handlePackagesPageChange"
+                  size="small"
+                  hide-on-single-page
+                />
               </div>
             </div>
 
@@ -920,7 +1244,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use 'sass:color';
-@use '../../../../styles/theme' as theme;
+@use '../../../../styles/theme';
 @use '../../../../styles/element/select';
 @use '../../../../styles/element/dialog';
 @use '../../../../styles/element/tag';
@@ -973,11 +1297,27 @@ onMounted(async () => {
           align-items: center;
           margin: 8px 0 12px 0;
           
-          h2 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-            color: theme.$gray_6;
+          .title-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            
+            h2 {
+              margin: 0;
+              font-size: 24px;
+              font-weight: 600;
+              color: theme.$gray_6;
+            }
+            
+            .preview-tag {
+              cursor: pointer;
+              font-size: 11px;
+              padding: 4px 8px;
+              
+              &:hover {
+                opacity: 0.8;
+              }
+            }
           }
         }
 
@@ -1116,6 +1456,13 @@ onMounted(async () => {
               background-color: theme.$teal_tint !important;
               border-color: theme.$teal_1 !important;
               color: theme.$teal_2 !important;
+            }
+            
+            // History Group
+            &.history-tag {
+              background-color: theme.$purple_tint !important;
+              border-color: theme.$purple_1 !important;
+              color: theme.$purple_2 !important;
             }
           }
         }
@@ -1667,6 +2014,7 @@ onMounted(async () => {
       }
     }
   }
+
 
   // Utility classes for spacing
   .ml-8 {

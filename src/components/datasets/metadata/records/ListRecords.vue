@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage } from 'element-plus'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider } from 'element-plus'
+import { ArrowDown, View } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
-import RecordFilter from './RecordFilterStyled.vue'
-import ModelSelectorDialog from './ModelSelectorDialog.vue'
+import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
@@ -43,6 +43,20 @@ const hasPreviousPage = ref(false)
 const currentPageNumber = ref(1)
 const selectedVersion = ref(null) // Currently selected model version
 
+// Filter data for MultiModelFilter
+const filters = ref([{
+  id: 1,
+  model: null, // Will be set from route params
+  modelProperties: [],
+  property: '',
+  operator: '',
+  value: '',
+  logicalOperator: 'and'
+}])
+
+// Debouncing for filter updates
+let filterUpdateTimeout = null
+
 // Model data
 const model = ref(null)
 const modelSchema = ref(null)
@@ -51,7 +65,6 @@ const loadingVersions = ref(false)
 const loadingModels = ref(false)
 const modelError = ref('')
 const versionError = ref('')
-const modelSelectorVisible = ref(false)
 
 // Computed properties
 const tableColumns = computed(() => {
@@ -127,8 +140,7 @@ const versionOptions = computed(() => {
 })
 
 const modelOptions = computed(() => {
-  const rawModels = metadataStore.models || []
-  const models = rawModels.map(item => item.model || item).filter(Boolean)
+  const models = metadataStore.models || []
   
   return models.map(model => ({
     label: model.display_name || model.name,
@@ -249,6 +261,9 @@ const fetchModel = async () => {
           selectedVersion.value = 'all'
         }
       }
+      
+      // Initialize filter with model information for MultiModelFilter
+      initializeFilter()
     } else {
       const errorMsg = 'Model schema not found'
       modelError.value = errorMsg
@@ -342,6 +357,116 @@ const onFilterChange = (newFilter) => {
   fetchRecords(null, 'forward', true)
 }
 
+// Initialize filter with model data for MultiModelFilter
+const initializeFilter = () => {
+  if (model.value && modelSchema.value) {
+    // Convert schema properties to the format expected by MultiModelFilter
+    const modelProperties = Object.entries(modelSchema.value.properties).map(([key, property]) => ({
+      name: key,
+      display_name: property.title || key,
+      type: property.type || 'string'
+    }))
+    
+    filters.value[0] = {
+      ...filters.value[0],
+      model: props.modelId,
+      modelProperties
+    }
+  }
+}
+
+// Debounced function to trigger API fetch
+const debouncedFetchRecords = () => {
+  // Clear any existing timeout
+  if (filterUpdateTimeout) {
+    clearTimeout(filterUpdateTimeout)
+  }
+  
+  // Set a new timeout to debounce rapid filter updates
+  filterUpdateTimeout = setTimeout(() => {
+    console.log('🔍 Debounced fetch triggered with filter:', activeFilter.value)
+    fetchRecords(null, 'forward', true)
+  }, 500) // 500ms debounce
+}
+
+// Handle MultiModelFilter events
+const onMultiFilterUpdate = (index, updatedFilter) => {
+  const previousFilter = activeFilter.value
+  
+  
+  // Handle multiple filters structure
+  if (updatedFilter && updatedFilter.hasMultipleFilters && updatedFilter.subFilters) {
+    // Multiple filters - convert each subfilter to API format
+    const validSubFilters = updatedFilter.subFilters.filter(f => 
+      f.property && f.operator && f.value !== ''
+    )
+    
+    if (validSubFilters.length === 0) {
+      activeFilter.value = null
+      // Immediately fetch for clearing filters (don't debounce clears)
+      if (previousFilter) {
+        if (filterUpdateTimeout) clearTimeout(filterUpdateTimeout)
+        fetchRecords(null, 'forward', true)
+      }
+      return
+    }
+    
+    // Convert each subfilter to API predicate format
+    const predicates = validSubFilters.map(filter => ({
+      property: `/${filter.property.replace(/\./g, '/')}`, // JSON pointer format: convert dots to slashes
+      operator: filter.operator,
+      value: filter.value
+    }))
+    
+    // Create combined predicate structure
+    if (predicates.length === 1) {
+      activeFilter.value = predicates[0]
+    } else {
+      // Use logical operator (AND/OR) to combine multiple predicates
+      const logicalOp = updatedFilter.logicalOperator || 'and'
+      activeFilter.value = {
+        [logicalOp]: predicates
+      }
+    }
+    
+    // Use debounced fetch for filter updates
+    debouncedFetchRecords()
+  }
+  // Handle single filter (backward compatibility)
+  else if (updatedFilter && updatedFilter.property && updatedFilter.operator && updatedFilter.value) {
+    const apiFilter = {
+      property: `/${updatedFilter.property.replace(/\./g, '/')}`, // JSON pointer format: convert dots to slashes
+      operator: updatedFilter.operator,
+      value: updatedFilter.value
+    }
+    activeFilter.value = apiFilter
+    
+    // Use debounced fetch for filter updates
+    debouncedFetchRecords()
+  } else {
+    activeFilter.value = null
+    // Immediately fetch for clearing filters (don't debounce clears)
+    if (previousFilter) {
+      if (filterUpdateTimeout) clearTimeout(filterUpdateTimeout)
+      fetchRecords(null, 'forward', true)
+    }
+  }
+}
+
+const onMultiFilterRemove = (index) => {
+  // Not applicable for single model filter, but required by MultiModelFilter
+  activeFilter.value = null
+  fetchRecords(null, 'forward', true)
+}
+
+const onMultiModelChange = (index, modelId) => {
+  // Model selection should be disabled, but handle it just in case
+  // Navigate to the new model if somehow triggered
+  if (modelId !== props.modelId) {
+    selectModel(modelId)
+  }
+}
+
 const onNextPage = () => {
   if (!hasNextPage.value) return
   
@@ -398,20 +523,30 @@ const onVersionChange = (version) => {
   fetchRecords(null, 'forward', true)
 }
 
-const openModelSelector = () => {
-  modelSelectorVisible.value = true
-}
+// Breadcrumb model selector doesn't need this function anymore
 
-const selectModel = (newModelId) => {
-  modelSelectorVisible.value = false
+const selectModel = (command) => {
+  // Check if it's a special command
+  if (typeof command === 'string' && command.startsWith('view-details:')) {
+    const targetModelId = command.split(':')[1]
+    router.push({
+      name: 'model-details',
+      params: {
+        orgId: router.currentRoute.value.params.orgId,
+        datasetId: props.datasetId,
+        modelId: targetModelId
+      }
+    })
+    return
+  }
   
-  // Navigate to the new model's records route
+  // Otherwise, it's a model selection - navigate to the new model's records route
   router.push({
     name: 'model-records-search',
     params: {
       orgId: router.currentRoute.value.params.orgId,
       datasetId: props.datasetId,
-      modelId: newModelId
+      modelId: command
     }
   })
 }
@@ -440,6 +575,45 @@ const formatCellValue = (value, column) => {
     } catch {
       return value
     }
+  }
+  
+  // Handle arrays
+  if (column.type === 'array' || Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return '[]'
+      }
+      // For arrays, show count and preview of first few items
+      const preview = value.slice(0, 3).map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return '{...}'
+        }
+        return JSON.stringify(item)
+      }).join(', ')
+      
+      const suffix = value.length > 3 ? `, ... +${value.length - 3} more` : ''
+      return `[${preview}${suffix}]`
+    }
+    return String(value)
+  }
+  
+  // Handle objects
+  if (column.type === 'object' || (typeof value === 'object' && value !== null && !Array.isArray(value))) {
+    const keys = Object.keys(value)
+    if (keys.length === 0) {
+      return '{}'
+    }
+    // For objects, show key count and preview of first few keys
+    const preview = keys.slice(0, 2).map(key => {
+      const val = value[key]
+      const displayVal = val === null ? 'null' : 
+                        typeof val === 'object' ? '{...}' : 
+                        JSON.stringify(val)
+      return `${key}: ${displayVal}`
+    }).join(', ')
+    
+    const suffix = keys.length > 2 ? `, ... +${keys.length - 2} more` : ''
+    return `{${preview}${suffix}}`
   }
   
   return String(value)
@@ -472,6 +646,23 @@ const goToRecordDetails = async (record) => {
   // Check if we're in relationship creation mode
   if (metadataStore.activeRelationshipCreation) {
     // Create a custom event to trigger relationship creation with complete record data
+    const recordData = {
+      id: record.id,
+      name: getRecordDisplayName(record),
+      modelId: props.modelId,
+      modelName: model.value?.display_name || model.value?.name || 'Unknown Model'
+    }
+    
+    const event = new CustomEvent('record-selected', { 
+      detail: recordData
+    })
+    window.dispatchEvent(event)
+    return
+  }
+  
+  // Check if we're in record attachment mode
+  if (metadataStore.activeRecordAttachment) {
+    // Create a custom event to trigger record attachment with complete record data
     const recordData = {
       id: record.id,
       name: getRecordDisplayName(record),
@@ -529,48 +720,79 @@ onMounted(async () => {
       <stage-actions>
         <template #left>
           <div class="left-wrapper">
-            <!-- Model Selector -->
-            <div class="model-selector-section">
-              <!--            <div class="model-label">Model</div>-->
-              <div class="model-title-content" @click="openModelSelector" :class="{ 'loading': loadingModels }">
-                <h3 v-if="model" class="model-title">{{ model.display_name || model.name }}</h3>
-                <div class="model-selector-icon" :class="{ 'loading': loadingModels }">
-                  <svg v-if="!loadingModels" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5H7z"/>
-                  </svg>
-                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="loading-spinner">
-                    <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/>
-                    <path d="M12,4a8,8,0,0,1,8,8" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <!-- Version Selector -->
-            <div class="version-selector-section">
-              <!--            <label class="selector-label">Version</label>-->
-              <el-select
-                :model-value="selectedVersion"
-                @update:model-value="onVersionChange"
-                placeholder="Choose version..."
-                :loading="loadingVersions"
-                :disabled="!versionOptions.length && !loadingVersions"
-                class="version-dropdown-compact"
-              >
-                <el-option
-                  v-for="version in versionOptions"
-                  :key="version.value"
-                  :label="version.label"
-                  :value="version.value"
-                >
-                  <div class="version-option">
-                    <div class="version-info">
-                      <span class="version-label">{{ version.label }}</span>
-                      <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
-                    </div>
-                  </div>
-                </el-option>
-              </el-select>
+            <!-- Breadcrumb Navigation with Model and Version Selectors -->
+            <div class="breadcrumb-nav">
+              <span class="breadcrumb-item">Models</span>
+              <span class="breadcrumb-separator">/</span>
+              
+              <!-- Model Dropdown -->
+              <el-dropdown trigger="click" @command="selectModel" :disabled="loadingModels">
+                <span class="breadcrumb-dropdown" :class="{ 'loading': loadingModels }">
+                  <span v-if="model">{{ model.display_name || model.name }}</span>
+                  <span v-else>Loading...</span>
+                  <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <!-- View Details option for current model -->
+                    <el-dropdown-item 
+                      :command="`view-details:${modelId}`"
+                      class="model-action-item"
+                    >
+                      <el-icon style="margin-right: 8px"><View /></el-icon>
+                      <span style="font-weight: 500">View Model Details</span>
+                    </el-dropdown-item>
+                    <el-divider style="margin: 6px 0" />
+                    
+                    <!-- Model selection items -->
+                    <el-dropdown-item 
+                      v-for="option in modelOptions" 
+                      :key="option.value"
+                      :command="option.value"
+                      :class="{ 'is-active': option.value === modelId }"
+                    >
+                      <div class="model-dropdown-item">
+                        <span class="model-name">{{ option.label }}</span>
+<!--                        <el-tag size="small" type="info">{{ option.count }} records</el-tag>-->
+                      </div>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <span class="breadcrumb-separator">/</span>
+              
+              <!-- Version Dropdown -->
+              <el-dropdown trigger="click" @command="onVersionChange" :disabled="loadingVersions || !versionOptions.length">
+                <span class="breadcrumb-dropdown version-dropdown" :class="{ 'loading': loadingVersions }">
+                  <span v-if="selectedVersion === 'all'">All Versions</span>
+                  <span v-else-if="selectedVersion === 'latest'">Latest (v{{ model?.latest_version?.version || 1 }})</span>
+                  <span v-else>Version {{ selectedVersion }}</span>
+                  <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item 
+                      v-for="version in versionOptions"
+                      :key="version.value"
+                      :command="version.value"
+                      :class="{ 'is-active': version.value === selectedVersion }"
+                    >
+                      <div class="version-dropdown-item">
+                        <div class="version-info-breadcrumb">
+                          <span class="version-name">{{ version.label }}</span>
+                          <span v-if="version.createdAt" class="version-date">{{ formatDate(version.createdAt) }}</span>
+                        </div>
+                        <el-tag v-if="version.isAll" size="small" type="info">All</el-tag>
+                        <el-tag v-else-if="version.isLatest" size="small" type="info">Current</el-tag>
+                      </div>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <span class="breadcrumb-separator">/</span>
+              <span class="breadcrumb-item">Records</span>
             </div>
           </div>
 
@@ -586,22 +808,21 @@ onMounted(async () => {
         </template>
       </stage-actions>
     </template>
-    <!-- Model Selector Dialog -->
-    <ModelSelectorDialog
-      v-model:visible="modelSelectorVisible"
-      :models="modelOptions"
-      :current-model-id="modelId"
-      :loading="loadingModels"
-      @select="selectModel"
-      @cancel="modelSelectorVisible = false"
-    />
 
-    <!-- Record Filters - Always show when schema is available -->
-    <record-filter
+    <!-- Record Filters - Use MultiModelFilter with fixed model -->
+    <multi-model-filter
+      v-if="filters[0].model && !error"
       class="record-filter-section"
-      v-if="modelSchema && !error"
-      :model-schema="modelSchema"
-      @filter-change="onFilterChange"
+      :models="modelOptions"
+      :filter="filters[0]"
+      :index="0"
+      :can-remove="false"
+      :dataset-id="datasetId"
+      @update-filter="onMultiFilterUpdate"
+      @remove-filter="onMultiFilterRemove"
+      @model-change="onMultiModelChange"
+      :hide-empty-model-selector="true"
+      :enable-autocomplete="true"
     />
 
     <!-- Loading and Error States -->
@@ -758,7 +979,71 @@ onMounted(async () => {
       align-items: center;
       display: flex;
       flex-direction: row;
+      gap: 20px;
     }
+
+    // Breadcrumb navigation styling
+    .breadcrumb-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      
+      .breadcrumb-item {
+        color: theme.$gray_5;
+        font-weight: 500;
+      }
+      
+      .breadcrumb-separator {
+        color: theme.$gray_4;
+        font-size: 16px;
+      }
+      
+      .breadcrumb-dropdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        color: theme.$purple_3;
+        font-weight: 500;
+        font-size: 14px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        user-select: none;
+        
+        &:hover:not(.loading) {
+          background-color: theme.$gray_1;
+          color: theme.$purple_2;
+        }
+        
+        &.loading {
+          cursor: default;
+          opacity: 0.6;
+        }
+        
+        .el-icon {
+          font-size: 14px;
+          transition: transform 0.2s ease;
+        }
+        
+        &:hover:not(.loading) .el-icon {
+          transform: translateY(1px);
+        }
+      }
+      
+      // Dropdown is open
+      :deep(.el-dropdown.is-active) {
+        .breadcrumb-dropdown {
+          background-color: theme.$gray_1;
+          
+          .el-icon {
+            transform: rotate(180deg);
+          }
+        }
+      }
+    }
+    
 
     .model-selector-section,
     .version-selector-section {
@@ -1181,6 +1466,78 @@ onMounted(async () => {
     color: theme.$gray_4;
     font-style: italic;
     text-transform: lowercase;
+  }
+}
+
+// Custom dropdown styling for model selector breadcrumb
+:deep(.el-dropdown__popper) {
+  .el-dropdown-menu__item {
+    &.is-active {
+      background-color: theme.$purple_tint;
+      color: theme.$purple_3;
+      
+      .model-name, .version-name {
+        font-weight: 600;
+      }
+    }
+    
+    &:hover {
+      background-color: theme.$gray_1;
+    }
+  }
+}
+
+// Model dropdown item styling - separate selector to ensure it applies
+:deep(.model-dropdown-item) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 250px;
+  padding: 4px 0;
+  
+  .model-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .el-tag {
+    flex-shrink: 0;
+  }
+}
+
+// Version dropdown item styling - separate selector to ensure it applies
+:deep(.version-dropdown-item) {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 250px;
+  padding: 4px 0;
+  
+  .version-info-breadcrumb {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    
+    .version-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .version-date {
+      font-size: 12px;
+      color: theme.$gray_4;
+    }
+  }
+  
+  .el-tag {
+    flex-shrink: 0;
   }
 }
 </style>

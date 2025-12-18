@@ -6,6 +6,7 @@ import { useMetadataStore } from '@/stores/metadataStore.js'
 import ModelSpecViewer from './ModelSpecViewer.vue'
 import PropertyDialog from './PropertyDialog.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue';
 
 // Store setup
 const metadataStore = useMetadataStore()
@@ -60,6 +61,7 @@ const emit = defineEmits(['save-model', 'save-template', 'cancel'])
 // Reactive data
 const mode = ref('guided') // 'guided' or 'json'
 const previewViewMode = ref('ui') // 'ui' or 'json' for preview panel
+const displayMode = ref('edit') // 'edit' or 'preview' for single column view
 
 // JSON Schema template
 const defaultSchema = {
@@ -118,12 +120,12 @@ const propertyForm = ref({
 
 // Property types with format support
 const propertyTypes = [
-  { value: 'string', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'integer', label: 'Integer' },
-  { value: 'boolean', label: 'True/False' },
-  { value: 'array', label: 'List' },
-  { value: 'object', label: 'Object' }
+  { value: 'string', label: 'Text', description: 'Text data with optional format validation' },
+  { value: 'number', label: 'Number', description: 'Decimal numbers (e.g., 3.14, 42.0)' },
+  { value: 'integer', label: 'Integer', description: 'Whole numbers only (e.g., 1, 42, 100)' },
+  { value: 'boolean', label: 'True/False', description: 'Boolean values (true or false)' },
+  { value: 'array', label: 'Array', description: 'List of values' },
+  { value: 'object', label: 'Object', description: 'Nested object with properties' }
 ]
 
 const stringFormats = [
@@ -615,10 +617,8 @@ const handlePropertySave = ({ propertyName, propertySchema, required, oldPropert
       return
     }
 
-    if (propertySchema['x-pennsieve-sensitive'] === true && !required) {
-      ElMessage.error(`Property "${propertyName}" has x-pennsieve-sensitive set but is not marked as required`)
-      return
-    }
+    // Note: Sensitive data properties (x-pennsieve-sensitive) are allowed to be optional
+    // Only key properties must be required
 
     // Update schema
     const newProperties = { ...modelData.value.latest_version.schema.properties }
@@ -764,11 +764,8 @@ const loadModelForEdit = async () => {
       // Check if we can find the model directly
       const directModel = allModels.find(item => {
         // Try different possible structures
-        return (item.model?.id === props.modelId) || 
-               (item.id === props.modelId) ||
-               (item.model?.id === parseInt(props.modelId)) ||
-               (item.id === parseInt(props.modelId))
-      })
+        return (item.id === props.modelId) ||
+               (item.id === parseInt(props.modelId)) })
       
       if (directModel) {
         console.log('Found model directly:', directModel)
@@ -892,6 +889,12 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
           </div>
         </div>
         <div class="header-actions">
+          <!-- Display Mode Toggle -->
+          <ViewToggle
+            v-model:view-mode="displayMode"
+            size="small"
+            @update:view-mode="(mode) => displayMode = mode === 'ui' ? 'edit' : 'preview'"
+          />
           <bf-button class="secondary" @click="cancelAndReturnToList">
             Cancel
           </bf-button>
@@ -903,9 +906,9 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
     </div>
 
 
-    <div class="generator-content">
-      <!-- Left Panel: Form or JSON Editor -->
-      <div class="editor-panel">
+    <div class="generator-content single-column">
+      <!-- Edit Mode: Form or JSON Editor -->
+      <div v-if="displayMode === 'edit'" class="editor-panel">
         <!-- Model Basic Info -->
         <el-card class="model-info-card" :class="{ 'edit-mode': isEditMode }">
           <template #header v-if="!isEditMode">
@@ -1072,8 +1075,8 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
         </div>
       </div>
 
-      <!-- Right Panel: Preview -->
-      <div class="preview-panel">
+      <!-- Preview Mode: Preview Panel -->
+      <div v-if="displayMode === 'preview'" class="preview-panel">
         <div class="preview-header">
           <span>Preview</span>
           <div class="preview-view-mode-tabs">
@@ -1226,6 +1229,16 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
     display: flex;
     gap: 24px;
     min-height: 600px;
+    
+    &.single-column {
+      display: block;
+      
+      .editor-panel,
+      .preview-panel {
+        width: 100%;
+        max-width: none;
+      }
+    }
   }
   
   .editor-panel {

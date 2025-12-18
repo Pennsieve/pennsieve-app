@@ -182,14 +182,20 @@ export default {
         //   this.$refs.orgMenu.updatePopper()
         // })
 
-        return this.organizations.filter((organization) => {
-          return (
-            organization.organization.name
-              .toLowerCase()
-              .indexOf(this.orgFilterName.toLowerCase()) > -1 &&
-            organization.organization.name != "Welcome"
-          );
-        });
+        return this.organizations
+          .filter((organization) => {
+            return (
+              organization.organization.name
+                .toLowerCase()
+                .indexOf(this.orgFilterName.toLowerCase()) > -1 &&
+              organization.organization.name != "Welcome"
+            );
+          })
+          .sort((a, b) => {
+            const nameA = a.organization.name.toLowerCase();
+            const nameB = b.organization.name.toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
       }
 
       return [];

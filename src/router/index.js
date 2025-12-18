@@ -7,9 +7,9 @@ import ModelList from "@/components/datasets/metadata/models/modelList.vue";
 import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
-import ListRecords from "@/components/datasets/metadata/models/ListRecords.vue";
-import RecordSpecViewer from "@/components/datasets/metadata/models/RecordSpecViewer.vue";
-import RecordSpecGenerator from "@/components/datasets/metadata/models/RecordSpecGenerator.vue";
+import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
+import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
+import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
 import DatasetMetadataRecordsView from "@/router/Dataset/DatasetMetadataRecordsView.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
@@ -1036,7 +1036,7 @@ const router = createRouter({
                 {
                   path: ':modelId/:recordId',
                   name: 'record-details',
-                  props: true,
+                  props: route => ({ ...route.params, ...route.query }),
                   meta: { 
                     backLink: {name: "Records", to: "model-records-search"},
                     breadcrumbs: [

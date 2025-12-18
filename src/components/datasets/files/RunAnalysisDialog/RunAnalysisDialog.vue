@@ -297,11 +297,9 @@
             />
           </div>
           <div class="table-container">
-            <files-table
+            <analysis-files-table
               :data="files"
               :clear-selected-values="clearSelectedValues"
-              withinRunAnalysisDialog
-              :enable-download="false"
               @selection-change="onFileSelect"
               @click-file-label="onClickLabel"
             />
@@ -342,7 +340,7 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
-    FilesTable,
+    AnalysisFilesTable,
     BfButton,
   },
 

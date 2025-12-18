@@ -4,6 +4,7 @@
       Files
     </template>
     <template v-else>
+      <!-- Dropdown menu for quick navigation -->
       <el-dropdown
         trigger="click"
         placement="bottom-start"
@@ -11,7 +12,7 @@
         @command="breadcrumbNavigate"
       >
         <span class="el-dropdown-link button-icon">
-          <IconMenu :height="20" :width="20" />
+          <IconMenu :height="16" :width="16" />
         </span>
         <template #dropdown>
           <el-dropdown-menu
@@ -26,22 +27,47 @@
             >
               {{ breadcrumb.content.name }}
             </el-dropdown-item>
-            <el-dropdown-item>Files</el-dropdown-item>
+            <el-dropdown-item command="">Files</el-dropdown-item>
           </el-dropdown-menu>
         </template>
-
       </el-dropdown>
 
-      <span>
-        <IconArrowRight
-          class="breadcrumb-caret"
-          :height="10"
-          :width="10"
-        />
-      </span>
-      <span class="collection-name" :class="isLightBackground && 'dark-text'">
-        {{ file.content.name }}
-      </span>
+      <!-- Full path display -->
+      <div class="full-path">
+        <span
+          class="breadcrumb-item clickable"
+          :class="isLightBackground && 'dark-text'"
+          @click="breadcrumbNavigate()"
+        >
+          Files
+        </span>
+        <template v-for="breadcrumb in breadcrumbs" :key="breadcrumb.content.id">
+          <span class="breadcrumb-separator">
+            <IconArrowRight
+              class="breadcrumb-caret"
+              :height="10"
+              :width="10"
+            />
+          </span>
+          <span
+            class="breadcrumb-item clickable"
+            :class="isLightBackground && 'dark-text'"
+            @click="breadcrumbNavigate(breadcrumb.content.id)"
+          >
+            {{ breadcrumb.content.name }}
+          </span>
+        </template>
+        <span class="breadcrumb-separator">
+          <IconArrowRight
+            class="breadcrumb-caret"
+            :height="10"
+            :width="10"
+          />
+        </span>
+        <span class="collection-name" :class="isLightBackground && 'dark-text'">
+          {{ file.content.name }}
+        </span>
+      </div>
     </template>
   </div>
 </template>
@@ -53,7 +79,7 @@ import IconArrowRight from "../../../icons/IconArrowRight.vue";
 
 export default {
   name: 'BreadcrumbNavigation',
-  components: {IconArrowRight, IconMenu},
+  components: { IconArrowRight, IconMenu },
   props: {
     isLightBackground: {
       type: Boolean,
@@ -85,7 +111,7 @@ export default {
 
   methods: {
     /**
-     * Handler for breadcrumb overflow navigation
+     * Handler for breadcrumb navigation
      * @param {String} id
      */
     breadcrumbNavigate: function(id = '') {
@@ -104,17 +130,22 @@ export default {
 .breadcrumb-navigation {
   align-items: center;
   display: flex;
-  font-size: 18px;
-  font-weight: 300;
-  line-height: 40px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 32px;
   margin: 0;
   margin-left: 16px;
   white-space: nowrap;
   color: theme.$purple_3;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
 
   .el-dropdown {
     color: theme.$purple_3;
     display: inline-flex;
+    flex-shrink: 0;
+    margin-right: 8px;
   }
 
   .breadcrumb-menu {
@@ -127,7 +158,7 @@ export default {
   }
   .breadcrumb-caret {
     flex-shrink: 0;
-    margin: 0 8px;
+    margin: 0 6px;
   }
   .collection-name {
     align-items: center;
@@ -138,6 +169,32 @@ export default {
   }
   .dark-text {
     color: theme.$gray_5;
+  }
+
+  .full-path {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .breadcrumb-item {
+    color: theme.$purple_3;
+    flex-shrink: 0;
+
+    &.clickable {
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .breadcrumb-separator {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
   }
 }
 </style>

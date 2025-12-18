@@ -440,7 +440,7 @@ export default {
       const packageType = pathOr('unknown', ['content', 'packageType'], pkg)
       const packageProperties = propOr([], 'properties', pkg)
       let component = packageType.toLowerCase()
-      if (isNil(this.typeMapper[packageType]) || packageState === 'ERROR') {
+      if ((isNil(this.typeMapper[packageType]) || packageState === 'ERROR')) {
         component = 'unknown';
       }
 
@@ -452,6 +452,10 @@ export default {
 
       if (subtype === 'ms excel') {
         component = 'xls'
+      }
+
+      if (this.isCollectionWithAViewer(pkg)) {
+        component = 'timeseries'
       }
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular']
@@ -490,6 +494,17 @@ export default {
         return ['UnknownViewer']
       }
 
+    },
+
+    isCollectionWithAViewer: function(pkg) {
+      const packageType = pathOr('', ['content', 'packageType'], pkg)
+      if (packageType !== 'Collection') {
+        return false
+      }
+      const packageProperties = propOr([], 'properties', pkg)
+      const collectionSubtype = this.getFilePropertyVal(packageProperties, 'subtype', 'Viewer')
+      const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
+      return isTimeseriesCollection
     }
   }
 

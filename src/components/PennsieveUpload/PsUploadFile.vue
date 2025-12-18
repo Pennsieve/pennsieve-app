@@ -1,10 +1,10 @@
 <template>
   <div>
     <div class="upload-file">
-      {{uploadObject.file.name}}
+      <div class="file-name">{{uploadObject?.file.name}}</div>
       <div class="right">
-        <div class="status">
-          {{uploadObject.status}}
+        <div :class="['status', statusClass]">
+          {{statusText}}
         </div>
 
         <div class="storage-value"> {{storageStr}} </div>
@@ -12,8 +12,9 @@
     </div>
     <div class="file-status">
       <bf-progress-bar
-        :loaded="uploadObject.progress.loaded"
-        :total="uploadObject.progress.total"
+        :loaded="uploadObject?.progress.loaded"
+        :total="uploadObject?.progress.total"
+        :complete="uploadObject?.status === 'processing'"
       />
     </div>
 
@@ -22,17 +23,34 @@
 
 <script lang=ts setup>
 
-import { reactive, computed } from 'vue'
+import { computed } from 'vue'
 import BfProgressBar from "../shared/bf-progress-bar/bf-progress-bar.vue";
 import { formatMetric } from "../../mixins/bf-storage-metrics/storageMetrics.js"
 
-const storageStr = computed(() => {
-  return formatMetric(props.uploadObject.file.size)
-})
-
-
 const props = defineProps({
   uploadObject: Object,
+})
+
+const storageStr = computed(() => {
+  return formatMetric(props.uploadObject?.file.size)
+})
+
+const statusText = computed(() => {
+  const status = props.uploadObject?.status
+  switch (status) {
+    case 'waiting':
+      return 'Waiting'
+    case 'uploading':
+      return 'Uploading'
+    case 'processing':
+      return 'Uploading...'
+    default:
+      return status
+  }
+})
+
+const statusClass = computed(() => {
+  return props.uploadObject?.status === 'processing' ? 'complete' : ''
 })
 
 
@@ -55,13 +73,28 @@ const props = defineProps({
   align-items: center;
   position: relative;
 
+  .file-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 16px;
+  }
+
   .right {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 
     .status {
       margin-right: 8px;
-      color: theme.$purple_3
+      color: theme.$purple_3;
+      min-width: 80px;
+      text-align: right;
+
+      &.complete {
+        color: theme.$green_1;
+      }
     }
   }
 
@@ -73,6 +106,8 @@ const props = defineProps({
 
   .storage-value {
     font-size: 12px;
+    min-width: 60px;
+    text-align: right;
   }
 }
 

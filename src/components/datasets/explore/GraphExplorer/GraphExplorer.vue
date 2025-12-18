@@ -4,7 +4,7 @@
       <stage-actions>
         <template #left>
           <div>
-            <h3 class="stage-title">Graph Explorer</h3>
+            <h3 class="stage-title">Explorer</h3>
             <div>Select one or more models to generate a view over the dataset</div>
           </div>
 
@@ -21,13 +21,13 @@
                 <i class="el-icon-loading"></i> Searching...
               </template>
               <template v-else>
-                <i class="el-icon-search"></i> Search
+                <i class="el-icon-search"></i> Create View
               </template>
             </bf-button>
 
             <!-- Clear All Button -->
             <bf-button
-              class="secondary mr-8"
+              class="secondary mr-8 flex"
               @click="clearAllQueries"
             >
               Clear All
@@ -38,47 +38,10 @@
               class="collapse-btn"
               @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"
             >
-              <span v-if="isQuerySectionCollapsed">Show Filters</span>
-              <span v-else>Hide Filters</span>
+              <span v-if="isQuerySectionCollapsed">Show Query Builder</span>
+              <span v-else>Hide Query Builder</span>
             </bf-button>
           </template>
-<!--          <ps-button-dropdown-->
-<!--            @click="toggleActionDropdown"-->
-<!--            :menu-open="!quickActionsVisible"-->
-<!--          >-->
-<!--            <template #buttons>-->
-<!--              &lt;!&ndash; Search Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button primary"-->
-<!--                :disabled="!canExecuteQuery"-->
-<!--                @click="executeQuery"-->
-<!--              >-->
-<!--                <template v-if="loading">-->
-<!--                  <i class="el-icon-loading"></i> Searching...-->
-<!--                </template>-->
-<!--                <template v-else>-->
-<!--                  <i class="el-icon-search"></i> Search-->
-<!--                </template>-->
-<!--              </bf-button>-->
-
-<!--              &lt;!&ndash; Clear All Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button secondary"-->
-<!--                @click="clearAllQueries"-->
-<!--              >-->
-<!--                Clear All-->
-<!--              </bf-button>-->
-<!--              -->
-<!--              &lt;!&ndash; Collapse Button &ndash;&gt;-->
-<!--              <bf-button-->
-<!--                class="dropdown-button collapse-btn"-->
-<!--                @click="isQuerySectionCollapsed = !isQuerySectionCollapsed"-->
-<!--              >-->
-<!--                <span v-if="isQuerySectionCollapsed">Show Filters</span>-->
-<!--                <span v-else>Hide Filters</span>-->
-<!--              </bf-button>-->
-<!--            </template>-->
-<!--          </ps-button-dropdown>-->
         </template>
       </stage-actions>
     </template>
@@ -94,9 +57,11 @@
             :filter="query"
             :index="index"
             :can-remove="queryFilters.length > 1"
+            :dataset-id="props.datasetId"
             @update-filter="updateFilter"
             @remove-filter="removeFilter"
             @model-change="onModelChange"
+            @clear-filter="clearFilter"
           />
         </div>
         
@@ -107,12 +72,12 @@
             class="btn-add-filter"
             @click="addFilter"
           >
-            + Add Filter
+            + Add Query
           </button>
 
           <!-- Record Limit Dropdown -->
           <div class="limit-selector">
-            <label class="limit-label">Records per model:</label>
+            <label class="limit-label">Records per query:</label>
             <select 
               v-model="recordLimit"
               class="limit-select"
@@ -165,48 +130,7 @@
         </div>
       </div>
       
-      <!-- Legend -->
-      <div class="control-group legend">
-        <span class="legend-title">Legend:</span>
-        
-        <!-- Model Colors (if any models are displayed) -->
-        <div v-if="displayedModels.length > 0" class="legend-models">
-          <div
-            v-for="modelId in displayedModels.slice(0, 5)"
-            :key="modelId"
-            class="legend-item model-legend"
-          >
-            <div 
-              class="legend-dot" 
-              :style="{
-                backgroundColor: getModelColorForLegend(modelId).background,
-                borderColor: getModelColorForLegend(modelId).border
-              }"
-            ></div>
-            <span class="model-name">{{ getModelName(modelId) }}</span>
-          </div>
-          <span v-if="displayedModels.length > 5" class="legend-more">
-            +{{ displayedModels.length - 5 }} more
-          </span>
-        </div>
-        
-        <!-- Relationship Legend -->
-        <div class="legend-relationships">
-          <div class="legend-item">
-            <div class="legend-line outbound"></div>
-            <span>Outbound →</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line inbound"></div>
-            <span>Inbound ←</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-line package"></div>
-            <span>Files</span>
-          </div>
-        </div>
-      </div>
-      
+
       <div class="control-group">
         <span class="node-count">{{ nodeCount }} nodes, {{ edgeCount }} relationships</span>
       </div>
@@ -215,6 +139,99 @@
     <!-- Graph Visualization -->
     <div class="graph-container">
       <div ref="sigmaContainer" class="sigma-container"></div>
+
+      <!-- Graph Legend - Bottom of graph container -->
+      <div class="graph-legend" :class="{ 'expanded': legendExpanded }">
+        <div class="legend-header" @click="legendExpanded = !legendExpanded">
+          <span class="legend-title">Legend</span>
+          <button class="legend-toggle" :class="{ 'expanded': legendExpanded }">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M6 9l-4-4h8l-4 4z" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="legend-content">
+          <!-- Compact view - single line -->
+          <div v-if="!legendExpanded" class="legend-compact">
+            <!-- Show first few models only -->
+            <div v-if="displayedModels.length > 0" class="legend-models-compact">
+              <div
+                v-for="modelId in displayedModels.slice(0, 3)"
+                :key="modelId"
+                class="legend-item model-legend"
+              >
+                <div
+                  class="legend-dot"
+                  :style="{
+                    backgroundColor: getModelColorForLegend(modelId).background,
+                    borderColor: getModelColorForLegend(modelId).border
+                  }"
+                ></div>
+                <span class="model-name">{{ getModelName(modelId) }}</span>
+              </div>
+              <span v-if="displayedModels.length > 3" class="legend-more">
+                +{{ displayedModels.length - 3 }} more
+              </span>
+            </div>
+
+            <!-- Essential relationship types -->
+            <div class="legend-relationships-compact">
+              <div class="legend-item">
+                <div class="legend-line outbound"></div>
+                <span>Relations</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line package"></div>
+                <span>Files</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expanded view - full legend -->
+          <div v-else class="legend-expanded">
+            <!-- All model colors -->
+            <div v-if="displayedModels.length > 0" class="legend-section">
+              <div class="legend-section-title">Models</div>
+              <div class="legend-models-grid">
+                <div
+                  v-for="modelId in displayedModels"
+                  :key="modelId"
+                  class="legend-item model-legend"
+                >
+                  <div
+                    class="legend-dot"
+                    :style="{
+                      backgroundColor: getModelColorForLegend(modelId).background,
+                      borderColor: getModelColorForLegend(modelId).border
+                    }"
+                  ></div>
+                  <span class="model-name">{{ getModelName(modelId) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- All relationship types -->
+            <div class="legend-section">
+              <div class="legend-section-title">Relationships</div>
+              <div class="legend-relationships-grid">
+                <div class="legend-item">
+                  <div class="legend-line outbound"></div>
+                  <span>Outbound →</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line inbound"></div>
+                  <span>Inbound ←</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-line package"></div>
+                  <span>Files</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <!-- Minimal Properties Bar - Bottom of graph container -->
       <div v-if="selectedNodeProperties" class="properties-bar">
@@ -298,7 +315,7 @@ import MultiModelFilter from './MultiModelFilter.vue'
 import IconSizeToFit from '@/components/icons/IconSizeToFit.vue'
 import IconCenter from '@/components/icons/IconCenter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
-import RecordSpecViewer from '@/components/datasets/metadata/models/RecordSpecViewer.vue'
+import RecordSpecViewer from '@/components/datasets/metadata/records/RecordSpecViewer.vue'
 import FileDetails from '@/components/datasets/files/FileDetails/FileDetails.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 
@@ -333,10 +350,10 @@ const edgeCount = ref(0)
 const recordLimit = ref(50) // Default to 50 records per model
 const isQuerySectionCollapsed = ref(false) // Track query section collapse state
 const quickActionsVisible = ref(true) // Track if actions are shown inline or in dropdown
+const legendExpanded = ref(false) // Track legend expansion state
 const models = computed(() => {
-  // Models in store have structure: [{ model: { id, name, display_name, ... } }]
+  // Models are now flattened in store: [{ id, name, display_name, ... }]
   return (metadataStore.models || [])
-    .map(item => item.model)
     .filter(model => model && model.id && model.name) // Filter out invalid models
 })
 const showDetailsPanel = ref(false)
@@ -375,45 +392,33 @@ const canExecuteQuery = computed(() => {
 const isSelectedNodePackage = computed(() => {
   if (!selectedRecord.value) return false
   
-  console.log('🔍 Checking if selected node is package:', selectedRecord.value)
   
   // First check the nodeType which is now preserved from our node structure
-  console.log('📦 Node nodeType:', selectedRecord.value.nodeType)
   if (selectedRecord.value.nodeType === 'package') {
-    console.log('✅ Detected package by nodeType field')
     return true
   }
   
   // Fallback: Node ID starts with 'package-'
   const nodeId = selectedRecord.value.nodeId || selectedRecord.value.id
-  console.log('📦 Node ID:', nodeId)
   if (typeof nodeId === 'string' && nodeId.startsWith('package-')) {
-    console.log('✅ Detected package by ID pattern')
     return true
   }
   
   // Fallback: Node has type field set to 'package' (from the data)
-  console.log('📦 Node type:', selectedRecord.value.type)
   if (selectedRecord.value.type === 'package') {
-    console.log('✅ Detected package by type field')
     return true
   }
   
   // Fallback: Node lacks model field (packages don't have models, records do)
   // AND has properties typical of packages
-  console.log('📦 Node model:', selectedRecord.value.model)
-  console.log('📦 Node size:', selectedRecord.value.size)
-  console.log('📦 Node name:', selectedRecord.value.name)
   if (!selectedRecord.value.model && (
     selectedRecord.value.size !== undefined || 
     selectedRecord.value.name !== undefined ||
     selectedRecord.value.type !== undefined
   )) {
-    console.log('✅ Detected package by missing model + package properties')
     return true
   }
   
-  console.log('❌ Not detected as package')
   return false
 })
 
@@ -436,7 +441,31 @@ const onModelChange = async (filterIndex, modelId) => {
 // Update filter helper
 const updateFilter = (filterIndex, updatedFilter) => {
   if (queryFilters.value[filterIndex]) {
-    queryFilters.value[filterIndex] = updatedFilter
+    // If the model is cleared and we have multiple filters, remove this filter
+    if (!updatedFilter.model && updatedFilter.model !== 0 && queryFilters.value.length > 1) {
+      removeFilter(filterIndex)
+    } else {
+      // For single filter or when updating, replace the entire queryFilters array
+      // to ensure Vue detects the change
+      queryFilters.value = queryFilters.value.map((filter, idx) => {
+        if (idx === filterIndex) {
+          // Return a completely new filter object, preserving multi-filter properties
+          return {
+            id: updatedFilter.model ? updatedFilter.id : Date.now(), // Force new ID when model is cleared
+            model: updatedFilter.model || '',
+            property: updatedFilter.property || '',
+            operator: updatedFilter.operator || '',
+            value: updatedFilter.value || '',
+            modelProperties: updatedFilter.modelProperties || [],
+            // Preserve multi-filter properties
+            hasMultipleFilters: updatedFilter.hasMultipleFilters || false,
+            subFilters: updatedFilter.subFilters || null,
+            logicalOperator: updatedFilter.logicalOperator || null
+          }
+        }
+        return filter
+      })
+    }
   }
 }
 
@@ -498,77 +527,150 @@ const removeFilter = (index) => {
   }
 }
 
+// Clear a specific filter (for when X is clicked on model)
+const clearFilter = (index) => {
+  // If this is the only filter, reset it to empty state
+  if (queryFilters.value.length === 1) {
+    queryFilters.value[0] = {
+      id: Date.now(),
+      model: '',
+      property: '',
+      operator: '',
+      value: '',
+      modelProperties: []
+    }
+  } else {
+    // If there are multiple filters, remove this one
+    removeFilter(index)
+  }
+}
+
+// Helper function to convert dot notation to JSON path format
+const convertToJsonPath = (property, modelId) => {
+  if (!property) return ''
+
+  // Convert dot notation to JSON path format: availability.quantity -> /availability/quantity
+  let jsonPath = property.includes('.') ?
+    `/${property.replace(/\./g, '/')}` :
+    `/${property}`
+
+  // Check if this property is an array and append /* if needed
+  if (modelId) {
+    const model = models.value.find(m => m.id === modelId)
+    if (model && model.latest_version && model.latest_version.schema) {
+      const schema = model.latest_version.schema
+
+      // Navigate to the property in the schema to check its type
+      const pathParts = property.split('.')
+      let currentSchema = schema.properties
+
+      for (let i = 0; i < pathParts.length && currentSchema; i++) {
+        const part = pathParts[i]
+        if (currentSchema[part]) {
+          if (i === pathParts.length - 1) {
+            // This is the final property - check if it's an array
+            if (currentSchema[part].type === 'array') {
+              jsonPath += '/*'
+            }
+          } else {
+            // Navigate deeper into the schema
+            if (currentSchema[part].type === 'object' && currentSchema[part].properties) {
+              currentSchema = currentSchema[part].properties
+            } else {
+              break // Can't navigate deeper
+            }
+          }
+        } else {
+          break // Property not found
+        }
+      }
+    }
+  }
+
+  return jsonPath
+}
+
 const executeQuery = async () => {
   if (!canExecuteQuery.value) return
   
   loading.value = true
   try {
-    
-    // Group filters by model for optimization
-    const filtersByModel = new Map()
-    
-    queryFilters.value
+    // Create one API call per MultiModelFilter instance
+    const queryPromises = queryFilters.value
       .filter(filter => filter.model) // Only process filters with a model selected
-      .forEach(filter => {
-        if (!filtersByModel.has(filter.model)) {
-          filtersByModel.set(filter.model, [])
-        }
-        filtersByModel.get(filter.model).push(filter)
-      })
-    
-    
-    // Prepare query promises - one per unique model
-    const queryPromises = Array.from(filtersByModel.entries()).map(async ([modelId, filters]) => {
-      try {
-        let options = { limit: recordLimit.value }
-        let combinedFilters = []
-        let hasValidFilters = false
-        
-        // Collect all valid filters for this model
-        filters.forEach(filter => {
-          if (filter.property && filter.operator && filter.value) {
-            const filterPredicate = {
-              property: `/${filter.property}`, // JSON Pointer format
-              operator: filter.operator,
-              value: parseValue(filter.value, filter.operator, filter.property, filter.modelProperties)
+      .map(async (multiModelFilter, index) => {
+        try {
+          let options = { limit: recordLimit.value }
+
+          // Handle multiple filters within each MultiModelFilter
+          if (multiModelFilter.hasMultipleFilters && multiModelFilter.subFilters) {
+            // MultiModelFilter has multiple sub-filters
+            const validSubFilters = multiModelFilter.subFilters.filter(subFilter =>
+              subFilter.property && subFilter.operator && subFilter.value
+            )
+
+            if (validSubFilters.length === 0) {
+              // No valid filters - fetch all records for the model (don't set options.filter)
+            } else if (validSubFilters.length === 1) {
+              // Single sub-filter - use it directly
+              const subFilter = validSubFilters[0]
+              options.filter = {
+                property: convertToJsonPath(subFilter.property, multiModelFilter.model),
+                operator: subFilter.operator,
+                value: parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+              }
+            } else {
+              // Multiple sub-filters - combine with the logical operator using the correct API format
+              const subFilterPredicates = validSubFilters.map(subFilter => {
+                const parsedValue = parseValue(subFilter.value, subFilter.operator, subFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+                const predicate = {
+                  property: convertToJsonPath(subFilter.property, multiModelFilter.model),
+                  operator: subFilter.operator,
+                  value: parsedValue
+                }
+                return predicate
+              }).filter(predicate => predicate.value !== null) // Filter out null values
+
+
+              // Use the logical operator as the key (and/or)
+              const logicalOp = multiModelFilter.logicalOperator || 'and'
+              options.filter = {
+                [logicalOp]: subFilterPredicates
+              }
+              
             }
-            combinedFilters.push(filterPredicate)
-            hasValidFilters = true
-          }
-        })
-        
-        // Apply combined filters if any exist
-        if (hasValidFilters) {
-          if (combinedFilters.length === 1) {
-            // Single filter - use it directly
-            options.filter = combinedFilters[0]
           } else {
-            // Multiple filters - combine with OR logic for broader results
-            options.filter = {
-              operator: 'or',
-              filters: combinedFilters
+            // Single filter (legacy format or single filter in new format)
+            if (multiModelFilter.property && multiModelFilter.operator && multiModelFilter.value) {
+              options.filter = {
+                property: convertToJsonPath(multiModelFilter.property),
+                operator: multiModelFilter.operator,
+                value: parseValue(multiModelFilter.value, multiModelFilter.operator, multiModelFilter.property, multiModelFilter.modelProperties, multiModelFilter.model)
+              }
+            } else {
+              // No valid single filter - fetch all records for the model (don't set options.filter)
+              // console.log(`No valid single filter for model ${multiModelFilter.model}, fetching all records`)
             }
           }
-        } else {
+
+          const response = await metadataStore.fetchRecords(props.datasetId, multiModelFilter.model, options)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: response.records || [],
+            multiModelFilter: multiModelFilter
+          }
+        } catch (error) {
+          console.error(`Query error for MultiModelFilter ${index} (model ${multiModelFilter.model}):`, error)
+          return {
+            multiModelFilterIndex: index,
+            modelId: multiModelFilter.model,
+            records: [],
+            multiModelFilter: multiModelFilter,
+            error: error
+          }
         }
-        
-        const response = await metadataStore.fetchRecords(props.datasetId, modelId, options)
-        return {
-          modelId: modelId,
-          records: response.records || [],
-          filters: filters,
-          combinedFilterCount: combinedFilters.length
-        }
-      } catch (error) {
-        console.error(`Query error for model ${modelId}:`, error)
-        return {
-          modelId: modelId,
-          records: [],
-          filters: filters,
-          error: error
-        }
-      }
-    })
+      })
     
     // Execute all queries in parallel
     const results = await Promise.all(queryPromises)
@@ -576,22 +678,20 @@ const executeQuery = async () => {
     // Combine and display results
     const allRecords = []
     let errorCount = 0
-    let totalApiCalls = results.length
-    let totalOriginalFilters = queryFilters.value.filter(f => f.model).length
+    let successfulCalls = 0
     
     results.forEach(result => {
       if (result.error) {
         errorCount++
+        console.warn(`MultiModelFilter ${result.multiModelFilterIndex} failed:`, result.error)
       } else {
         allRecords.push(...result.records)
+        successfulCalls++
       }
     })
     
-    
     if (errorCount > 0) {
-      ElMessage.warning(`${errorCount} queries failed, showing results from successful queries`)
-    } else if (totalApiCalls < totalOriginalFilters) {
-      ElMessage.success(`Query optimized: ${totalOriginalFilters} filters executed as ${totalApiCalls} API calls`)
+      ElMessage.warning(`${errorCount} queries failed, showing results from ${successfulCalls} successful queries`)
     }
     
     displayQueryResults(allRecords)
@@ -605,12 +705,63 @@ const executeQuery = async () => {
 }
 
 // Parse value based on operator type (similar to RecordFilter)
-const parseValue = (value, operator, propertyName, modelProperties) => {
+// Helper function to get nested property type from schema
+const getNestedPropertyType = (propertyPath, modelId) => {
+  if (!propertyPath || !modelId) return 'string'
+
+  const model = models.value.find(m => m.id === modelId)
+  if (!model || !model.latest_version || !model.latest_version.schema) return 'string'
+
+  const schema = model.latest_version.schema
+  if (!schema.properties) return 'string'
+
+  // Handle dot notation for nested properties
+  const pathParts = propertyPath.split('.')
+  let currentSchema = schema.properties
+
+  for (let i = 0; i < pathParts.length; i++) {
+    const part = pathParts[i]
+    if (currentSchema[part]) {
+      if (i === pathParts.length - 1) {
+        // Last part - return the type
+        return currentSchema[part].type || 'string'
+      } else {
+        // Navigate deeper
+        if (currentSchema[part].type === 'object' && currentSchema[part].properties) {
+          currentSchema = currentSchema[part].properties
+        } else {
+          return 'string' // Can't navigate deeper
+        }
+      }
+    } else {
+      return 'string' // Property not found
+    }
+  }
+
+  return 'string'
+}
+
+const parseValue = (value, operator, propertyName, modelProperties, modelId) => {
   if (!value) return value
   
   // Get property type for better value parsing
-  const property = modelProperties?.find(p => p.name === propertyName)
-  const propertyType = property?.type || 'string'
+  // First try to find the property directly (for simple properties from GraphExplorer)
+  let property = modelProperties?.find(p => p.name === propertyName)
+  let propertyType = property?.type
+
+  // If not found, try nested property lookup using the schema
+  if (!property && propertyName && propertyName.includes('.') && modelId) {
+    propertyType = getNestedPropertyType(propertyName, modelId)
+  }
+
+  // Fallback to simple property name lookup
+  if (!propertyType && propertyName && propertyName.includes('.')) {
+    const simplePropertyName = propertyName.split('.').pop()
+    property = modelProperties?.find(p => p.name === simplePropertyName)
+    propertyType = property?.type
+  }
+
+  propertyType = propertyType || 'string'
   
   // Handle operators that expect arrays
   if (['in', 'overlap', 'containedIn'].includes(operator)) {
@@ -649,6 +800,7 @@ const parseValue = (value, operator, propertyName, modelProperties) => {
     return value === 'true' || value === true
   }
   
+
   return value
 }
 
@@ -659,6 +811,11 @@ const displayQueryResults = (records) => {
   edges.value = []
   expandedNodes.value.clear()
   nodeExpansionMap.value.clear()
+  
+  // Clear selected nodes
+  selectedNodeProperties.value = null
+  selectedRecord.value = null
+  showDetailsPanel.value = false
   
   if (!records || records.length === 0) {
     ElMessage.info('No records found matching your query')
@@ -735,28 +892,174 @@ const expandNode = async (nodeId) => {
       return
     }
     
-    
     loading.value = true
     
-    // Fetch relationships for this record
-    const relationships = await fetchRecordRelationships(node.data.id)
+    // Handle package nodes differently from record nodes
+    if (node.type === 'package') {
+      await expandPackageNode(node)
+    } else {
+      // Fetch relationships for this record
+      const relationships = await fetchRecordRelationships(node.data.id)
+      
+      // Fetch packages for this record
+      const packages = await fetchRecordPackages(node.data.id)
+      
+      // Add new nodes and edges
+      const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
+      
+      // Track expansion for proper collapse behavior
+      nodeExpansionMap.value.set(nodeId, {
+        children: addedChildren,
+        edges: addedEdges
+      })
+      
+      // Mark as expanded
+      expandedNodes.value.add(nodeId)
+      node.data.expanded = true
+      
+      // Update the graph display
+      updateGraph()
+      
+      // Save state after node expansion
+      saveStateToStore()
+      
+      // Start animated force simulation after node expansion (only in Force mode)
+      if (currentLayout.value === 'Force') {
+        await startBackgroundForceSimulation()
+      }
+      
+    }
+
+  } catch (error) {
+    console.error('❌ Error expanding node:', error)
+    ElMessage.error(`Failed to expand node: ${error.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const expandPackageNode = async (packageNode) => {
+  try {
     
-    // Fetch packages for this record
-    const packages = await fetchRecordPackages(node.data.id)
+    // Check if package node is already expanded
+    if (expandedNodes.value.has(packageNode.id)) {
+      collapseNode(packageNode.id)
+      return
+    }
     
-    // Add new nodes and edges
-    const { limitedRelationships, limitedPackages, addedChildren, addedEdges } = addRelatedNodes(node, relationships, packages)
+    // Extract package ID from the node data
+    const packageId = packageNode.data.package?.node_id || packageNode.data.id
+    
+    if (!packageId) {
+      console.error('❌ No package ID found for expansion')
+      ElMessage.error('Package ID not found')
+      return
+    }
+    
+    
+    // Fetch connected records for this package using the metadata store
+    const response = await metadataStore.fetchPackageConnectedRecords(props.datasetId, packageId)
+    const connectedRecords = response?.records || response || []
+    
+    
+    if (!connectedRecords.length) {
+      ElMessage.info('No connected records found for this package')
+      return
+    }
+    
+    // Add connected records as nodes around the package
+    const addedChildren = new Set()
+    const addedEdges = new Set()
+    
+    // Get current position of parent package node from Sigma graph
+    const currentPackageAttrs = graph.value.getNodeAttributes(packageNode.id)
+    const currentPackagePosition = {
+      x: currentPackageAttrs.x || packageNode.position?.x || 0,
+      y: currentPackageAttrs.y || packageNode.position?.y || 0
+    }
+    
+    // Add color assignment for any new models
+    const uniqueModelIds = [...new Set(connectedRecords.map(r => r.model_id).filter(id => id))]
+    if (uniqueModelIds.length > 0) {
+      const existingModels = new Set(Array.from(modelColorAssignment.value.keys() || []))
+      const newModels = uniqueModelIds.filter(id => !existingModels.has(id))
+      if (newModels.length > 0) {
+        const newColorAssignment = createModelColorAssignment([...displayedModels.value, ...newModels])
+        // Preserve existing color assignments
+        modelColorAssignment.value.forEach((color, modelId) => {
+          if (newColorAssignment.has(modelId)) {
+            newColorAssignment.set(modelId, color)
+          }
+        })
+        modelColorAssignment.value = newColorAssignment
+        displayedModels.value = [...displayedModels.value, ...newModels]
+      }
+    }
+    
+    // Position connected records in a circle around the package
+    const recordRadius = Math.min(120, Math.max(80, connectedRecords.length * 20))
+    
+    connectedRecords.forEach((record, index) => {
+      const recordId = `record-${record.id}`
+      const existingNode = nodes.value.find(n => n.id === recordId)
+      
+      // Create node only if it doesn't exist
+      if (!existingNode) {
+        const recordAngle = (index / connectedRecords.length) * 2 * Math.PI
+        
+        const newNode = {
+          id: recordId,
+          type: 'record',
+          position: {
+            x: currentPackagePosition.x + Math.cos(recordAngle) * recordRadius,
+            y: currentPackagePosition.y + Math.sin(recordAngle) * recordRadius
+          },
+          data: {
+            id: record.id,
+            label: getRecordLabel(record, record.model_id),
+            model: record.model_id,
+            properties: record.value || record.properties || record.values || {},
+            relationships: [],
+            expanded: false
+          }
+        }
+        
+        nodes.value.push(newNode)
+        addedChildren.add(recordId)
+      } else {
+      }
+      
+      // Always create edge from record to package (record "has" package)
+      const edgeId = `${recordId}-${packageNode.id}`
+      
+      // Check if edge already exists
+      if (!edges.value.find(e => e.id === edgeId)) {
+        const newEdge = {
+          id: edgeId,
+          source: recordId,
+          target: packageNode.id,
+          type: 'package-record',
+          data: {
+            type: 'package-record',
+            direction: 'inbound' // From package perspective: package is owned by record
+          }
+        }
+        
+        edges.value.push(newEdge)
+        addedEdges.add(edgeId)
+      } else {
+      }
+    })
     
     // Track expansion for proper collapse behavior
-    nodeExpansionMap.value.set(nodeId, {
+    nodeExpansionMap.value.set(packageNode.id, {
       children: addedChildren,
       edges: addedEdges
     })
     
     // Mark as expanded
-    expandedNodes.value.add(nodeId)
-    node.data.expanded = true
-    
+    expandedNodes.value.add(packageNode.id)
+    packageNode.data.expanded = true
     
     // Update the graph display
     updateGraph()
@@ -769,13 +1072,11 @@ const expandNode = async (nodeId) => {
       await startBackgroundForceSimulation()
     }
     
-    ElMessage.success(`Expanded node: added ${limitedRelationships.length} relationships and ${limitedPackages.length} files`)
+    ElMessage.success(`Added ${connectedRecords.length} connected records`)
     
   } catch (error) {
-    console.error('❌ Error expanding node:', error)
-    ElMessage.error(`Failed to expand node: ${error.message}`)
-  } finally {
-    loading.value = false
+    console.error('❌ Error expanding package node:', error)
+    ElMessage.error(`Failed to expand package: ${error.message}`)
   }
 }
 
@@ -791,9 +1092,25 @@ const fetchRecordRelationships = async (recordId) => {
       return relationships.relationships
     } else if (relationships && Array.isArray(relationships.data)) {
       return relationships.data
+    } else if (relationships && relationships.relationships && (relationships.relationships.inbound || relationships.relationships.outbound)) {
+      // Handle new API structure: {relationships: {inbound: [...], outbound: [...]}}
+      const relationshipData = relationships.relationships
+      const allRelationships = [
+        ...(Array.isArray(relationshipData.inbound) ? relationshipData.inbound.map(rel => ({
+          ...rel,
+          direction: 'inbound'
+        })) : []),
+        ...(Array.isArray(relationshipData.outbound) ? relationshipData.outbound.map(rel => ({
+          ...rel,
+          direction: 'outbound'
+        })) : [])
+      ]
+      // Debug the structure of individual relationships
+      if (allRelationships.length > 0) {
+      }
+      return allRelationships
     } else if (relationships && (relationships.inbound || relationships.outbound)) {
-      // Handle {inbound: [...], outbound: [...]} structure with direction tracking
-      // Either inbound or outbound can be null/undefined
+      // Handle legacy {inbound: [...], outbound: [...]} structure (fallback)
       const allRelationships = [
         ...(Array.isArray(relationships.inbound) ? relationships.inbound.map(rel => ({
           ...rel,
@@ -820,21 +1137,18 @@ const fetchRecordRelationships = async (recordId) => {
 
 const fetchRecordPackages = async (recordId) => {
   try {
-    console.log('🔍 Fetching packages for record:', recordId)
     // Use the metadata store method
     const packages = await metadataStore.fetchRecordPackages(props.datasetId, recordId)
     
-    console.log('📦 Raw packages response:', packages)
     
     // Handle different response structures
     if (Array.isArray(packages)) {
-      console.log('✅ Found packages (array):', packages.length)
       return packages
     } else if (packages && Array.isArray(packages.packages)) {
-      console.log('✅ Found packages (nested):', packages.packages.length)
+      // console.log('✅ Found packages (nested):', packages.packages.length)
       return packages.packages
     } else if (packages && Array.isArray(packages.data)) {
-      console.log('✅ Found packages (data):', packages.data.length)
+      // console.log('✅ Found packages (data):', packages.data.length)
       return packages.data
     } else {
       console.warn('⚠️ Unexpected packages structure:', packages)
@@ -939,11 +1253,9 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
         // Create edge with direction-based coloring (always create edge, even to existing nodes)
         const edgeId = `${parentId}-${targetId}-${rel.direction || 'unknown'}`
         if (!edges.value.find(e => e.id === edgeId)) {
-          // Color coding: 
-          // - Green for outbound (this record points to another)
-          // - Blue for inbound (another record points to this)
+          // Store direction information but use grey color by default
+          // Colors will be applied dynamically in edgeReducer based on selection
           const isOutbound = rel.direction === 'outbound'
-          const edgeColor = isOutbound ? '#22C55E' : '#3B82F6' // green : blue
           const edgeLabel = `${rel.relationship_type || 'related'} ${isOutbound ? '→' : '←'}`
           
           edges.value.push({
@@ -953,12 +1265,13 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
             label: edgeLabel,
             type: 'default',
             style: { 
-              stroke: edgeColor,
+              stroke: '#d1d5db', // Default grey color
               strokeWidth: 2
             },
             data: {
               direction: rel.direction,
-              relationshipType: rel.relationship_type
+              relationshipType: rel.relationship_type,
+              parentNodeId: parentId // Store which node this edge was expanded from
             }
           })
           
@@ -1030,10 +1343,7 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
               package: packageData
             }
           }
-          console.log('📦 Creating package node:', packageId)
-          console.log('📦 Package data being stored:', packageData)
-          console.log('📦 newNode.data.package:', newNode.data.package)
-          console.log('📦 newNode.data.package.node_id:', newNode.data.package?.node_id)
+
           nodes.value.push(newNode)
           
           // Only track nodes that were actually created during this expansion
@@ -1054,6 +1364,10 @@ const addRelatedNodes = (parentNode, relationships, packages) => {
               stroke: '#6B7280', // gray for packages
               strokeWidth: 1,
               strokeDasharray: '5,5' // dashed line for packages
+            },
+            data: {
+              type: 'record-package',
+              direction: 'outbound' // From record perspective: record "has" package
             }
           })
           
@@ -1332,6 +1646,11 @@ const getModelName = (modelId) => {
 
 // Get model color for legend
 const getModelColorForLegend = (modelId) => {
+  // Defensive check to ensure modelColorAssignment is a Map
+  if (!modelColorAssignment.value || typeof modelColorAssignment.value.get !== 'function') {
+    console.warn('⚠️ modelColorAssignment is not a Map, reinitializing')
+    modelColorAssignment.value = new Map()
+  }
   return modelColorAssignment.value.get(modelId) || getModelColor(modelId)
 }
 
@@ -1402,6 +1721,7 @@ const getRecordLabel = (record, modelId, maxLength = 20) => {
 // State for drag functionality
 const draggedNode = ref(null)
 const isDragging = ref(false)
+const connectedNodeOffsets = ref(new Map()) // Store relative positions of connected nodes
 
 // State for force layout animation
 const forceLayoutRunning = ref(false)
@@ -1430,6 +1750,7 @@ const initializeGraph = () => {
     enableEdgeClickEvents: true,
     enableEdgeWheelEvents: true,
     enableEdgeHoverEvents: true,
+    enableNodeHoverEvents: false, // Disable hover events completely to prevent override of our nodeReducer styling
     // Zoom sensitivity settings for smoother scroll
     zoomingRatio: 1.3, // Reduced from default ~1.5 for smaller zoom steps
     mouseZoomDuration: 200, // Smooth zoom animation duration in ms
@@ -1449,12 +1770,7 @@ const initializeGraph = () => {
       const isSelected = selectedNodeProperties.value && 
         selectedNodeProperties.value.nodeId === node
       const isExpanded = expandedNodes.value.has(node)
-      
-      // Debug logging for visual indicators
-      if (isSelected || isExpanded) {
-      }
-      
-      
+
       // Base size calculation
       let baseSize = 8
       if (isExpanded) {
@@ -1475,13 +1791,15 @@ const initializeGraph = () => {
         const modelColor = modelColorAssignment.value.has(data.model) 
           ? modelColorAssignment.value.get(data.model)
           : getModelColor(data.model)
+
         res.color = modelColor.border
         res.borderColor = modelColor.border  
         res.backgroundColor = modelColor.background
+        res.size = baseSize * sizeFactor // Scale size based on zoom
+
         // Limit record label length
         const originalLabel = data.label || 'record'
         res.label = originalLabel.length > 20 ? originalLabel.substring(0, 17) + '...' : originalLabel
-        res.size = baseSize * sizeFactor // Scale size based on zoom
       }
       
       // Handle visual indicators for selection and expansion states
@@ -1495,45 +1813,70 @@ const initializeGraph = () => {
       
       return res
     },
-    edgeReducer: (edge, data) => {
+    edgeReducer: (edgeKey, data) => {
       const res = { ...data }
       
-      // Color edges based on direction
-      if (data.direction === 'outbound') {
-        res.color = '#22c55e' // green
-      } else if (data.direction === 'inbound') {
-        res.color = '#3b82f6' // blue
-      } else if (data.type === 'package') {
-        res.color = '#6b7280' // gray
-      } else {
-        res.color = '#d1d5db' // default gray
+      // Default color for all relationships is grey
+      let baseColor = '#b3bcce' // default gray
+
+      // Only show colored relationships if there's a selected node
+      if (selectedNodeProperties.value) {
+        const selectedNodeId = selectedNodeProperties.value.nodeId
+
+        // Get the edge from the graph to access source and target
+        let edgeSource, edgeTarget
+        if (graph.value && graph.value.hasEdge(edgeKey)) {
+          edgeSource = graph.value.source(edgeKey)
+          edgeTarget = graph.value.target(edgeKey)
+        }
+
+        // Check if this edge connects to the selected node
+        const connectsToSelected = edgeSource === selectedNodeId || edgeTarget === selectedNodeId
+
+
+        if (connectsToSelected && edgeSource && edgeTarget) {
+          // Determine direction relative to the selected node
+          // If the edge source is the selected node, it's outbound from selected
+          // If the edge target is the selected node, it's inbound to selected
+          const isOutboundFromSelected = edgeSource === selectedNodeId
+          const isInboundToSelected = edgeTarget === selectedNodeId
+
+          if (isOutboundFromSelected) {
+            baseColor = '#22c55e' // green for outbound from selected node
+            // console.log('✅ Coloring edge green (outbound from selected)')
+          } else if (isInboundToSelected) {
+            baseColor = '#3b82f6' // blue for inbound to selected node
+            // console.log('✅ Coloring edge blue (inbound to selected)')
+          }
+        }
       }
       
+      // Package edges stay grey regardless of selection
+      if (data.type === 'record-package') {
+        baseColor = '#6b7280' // gray for package edges
+      }
+
+      res.color = baseColor
       res.size = data.size || 2
+
       return res
     }
   })
   
   // Add click handlers
   sigmaInstance.value.on('clickNode', (event) => {
-    console.log('🖱️ Node clicked! isDragging:', isDragging.value)
     if (!isDragging.value) {
+      const nodeId = event.node
+      const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+
+
       // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
       // The modifier keys are in event.event.original (PointerEvent)
       const originalEvent = event.event?.original
       const hasModifier = originalEvent?.ctrlKey || originalEvent?.metaKey
-      console.log('🔑 Modifier key check - hasModifier:', hasModifier, 'ctrlKey:', originalEvent?.ctrlKey, 'metaKey:', originalEvent?.metaKey)
-      
+
       if (hasModifier) {
         // Modifier + click = open sidebar
-        const nodeId = event.node
-        const nodeAttributes = graph.value.getNodeAttributes(nodeId)
-        
-        console.log('🔍 Node click debug:')
-        console.log('   - Clicked nodeId:', nodeId, typeof nodeId)
-        console.log('   - Available node IDs:', nodes.value.map(n => n.id))
-        console.log('   - Node attributes:', nodeAttributes)
-        
         // Find the full node data from our nodes array
         // Try exact match first, then try package ID pattern match
         let fullNodeData = nodes.value.find(n => n.id === nodeId)
@@ -1541,7 +1884,6 @@ const initializeGraph = () => {
         if (!fullNodeData && typeof nodeId === 'number') {
           // Try to find package node by numeric ID
           fullNodeData = nodes.value.find(n => n.id === `package-${nodeId}`)
-          console.log('   - Tried package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
         }
         
         if (!fullNodeData && typeof nodeId === 'string') {
@@ -1549,13 +1891,8 @@ const initializeGraph = () => {
           const numericId = nodeId.replace('package-', '')
           if (numericId !== nodeId) {
             fullNodeData = nodes.value.find(n => n.id === `package-${numericId}`)
-            console.log('   - Tried reverse package pattern match for nodeId:', nodeId, 'found:', fullNodeData)
           }
         }
-        
-        console.log('   - Final fullNodeData:', fullNodeData)
-        console.log('   - fullNodeData.data:', fullNodeData?.data)
-        console.log('   - fullNodeData.data.package:', fullNodeData?.data?.package)
         
         // Use the full node data if available, otherwise fall back to attributes
         selectedRecord.value = fullNodeData ? { 
@@ -1564,13 +1901,9 @@ const initializeGraph = () => {
           nodeType: fullNodeData.type // Preserve the node type
         } : nodeAttributes
         
-        console.log('   - Final selectedRecord:', selectedRecord.value)
-        console.log('   - selectedRecord.package:', selectedRecord.value?.package)
-        
         showDetailsPanel.value = true
       } else {
         // Regular click = show banner with node properties
-        const nodeId = event.node
         const nodeData = graph.value.getNodeAttributes(nodeId)
         
         
@@ -1602,16 +1935,32 @@ const initializeGraph = () => {
     }
   })
   
+  // Add click handler for canvas (empty space)
+  sigmaInstance.value.on('clickStage', (event) => {
+    // Clear selected node when clicking on empty canvas
+    if (selectedNodeProperties.value) {
+      selectedNodeProperties.value = null
+      sigmaInstance.value.refresh()
+    }
+  })
+  
   sigmaInstance.value.on('doubleClickNode', (event) => {
     // Prevent default camera zoom behavior
     event.preventSigmaDefault()
     event.event.original.preventDefault()
     event.event.original.stopPropagation()
     
+    const nodeId = event.node
+    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+
+
     expandNode(event.node)
   })
   
-  // Add drag functionality  
+  // Note: Node hover events are disabled at the Sigma configuration level
+  // (enableNodeHoverEvents: false) to completely prevent hover styling on hidden nodes
+
+  // Add drag functionality
   setupDragBehavior()
   
   // Add canvas drag detection
@@ -1636,6 +1985,15 @@ const setupDragBehavior = () => {
   
   // Mouse down on node - start drag
   sigmaInstance.value.on('downNode', (event) => {
+    // Disable dragging in Circle mode
+    if (currentLayout.value === 'Circle') {
+      return
+    }
+    
+    const nodeId = event.node
+    const nodeAttributes = graph.value.getNodeAttributes(nodeId)
+
+
     draggedNodeId = event.node
     isDraggingNode = true
     hasDraggedDistance = false
@@ -1665,7 +2023,14 @@ const setupDragBehavior = () => {
           // Now we know it's a real drag, update global state
           draggedNode.value = draggedNodeId
           isDragging.value = true
-          // No force simulation during node drag - just move the node
+          
+          // Disable camera zoom/pan during drag
+          sigmaInstance.value.getCamera().disable()
+          
+          // Store initial positions of connected nodes for dragging
+          if (currentLayout.value === 'Force') {
+            initializeConnectedNodeDragging(draggedNodeId)
+          }
         }
       }
 
@@ -1681,6 +2046,11 @@ const setupDragBehavior = () => {
       const nodeIndex = nodes.value.findIndex(n => n.id === draggedNodeId)
       if (nodeIndex !== -1) {
         nodes.value[nodeIndex].position = { x: currentGraphPos.x, y: currentGraphPos.y }
+      }
+
+      // Move connected nodes if we have dragged distance and are in Force mode
+      if (hasDraggedDistance && currentLayout.value === 'Force') {
+        moveConnectedNodes(draggedNodeId, currentGraphPos)
       }
 
       // Refresh display
@@ -2181,6 +2551,140 @@ const stopDragForceAnimation = () => {
   }
 }
 
+// Initialize connected node dragging by storing initial positions
+const initializeConnectedNodeDragging = (draggedNodeId) => {
+  if (!graph.value || !draggedNodeId) return
+
+  // Clear previous offsets
+  connectedNodeOffsets.value.clear()
+
+  try {
+    // Get the current position of the dragged node
+    const draggedNodePos = {
+      x: graph.value.getNodeAttribute(draggedNodeId, 'x'),
+      y: graph.value.getNodeAttribute(draggedNodeId, 'y')
+    }
+
+    // Find all directly connected nodes
+    const connectedNodeIds = new Set()
+
+    // Check all edges to find connected nodes
+    edges.value.forEach(edge => {
+      if (edge.source === draggedNodeId) {
+        connectedNodeIds.add(edge.target)
+      } else if (edge.target === draggedNodeId) {
+        connectedNodeIds.add(edge.source)
+      }
+    })
+
+    // Store the relative offset of each connected node to the dragged node
+    connectedNodeIds.forEach(connectedNodeId => {
+      if (graph.value.hasNode(connectedNodeId)) {
+        const connectedNodePos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+
+        // Calculate and store the offset
+        const offset = {
+          x: connectedNodePos.x - draggedNodePos.x,
+          y: connectedNodePos.y - draggedNodePos.y
+        }
+
+        connectedNodeOffsets.value.set(connectedNodeId, offset)
+      }
+    })
+
+  } catch (error) {
+    console.warn('⚠️ Error initializing connected node dragging:', error)
+    connectedNodeOffsets.value.clear()
+  }
+}
+
+// Move connected nodes based on the dragged node's new position
+const moveConnectedNodes = (draggedNodeId, newDraggedNodePos) => {
+  if (!connectedNodeOffsets.value.size || !graph.value) return
+
+  try {
+    // Move each connected node with asymmetric behavior
+    connectedNodeOffsets.value.forEach((offset, connectedNodeId) => {
+      // Skip locked nodes - they should not move with the dragged node
+      if (isNodeLocked(connectedNodeId)) {
+        return
+      }
+
+      if (graph.value.hasNode(connectedNodeId)) {
+        // Get current position of the connected node
+        const currentPos = {
+          x: graph.value.getNodeAttribute(connectedNodeId, 'x'),
+          y: graph.value.getNodeAttribute(connectedNodeId, 'y')
+        }
+
+        // Calculate current distance between dragged node and connected node
+        const currentDistance = Math.sqrt(
+          Math.pow(currentPos.x - newDraggedNodePos.x, 2) +
+          Math.pow(currentPos.y - newDraggedNodePos.y, 2)
+        )
+
+        // Use the original stored offset distance as the reference
+        const originalDistance = Math.sqrt(
+          Math.pow(offset.x, 2) + Math.pow(offset.y, 2)
+        )
+
+        let newConnectedPos
+
+        // Add small tolerance to prevent jittering at the boundary
+        const tolerance = 5 // pixels
+
+        if (currentDistance <= originalDistance + tolerance) {
+          // Moving closer or at original distance: don't push connected node away
+          // Keep the connected node where it is (no resistance when shortening)
+          newConnectedPos = {
+            x: currentPos.x,
+            y: currentPos.y
+          }
+        } else {
+          // Moving away: connected node follows to maintain the original distance
+          // Calculate the direction vector from dragged node to connected node
+          const directionX = currentPos.x - newDraggedNodePos.x
+          const directionY = currentPos.y - newDraggedNodePos.y
+
+          // Normalize the direction vector
+          const directionLength = Math.sqrt(directionX * directionX + directionY * directionY)
+          const normalizedDirX = directionLength > 0 ? directionX / directionLength : 0
+          const normalizedDirY = directionLength > 0 ? directionY / directionLength : 0
+
+          // Calculate target position at original distance in the current direction
+          const targetPos = {
+            x: newDraggedNodePos.x + normalizedDirX * originalDistance,
+            y: newDraggedNodePos.y + normalizedDirY * originalDistance
+          }
+
+          // Apply follow factor for elastic behavior
+          const followFactor = 0.4 // How much the connected node follows (0 = doesn't follow, 1 = follows completely)
+
+          newConnectedPos = {
+            x: currentPos.x + (targetPos.x - currentPos.x) * followFactor,
+            y: currentPos.y + (targetPos.y - currentPos.y) * followFactor
+          }
+        }
+
+        // Update the connected node's position
+        graph.value.setNodeAttribute(connectedNodeId, 'x', newConnectedPos.x)
+        graph.value.setNodeAttribute(connectedNodeId, 'y', newConnectedPos.y)
+
+        // Update internal nodes array
+        const nodeIndex = nodes.value.findIndex(n => n.id === connectedNodeId)
+        if (nodeIndex !== -1) {
+          nodes.value[nodeIndex].position = { x: newConnectedPos.x, y: newConnectedPos.y }
+        }
+      }
+    })
+  } catch (error) {
+    console.warn('⚠️ Error moving connected nodes:', error)
+  }
+}
+
 // Update graph with new data
 const updateGraph = () => {
   if (!graph.value || !sigmaInstance.value) return
@@ -2194,8 +2698,7 @@ const updateGraph = () => {
       // Assign different masses based on node type to influence layout
       const mass = node.type === 'package' ? 0.5 : 1.0 // Packages are lighter
       const nodeSize = node.type === 'package' ? 35 : 25 // Match the nodeReducer sizes
-      
-      
+
       graph.value.addNode(node.id, {
         x: node.position?.x || Math.random(),
         y: node.position?.y || Math.random(),
@@ -2416,7 +2919,18 @@ const restoreStateFromStore = () => {
     
     // Restore model data
     displayedModels.value = graphStore.currentDisplayedModels
-    modelColorAssignment.value = graphStore.currentModelColorAssignment
+    // Ensure modelColorAssignment is restored as a Map
+    const storedModelColors = graphStore.currentModelColorAssignment
+    if (storedModelColors && typeof storedModelColors === 'object') {
+      if (storedModelColors instanceof Map) {
+        modelColorAssignment.value = storedModelColors
+      } else {
+        // Convert plain object to Map
+        modelColorAssignment.value = new Map(Object.entries(storedModelColors))
+      }
+    } else {
+      modelColorAssignment.value = new Map()
+    }
     
     // Restore selection state
     selectedRecord.value = graphStore.currentSelectedRecord
@@ -2769,6 +3283,192 @@ onUnmounted(() => {
       min-height: 400px; // Ensure sigma container has minimum height
     }
     
+    .graph-legend {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: theme.$white;
+      border-top: 1px solid theme.$gray_2;
+      z-index: 999; // Just below properties bar
+      transition: all 0.3s ease;
+
+      .legend-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 20px;
+        cursor: pointer;
+        background: theme.$gray_1;
+        border-bottom: 1px solid theme.$gray_2;
+
+        &:hover {
+          background: theme.$gray_2;
+        }
+
+        .legend-title {
+          font-size: 13px;
+          font-weight: 500;
+          color: theme.$gray_6;
+        }
+
+        .legend-toggle {
+          background: none;
+          border: none;
+          color: theme.$gray_5;
+          cursor: pointer;
+          padding: 2px;
+          border-radius: 2px;
+          transition: all 0.2s ease;
+          transform: rotate(0deg);
+
+          &.expanded {
+            transform: rotate(180deg);
+          }
+
+          &:hover {
+            color: theme.$gray_6;
+            background: theme.$gray_3;
+          }
+
+          svg {
+            display: block;
+          }
+        }
+      }
+
+      .legend-content {
+        overflow: hidden;
+        transition: all 0.3s ease;
+
+        .legend-compact {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          padding: 8px 20px;
+
+          .legend-models-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-right: 20px;
+            padding-right: 20px;
+            border-right: 1px solid theme.$gray_2;
+          }
+
+          .legend-relationships-compact {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+        }
+
+        .legend-expanded {
+          padding: 16px 20px;
+
+          .legend-section {
+            margin-bottom: 16px;
+
+            &:last-child {
+              margin-bottom: 0;
+            }
+
+            .legend-section-title {
+              font-size: 12px;
+              font-weight: 600;
+              color: theme.$gray_6;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+
+            .legend-models-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+              gap: 8px 16px;
+            }
+
+            .legend-relationships-grid {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+              flex-wrap: wrap;
+            }
+          }
+        }
+
+        // Shared legend item styles
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: theme.$gray_5;
+
+          &.model-legend {
+            .legend-dot {
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              border: 2px solid;
+              flex-shrink: 0;
+            }
+
+            .model-name {
+              max-width: 150px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              font-size: 11px;
+              color: theme.$gray_6;
+            }
+          }
+
+          .legend-line {
+            width: 20px;
+            height: 2px;
+            border-radius: 1px;
+            flex-shrink: 0;
+
+            &.outbound {
+              background-color: #22C55E;
+            }
+
+            &.inbound {
+              background-color: #3B82F6;
+            }
+
+            &.package {
+              background-color: #6B7280;
+              background-image: repeating-linear-gradient(
+                to right,
+                #6B7280,
+                #6B7280 3px,
+                transparent 3px,
+                transparent 7px
+              );
+            }
+          }
+        }
+
+        .legend-more {
+          font-size: 11px;
+          color: theme.$gray_4;
+          font-style: italic;
+        }
+      }
+
+      // Compact mode (default)
+      &:not(.expanded) .legend-content {
+        max-height: 40px;
+      }
+
+      // Expanded mode
+      &.expanded .legend-content {
+        max-height: 300px; // Generous height for expanded content
+      }
+    }
+
     .properties-bar {
       position: absolute;
       bottom: 0;
