@@ -103,7 +103,24 @@ export function useHandleXhrError(err) {
         }
     }
     else {
-        // emit ajaxError
-        EventBus.$emit('ajaxError', err)
-    }
+        err.json().then(errorJson => {
+          console.log('🔧 useHandleXhrError: errorJson is', errorJson)
+          if (errorJson) {
+            const msg = errorJson.message
+            EventBus.$emit('ajaxError', {
+              detail: {
+                type: 'info',
+                msg: msg,
+              }
+            })
+          } else {
+            EventBus.$emit('ajaxError', {
+              detail: {
+                type: 'error',
+                msg: `Request failed with status ${status}`
+              }
+            })
+          }
+        })
+  }
 }

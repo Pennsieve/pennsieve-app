@@ -75,7 +75,6 @@ const {
 } = useAnnotationInteraction(focusedAnn, renderAnn, hoverOffsets)
 
 const {
-  createAnnotationLayer,
   loadLayers
 } = useAnnotationLayers()
 
@@ -109,33 +108,6 @@ const selectFocusedAnn = () => {
     nextTick(() => renderCanvas())
   }
 }
-
-const createLayer = async (newLayer) => {
-  try {
-    await createAnnotationLayer(newLayer, props.activeViewer, emit)
-  } catch (error) {
-    console.error('Error creating layer:', error)
-  }
-}
-
-// Watch for activeViewer changes
-watch(
-  () => props.activeViewer,
-  async (newValue) => {
-    try {
-      await loadLayers(newValue, emit)
-      await checkAnnotationRange(
-        props.start,
-        props.start + props.duration,
-        props,
-        newValue,
-        emit
-      )
-    } catch (error) {
-      console.error('Error loading annotations for new viewer:', error)
-    }
-  }
-)
 
 // Lifecycle
 onMounted(async () => {
@@ -179,7 +151,6 @@ defineExpose({
   checkAnnotationRange: (start, end) =>
     checkAnnotationRange(start, end, props, props.activeViewer, emit),
   selectFocusedAnn,
-  createAnnotationLayer: createLayer,
   onMouseDown,
   onMouseMove,
   onMouseUp

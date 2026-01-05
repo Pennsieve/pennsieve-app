@@ -388,10 +388,6 @@ const resetFocusedAnnotation = () => {
   annCanvas.value?.resetFocusedAnnotation();
 };
 
-const createAnnotationLayer = (newLayer) => {
-  annCanvas.value?.createAnnotationLayer(newLayer);
-};
-
 const getNextAnnotation = () => {
   let cursorOffset =
     (props.cursorLoc * props.cWidth - props.constants["CURSOROFFSET"]) *
@@ -1188,7 +1184,6 @@ defineExpose({
   rsPeriod,
 
   resetFocusedAnnotation,
-  createAnnotationLayer,
   getNextAnnotation,
   getPreviousAnnotation,
   setFilters,
