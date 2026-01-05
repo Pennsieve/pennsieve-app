@@ -6,7 +6,7 @@
     @close="closeDialog"
     v-if="processStep < lastProcessStep"
     class="run-analysis-dialog"
-    width="720px"
+    width="900px"
   >
     <template #header>
       <bf-dialog-header slot="title" title="Run Analysis Workflow" />
@@ -44,49 +44,81 @@
             </p>
           </div>
 
-          <el-form label-position="top" class="analysis-form">
-            <el-form-item>
-              <template #label>
-                <span>Compute Node</span>
-                <span class="label-required">*</span>
-              </template>
-              <el-select
-                v-model="computeNodeValue"
-                placeholder="Select Compute Node"
-                @change="setSelectedComputeNode(computeNodeValue)"
-                class="full-width"
-              >
-                <el-option
-                  v-for="(item, i) in computeNodeOptions"
-                  :key="i"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
+          <div class="config-layout">
+            <!-- Required Section -->
+            <div class="config-section">
+              <div class="section-header">
+                <span class="section-title">Compute Environment</span>
+                <span class="section-badge required">Required</span>
+              </div>
+              <div class="section-content">
+                <el-form label-position="top" class="analysis-form">
+                  <el-form-item>
+                    <template #label>
+                      <span>Compute Node</span>
+                    </template>
+                    <div class="field-with-hint">
+                      <el-select
+                        v-model="computeNodeValue"
+                        placeholder="Select a compute node"
+                        @change="setSelectedComputeNode(computeNodeValue)"
+                        class="config-select"
+                      >
+                        <el-option
+                          v-for="(item, i) in computeNodeOptions"
+                          :key="i"
+                          :label="item.label"
+                          :value="item.value"
+                        />
+                      </el-select>
+                      <p class="field-hint">
+                        Choose where your analysis workflow will be executed.
+                      </p>
+                    </div>
+                  </el-form-item>
+                </el-form>
+              </div>
+            </div>
 
-            <el-form-item>
-              <template #label>
-                <span>Target Directory</span>
-                <span class="label-optional">optional</span>
-              </template>
-              <el-input
-                v-model="targetDirectory"
-                placeholder="Enter target directory path"
-              />
-            </el-form-item>
+            <!-- Optional Section -->
+            <div class="config-section">
+              <div class="section-header">
+                <span class="section-title">Additional Settings</span>
+                <span class="section-badge optional">Optional</span>
+              </div>
+              <div class="section-content">
+                <el-form label-position="top" class="analysis-form">
+                  <div class="form-row">
+                    <el-form-item class="form-col">
+                      <template #label>
+                        <span>Target Directory</span>
+                      </template>
+                      <el-input
+                        v-model="targetDirectory"
+                        placeholder="e.g., /output/results"
+                      />
+                      <p class="field-hint">
+                        Where output files will be saved.
+                      </p>
+                    </el-form-item>
 
-            <el-form-item>
-              <template #label>
-                <span>Workflow Run Name</span>
-                <span class="label-optional">optional</span>
-              </template>
-              <el-input
-                v-model="name"
-                placeholder="Enter a name for this workflow run"
-              />
-            </el-form-item>
-          </el-form>
+                    <el-form-item class="form-col">
+                      <template #label>
+                        <span>Workflow Run Name</span>
+                      </template>
+                      <el-input
+                        v-model="name"
+                        placeholder="e.g., Analysis Run 1"
+                      />
+                      <p class="field-hint">
+                        A descriptive name to identify this run.
+                      </p>
+                    </el-form-item>
+                  </div>
+                </el-form>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Step 2: Choose Workflow -->
@@ -1264,6 +1296,81 @@ export default {
   }
 }
 
+// Configuration Layout
+.config-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.config-section {
+  background-color: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+  overflow: hidden;
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background-color: white;
+    border-bottom: 1px solid theme.$gray_2;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: theme.$gray_6;
+  }
+
+  .section-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    &.required {
+      background-color: theme.$purple_tint;
+      color: theme.$purple_3;
+    }
+
+    &.optional {
+      background-color: theme.$gray_2;
+      color: theme.$gray_5;
+    }
+  }
+
+  .section-content {
+    padding: 20px;
+  }
+}
+
+.config-select {
+  width: 100%;
+  max-width: 400px;
+  display: block;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-col {
+  flex: 1;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: theme.$gray_4;
+  margin: 6px 0 0 0;
+  line-height: 1.4;
+}
+
 // Form Styles
 .analysis-form {
   .full-width {
@@ -1531,7 +1638,7 @@ export default {
   }
 
   .files-table-container {
-    max-height: 350px;
+    max-height: 450px;
     overflow-y: auto;
   }
 }
