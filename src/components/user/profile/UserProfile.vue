@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch, getCurrentInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
-import DegreeSelect from "@/components/shared/DegreeSelect.vue";
+import DegreeSelect from "@/components/shared/DegreeSelect/DegreeSelect.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import * as siteConfig from "@/site-config/site.json";
