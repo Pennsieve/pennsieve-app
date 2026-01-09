@@ -509,9 +509,9 @@ export default {
   components: {
     BfDialogHeader,
     DialogBody,
+    BfButton,
     AnalysisFilesTable,
     BreadcrumbNavigation,
-    BfButton,
   },
 
   mixins: [Request],

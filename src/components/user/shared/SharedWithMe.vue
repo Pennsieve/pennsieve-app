@@ -161,9 +161,6 @@ export default {
         return []
       }
 
-      // Debug: Let's see all organizations for now
-      console.log('Organizations from Vuex:', this.organizations)
-
       // For now, return all organizations to see the structure
       // TODO: Properly filter for shared workspaces once we understand the data structure
       return this.organizations
@@ -286,9 +283,9 @@ export default {
 @use '../../../styles/_theme.scss';
 
 .shared-with-me {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
+  //padding: 16px;
+  //max-width: 1200px;
+  //margin: 0 auto;
 }
 
 .page-header {

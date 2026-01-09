@@ -652,6 +652,7 @@ export default {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    max-width: 1200px;
 
     h3 {
       font-size: 16px;
