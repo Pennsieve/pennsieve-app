@@ -1,6 +1,8 @@
 <template>
   <div class="bf-navigation-tertiary">
 
+
+
     <bf-navigation-item
       v-if="orgId"
       :link="{ name: 'shared-with-me', params: {}}"
@@ -19,6 +21,8 @@
 
     </bf-navigation-item>
 
+
+
     <user-menu :style="{ backgroundColor: `${bkColor}` }"/>
   </div>
 </template>
@@ -32,6 +36,8 @@
   import IconOrganization from "../icons/IconOrganization.vue";
   import BfNavigationItem from "../bf-navigation/bf-navigation-item/BfNavigationItem.vue";
   import IconPennsieveMark from "../icons/IconPennsieveMark.vue";
+  import IconSettings from "@/components/icons/IconSettings.vue";
+  import UserNavigationItem from "@/components/user-navigation/UserNavigationItem.vue";
 
   // const SearchMenu = () => import('@/components/bf-navigation/SearchMenu/SearchMenu.vue')
 
@@ -54,6 +60,7 @@
     },
 
     components: {
+      UserNavigationItem, IconSettings,
       IconPennsieveMark,
       HelpMenu,
       UserMenu,
