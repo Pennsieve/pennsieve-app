@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { useProposalStore } from '@/stores/proposalStore'
@@ -381,6 +381,58 @@ onMounted(async () => {
     fetchRepositories()
   ])
 })
+
+const handleQueryParameters = () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const openSubmitModal = urlParams.get('openSubmitModal')
+  const repositoryId = urlParams.get('repositoryId')
+  const repositoryName = urlParams.get('repositoryName')
+  
+  if (openSubmitModal === 'true' && repositories.value.length > 0) {
+    let repository = null
+    
+    // Try to find repository by ID first, then by name
+    if (repositoryId) {
+      repository = repositories.value.find(repo => 
+        repo.organizationNodeId === repositoryId || 
+        repo.id === repositoryId ||
+        repo.name?.toLowerCase() === repositoryId.toLowerCase() ||
+        repo.displayName?.toLowerCase() === repositoryId.toLowerCase()
+      )
+    }
+    
+    // If not found by ID and repositoryName is provided, search by name
+    if (!repository && repositoryName) {
+      repository = repositories.value.find(repo => 
+        repo.name?.toLowerCase() === repositoryName.toLowerCase() ||
+        repo.displayName?.toLowerCase() === repositoryName.toLowerCase()
+      )
+    }
+    
+    if (repository) {
+      // Set the repository and open modal
+      selectedRepository.value = repository
+      activeProposal.value = null
+      showProposalDialog.value = true
+      
+      // Clean up URL by removing query parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, document.title, newUrl)
+    } else {
+      const searchTerm = repositoryId || repositoryName
+      if (searchTerm) {
+        console.warn(`Repository "${searchTerm}" not found`)
+      }
+    }
+  }
+}
+
+// Watch for repositories to be loaded and handle query parameters
+watch(repositories, (newRepositories) => {
+  if (newRepositories.length > 0) {
+    handleQueryParameters()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">
