@@ -4,9 +4,9 @@
     :clearable="true"
     :disabled="disabled"
     :placeholder="placeholder"
-    :value="value"
-    @change="$emit('input', $event)"
-    @clear="$emit('input', null)"
+    :model-value="modelValue"
+    @update:model-value="$emit('update:modelValue', $event)"
+    @clear="$emit('update:modelValue', null)"
   >
     <el-option
       v-for="degree in degrees"
@@ -21,6 +21,8 @@
 export default {
   name: 'DegreeSelect',
 
+  emits: ['update:modelValue'],
+
   props: {
     disabled: {
       type: Boolean,
@@ -28,9 +30,9 @@ export default {
     },
     placeholder: {
       type: String,
-      default: ''
+      default: 'Select a degree'
     },
-    value: {
+    modelValue: {
       type: String,
       default: ''
     }

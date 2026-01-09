@@ -39,13 +39,13 @@
 <!--        :coming-soon="true"-->
 <!--      />-->
 
-      <user-dashboard-card
-        title="Privacy and Compliance"
-        description="Control data sharing and privacy settings"
-        :route="{ name: 'user-privacy' }"
-        icon="security"
-        :coming-soon="true"
-      />
+<!--      <user-dashboard-card-->
+<!--        title="Privacy and Compliance"-->
+<!--        description="Control data sharing and privacy settings"-->
+<!--        :route="{ name: 'user-privacy' }"-->
+<!--        icon="security"-->
+<!--        :coming-soon="true"-->
+<!--      />-->
 
 <!--      <user-dashboard-card-->
 <!--        title="Billing"-->

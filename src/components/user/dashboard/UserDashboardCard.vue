@@ -119,7 +119,6 @@ export default {
 .user-dashboard-card {
   background: theme.$white;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
   padding: 32px 24px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -131,8 +130,8 @@ export default {
   min-height: 200px;
 
   &:hover {
-    border-color: theme.$purple_2;
-    background-color: theme.$purple_tint;
+    border-color: theme.$gray_3;
+    background-color: theme.$gray_1;
     .card-arrow {
       transform: translateX(4px);
     }

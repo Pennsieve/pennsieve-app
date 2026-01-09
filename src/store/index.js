@@ -49,6 +49,7 @@ const initialState = () => ({
   organizations: [],
   activeOrganization: {},
   activeOrgSynced: false,
+  isSwitchingOrganization: false,
   isLoadingDatasets: true,
   isLoadingDatasetsError: false,
   isLoadingDatasetBanner: true,
@@ -165,6 +166,9 @@ export const mutations = {
         state.teams = [];
         state.activeOrganization = activeOrganization;
       },
+      SET_IS_SWITCHING_ORGANIZATION(state, isSwitching) {
+        state.isSwitchingOrganization = isSwitching;
+      },
       UPDATE_ORGANIZATIONS(state, organizations) {
         state.organizations = organizations;
       },
@@ -181,6 +185,9 @@ export const mutations = {
         state.profile = profile;
       },
       CLEAR_STATE(state) {
+        // Preserve the switching organization state
+        const isSwitching = state.isSwitchingOrganization;
+        
         state.profile = {};
         state.activeOrganization = {};
         state.organizations = {};
@@ -197,7 +204,10 @@ export const mutations = {
         state.datasetTemplates = [];
         state.searchModalVisible = false;
         state.cognitoUser = {};
-        state.sessionTimer = null
+        state.sessionTimer = null;
+        
+        // Restore the switching organization state
+        state.isSwitchingOrganization = isSwitching;
       },
       UPDATE_CUR_DATASET(state, dataset) {
         state.curDataset = dataset;
@@ -643,6 +653,8 @@ export const actions = {
       commit("UPDATE_ORG_DATASET_STATUSES", evt),
   updateActiveOrganization: ({ commit }, evt) =>
       commit("UPDATE_ACTIVE_ORGANIZATION", evt),
+  setIsSwitchingOrganization: ({ commit }, evt) =>
+      commit("SET_IS_SWITCHING_ORGANIZATION", evt),
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
