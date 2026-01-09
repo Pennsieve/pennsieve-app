@@ -124,7 +124,6 @@ const statusClass = computed(() => {
 
 .integration-card {
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
   padding: 24px;
   background: white;
   transition: all 0.2s ease;

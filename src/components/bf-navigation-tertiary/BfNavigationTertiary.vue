@@ -3,7 +3,7 @@
 
     <bf-navigation-item
       v-if="orgId"
-      :link="{ name: 'user-profile', params: {}}"
+      :link="{ name: 'shared-with-me', params: {}}"
       label="My Workspace"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"

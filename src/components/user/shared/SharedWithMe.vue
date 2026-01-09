@@ -286,9 +286,9 @@ export default {
 @use '../../../styles/_theme.scss';
 
 .shared-with-me {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
+  //padding: 16px;
+  //max-width: 1200px;
+  //margin: 0 auto;
 }
 
 .page-header {

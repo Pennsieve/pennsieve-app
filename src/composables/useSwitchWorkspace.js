@@ -7,6 +7,14 @@ import router from "@/router";
 
 export async function useSwitchWorkspace(org) {
     const orgId = org.organization.id
+    
+    // Track when loading started for minimum display time
+    const loadingStartTime = Date.now()
+    const minimumLoadingTime = 600 // milliseconds
+    
+    // Set loading state to true at the beginning (in case it wasn't set already)
+    store.dispatch('setIsSwitchingOrganization', true)
+    
     return useGetToken()
         .then(token => {
             const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
@@ -28,11 +36,30 @@ export async function useSwitchWorkspace(org) {
                         })
 
                 }).then(() => {
-                    console.log('Organization Switched')
                     return store.dispatch('updateActiveOrganization', org)
                 })
+                .finally(() => {
+                    // Calculate how long the loading has been shown
+                    const elapsedTime = Date.now() - loadingStartTime
+                    const remainingTime = Math.max(0, minimumLoadingTime - elapsedTime)
+                    
+                    // Clear loading state after minimum time has passed
+                    setTimeout(() => {
+                        store.dispatch('setIsSwitchingOrganization', false)
+                    }, remainingTime)
+                })
         })
-        .catch(err => useHandleXhrError(err))
+        .catch(err => {
+            // Clear loading state on error with minimum display time
+            const elapsedTime = Date.now() - loadingStartTime
+            const remainingTime = Math.max(0, minimumLoadingTime - elapsedTime)
+            
+            setTimeout(() => {
+                store.dispatch('setIsSwitchingOrganization', false)
+            }, remainingTime)
+            
+            useHandleXhrError(err)
+        })
 
 
 }

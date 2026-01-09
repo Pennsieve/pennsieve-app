@@ -1,10 +1,10 @@
 <template>
-  <div class="card-wrapper">
+  <div class="card-wrapper" @click="handleWorkspaceClick">
     <div class="top">
       <div class="title">
-        <router-link :to="getWorkspaceUrl(workspace.organization.id)">
+        <a href="#" @click.prevent>
           {{ workspace.organization.name }}
-        </router-link>
+        </a>
       </div>
     </div>
     <div 
@@ -17,6 +17,7 @@
 
 <script>
 import * as siteConfig from '@/site-config/site.json'
+import EventBus from '@/utils/event-bus'
 
 export default {
   name: 'WorkspaceCard',
@@ -49,6 +50,14 @@ export default {
   methods: {
     getWorkspaceUrl(workspaceId) {
       return `/${workspaceId}/datasets`
+    },
+
+    handleWorkspaceClick() {
+      // Set loading state to true before switching
+      this.$store.dispatch('setIsSwitchingOrganization', true)
+      
+      // Emit the switch-organization event just like UserMenu does
+      EventBus.$emit('switch-organization', this.workspace)
     }
   }
 }
@@ -62,7 +71,6 @@ export default {
   height: 150px;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 4px 4px theme.$gray_2;
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -76,12 +84,10 @@ export default {
     border-left: 1px solid theme.$gray_2;
     border-top: 1px solid theme.$gray_2;
     border-right: 1px solid theme.$gray_2;
-    border-radius: 4px 4px 0 0;
   }
 
   .bottom {
     flex: 1;
-    border-radius: 0 0 4px 4px;
   }
 }
 
