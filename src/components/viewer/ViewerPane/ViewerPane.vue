@@ -42,6 +42,9 @@ import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
+import { useViewerStore as useLibraryViewerStore, TSViewer } from '@pennsieve-viz/tsviewer'
+import '@pennsieve-viz/tsviewer/style.css'
+import * as siteConfig from '@/site-config/site.json'
 
 export default {
   name: "ViewerPane",
@@ -68,9 +71,7 @@ export default {
     VideoViewer: defineAsyncComponent(() =>
       import("../../viewers/VideoViewer.vue")
     ),
-    TimeseriesViewer: defineAsyncComponent(() =>
-      import("../../viewers/TSViewer/TSViewer.vue")
-    ),
+    TimeseriesViewer: TSViewer,
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
@@ -109,7 +110,13 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      isLoading: false,
     };
+  },
+
+mounted(){
+    this.fetchTimeseriesData();
+    this.isLoading = false
   },
 
   watch: {
@@ -125,6 +132,24 @@ export default {
   },
 
   methods: {
+    /**
+     * Called when component is mounted
+     */
+    fetchTimeseriesData: async function () {
+      this.isLoading = true;
+      const viewerStore = useLibraryViewerStore()
+      const viewerConfig = {
+        timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
+        apiUrl: siteConfig.apiUrl,
+        timeSeriesApi: siteConfig.timeSeriesApi,
+      };
+      viewerStore.setViewerConfig(viewerConfig)
+
+      return await viewerStore.fetchAndSetActiveViewer({
+        packageId: this.pkg?.content?.id,
+      })
+    },
+
     /**
      * Invoke method on viewer
      * Event emitted from palettes
@@ -199,6 +224,8 @@ export default {
       return isTimeseriesFile && isUnprocessed;
     },
   },
+
+  
 };
 </script>
 

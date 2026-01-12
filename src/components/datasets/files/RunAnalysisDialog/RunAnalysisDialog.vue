@@ -333,6 +333,7 @@ import { mapState, mapActions, mapGetters } from "vuex";
 import FilesTable from "../../../FilesTable/FilesTable.vue";
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 
 export default {
   name: "IntegratedAnalysisDialog",
