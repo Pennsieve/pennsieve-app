@@ -1,8 +1,6 @@
 <template>
   <bf-stage slot="stage">
 
-
-
     <div class="shared-with-me">
 
       <!-- Workspaces Section -->
