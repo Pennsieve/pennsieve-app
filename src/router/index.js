@@ -309,7 +309,7 @@ const router = createRouter({
           meta: {
             hideSecondaryNav: true,
             title: 'Data Publishing',
-            description: 'View and manage your data publishing dashboard and submissions.'
+            description: 'Manage your dataset publishing proposals.'
           },
           children: [
             {

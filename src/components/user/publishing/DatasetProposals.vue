@@ -3,7 +3,7 @@
     <div class="page-header">
       <p class="page-description">
         Manage your dataset proposal submissions. Track the status of your submissions, edit drafts, 
-        and submit new proposals to open repositories.
+        and submit new proposals to available repositories.
       </p>
       
       <div class="header-actions">
@@ -57,7 +57,9 @@
       <!-- Empty State -->
       <div v-else class="empty-state">
         <div class="empty-content">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon">
+            <IconDocument :width="64" :height="64" color="currentColor" />
+          </div>
           <h2>No Dataset Proposals Yet</h2>
           <p>
             You haven't created any dataset proposals yet. Submit your datasets to open repositories 
@@ -112,6 +114,7 @@ import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
+import IconDocument from '@/components/icons/IconDocument.vue'
 
 const store = useStore()
 const proposalStore = useProposalStore()
@@ -544,7 +547,7 @@ watch(repositories, (newRepositories) => {
     max-width: 500px;
     
     .empty-icon {
-      font-size: 64px;
+      color: theme.$purple_tint;
       margin-bottom: 16px;
     }
     

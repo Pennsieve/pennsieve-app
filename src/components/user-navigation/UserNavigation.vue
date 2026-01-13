@@ -87,7 +87,7 @@
 
       <user-navigation-item
         :link="{ name: 'data-publishing' }"
-        label="Submit Datasets"
+        label="Data Publishing"
         :condensed="primaryNavCondensed"
       >
         <template v-slot:icon>

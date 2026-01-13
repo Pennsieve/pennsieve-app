@@ -75,8 +75,12 @@ export default {
   transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 2px 6px 8px rgba(0, 0, 0, 0.15);
+    transform: scale(1.01);
+    
+    .top {
+      background: theme.$gray_1;
+      border-color: theme.$gray_2;
+    }
   }
 
   .top {
