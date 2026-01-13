@@ -8,58 +8,41 @@ import router from "@/router";
 export async function useSwitchWorkspace(org) {
     const orgId = org.organization.id
     
-    // Track when loading started for minimum display time
-    const loadingStartTime = Date.now()
-    const minimumLoadingTime = 600 // milliseconds
-    
-    // Set loading state to true at the beginning (in case it wasn't set already)
+    // Set loading state to true at the beginning
     store.dispatch('setIsSwitchingOrganization', true)
     
-    return useGetToken()
-        .then(token => {
-            const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
-            return useSendXhr(switchOrgUrl, {method: 'PUT'})
-                .then(response => {
+    try {
+        const token = await useGetToken()
+        const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
+        
+        // Perform the organization switch
+        await useSendXhr(switchOrgUrl, {method: 'PUT'})
 
-                    const p0 = store.dispatch('clearState')
-                    const p1 = store.dispatch('clearDatasetFilters')
-                    const p2 = store.dispatch('datasetModule/clearSearchState')
-                    const p3 = store.dispatch('updateFilesProxyId', null)
+        // Clear state and update stores
+        await Promise.all([
+            store.dispatch('clearState'),
+            store.dispatch('clearDatasetFilters'),
+            store.dispatch('datasetModule/clearSearchState'),
+            store.dispatch('updateFilesProxyId', null)
+        ])
 
-                    return Promise.all([p0,p1,p2,p3])
-                        .then(() => {
-                            if (!checkIsSubscribed) {
-                                router.replace(`/${orgId}/welcome/terms-of-service`)
-                            } else {
-                                router.replace(`/${orgId}/datasets`)
-                            }
-                        })
+        // Navigate to the appropriate route
+        if (!checkIsSubscribed) {
+            await router.replace(`/${orgId}/welcome/terms-of-service`)
+        } else {
+            await router.replace(`/${orgId}/datasets`)
+        }
 
-                }).then(() => {
-                    return store.dispatch('updateActiveOrganization', org)
-                })
-                .finally(() => {
-                    // Calculate how long the loading has been shown
-                    const elapsedTime = Date.now() - loadingStartTime
-                    const remainingTime = Math.max(0, minimumLoadingTime - elapsedTime)
-                    
-                    // Clear loading state after minimum time has passed
-                    setTimeout(() => {
-                        store.dispatch('setIsSwitchingOrganization', false)
-                    }, remainingTime)
-                })
-        })
-        .catch(err => {
-            // Clear loading state on error with minimum display time
-            const elapsedTime = Date.now() - loadingStartTime
-            const remainingTime = Math.max(0, minimumLoadingTime - elapsedTime)
-            
-            setTimeout(() => {
-                store.dispatch('setIsSwitchingOrganization', false)
-            }, remainingTime)
-            
-            useHandleXhrError(err)
-        })
-
-
+        // Update the active organization
+        await store.dispatch('updateActiveOrganization', org)
+        
+        // Clear loading state only after everything is complete
+        store.dispatch('setIsSwitchingOrganization', false)
+        
+    } catch (err) {
+        // Clear loading state immediately on error
+        store.dispatch('setIsSwitchingOrganization', false)
+        useHandleXhrError(err)
+        throw err
+    }
 }

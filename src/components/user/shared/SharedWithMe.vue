@@ -42,29 +42,33 @@
 
         <div v-else-if="guestDatasets.length === 0" class="empty-state">
           <div class="empty-state-content">
-            <IconDataset :width="48" :height="48" color="#71747c" />
-            <h3>No guest dataset access</h3>
-            <p>You haven't been invited to any datasets as a guest.</p>
+            <IconCompass :width="48" :height="48" color="#71747c" />
+            <h3>No datasets available</h3>
+            <p>You haven't been invited to any datasets outside your workspaces.</p>
           </div>
         </div>
 
         <div v-else class="dataset-list">
-          <div class="dataset-list-header">
-            <div class="dataset-search">
-              <el-input
-                v-model="datasetSearchQuery"
-                class="dataset-search-input"
-                placeholder="Search guest datasets..."
-                @input="filterDatasets"
-              >
-                <template #prefix>
-                  <IconMagnifyingGlass :height="20" :width="20" color="#71747c" />
-                </template>
-              </el-input>
+
+          <!-- Pagination Controls -->
+          <div class="dataset-list-controls mb-8">
+            <div class="dataset-list-controls-menus">
+              <pagination-page-menu
+                class="mr-24"
+                pagination-item-label="Datasets"
+                :page-size="pageSize"
+                @update-page-size="updatePageSize"
+              />
             </div>
-            <div class="dataset-count">
-              {{ filteredGuestDatasets.length }} dataset{{ filteredGuestDatasets.length !== 1 ? 's' : '' }}
-            </div>
+
+            <el-pagination
+              :page-size="pageSize"
+              :pager-count="5"
+              :current-page="currentPage"
+              layout="prev, pager, next"
+              :total="totalCount"
+              @current-change="onPageChange"
+            />
           </div>
 
           <div class="dataset-grid">
@@ -102,12 +106,12 @@
           </div>
 
           <!-- Pagination for datasets if needed -->
-          <div v-if="filteredGuestDatasets.length > pageSize" class="pagination-container">
+          <div  class="pagination-container">
             <el-pagination
               :page-size="pageSize"
               :current-page="currentPage"
               layout="prev, pager, next"
-              :total="filteredGuestDatasets.length"
+              :total="totalCount"
               @current-change="onPageChange"
             />
           </div>
@@ -126,18 +130,24 @@ import IconDataset from '@/components/icons/IconDataset.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconMagnifyingGlass from '@/components/icons/IconMagnifyingGlass.vue'
 import WorkspaceCard from './WorkspaceCard.vue'
+import PaginationPageMenu from '@/components/shared/PaginationPageMenu/PaginationPageMenu.vue'
 import { useGetToken } from '@/composables/useGetToken'
+import IconCollaborators from "@/components/icons/IconCollaborators.vue";
+import IconCompass from "@/components/icons/IconCompass.vue";
 
 export default {
   name: 'SharedWithMe',
 
   components: {
+    IconCompass,
+    IconCollaborators,
     BfStage,
     IconOrganization,
     IconDataset,
     IconArrowRight,
     IconMagnifyingGlass,
-    WorkspaceCard
+    WorkspaceCard,
+    PaginationPageMenu
   },
 
   data() {
@@ -147,7 +157,8 @@ export default {
       datasetSearchQuery: '',
       filteredGuestDatasets: [],
       currentPage: 1,
-      pageSize: 20
+      pageSize: 20,
+      totalCount: 0
     }
   },
 
@@ -189,8 +200,11 @@ export default {
         // Get the user's authentication token
         const token = await useGetToken()
         
-        // Fetch shared datasets from the API
-        const response = await fetch('https://api2.pennsieve.net/datasets/shared-datasets?limit=100&offset=0', {
+        // Calculate offset for current page
+        const offset = (this.currentPage - 1) * this.pageSize
+        
+        // Fetch shared datasets from the API with pagination
+        const response = await fetch(`https://api2.pennsieve.net/datasets/shared-datasets?limit=${this.pageSize}&offset=${offset}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -206,10 +220,12 @@ export default {
         // Transform the API response to match our component's data structure
         this.guestDatasets = data.datasets || []
         this.filteredGuestDatasets = [...this.guestDatasets]
+        this.totalCount = data.totalCount || data.datasets?.length || 0
       } catch (error) {
         console.error('Error loading guest datasets:', error)
         this.guestDatasets = []
         this.filteredGuestDatasets = []
+        this.totalCount = 0
       } finally {
         this.isLoadingDatasets = false
       }
@@ -305,6 +321,13 @@ export default {
 
     onPageChange(page) {
       this.currentPage = page
+      this.loadGuestDatasets()
+    },
+
+    updatePageSize(newPageSize) {
+      this.pageSize = newPageSize
+      this.currentPage = 1 // Reset to first page when changing page size
+      this.loadGuestDatasets()
     }
   }
 }
@@ -621,6 +644,27 @@ export default {
   transition: transform 0.2s ease;
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+.dataset-list-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .dataset-list-controls-menus {
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+
+    .dataset-list-controls-menus {
+      justify-content: center;
+    }
+  }
 }
 
 .pagination-container {

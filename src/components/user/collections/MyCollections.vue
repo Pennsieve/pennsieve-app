@@ -26,7 +26,7 @@
     </div>
 
     <!-- Use the CollectionsList component -->
-    <collections-list ref="collectionsList" :user="true" :search-query="searchQuery" />
+    <collections-list ref="collectionsList" :user="true" :search-query="searchQuery" @create-collection="showCreateDialog" />
     
     <!-- Create Collection Dialog -->
     <create-collection-dialog
