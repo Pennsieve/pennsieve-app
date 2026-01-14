@@ -205,9 +205,7 @@ async function fetchGithubProfile() {
 
 function openGitHub() {
   const redirectUri = `${window.location.origin}/github-redirect`;
-  const githubAppUrl =
-    siteConfig.githubAppUrl || "https://github.com/apps/pennsieve";
-  const url = `${githubAppUrl}?redirect_uri=${redirectUri}`;
+  const url = `${siteConfig.githubAppUrl}?redirect_uri=${redirectUri}`;
 
   oauthWindow.value = window.open(
     url,
@@ -227,10 +225,16 @@ const messageEventListener = async (event) => {
     if (oauthCode !== "") {
       try {
         const token = await useGetToken();
+
+
+
         const response = await useSendXhr(
-          `${siteConfig.apiUrl}/user/github/register?api_key=${token}`,
+          `${siteConfig.api2Url}/accounts/github/register`,
           {
             method: "POST",
+            header: {
+              'Authorization': `Bearer ${token}`
+            },
             body: {
               code: oauthCode,
               installation_id: event.data.installationId,

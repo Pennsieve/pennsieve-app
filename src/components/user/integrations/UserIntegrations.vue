@@ -138,52 +138,6 @@ function updateGithubIntegration() {
   )
 }
 
-const messageEventListener = async (event) => {
-  if (
-    event.data &&
-    event.data.source &&
-    event.data.source === "github-redirect-response" &&
-    event.data.code
-  ) {
-    const oauthCode = event.data.code
-    if (oauthCode !== "") {
-      try {
-        // Use the same registration endpoint as initial connection
-        const token = await useGetToken()
-        const response = await fetch(`${siteConfig.apiUrl}/user/github/register?api_key=${token}`, {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            code: oauthCode,
-            installation_id: event.data.installationId,
-          })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          
-          // Update store with fresh data
-          const updatedProfile = {
-            ...profile.value,
-            githubProfile: data
-          }
-          
-          store.dispatch('updateProfile', updatedProfile)
-          
-          // Also refresh the GitHub profile data
-          await fetchGithubProfile()
-          
-          console.log('GitHub integration updated successfully:', data)
-        }
-      } catch (error) {
-        console.error('GitHub integration update error:', error)
-      }
-    }
-  }
-}
-
 async function fetchGithubProfile() {
   try {
     const token = await useGetToken()
