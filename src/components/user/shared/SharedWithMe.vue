@@ -132,6 +132,7 @@ import PaginationPageMenu from '@/components/shared/PaginationPageMenu/Paginatio
 import { useGetToken } from '@/composables/useGetToken'
 import IconCollaborators from "@/components/icons/IconCollaborators.vue";
 import IconCompass from "@/components/icons/IconCompass.vue";
+import * as siteConfig from "@/site-config/site.json";
 
 export default {
   name: 'SharedWithMe',
@@ -200,9 +201,9 @@ export default {
         
         // Calculate offset for current page
         const offset = (this.currentPage - 1) * this.pageSize
-        
+
         // Fetch shared datasets from the API with pagination
-        const response = await fetch(`https://api2.pennsieve.net/datasets/shared-datasets?limit=${this.pageSize}&offset=${offset}`, {
+        const response = await fetch(`${siteConfig.api2Url}/datasets/shared-datasets?limit=${this.pageSize}&offset=${offset}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
