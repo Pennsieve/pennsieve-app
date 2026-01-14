@@ -195,14 +195,16 @@ export default {
 .repo-list-item {
   background: white;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  //border-radius: 4px;
+  //margin-bottom: 8px;
   transition: all 0.2s ease;
   overflow: hidden;
+  max-width: 1200px;
 
   &:hover {
     border-color: theme.$gray_3;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    background: theme.$gray_1;
+    //box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 }
 

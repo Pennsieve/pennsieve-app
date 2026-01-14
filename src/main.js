@@ -163,8 +163,12 @@ router.beforeEach(async (to, from, next) => {
 
         // ==== GOING TO AUTHENTICATED PAGE WITH ORG CONTEXT ====
         // ==== GET PROFILE/ORGS AND CHECK PREFERRED ORG ====
-        // ==== Only get Profile and Workspaces if they have not been fetched before ====
-        if (Object.keys(store.getters.profile).length  === 0) {
+        
+        // Check if profile needs to be fetched
+        const profileExists = Object.keys(store.getters.profile).length > 0
+        
+        if (!profileExists) {
+            // First load - fetch everything
             await useGetProfileAndOrg(store)
                 .then(() => {
                     return checkActiveOrg(to)})
@@ -174,6 +178,21 @@ router.beforeEach(async (to, from, next) => {
                 .then(() => {
                     return getPrimaryData()
                 }).catch(err => useHandleXhrError(err))
+        } else {
+            // Profile exists - just check if org context needs updating
+            const routeOrgId = to.params.orgId
+            const currentActiveOrgId = store.getters.activeOrganization?.organization?.id
+            
+            // Only check/switch org if the route has an orgId and it's different from current
+            if (routeOrgId && routeOrgId !== currentActiveOrgId) {
+                await checkActiveOrg(to)
+                    .then(() => {
+                        // Only fetch primary data if we actually switched orgs
+                        if (store.getters.activeOrganization?.organization?.id !== currentActiveOrgId) {
+                            return getPrimaryData()
+                        }
+                    }).catch(err => useHandleXhrError(err))
+            }
         }
 
         next()
@@ -200,6 +219,12 @@ async function getPrimaryData() {
     return useGetToken().then(async token => {
 
         const activeOrg = store.getters.activeOrganization
+        
+        // Skip fetching primary data for guest organizations
+        if (activeOrg?.isGuest) {
+            return Promise.resolve()
+        }
+        
         const activeOrgId = activeOrg.organization.id
         const teamUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams?api_key=${token}`
 
@@ -301,18 +326,47 @@ function updateMembers(users) {
 async function checkActiveOrg(to) {
     const preferredOrgId = store.getters.profile.preferredOrganization
     const orgs = store.getters.organizations
-    const activeOrgId = preferredOrgId ?
-        pathOr(preferredOrgId, ['params', 'orgId'], to) :
-        path(['organizations', 0, 'organization', 'id'], orgs)
-
-    const activeOrgIndex = orgs.findIndex(org => Boolean(org.organization.id === activeOrgId))
-    const activeOrg = orgs[activeOrgIndex]
-
-    if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
-        return useSwitchWorkspace(activeOrg)
-    } else {
-        return store.dispatch('updateActiveOrganization', activeOrg)
+    const routeOrgId = to.params.orgId
+    const currentActiveOrgId = store.getters.activeOrganization?.organization?.id
+    
+    // Determine which org ID to use
+    const targetOrgId = routeOrgId || preferredOrgId || path(['organizations', 0, 'organization', 'id'], orgs)
+    
+    // Check if target org is already active - no need to do anything
+    if (targetOrgId === currentActiveOrgId) {
+        return Promise.resolve()
     }
+    
+    // Find the organization in the user's list
+    const activeOrgIndex = orgs.findIndex(org => org.organization.id === targetOrgId)
+    const activeOrg = orgs[activeOrgIndex]
+    
+    // Check if this is a shared dataset (org not in user's list)
+    if (routeOrgId && activeOrgIndex === -1) {
+        // User is navigating to a shared dataset in an org they're not a member of
+        // Create a minimal org object for navigation context
+        const guestOrg = {
+            organization: {
+                id: routeOrgId,
+                name: 'External Workspace',
+                isGuest: true
+            },
+            isGuest: true
+        }
+        return store.dispatch('updateActiveOrganization', guestOrg)
+    } else if (activeOrg) {
+        // User is a member of this org
+        if (routeOrgId && routeOrgId !== preferredOrgId) {
+            // Switching to a different org than preferred
+            return useSwitchWorkspace(activeOrg)
+        } else {
+            // Just update the active org without API call
+            return store.dispatch('updateActiveOrganization', activeOrg)
+        }
+    }
+    
+    // Fallback - shouldn't normally reach here
+    return Promise.resolve()
 }
 
 

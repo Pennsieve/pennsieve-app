@@ -95,6 +95,7 @@ import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import orcidImage from '@/assets/images/orcid_24x24.png'
 
 const store = useStore()
+const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
 const profile = computed(() => store.state.profile)
 
@@ -186,7 +187,7 @@ const messageEventListener = async (event) => {
 async function fetchGithubProfile() {
   try {
     const token = await useGetToken()
-    const response = await fetch('https://api2.pennsieve.net/accounts/github/user', {
+    const response = await fetch(GithubProfileUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

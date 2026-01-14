@@ -288,7 +288,6 @@ h2 {
 
 .support-option {
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
   padding: 24px;
   background: white;
   transition: all 0.2s ease;
@@ -467,7 +466,6 @@ h2 {
   display: block;
   padding: 16px;
   background: theme.$gray_1;
-  border-radius: 6px;
   border: 1px solid theme.$gray_2;
   text-decoration: none;
   color: inherit;
@@ -475,7 +473,7 @@ h2 {
 
   &:hover {
     background: white;
-    border-color: theme.$purple_3;
+    border-color: theme.$purple_1;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     text-decoration: none;
     color: inherit;

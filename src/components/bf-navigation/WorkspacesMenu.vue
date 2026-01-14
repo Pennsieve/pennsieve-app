@@ -36,12 +36,9 @@
               {{ organizationName }}
             </span>
             <span v-else id="organization-name" class="loading-text"
-              >&nbsp;</span
+            >&nbsp;</span
             >
 
-<!--            <span v-if="isWorkspaceGuest && isDataLoaded" id="workspace-guest">-->
-<!--              (workspace guest)-->
-<!--            </span>-->
           </div>
 
           <IconArrowRight
@@ -66,55 +63,28 @@
         @mouseleave="onUserMenuMouseleave"
       >
         <div class="bf-menu">
-          <div class="menu-header">
-            <span class="menu-title">Switch Workspace</span>
-          </div>
-          
-          <div class="workspace-list">
-            <!-- My Workspace -->
-            <a
-              href="#"
-              class="workspace-item"
-              :class="{ 'active': isMyWorkspaceActive }"
-              @click.prevent="goToMyWorkspace"
-            >
-              <span class="workspace-name">My Workspace</span>
-              <IconCheck
-                v-if="isMyWorkspaceActive"
-                class="icon-check"
-                :width="16"
-                :height="16"
-              />
-            </a>
-
-            <a
-              v-for="org in filteredOrganizations"
-              :key="org.organization.id"
-              href="#"
-              class="workspace-item"
-              :class="{ 'active': org.organization.name === organizationName }"
-              @click.prevent="switchOrganization(org)"
-            >
-              <span class="workspace-name">{{ org.organization.name }}</span>
-              <IconCheck
-                v-if="org.organization.name === organizationName"
-                class="icon-check"
-                :width="16"
-                :height="16"
-              />
-            </a>
-            
-            <div v-if="filteredOrganizations.length === 0" class="empty-workspaces">
-              No shared workspaces available
-            </div>
-          </div>
-          
-          <div class="menu-footer">
-            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
-
-              <span>Exit Workspaces</span>
-              <IconArrowRight class="exit-icon" :width="14" :height="14" />
-            </a>
+          <div class="bf-menu scroll-menu">
+            <ul>
+              <li
+                v-for="org in filteredOrganizations"
+                :key="org.organization.id"
+              >
+                <a
+                  href="#"
+                  class="bf-menu-item"
+                  @click.prevent="switchOrganization(org)"
+                >
+                  {{ org.organization.name }}
+                  <IconCheck
+                    v-if="org.organization.name === organizationName"
+                    class="icon-check"
+                    :width="20"
+                    :height="20"
+                    color="black"
+                  />
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -205,7 +175,7 @@ export default {
           .filter((organization) => {
             // Filter out guest workspaces
             const isGuest = organization.isGuest || organization.organization?.isGuest;
-            
+
             return (
               !isGuest &&
               organization.organization.name
@@ -270,15 +240,6 @@ export default {
     showOrgFilter: function () {
       return this.organizations.length >= 20;
     },
-
-    /**
-     * Check if currently in My Workspace (no active organization or user's email is shown)
-     * @returns {Boolean}
-     */
-    isMyWorkspaceActive: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return !orgId || orgId === "" || this.$route.name === 'shared-with-me';
-    },
   },
 
   methods: {
@@ -298,14 +259,6 @@ export default {
       this.closeMenus();
 
       EventBus.$emit("switch-organization", org);
-    },
-
-    /**
-     * Navigate to My Workspace (shared-with-me page)
-     */
-    goToMyWorkspace: function () {
-      this.closeMenus();
-      this.$router.push({ name: 'shared-with-me' });
     },
 
     /**
@@ -414,12 +367,7 @@ export default {
 
 .user-menu-wrap {
   --el-popover-padding: 0;
-  --el-popover-bg-color: white;
-  background: theme.$purple_3;
-  
-  .secondary & {
-    background: theme.$gray_2;
-  }
+  --el-popover-bg-color: theme.$purple_2;
 }
 
 .person-circle {
@@ -437,7 +385,12 @@ export default {
   overflow: hidden;
   width: 32px;
 }
-
+.user-menu-wrap {
+  background: theme.$purple_3;
+  .secondary & {
+    background: theme.$gray_2;
+  }
+}
 .user-menu {
   cursor: pointer;
   height: 74px;
@@ -452,9 +405,11 @@ export default {
 }
 #organization-name {
   font-size: 12px;
-  opacity: 0.9;
 }
-
+#workspace-guest {
+  font-size: 10px;
+  color: #999999;
+}
 .info {
   flex: 1;
   margin: 0 8px 0 12px;
@@ -469,95 +424,21 @@ export default {
     text-overflow: ellipsis;
   }
 }
+.filter-input {
+  border-bottom: none;
+  border-top: 1px solid theme.$gray_2;
+}
 
-.bf-menu {
-  padding: 0;
-  
-  .menu-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid theme.$gray_2;
-    
-    .menu-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: theme.$gray_5;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-  }
-  
-  .workspace-list {
-    max-height: 300px;
-    overflow-y: auto;
-    padding: 8px 0;
-    
-    .workspace-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
-      color: theme.$gray_6;
-      text-decoration: none;
-      font-size: 14px;
-      transition: all 0.2s ease;
-      
-      &:hover {
-        background: theme.$gray_1;
-      }
-      
-      &.active {
-        background: theme.$purple_tint;
-        color: theme.$purple_2;
-        
-        .icon-check {
-          color: theme.$purple_2;
-        }
-      }
-      
-      .workspace-name {
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        margin-right: 8px;
-      }
-      
-      .icon-check {
-        flex-shrink: 0;
-        color: theme.$purple_2;
-      }
-    }
-    
-    .empty-workspaces {
-      padding: 20px 16px;
-      text-align: center;
-      color: theme.$gray_4;
-      font-size: 13px;
-    }
-  }
-  
-  .menu-footer {
-    border-top: 1px solid theme.$gray_2;
-    padding: 8px 0;
-    
-    .exit-link {
-      display: flex;
-      align-items: center;
-      padding: 10px 16px;
-      color: theme.$gray_6;
-      text-decoration: none;
-      font-size: 14px;
-      transition: background 0.2s ease;
-      
-      &:hover {
-        background: theme.$gray_1;
-      }
-      
-      .exit-icon {
-        margin-right: 8px;
-      }
-    }
-  }
+.user-menu-org-menu {
+  margin-left: 0 !important;
+}
+.user-menu-popover {
+  margin-left: 16px !important;
+}
+.icon-check {
+  margin-top: -4px;
+  float: right;
+  color: theme.$gray_4;
 }
 
 .loading-avatar {

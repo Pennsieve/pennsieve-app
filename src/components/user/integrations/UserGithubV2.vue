@@ -132,6 +132,8 @@ const displayGithubProfile = computed(() => {
     : profile.value?.githubProfile || {};
 });
 
+const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
+
 onMounted(() => {
   window.addEventListener("message", messageEventListener);
   initializeGithubData();
@@ -140,6 +142,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("message", messageEventListener);
 });
+
+
 
 async function initializeGithubData() {
   loading.value = true;
@@ -159,7 +163,7 @@ async function fetchGithubProfile() {
   try {
     const token = await useGetToken();
     const response = await fetch(
-      "https://api2.pennsieve.net/accounts/github/user",
+      GithubProfileUrl,
       {
         method: "GET",
         headers: {
@@ -273,7 +277,7 @@ const messageEventListener = async (event) => {
 async function confirmDelete() {
   try {
     const token = await useGetToken();
-    await useSendXhr("https://api2.pennsieve.net/accounts/github/user", {
+    await useSendXhr(GithubProfileUrl, {
       method: "DELETE",
       header: {
         Authorization: `Bearer ${token}`,

@@ -87,7 +87,7 @@
 
       <user-navigation-item
         :link="{ name: 'data-publishing' }"
-        label="Submit Dataset"
+        label="Data Publishing"
         :condensed="primaryNavCondensed"
       >
         <template v-slot:icon>
@@ -95,9 +95,6 @@
         </template>
       </user-navigation-item>
 
-    </div>
-
-    <div class="menu-wrap bottom">
       <user-navigation-item
         :link="{ name: 'my-settings' }"
         label="Account Settings"
@@ -107,19 +104,11 @@
           <IconSettings :width="20" :height="20" color="currentColor" />
         </template>
       </user-navigation-item>
-<!--      <user-navigation-item-->
-<!--        v-if="userProfile && userProfile.email"-->
-<!--        :link="{ name: 'user-profile' }"-->
-<!--        :label="userDisplayName"-->
-<!--        :subtitle="userProfile.email"-->
-<!--        :condensed="primaryNavCondensed"-->
-<!--      >-->
-<!--        <template v-slot:icon>-->
-<!--          <div class="user-avatar">-->
-<!--            {{ userInitials }}-->
-<!--          </div>-->
-<!--        </template>-->
-<!--      </user-navigation-item>-->
+
+    </div>
+
+    <div class="menu-wrap bottom">
+
     </div>
     
     <bf-navigation-tertiary

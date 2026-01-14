@@ -5,6 +5,14 @@ let route = useRoute();
 
 <template>
   <div id="app-wrap">
+    <!-- Organization switch loading overlay -->
+    <div v-if="isSwitchingOrganization" class="org-switch-overlay">
+      <div class="org-switch-spinner">
+        <div class="spinner"></div>
+        <p>Switching workspace...</p>
+      </div>
+    </div>
+    
     <router-view name="header" />
     <div class="session-info" v-if="showSessionTimer">
       <div>
@@ -66,6 +74,7 @@ export default {
     PennsieveUpload,
     PsAnalytics,
     BfDownloadFile,
+    Office365Dialog,
   },
   mixins: [globalMessageHandler, request],
 
@@ -95,6 +104,7 @@ export default {
       "secondaryNavOpen",
       "environment",
       "searchModalVisible",
+      "isSwitchingOrganization",
     ]),
     ...mapGetters([
       "activeOrganization",
@@ -319,6 +329,48 @@ export default {
   padding: 8px 16px;
   font-weight: 500;
   color: theme.$purple_2;
+}
+
+.org-switch-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.org-switch-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  
+  p {
+    font-size: 16px;
+    color: theme.$gray_5;
+    font-weight: 400;
+    margin: 0;
+  }
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid theme.$gray_2;
+  border-top-color: theme.$purple_2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
 
