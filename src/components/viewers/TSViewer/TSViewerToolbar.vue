@@ -5,8 +5,9 @@
       <el-input-number
         v-model="durationInSeconds"
         v-if="showTimeZoom"
-        :precision="1"
-        :step="5"
+        :precision="durationPrecision"
+        :step="durationStep"
+        :min="0.01"
         :max="constants['MAXDURATION']"
         controls-position="right">
 
@@ -216,6 +217,9 @@ const iconPlay = computed(() => {
   }
 })
 
+// Store the previous value to detect direction of change
+let previousDuration = ref(props.duration / 1e6)
+
 const durationInSeconds = computed({
   // getter
   get() {
@@ -223,7 +227,73 @@ const durationInSeconds = computed({
   },
   // setter
   set(newValue) {
-    emit('updateDuration', newValue)
+    const currentValue = props.duration / 1e6
+    const isIncreasing = newValue > currentValue
+    const isDecreasing = newValue < currentValue
+    
+    // Ensure minimum value
+    let validValue = Math.max(0.01, newValue)
+    
+    // Handle boundary transitions specially
+    if (currentValue === 0.1 && isIncreasing) {
+      validValue = 0.2 // Jump from 0.1 to 0.2 when increasing
+    } else if (currentValue === 0.1 && isDecreasing) {
+      validValue = 0.09 // Jump from 0.1 to 0.09 when decreasing
+    } else if (currentValue === 1 && isIncreasing) {
+      validValue = 2 // Jump from 1 to 2 when increasing
+    } else if (currentValue === 1 && isDecreasing) {
+      validValue = 0.9 // Jump from 1 to 0.9 when decreasing
+    } else if (currentValue === 10 && isIncreasing) {
+      validValue = 20 // Jump from 10 to 20 when increasing
+    } else if (currentValue === 10 && isDecreasing) {
+      validValue = 9 // Jump from 10 to 9 when decreasing
+    } else {
+      // Round to appropriate precision to avoid floating point issues
+      if (validValue < 0.095) {
+        validValue = Math.round(validValue * 100) / 100 // Round to 0.01
+      } else if (validValue < 0.95) {
+        validValue = Math.round(validValue * 10) / 10 // Round to 0.1
+      } else if (validValue < 9.5) {
+        validValue = Math.round(validValue) // Round to 1
+      } else if (validValue < 95) {
+        validValue = Math.round(validValue / 10) * 10 // Round to 10
+      } else {
+        validValue = Math.round(validValue / 100) * 100 // Round to 100
+      }
+    }
+    
+    previousDuration.value = validValue
+    emit('updateDuration', validValue)
+  }
+})
+
+// Dynamic step size based on current duration
+const durationStep = computed(() => {
+  const currentDuration = durationInSeconds.value
+  
+  // Regular step logic
+  if (currentDuration < 0.1) {
+    return 0.01 // Step by 0.01 second below 0.1 second
+  } else if (currentDuration < 1) {
+    return 0.1 // Step by 0.1 second below 1 second
+  } else if (currentDuration < 10) {
+    return 1 // Step by 1 second below 10 seconds
+  } else if (currentDuration < 100) {
+    return 10 // Step by 10 seconds below 100 seconds
+  } else {
+    return 100 // Step by 100 seconds for 100+ seconds
+  }
+})
+
+// Dynamic precision based on current duration
+const durationPrecision = computed(() => {
+  const currentDuration = durationInSeconds.value
+  if (currentDuration < 1) {
+    return 2 // Show 2 decimal places below 1 second (0.01, 0.10, etc.)
+  } else if (currentDuration < 10) {
+    return 1 // Show 1 decimal place below 10 seconds (1.0, 2.0, etc.)
+  } else {
+    return 0 // Show whole seconds for 10+ seconds
   }
 })
 

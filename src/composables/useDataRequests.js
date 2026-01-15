@@ -99,6 +99,7 @@ export const useDataRequests = () => {
     // Request data (from original)
     const requestData = (showChannels, start, duration, viewData, requestedPages, constants, rsPeriod, ts_end, segmIndexOf, getChannelIdFn) => {
         const pageSize = 15000000
+        
 
         // Init async requests for viewport pages
         aSyncRequests.value = []
@@ -176,20 +177,30 @@ export const useDataRequests = () => {
                 }
 
                 if (inRange) {
-                    // Data is already cached
-                    let isViewPage = curSegm.startTs < start + duration
+                    // Process ALL segments with the same pageStart
+                    const currentPageStart = curSegm.pageStart
+                    let processedAnySegment = false
+                    
+                    // Process all segments in this page
+                    while (curSegm && curSegm.pageStart === currentPageStart) {
+                        let isViewPage = curSegm.startTs < start + duration
+                        
+                        // Only add to viewData if segment is not a prefetch page
+                        if (isViewPage) {
+                            chanViewData.blocks.push(curSegm)
+                            processedAnySegment = true
+                        }
 
-                    segmOffset += 1
-                    curTime += pageSize
-
-                    // Only add to viewData if segment is not a prefetch page
-                    if (isViewPage) {
-                        chanViewData.blocks.push(curSegm)
+                        // Move to next segment
+                        segmOffset += 1
+                        curSegm = chDataSegments[firstSegment + segmOffset]
                     }
 
-                    const prevPageTime = curSegm.pageStart
-                    curSegm = chDataSegments[firstSegment + segmOffset]
-                    if (curSegm && prevPageTime === curSegm.pageStart) {
+                    // Move to next page
+                    curTime += pageSize
+                    
+                    // If we have more segments and they're from the same page, continue processing
+                    if (curSegm && curSegm.pageStart === currentPageStart) {
                         continuationSegment = true
                     }
                 } else {
@@ -207,6 +218,12 @@ export const useDataRequests = () => {
                                 }
                             }
                         }
+                        continue
+                    }
+
+                    // Skip if this page would start after dataset end
+                    if (curTime >= ts_end) {
+                        curTime += pageSize
                         continue
                     }
 
@@ -324,8 +341,38 @@ export const useDataRequests = () => {
 
             // Check for last block
             let requestEndTime = curRequest.start + curRequest.duration
+            
+            // Debug logging for invalid request issue
+            if (curRequest.start >= datasetEndTime) {
+                console.error('❌ Request start time is beyond dataset end!', {
+                    requestStart: curRequest.start,
+                    requestDuration: curRequest.duration,
+                    calculatedEndTime: requestEndTime,
+                    datasetEndTime: datasetEndTime,
+                    isStartAfterEnd: curRequest.start >= datasetEndTime
+                })
+            }
+            
             if (requestEndTime > datasetEndTime) {
+                console.warn('📊 Clamping request end time to dataset boundary:', {
+                    original: requestEndTime,
+                    clamped: datasetEndTime,
+                    requestStart: curRequest.start,
+                    duration: curRequest.duration
+                })
                 requestEndTime = datasetEndTime
+            }
+            
+            // This should never happen - skip the request if it does
+            if (requestEndTime <= curRequest.start) {
+                console.error('🚨 CRITICAL: Invalid request detected - endTime <= startTime! Skipping request.', {
+                    startTime: curRequest.start,
+                    endTime: requestEndTime,
+                    duration: curRequest.duration,
+                    datasetEndTime: datasetEndTime,
+                    originalEndTime: curRequest.start + curRequest.duration
+                })
+                continue // Skip this invalid request to prevent WebSocket closure
             }
 
             const ws = websocket
