@@ -162,8 +162,8 @@ export const mutations = {
         state.orgMembers = members;
       },
       UPDATE_ACTIVE_ORGANIZATION(state, activeOrganization) {
-        state.orgMembers = [];
-        state.teams = [];
+        // Don't clear orgMembers and teams here - they will be updated
+        // when getPrimaryData() fetches the new workspace data
         state.activeOrganization = activeOrganization;
       },
       SET_IS_SWITCHING_ORGANIZATION(state, isSwitching) {

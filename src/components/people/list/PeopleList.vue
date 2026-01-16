@@ -190,12 +190,31 @@ export default {
   watch: {
     orgMembers: {
       handler: function(orgMembers) {
-        if (orgMembers.length > 0) {
+        if (orgMembers && orgMembers.length > 0) {
           this.members = orgMembers
           this.getUsers()
+        } else {
+          // Reset state when no members (e.g., after workspace switch)
+          this.allPeople = []
+          this.members = []
+          this.invitations = []
+          this.isLoading = false // Important: stop the loading spinner
         }
       },
       immediate: true
+    },
+    activeOrganization: {
+      handler: function(newOrg, oldOrg) {
+        // Reset component state when switching organizations
+        if (oldOrg && newOrg && oldOrg.organization?.id !== newOrg.organization?.id) {
+          this.allPeople = []
+          this.members = []
+          this.invitations = []
+          this.offset = 0
+          this.isLoading = true // Show loading while waiting for new data
+        }
+      },
+      deep: true
     }
   },
 
@@ -349,11 +368,8 @@ export default {
               const pendingMembers = this.updatePendingMembers(values[0])
               const currentMembers = this.updateCurrentMembers(values[1])
               const allUsers = union(pendingMembers, currentMembers)
-              if (this.allPeople.length !== this.orgMembers.length) {
-                this.allPeople = this.returnSort('lastName', allUsers, this.sortDirection)
-              } else {
-                this.allPeople = allUsers
-              }
+              // Always update and sort allPeople when workspace changes
+              this.allPeople = this.returnSort('lastName', allUsers, this.sortDirection)
             })
 
         }).catch(this.handleXhrError.bind(this))
