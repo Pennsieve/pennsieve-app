@@ -185,12 +185,15 @@ router.beforeEach(async (to, from, next) => {
             
             // Only check/switch org if the route has an orgId and it's different from current
             if (routeOrgId && routeOrgId !== currentActiveOrgId) {
+                // Clear workspace-specific data before switching
+                store.commit('UPDATE_ORG_MEMBERS', [])
+                store.commit('UPDATE_TEAMS', [])
+                
                 await checkActiveOrg(to)
                     .then(() => {
-                        // Only fetch primary data if we actually switched orgs
-                        if (store.getters.activeOrganization?.organization?.id !== currentActiveOrgId) {
-                            return getPrimaryData()
-                        }
+                        // Fetch primary data when switching orgs via navigation
+                        // This ensures teams, members, etc. are loaded for the new workspace
+                        return getPrimaryData()
                     }).catch(err => useHandleXhrError(err))
             }
         }
@@ -356,13 +359,9 @@ async function checkActiveOrg(to) {
         return store.dispatch('updateActiveOrganization', guestOrg)
     } else if (activeOrg) {
         // User is a member of this org
-        if (routeOrgId && routeOrgId !== preferredOrgId) {
-            // Switching to a different org than preferred
-            return useSwitchWorkspace(activeOrg)
-        } else {
-            // Just update the active org without API call
-            return store.dispatch('updateActiveOrganization', activeOrg)
-        }
+        // For route-based navigation, just update the active org without using useSwitchWorkspace
+        // which is designed for user-initiated switches and includes router.replace calls
+        return store.dispatch('updateActiveOrganization', activeOrg)
     }
     
     // Fallback - shouldn't normally reach here
