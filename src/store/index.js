@@ -106,7 +106,6 @@ const initialState = () => ({
   searchModalVisible: false,
   searchModalSearch: {},
   shouldCollapsePrimaryNav: false,
-  scientificUnits: [],
   profile: {},
   pageNotFound: false,
   dataUseAgreements: [],
@@ -139,10 +138,6 @@ export const mutations = {
 
       SET_PAGE_NOT_FOUND(state, data) {
         state.pageNotFound = data;
-      },
-
-      UPDATE_SCIENTIFIC_UNITS(state, data) {
-        state.scientificUnits = data;
       },
 
       UPDATE_SEARCH_MODAL_SEARCH(state, data) {
@@ -625,8 +620,6 @@ export const actions = {
   updateCognitoUser: ({ commit }, evt) => commit("UPDATE_COGNITO_USER", evt),
   updateGithubProfile: ({ commit }, evt) => commit("UPDATE_GITHUB_PROFILE", evt),
   updatePageNotFound: ({ commit }, evt) => commit("SET_PAGE_NOT_FOUND", evt),
-  updateScientificUnits: ({ commit }, evt) =>
-      commit("UPDATE_SCIENTIFIC_UNITS", evt),
   updateSearchModalSearch: ({ commit }, search) => {
     commit("UPDATE_SEARCH_MODAL_SEARCH", search);
   },
