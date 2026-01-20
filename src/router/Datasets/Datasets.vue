@@ -82,17 +82,17 @@ export default {
       return this.$route.name === "datasets-list";
     },
 
-    /**
-     * Get units URL
-     * @returns {String}
-     */
-    scientificUnitsUrl: async function () {
-      const datasetId = pathOr("", ["content", "id"], this.dataset);
-
-      return useGetToken().then((token) => {
-        return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/units?api_key=${token}`;
-      });
-    },
+    // /**
+    //  * Get units URL
+    //  * @returns {String}
+    //  */
+    // scientificUnitsUrl: async function () {
+    //   const datasetId = pathOr("", ["content", "id"], this.dataset);
+    //
+    //   return useGetToken().then((token) => {
+    //     return `${this.config.apiUrl}/models/datasets/${datasetId}/properties/units?api_key=${token}`;
+    //   });
+    // },
 
     /**
      * Compute URL to get a dataset
@@ -193,30 +193,30 @@ export default {
     ...mapActions("datasetModule", ["setPusherChannel"]),
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
 
-    /**
-     * Retrieves list of scientific units
-     */
-    getScientificUnits: function () {
-      this.scientificUnitsUrl.then((url) => {
-        this.sendXhr(url)
-          .then((resp) => {
-            this.updateScientificUnits([
-              ...resp,
-              {
-                dimension: "Other",
-                units: [
-                  {
-                    name: "Other",
-                    displayName: "Other",
-                    description: "Other",
-                  },
-                ],
-              },
-            ]);
-          })
-          .catch(this.handleXhrError.bind(this));
-      });
-    },
+    // /**
+    //  * Retrieves list of scientific units
+    //  */
+    // getScientificUnits: function () {
+    //   this.scientificUnitsUrl.then((url) => {
+    //     this.sendXhr(url)
+    //       .then((resp) => {
+    //         this.updateScientificUnits([
+    //           ...resp,
+    //           {
+    //             dimension: "Other",
+    //             units: [
+    //               {
+    //                 name: "Other",
+    //                 displayName: "Other",
+    //                 description: "Other",
+    //               },
+    //             ],
+    //           },
+    //         ]);
+    //       })
+    //       .catch(this.handleXhrError.bind(this));
+    //   });
+    // },
 
     /**
      * Get the current dataset
@@ -243,7 +243,7 @@ export default {
             })
             .then((dataset) => {
               this.setDataset(dataset);
-              this.getScientificUnits();
+              // this.getScientificUnits();
             })
             .then(() => {
               return this.getUserRole();

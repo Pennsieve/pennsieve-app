@@ -271,7 +271,7 @@ export const actions = {
 
 
     const datasetId = router.currentRoute.value.params.datasetId
-    const endpoint = `${rootState.config.api2Url}/manifest`
+    const endpoint = `${rootState.config.api2Url}/upload/manifest`
 
     const apiKey = await useGetToken()
 
