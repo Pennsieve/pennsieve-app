@@ -118,11 +118,10 @@ const githubUsername = computed(() => {
 const oauthWindow = ref(null)
 
 onMounted(async () => {
-  // Fetch fresh GitHub data to ensure integration status is up to date
-  await fetchGithubProfile()
-  
-  // Listen for GitHub OAuth updates
-  window.addEventListener('message', messageEventListener)
+  // Only fetch GitHub profile if we don't already have it
+  if (!profile.value?.githubProfile) {
+    await fetchGithubProfile()
+  }
 })
 
 function updateGithubIntegration() {
