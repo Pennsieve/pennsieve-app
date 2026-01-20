@@ -159,7 +159,7 @@ async function fetchGithubProfile() {
           githubProfile: data
         }
         
-        store.dispatch('updateProfile', updatedProfile)
+        await store.dispatch('updateProfile', updatedProfile)
         
         console.log('Updated store with GitHub profile from UserIntegrations:', data)
       }
