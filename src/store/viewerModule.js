@@ -302,6 +302,91 @@ export const actions = {
     commit('SET_VIEWER_MONTAGE_SCHEME', evt.montageScheme)
     commit('SET_CUSTOM_MONTAGE_MAP', JSON.parse(evt.customMontageMap))
   },
+  fetchCloudFrontUrl: async ({rootState}, { packageId, datasetId }) => {
+    try {
+      const token = await useGetToken()
+      const queryParams = toQueryParams({
+        package_id: packageId,
+        dataset_id: datasetId
+      })
+      const url = `${rootState.config.apiUrl}/packages/cloudfront/sign?${queryParams}`
+
+      const myHeaders = new Headers()
+      myHeaders.append('Authorization', 'Bearer ' + token)
+      myHeaders.append('Accept', 'application/json')
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: myHeaders
+      })
+
+      if (resp.ok) {
+        const result = await resp.json()
+        return result.url
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
+  /**
+   * Get viewer assets for a package
+   * @param {String} packageId
+   * @returns {Promise<Array>} Array of file assets
+   */
+  fetchViewerAssets: async ({rootState}, packageId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.apiUrl}/packages/${packageId}/view?api_key=${token}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (resp.ok) {
+        return await resp.json()
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
+  /**
+   * Get presigned URL for a file
+   * @param {String} packageId
+   * @param {String} fileId
+   * @returns {Promise<String>} Presigned URL
+   */
+  fetchFileUrl: async ({rootState}, { packageId, fileId }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (resp.ok) {
+        const result = await resp.json()
+        return result.url
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
   fetchWorkspaceMontages: async ({commit, rootState}, evt) => {
     try {
       let endpoint = `${rootState.config.api2Url}/timeseries/montages`
