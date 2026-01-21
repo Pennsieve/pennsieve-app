@@ -179,7 +179,7 @@ export const actions = {
 
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
         try {
-            let endpoint = `${rootState.config.api2Url}/manifest/archive`
+            let endpoint = `${rootState.config.api2Url}/upload/manifest/archive`
             const token = await useGetToken()
 
             const queryParams = toQueryParams({
@@ -209,7 +209,7 @@ export const actions = {
 
     archiveManifest: async ({commit, rootState}, {manifest_id, permanent}) => {
         try {
-            let endpoint = `${rootState.config.api2Url}/manifest/archive`
+            let endpoint = `${rootState.config.api2Url}/upload/manifest/archive`
             const apiKey = await useGetToken()
 
             const queryParams = toQueryParams({
@@ -321,7 +321,7 @@ export const actions = {
         if (state.manifestNodeId.length > 0 && datasetId===state.savedDatasetId) {
             return state.manifestNodeId
         } else {
-            const endpoint = `${rootState.config.api2Url}/manifest`
+            const endpoint = `${rootState.config.api2Url}/upload/manifest`
 
             state.savedDatasetId = datasetId;
 
@@ -430,7 +430,7 @@ export const actions = {
         // 3. All files are uploaded to the folder specified in 'destinationPackageId'
 
         //
-        const endpoint = `${rootState.config.api2Url}/manifest`
+        const endpoint = `${rootState.config.api2Url}/upload/manifest`
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
 

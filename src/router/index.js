@@ -69,8 +69,6 @@ const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/SetupFederatedLogin.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 
-const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
-const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
@@ -79,15 +77,12 @@ const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
-const MySettings = () => import('./MySettings/MySettings.vue')
-const MySettingsContainer = () => import('../components/my-settings/MySettingsContainer.vue')
 
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
 const TeamsList = () => import('../components/teams/list/TeamsList.vue')
-const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 /**
@@ -159,6 +154,7 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
+      redirect: "/my-workspace/shared",
     },
     {
       path: "/login",

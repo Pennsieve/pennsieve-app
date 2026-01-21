@@ -176,7 +176,7 @@ export default {
     },
     getManifestFilesUrl: function() {
       const pageLimit = 20
-      let url = `${this.config.api2Url}/manifest/files?&manifest_id=${this.item.id}&limit=${pageLimit}`
+      let url = `${this.config.api2Url}/upload/manifest/files?&manifest_id=${this.item.id}&limit=${pageLimit}`
       if (this.statusFilter != "All") {
         url = url + `&status=${this.statusFilter.replace(/\s/g, "")}`
       }
