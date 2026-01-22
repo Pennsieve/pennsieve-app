@@ -242,14 +242,6 @@
         immediate: true
       },
 
-      orgMembers: {
-        handler: function(val) {
-          if (val) {
-            this.getUsers()
-          }
-        },
-        immediate: true
-      }
     },
 
     methods: {
