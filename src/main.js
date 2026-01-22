@@ -26,7 +26,8 @@ import {fetchAuthSession} from "aws-amplify/auth";
 import {useGetProfileAndOrg} from "@/composables/useGetProfileAndOrg";
 import {useGetToken} from "@/composables/useGetToken";
 import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
-import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import {useSendXhr} from "@/mixins/request/request_composable";
+import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
@@ -156,7 +157,15 @@ router.beforeEach(async (to, from, next) => {
         // Only get Profile if not already fetched
         if (Object.keys(store.getters.profile).length === 0) {
             await useGetProfileAndOrg(store)
-                .catch(err => useHandleXhrError(err))
+                .catch(err => {
+                    console.error('Error loading profile:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'error',
+                            msg: 'Unable to load user profile. Please try refreshing the page.'
+                        }
+                    })
+                })
         }
         next()
     } else {
@@ -170,14 +179,35 @@ router.beforeEach(async (to, from, next) => {
         if (!profileExists) {
             // First load - fetch everything
             await useGetProfileAndOrg(store)
-                .then(() => {
-                    return checkActiveOrg(to)})
-                .then(() =>{
+                .then(async () => {
+                    await checkActiveOrg(to)
+                    
+                    // If this is a direct navigation to a specific org, switch session first
+                    const routeOrgId = to.params.orgId
+                    if (routeOrgId) {
+                        try {
+                            const token = await useGetToken()
+                            const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${routeOrgId}&api_key=${token}`
+                            await useSendXhr(switchOrgUrl, {method: 'PUT'})
+                            console.log(`Successfully switched session to organization: ${routeOrgId}`)
+                        } catch (err) {
+                            console.warn('Failed to switch organization session on first load:', err)
+                        }
+                    }
+                    
                     return store.dispatch('setActiveOrgSynced')
                 })
                 .then(() => {
                     return getPrimaryData()
-                }).catch(err => useHandleXhrError(err))
+                }).catch(err => {
+                    console.error('Error during workspace initialization:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'error',
+                            msg: 'There was an issue loading workspace data. Some features may be unavailable.'
+                        }
+                    })
+                })
         } else {
             // Profile exists - just check if org context needs updating
             const routeOrgId = to.params.orgId
@@ -185,16 +215,45 @@ router.beforeEach(async (to, from, next) => {
             
             // Only check/switch org if the route has an orgId and it's different from current
             if (routeOrgId && routeOrgId !== currentActiveOrgId) {
-                // Clear workspace-specific data before switching
-                store.commit('UPDATE_ORG_MEMBERS', [])
-                store.commit('UPDATE_TEAMS', [])
+                // Use the same clearing logic as useSwitchWorkspace
+                await Promise.all([
+                    store.dispatch('clearState'),
+                    store.dispatch('clearDatasetFilters'),
+                    store.dispatch('datasetModule/clearSearchState'),
+                    store.dispatch('updateFilesProxyId', null)
+                ])
                 
+                // Switch the backend session to match the URL FIRST
+                let sessionSwitched = false
+                try {
+                    const token = await useGetToken()
+                    const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${routeOrgId}&api_key=${token}`
+                    await useSendXhr(switchOrgUrl, {method: 'PUT'})
+                    sessionSwitched = true
+                    console.log(`Successfully switched session to organization: ${routeOrgId}`)
+                } catch (err) {
+                    console.warn('Failed to switch organization session:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'warning', 
+                            msg: 'Unable to switch workspace session. Some features may be unavailable.'
+                        }
+                    })
+                }
+                
+                // Only proceed with data loading if session switch succeeded
                 await checkActiveOrg(to)
-                    .then(() => {
-                        // Fetch primary data when switching orgs via navigation
-                        // This ensures teams, members, etc. are loaded for the new workspace
-                        return getPrimaryData()
-                    }).catch(err => useHandleXhrError(err))
+                if (sessionSwitched) {
+                    await getPrimaryData().catch(err => {
+                        console.error('Error loading workspace data:', err)
+                        EventBus.$emit('toast', {
+                            detail: {
+                                type: 'warning',
+                                msg: 'Workspace switched but some data may still be loading.'
+                            }
+                        })
+                    })
+                }
             }
         }
 
@@ -255,7 +314,7 @@ async function getPrimaryData() {
                 .then(resp => {
                     const orgMembers = updateMembers(resp)
                     store.dispatch('updateOrgMembers',orgMembers)
-                }).catch(err => useHandleXhrError(err))
+                }).catch(err => console.warn('Failed to load additional data:', err))
         }
 
         // ==== ORG CONTRIBUTORS ====
@@ -263,21 +322,21 @@ async function getPrimaryData() {
         const contributorPromise = useSendXhr(orgContributorUrl)
             .then(resp => {
                 store.dispatch('setOrgContributors', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
         // ==== DATA USE AGREEMENTS ====
         const dataUseAgreementUrl =`${siteConfig.apiUrl}/organizations/${activeOrgId}/data-use-agreements?api_key=${token}`
         const dataUseAgreementPromise = useSendXhr(dataUseAgreementUrl)
             .then(resp => {
                 store.dispatch('updateDataUseAgreements', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
         // ==== Dataset Statuses ====
         const datasetStatusUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/dataset-status?api_key=${token}`
         const datasetStatusPromise = useSendXhr(datasetStatusUrl)
             .then(resp => {
                 store.dispatch('updateOrgDatasetStatuses', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
 
         return Promise.all(
