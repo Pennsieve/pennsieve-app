@@ -17,10 +17,10 @@
     "build-clin": "npm run site-config-clin && npm run build"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity": "^3.499.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.499.0",
-    "@aws-sdk/client-s3": "^3.501.0",
-    "@aws-sdk/credential-providers": "^3.501.0",
+    "@aws-sdk/client-cognito-identity": "^3.974.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.974.0",
+    "@aws-sdk/client-s3": "^3.974.0",
+    "@aws-sdk/credential-providers": "^3.974.0",
     "@aws-sdk/lib-storage": "^3.501.0",
     "@dagrejs/dagre": "^1.1.4",
     "@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
@@ -40,7 +40,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "animejs": "^3.2.1",
-    "aws-amplify": "^6.8.0",
+    "aws-amplify": "^6.16.0",
     "blueimp-md5": "^2.19.0",
     "cropperjs": "^1.6.1",
     "d3": "^7.9.0",
