@@ -179,7 +179,7 @@ export const actions = {
   },
   fetchComputeResourceAccounts: async ({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.api2Url}/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/compute/resources/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
 
       const userToken = await useGetToken();
       const resp = await fetch(url, {
