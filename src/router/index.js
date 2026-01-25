@@ -95,6 +95,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
  */
 const UserProfile = () => import('../components/user/profile/UserProfile.vue')
 const UserApiKeys = () => import('../components/user/integrations/UserApiKeys.vue')
+const UserComputeResources = () => import('../components/user/integrations/UserComputeResources.vue')
 const UserSecurity = () => import('../components/user/integrations/UserSecurity.vue')
 const UserSupport = () => import('../components/user/integrations/UserSupport.vue')
 const UserDashboard = () => import('../components/user/dashboard/UserDashboard.vue')
@@ -260,6 +261,20 @@ const router = createRouter({
                   },
                   components: {
                     stage: UserApiKeys,
+                    navigation: UserNavigation,
+                  },
+                  props: true
+                },
+                {
+                  name: 'user-compute-resource',
+                  path: 'compute-resources',
+                  meta: {
+                    title: 'Compute Resources',
+                    description: 'Manage your external compute and storage accounts.',
+                    breadcrumbParent: 'user-integrations'
+                  },
+                  components: {
+                    stage: UserComputeResources,
                     navigation: UserNavigation,
                   },
                   props: true
