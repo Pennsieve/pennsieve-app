@@ -1504,14 +1504,6 @@ const router = createRouter({
           props: true
         },
         {
-          name: 'compute-nodes',
-          path: 'compute-nodes',
-          components: {
-            stage: ComputeNodesList,
-          },
-          props: true
-        },
-        {
           name: 'applications',
           path: 'applications',
           components: {
@@ -1527,14 +1519,53 @@ const router = createRouter({
         page: Settings,
         navigation: BfNavigation
       },
+      redirect: {
+        name: 'workspace-settings-overview'
+      },
       children: [
         {
-          name: 'settings',
+          name: 'workspace-settings-overview',
           path: '',
           components: {
             stage: OrgSettings
           }
         },
+        {
+          name: 'workspace-general',
+          path: 'general',
+          components: {
+            stage: () => import('../components/OrgSettings/GeneralSettingsPage.vue')
+          }
+        },
+        {
+          name: 'workspace-dataset-statuses',
+          path: 'dataset-statuses',
+          components: {
+            stage: () => import('../components/OrgSettings/DatasetStatusesPage.vue')
+          }
+        },
+        {
+          name: 'workspace-data-use-agreements',
+          path: 'data-use-agreements',
+          components: {
+            stage: () => import('../components/OrgSettings/DataUseAgreementsPage.vue')
+          }
+        },
+        {
+          name: 'workspace-usage-analytics',
+          path: 'usage',
+          components: {
+            stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
+          }
+        },
+        {
+          name: 'compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList
+          },
+          props: true
+        }
       ],
       props: true
     },

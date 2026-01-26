@@ -385,7 +385,6 @@ async function confirmDeleteNode() {
                 <li>Click "Create Compute Node" to set up a new node</li>
                 <li>Configure the node with a name and description</li>
                 <li>Manage node status (enabled/paused) as needed</li>
-                <li>Monitor node activity and resource usage</li>
               </ol>
             </div>
             <div class="documentation-link">
