@@ -9,6 +9,8 @@ import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconApi from '@/components/icons/IconApi.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
+import IconSettings from '@/components/icons/IconSettings.vue'
+import IconInfo from '@/components/icons/IconInfo.vue'
 
 const store = useStore()
 const profile = computed(() => store.state.profile)
@@ -517,7 +519,7 @@ function isAddWorkspaceDisabled() {
             <strong>Note:</strong> Each compute resource can have multiple compute nodes associated with it across different Pennsieve workspaces.
             Compute node management is handled separately through the Analysis section.
           </p>
-          <div class="setup-steps">continu
+          <div class="setup-steps">
             <h4>Quick Setup Guide:</h4>
             <ol>
               <li>Configure your AWS account using the AWS CLI</li>
@@ -698,7 +700,16 @@ function isAddWorkspaceDisabled() {
                   </div>
                   <div class="detail-row" v-if="resource.roleName">
                     <span class="detail-label">Role Name:</span>
-                    <span class="detail-value">{{ resource.roleName }}</span>
+                    <span class="detail-value">
+                      {{ resource.roleName }}
+                      <el-tooltip 
+                        content="This is the role in the external account that allows Pennsieve to deploy infrastructure for analysis pipelines."
+                        placement="top"
+                        effect="dark"
+                      >
+                        <IconInfo :width="14" :height="14" class="info-icon" />
+                      </el-tooltip>
+                    </span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Resource UUID:</span>
@@ -744,6 +755,16 @@ function isAddWorkspaceDisabled() {
                         </div>
                       </div>
                       <div class="workspace-actions">
+                        <router-link 
+                          :to="{ 
+                            name: 'compute-nodes',
+                            params: { orgId: workspace.organizationId }
+                          }"
+                          class="manage-nodes-button"
+                          title="Manage compute nodes"
+                        >
+                          <IconSettings :width="16" :height="16" />
+                        </router-link>
                         <button 
                           @click="openRemoveWorkspaceDialog(resource, workspace.organizationId)" 
                           :disabled="isWorkspaceOperationLoading(resource, workspace.organizationId)"
@@ -1622,6 +1643,17 @@ h2 {
           border-radius: 3px;
         }
 
+        .info-icon {
+          margin-left: 8px;
+          color: theme.$gray_4;
+          cursor: help;
+          vertical-align: middle;
+          
+          &:hover {
+            color: theme.$purple_2;
+          }
+        }
+
         .status-text {
           display: inline-block;
           padding: 2px 8px;
@@ -1759,6 +1791,9 @@ h2 {
       }
 
       .workspace-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
         flex-shrink: 0;
         margin-top: 2px; // Align with content
       }
@@ -1869,6 +1904,31 @@ h2 {
     strong {
       color: #92400E !important;
     }
+  }
+}
+
+// Manage nodes button styles
+.manage-nodes-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: theme.$gray_1;
+  color: theme.$gray_5;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: theme.$purple_1;
+    color: white;
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(theme.$purple_1, 0.2);
   }
 }
 

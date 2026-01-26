@@ -121,7 +121,7 @@ export const actions = {
   fetchComputeNodes: async ({ commit, rootState }) => {
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
         return fetch(url, {
           method: "GET",
           headers: {

@@ -52,12 +52,12 @@
           action-text="Manage API Keys"
         />
 
-        <!-- API Keys Integration -->
+        <!-- Compute Resources Integration -->
         <IntegrationCard
           title="Compute Resources"
           description="External accounts that can be used for compute, and storage nodes"
-          icon="IconApi"
-          icon-class="api"
+          icon="IconStorage"
+          icon-class="storage"
           status="info"
           status-text=""
           :route="{ name: 'user-compute-resource' }"
