@@ -78,7 +78,7 @@ import UserRoles from "../../../mixins/user-roles";
 import RemoveIntegrationDialog from "../removeIntegrationDialog.vue";
 
 import { pathOr, propOr } from "ramda";
-import DeleteApiKey from "../../my-settings/windows/DeleteApiKey.vue";
+import DeleteApiKey from "../../user/integrations/APIKeys/DeleteApiKey.vue";
 import IntegrationApiKeyDetails from "../integrationApiKeyDetails.vue";
 
 export default {

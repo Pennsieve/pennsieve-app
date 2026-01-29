@@ -4,6 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 
 // https://vitejs.dev/config/
@@ -33,8 +34,16 @@ export default defineConfig({
     Components({
       resolvers: [ElementPlusResolver({importStyle: false})],
     }),
+    nodePolyfills({
+      include: ['util'],
+      globals: {
+        process: true,
+        Buffer: true,
+      },
+    }),
   ],
   define: {
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
   },
   resolve: {
     alias: {

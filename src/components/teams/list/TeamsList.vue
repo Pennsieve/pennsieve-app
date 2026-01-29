@@ -145,10 +145,22 @@ export default {
       handler: function (teams) {
         if (teams) {
           this.getTeams();
+        } else {
+          // Reset state when no teams
+          this.teamsList = []
         }
       },
       immediate: true,
     },
+    activeOrganization: {
+      handler: function(newOrg, oldOrg) {
+        // Reset component state when switching organizations
+        if (oldOrg && newOrg && oldOrg.organization?.id !== newOrg.organization?.id) {
+          this.teamsList = []
+        }
+      },
+      deep: true
+    }
   },
 
   beforeRouteEnter(to, from, next) {

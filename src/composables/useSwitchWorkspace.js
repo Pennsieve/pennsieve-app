@@ -7,32 +7,42 @@ import router from "@/router";
 
 export async function useSwitchWorkspace(org) {
     const orgId = org.organization.id
-    return useGetToken()
-        .then(token => {
-            const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
-            return useSendXhr(switchOrgUrl, {method: 'PUT'})
-                .then(response => {
+    
+    // Set loading state to true at the beginning
+    store.dispatch('setIsSwitchingOrganization', true)
+    
+    try {
+        const token = await useGetToken()
+        const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
+        
+        // Perform the organization switch
+        await useSendXhr(switchOrgUrl, {method: 'PUT'})
 
-                    const p0 = store.dispatch('clearState')
-                    const p1 = store.dispatch('clearDatasetFilters')
-                    const p2 = store.dispatch('datasetModule/clearSearchState')
-                    const p3 = store.dispatch('updateFilesProxyId', null)
+        // Clear state and update stores
+        await Promise.all([
+            store.dispatch('clearState'),
+            store.dispatch('clearDatasetFilters'),
+            store.dispatch('datasetModule/clearSearchState'),
+            store.dispatch('updateFilesProxyId', null)
+        ])
 
-                    return Promise.all([p0,p1,p2,p3])
-                        .then(() => {
-                            if (!checkIsSubscribed) {
-                                router.replace(`/${orgId}/welcome/terms-of-service`)
-                            } else {
-                                router.replace(`/${orgId}/datasets`)
-                            }
-                        })
+        // Navigate to the appropriate route
+        if (!checkIsSubscribed) {
+            await router.replace(`/${orgId}/welcome/terms-of-service`)
+        } else {
+            await router.replace(`/${orgId}/datasets`)
+        }
 
-                }).then(() => {
-                    console.log('Organization Switched')
-                    return store.dispatch('updateActiveOrganization', org)
-                })
-        })
-        .catch(err => useHandleXhrError(err))
-
-
+        // Update the active organization
+        await store.dispatch('updateActiveOrganization', org)
+        
+        // Clear loading state only after everything is complete
+        store.dispatch('setIsSwitchingOrganization', false)
+        
+    } catch (err) {
+        // Clear loading state immediately on error
+        store.dispatch('setIsSwitchingOrganization', false)
+        useHandleXhrError(err)
+        throw err
+    }
 }

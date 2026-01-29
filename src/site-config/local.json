@@ -25,6 +25,7 @@
     "appId": "47a81ebaf87f4c168177",
     "region": "us2"
   },
+  "githubAppUrl": "https://github.com/apps/pennsieve-test",
   "awsConfig": {
     "authenticationFlowType": "USER_PASSWORD_AUTH",
     "region": "us-east-1",

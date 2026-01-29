@@ -44,12 +44,12 @@
 import { mapGetters, mapActions } from 'vuex'
 import { pathOr, prop } from 'ramda'
 
-import BfDialogHeader from '../../shared/bf-dialog-header/BfDialogHeader.vue'
-import DialogBody from '../../shared/dialog-body/DialogBody.vue'
-import BfButton from '../../shared/bf-button/BfButton.vue'
+import BfDialogHeader from '../../../shared/bf-dialog-header/BfDialogHeader.vue'
+import DialogBody from '../../../shared/dialog-body/DialogBody.vue'
+import BfButton from '../../../shared/bf-button/BfButton.vue'
 
-import Request from '../../../mixins/request'
-import EventBus from '../../../utils/event-bus'
+import Request from '../../../../mixins/request'
+import EventBus from '../../../../utils/event-bus'
 import {useGetToken} from "@/composables/useGetToken";
 import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
 

@@ -1,15 +1,13 @@
 <template>
   <bf-stage slot="stage">
 
-
-
     <div class="shared-with-me">
 
       <!-- Workspaces Section -->
       <div class="section">
         <div class="section-header">
           <h2>Shared Workspaces</h2>
-          <p class="section-description">Workspaces where you have been invited as a collaborator</p>
+          <p class="section-description">A list of workspaces that you have access to. You can have access to many datasets within a workspace.</p>
         </div>
 
         <div v-if="sharedWorkspaces.length === 0" class="empty-state">
@@ -32,8 +30,8 @@
       <!-- Datasets Section -->
       <div class="section">
         <div class="section-header">
-          <h2>Shared Datasets</h2>
-          <p class="section-description">Coming soon! -- Shared datasets from external workspaces.</p>
+          <h2>Shared With Me</h2>
+          <p class="section-description">A list of datasets shared with you from workspaces other than those listed above. Although you don't have access to the full workspace, you can still interact with these specific datasets.</p>
         </div>
 
         <div v-if="isLoadingDatasets" class="loading-state" v-loading="isLoadingDatasets">
@@ -42,29 +40,33 @@
 
         <div v-else-if="guestDatasets.length === 0" class="empty-state">
           <div class="empty-state-content">
-            <IconDataset :width="48" :height="48" color="#71747c" />
-            <h3>No guest dataset access</h3>
-            <p>You haven't been invited to any datasets as a guest.</p>
+            <IconCompass :width="48" :height="48" color="#71747c" />
+            <h3>No datasets available</h3>
+            <p>You haven't been invited to any datasets outside your workspaces.</p>
           </div>
         </div>
 
         <div v-else class="dataset-list">
-          <div class="dataset-list-header">
-            <div class="dataset-search">
-              <el-input
-                v-model="datasetSearchQuery"
-                class="dataset-search-input"
-                placeholder="Search guest datasets..."
-                @input="filterDatasets"
-              >
-                <template #prefix>
-                  <IconMagnifyingGlass :height="20" :width="20" color="#71747c" />
-                </template>
-              </el-input>
+
+          <!-- Pagination Controls -->
+          <div class="dataset-list-controls mb-8">
+            <div class="dataset-list-controls-menus">
+              <pagination-page-menu
+                class="mr-24"
+                pagination-item-label="Datasets"
+                :page-size="pageSize"
+                @update-page-size="updatePageSize"
+              />
             </div>
-            <div class="dataset-count">
-              {{ filteredGuestDatasets.length }} dataset{{ filteredGuestDatasets.length !== 1 ? 's' : '' }}
-            </div>
+
+            <el-pagination
+              :page-size="pageSize"
+              :pager-count="5"
+              :current-page="currentPage"
+              layout="prev, pager, next"
+              :total="totalCount"
+              @current-change="onPageChange"
+            />
           </div>
 
           <div class="dataset-grid">
@@ -75,17 +77,22 @@
               @click="navigateToDataset(dataset)"
             >
               <div class="dataset-card-content">
-                <div class="dataset-icon">
-                  <IconDataset :width="24" :height="24" color="currentColor" />
-                </div>
+<!--                TODO: insert banner image-->
+<!--                <div class="dataset-icon">-->
+<!--                  <IconDataset :width="24" :height="24" color="currentColor" />-->
+<!--                </div>-->
                 <div class="dataset-info">
-                  <h3 class="dataset-name">{{ dataset.content.name }}</h3>
+                  <div class="dataset-header">
+                    <h3 class="dataset-name">{{ dataset.content.name }}</h3>
+                    <span class="dataset-status-tag" :class="`status-${dataset.content.status.toLowerCase().replace('_', '-')}`">
+                      {{ formatDatasetStatus(dataset.content.status) }}
+                    </span>
+                  </div>
                   <p class="dataset-org">{{ getDatasetOrganization(dataset) }}</p>
                   <p class="dataset-description" v-if="dataset.content.description">
                     {{ truncateDescription(dataset.content.description) }}
                   </p>
                   <div class="dataset-meta">
-                    <span class="dataset-size">{{ formatDatasetSize(dataset.content.size) }}</span>
                     <span class="dataset-updated">Updated {{ formatDate(dataset.content.updatedAt) }}</span>
                   </div>
                 </div>
@@ -97,12 +104,12 @@
           </div>
 
           <!-- Pagination for datasets if needed -->
-          <div v-if="filteredGuestDatasets.length > pageSize" class="pagination-container">
+          <div  class="pagination-container">
             <el-pagination
               :page-size="pageSize"
               :current-page="currentPage"
               layout="prev, pager, next"
-              :total="filteredGuestDatasets.length"
+              :total="totalCount"
               @current-change="onPageChange"
             />
           </div>
@@ -121,17 +128,25 @@ import IconDataset from '@/components/icons/IconDataset.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconMagnifyingGlass from '@/components/icons/IconMagnifyingGlass.vue'
 import WorkspaceCard from './WorkspaceCard.vue'
+import PaginationPageMenu from '@/components/shared/PaginationPageMenu/PaginationPageMenu.vue'
+import { useGetToken } from '@/composables/useGetToken'
+import IconCollaborators from "@/components/icons/IconCollaborators.vue";
+import IconCompass from "@/components/icons/IconCompass.vue";
+import * as siteConfig from "@/site-config/site.json";
 
 export default {
   name: 'SharedWithMe',
 
   components: {
+    IconCompass,
+    IconCollaborators,
     BfStage,
     IconOrganization,
     IconDataset,
     IconArrowRight,
     IconMagnifyingGlass,
-    WorkspaceCard
+    WorkspaceCard,
+    PaginationPageMenu
   },
 
   data() {
@@ -141,7 +156,8 @@ export default {
       datasetSearchQuery: '',
       filteredGuestDatasets: [],
       currentPage: 1,
-      pageSize: 20
+      pageSize: 20,
+      totalCount: 0
     }
   },
 
@@ -155,18 +171,20 @@ export default {
       'activeOrganization'
     ]),
 
-    // All available workspaces (for now, show all organizations until we understand the structure)
+    // Filter to show only workspaces where the user is a member (not a guest)
     sharedWorkspaces() {
       if (!this.organizations || !Array.isArray(this.organizations)) {
         return []
       }
 
-      // Debug: Let's see all organizations for now
-      console.log('Organizations from Vuex:', this.organizations)
-
-      // For now, return all organizations to see the structure
-      // TODO: Properly filter for shared workspaces once we understand the data structure
-      return this.organizations
+      // Filter out workspaces where the user is a guest
+      // Show only workspaces where the user has full membership
+      return this.organizations.filter(workspace => {
+        // Check if the workspace has the isGuest flag set to true
+        // If isGuest is true or the workspace is marked as guest, exclude it
+        const isGuest = workspace.isGuest || workspace.organization?.isGuest
+        return !isGuest
+      })
     }
   },
 
@@ -178,17 +196,35 @@ export default {
     async loadGuestDatasets() {
       this.isLoadingDatasets = true
       try {
-        // TODO: Implement API call to fetch datasets where user is a guest
-        // This would be a new endpoint that returns datasets across organizations
-        // where the current user has guest access
+        // Get the user's authentication token
+        const token = await useGetToken()
         
-        // Placeholder - this would be replaced with actual API call
-        this.guestDatasets = []
+        // Calculate offset for current page
+        const offset = (this.currentPage - 1) * this.pageSize
+
+        // Fetch shared datasets from the API with pagination
+        const response = await fetch(`${siteConfig.api2Url}/datasets/shared-datasets?limit=${this.pageSize}&offset=${offset}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch shared datasets: ${response.status}`)
+        }
+
+        const data = await response.json()
+        
+        // Transform the API response to match our component's data structure
+        this.guestDatasets = data.datasets || []
         this.filteredGuestDatasets = [...this.guestDatasets]
+        this.totalCount = data.totalCount || data.datasets?.length || 0
       } catch (error) {
         console.error('Error loading guest datasets:', error)
         this.guestDatasets = []
         this.filteredGuestDatasets = []
+        this.totalCount = 0
       } finally {
         this.isLoadingDatasets = false
       }
@@ -214,7 +250,7 @@ export default {
 
     navigateToDataset(dataset) {
       // Navigate to the dataset in its organization context
-      const orgId = dataset.organizationId || dataset.content.organizationId
+      const orgId = dataset.content.workspaceNodeId
       const datasetId = dataset.content.id
       this.$router.push({ 
         name: 'dataset-overview', 
@@ -243,7 +279,7 @@ export default {
 
     getDatasetOrganization(dataset) {
       // Get organization name for the dataset
-      return dataset.organizationName || 'Unknown Organization'
+      return dataset.content.workspaceName || 'Unknown Organization'
     },
 
     truncateDescription(description, maxLength = 120) {
@@ -258,6 +294,13 @@ export default {
       const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
       const i = Math.floor(Math.log(sizeInBytes) / Math.log(1024))
       return Math.round(sizeInBytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+    },
+
+    formatDatasetStatus(status) {
+      if (!status || status === 'NO_STATUS') return 'No Status'
+      
+      // Convert status to human-readable format
+      return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     },
 
     formatDate(dateString) {
@@ -277,6 +320,13 @@ export default {
 
     onPageChange(page) {
       this.currentPage = page
+      this.loadGuestDatasets()
+    },
+
+    updatePageSize(newPageSize) {
+      this.pageSize = newPageSize
+      this.currentPage = 1 // Reset to first page when changing page size
+      this.loadGuestDatasets()
     }
   }
 }
@@ -286,9 +336,7 @@ export default {
 @use '../../../styles/_theme.scss';
 
 .shared-with-me {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
+  // Component container
 }
 
 .page-header {
@@ -297,7 +345,7 @@ export default {
 
   h1 {
     font-size: 32px;
-    font-weight: 300;
+    font-weight: 500;
     color: theme.$gray_6;
     margin: 0 0 12px 0;
   }
@@ -322,7 +370,7 @@ export default {
 
   h2 {
     font-size: 20px;
-    font-weight: 300;
+    font-weight: 500;
     color: theme.$gray_6;
     margin: 0 0 8px 0;
   }
@@ -331,6 +379,7 @@ export default {
     font-size: 14px;
     color: theme.$gray_4;
     margin: 0;
+    max-width: 600px;
   }
 }
 
@@ -348,14 +397,14 @@ export default {
 }
 
 .empty-state {
-  padding: 48px 24px;
+  padding: 16px 24px;
 
   .empty-state-content {
     text-align: center;
 
     h3 {
       font-size: 18px;
-      font-weight: 500;
+      font-weight: 300;
       color: theme.$gray_5;
       margin: 16px 0 8px 0;
     }
@@ -379,15 +428,15 @@ export default {
   border: 1px solid theme.$gray_2;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  //transition: all 0.2s ease;
 
   &:hover {
     border-color: theme.$purple_2;
-    box-shadow: 0 4px 12px rgba(77, 98, 140, 0.15);
-    transform: translateY(-1px);
+    //box-shadow: 0 4px 12px rgba(77, 98, 140, 0.15);
+    //transform: translateY(-1px);
 
     .workspace-arrow {
-      transform: translateX(4px);
+      //transform: translateX(4px);
     }
   }
 }
@@ -493,14 +542,12 @@ export default {
 .dataset-card {
   background: theme.$white;
   border: 1px solid theme.$gray_2;
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: theme.$purple_2;
-    box-shadow: 0 4px 12px rgba(77, 98, 140, 0.15);
-    transform: translateY(-1px);
+    border-color: theme.$gray_3;
+    background: theme.$gray_1;
 
     .dataset-arrow {
       transform: translateX(4px);
@@ -526,14 +573,37 @@ export default {
   min-width: 0;
 }
 
+.dataset-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
 .dataset-name {
   font-size: 16px;
   font-weight: 500;
   color: theme.$gray_6;
-  margin: 0 0 4px 0;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.dataset-status-tag {
+  background: theme.$gray_1;
+  color: theme.$gray_5;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  
 }
 
 .dataset-org {
@@ -573,6 +643,27 @@ export default {
   transition: transform 0.2s ease;
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+.dataset-list-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .dataset-list-controls-menus {
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+
+    .dataset-list-controls-menus {
+      justify-content: center;
+    }
+  }
 }
 
 .pagination-container {

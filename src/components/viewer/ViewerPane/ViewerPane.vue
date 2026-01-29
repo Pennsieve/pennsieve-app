@@ -21,7 +21,14 @@
         </tag-pill>
       </div>
     </div>
+    <OmeViewer
+      v-if="cmpViewer === 'OmeViewer'"
+      ref="viewer"
+      :source="omeTiffSource"
+      source-type="ome-tiff"
+    />
     <component
+      v-else
       :is="cmpViewer"
       :is-preview="isPreview"
       ref="viewer"
@@ -33,8 +40,9 @@
 </template>
 
 <script>
-import { propOr, pathOr, path, isNil } from "ramda";
+import { propOr, pathOr } from "ramda";
 import { defineAsyncComponent } from "vue";
+import { mapActions } from "vuex";
 
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
@@ -45,6 +53,8 @@ import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 import { useViewerStore as useLibraryViewerStore, TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
 import * as siteConfig from '@/site-config/site.json'
+
+import "@pennsieve-viz/micro-ct/style.css";
 
 export default {
   name: "ViewerPane",
@@ -87,6 +97,9 @@ export default {
     CSVViewer: defineAsyncComponent(() =>
       import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
     ),
+    OmeViewer: defineAsyncComponent(()=>
+    import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
+    )
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -111,6 +124,7 @@ export default {
       cmpViewer: "",
       availableViewers: [],
       isLoading: false,
+      omeTiffSource: "",
     };
   },
 
@@ -123,7 +137,6 @@ mounted(){
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
-          console.log(pkg);
           this.loadViewer(pkg);
         }
       },
@@ -132,6 +145,8 @@ mounted(){
   },
 
   methods: {
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+
     /**
      * Called when component is mounted
      */
@@ -169,7 +184,6 @@ mounted(){
     },
 
     viewerNameMapper: function (viewer) {
-      console.log(viewer);
       switch (viewer) {
         case "DataExplorer":
           return "Data Explorer";
@@ -181,28 +195,45 @@ mounted(){
     },
 
     selectViewer: function (evt) {
-      console.log(evt);
       this.cmpViewer = evt;
     },
 
     /**
      * loads appropriate viewer based on package type
      */
-    loadViewer: function (activeViewer) {
+    loadViewer: async function (activeViewer) {
       // Reset viewers
       this.cmpViewer = "";
+      this.omeTiffSource = "";
       const viewerWrap = this.$refs.viewerWrap;
       if (viewerWrap) {
         viewerWrap.innerHTML = "";
       }
 
       this.availableViewers = this.checkViewerType(activeViewer);
-      console.log("Use viewerType: " + this.availableViewers);
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
-        this.loadVueViewer(this.availableViewers[0]);
+        const viewerToLoad = this.availableViewers[0];
+
+        // Handle viewer source - fetch presigned URL
+        // use this when migrating instead of a wrapper for every component
+        if (viewerToLoad === 'OmeViewer') {
+          try {
+            const pkgId = pathOr('', ['content', 'id'], activeViewer);
+            const viewerAssets = await this.fetchViewerAssets(pkgId);
+
+            if (viewerAssets && viewerAssets.length > 0) {
+              const fileId = pathOr('', ['content', 'id'], viewerAssets[0]);
+              this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
+            }
+          } catch (err) {
+            console.error('Failed to fetch file URL:', err);
+          }
+        }
+
+        this.loadVueViewer(viewerToLoad);
       }
     },
 

@@ -41,7 +41,7 @@ const useIconComponent = computed(() => props.iconComponent !== null)
       <h2>{{ pageTitle }}</h2>
       <p class="description">{{ pageDescription }}</p>
       <div class="additional-info">
-        <p>We're working hard to bring you this feature. Stay tuned for updates! (Roadmap 2026)</p>
+        <p>We're working hard to bring you this feature. Analysis is currently only available in shared workspaces. Stay tuned for updates! (Roadmap 2026)</p>
       </div>
     </div>
   </div>
@@ -52,7 +52,7 @@ const useIconComponent = computed(() => props.iconComponent !== null)
 
 .coming-soon-container {
   padding: 80px 40px;
-  max-width: 800px;
+  max-width: 600px;
   margin: 0 auto;
   text-align: center;
 }

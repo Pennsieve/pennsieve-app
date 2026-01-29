@@ -3,7 +3,7 @@
     <div class="page-header">
       <p class="page-description">
         Manage your dataset proposal submissions. Track the status of your submissions, edit drafts, 
-        and submit new proposals to open repositories.
+        and submit new proposals to available repositories.
       </p>
       
       <div class="header-actions">
@@ -57,7 +57,9 @@
       <!-- Empty State -->
       <div v-else class="empty-state">
         <div class="empty-content">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon">
+            <IconDocument :width="64" :height="64" color="currentColor" />
+          </div>
           <h2>No Dataset Proposals Yet</h2>
           <p>
             You haven't created any dataset proposals yet. Submit your datasets to open repositories 
@@ -104,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { useProposalStore } from '@/stores/proposalStore'
@@ -112,6 +114,7 @@ import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
+import IconDocument from '@/components/icons/IconDocument.vue'
 
 const store = useStore()
 const proposalStore = useProposalStore()
@@ -381,6 +384,58 @@ onMounted(async () => {
     fetchRepositories()
   ])
 })
+
+const handleQueryParameters = () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const openSubmitModal = urlParams.get('openSubmitModal')
+  const repositoryId = urlParams.get('repositoryId')
+  const repositoryName = urlParams.get('repositoryName')
+  
+  if (openSubmitModal === 'true' && repositories.value.length > 0) {
+    let repository = null
+    
+    // Try to find repository by ID first, then by name
+    if (repositoryId) {
+      repository = repositories.value.find(repo => 
+        repo.organizationNodeId === repositoryId || 
+        repo.id === repositoryId ||
+        repo.name?.toLowerCase() === repositoryId.toLowerCase() ||
+        repo.displayName?.toLowerCase() === repositoryId.toLowerCase()
+      )
+    }
+    
+    // If not found by ID and repositoryName is provided, search by name
+    if (!repository && repositoryName) {
+      repository = repositories.value.find(repo => 
+        repo.name?.toLowerCase() === repositoryName.toLowerCase() ||
+        repo.displayName?.toLowerCase() === repositoryName.toLowerCase()
+      )
+    }
+    
+    if (repository) {
+      // Set the repository and open modal
+      selectedRepository.value = repository
+      activeProposal.value = null
+      showProposalDialog.value = true
+      
+      // Clean up URL by removing query parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, document.title, newUrl)
+    } else {
+      const searchTerm = repositoryId || repositoryName
+      if (searchTerm) {
+        console.warn(`Repository "${searchTerm}" not found`)
+      }
+    }
+  }
+}
+
+// Watch for repositories to be loaded and handle query parameters
+watch(repositories, (newRepositories) => {
+  if (newRepositories.length > 0) {
+    handleQueryParameters()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">
@@ -492,7 +547,7 @@ onMounted(async () => {
     max-width: 500px;
     
     .empty-icon {
-      font-size: 64px;
+      color: theme.$purple_tint;
       margin-bottom: 16px;
     }
     
