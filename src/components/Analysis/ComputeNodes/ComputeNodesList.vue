@@ -9,18 +9,34 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPageState.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
+import ComputeNodeCard from './ComputeNodeCard.vue'
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+
+const props = defineProps({
+  orgId: String
+})
 
 const store = useStore()
+const computeResourcesStore = useComputeResourcesStore()
 const profile = computed(() => store.state.profile)
 const activeOrganization = computed(() => store.getters.activeOrganization)
 const orgMembers = computed(() => store.state.orgMembers || [])
+const orgId = computed(() => props.orgId)
 
-const computeNodes = ref([])
-const isLoading = ref(false)
+// Use Pinia store for compute nodes data - use scoped system
+const computeNodes = computed(() => {
+  // For organization context, use workspace scope
+  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
+  return computeResourcesStore.getScopedComputeNodes(scope) || []
+})
+const isLoading = computed(() => {
+  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
+  return computeResourcesStore.isScopeLoading(scope)
+})
+
 const expandedNodes = ref(new Set())
 const editingNodes = ref(new Set())
 const editingData = ref({})
-const isUpdating = ref(new Set())
 const createComputeNodeDialogVisible = ref(false)
 const deleteNodeDialogVisible = ref(false)
 const selectedNodeForDeletion = ref(null)
@@ -44,6 +60,9 @@ const isOwner = computed(() => activeOrganization.value?.isOwner || false)
 
 // Show empty state when no nodes exist
 const showEmptyState = computed(() => !isLoading.value && computeNodes.value.length === 0)
+// Computes if any Compute Resources are available
+const hasNoResources = computed(() => { return computeNodes.value.length === 0 })
+
 
 // Format account ID for display
 const formatAccountId = (accountId) => {
@@ -96,37 +115,12 @@ onMounted(() => {
 })
 
 async function fetchComputeNodes() {
-  isLoading.value = true
   try {
-    const token = await useGetToken()
-    const orgId = currentOrganization.value?.id
-    if (!orgId) {
-      console.error('No organization ID found')
-      return
-    }
-    
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes?organization_id=${orgId}`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      computeNodes.value = data || []
-    } else {
-      console.error('Failed to fetch compute nodes:', response.status, response.statusText)
-      computeNodes.value = []
-    }
+    // Get organization ID from Vuex store
+    const orgId = currentOrganization.value?.nodeId || currentOrganization.value?.id
+    await computeResourcesStore.fetchComputeNodes(orgId)
   } catch (error) {
     console.error('Failed to fetch compute nodes:', error)
-    computeNodes.value = []
-  } finally {
-    isLoading.value = false
   }
 }
 
@@ -149,7 +143,7 @@ function isNodeEditing(nodeUuid) {
 }
 
 function isNodeUpdating(nodeUuid) {
-  return isUpdating.value.has(nodeUuid)
+  return computeResourcesStore.isNodeUpdating(nodeUuid)
 }
 
 function startEditing(node) {
@@ -180,10 +174,7 @@ async function saveChanges(node) {
   
   if (!changes) return
   
-  // Add to updating set
-  const newUpdating = new Set(isUpdating.value)
-  newUpdating.add(nodeUuid)
-  isUpdating.value = newUpdating
+  computeResourcesStore.setNodeUpdating(nodeUuid, true)
   
   try {
     const token = await useGetToken()
@@ -205,14 +196,8 @@ async function saveChanges(node) {
     if (response.ok) {
       const updatedNode = await response.json()
       
-      // Update the node in the list
-      const index = computeNodes.value.findIndex(n => n.uuid === nodeUuid)
-      if (index !== -1) {
-        computeNodes.value[index] = {
-          ...computeNodes.value[index],
-          ...updatedNode
-        }
-      }
+      // Refresh the compute nodes to get the updated data
+      await fetchComputeNodes()
       
       // Exit editing mode
       cancelEditing(nodeUuid)
@@ -226,61 +211,17 @@ async function saveChanges(node) {
     console.error('Failed to update node:', error)
     ElMessage.error('Failed to update compute node')
   } finally {
-    // Remove from updating set
-    const newUpdating = new Set(isUpdating.value)
-    newUpdating.delete(nodeUuid)
-    isUpdating.value = newUpdating
+    computeResourcesStore.setNodeUpdating(nodeUuid, false)
   }
 }
 
 async function updateStatus(node, newStatus) {
-  const nodeUuid = node.uuid
-  
-  // Add to updating set
-  const newUpdating = new Set(isUpdating.value)
-  newUpdating.add(nodeUuid)
-  isUpdating.value = newUpdating
-  
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid}`
-    
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: newStatus
-      })
-    })
-    
-    if (response.ok) {
-      const updatedNode = await response.json()
-      
-      // Update the node in the list
-      const index = computeNodes.value.findIndex(n => n.uuid === nodeUuid)
-      if (index !== -1) {
-        computeNodes.value[index] = {
-          ...computeNodes.value[index],
-          ...updatedNode
-        }
-      }
-      
-      ElMessage.success(`Compute node ${newStatus.toLowerCase()}`)
-    } else {
-      console.error('Failed to update node status:', response.status, response.statusText)
-      ElMessage.error('Failed to update node status')
-    }
+    await computeResourcesStore.updateNodeStatus(node.uuid, newStatus)
+    ElMessage.success(`Compute node ${newStatus.toLowerCase()}`)
   } catch (error) {
     console.error('Failed to update node status:', error)
     ElMessage.error('Failed to update node status')
-  } finally {
-    // Remove from updating set
-    const newUpdating = new Set(isUpdating.value)
-    newUpdating.delete(nodeUuid)
-    isUpdating.value = newUpdating
   }
 }
 
@@ -334,11 +275,8 @@ async function confirmDeleteNode() {
     })
     
     if (response.ok) {
-      // Remove from local list
-      const index = computeNodes.value.findIndex(n => n.uuid === selectedNodeForDeletion.value.uuid)
-      if (index !== -1) {
-        computeNodes.value.splice(index, 1)
-      }
+      // Refresh the compute nodes list after deletion
+      await fetchComputeNodes()
       
       ElMessage.success('Compute node deleted successfully')
       closeDeleteDialog()
@@ -371,14 +309,14 @@ async function confirmDeleteNode() {
           <div class="info-card">
             <h3>Managing Compute Nodes</h3>
             <p>
-              Compute nodes are computational resources within your cloud accounts that process and analyze your Pennsieve data.
-              Each compute node is associated with a specific AWS account and can run analysis workflows on your datasets.
+              Compute nodes are computational resources deployed on individual user's cloud accounts that process and analyze Pennsieve data.
+              Each compute node is created from a Compute Resource (AWS account) owned by a specific user, but can be shared with other users in workspaces to enable collaborative data analysis.
             </p>
             <p class="info-note">
-              <strong>Note:</strong> Before creating compute nodes, ensure you have registered your AWS account as a Compute Resource.
-              Compute nodes require an active AWS account with the proper permissions configured.
+              <strong>Note:</strong> Compute Resources are associated with individual users who own the cloud accounts. 
+              Compute nodes created from these resources can be shared across workspace members with different permission levels (private, workspace, or shared access).
             </p>
-            <div class="setup-steps">
+            <div class="setup-steps" v-if="hasNoResources">
               <h4>Quick Setup Guide:</h4>
               <ol>
                 <li>Ensure your AWS account is registered as a Compute Resource</li>
@@ -411,190 +349,29 @@ async function confirmDeleteNode() {
               <div v-if="hasAdminRights" class="copy">
                 <h2>There are no Compute Nodes registered for {{ orgName }} yet.</h2>
                 <p>
-                  Compute Nodes are associated with an Account, and allow users in your
-                  organization to access compute resources to run data analysis
-                  applications workflows. Click "Create Compute Node" above to get started.
+                  Compute Nodes are created from user-owned Compute Resources (cloud accounts) and can be shared
+                  with workspace members to enable collaborative data analysis. Workspace administrators can create nodes
+                  from available compute resources and manage access permissions. Click "Create Compute Node" above to get started.
                 </p>
               </div>
               <div v-else class="copy">
                 <h2>{{ orgName }} doesn't have any compute nodes yet.</h2>
                 <p>
-                  Contact your administrator to get started working with Compute Nodes
+                  Contact your administrator to set up Compute Resources and create shared Compute Nodes for this workspace.
                 </p>
               </div>
             </bf-empty-page-state>
           </div>
 
           <div v-else class="nodes-grid">
-            <div 
+            <ComputeNodeCard 
               v-for="node in computeNodes" 
               :key="node.uuid"
-              class="node-card"
-              :class="{ expanded: isNodeExpanded(node.uuid) }"
-            >
-              <div 
-                class="node-header clickable"
-                @click="toggleNodeExpansion(node.uuid)"
-              >
-                <div class="node-info">
-                  <h3>{{ node.name }}</h3>
-                  <div class="node-subtitle">
-                    {{ getAccountTypeLabel(node.account?.accountType) }} Account
-                  </div>
-                  <div class="node-description" v-if="node.description">
-                    {{ node.description }}
-                  </div>
-                  <div class="node-account">
-                    <strong>Account ID:</strong> {{ formatAccountId(node.account?.accountId) }}
-                  </div>
-                  <div class="node-identifier">
-                    <strong>Node ID:</strong> {{ node.identifier }}
-                  </div>
-                </div>
-                <div class="node-header-actions">
-                  <div class="node-status-badge" @click.stop>
-                    <el-select 
-                      :model-value="getStatusForNode(node)"
-                      @change="(value) => updateStatus(node, value)"
-                      :loading="isNodeUpdating(node.uuid)"
-                      :disabled="!hasAdminRights"
-                      size="small"
-                      :class="['status-select', getStatusForNode(node).toLowerCase()]"
-                      @click.stop
-                    >
-                      <el-option label="Enabled" value="Enabled" />
-                      <el-option label="Paused" value="Paused" />
-                    </el-select>
-                  </div>
-                  <button class="expand-toggle" @click.stop="toggleNodeExpansion(node.uuid)">
-                    <span class="expand-text">{{ isNodeExpanded(node.uuid) ? 'Hide Details' : 'Show Details' }}</span>
-                    <span class="chevron-icon" :class="{ expanded: isNodeExpanded(node.uuid) }">▼</span>
-                  </button>
-                </div>
-              </div>
-              
-              <transition name="expand">
-                <div v-if="isNodeExpanded(node.uuid)" class="node-expanded-content">
-                  <div class="detail-section">
-                    <div class="detail-header">
-                      <h4>Node Information</h4>
-                      <div class="detail-actions">
-                        <bf-button 
-                          v-if="!isNodeEditing(node.uuid) && hasAdminRights" 
-                          @click="startEditing(node)" 
-                          class="secondary small"
-                        >
-                          Edit
-                        </bf-button>
-                        <div v-else-if="isNodeEditing(node.uuid)" class="edit-actions">
-                          <bf-button 
-                            @click="saveChanges(node)" 
-                            :loading="isNodeUpdating(node.uuid)"
-                            class="primary small"
-                          >
-                            Save
-                          </bf-button>
-                          <bf-button 
-                            @click="cancelEditing(node.uuid)" 
-                            class="secondary small"
-                          >
-                            Cancel
-                          </bf-button>
-                        </div>
-                        <bf-button 
-                          v-if="isOwner && !isNodeEditing(node.uuid)" 
-                          @click="openDeleteDialog(node)" 
-                          class="danger small"
-                        >
-                          Delete
-                        </bf-button>
-                      </div>
-                    </div>
-                    
-                    <!-- Editable Name -->
-                    <div class="detail-row">
-                      <span class="detail-label">Name:</span>
-                      <span class="detail-value" v-if="!isNodeEditing(node.uuid)">
-                        {{ node.name }}
-                      </span>
-                      <div class="detail-value" v-else>
-                        <el-input 
-                          v-model="editingData[node.uuid].name"
-                          placeholder="Enter node name"
-                          size="small"
-                        />
-                      </div>
-                    </div>
-                    
-                    <!-- Editable Description -->
-                    <div class="detail-row">
-                      <span class="detail-label">Description:</span>
-                      <span class="detail-value" v-if="!isNodeEditing(node.uuid)">
-                        <span v-if="node.description">{{ node.description }}</span>
-                        <span v-else class="empty-value">No description set</span>
-                      </span>
-                      <div class="detail-value" v-else>
-                        <el-input 
-                          v-model="editingData[node.uuid].description"
-                          type="textarea"
-                          placeholder="Enter node description"
-                          :rows="2"
-                          size="small"
-                        />
-                      </div>
-                    </div>
-                    
-                    <!-- Status (editable in edit mode) -->
-                    <div class="detail-row">
-                      <span class="detail-label">Status:</span>
-                      <span class="detail-value" v-if="!isNodeEditing(node.uuid)">
-                        <span class="status-text" :class="{ paused: getStatusForNode(node) === 'Paused' }">
-                          {{ getStatusForNode(node) }}
-                        </span>
-                      </span>
-                      <div class="detail-value" v-else>
-                        <el-select 
-                          v-model="editingData[node.uuid].status"
-                          size="small"
-                        >
-                          <el-option label="Enabled" value="Enabled" />
-                          <el-option label="Paused" value="Paused" />
-                        </el-select>
-                      </div>
-                    </div>
-                    
-                    <div class="detail-row">
-                      <span class="detail-label">Account Type:</span>
-                      <span class="detail-value">{{ getAccountTypeLabel(node.account?.accountType) }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Account ID:</span>
-                      <span class="detail-value">{{ formatAccountId(node.account?.accountId) }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Node UUID:</span>
-                      <span class="detail-value mono">{{ node.uuid }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Gateway URL:</span>
-                      <span class="detail-value mono small">{{ node.computeNodeGatewayUrl || 'N/A' }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">EFS ID:</span>
-                      <span class="detail-value mono">{{ node.efsId || 'N/A' }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Created By:</span>
-                      <span class="detail-value">{{ getUserName(node.userId) }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Created At:</span>
-                      <span class="detail-value">{{ formatDate(node.createdAt) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </transition>
-            </div>
+              :node="node"
+              :has-admin-rights="hasAdminRights"
+              :is-updating="isNodeUpdating(node.uuid)"
+              @update-status="updateStatus"
+            />
           </div>
         </div>
       </div>
@@ -951,6 +728,34 @@ h2 {
         color: #D97706;
       }
     }
+  }
+}
+
+.manage-button {
+  background: theme.$purple_3;
+  color: white;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  
+  &:hover {
+    background: theme.$purple_2;
+    text-decoration: none;
+    color: white;
+  }
+  
+  &:active {
+    transform: translateY(1px);
   }
 }
 

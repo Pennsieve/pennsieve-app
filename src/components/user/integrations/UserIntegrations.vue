@@ -52,18 +52,6 @@
           action-text="Manage API Keys"
         />
 
-        <!-- Compute Resources Integration -->
-        <IntegrationCard
-          title="Compute Resources"
-          description="External accounts that can be used for compute, and storage nodes"
-          icon="IconStorage"
-          icon-class="storage"
-          status="info"
-          status-text=""
-          :route="{ name: 'user-compute-resource' }"
-          action-text="Manage Compute Resources"
-        />
-
         <!-- Future Integrations Placeholder -->
 <!--        <div class="integration-card coming-soon">-->
 <!--          <div class="integration-header">-->
