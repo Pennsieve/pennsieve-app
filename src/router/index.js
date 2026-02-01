@@ -121,6 +121,7 @@ const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
+const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
@@ -212,6 +213,19 @@ const router = createRouter({
               props: true
             },
             {
+                name: 'user-compute-resource',
+                path: 'compute-resources',
+                meta: {
+                  title: 'Compute Resources',
+                  description: 'Manage your external compute and storage accounts.',
+                },
+                components: {
+                  stage: UserComputeResources,
+                  navigation: UserNavigation,
+                },
+                props: true
+              },
+            {
               name: 'user-integrations',
               path: 'integrations',
               meta: {
@@ -265,20 +279,20 @@ const router = createRouter({
                   },
                   props: true
                 },
-                {
-                  name: 'user-compute-resource',
-                  path: 'compute-resources',
-                  meta: {
-                    title: 'Compute Resources',
-                    description: 'Manage your external compute and storage accounts.',
-                    breadcrumbParent: 'user-integrations'
-                  },
-                  components: {
-                    stage: UserComputeResources,
-                    navigation: UserNavigation,
-                  },
-                  props: true
-                }
+                // {
+                //   name: 'user-compute-resource',
+                //   path: 'compute-resources',
+                //   meta: {
+                //     title: 'Compute Resources',
+                //     description: 'Manage your external compute and storage accounts.',
+                //     breadcrumbParent: 'user-integrations'
+                //   },
+                //   components: {
+                //     stage: UserComputeResources,
+                //     navigation: UserNavigation,
+                //   },
+                //   props: true
+                // }
               ]
             },
             {
@@ -1563,6 +1577,14 @@ const router = createRouter({
           path: 'compute-nodes',
           components: {
             stage: ComputeNodesList
+          },
+          props: true
+        },
+        {
+          name: 'compute-node-management',
+          path: 'compute-nodes/:nodeId',
+          components: {
+            stage: ComputeNodeManagement
           },
           props: true
         }

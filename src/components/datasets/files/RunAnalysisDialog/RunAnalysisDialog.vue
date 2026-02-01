@@ -65,10 +65,11 @@
                         class="config-select"
                       >
                         <el-option
-                          v-for="(item, i) in computeNodeOptions"
+                          v-for="(item, i) in enhancedComputeNodeOptions"
                           :key="i"
                           :label="item.label"
                           :value="item.value"
+                          :disabled="item.disabled"
                         />
                       </el-select>
                       <p class="field-hint">
@@ -497,6 +498,7 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore';
 import FilesTable from "../../../FilesTable/FilesTable.vue";
 import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../BreadcrumbNavigation/BreadcrumbNavigation.vue";
@@ -522,6 +524,10 @@ export default {
       default: false,
     },
     datasetId: {
+      type: String,
+      default: "",
+    },
+    organizationId: {
       type: String,
       default: "",
     },
@@ -583,7 +589,6 @@ export default {
   },
   computed: {
     ...mapState("analysisModule", [
-      "computeNodes",
       "workflows",
       "preprocessors",
       "processors",
@@ -592,6 +597,29 @@ export default {
       "fileCount",
     ]),
     ...mapGetters(["config"]),
+
+    // Compute nodes from the computeResourcesStore
+    computeNodes() {
+      const computeResourcesStore = useComputeResourcesStore()
+      // Always use workspace scope if we're in an organization context
+      // The organizationId should come from the current workspace context
+      const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+      const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+      
+      // Only return enabled nodes
+      return computeResourcesStore.getScopedComputeNodes(scope)
+        .filter(node => node.status === 'Enabled')
+    },
+
+    // Enhanced compute node options - nodes are already filtered by enabled status and organization
+    enhancedComputeNodeOptions() {
+      return this.computeNodes
+        .map(node => ({
+          value: node.uuid,
+          label: node.name,
+          disabled: false
+        }))
+    },
 
     fileId() {
       return pathOr(
@@ -675,18 +703,22 @@ export default {
     },
   },
 
-  mounted() {
+  async mounted() {
     this.fetchFiles();
-    this.fetchComputeNodes();
     this.fetchWorkflows();
     this.fetchApplications();
+    
+    // Fetch compute nodes from computeResourcesStore instead of Vuex
+    const computeResourcesStore = useComputeResourcesStore()
+    const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+    const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+    await computeResourcesStore.fetchScopedComputeNodes(scope, currentOrgId)
   },
 
   methods: {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "fetchComputeNodes",
       "fetchWorkflows",
       "fetchApplications",
       "updateFileCount",
@@ -1094,9 +1126,10 @@ export default {
     },
 
     setSelectedComputeNode: function (value) {
-      this.selectedComputeNode = this.computeNodes.find(
-        (computeNode) => computeNode.name === value
-      );
+      // Now using UUID-based selection from enhanced options
+      const computeResourcesStore = useComputeResourcesStore()
+      const scope = this.organizationId ? `workspace:${this.organizationId}` : 'account-owner'
+      this.selectedComputeNode = computeResourcesStore.getComputeNodeById(value, scope) || {}
     },
 
     setSelectedWorkflow: function (value) {

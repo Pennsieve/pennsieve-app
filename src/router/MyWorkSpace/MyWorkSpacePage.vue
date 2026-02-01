@@ -151,7 +151,7 @@ export default {
     },
     isIntegrationChildPage() {
       // Check if current route is a child of integrations (needs Platform Integrations in breadcrumb)
-      const integrationChildPages = ['user-orcid', 'user-github', 'user-api', 'user-compute-resource'];
+      const integrationChildPages = ['user-orcid', 'user-github', 'user-api'];
       return integrationChildPages.includes(this.$route.name);
     },
     isCollectionsSubPage() {
@@ -197,6 +197,10 @@ export default {
           {
             to: 'user-security',
             name: 'Security'
+          },
+          {
+            to: 'user-compute-resource',
+            name: 'Compute Resources'
           },
           {
             to: 'user-support',

@@ -1,38 +1,47 @@
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
-import { useGetToken } from '@/composables/useGetToken'
-import { useSendXhr } from '@/mixins/request/request_composable'
-import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconApi from '@/components/icons/IconApi.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
-import IconSettings from '@/components/icons/IconSettings.vue'
 import IconInfo from '@/components/icons/IconInfo.vue'
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const store = useStore()
+const computeResourcesStore = useComputeResourcesStore()
 const profile = computed(() => store.state.profile)
 const orgMembers = computed(() => store.state.orgMembers || [])
 
-const computeResources = ref([])
-const isLoading = ref(false)
+// Use Pinia store for compute resources data
+const computeResources = computed(() => computeResourcesStore.computeAccounts)
+const isLoading = computed(() => computeResourcesStore.isLoadingComputeAccounts)
+
 const expandedResources = ref(new Set())
 const editingResources = ref(new Set())
 const editingData = ref({})
-const isUpdating = ref(new Set())
 const workspaceOperations = ref(new Set())
 const showAddWorkspaceDialog = ref(false)
 const showRemoveWorkspaceDialog = ref(false)
 const selectedResourceForWorkspace = ref(null)
 const selectedWorkspaceForRemoval = ref(null)
 const newWorkspaceAccess = ref({ isPublic: false, organizationId: null })
-const availableWorkspaces = ref([])
-const isLoadingWorkspaces = ref(false)
+
+// State for compute nodes per account - now handled by store
+const isLoadingComputeNodes = ref(new Set()) // Keep for individual resource loading states
+
+// Use scoped compute nodes from store
+const ACCOUNT_OWNER_SCOPE = 'account-owner'
+const allComputeNodes = computed(() => {
+  return computeResourcesStore.getScopedComputeNodes(ACCOUNT_OWNER_SCOPE)
+})
+const computeNodesLoaded = computed(() => computeResourcesStore.isScopedCacheValid(ACCOUNT_OWNER_SCOPE))
 
 // Get current organization from store
 const currentOrganization = computed(() => store.getters.activeOrganization?.organization)
+
+const hasNoResources = computed(() => { return computeResources.value.length === 0 })
 
 // Get workspaces where user has admin rights
 const adminWorkspaces = computed(() => {
@@ -69,36 +78,19 @@ const formatAccountId = (accountId) => {
   return accountId
 }
 
-onMounted(() => {
-  fetchComputeResources()
+onMounted(async () => {
+  await computeResourcesStore.fetchComputeAccounts()
+  // Fetch all compute nodes once when component mounts using scoped caching
+  await fetchAllComputeNodes()
 })
 
-async function fetchComputeResources() {
-  isLoading.value = true
+
+// Fetch all compute nodes once and cache them using scoped store
+async function fetchAllComputeNodes() {
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/accounts?includeWorkspaces=true`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      computeResources.value = data || []
-    } else {
-      console.error('Failed to fetch compute resources:', response.status, response.statusText)
-      computeResources.value = []
-    }
+    await computeResourcesStore.fetchScopedComputeNodes(ACCOUNT_OWNER_SCOPE)
   } catch (error) {
-    console.error('Failed to fetch compute resources:', error)
-    computeResources.value = []
-  } finally {
-    isLoading.value = false
+    console.error('Failed to fetch all compute nodes:', error)
   }
 }
 
@@ -108,6 +100,8 @@ function toggleResourceExpansion(resourceUuid) {
     newExpanded.delete(resourceUuid)
   } else {
     newExpanded.add(resourceUuid)
+    // Ensure compute nodes are loaded when expanding
+    fetchComputeNodesForAccount()
   }
   expandedResources.value = newExpanded
 }
@@ -121,7 +115,7 @@ function isResourceEditing(resourceUuid) {
 }
 
 function isResourceUpdating(resourceUuid) {
-  return isUpdating.value.has(resourceUuid)
+  return computeResourcesStore.isNodeUpdating(resourceUuid)
 }
 
 function startEditing(resource) {
@@ -152,103 +146,28 @@ async function saveChanges(resource) {
   
   if (!changes) return
   
-  // Add to updating set
-  const newUpdating = new Set(isUpdating.value)
-  newUpdating.add(resourceUuid)
-  isUpdating.value = newUpdating
-  
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/accounts/${resourceUuid}`
-    
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: changes.name || null,
-        description: changes.description || null,
-        status: changes.status
-      })
+    await computeResourcesStore.updateAccount(resourceUuid, {
+      name: changes.name || null,
+      description: changes.description || null,
+      status: changes.status
     })
     
-    if (response.ok) {
-      const updatedResource = await response.json()
-      
-      // Update the resource in the list, preserving existing data like workspaces
-      const index = computeResources.value.findIndex(r => r.uuid === resourceUuid)
-      if (index !== -1) {
-        // Merge updated data with existing resource to preserve workspace info
-        computeResources.value[index] = {
-          ...computeResources.value[index],
-          ...updatedResource
-        }
-      }
-      
-      // Exit editing mode
-      cancelEditing(resourceUuid)
-    } else {
-      console.error('Failed to update resource:', response.status, response.statusText)
-      // Handle error - maybe show a toast notification
-    }
+    // Exit editing mode
+    cancelEditing(resourceUuid)
   } catch (error) {
     console.error('Failed to update resource:', error)
-    // Handle error
-  } finally {
-    // Remove from updating set
-    const newUpdating = new Set(isUpdating.value)
-    newUpdating.delete(resourceUuid)
-    isUpdating.value = newUpdating
+    // Handle error - maybe show a toast notification
   }
 }
 
 async function updateStatus(resource, newStatus) {
   const resourceUuid = resource.uuid
   
-  // Add to updating set
-  const newUpdating = new Set(isUpdating.value)
-  newUpdating.add(resourceUuid)
-  isUpdating.value = newUpdating
-  
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/accounts/${resourceUuid}`
-    
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: newStatus
-      })
-    })
-    
-    if (response.ok) {
-      const updatedResource = await response.json()
-      
-      // Update the resource in the list, preserving existing data like workspaces
-      const index = computeResources.value.findIndex(r => r.uuid === resourceUuid)
-      if (index !== -1) {
-        // Merge updated data with existing resource to preserve workspace info
-        computeResources.value[index] = {
-          ...computeResources.value[index],
-          ...updatedResource
-        }
-      }
-    } else {
-      console.error('Failed to update resource status:', response.status, response.statusText)
-    }
+    await computeResourcesStore.updateAccountStatus(resourceUuid, newStatus)
   } catch (error) {
     console.error('Failed to update resource status:', error)
-  } finally {
-    // Remove from updating set
-    const newUpdating = new Set(isUpdating.value)
-    newUpdating.delete(resourceUuid)
-    isUpdating.value = newUpdating
   }
 }
 
@@ -267,15 +186,26 @@ function getStatusForResource(resource) {
   return resource.status ? resource.status.toLowerCase() : 'enabled'
 }
 
-function getStatusColor(resource) {
-  const status = getStatusForResource(resource)
-  if (status === 'paused') return '#F59E0B' // Amber/Orange for paused
-  return '#10B981' // Green for enabled
-}
 
 function formatDate(timestamp) {
   if (!timestamp) return 'N/A'
-  const date = new Date(timestamp * 1000) // Convert from Unix timestamp
+  
+  // Handle different date formats
+  let date
+  if (typeof timestamp === 'string') {
+    // Handle ISO string format like "2025-09-09 20:09:53.21578262 +0000 UTC"
+    date = new Date(timestamp)
+  } else if (typeof timestamp === 'number') {
+    // Handle Unix timestamp
+    date = new Date(timestamp * 1000)
+  } else {
+    return 'N/A'
+  }
+  
+  if (isNaN(date.getTime())) {
+    return 'N/A'
+  }
+  
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -329,33 +259,7 @@ async function removeWorkspaceAccess(resource, organizationId) {
   workspaceOperations.value = newOperations
   
   try {
-    const token = await useGetToken()
-    const encodedOrgId = encodeURIComponent(organizationId)
-    const url = `${siteConfig.api2Url}/compute/resources/accounts/${resource.uuid}/workspaces/${encodedOrgId}`
-    
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      // Remove the workspace from the local state
-      const resourceIndex = computeResources.value.findIndex(r => r.uuid === resource.uuid)
-      if (resourceIndex !== -1) {
-        const updatedWorkspaces = computeResources.value[resourceIndex].enabledWorkspaces?.filter(
-          ws => ws.organizationId !== organizationId
-        ) || []
-        computeResources.value[resourceIndex] = {
-          ...computeResources.value[resourceIndex],
-          enabledWorkspaces: updatedWorkspaces
-        }
-      }
-    } else {
-      console.error('Failed to remove workspace access:', response.status, response.statusText)
-    }
+    await computeResourcesStore.removeWorkspaceAccess(resource.uuid, organizationId)
   } catch (error) {
     console.error('Failed to remove workspace access:', error)
   } finally {
@@ -373,61 +277,27 @@ async function addWorkspaceAccess(resource, organizationId, isPublic) {
   workspaceOperations.value = newOperations
   
   try {
-    const token = await useGetToken()
-    const encodedOrgId = encodeURIComponent(organizationId)
-    const url = `${siteConfig.api2Url}/compute/resources/accounts/${resource.uuid}/workspaces?organization_id=${encodedOrgId}`
+    await computeResourcesStore.addWorkspaceAccess(resource.uuid, organizationId, isPublic)
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ isPublic })
-    })
-    
-    if (response.ok) {
-      // Add the new workspace to the local state
-      const resourceIndex = computeResources.value.findIndex(r => r.uuid === resource.uuid)
-      if (resourceIndex !== -1) {
-        const newWorkspace = {
-          organizationId,
-          isPublic,
-          enabledBy: profile.value?.id || 'current-user',
-          enabledAt: Math.floor(Date.now() / 1000) // Current timestamp
-        }
-        
-        const currentWorkspaces = computeResources.value[resourceIndex].enabledWorkspaces || []
-        computeResources.value[resourceIndex] = {
-          ...computeResources.value[resourceIndex],
-          enabledWorkspaces: [...currentWorkspaces, newWorkspace]
-        }
-      }
-      
-      // Close dialog and reset form
-      closeAddWorkspaceDialog()
-    } else {
-      const errorText = await response.text()
-      console.error('Failed to add workspace access:', response.status, response.statusText, errorText)
-      
-      // Check if the error indicates the account is already enabled
-      if (errorText.includes('account already enabled for workspace')) {
-        // Show toast message for already enabled workspace
-        ElMessage.warning({
-          message: 'This compute resource is already enabled for the selected workspace.',
-          duration: 4000
-        })
-      } else {
-        // Show generic error message
-        ElMessage.error({
-          message: 'Failed to add workspace access. Please try again.',
-          duration: 4000
-        })
-      }
-    }
+    // Close dialog and reset form
+    closeAddWorkspaceDialog()
   } catch (error) {
     console.error('Failed to add workspace access:', error)
+    
+    // Check if the error indicates the account is already enabled
+    if (error.message && error.message.includes('account already enabled for workspace')) {
+      // Show toast message for already enabled workspace
+      ElMessage.warning({
+        message: 'This compute resource is already enabled for the selected workspace.',
+        duration: 4000
+      })
+    } else {
+      // Show generic error message
+      ElMessage.error({
+        message: 'Failed to add workspace access. Please try again.',
+        duration: 4000
+      })
+    }
   } finally {
     // Remove from operations set
     const newOperations = new Set(workspaceOperations.value)
@@ -460,7 +330,9 @@ function getWorkspaceNameById(organizationId) {
   
   // Then check all organizations in store
   const organizations = store.state.organizations || []
-  const org = organizations.find(org => {
+  // Ensure organizations is an array
+  const orgsArray = Array.isArray(organizations) ? organizations : []
+  const org = orgsArray.find(org => {
     const orgId = org.organization?.id || org.id
     return orgId === organizationId
   })
@@ -493,6 +365,59 @@ function isAddWorkspaceDisabled() {
   return !newWorkspaceAccess.value.organizationId || 
          (selectedResourceForWorkspace.value && isWorkspaceOperationLoading(selectedResourceForWorkspace.value))
 }
+
+// Ensure compute nodes are loaded from the cached store
+function fetchComputeNodesForAccount() {
+  // If nodes aren't loaded yet, trigger a scoped fetch
+  if (!computeNodesLoaded.value) {
+    fetchAllComputeNodes()
+  }
+  // Note: No need to manually filter and store - getComputeNodesForResource will handle this reactively
+}
+
+function isLoadingComputeNodesForResource(resourceUuid) {
+  return isLoadingComputeNodes.value.has(resourceUuid) || computeResourcesStore.isScopeLoading(ACCOUNT_OWNER_SCOPE)
+}
+
+function getComputeNodesForResource(resourceUuid) {
+  // Find the resource by UUID to get the accountId
+  const resource = computeResources.value.find(r => r.uuid === resourceUuid)
+  if (!resource) return []
+  
+  // Filter nodes from store cache by accountId
+  return allComputeNodes.value.filter(node => 
+    node.account?.accountId === resource.accountId
+  )
+}
+
+// Node status functions for display
+function getNodeStatusForDisplay(node) {
+  // Return the actual node status - should be 'Pending', 'Enabled', or 'Paused'
+  const status = node.status
+  
+  // Normalize the status to expected values
+  if (!status) return 'Pending'
+  
+  const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+  
+  // Map any legacy or alternative status values if needed
+  switch(normalizedStatus) {
+    case 'Pending':
+    case 'Enabled':
+    case 'Paused':
+      return normalizedStatus
+    case 'Active':
+    case 'Running':
+    case 'Ready':
+      return 'Enabled'
+    case 'Stopped':
+    case 'Disabled':
+      return 'Paused'
+    default:
+      return 'Pending'
+  }
+}
+
 </script>
 
 <template>
@@ -512,21 +437,22 @@ function isAddWorkspaceDisabled() {
         <div class="info-card">
           <h3>Setting Up Compute Resources</h3>
           <p>
-            Compute resources are configured outside of this web application through the Pennsieve Agent.
-            Once configured, they will appear here where you can view their status and manage workspace access.
+            Compute resources are your personal cloud accounts (AWS) that you register with Pennsieve through the Pennsieve Agent.
+            As the owner of these accounts, you control which workspaces have access to create compute nodes on your infrastructure.
+            Once configured, they will appear here where you can view their status and manage workspace access permissions.
           </p>
           <p class="info-note">
-            <strong>Note:</strong> Each compute resource can have multiple compute nodes associated with it across different Pennsieve workspaces.
-            Compute node management is handled separately through the Analysis section.
+            <strong>User Ownership Model:</strong> You own and pay for these compute resources, but you can share them with workspace members to enable collaborative data analysis.
+            Compute nodes created from your resources can be shared with different permission levels (private, workspace-wide, or user-specific access).
           </p>
-          <div class="setup-steps">
+          <div class="setup-steps" v-if="hasNoResources">
             <h4>Quick Setup Guide:</h4>
             <ol>
               <li>Configure your AWS account using the AWS CLI</li>
               <li>Download and configure the Pennsieve Agent</li>
               <li>Use the Pennsieve Agent to register your AWS account</li>
-              <li>Make the compute resource available to workspaces</li>
-              <li>Manage compute nodes through the Analysis > Compute Nodes section</li>
+              <li>Share your compute resource with workspaces where you want to enable collaborative analysis</li>
+              <li>Workspace members can then create compute nodes on your resources through the Analysis > Compute Nodes section</li>
             </ol>
           </div>
           <div class="documentation-link">
@@ -755,16 +681,16 @@ function isAddWorkspaceDisabled() {
                         </div>
                       </div>
                       <div class="workspace-actions">
-                        <router-link 
-                          :to="{ 
-                            name: 'compute-nodes',
-                            params: { orgId: workspace.organizationId }
-                          }"
-                          class="manage-nodes-button"
-                          title="Manage compute nodes"
-                        >
-                          <IconSettings :width="16" :height="16" />
-                        </router-link>
+<!--                        <router-link -->
+<!--                          :to="{ -->
+<!--                            name: 'compute-nodes',-->
+<!--                            params: { orgId: workspace.organizationId }-->
+<!--                          }"-->
+<!--                          class="manage-nodes-button"-->
+<!--                          title="Manage compute nodes"-->
+<!--                        >-->
+<!--                          <IconSettings :width="16" :height="16" />-->
+<!--                        </router-link>-->
                         <button 
                           @click="openRemoveWorkspaceDialog(resource, workspace.organizationId)" 
                           :disabled="isWorkspaceOperationLoading(resource, workspace.organizationId)"
@@ -780,6 +706,61 @@ function isAddWorkspaceDisabled() {
                   <div v-else class="no-workspaces">
                     <p>No workspaces are currently enabled for this resource.</p>
                     <p class="add-workspace-hint">Click "Add Workspace" to enable access for this organization.</p>
+                  </div>
+                </div>
+                
+                <!-- Compute Nodes Section -->
+                <div class="detail-section">
+                  <div class="detail-header">
+                    <h4>Compute Nodes</h4>
+                    <div class="detail-actions">
+                      <span v-if="isLoadingComputeNodesForResource(resource.uuid)" class="loading-text">
+                        Loading nodes...
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div v-loading="isLoadingComputeNodesForResource(resource.uuid)" class="compute-nodes-content">
+                    <div v-if="getComputeNodesForResource(resource.uuid).length > 0" class="compute-nodes-list">
+                      <div 
+                        v-for="node in getComputeNodesForResource(resource.uuid)" 
+                        :key="node.uuid"
+                        class="compute-node-item"
+                      >
+                        <div class="node-content">
+                          <div class="node-name">
+                            <strong>{{ node.name || 'Unnamed Node' }}</strong>
+                          </div>
+                          <div class="node-info">
+                            <span class="node-workspace">{{ getWorkspaceNameById(node.organizationId) }}</span>
+                            <span class="node-separator">•</span>
+                            <span class="node-owner">{{ getUserName(node.userId) }}</span>
+                          </div>
+                        </div>
+                        <div class="node-actions">
+                          <div class="node-status">
+                            <span :class="['node-status-badge', getNodeStatusForDisplay(node).toLowerCase()]">
+                              {{ getNodeStatusForDisplay(node) }}
+                            </span>
+                          </div>
+<!--                          <router-link -->
+<!--                            :to="{ -->
+<!--                              name: 'compute-node-management',-->
+<!--                              params: { orgId: node.organizationId, nodeId: node.uuid }-->
+<!--                            }"-->
+<!--                            class="manage-node-button"-->
+<!--                            title="Manage this compute node"-->
+<!--                          >-->
+<!--                            <IconSettings :width="16" :height="16" />-->
+<!--                          </router-link>-->
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div v-else-if="!isLoadingComputeNodesForResource(resource.uuid)" class="no-compute-nodes">
+                      <p>No compute nodes are currently deployed for this account.</p>
+                      <p class="compute-nodes-hint">Compute nodes are created when you run analysis workflows in workspaces that have access to this compute resource.</p>
+                    </div>
                   </div>
                 </div>
                 
@@ -970,7 +951,7 @@ function isAddWorkspaceDisabled() {
 
 .compute-resources-container {
   max-width: 1000px;
-  margin: 0;
+  margin: 16px;
 }
 
 h2 {
@@ -1747,7 +1728,6 @@ h2 {
       align-items: flex-start;
       padding: 12px;
       background: theme.$gray_1;
-      border-radius: 6px;
       margin-bottom: 12px;
       gap: 12px;
 
@@ -2043,6 +2023,229 @@ h2 {
   }
 }
 
+// Compute Nodes Section Styles
+.compute-nodes-content {
+  .compute-nodes-list {
+    .compute-node-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px;
+      //background: theme.$gray_1;
+      //border-radius: 6px;
+      margin-bottom: 12px;
+      gap: 12px;
+      //border: 1px solid theme.$gray_2;
+      transition: all 0.2s ease;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      &:hover {
+        background: rgba(theme.$purple_1, 0.05);
+        border-color: rgba(theme.$purple_1, 0.2);
+      }
+
+      .node-content {
+        flex: 1;
+
+        .node-name {
+          margin-bottom: 6px;
+
+          strong {
+            font-size: 14px;
+            color: theme.$gray_6;
+            font-weight: 500;
+          }
+        }
+
+        .node-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: theme.$gray_5;
+
+          .node-workspace {
+            font-weight: 500;
+          }
+
+          .node-separator {
+            color: theme.$gray_4;
+          }
+
+        }
+      }
+
+      .node-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-shrink: 0;
+        margin-top: 2px;
+
+        .node-status {
+          .node-status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 2px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            
+            // Status colors
+            &.pending {
+              background: rgba(theme.$gray_4, 0.15);
+              color: theme.$gray_5;
+              border: 1px solid rgba(theme.$gray_4, 0.3);
+            }
+            
+            &.enabled {
+              background: rgba(#10B981, 0.1);
+              color: theme.$green_2;
+              border: 1px solid rgba(#10B981, 0.2);
+            }
+            
+            &.paused {
+              background: rgba(#F59E0B, 0.1);
+              color: theme.$orange_2;
+              border: 1px solid rgba(#F59E0B, 0.2);
+            }
+          }
+          
+          .node-status-select {
+            min-width: 80px;
+            
+            :deep(.el-select__wrapper) {
+              border: 1px solid transparent;
+              border-radius: 2px;
+              font-size: 11px;
+              font-weight: 500;
+              text-transform: capitalize;
+              letter-spacing: 0.25px;
+              height: 24px;
+              transition: all 0.2s ease;
+              box-shadow: none;
+              
+              &:hover {
+                border-color: theme.$gray_3;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+              }
+              
+              &.is-focused {
+                border-color: theme.$purple_2;
+                box-shadow: 0 0 0 2px rgba(theme.$purple_2, 0.1);
+              }
+            }
+            
+            :deep(.el-input__inner) {
+              color: theme.$gray_6;
+              text-align: left;
+              font-size: 11px;
+              font-weight: 500;
+            }
+            
+            :deep(.el-select__caret) {
+              color: theme.$gray_4;
+            }
+            
+            // Status-specific colors - same as account state tags
+            &.enabled {
+              :deep(.el-select__wrapper) {
+                background: rgba(#10B981, 0.08);
+                border-color: rgba(#10B981, 0.2);
+                
+                &:hover {
+                  background: rgba(#10B981, 0.12);
+                  border-color: rgba(#10B981, 0.3);
+                }
+              }
+              
+              :deep(.el-input__inner) {
+                color: #059669;
+              }
+              
+              :deep(.el-select__caret) {
+                color: #059669;
+              }
+            }
+            
+            &.disabled {
+              :deep(.el-select__wrapper) {
+                background: rgba(theme.$gray_4, 0.08);
+                border-color: rgba(theme.$gray_4, 0.2);
+                
+                &:hover {
+                  background: rgba(theme.$gray_4, 0.12);
+                  border-color: rgba(theme.$gray_4, 0.3);
+                }
+              }
+              
+              :deep(.el-input__inner) {
+                color: theme.$gray_5;
+              }
+              
+              :deep(.el-select__caret) {
+                color: theme.$gray_5;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .no-compute-nodes {
+    text-align: center;
+    padding: 24px;
+    
+    p {
+      color: theme.$gray_5;
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+      
+      &.compute-nodes-hint {
+        font-size: 13px;
+        color: theme.$gray_4;
+      }
+    }
+  }
+
+  .loading-text {
+    font-size: 13px;
+    color: theme.$gray_4;
+    font-style: italic;
+  }
+}
+
+// Manage node button styles
+.manage-node-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: theme.$gray_2;
+  color: theme.$gray_5;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: theme.$purple_1;
+    color: white;
+    transform: translateY(-1px);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(theme.$purple_1, 0.2);
+  }
+}
+
 // Responsive adjustments
 @media (max-width: 768px) {
   .header-section {
@@ -2056,6 +2259,18 @@ h2 {
 
   .guidelines-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compute-nodes-content {
+    .compute-nodes-list {
+      .compute-node-item {
+        .node-content {
+          .node-details {
+            grid-template-columns: 1fr;
+          }
+        }
+      }
+    }
   }
 }
 </style>
