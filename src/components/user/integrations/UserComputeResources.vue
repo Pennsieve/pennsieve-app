@@ -521,8 +521,8 @@ function getNodeStatusForDisplay(node) {
                     :class="['status-select', getStatusForResource(resource)]"
                     @click.stop
                   >
-                    <el-option label="Enabled" value="enabled" />
-                    <el-option label="Paused" value="paused" />
+                    <el-option label="Enabled" value="Enabled" />
+                    <el-option label="Paused" value="Paused" />
                   </el-select>
                 </div>
                 <button class="expand-toggle" @click.stop="toggleResourceExpansion(resource.uuid)">

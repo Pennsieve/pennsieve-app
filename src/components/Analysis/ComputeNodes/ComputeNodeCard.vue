@@ -20,7 +20,20 @@
         </div>
       </div>
       <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop>
+        <div class="node-status-badge" @click.stop v-if="hasAdminRights && getStatusForNode(node) !== 'Pending'">
+          <el-select 
+            :model-value="getStatusForNode(node)"
+            @change="(value) => updateStatus(value)"
+            :loading="isUpdatingPermissions"
+            size="small"
+            :class="['status-select', getStatusForNode(node).toLowerCase()]"
+            @click.stop
+          >
+            <el-option label="Enabled" value="Enabled" />
+            <el-option label="Paused" value="Paused" />
+          </el-select>
+        </div>
+        <div class="node-status-badge" @click.stop v-else>
           <span 
             :class="['node-status-badge', getStatusForNode(node).toLowerCase()]"
           >
@@ -40,23 +53,66 @@
           <div class="detail-header">
             <h4>Node Information</h4>
             <div class="detail-actions">
+              <button 
+                v-if="!isEditing && hasAdminRights" 
+                @click="startEditing" 
+                class="edit-button"
+              >
+                Edit
+              </button>
+              <div v-else-if="isEditing" class="edit-actions">
+                <button 
+                  @click="saveChanges" 
+                  :disabled="isUpdatingPermissions"
+                  class="save-button"
+                >
+                  Save
+                </button>
+                <button 
+                  @click="cancelEditing" 
+                  class="cancel-button"
+                >
+                  Cancel
+                </button>
+              </div>
               <slot name="detail-actions" />
             </div>
           </div>
           
+          <!-- Editable Name -->
           <div class="detail-row">
             <span class="detail-label">Name:</span>
-            <span class="detail-value">{{ node.name }}</span>
+            <span class="detail-value" v-if="!isEditing">
+              <span v-if="node.name">{{ node.name }}</span>
+              <span v-else class="empty-value">No name set</span>
+            </span>
+            <div class="detail-value" v-else>
+              <input 
+                v-model="editingData.name"
+                placeholder="Enter node name"
+                class="edit-input"
+              />
+            </div>
           </div>
           
+          <!-- Editable Description -->
           <div class="detail-row">
             <span class="detail-label">Description:</span>
-            <span class="detail-value">
+            <span class="detail-value" v-if="!isEditing">
               <span v-if="node.description">{{ node.description }}</span>
               <span v-else class="empty-value">No description set</span>
             </span>
+            <div class="detail-value" v-else>
+              <textarea 
+                v-model="editingData.description"
+                placeholder="Enter node description"
+                rows="2"
+                class="edit-textarea"
+              />
+            </div>
           </div>
           
+          <!-- Status (read-only) -->
           <div class="detail-row">
             <span class="detail-label">Status:</span>
             <span class="detail-value">
@@ -264,7 +320,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useStore } from 'vuex'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElSelect, ElOption } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const props = defineProps({
@@ -333,6 +389,10 @@ const showAddUserDialog = ref(false)
 const showAddTeamDialog = ref(false)
 const selectedUserId = ref('')
 const selectedTeamId = ref('')
+
+// Editing state
+const isEditing = ref(false)
+const editingData = ref({})
 
 // Computed properties for available users and teams
 const availableUsers = computed(() => {
@@ -518,6 +578,53 @@ async function removeTeamAccess(teamId) {
     ElMessage.error('Failed to revoke team access')
   }
 }
+
+// Node editing functions  
+function startEditing() {
+  isEditing.value = true
+  
+  // Initialize editing data with current values
+  editingData.value = {
+    name: props.node.name || '',
+    description: props.node.description || ''
+  }
+}
+
+function cancelEditing() {
+  isEditing.value = false
+  editingData.value = {}
+}
+
+async function saveChanges() {
+  const changes = editingData.value
+  
+  if (!changes) return
+  
+  try {
+    await computeResourcesStore.updateComputeNode(props.node.uuid, {
+      name: changes.name || null,
+      description: changes.description || null
+    })
+    
+    ElMessage.success('Compute node updated successfully')
+    
+    // Exit editing mode
+    cancelEditing()
+  } catch (error) {
+    console.error('Failed to update compute node:', error)
+    ElMessage.error('Failed to update compute node')
+  }
+}
+
+async function updateStatus(newStatus) {
+  try {
+    await computeResourcesStore.updateComputeNodeStatus(props.node.uuid, newStatus)
+    ElMessage.success(`Status updated to ${newStatus}`)
+  } catch (error) {
+    console.error('Failed to update compute node status:', error)
+    ElMessage.error('Failed to update compute node status')
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -620,6 +727,39 @@ async function removeTeamAccess(teamId) {
   }
 }
 
+.status-select {
+  min-width: 90px;
+  
+  :deep(.el-select__wrapper) {
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    height: 28px;
+    padding: 4px 12px;
+  }
+  
+  &.enabled :deep(.el-select__wrapper) {
+    background: rgba(#10B981, 0.1);
+    color: #059669;
+    border: 1px solid rgba(#10B981, 0.2);
+  }
+  
+  &.paused :deep(.el-select__wrapper) {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(#F59E0B, 0.2);
+  }
+  
+  &.pending :deep(.el-select__wrapper) {
+    background: rgba(#6B7280, 0.1);
+    color: #6B7280;
+    border: 1px solid rgba(#6B7280, 0.2);
+  }
+}
+
 .manage-button {
   background: theme.$purple_3;
   color: white;
@@ -715,6 +855,50 @@ async function removeTeamAccess(teamId) {
           display: flex;
           gap: 8px;
         }
+        
+        .edit-button,
+        .save-button,
+        .cancel-button {
+          background: theme.$purple_1;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          
+          &:hover {
+            background: theme.$purple_2;
+            transform: translateY(-1px);
+          }
+          
+          &:active {
+            transform: translateY(0);
+          }
+          
+          &:disabled {
+            background: theme.$gray_4;
+            color: white;
+            cursor: not-allowed;
+            transform: none;
+            
+            &:hover {
+              background: theme.$gray_4;
+              transform: none;
+            }
+          }
+        }
+        
+        .cancel-button {
+          background: theme.$gray_4;
+          
+          &:hover {
+            background: theme.$gray_5;
+          }
+        }
+        
       }
     }
 
@@ -764,6 +948,38 @@ async function removeTeamAccess(teamId) {
         .empty-value {
           color: theme.$gray_4;
           font-style: italic;
+        }
+        
+        // Form elements for editing
+        .edit-input,
+        .edit-textarea,
+        .edit-select {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          padding: 6px 12px;
+          border: 1px solid theme.$gray_3;
+          border-radius: 4px;
+          font-size: 14px;
+          font-family: inherit;
+          background: white;
+          color: theme.$gray_6;
+          
+          &:focus {
+            outline: none;
+            border-color: theme.$purple_1;
+            box-shadow: 0 0 0 2px rgba(theme.$purple_1, 0.2);
+          }
+        }
+        
+        .edit-textarea {
+          resize: vertical;
+          min-height: 60px;
+          line-height: 1.4;
+        }
+        
+        .edit-select {
+          cursor: pointer;
         }
       }
     }

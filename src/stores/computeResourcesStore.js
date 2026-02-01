@@ -827,6 +827,97 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // PATCH method for compute node updates (name, description, status)
+  const updateComputeNode = async (nodeUuid, changes) => {
+    setNodeUpdating(nodeUuid, true)
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid}`
+      
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(changes)
+      })
+      
+      if (response.ok) {
+        const updatedNode = await response.json()
+        
+        // Update the node in all scoped caches and re-sort if name changed
+        for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
+          const nodeIndex = scopedNodes.findIndex(node => node.uuid === nodeUuid)
+          if (nodeIndex !== -1) {
+            // Update the node
+            scopedNodes[nodeIndex] = { ...scopedNodes[nodeIndex], ...updatedNode }
+            
+            // Re-sort if name might have changed
+            if (changes.name) {
+              const sortedNodes = [...scopedNodes].sort((a, b) => {
+                const nameA = (a.name || '').toLowerCase()
+                const nameB = (b.name || '').toLowerCase()
+                return nameA.localeCompare(nameB)
+              })
+              scopedComputeNodes.value.set(scope, sortedNodes)
+            }
+          }
+        }
+        
+        return updatedNode
+      } else {
+        const errorDetails = await response.text()
+        console.error('Failed to update compute node:', response.status, response.statusText, errorDetails)
+        return Promise.reject(new Error(`Failed to update compute node: ${response.statusText} - ${errorDetails}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node:', error)
+      return Promise.reject(error)
+    } finally {
+      setNodeUpdating(nodeUuid, false)
+    }
+  }
+
+  // PATCH method for compute node status only
+  const updateComputeNodeStatus = async (nodeUuid, status) => {
+    setNodeUpdating(nodeUuid, true)
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid}`
+      
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      })
+      
+      if (response.ok) {
+        // Update the node status in all scoped caches
+        for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
+          const nodeIndex = scopedNodes.findIndex(node => node.uuid === nodeUuid)
+          if (nodeIndex !== -1) {
+            scopedNodes[nodeIndex] = { ...scopedNodes[nodeIndex], status }
+          }
+        }
+        
+        return true
+      } else {
+        const errorDetails = await response.text()
+        console.error('Failed to update compute node status:', response.status, response.statusText, errorDetails)
+        return Promise.reject(new Error(`Failed to update compute node status: ${response.statusText} - ${errorDetails}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node status:', error)
+      return Promise.reject(error)
+    } finally {
+      setNodeUpdating(nodeUuid, false)
+    }
+  }
+
   return {
     // State - Accounts
     computeAccounts,
@@ -868,6 +959,10 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     createComputeNode,
     deleteComputeNode,
     editComputeNode,
+    
+    // PATCH Operations for compute nodes
+    updateComputeNode,
+    updateComputeNodeStatus,
     
     // Actions - Accounts
     fetchComputeAccounts,
