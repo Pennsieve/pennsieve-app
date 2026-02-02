@@ -17,8 +17,6 @@ import type { Level, RenderAs, GradientType } from 'qrcode.vue'
 import IconUpload from "~/components/Icons/IconUpload.vue";
 import {pathOr} from "ramda";
 
-const runtimeConfig = useRuntimeConfig()
-
 const loginScope = ref('')
 const loginProvider = ref('')
 const loginProviders = {
