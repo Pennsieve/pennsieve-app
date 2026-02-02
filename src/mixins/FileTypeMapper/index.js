@@ -13,7 +13,8 @@ export default {
         Video: 'video',
         Text: 'text',
         ZIP: 'zip',
-        CSV: 'csv'
+        CSV: 'csv',
+        OMETIFF: 'omeTiff'
       },
       fileTypes: [
         {
@@ -440,7 +441,7 @@ export default {
       const packageType = pathOr('unknown', ['content', 'packageType'], pkg)
       const packageProperties = propOr([], 'properties', pkg)
       let component = packageType.toLowerCase()
-      if (isNil(this.typeMapper[packageType]) || packageState === 'ERROR') {
+      if ((isNil(this.typeMapper[packageType]) || packageState === 'ERROR')) {
         component = 'unknown';
       }
 
@@ -454,7 +455,9 @@ export default {
         component = 'xls'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular']
+      if (this.isCollectionWithAViewer(pkg)) {
+        component = 'timeseries'
+      }
       const vueViewerMap = {
         image: ['ImageViewer'],
         pdf: ['PDFViewer'],
@@ -468,7 +471,15 @@ export default {
         parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
         mri: ['NiiViewer'],
         tabular: ['CSVViewer','DataExplorer'],
+        omeTiff: ['OmeViewer'],
       }
+
+      // OME-TIFF check based solely on filename - takes precedence over packageType
+      if (this.isOMETiff(pkg)) {
+        return vueViewerMap['omeTiff']
+      }
+
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
 
       // TODO: This currently picks the first of the viewers and should be replaced by more solid support
       for (let i in packageProperties) {
@@ -490,6 +501,21 @@ export default {
         return ['UnknownViewer']
       }
 
+    },
+
+    isCollectionWithAViewer: function(pkg) {
+      const packageType = pathOr('', ['content', 'packageType'], pkg)
+      if (packageType !== 'Collection') {
+        return false
+      }
+      const packageProperties = propOr([], 'properties', pkg)
+      const collectionSubtype = this.getFilePropertyVal(packageProperties, 'subtype', 'Viewer')
+      const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
+      return isTimeseriesCollection
+    },
+    isOMETiff: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.ome.tiff') || fileName.endsWith('.ome.tif')
     }
   }
 

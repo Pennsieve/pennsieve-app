@@ -1,12 +1,16 @@
 <template>
   <transition name="dialog-fade">
     <div class="bf-upload-info">
+      <button class="dismiss-btn" @click="onDismiss" title="Dismiss">
+        <IconRemove />
+      </button>
       <div v-if="getIsUploading" class="copy">
         <strong> {{ uploadCopy }}</strong>
 
         <bf-progress-bar
           :loaded="getUploadProgress().loaded"
           :total="getUploadProgress().total"
+          :complete="allFilesComplete"
         />
       </div>
       <div v-else class="copy">
@@ -14,9 +18,12 @@
       </div>
       <div class="upload-details">
         <button class="show-details" @click="showUpload">Show details</button>
-        <div v-if="getIsUploading">
+        <div v-if="getIsUploading && !allFilesComplete">
           <strong>{{ loadedStr }}</strong>
           of {{ totalStr }}
+        </div>
+        <div v-else-if="allFilesComplete" class="complete-text">
+          Uploading...
         </div>
       </div>
     </div>
@@ -29,12 +36,14 @@ import { propOr } from "ramda";
 import BfProgressBar from "../../../shared/bf-progress-bar/bf-progress-bar.vue";
 import BfStorageMetrics from "../../../../mixins/bf-storage-metrics";
 import EventBus from "../../../../utils/event-bus";
+import IconRemove from "../../../icons/IconRemove.vue";
 
 export default {
   name: "BfUploadInfo",
 
   components: {
     BfProgressBar,
+    IconRemove,
   },
 
   mixins: [BfStorageMetrics],
@@ -49,6 +58,7 @@ export default {
       "getIsUploading",
       "getUploadMap",
       "getUploadComplete",
+      "getTotalFilesInBatch",
     ]),
 
     /**
@@ -59,8 +69,9 @@ export default {
       if (this.getUploadComplete()) {
         return "";
       }
-      const file = this.getUploadMap().size > 1 ? "files" : "file";
-      return `Uploading ${this.getUploadMap().size} ${file}`;
+      const totalFiles = this.getTotalFilesInBatch();
+      const file = totalFiles > 1 ? "files" : "file";
+      return `Uploading ${totalFiles} ${file}`;
     },
 
     loadedStr: function () {
@@ -68,6 +79,21 @@ export default {
     },
     totalStr: function () {
       return this.formatMetric(this.getUploadProgress().total);
+    },
+
+    /**
+     * Check if all files have completed uploading (in processing state)
+     * @returns {Boolean}
+     */
+    allFilesComplete: function () {
+      const uploadMap = this.getUploadMap();
+      if (uploadMap.size === 0) return false;
+      for (const [, value] of uploadMap) {
+        if (value.status !== "processing") {
+          return false;
+        }
+      }
+      return true;
     },
   },
 
@@ -84,8 +110,7 @@ export default {
      * Dismiss status bar and clear uploaded files in bf-upload
      */
     onDismiss: function () {
-      EventBus.$emit("dismiss-upload-info");
-      EventBus.$emit("close-uploader");
+      this.$store.dispatch("uploadModule/resetUpload");
     },
   },
 };
@@ -103,6 +128,7 @@ export default {
   margin-left: -240px;
   left: 50%;
   padding: 8px 16px;
+  padding-right: 40px;
   position: absolute;
   top: 8px;
   width: 480px;
@@ -118,6 +144,29 @@ button {
   color: theme.$app-primary-color;
   text-decoration: underline;
 }
+.dismiss-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  text-decoration: none;
+  color: theme.$gray_4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: theme.$gray_6;
+  }
+
+  .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
 .upload-details {
   display: flex;
   margin-top: 4px;
@@ -125,5 +174,9 @@ button {
 .show-details {
   flex: 1;
   text-align: left;
+}
+.complete-text {
+  color: theme.$green_1;
+  font-weight: 500;
 }
 </style>

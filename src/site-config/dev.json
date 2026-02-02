@@ -21,6 +21,7 @@
   "notificationUrl": "wss://api.pennsieve.net/notifications/notification/connect",
   "googleMapApi": "xxxxxxxxxxxxxx",
   "mapTiler": "xxxxx",
+  "githubAppUrl": "https://github.com/apps/pennsieve-test",
   "awsConfig": {
     "authenticationFlowType": "USER_PASSWORD_AUTH",
     "region": "us-east-1",

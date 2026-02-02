@@ -95,6 +95,7 @@ import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import orcidImage from '@/assets/images/orcid_24x24.png'
 
 const store = useStore()
+const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
 const profile = computed(() => store.state.profile)
 
@@ -117,11 +118,10 @@ const githubUsername = computed(() => {
 const oauthWindow = ref(null)
 
 onMounted(async () => {
-  // Fetch fresh GitHub data to ensure integration status is up to date
-  await fetchGithubProfile()
-  
-  // Listen for GitHub OAuth updates
-  window.addEventListener('message', messageEventListener)
+  // Only fetch GitHub profile if we don't already have it
+  if (!profile.value?.githubProfile) {
+    await fetchGithubProfile()
+  }
 })
 
 function updateGithubIntegration() {
@@ -137,56 +137,10 @@ function updateGithubIntegration() {
   )
 }
 
-const messageEventListener = async (event) => {
-  if (
-    event.data &&
-    event.data.source &&
-    event.data.source === "github-redirect-response" &&
-    event.data.code
-  ) {
-    const oauthCode = event.data.code
-    if (oauthCode !== "") {
-      try {
-        // Use the same registration endpoint as initial connection
-        const token = await useGetToken()
-        const response = await fetch(`${siteConfig.apiUrl}/user/github/register?api_key=${token}`, {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            code: oauthCode,
-            installation_id: event.data.installationId,
-          })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          
-          // Update store with fresh data
-          const updatedProfile = {
-            ...profile.value,
-            githubProfile: data
-          }
-          
-          store.dispatch('updateProfile', updatedProfile)
-          
-          // Also refresh the GitHub profile data
-          await fetchGithubProfile()
-          
-          console.log('GitHub integration updated successfully:', data)
-        }
-      } catch (error) {
-        console.error('GitHub integration update error:', error)
-      }
-    }
-  }
-}
-
 async function fetchGithubProfile() {
   try {
     const token = await useGetToken()
-    const response = await fetch('https://api2.pennsieve.net/accounts/github/user', {
+    const response = await fetch(GithubProfileUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -205,7 +159,7 @@ async function fetchGithubProfile() {
           githubProfile: data
         }
         
-        store.dispatch('updateProfile', updatedProfile)
+        await store.dispatch('updateProfile', updatedProfile)
         
         console.log('Updated store with GitHub profile from UserIntegrations:', data)
       }

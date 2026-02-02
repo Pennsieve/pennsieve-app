@@ -35,37 +35,6 @@
           />
         </div>
       </div>
-      <div
-        class="record-info"
-        v-for="item in curPackageMetaData"
-        :key="item.id"
-      >
-        <div class="record-header">
-          <div>{{ item.model }}</div>
-          <el-popover
-            placement="top-start"
-            title="Information"
-            width="260"
-            trigger="hover"
-            :content="getMessage(item.origin.node_id, item.model)"
-          >
-            <template #reference>
-              <IconInfo :width="14" :height="14" />
-            </template>
-          </el-popover>
-        </div>
-
-        <div
-          class="record-props"
-          v-for="(value, propertyName) in item.props"
-          :key="value"
-        >
-          <div class="record-prop-item">
-            <div class="prop-label">{{ propertyName }}</div>
-            <div>{{ value }}</div>
-          </div>
-        </div>
-      </div>
     </template>
 
     <template v-else-if="showDatasetInfo">
@@ -100,6 +69,39 @@
         <div class="simple-message">{{ noDetailsMessage }}</div>
       </div>
     </template>
+
+    <!-- Connected Records Section -->
+    <template v-if="connectedRecords.length > 0">
+      <div class="header"><div>Connected Records</div></div>
+      <div class="connected-records">
+        <div 
+          class="model-group"
+          v-for="(records, modelId) in groupedRecords"
+          :key="modelId"
+        >
+          <div class="model-group-header">{{ getModelDisplayName(modelId) }}</div>
+          <div 
+            class="record-item clickable-record"
+            v-for="record in records"
+            :key="record.id"
+            @click="navigateToRecord(record)"
+          >
+            <div class="record-content">
+              <div class="record-title">{{ getRecordTitle(record) }}</div>
+              <div class="record-keys" v-if="hasKeyProperties(record)">
+                <span 
+                  class="key-value-pair"
+                  v-for="(value, key) in getKeyProperties(record)"
+                  :key="key"
+                >
+                  <span class="key">{{ key }}:</span> {{ value }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -113,6 +115,8 @@ import IconAnnotation from "../../../icons/IconAnnotation.vue";
 import IconInfo from "../../../icons/IconInfo.vue";
 import { copyText } from "vue3-clipboard";
 import { ref } from "vue";
+import { useMetadataStore } from "../../../../stores/metadataStore";
+import { useRecordKeyProperties } from "../../../../composables/useRecordKeyProperties";
 
 export default {
   name: "FileMetadataInfo",
@@ -120,6 +124,16 @@ export default {
   components: { IconInfo, IconAnnotation },
 
   mixins: [BfStorageMetrics, FormatDate],
+
+  setup() {
+    const { getKeyProperties, hasKeyProperties, getRecordTitle } = useRecordKeyProperties();
+    
+    return {
+      getKeyProperties,
+      hasKeyProperties,
+      getRecordTitle
+    };
+  },
 
   props: {
     selectedFiles: {
@@ -137,11 +151,14 @@ export default {
   },
 
   data: function () {
-    return {};
+    return {
+      connectedRecords: [],
+      loadingRecords: false,
+    };
   },
 
   computed: {
-    ...mapGetters("filesModule", ["curPackageMetaData"]),
+    ...mapGetters(["dataset"]),
 
     fileLocation: function () {
       const ancestors = this.folder.ancestors;
@@ -253,14 +270,25 @@ export default {
         return false;
       }
     },
+    
+    groupedRecords: function () {
+      const grouped = {};
+      this.connectedRecords.forEach(record => {
+        if (!grouped[record.model_id]) {
+          grouped[record.model_id] = [];
+        }
+        grouped[record.model_id].push(record);
+      });
+      return grouped;
+    },
   },
 
   watch: {
     selectedFiles(newSelectedFiles, oldQuestion) {
       if (newSelectedFiles.length == 1) {
-        this.fetchMetadataForPackage(newSelectedFiles[0].content.nodeId);
+        this.fetchConnectedRecords(newSelectedFiles[0].content.nodeId);
       } else if (newSelectedFiles.length == 0) {
-        this.fetchMetadataForPackage(this.folder.content.id);
+        this.fetchConnectedRecords(this.folder.content.id);
       }
     },
   },
@@ -270,8 +298,143 @@ export default {
   unmounted: function () {},
 
   methods: {
-    ...mapActions("filesModule", ["fetchMetadataForPackage"]),
-    getMessage(itemId, modelName) {
+
+    /**
+     * Fetch connected records for a package
+     * @param {String} packageId - The package ID to fetch records for
+     */
+    async fetchConnectedRecords(packageId) {
+      if (!packageId || packageId === '') {
+        this.connectedRecords = [];
+        return;
+      }
+
+      this.loadingRecords = true;
+      try {
+        const metadataStore = useMetadataStore();
+        const datasetId = this.dataset?.content?.nodeId || this.$route.params.datasetId;
+        
+        // Fetch models to get schema information
+        if (!metadataStore.modelsLoaded) {
+          await metadataStore.fetchModels(datasetId);
+        }
+        
+        const response = await metadataStore.fetchPackageConnectedRecords(datasetId, packageId, {
+          page_size: 50
+        });
+        
+        const records = response?.records || [];
+        
+        // Pre-fetch schemas for all unique models in the connected records
+        await this.ensureModelSchemas(records, metadataStore, datasetId);
+        
+        this.connectedRecords = records;
+      } catch (error) {
+        console.error('Error fetching connected records:', error);
+        this.connectedRecords = [];
+      } finally {
+        this.loadingRecords = false;
+      }
+    },
+
+    /**
+     * Get display name for a record
+     * @param {Object} record - The record object
+     * @returns {String} Display name
+     */
+    getRecordDisplayName(record) {
+      const metadataStore = useMetadataStore();
+      const model = metadataStore.modelById(record.model_id);
+      const modelName = model?.display_name || model?.name || 'Record';
+      
+      // Try to get a meaningful display name from key properties
+      const keyProperties = this.getKeyProperties(record);
+      const keyEntries = Object.entries(keyProperties);
+      
+      if (keyEntries.length > 0) {
+        const [firstKey, firstValue] = keyEntries[0];
+        return `${modelName}: ${firstValue}`;
+      }
+      
+      // Fallback to the record ID
+      return `${modelName}: ${record.id ? record.id.substring(0, 8) + '...' : 'Unknown'}`;
+    },
+
+    /**
+     * Ensure model schemas are loaded in the metadata store for all unique models in the records
+     * @param {Array} records - Array of records
+     * @param {Object} metadataStore - The metadata store instance
+     * @param {String} datasetId - The dataset ID
+     */
+    async ensureModelSchemas(records, metadataStore, datasetId) {
+      const uniqueModelIds = [...new Set(records.map(record => record.model_id))];
+      
+      for (const modelId of uniqueModelIds) {
+        try {
+          let model = metadataStore.modelById(modelId);
+          console.log(`ensureModelSchemas - checking model ${modelId}:`, model);
+          
+          // If model doesn't have schema, try to load it
+          if (model && (!model.schema && !model.latest_version?.schema)) {
+            console.log(`ensureModelSchemas - fetching schema for model ${modelId}`);
+            // Fetch the model version schema and update the model in the store
+            const modelVersion = await metadataStore.fetchModelVersion(datasetId, modelId, 1);
+            if (modelVersion?.schema) {
+              // Update the model in the store with the schema
+              model.schema = modelVersion.schema;
+              console.log(`ensureModelSchemas - updated model ${modelId} with schema:`, model.schema);
+            }
+          }
+        } catch (error) {
+          console.error(`Error ensuring schema for model ${modelId}:`, error);
+        }
+      }
+    },
+
+
+    /**
+     * Group connected records by model
+     * @returns {Object} Records grouped by model_id
+     */
+    groupedRecords() {
+      const grouped = {};
+      this.connectedRecords.forEach(record => {
+        if (!grouped[record.model_id]) {
+          grouped[record.model_id] = [];
+        }
+        grouped[record.model_id].push(record);
+      });
+      return grouped;
+    },
+
+    /**
+     * Get display name for a model
+     * @param {String} modelId - The model ID
+     * @returns {String} Model display name
+     */
+    getModelDisplayName(modelId) {
+      const metadataStore = useMetadataStore();
+      const model = metadataStore.modelById(modelId);
+      return model?.display_name || model?.name || 'Records';
+    },
+
+
+    /**
+     * Navigate to record details page
+     * @param {Object} record - The record object
+     */
+    navigateToRecord(record) {
+      if (record && record.id && record.model_id) {
+        this.$router.push({
+          name: 'record-details',
+          params: {
+            modelId: record.model_id,
+            recordId: record.id
+          }
+        });
+      }
+    },
+    removeThisEntireFunction_getMessage(itemId, modelName) {
       // Get Folder Name
       var fName = "";
       var curNodeId = "";
@@ -282,7 +445,8 @@ export default {
       }
 
       if (curNodeId == itemId) {
-        if (modelName == this.curPackageMetaData[0].model) {
+        // Legacy code removed - this.curPackageMetaData no longer exists
+        if (false) { // modelName == this.curPackageMetaData[0].model) {
           fName =
             "the selected file is directly associated with the '" +
             modelName +
@@ -425,6 +589,59 @@ export default {
     margin-left: 8px;
     font-size: 12px;
     color: theme.$gray_5;
+  }
+}
+
+.connected-records {
+  margin: 4px 8px 24px 4px;
+
+  .model-group {
+    margin-bottom: 8px;
+
+    .model-group-header {
+      font-size: 13px;
+      font-weight: 500;
+      color: theme.$purple_2;
+      padding: 4px 8px;
+      border-bottom: 1px solid theme.$gray_2;
+    }
+
+    .record-item {
+      padding: 6px 8px;
+      margin: 2px 0;
+      transition: background-color 0.2s ease;
+
+      &.clickable-record {
+        cursor: pointer;
+        
+        &:hover {
+          background-color: theme.$gray_1;
+        }
+      }
+
+      .record-content {
+        .record-title {
+          font-size: 12px;
+          font-weight: 300;
+          color: theme.$gray_6;
+          margin-bottom: 2px;
+        }
+
+        .record-keys {
+          font-size: 12px;
+          color: theme.$gray_5;
+          
+          .key-value-pair {
+            display: inline-block;
+            margin-right: 12px;
+            
+            .key {
+              font-weight: 500;
+            }
+          }
+        }
+      }
+    }
   }
 }
 </style>

@@ -132,6 +132,8 @@ const displayGithubProfile = computed(() => {
     : profile.value?.githubProfile || {};
 });
 
+const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
+
 onMounted(() => {
   window.addEventListener("message", messageEventListener);
   initializeGithubData();
@@ -140,6 +142,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("message", messageEventListener);
 });
+
+
 
 async function initializeGithubData() {
   loading.value = true;
@@ -159,7 +163,7 @@ async function fetchGithubProfile() {
   try {
     const token = await useGetToken();
     const response = await fetch(
-      "https://api2.pennsieve.net/accounts/github/user",
+      GithubProfileUrl,
       {
         method: "GET",
         headers: {
@@ -201,9 +205,7 @@ async function fetchGithubProfile() {
 
 function openGitHub() {
   const redirectUri = `${window.location.origin}/github-redirect`;
-  const githubAppUrl =
-    siteConfig.githubAppUrl || "https://github.com/apps/pennsieve";
-  const url = `${githubAppUrl}?redirect_uri=${redirectUri}`;
+  const url = `${siteConfig.githubAppUrl}?redirect_uri=${redirectUri}`;
 
   oauthWindow.value = window.open(
     url,
@@ -223,10 +225,16 @@ const messageEventListener = async (event) => {
     if (oauthCode !== "") {
       try {
         const token = await useGetToken();
+
+
+
         const response = await useSendXhr(
-          `${siteConfig.apiUrl}/user/github/register?api_key=${token}`,
+          `${siteConfig.api2Url}/accounts/github/register`,
           {
             method: "POST",
+            header: {
+              'Authorization': `Bearer ${token}`
+            },
             body: {
               code: oauthCode,
               installation_id: event.data.installationId,
@@ -273,7 +281,7 @@ const messageEventListener = async (event) => {
 async function confirmDelete() {
   try {
     const token = await useGetToken();
-    await useSendXhr("https://api2.pennsieve.net/accounts/github/user", {
+    await useSendXhr(GithubProfileUrl, {
       method: "DELETE",
       header: {
         Authorization: `Bearer ${token}`,

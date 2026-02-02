@@ -1,9 +1,11 @@
 <template>
   <div class="bf-navigation-tertiary">
 
+
+
     <bf-navigation-item
       v-if="orgId"
-      :link="{ name: 'user-profile', params: {}}"
+      :link="{ name: 'shared-with-me', params: {}}"
       label="My Workspace"
       :condensed="primaryNavCondensed"
       :styleColor="navStyleColor"
@@ -19,7 +21,29 @@
 
     </bf-navigation-item>
 
+
+
+
+<!--    <bf-navigation-item-->
+<!--      :link="{ name: 'shared-with-me', params: {}}"-->
+<!--      label="Exit Workspaces"-->
+<!--      :condensed="primaryNavCondensed"-->
+<!--      :styleColor="navStyleColor"-->
+<!--    >-->
+<!--      <template #icon>-->
+<!--        <IconArrowRight-->
+<!--          :width="20"-->
+<!--          :height="20"-->
+<!--          color="currentColor"-->
+<!--        />-->
+<!--      </template>-->
+
+
+<!--    </bf-navigation-item>-->
+
     <user-menu :style="{ backgroundColor: `${bkColor}` }"/>
+
+
   </div>
 </template>
 
@@ -32,6 +56,14 @@
   import IconOrganization from "../icons/IconOrganization.vue";
   import BfNavigationItem from "../bf-navigation/bf-navigation-item/BfNavigationItem.vue";
   import IconPennsieveMark from "../icons/IconPennsieveMark.vue";
+  import IconSettings from "@/components/icons/IconSettings.vue";
+  import UserNavigationItem from "@/components/user-navigation/UserNavigationItem.vue";
+  import IconExplore from "@/components/icons/IconExplore.vue";
+  import IconEcosystem from "@/components/icons/IconEcosystem.vue";
+  import IconFeedback from "@/components/icons/IconFeedback.vue";
+  import IconDelete from "@/components/icons/IconDelete.vue";
+  import IconCommunity from "@/components/icons/IconCommunity.vue";
+  import IconArrowRight from "@/components/icons/IconArrowRight.vue";
 
   // const SearchMenu = () => import('@/components/bf-navigation/SearchMenu/SearchMenu.vue')
 
@@ -54,6 +86,13 @@
     },
 
     components: {
+      IconArrowRight,
+      IconCommunity,
+      IconDelete,
+      IconFeedback,
+      IconEcosystem,
+      IconExplore,
+      UserNavigationItem, IconSettings,
       IconPennsieveMark,
       HelpMenu,
       UserMenu,

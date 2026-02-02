@@ -80,7 +80,7 @@
 
 <script>
 import BfButton from "../../../shared/bf-button/BfButton.vue";
-import DeleteOrcid from "../../../my-settings/windows/DeleteOrcid.vue";
+import DeleteOrcid from "./DeleteOrcid.vue";
 import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr } from "ramda";
 import IconRemove from "../../../icons/IconRemove.vue";

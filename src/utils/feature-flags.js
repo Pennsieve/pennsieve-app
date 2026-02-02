@@ -50,7 +50,9 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isNIHPRECISIONHumanPainNetwork = orgId === "N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae"
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics || isIHSurgeProd || isNIHPRECISIONHumanPainNetwork; 
+    const isBE5210 = orgId === "N:organization:e642b431-0def-4f6c-b452-e538a86958b5"
+
+   return isBE5210 || isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics || isIHSurgeProd || isNIHPRECISIONHumanPainNetwork;
 }
 
 export function isEnabledForAllDevOrgs(url) {

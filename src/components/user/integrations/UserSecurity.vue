@@ -40,7 +40,7 @@ onMounted(async () => {
     }
 
     const prefs = await fetchMFAPreference()
-    if (prefs.enabled.includes('TOTP')) {
+    if (prefs && prefs.enabled && prefs.enabled.includes('TOTP')) {
       mfaState.value = mfaStates.ENABLED
     }
   } catch (error) {

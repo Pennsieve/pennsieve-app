@@ -121,7 +121,7 @@ export const actions = {
   fetchComputeNodes: async ({ commit, rootState }) => {
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
         return fetch(url, {
           method: "GET",
           headers: {
@@ -179,7 +179,7 @@ export const actions = {
   },
   fetchComputeResourceAccounts: async ({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.api2Url}/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/compute/resources/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
 
       const userToken = await useGetToken();
       const resp = await fetch(url, {

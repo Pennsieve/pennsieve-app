@@ -26,7 +26,8 @@ import {fetchAuthSession} from "aws-amplify/auth";
 import {useGetProfileAndOrg} from "@/composables/useGetProfileAndOrg";
 import {useGetToken} from "@/composables/useGetToken";
 import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
-import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import {useSendXhr} from "@/mixins/request/request_composable";
+import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
@@ -156,24 +157,104 @@ router.beforeEach(async (to, from, next) => {
         // Only get Profile if not already fetched
         if (Object.keys(store.getters.profile).length === 0) {
             await useGetProfileAndOrg(store)
-                .catch(err => useHandleXhrError(err))
+                .catch(err => {
+                    console.error('Error loading profile:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'error',
+                            msg: 'Unable to load user profile. Please try refreshing the page.'
+                        }
+                    })
+                })
         }
         next()
     } else {
 
         // ==== GOING TO AUTHENTICATED PAGE WITH ORG CONTEXT ====
         // ==== GET PROFILE/ORGS AND CHECK PREFERRED ORG ====
-        // ==== Only get Profile and Workspaces if they have not been fetched before ====
-        if (Object.keys(store.getters.profile).length  === 0) {
+        
+        // Check if profile needs to be fetched
+        const profileExists = Object.keys(store.getters.profile).length > 0
+        
+        if (!profileExists) {
+            // First load - fetch everything
             await useGetProfileAndOrg(store)
-                .then(() => {
-                    return checkActiveOrg(to)})
-                .then(() =>{
+                .then(async () => {
+                    await checkActiveOrg(to)
+                    
+                    // If this is a direct navigation to a specific org, switch session first
+                    const routeOrgId = to.params.orgId
+                    if (routeOrgId) {
+                        try {
+                            const token = await useGetToken()
+                            const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${routeOrgId}&api_key=${token}`
+                            await useSendXhr(switchOrgUrl, {method: 'PUT'})
+                            console.log(`Successfully switched session to organization: ${routeOrgId}`)
+                        } catch (err) {
+                            console.warn('Failed to switch organization session on first load:', err)
+                        }
+                    }
+                    
                     return store.dispatch('setActiveOrgSynced')
                 })
                 .then(() => {
                     return getPrimaryData()
-                }).catch(err => useHandleXhrError(err))
+                }).catch(err => {
+                    console.error('Error during workspace initialization:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'error',
+                            msg: 'There was an issue loading workspace data. Some features may be unavailable.'
+                        }
+                    })
+                })
+        } else {
+            // Profile exists - just check if org context needs updating
+            const routeOrgId = to.params.orgId
+            const currentActiveOrgId = store.getters.activeOrganization?.organization?.id
+            
+            // Only check/switch org if the route has an orgId and it's different from current
+            if (routeOrgId && routeOrgId !== currentActiveOrgId) {
+                // Use the same clearing logic as useSwitchWorkspace
+                await Promise.all([
+                    store.dispatch('clearState'),
+                    store.dispatch('clearDatasetFilters'),
+                    store.dispatch('datasetModule/clearSearchState'),
+                    store.dispatch('updateFilesProxyId', null)
+                ])
+                
+                // Switch the backend session to match the URL FIRST
+                let sessionSwitched = false
+                try {
+                    const token = await useGetToken()
+                    const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${routeOrgId}&api_key=${token}`
+                    await useSendXhr(switchOrgUrl, {method: 'PUT'})
+                    sessionSwitched = true
+                    console.log(`Successfully switched session to organization: ${routeOrgId}`)
+                } catch (err) {
+                    console.warn('Failed to switch organization session:', err)
+                    EventBus.$emit('toast', {
+                        detail: {
+                            type: 'warning', 
+                            msg: 'Unable to switch workspace session. Some features may be unavailable.'
+                        }
+                    })
+                }
+                
+                // Only proceed with data loading if session switch succeeded
+                await checkActiveOrg(to)
+                if (sessionSwitched) {
+                    await getPrimaryData().catch(err => {
+                        console.error('Error loading workspace data:', err)
+                        EventBus.$emit('toast', {
+                            detail: {
+                                type: 'warning',
+                                msg: 'Workspace switched but some data may still be loading.'
+                            }
+                        })
+                    })
+                }
+            }
         }
 
         next()
@@ -200,6 +281,12 @@ async function getPrimaryData() {
     return useGetToken().then(async token => {
 
         const activeOrg = store.getters.activeOrganization
+        
+        // Skip fetching primary data for guest organizations
+        if (activeOrg?.isGuest) {
+            return Promise.resolve()
+        }
+        
         const activeOrgId = activeOrg.organization.id
         const teamUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams?api_key=${token}`
 
@@ -227,7 +314,7 @@ async function getPrimaryData() {
                 .then(resp => {
                     const orgMembers = updateMembers(resp)
                     store.dispatch('updateOrgMembers',orgMembers)
-                }).catch(err => useHandleXhrError(err))
+                }).catch(err => console.warn('Failed to load additional data:', err))
         }
 
         // ==== ORG CONTRIBUTORS ====
@@ -235,21 +322,21 @@ async function getPrimaryData() {
         const contributorPromise = useSendXhr(orgContributorUrl)
             .then(resp => {
                 store.dispatch('setOrgContributors', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
         // ==== DATA USE AGREEMENTS ====
         const dataUseAgreementUrl =`${siteConfig.apiUrl}/organizations/${activeOrgId}/data-use-agreements?api_key=${token}`
         const dataUseAgreementPromise = useSendXhr(dataUseAgreementUrl)
             .then(resp => {
                 store.dispatch('updateDataUseAgreements', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
         // ==== Dataset Statuses ====
         const datasetStatusUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/dataset-status?api_key=${token}`
         const datasetStatusPromise = useSendXhr(datasetStatusUrl)
             .then(resp => {
                 store.dispatch('updateOrgDatasetStatuses', resp)
-            }).catch(err => useHandleXhrError(err))
+            }).catch(err => console.warn('Failed to load additional data:', err))
 
 
         return Promise.all(
@@ -301,18 +388,43 @@ function updateMembers(users) {
 async function checkActiveOrg(to) {
     const preferredOrgId = store.getters.profile.preferredOrganization
     const orgs = store.getters.organizations
-    const activeOrgId = preferredOrgId ?
-        pathOr(preferredOrgId, ['params', 'orgId'], to) :
-        path(['organizations', 0, 'organization', 'id'], orgs)
-
-    const activeOrgIndex = orgs.findIndex(org => Boolean(org.organization.id === activeOrgId))
+    const routeOrgId = to.params.orgId
+    const currentActiveOrgId = store.getters.activeOrganization?.organization?.id
+    
+    // Determine which org ID to use
+    const targetOrgId = routeOrgId || preferredOrgId || path(['organizations', 0, 'organization', 'id'], orgs)
+    
+    // Check if target org is already active - no need to do anything
+    if (targetOrgId === currentActiveOrgId) {
+        return Promise.resolve()
+    }
+    
+    // Find the organization in the user's list
+    const activeOrgIndex = orgs.findIndex(org => org.organization.id === targetOrgId)
     const activeOrg = orgs[activeOrgIndex]
-
-    if ((activeOrgId && preferredOrgId) && activeOrgId !== preferredOrgId) {
-        return useSwitchWorkspace(activeOrg)
-    } else {
+    
+    // Check if this is a shared dataset (org not in user's list)
+    if (routeOrgId && activeOrgIndex === -1) {
+        // User is navigating to a shared dataset in an org they're not a member of
+        // Create a minimal org object for navigation context
+        const guestOrg = {
+            organization: {
+                id: routeOrgId,
+                name: 'External Workspace',
+                isGuest: true
+            },
+            isGuest: true
+        }
+        return store.dispatch('updateActiveOrganization', guestOrg)
+    } else if (activeOrg) {
+        // User is a member of this org
+        // For route-based navigation, just update the active org without using useSwitchWorkspace
+        // which is designed for user-initiated switches and includes router.replace calls
         return store.dispatch('updateActiveOrganization', activeOrg)
     }
+    
+    // Fallback - shouldn't normally reach here
+    return Promise.resolve()
 }
 
 

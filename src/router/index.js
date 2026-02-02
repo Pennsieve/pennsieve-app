@@ -69,8 +69,6 @@ const SetupProfile = () => import('../components/SetupProfile/SetupProfile.vue')
 const SetupFederatedLogin = () => import('../components/SetupFederatedLogin/SetupFederatedLogin.vue')
 const FinalizeAccount = () => import('../components/FinalizeAccount/FinalizeAccount.vue')
 
-const WelcomePage = () => import('./welcomePage/WelcomePage.vue')
-const SubmitDatasetPage = () => import('./welcomePage/SubmitDatasetPage.vue')
 const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
@@ -79,15 +77,12 @@ const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
-const MySettings = () => import('./MySettings/MySettings.vue')
-const MySettingsContainer = () => import('../components/my-settings/MySettingsContainer.vue')
 
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
 const TeamsList = () => import('../components/teams/list/TeamsList.vue')
-const TeamMembers = () => import('./team-members/TeamMembers.vue')
 const TeamMembersList = () => import('../components/teams/members/TeamMembersList.vue')
 
 /**
@@ -100,6 +95,7 @@ const BfDatasetSettings = () => import('../components/datasets/settings/BfDatase
  */
 const UserProfile = () => import('../components/user/profile/UserProfile.vue')
 const UserApiKeys = () => import('../components/user/integrations/UserApiKeys.vue')
+const UserComputeResources = () => import('../components/user/integrations/UserComputeResources.vue')
 const UserSecurity = () => import('../components/user/integrations/UserSecurity.vue')
 const UserSupport = () => import('../components/user/integrations/UserSupport.vue')
 const UserDashboard = () => import('../components/user/dashboard/UserDashboard.vue')
@@ -125,6 +121,7 @@ const Analysis = () => import ('./Analysis/Analysis.vue')
 const WebhooksList = () => import ('../components/Integrations/WebhooksList/WebhooksList.vue')
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
+const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
@@ -159,6 +156,7 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
+      redirect: "/my-workspace/shared",
     },
     {
       path: "/login",
@@ -215,6 +213,19 @@ const router = createRouter({
               props: true
             },
             {
+                name: 'user-compute-resource',
+                path: 'compute-resources',
+                meta: {
+                  title: 'Compute Resources',
+                  description: 'Manage your external compute and storage accounts.',
+                },
+                components: {
+                  stage: UserComputeResources,
+                  navigation: UserNavigation,
+                },
+                props: true
+              },
+            {
               name: 'user-integrations',
               path: 'integrations',
               meta: {
@@ -267,7 +278,21 @@ const router = createRouter({
                     navigation: UserNavigation,
                   },
                   props: true
-                }
+                },
+                // {
+                //   name: 'user-compute-resource',
+                //   path: 'compute-resources',
+                //   meta: {
+                //     title: 'Compute Resources',
+                //     description: 'Manage your external compute and storage accounts.',
+                //     breadcrumbParent: 'user-integrations'
+                //   },
+                //   components: {
+                //     stage: UserComputeResources,
+                //     navigation: UserNavigation,
+                //   },
+                //   props: true
+                // }
               ]
             },
             {
@@ -309,7 +334,7 @@ const router = createRouter({
           meta: {
             hideSecondaryNav: true,
             title: 'Data Publishing',
-            description: 'View and manage your data publishing dashboard and submissions.'
+            description: 'Manage your dataset publishing proposals.'
           },
           children: [
             {
@@ -1493,14 +1518,6 @@ const router = createRouter({
           props: true
         },
         {
-          name: 'compute-nodes',
-          path: 'compute-nodes',
-          components: {
-            stage: ComputeNodesList,
-          },
-          props: true
-        },
-        {
           name: 'applications',
           path: 'applications',
           components: {
@@ -1516,14 +1533,61 @@ const router = createRouter({
         page: Settings,
         navigation: BfNavigation
       },
+      redirect: {
+        name: 'workspace-settings-overview'
+      },
       children: [
         {
-          name: 'settings',
+          name: 'workspace-settings-overview',
           path: '',
           components: {
             stage: OrgSettings
           }
         },
+        {
+          name: 'workspace-general',
+          path: 'general',
+          components: {
+            stage: () => import('../components/OrgSettings/GeneralSettingsPage.vue')
+          }
+        },
+        {
+          name: 'workspace-dataset-statuses',
+          path: 'dataset-statuses',
+          components: {
+            stage: () => import('../components/OrgSettings/DatasetStatusesPage.vue')
+          }
+        },
+        {
+          name: 'workspace-data-use-agreements',
+          path: 'data-use-agreements',
+          components: {
+            stage: () => import('../components/OrgSettings/DataUseAgreementsPage.vue')
+          }
+        },
+        {
+          name: 'workspace-usage-analytics',
+          path: 'usage',
+          components: {
+            stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
+          }
+        },
+        {
+          name: 'compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList
+          },
+          props: true
+        },
+        {
+          name: 'compute-node-management',
+          path: 'compute-nodes/:nodeId',
+          components: {
+            stage: ComputeNodeManagement
+          },
+          props: true
+        }
       ],
       props: true
     },

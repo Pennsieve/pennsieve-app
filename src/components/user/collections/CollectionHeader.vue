@@ -2,39 +2,51 @@
   <div class="collection-header">
     <div class="row">
       <div class="col-xs-12 col-sm-6">
-        <div class="collection-title-wrap">
-          <h1 class="collection-title">
-            {{ collectionTitle }}
-          </h1>
-        </div>
+        <div class="collection-info-wrapper">
+          <div class="collection-info-top">
+            <div class="collection-title-wrap">
+              <h1 class="collection-title">
+                {{ collectionTitle }}
+              </h1>
+            </div>
 
-        <!-- Collection Authors -->
-        <div
-          v-if="collectionContributors && collectionContributors.length > 0"
-          class="collection-authors"
-        >
-          <div
-            v-for="(contributor, idx) in collectionContributors"
-            :key="`${contributor.firstName}-${contributor.lastName}-${
-              contributor.orcid || idx
-            }`"
-            class="contributor-item-wrap"
-          >
-            <contributor-item :contributor="contributor" />
-            <template v-if="idx < collectionContributors.length - 1">
-              ,
-            </template>
+            <!-- Collection Authors -->
+            <div
+              v-if="collectionContributors && collectionContributors.length > 0"
+              class="collection-authors"
+            >
+              <div
+                v-for="(contributor, idx) in collectionContributors"
+                :key="`${contributor.firstName}-${contributor.lastName}-${
+                  contributor.orcid || idx
+                }`"
+                class="contributor-item-wrap"
+              >
+                <contributor-item :contributor="contributor" />
+                <template v-if="idx < collectionContributors.length - 1">
+                  ,
+                </template>
+              </div>
+            </div>
+
+            <p class="collection-description">
+              {{ collectionDescription }}
+            </p>
+
+            <div v-if="collectionOwner" class="collection-meta">
+              <div class="collection-corresponding-contributor">
+                <p>Corresponding Contributor:</p>
+                <contributor-item :contributor="correspondingContributor" />
+              </div>
+            </div>
           </div>
-        </div>
 
-        <p class="collection-description">
-          {{ collectionDescription }}
-        </p>
-
-        <div v-if="collectionOwner" class="collection-meta">
-          <div class="collection-corresponding-contributor">
-            <p>Corresponding Contributor:</p>
-            <contributor-item :contributor="correspondingContributor" />
+          <!-- DOI Display at bottom -->
+          <div v-if="doiLink" class="collection-doi">
+            <p class="doi-label">DOI:</p>
+            <a :href="doiLink" target="_blank" rel="noopener noreferrer" class="doi-link">
+              {{ collectionDOI }}
+            </a>
           </div>
         </div>
       </div>
@@ -111,6 +123,7 @@ import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 import IconLicense from "../../icons/IconLicense.vue";
 import IconFiles from "../../icons/IconFiles.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import { useCollectionsStore } from "@/stores/collectionStore.js";
 
 export default {
   name: "CollectionHeader",
@@ -140,6 +153,13 @@ export default {
       type: String,
       default: "",
     },
+  },
+
+  data() {
+    return {
+      collectionDOI: null,
+      doiLink: null,
+    };
   },
 
   computed: {
@@ -269,7 +289,40 @@ export default {
     },
   },
 
+  watch: {
+    "collectionDetails.id": {
+      immediate: true,
+      handler(newId) {
+        if (newId) {
+          this.fetchCollectionDOI();
+        }
+      },
+    },
+  },
+
   methods: {
+    async fetchCollectionDOI() {
+      if (!this.collectionDetails?.id) return;
+
+      try {
+        const collectionsStore = useCollectionsStore();
+        const response = await collectionsStore.getCollectionDOI(
+          this.collectionDetails.id
+        );
+
+        if (response?.doi) {
+          this.collectionDOI = response.doi;
+          // Build the DOI link - standard DOI resolver URL
+          this.doiLink = `https://doi.org/${response.doi}`;
+        }
+      } catch (error) {
+        console.error("Failed to fetch collection DOI:", error);
+        // Silently fail - DOI is optional
+        this.collectionDOI = null;
+        this.doiLink = null;
+      }
+    },
+
     formatNumber(number) {
       if (!number) return "0";
       return number.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
@@ -366,6 +419,21 @@ export default {
   }
 }
 
+.collection-info-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 250px;
+
+  @media (min-width: 48em) {
+    min-height: 300px;
+  }
+}
+
+.collection-info-top {
+  flex: 1;
+}
+
 .collection-title-wrap {
   position: relative;
 
@@ -434,6 +502,34 @@ export default {
   p {
     margin: 0 8px 0 0;
     font-weight: 500;
+  }
+}
+
+.collection-doi {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid theme.$gray_2;
+
+  .doi-label {
+    margin: 0;
+    font-weight: 600;
+    font-size: 14px;
+    color: theme.$gray_5;
+    margin-right: 8px;
+  }
+
+  .doi-link {
+    font-size: 14px;
+    color: theme.$purple_2;
+    text-decoration: none;
+    word-break: break-all;
+
+    &:hover,
+    &:focus {
+      text-decoration: underline;
+    }
   }
 }
 

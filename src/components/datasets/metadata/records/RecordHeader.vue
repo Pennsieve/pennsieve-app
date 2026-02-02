@@ -61,7 +61,7 @@
               @click="$emit('go-to-model')"
               link
               size="small"
-              class="metadata-action-btn"
+              class="metadata-action-btn box"
               title="Go to Model Details"
             >
               <IconArrowRight :width="12" :height="12" />
@@ -227,6 +227,8 @@ const copyModelId = async () => {
           .metadata-value {
             color: theme.$gray_5;
             font-size: 12px;
+
+
           }
 
           .metadata-action-btn {
@@ -236,7 +238,11 @@ const copyModelId = async () => {
             min-height: unset !important;
             height: 14px !important;
             width: 14px !important;
-            
+
+            &.box {
+              border: 1px solid theme.$gray_4;
+            }
+
             :deep(.el-button__icon) {
               margin: 0 !important;
             }

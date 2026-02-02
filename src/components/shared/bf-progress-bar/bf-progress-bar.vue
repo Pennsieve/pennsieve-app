@@ -1,8 +1,8 @@
 <template>
   <div class="ps-progress-bar">
     <div
-      class="bar"
-      :style="{ width: Math.ceil(progress) + '%' }"
+      :class="['bar', { complete: complete }]"
+      :style="barStyle"
     />
   </div>
 </template>
@@ -19,7 +19,14 @@
       /**
        * Total size of item
        */
-      total: Number
+      total: Number,
+      /**
+       * Whether upload is complete (shows full bar)
+       */
+      complete: {
+        type: Boolean,
+        default: false
+      }
     },
 
     computed: {
@@ -29,6 +36,17 @@
        */
       progress: function () {
         return (this.loaded / this.total) * 100
+      },
+
+      /**
+       * Compute bar style based on mode
+       * @returns {Object}
+       */
+      barStyle: function () {
+        if (this.complete) {
+          return {}
+        }
+        return { width: Math.ceil(this.progress) + '%' }
       }
     }
   }
@@ -48,6 +66,10 @@
       background: theme.$green_1;
       height: 100%;
       width: 0;
+
+      &.complete {
+        width: 100%;
+      }
     }
   }
 </style>

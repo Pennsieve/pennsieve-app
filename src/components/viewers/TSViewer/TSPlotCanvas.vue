@@ -308,11 +308,27 @@ const monitorPrefetchActivity = () => {
 
     // console.log('📊 Prefetch Monitor:', stats)
 
-    // Check for stuck requests (older than 10 seconds)
-    const stuckRequests = stats.requestedPages.filter(page => page.age > 10000)
+    // Check for stuck requests (older than 10 seconds) and clean them up
+    const STUCK_REQUEST_TIMEOUT = 10000 // 10 seconds
+    const stuckRequests = stats.requestedPages.filter(page => page.age > STUCK_REQUEST_TIMEOUT)
+    
     if (stuckRequests.length > 0) {
-      console.warn('⚠️ Detected stuck requests:', stuckRequests)
-
+      console.warn('⚠️ Detected stuck requests, cleaning up:', stuckRequests.map(req => ({
+        pageStart: req.pageStart,
+        age: Math.round(req.age / 1000) + 's',
+        channels: req.channels
+      })))
+      
+      // Clean up stuck requests
+      stuckRequests.forEach(req => {
+        requestedPages.value.delete(req.pageStart)
+        console.log('🧹 Removed stuck request for pageStart:', req.pageStart)
+      })
+      
+      // Decrement stale counter to allow retries
+      if (staleDataCounter.value > 0) {
+        staleDataCounter.value = Math.max(0, staleDataCounter.value - 1)
+      }
     }
 
     // Check if prefetch is blocked
@@ -605,9 +621,9 @@ onChannelDetails((channelDetails) => {
   console.log('📡 RECEIVED CHANNEL DETAILS:', {
     channelCount: channelDetails.length,
     channels: channelDetails.map(ch => ({
-      id: ch.content?.id,
-      name: ch.content?.name,
-      type: ch.content?.channelType
+      id:ch?.id,
+      name:ch?.name,
+      type:ch?.channelType
     }))
   })
 
