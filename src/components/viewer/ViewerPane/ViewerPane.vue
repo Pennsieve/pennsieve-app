@@ -128,16 +128,13 @@ export default {
     };
   },
 
-mounted(){
-    this.fetchTimeseriesData();
-    this.isLoading = false
-  },
 
   watch: {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
+          this.fetchTimeseriesData();
         }
       },
       immediate: true,
@@ -160,9 +157,13 @@ mounted(){
       };
       viewerStore.setViewerConfig(viewerConfig)
 
-      return await viewerStore.fetchAndSetActiveViewer({
-        packageId: this.pkg?.content?.id,
-      })
+      try {
+        return await viewerStore.fetchAndSetActiveViewer({
+          packageId: this.pkg?.content?.id,
+        })
+      } finally {
+        this.isLoading = false
+      }
     },
 
     /**
