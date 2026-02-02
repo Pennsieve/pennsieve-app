@@ -497,6 +497,7 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
+import FilesTable from "../../../FilesTable/FilesTable.vue";
 import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
