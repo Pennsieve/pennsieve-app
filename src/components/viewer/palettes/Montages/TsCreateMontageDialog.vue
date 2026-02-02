@@ -288,7 +288,7 @@ function cancel() {
 </template>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme';
+@use '../../../../styles/theme';
 
 .form-item-desc {
   color: theme.$gray_4;
