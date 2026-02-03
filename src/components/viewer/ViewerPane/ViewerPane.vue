@@ -52,6 +52,7 @@ import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 
 import "@pennsieve-viz/micro-ct/style.css";
+import "@pennsieve-viz/core/style.css";
 
 export default {
   name: "ViewerPane",
