@@ -501,7 +501,6 @@ import FilesTable from "../../../FilesTable/FilesTable.vue";
 import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
-import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "IntegratedAnalysisDialog",

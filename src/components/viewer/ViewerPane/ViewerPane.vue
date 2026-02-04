@@ -50,6 +50,9 @@ import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
+import { useViewerStore as useLibraryViewerStore, TSViewer } from '@pennsieve-viz/tsviewer'
+import '@pennsieve-viz/tsviewer/style.css'
+import * as siteConfig from '@/site-config/site.json'
 
 import "@pennsieve-viz/micro-ct/style.css";
 
@@ -78,9 +81,7 @@ export default {
     VideoViewer: defineAsyncComponent(() =>
       import("../../viewers/VideoViewer.vue")
     ),
-    TimeseriesViewer: defineAsyncComponent(() =>
-      import("../../viewers/TSViewer/TSViewer.vue")
-    ),
+    TimeseriesViewer: TSViewer,
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
@@ -122,15 +123,18 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      isLoading: false,
       omeTiffSource: "",
     };
   },
+
 
   watch: {
     pkg: {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
+          this.fetchTimeseriesData();
         }
       },
       immediate: true,
@@ -139,6 +143,28 @@ export default {
 
   methods: {
     ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+
+    /**
+     * Called when component is mounted
+     */
+    fetchTimeseriesData: async function () {
+      this.isLoading = true;
+      const viewerStore = useLibraryViewerStore()
+      const viewerConfig = {
+        timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
+        apiUrl: siteConfig.apiUrl,
+        timeSeriesApi: siteConfig.timeSeriesApi,
+      };
+      viewerStore.setViewerConfig(viewerConfig)
+
+      try {
+        return await viewerStore.fetchAndSetActiveViewer({
+          packageId: this.pkg?.content?.id,
+        })
+      } finally {
+        this.isLoading = false
+      }
+    },
 
     /**
      * Invoke method on viewer
@@ -230,6 +256,8 @@ export default {
       return isTimeseriesFile && isUnprocessed;
     },
   },
+
+  
 };
 </script>
 

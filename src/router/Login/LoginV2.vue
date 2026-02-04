@@ -3,6 +3,7 @@ import { ref } from "vue";
 import * as config from "@/site-config/site.json";
 import { AuthError, signIn, signOut } from "aws-amplify/auth";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import { useRouter } from "vue-router";
 
 //  ==== LOGIN ====
 const logInForm = ref({
@@ -30,6 +31,7 @@ const logInRules = ref({
 const isLoggingIn = ref(false);
 const pwdFieldRef = ref(null);
 const logInFormRef = ref(null);
+const router = useRouter();
 
 /**
  * Validate form and submit if valid
@@ -83,7 +85,7 @@ async function handleLoginSuccess(user) {
       break;
     // ...
     case "DONE":
-      await router.push({ path: "/" });
+      await router.push({ path: "/my-workspace" });
       break;
   }
 }
