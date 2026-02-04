@@ -899,7 +899,7 @@ export default {
     },
 
     runAnalysis: async function () {
-      const url = `${this.config.api2Url}/workflows/instances`;
+      const url = `${this.config.api2Url}/compute/workflows/instances`;
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
@@ -1125,10 +1125,19 @@ export default {
     },
 
     setSelectedComputeNode: function (value) {
-      // Now using UUID-based selection from enhanced options
-      const computeResourcesStore = useComputeResourcesStore()
-      const scope = this.organizationId ? `workspace:${this.organizationId}` : 'account-owner'
-      this.selectedComputeNode = computeResourcesStore.getComputeNodeById(value, scope) || {}
+      // Try to find the node directly from the computeNodes computed property first
+      // This ensures we're using the same filtered list that populates the dropdown
+      const nodeFromComputed = this.computeNodes.find(node => node.uuid === value)
+      
+      // Fallback to store lookup if not found in computed
+      if (!nodeFromComputed) {
+        const computeResourcesStore = useComputeResourcesStore()
+        const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+        const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+        this.selectedComputeNode = computeResourcesStore.getComputeNodeById(value, scope) || {}
+      } else {
+        this.selectedComputeNode = nodeFromComputed
+      }
     },
 
     setSelectedWorkflow: function (value) {
