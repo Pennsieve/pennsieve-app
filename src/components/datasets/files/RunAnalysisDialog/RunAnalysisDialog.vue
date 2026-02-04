@@ -900,11 +900,6 @@ export default {
     },
 
     runAnalysis: async function () {
-      console.log('runAnalysis called')
-      console.log('computeNodeValue:', this.computeNodeValue)
-      console.log('selectedComputeNode:', this.selectedComputeNode)
-      console.log('selectedComputeNode.uuid:', this.selectedComputeNode?.uuid)
-      
       const url = `${this.config.api2Url}/compute/workflows/instances`;
 
       let arrayOfPackageIds = [];
@@ -1131,31 +1126,19 @@ export default {
     },
 
     setSelectedComputeNode: function (value) {
-      // Now using UUID-based selection from enhanced options
-      // Use the same scope calculation as in the computeNodes computed property
-      const computeResourcesStore = useComputeResourcesStore()
-      const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
-      const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
-      
-      console.log('setSelectedComputeNode called with value:', value)
-      console.log('Scope:', scope)
-      console.log('organizationId:', this.organizationId)
-      console.log('route orgId:', this.$route?.params?.orgId)
-      console.log('config orgId:', this.config?.organizationId)
-      console.log('Available nodes from computeNodes:', this.computeNodes)
-      console.log('Available nodes from store:', computeResourcesStore.getScopedComputeNodes(scope))
-      
       // Try to find the node directly from the computeNodes computed property first
       // This ensures we're using the same filtered list that populates the dropdown
       const nodeFromComputed = this.computeNodes.find(node => node.uuid === value)
-      console.log('Found node from computed:', nodeFromComputed)
       
       // Fallback to store lookup if not found in computed
-      const nodeFromStore = nodeFromComputed || computeResourcesStore.getComputeNodeById(value, scope)
-      console.log('Final node:', nodeFromStore)
-      
-      this.selectedComputeNode = nodeFromStore || {}
-      console.log('selectedComputeNode set to:', this.selectedComputeNode)
+      if (!nodeFromComputed) {
+        const computeResourcesStore = useComputeResourcesStore()
+        const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+        const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+        this.selectedComputeNode = computeResourcesStore.getComputeNodeById(value, scope) || {}
+      } else {
+        this.selectedComputeNode = nodeFromComputed
+      }
     },
 
     setSelectedWorkflow: function (value) {
