@@ -121,7 +121,7 @@ export const actions = {
   fetchComputeNodes: async ({ commit, rootState }) => {
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
         return fetch(url, {
           method: "GET",
           headers: {
@@ -267,7 +267,7 @@ export const actions = {
     }
   },
   createWorkflow: async ({ commit, rootState }, newWorkflow) => {
-    const url = `${rootState.config.api2Url}/workflows`;
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions`;
 
     try {
       const userToken = await useGetToken();
@@ -328,7 +328,7 @@ export const actions = {
   },
   fetchWorkflowInstances: async ({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.api2Url}/workflows/instances?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/compute/workflows/instances?organization_id=${rootState.activeOrganization.organization.id}`;
       const userToken = await useGetToken();
       const resp = await fetch(url, {
         method: "GET",
@@ -362,7 +362,7 @@ export const actions = {
     const applicationId = application.uuid;
     // Fetch application logs
     try {
-      const url = `${rootState.config.api2Url}/workflows/instances/${integrationId}/logs?applicationUuid=${applicationId}`;
+      const url = `${rootState.config.api2Url}/compute/workflows/instances/${integrationId}/logs?applicationUuid=${applicationId}`;
 
       const resp = await fetch(url, {
         method: "GET",
@@ -391,7 +391,7 @@ export const actions = {
       return;
     }
     try {
-      const url = `${rootState.config.api2Url}/workflows/instances/${workflow.uuid}/status`;
+      const url = `${rootState.config.api2Url}/compute/workflows/instances/${workflow.uuid}/status`;
 
       const userToken = await useGetToken();
       const resp = await fetch(url, {
@@ -631,7 +631,7 @@ export const actions = {
   fetchWorkflows: async ({ commit, rootState }) => {
     try {
       const userToken = await useGetToken();
-      const url = `${rootState.config.api2Url}/workflows?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/compute/workflows/definitions?organization_id=${rootState.activeOrganization.organization.id}`;
 
       const resp = await fetch(url, {
         method: "GET",
