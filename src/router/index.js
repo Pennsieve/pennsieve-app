@@ -77,7 +77,6 @@ const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
-const MySettings = () => import('./MySettings/MySettings.vue')
 
 const People = () => import('./people/People.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')

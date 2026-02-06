@@ -4,12 +4,12 @@ import { useStore } from "vuex";
 import { computed, ref } from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
 import IconXCircle from "@/components/icons/IconXCircle.vue";
-import TsCreateMontageDialog from "@/components/viewer/palettes/Montages/TsCreateMontageDialog.vue";
+import TsCreateMontageDialog from "@/components/viewers/TSViewer/TsCreateMontageDialog.vue";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog/ConfirmationDialog.vue";
 import toQueryParams from "@/utils/toQueryParams";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
-import { useViewerStore } from '@/stores/tsviewer';
+import { useViewerStore } from '@/stores/tsviewer'
 
 // Store setup
 const viewerStore = useViewerStore()
