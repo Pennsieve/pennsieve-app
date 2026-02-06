@@ -1,6 +1,7 @@
 // composables/useAnnotationLayers.js
 import { ref, computed } from 'vue'
 import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerStore as useLibraryViewerStore } from '@pennsieve-viz/tsviewer'
 import { useGetToken } from "@/composables/useGetToken"
 import { useHandleXhrError, useSendXhr } from "@/mixins/request/request_composable"
 import EventBus from '@/utils/event-bus'
@@ -8,6 +9,7 @@ import { hexToRgbA } from '@/utils/annotationUtils'
 
 export function useAnnotationLayers() {
     const viewerStore = useViewerStore()
+    const libraryStore = useLibraryViewerStore()
 
     const annLayerInfo = ref([])
     const defaultColors = ref([
@@ -87,6 +89,14 @@ export function useAnnotationLayers() {
             viewerStore.createLayer(layer)
             viewerStore.setActiveAnnotationLayer(layer.id)
 
+            // Sync to library store so TSViewer sees the new layer
+            if (libraryStore.createLayer) {
+                libraryStore.createLayer(JSON.parse(JSON.stringify(layer)))
+            }
+            if (libraryStore.setActiveAnnotationLayer) {
+                libraryStore.setActiveAnnotationLayer(layer.id)
+            }
+
             EventBus.$emit('toast', {
                 detail: {
                     msg: `'${layer.name}' Layer Created`
@@ -114,6 +124,11 @@ export function useAnnotationLayers() {
 
             layer.visible = visible
             viewerStore.updateLayer(layer)
+
+            // Sync to library store
+            if (libraryStore.updateLayer) {
+                libraryStore.updateLayer(JSON.parse(JSON.stringify(layer)))
+            }
 
             console.log(`[useAnnotationLayers] Updated layer:`, layer.name, 'new visible:', layer.visible)
 
@@ -152,6 +167,11 @@ export function useAnnotationLayers() {
             // Remove from store
             viewerStore.removeLayer(layerId)
 
+            // Sync to library store
+            if (libraryStore.deleteLayer) {
+                libraryStore.deleteLayer({ id: layerId })
+            }
+
             EventBus.$emit('toast', {
                 detail: {
                     msg: 'Layer deleted successfully'
@@ -181,6 +201,11 @@ export function useAnnotationLayers() {
                 layer.bkColor = hexToRgbA(newColor, 0.15)
                 layer.selColor = hexToRgbA(newColor, 0.9)
                 viewerStore.updateLayer(layer)
+
+                // Sync to library store
+                if (libraryStore.updateLayer) {
+                    libraryStore.updateLayer(JSON.parse(JSON.stringify(layer)))
+                }
             }
 
             return response

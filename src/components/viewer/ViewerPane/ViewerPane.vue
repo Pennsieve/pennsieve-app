@@ -41,8 +41,9 @@
 
 <script>
 import { propOr, pathOr } from "ramda";
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, watch } from "vue";
 import { mapActions } from "vuex";
+import { storeToRefs } from "pinia";
 
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
@@ -53,6 +54,7 @@ import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 import { useViewerStore as useLibraryViewerStore, TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
 import * as siteConfig from '@/site-config/site.json'
+import { useViewerStore as useLocalViewerStore } from '@/stores/tsviewer'
 
 import "@pennsieve-viz/micro-ct/style.css";
 
@@ -125,9 +127,13 @@ export default {
       availableViewers: [],
       isLoading: false,
       omeTiffSource: "",
+      stopWatchers: [],
     };
   },
 
+  beforeUnmount() {
+    this.stopWatchers.forEach(stop => stop());
+  },
 
   watch: {
     pkg: {
@@ -149,16 +155,45 @@ export default {
      */
     fetchTimeseriesData: async function () {
       this.isLoading = true;
-      const viewerStore = useLibraryViewerStore()
+      const libraryStore = useLibraryViewerStore()
+      const localStore = useLocalViewerStore()
       const viewerConfig = {
         timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
         apiUrl: siteConfig.apiUrl,
         timeSeriesApi: siteConfig.timeSeriesApi,
       };
-      viewerStore.setViewerConfig(viewerConfig)
+      libraryStore.setViewerConfig(viewerConfig)
+
+      // Set up one-way watchers: library store → local store (for sidebar)
+      // Deep clone data to avoid shared reactivity that could interfere with library
+      const { viewerChannels, viewerAnnotations } = storeToRefs(libraryStore)
+
+      // Clean up existing watchers
+      this.stopWatchers.forEach(stop => stop());
+      this.stopWatchers = [];
+
+      // Sync channels from library to local store
+      this.stopWatchers.push(
+        watch(viewerChannels, (channels) => {
+          if (channels && channels.length > 0) {
+            console.log('Syncing channels to sidebar:', channels.length)
+            localStore.setChannels(JSON.parse(JSON.stringify(channels)))
+          }
+        }, { immediate: true })
+      );
+
+      // Sync annotations from library to local store
+      this.stopWatchers.push(
+        watch(viewerAnnotations, (annotations) => {
+          if (annotations && annotations.length > 0) {
+            console.log('Syncing annotations to sidebar:', annotations.length)
+            localStore.setAnnotations(JSON.parse(JSON.stringify(annotations)))
+          }
+        }, { immediate: true })
+      );
 
       try {
-        return await viewerStore.fetchAndSetActiveViewer({
+        return await libraryStore.fetchAndSetActiveViewer({
           packageId: this.pkg?.content?.id,
         })
       } finally {
