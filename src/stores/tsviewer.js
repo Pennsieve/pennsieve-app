@@ -8,7 +8,7 @@ import { propOr, propEq, findIndex } from 'ramda'
 
 import vuexStore from '../store/index'  // Assuming your Vuex store is exported from vuexStore.js
 
-export const useViewerStore = defineStore('local-tsviewer', () => {
+export const useViewerStore = defineStore('tsviewer', () => {
 
     const config = site
     const viewerChannels = ref([])
