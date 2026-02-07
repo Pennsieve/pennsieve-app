@@ -39,10 +39,6 @@ const initialState = () => ({
   viewerAnnotations: [],
   activeAnnotationLayer: {},
   activeAnnotation: {},
-  viewerDiscussions: {
-    comments: {},
-    discussions: []
-  },
   viewerErrors: {},
   //TODO make strings enum constants
   viewerSidePanelView: viewerSidePanelTypes.INFO_PANEL,
@@ -146,65 +142,6 @@ export const mutations = {
     annotations.splice(annotationIndex, 1)
   },
 
-  SET_DISCUSSIONS (state, { discussions, comments }) {
-    state.viewerDiscussions = {
-      discussions,
-      comments
-    }
-  },
-
-  //TODO the business logic in here should be moved to an action which also uses CREATE_COMMENT
-  CREATE_DISCUSSION (state, data) {
-    // Add comment
-    const commentDiscussionId = pathOr('', ['comment', 'discussion_id'], data)
-    const comments = state.viewerDiscussions.comments[commentDiscussionId]
-
-    if (comments) {
-      comments.push(data.comment)
-    }
-
-    /*
-     * Add discussion if needed
-     * Also create comment for discussion
-     */
-    const discussions = state.viewerDiscussions.discussions
-    const hasDiscussion = includes(data.discussion, discussions)
-
-    if (hasDiscussion === false) {
-      discussions.push(data.discussion)
-      state.viewerDiscussions.comments[commentDiscussionId] = [data.comment]
-    }
-  },
-
-  REMOVE_DISCUSSION (state, discussionIndex) {
-    state.viewerDiscussions.discussions.splice(discussionIndex, 1)
-  },
-
-  CREATE_COMMENT (state, { comment, discussionId }) {
-    propOr([], discussionId, state.viewerDiscussions.comments).push(comment)
-  },
-
-  //TODO move logic to action, use removeDiscussion action instead of manually doing it if no more comments
-  REMOVE_COMMENT (state, data) {
-    const discussionId = propOr(0, 'discussion_id', data)
-    const comments = propOr([], discussionId, state.viewerDiscussions.comments)
-
-    const commentId = propOr(0, 'id', data)
-    const commentIdx = findIndex(propEq('id', commentId), comments)
-
-    const updatedComments = remove(commentIdx, 1, comments)
-
-    state.viewerDiscussions.comments[discussionId] = updatedComments
-
-    // Remove discussion if there are no more comments
-    if (updatedComments.length === 0) {
-      const discussions = state.viewerDiscussions.discussions
-      const discussionIdx = findIndex(propEq('id', discussionId), discussions)
-
-      state.viewerDiscussions.discussions.splice(discussionIdx, 1)
-    }
-
-  },
 
   SET_VIEWER_ERRORS (state, data) {
     state.viewerErrors = data
@@ -273,27 +210,6 @@ export const actions = {
 
     commit('UPDATE_VIEWER_SLIDE_INFO', newSlideInfo)
   },
-  setDiscussions: ({commit}, discussionData) => {
-    const discussions = propOr([], 'discussions', discussionData)
-    const comments = propOr({}, 'comments', discussionData)
-
-    commit('SET_DISCUSSIONS', { discussions, comments })
-  },
-  createDiscussion: ({commit}, evt) =>
-    commit('CREATE_DISCUSSION', evt),
-  removeDiscussion: ({commit}, evt) => {
-    const discussionIndex = findIndex(
-      propEq('id', evt),
-      state.viewerDiscussions.discussions
-    )
-    commit('REMOVE_DISCUSSION', discussionIndex)
-  },
-  createComment: ({commit}, comment) => {
-    const discussionId = propOr(0, 'discussion_id', comment)
-    commit('CREATE_COMMENT', { comment, discussionId })
-  },
-  removeComment: ({commit}, evt) =>
-    commit('REMOVE_COMMENT', evt),
   setViewerErrors: ({ commit }, evt) =>
     commit('SET_VIEWER_ERRORS', evt),
   setViewerMontageScheme: ({commit}, evt) =>

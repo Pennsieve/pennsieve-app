@@ -117,7 +117,6 @@ import IconCompass from "../../icons/IconCompass.vue";
 import IconChannel from "../../icons/IconChannel.vue";
 import IconInfo from "../../icons/IconInfo.vue";
 import IconLink from "@/components/icons/IconLink.vue";
-import IconDiscussion from "../../icons/IconDiscussion.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
 import IconMouseCursor from "../../icons/IconMouseCursor.vue";
@@ -147,7 +146,6 @@ export default {
     IconCompass,
     IconChannel,
     IconInfo,
-    IconDiscussion,
     IconMouseCursor,
   },
   mixins: [Request, ViewerToolsPalettes],
