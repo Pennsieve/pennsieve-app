@@ -119,11 +119,6 @@ export default {
           icon: 'IconInfo',
           tooltip: 'Info Panel'
         },
-        {
-          eventName: 'discussion',
-          icon: 'IconDiscussion',
-          tooltip: 'Discussions'
-        },
         // {
         //   eventName: 'fileBrowser',
         //   icon: 'icon-file-explorer',

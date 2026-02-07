@@ -19,15 +19,7 @@
         color="#e94b4b"
       />
       <h2>Delete annotation?</h2>
-      <template v-if="deleteAnnotation.withDiscussions">
-        <p>
-          Deleting this annotation will also remove any associated discussions and cannot be undone.
-        </p>
-        <p>
-          Are you sure you would like to remove this annotation?
-        </p>
-      </template>
-      <p v-else>
+      <p>
         {{ annotationDescription }}
       </p>
       <div class="dialog-simple-buttons">
@@ -76,12 +68,7 @@ export default {
     },
     deleteAnnotation: {
       type: Object,
-      default: () => {
-        return {
-          annotation: {},
-          withDiscussions: false
-        }
-      }
+      default: () => ({})
     }
   },
 
@@ -97,7 +84,7 @@ export default {
      * @returns {String}
      */
     annotationDescription: function() {
-      return pathOr('', ['annotation', 'description'], this.deleteAnnotation)
+      return pathOr('', ['description'], this.deleteAnnotation)
     },
 
     /**
@@ -105,9 +92,7 @@ export default {
      * @returns {String}
      */
     btnDeleteCopy: function (){
-      return this.deleteAnnotation.withDiscussions
-        ? `Yes, I'm sure`
-        : 'Delete'
+      return 'Delete'
     }
   },
 
@@ -125,10 +110,7 @@ export default {
      */
     onClosed: function() {
       this.isProcessing = false
-      this.$emit('update:annotation', {
-        annotation: {},
-        withDiscussions: false
-      })
+      this.$emit('update:annotation', {})
     }
   }
 }

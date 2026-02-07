@@ -2,7 +2,6 @@ export const PIXEL_RATIO = window.devicePixelRatio || 1;
 export const VIEWPORT_RATIO = 0.98;
 export const viewerSidePanelTypes = Object.freeze({
   INFO_PANEL: 'infoPanel',
-  DISCUSSION: 'discussion',
   FILE_BROWSER: 'fileBrowser',
   ANNOTATIONS: 'annotations',
   CHANNELS: 'channels',

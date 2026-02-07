@@ -1009,12 +1009,11 @@
        * Remove individual annotation
        */
       deleteAnnotation: function() {
-        const annotationId = pathOr(0, ['annotation', 'id'], this.annotationDelete)
-        const withDiscussions = propOr(false, 'withDiscussions', this.annotationDelete)
+        const annotationId = pathOr(0, ['id'], this.annotationDelete)
 
         useGetToken()
           .then(token => {
-            const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${token}&withDiscussions=${withDiscussions}`
+            const url = `${this.config.apiUrl}/annotations/${annotationId}?api_key=${token}`
             return fetch(url, {
               method: 'DELETE',
               headers: {
@@ -1029,8 +1028,7 @@
                 return response.json()
               })
               .then(() => {
-                const annotation = propOr({}, 'annotation', this.annotationDelete)
-                return this.$store.dispatch('viewerModule/deleteAnnotation', annotation)
+                return this.$store.dispatch('viewerModule/deleteAnnotation', this.annotationDelete)
                   .then(() => {
                     // Find annotation on canvas and remove it
                     try {
@@ -1044,9 +1042,9 @@
                   })
               })
           })
-          .catch(() => {
-            const payload = Object.assign({}, this.annotationDelete, { withDiscussions: true })
-            this.confirmDeleteAnnotation(payload)
+          .catch((error) => {
+            EventBus.$emit('toast', {type: 'ERROR', msg: 'Failed to delete annotation'})
+            console.error('Delete annotation error:', error)
           })
 
 
