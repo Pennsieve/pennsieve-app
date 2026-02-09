@@ -88,6 +88,7 @@ export default {
         'user-orcid': 'ORCID Integration',
         'user-github': 'GitHub Integration',
         'user-api': 'API Keys',
+        'user-compute-resource': 'Compute Resources',
         'user-integrations': 'Platform Integrations',
         'user-security': 'Security Settings',
         'user-support': 'Support & Help',
@@ -143,7 +144,7 @@ export default {
     isSettingsSubPage() {
       // Check if current route is a child of settings
       const settingsSubPages = [
-        'user-profile', 'user-orcid', 'user-github', 'user-api', 
+        'user-profile', 'user-orcid', 'user-github', 'user-api', 'user-compute-resource',
         'user-integrations', 'user-security', 'user-support'
       ];
       return settingsSubPages.includes(this.$route.name);
@@ -196,6 +197,10 @@ export default {
           {
             to: 'user-security',
             name: 'Security'
+          },
+          {
+            to: 'user-compute-resource',
+            name: 'Compute Resources'
           },
           {
             to: 'user-support',

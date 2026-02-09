@@ -140,10 +140,6 @@ export default {
           to: "workflows",
         },
         {
-          name: "Configuration",
-          to: "compute-nodes",
-        },
-        {
           name: "Applications",
           to: "applications",
         },
