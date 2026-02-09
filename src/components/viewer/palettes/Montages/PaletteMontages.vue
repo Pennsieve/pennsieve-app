@@ -1,7 +1,7 @@
 <script setup>
 import bfButton from "@/components/shared/bf-button/BfButton.vue";
 import { useStore } from "vuex";
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
 import IconXCircle from "@/components/icons/IconXCircle.vue";
 import TsCreateMontageDialog from "@/components/viewer/palettes/Montages/TsCreateMontageDialog.vue";
@@ -9,10 +9,14 @@ import ConfirmationDialog from "@/components/shared/ConfirmationDialog/Confirmat
 import toQueryParams from "@/utils/toQueryParams";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
-import { useViewerStore } from '@/stores/tsviewer';
+import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerInstance } from '@/composables/useViewerInstance'
 
 // Store setup
-const viewerStore = useViewerStore()
+// Local app store for workspace montages (app-specific data)
+const appViewerStore = useViewerStore()
+// Library viewer controls for montage scheme state
+const viewerControls = useViewerInstance()
 const store = useStore() // Keep for non-viewer related state like config and activeOrganization
 
 // Props and emits
@@ -30,12 +34,14 @@ const createMontageDialogVisible = ref(false)
 const confirmationDialogVisible = ref(false)
 const deleteMontageItem = ref({})
 
-// Computed properties - all using viewerStore now
+// Computed properties
+// Workspace montages from app-level store (fetched from app API)
 const workspaceMontages = computed(() => {
-  return viewerStore.workspaceMontages
+  return appViewerStore.workspaceMontages
 })
 
-const selectedMontageName = computed(() => viewerStore.viewerMontageScheme)
+// Selected montage from library viewer controls
+const selectedMontageName = computed(() => viewerControls.montageScheme.value)
 
 const expandedMontages = computed(() => {
   const defaultMontage = {
@@ -44,22 +50,41 @@ const expandedMontages = computed(() => {
     channelPairs: []
   }
 
-  const wsMontages = viewerStore.workspaceMontages
-  if (wsMontages.length > 1) {
+  const wsMontages = appViewerStore.workspaceMontages
+  if (wsMontages.length > 0) {
     return [defaultMontage, ...wsMontages]
   } else {
     return [defaultMontage]
   }
 })
 
+// Fetch workspace montages on mount and sync to library store
+onMounted(async () => {
+  const montages = await appViewerStore.fetchWorkspaceMontages()
+  // Sync montages to library store so it can apply them
+  if (viewerControls.store?.setWorkspaceMontages) {
+    viewerControls.store.setWorkspaceMontages(montages)
+  }
+})
+
 // Methods
 function onMontageSelected(montageName) {
-  console.log('select: ' + montageName)
-  viewerStore.setViewerMontageScheme(montageName)
+  // Update library store - this triggers the montage change internally
+  if (viewerControls.store?.setViewerMontageScheme) {
+    viewerControls.store.setViewerMontageScheme(montageName)
+  }
+
+  // Also update app store for UI state sync
+  appViewerStore.setViewerMontageScheme(montageName)
 }
 
 function createMontage() {
-  viewerStore.setViewerMontageScheme("NOT_MONTAGED")
+  appViewerStore.setViewerMontageScheme("NOT_MONTAGED")
+
+  if (viewerControls.store?.setViewerMontageScheme) {
+    viewerControls.store.setViewerMontageScheme("NOT_MONTAGED")
+  }
+
   createMontageDialogVisible.value = true
 }
 
@@ -92,14 +117,15 @@ async function doDeleteMontage(evt) {
       },
     })
 
-    console.log('SUCCESS DELETE MONTAGE')
     confirmationDialogVisible.value = false
 
-    // Fetch updated montages using viewerStore
-    viewerStore.fetchWorkspaceMontages()
+    // Fetch updated montages and sync to library store
+    const montages = await appViewerStore.fetchWorkspaceMontages()
+    if (viewerControls.store?.setWorkspaceMontages) {
+      viewerControls.store.setWorkspaceMontages(montages)
+    }
   } catch (error) {
     console.error('Error deleting montage:', error)
-    // Could add error handling/notification here
   }
 }
 </script>

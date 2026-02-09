@@ -35,6 +35,7 @@
       :idx="0"
       :pkg="pkg"
       :side-panel-open="sidePanelOpen"
+      :instance-id="viewerInstanceId"
     />
   </div>
 </template>
@@ -51,10 +52,15 @@ import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
-import { useViewerStore as useLibraryViewerStore, TSViewer } from '@pennsieve-viz/tsviewer'
+import { TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
 import * as siteConfig from '@/site-config/site.json'
-import { useViewerStore as useLocalViewerStore } from '@/stores/tsviewer'
+import {
+  VIEWER_INSTANCE_ID,
+  initViewerStore,
+  cleanupViewerStore,
+  useViewerInstance
+} from '@/composables/useViewerInstance'
 
 import "@pennsieve-viz/micro-ct/style.css";
 
@@ -127,12 +133,8 @@ export default {
       availableViewers: [],
       isLoading: false,
       omeTiffSource: "",
-      stopWatchers: [],
+      viewerInstanceId: VIEWER_INSTANCE_ID,
     };
-  },
-
-  beforeUnmount() {
-    this.stopWatchers.forEach(stop => stop());
   },
 
   watch: {
@@ -155,47 +157,22 @@ export default {
      */
     fetchTimeseriesData: async function () {
       this.isLoading = true;
-      const libraryStore = useLibraryViewerStore()
-      const localStore = useLocalViewerStore()
+      // Initialize the viewer store with the shared instance ID
+      const viewerStore = initViewerStore(this.viewerInstanceId)
+      const viewerControls = useViewerInstance(this.viewerInstanceId)
+
       const viewerConfig = {
         timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
         apiUrl: siteConfig.apiUrl,
         timeSeriesApi: siteConfig.timeSeriesApi,
       };
-      libraryStore.setViewerConfig(viewerConfig)
-
-      // Set up one-way watchers: library store → local store (for sidebar)
-      // Deep clone data to avoid shared reactivity that could interfere with library
-      const { viewerChannels, viewerAnnotations } = storeToRefs(libraryStore)
-
-      // Clean up existing watchers
-      this.stopWatchers.forEach(stop => stop());
-      this.stopWatchers = [];
-
-      // Sync channels from library to local store
-      this.stopWatchers.push(
-        watch(viewerChannels, (channels) => {
-          if (channels && channels.length > 0) {
-            console.log('Syncing channels to sidebar:', channels.length)
-            localStore.setChannels(JSON.parse(JSON.stringify(channels)))
-          }
-        }, { immediate: true })
-      );
-
-      // Sync annotations from library to local store
-      this.stopWatchers.push(
-        watch(viewerAnnotations, (annotations) => {
-          if (annotations && annotations.length > 0) {
-            console.log('Syncing annotations to sidebar:', annotations.length)
-            localStore.setAnnotations(JSON.parse(JSON.stringify(annotations)))
-          }
-        }, { immediate: true })
-      );
+      viewerStore.setViewerConfig(viewerConfig)
 
       try {
-        return await libraryStore.fetchAndSetActiveViewer({
+        const result = await viewerStore.fetchAndSetActiveViewer({
           packageId: this.pkg?.content?.id,
         })
+        return result
       } finally {
         this.isLoading = false
       }
@@ -292,7 +269,10 @@ export default {
     },
   },
 
-  
+  beforeUnmount() {
+    // Clean up the viewer store when the component is destroyed
+    cleanupViewerStore(this.viewerInstanceId);
+  },
 };
 </script>
 

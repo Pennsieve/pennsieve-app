@@ -154,5 +154,7 @@ export default {
   width: 100%;
   max-width: 354px;
   display: flex;
+  position: relative;
+  z-index: 10;
 }
 </style>
