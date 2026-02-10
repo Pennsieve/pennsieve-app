@@ -1016,7 +1016,7 @@ export const getters = {
   isUserPublisher: (state) => {
     return state.publishers.map((p) => p.id).includes(state.profile.id);
   },
-  datasetLocked: (state) => {
+  datasetLocked: (werstate) => {
     return state.dataset.locked;
   },
   publisherTeam: (state) =>
