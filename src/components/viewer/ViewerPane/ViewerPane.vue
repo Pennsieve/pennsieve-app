@@ -35,14 +35,16 @@
       :idx="0"
       :pkg="pkg"
       :side-panel-open="sidePanelOpen"
+      :instance-id="viewerInstanceId"
     />
   </div>
 </template>
 
 <script>
 import { propOr, pathOr } from "ramda";
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, watch } from "vue";
 import { mapActions } from "vuex";
+import { storeToRefs } from "pinia";
 
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
@@ -50,6 +52,15 @@ import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
+import { TSViewer } from '@pennsieve-viz/tsviewer'
+import '@pennsieve-viz/tsviewer/style.css'
+import * as siteConfig from '@/site-config/site.json'
+import {
+  VIEWER_INSTANCE_ID,
+  initViewerStore,
+  cleanupViewerStore,
+  useViewerInstance
+} from '@/composables/useViewerInstance'
 
 import "@pennsieve-viz/micro-ct/style.css";
 
@@ -123,6 +134,7 @@ export default {
       cmpViewer: "",
       availableViewers: [],
       omeTiffSource: "",
+      viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
 
@@ -139,6 +151,32 @@ export default {
 
   methods: {
     ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+
+    /**
+     * Called when component is mounted
+     */
+    fetchTimeseriesData: async function () {
+      this.isLoading = true;
+      // Initialize the viewer store with the shared instance ID
+      const viewerStore = initViewerStore(this.viewerInstanceId)
+      const viewerControls = useViewerInstance(this.viewerInstanceId)
+
+      const viewerConfig = {
+        timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
+        apiUrl: siteConfig.apiUrl,
+        timeSeriesApi: siteConfig.timeSeriesApi,
+      };
+      viewerStore.setViewerConfig(viewerConfig)
+
+      try {
+        const result = await viewerStore.fetchAndSetActiveViewer({
+          packageId: this.pkg?.content?.id,
+        })
+        return result
+      } finally {
+        this.isLoading = false
+      }
+    },
 
     /**
      * Invoke method on viewer
@@ -230,6 +268,12 @@ export default {
       return isTimeseriesFile && isUnprocessed;
     },
   },
+
+  beforeUnmount() {
+    // Clean up the viewer store when the component is destroyed
+    cleanupViewerStore(this.viewerInstanceId);
+  },
+
 };
 </script>
 
