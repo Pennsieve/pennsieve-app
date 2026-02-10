@@ -41,6 +41,7 @@ import { computed } from 'vue'
 import IconOrcid from '../../icons/IconOrcid.vue'
 import IconGitHub from '../../icons/IconGitHub.vue'
 import IconApi from '../../icons/IconApi.vue'
+import IconStorage from '../../icons/IconStorage.vue'
 import IconIntegrations from '../../icons/IconIntegrations.vue'
 
 const props = defineProps({
@@ -109,6 +110,7 @@ const iconComponent = computed(() => {
     'IconOrcid': IconOrcid,
     'IconGitHub': IconGitHub, 
     'IconApi': IconApi,
+    'IconStorage': IconStorage,
     'IconIntegrations': IconIntegrations
   }
   return iconMap[props.icon] || IconIntegrations
@@ -165,6 +167,11 @@ const statusClass = computed(() => {
     &.api {
       background: rgba(102, 51, 153, 0.1);
       color: #663399;
+    }
+
+    &.storage {
+      background: rgba(76, 175, 80, 0.1);
+      color: #4caf50;
     }
 
     &.future {

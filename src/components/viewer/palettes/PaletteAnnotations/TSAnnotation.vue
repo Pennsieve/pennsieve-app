@@ -118,10 +118,7 @@ export default {
       } else {
         EventBus.$emit('active-viewer-action', {
           method: 'confirmDeleteAnnotation',
-          payload: {
-            annotation: this.annotation,
-            withDiscussions: true,
-          }
+          payload: this.annotation
         })
       }
     },

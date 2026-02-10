@@ -4,13 +4,14 @@ import { useStore } from "vuex";
 import { computed, ref, onMounted } from "vue";
 import MontageAccordion from "@/components/viewer/palettes/Montages/MontageAccordion.vue";
 import IconXCircle from "@/components/icons/IconXCircle.vue";
-import TsCreateMontageDialog from "@/components/viewer/palettes/Montages/TsCreateMontageDialog.vue";
+import TsCreateMontageDialog from "@/components/viewers/TSViewer/TsCreateMontageDialog.vue";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog/ConfirmationDialog.vue";
 import toQueryParams from "@/utils/toQueryParams";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useViewerStore } from '@/stores/tsviewer'
 import { useViewerInstance } from '@/composables/useViewerInstance'
+
 
 // Store setup
 // Local app store for workspace montages (app-specific data)

@@ -65,10 +65,11 @@
                         class="config-select"
                       >
                         <el-option
-                          v-for="(item, i) in computeNodeOptions"
+                          v-for="(item, i) in enhancedComputeNodeOptions"
                           :key="i"
                           :label="item.label"
                           :value="item.value"
+                          :disabled="item.disabled"
                         />
                       </el-select>
                       <p class="field-hint">
@@ -497,10 +498,12 @@ import Request from "../../../../mixins/request/index";
 import { isEmpty, pathOr, propOr } from "ramda";
 import EventBus from "../../../../utils/event-bus";
 import { mapState, mapActions, mapGetters } from "vuex";
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore';
 import FilesTable from "../../../FilesTable/FilesTable.vue";
 import AnalysisFilesTable from "../../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 export default {
   name: "IntegratedAnalysisDialog",
@@ -521,6 +524,10 @@ export default {
       default: false,
     },
     datasetId: {
+      type: String,
+      default: "",
+    },
+    organizationId: {
       type: String,
       default: "",
     },
@@ -582,7 +589,6 @@ export default {
   },
   computed: {
     ...mapState("analysisModule", [
-      "computeNodes",
       "workflows",
       "preprocessors",
       "processors",
@@ -591,6 +597,29 @@ export default {
       "fileCount",
     ]),
     ...mapGetters(["config"]),
+
+    // Compute nodes from the computeResourcesStore
+    computeNodes() {
+      const computeResourcesStore = useComputeResourcesStore()
+      // Always use workspace scope if we're in an organization context
+      // The organizationId should come from the current workspace context
+      const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+      const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+      
+      // Only return enabled nodes
+      return computeResourcesStore.getScopedComputeNodes(scope)
+        .filter(node => node.status === 'Enabled')
+    },
+
+    // Enhanced compute node options - nodes are already filtered by enabled status and organization
+    enhancedComputeNodeOptions() {
+      return this.computeNodes
+        .map(node => ({
+          value: node.uuid,
+          label: node.name,
+          disabled: false
+        }))
+    },
 
     fileId() {
       return pathOr(
@@ -674,18 +703,22 @@ export default {
     },
   },
 
-  mounted() {
+  async mounted() {
     this.fetchFiles();
-    this.fetchComputeNodes();
     this.fetchWorkflows();
     this.fetchApplications();
+    
+    // Fetch compute nodes from computeResourcesStore instead of Vuex
+    const computeResourcesStore = useComputeResourcesStore()
+    const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+    const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+    await computeResourcesStore.fetchScopedComputeNodes(scope, currentOrgId)
   },
 
   methods: {
     ...mapActions("analysisModule", [
       "setSelectedFiles",
       "clearSelectedFiles",
-      "fetchComputeNodes",
       "fetchWorkflows",
       "fetchApplications",
       "updateFileCount",
@@ -867,7 +900,7 @@ export default {
     },
 
     runAnalysis: async function () {
-      const url = `${this.config.api2Url}/workflows/instances`;
+      const url = `${this.config.api2Url}/compute/workflows/instances`;
 
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
@@ -1093,9 +1126,19 @@ export default {
     },
 
     setSelectedComputeNode: function (value) {
-      this.selectedComputeNode = this.computeNodes.find(
-        (computeNode) => computeNode.name === value
-      );
+      // Try to find the node directly from the computeNodes computed property first
+      // This ensures we're using the same filtered list that populates the dropdown
+      const nodeFromComputed = this.computeNodes.find(node => node.uuid === value)
+      
+      // Fallback to store lookup if not found in computed
+      if (!nodeFromComputed) {
+        const computeResourcesStore = useComputeResourcesStore()
+        const currentOrgId = this.organizationId || this.$route.params.orgId || this.config.organizationId
+        const scope = currentOrgId ? `workspace:${currentOrgId}` : 'account-owner'
+        this.selectedComputeNode = computeResourcesStore.getComputeNodeById(value, scope) || {}
+      } else {
+        this.selectedComputeNode = nodeFromComputed
+      }
     },
 
     setSelectedWorkflow: function (value) {
