@@ -18,7 +18,18 @@
       </template>
 
 
-      <div class="pagination-header mb-16">
+      <div class="search-section mb-16">
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search by name or email..."
+          prefix-icon="el-icon-search"
+          class="search-input"
+          clearable
+          @input="handleSearch"
+        />
+      </div>
+
+      <div class="pagination-header mb-16" v-if="filteredPeople.length > 0">
         <pagination-page-menu
           class="mr-24"
           pagination-item-label="Results"
@@ -30,7 +41,7 @@
           :pager-count="5"
           :current-page="offset / limit + 1"
           layout="prev, pager, next"
-          :total="allPeople.length"
+          :total="filteredPeople.length"
           @current-change="onPaginationPageChange"
         />
       </div>
@@ -94,8 +105,26 @@
           />
         </div>
       </div>
+      
+      <div
+        v-else-if="searchQuery && filteredPeople.length === 0"
+        class="no-results"
+      >
+        <p>No members found matching "{{ searchQuery }}"</p>
+        <p class="no-results-hint">Try searching with a different name or email</p>
+      </div>
+      
+      <div
+        v-else-if="!searchQuery && allPeople.length === 0 && !isLoading"
+        class="no-results"
+      >
+        <p>No team members yet</p>
+        <p class="no-results-hint" v-if="hasAdminRights">Click "Send Invitation" to add team members</p>
+      </div>
 
+      <!-- Dialog components - only rendered when needed -->
       <invite-member
+        v-if="isInviteVisible"
         :dialog-visible="isInviteVisible"
         :header="modalHeader"
         :all-org-members="people"
@@ -162,7 +191,8 @@ export default {
       limit: 25,
       members: [],
       invitations: [],
-      sortDirection: "asc"
+      sortDirection: "asc",
+      searchQuery: ''
     }
   },
 
@@ -180,10 +210,32 @@ export default {
       return isAdmin || isOwner
     },
     /**
-     * the displayed subset of allPeople based on which page in the paginated list we are on
+     * Filtered list of people based on search query
+     */
+    filteredPeople: function() {
+      if (!this.searchQuery) {
+        return this.allPeople
+      }
+      
+      const query = this.searchQuery.toLowerCase().trim()
+      return this.allPeople.filter(person => {
+        const firstName = (person.firstName || '').toLowerCase()
+        const lastName = (person.lastName || '').toLowerCase()
+        const email = (person.email || '').toLowerCase()
+        const fullName = `${firstName} ${lastName}`.toLowerCase()
+        
+        return firstName.includes(query) ||
+               lastName.includes(query) ||
+               fullName.includes(query) ||
+               email.includes(query)
+      })
+    },
+    
+    /**
+     * the displayed subset of filteredPeople based on which page in the paginated list we are on
      */
     people: function() {
-      return this.allPeople.slice(this.offset, this.offset + this.limit)
+      return this.filteredPeople.slice(this.offset, this.offset + this.limit)
     }
   },
 
@@ -406,6 +458,14 @@ export default {
     onUpdateLimit: function(limit) {
       this.offset = 0
       this.limit = limit
+    },
+    
+    /**
+     * Handle search input changes
+     */
+    handleSearch: function() {
+      // Reset to first page when searching
+      this.offset = 0
     }
   }
 }
@@ -414,6 +474,7 @@ export default {
 <style scoped lang="scss">
 @use "../../../styles/element/pagination";
 @use "../../../styles/element/table";
+@use "../../../styles/element/input";
 
 .data-usage {
   text-align: right;
@@ -421,8 +482,37 @@ export default {
 .col-spacer {
   height: 17px;
 }
+.search-section {
+  margin-bottom: 20px;
+  
+  .search-input {
+    max-width: 400px;
+  }
+}
+
 .pagination-header {
   display: flex;
   justify-content: space-between
+}
+
+.no-results {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fafafa;
+  border-radius: 4px;
+  border: 1px solid #e4e4e4;
+  
+  p {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: #404554;
+    font-weight: 500;
+  }
+  
+  .no-results-hint {
+    font-size: 14px;
+    color: #71747c;
+    font-weight: normal;
+  }
 }
 </style>
