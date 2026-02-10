@@ -89,9 +89,7 @@ export default {
     VideoViewer: defineAsyncComponent(() =>
       import("../../viewers/VideoViewer.vue")
     ),
-    TimeseriesViewer: defineAsyncComponent(() =>
-      import("../../viewers/TSViewer/TSViewer.vue")
-    ),
+    TimeseriesViewer: TSViewer,
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
@@ -133,6 +131,7 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      isLoading: false,
       omeTiffSource: "",
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
@@ -143,6 +142,7 @@ export default {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
+          this.fetchTimeseriesData();
         }
       },
       immediate: true,
@@ -273,7 +273,6 @@ export default {
     // Clean up the viewer store when the component is destroyed
     cleanupViewerStore(this.viewerInstanceId);
   },
-
 };
 </script>
 
