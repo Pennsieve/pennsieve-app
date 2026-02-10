@@ -20,7 +20,7 @@
         </div>
       </div>
       <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop v-if="hasAdminRights && getStatusForNode(node) !== 'Pending'">
+        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending'">
           <el-select 
             :model-value="getStatusForNode(node)"
             @change="(value) => updateStatus(value)"
@@ -54,7 +54,7 @@
             <h4>Node Information</h4>
             <div class="detail-actions">
               <button 
-                v-if="!isEditing && hasAdminRights" 
+                v-if="!isEditing && canManagePermissions" 
                 @click="startEditing" 
                 class="edit-button"
               >
@@ -135,14 +135,6 @@
             <span class="detail-value mono">{{ node.uuid }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Gateway URL:</span>
-            <span class="detail-value mono small">{{ node.computeNodeGatewayUrl || 'N/A' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">EFS ID:</span>
-            <span class="detail-value mono">{{ node.efsId || 'N/A' }}</span>
-          </div>
-          <div class="detail-row">
             <span class="detail-label">Created By:</span>
             <span class="detail-value">{{ getUserName(node.userId) }}</span>
           </div>
@@ -158,12 +150,17 @@
             <h4>Access & Permissions</h4>
           </div>
           
-          <div class="permissions-content" v-if="!isLoadingPermissions && hasAdminRights">
+          <div class="permissions-content" v-if="!isLoadingPermissions && (canManagePermissions || nodePermissions.accessScope)">
             <div class="access-scope-section">
+              <div v-if="nodePermissions.owner" class="detail-row">
+                <span class="detail-label">Owner:</span>
+                <span class="detail-value">{{ getUserName(nodePermissions.owner) }}</span>
+              </div>
               <div class="detail-row">
                 <span class="detail-label">Access Scope:</span>
                 <span class="detail-value">
                   <el-select 
+                    v-if="canManagePermissions"
                     v-model="localAccessScope"
                     @change="handleAccessScopeChange"
                     :loading="isUpdatingPermissions"
@@ -174,8 +171,11 @@
                     <el-option label="Workspace - All workspace members can access" value="workspace" />
                     <el-option label="Shared - Specific users and teams" value="shared" />
                   </el-select>
-                  <span class="scope-description">
-                    <span v-if="localAccessScope === 'private'">Only you can access this compute node</span>
+                  <span v-else class="access-scope-badge" :class="localAccessScope">
+                    {{ localAccessScope === 'private' ? 'Private' : localAccessScope === 'workspace' ? 'Workspace' : 'Shared' }}
+                  </span>
+                  <span v-if="!canManagePermissions" class="scope-description">
+                    <span v-if="localAccessScope === 'private'">Only the owner can access this compute node</span>
                     <span v-else-if="localAccessScope === 'workspace'">All workspace members can access this compute node</span>
                     <span v-else>Shared with specific users and teams</span>
                   </span>
@@ -187,7 +187,7 @@
             <div v-if="localAccessScope === 'shared'" class="shared-section">
               <div class="shared-header">
                 <h5>Shared With Users</h5>
-                <button @click="openAddUserDialog" class="add-button" v-if="hasAdminRights">
+                <button @click="openAddUserDialog" class="add-button" v-if="canManagePermissions">
                   <span>+ Add User</span>
                 </button>
               </div>
@@ -197,7 +197,7 @@
                   <button 
                     @click="removeUserAccess(userId)" 
                     class="remove-button" 
-                    v-if="hasAdminRights"
+                    v-if="canManagePermissions"
                     title="Remove user access"
                   >
                     ×
@@ -213,7 +213,7 @@
             <div v-if="localAccessScope === 'shared'" class="shared-section">
               <div class="shared-header">
                 <h5>Shared With Teams</h5>
-                <button @click="openAddTeamDialog" class="add-button" v-if="hasAdminRights">
+                <button @click="openAddTeamDialog" class="add-button" v-if="canManagePermissions">
                   <span>+ Add Team</span>
                 </button>
               </div>
@@ -223,7 +223,7 @@
                   <button 
                     @click="removeTeamAccess(teamId)" 
                     class="remove-button" 
-                    v-if="hasAdminRights"
+                    v-if="canManagePermissions"
                     title="Remove team access"
                   >
                     ×
@@ -236,7 +236,7 @@
             </div>
           </div>
           
-          <div v-else-if="!isLoadingPermissions && !hasAdminRights" class="no-permissions-message">
+          <div v-else-if="!isLoadingPermissions && !canManagePermissions && !nodePermissions.accessScope" class="no-permissions-message">
             <p>You don't have permission to view or manage access settings for this compute node.</p>
           </div>
         </div>
@@ -318,7 +318,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElSelect, ElOption } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
@@ -351,6 +351,21 @@ const isExpanded = ref(false)
 const nodePermissions = computed(() => computeResourcesStore.getNodePermissions(props.node.uuid))
 const isLoadingPermissions = computed(() => computeResourcesStore.isNodePermissionsLoading(props.node.uuid))
 const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(props.node.uuid))
+
+// Check if current user is the owner of the node based on permissions
+const isNodeOwner = computed(() => {
+  const permissions = nodePermissions.value
+  if (!permissions || !permissions.owner) {
+    return false
+  }
+  const isOwner = permissions.owner === profile.value?.id
+  return isOwner
+})
+
+// User can manage permissions if they are the owner
+const canManagePermissions = computed(() => {
+  return isNodeOwner.value
+})
 
 // Reactive permission data
 const localAccessScope = ref('private')
@@ -410,7 +425,15 @@ const availableTeams = computed(() => {
   )
 })
 
-// Watch for expansion and fetch permissions when expanded
+// Fetch permissions immediately on mount to determine ownership
+onMounted(async () => {
+  // Always fetch permissions on mount to determine if user is owner
+  if (Object.keys(nodePermissions.value).length === 0) {
+    await computeResourcesStore.fetchNodePermissions(props.node.uuid)
+  }
+})
+
+// Watch for expansion and fetch permissions when expanded (in case they weren't loaded)
 watch(isExpanded, async (newValue) => {
   if (newValue && Object.keys(nodePermissions.value).length === 0) {
     await computeResourcesStore.fetchNodePermissions(props.node.uuid)
@@ -702,7 +725,6 @@ async function updateStatus(newStatus) {
 .node-status-badge {
   display: inline-block;
   padding: 4px 12px;
-  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
@@ -732,7 +754,6 @@ async function updateStatus(newStatus) {
   
   :deep(.el-select__wrapper) {
     border: 1px solid transparent;
-    border-radius: 12px;
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
@@ -923,7 +944,7 @@ async function updateStatus(newStatus) {
           font-size: 13px;
           background: theme.$gray_1;
           padding: 2px 6px;
-          border-radius: 3px;
+          //border-radius: 3px;
           
           &.small {
             font-size: 11px;
@@ -933,7 +954,6 @@ async function updateStatus(newStatus) {
         .status-text {
           display: inline-block;
           padding: 2px 8px;
-          border-radius: 4px;
           font-size: 12px;
           font-weight: 500;
           background: rgba(theme.$green_1, 0.1);
