@@ -147,7 +147,7 @@
 
       <bf-navigation-item
         v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
-        :link="{ name: 'settings', params: { orgId: activeOrganizationId } }"
+        :link="{ name: 'workspace-settings-overview', params: { orgId: activeOrganizationId } }"
         label="Settings"
         :condensed="primaryNavCondensed"
         :styleColor="navStyleColor"
