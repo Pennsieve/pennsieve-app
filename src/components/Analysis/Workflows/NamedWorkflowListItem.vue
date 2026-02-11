@@ -1,8 +1,16 @@
 <template>
-  <div class="workflows-list-item">
+  <div class="workflows-list-item" :class="{ inactive: !isActiveLocal }">
     <el-row class="info">
-      <el-col :span="24" class="workflow-title">
+      <el-col :span="16" class="workflow-title">
         <span>{{ workflow.name }}</span>
+      </el-col>
+      <el-col :span="8" class="active-switch">
+        <el-switch
+          v-model="isActiveLocal"
+          active-color="#5039F7"
+          inactive-color="#CAC5BF"
+          @change="toggleActive"
+        />
       </el-col>
     </el-row>
     <el-row class="workflow-body">
@@ -40,7 +48,7 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapState, mapActions } from "vuex";
 import FormatDate from "../../../mixins/format-date";
 
 export default {
@@ -50,6 +58,18 @@ export default {
     workflow: {
       type: Object,
       default: () => ({}),
+    },
+  },
+
+  data() {
+    return {
+      isActiveLocal: this.workflow.isActive,
+    };
+  },
+
+  watch: {
+    "workflow.isActive"(newVal) {
+      this.isActiveLocal = newVal;
     },
   },
 
@@ -63,6 +83,17 @@ export default {
   },
 
   methods: {
+    ...mapActions("analysisModule", ["updateWorkflowActiveStatus"]),
+    async toggleActive(value) {
+      try {
+        await this.updateWorkflowActiveStatus({
+          uuid: this.workflow.uuid,
+          isActive: value,
+        });
+      } catch {
+        this.isActiveLocal = !value;
+      }
+    },
     convertGitToHttps(gitUrl) {
       if (!gitUrl) return "#";
       // Convert git://github.com/user/repo to https://github.com/user/repo
@@ -89,6 +120,16 @@ export default {
   background-color: white;
   display: flex;
   flex-direction: column;
+
+  &.inactive {
+    opacity: 0.55;
+  }
+}
+
+.active-switch {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .workflow-title {

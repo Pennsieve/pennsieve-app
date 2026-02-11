@@ -1041,14 +1041,14 @@ export default {
     },
 
     formatWorkflowOptions: function () {
-      if (!this.workflows) {
+      if (!this.activeWorkflows) {
         return;
       }
 
-      let filteredWorkflows = this.workflows;
+      let filteredWorkflows = this.activeWorkflows;
 
       if (this.selectedComputeNode.uuid) {
-        filteredWorkflows = this.workflows.filter(
+        filteredWorkflows = this.activeWorkflows.filter(
           (workflow) =>
             workflow.computeNode &&
             this.selectedComputeNode.uuid === workflow.computeNode.uuid

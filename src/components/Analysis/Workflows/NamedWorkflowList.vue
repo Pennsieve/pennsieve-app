@@ -53,10 +53,10 @@ export default {
     ...mapState("analysisModule", ["workflows"]),
 
     sortedWorkflows: function () {
-      const activeWorkflows = this.workflows.filter(
-        (workflow) => workflow.isActive
-      );
-      return [...activeWorkflows].sort((a, b) => {
+      return [...this.workflows].sort((a, b) => {
+        if (a.isActive !== b.isActive) {
+          return a.isActive ? -1 : 1;
+        }
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
         return dateB - dateA;
