@@ -72,23 +72,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
-import { storeToRefs } from 'pinia'
+import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import {
   compose,
   uniq,
   pluck,
   pathEq,
-  includes,
-  without,
-  propEq,
-  pathOr,
-  findIndex,
   propOr
 } from 'ramda'
 
-import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerInstance } from '@/composables/useViewerInstance'
 import Accordion from '../../../shared/Accordion/Accordion.vue'
 import BfChannel from './BfChannel.vue'
 import BfButton from '../../../shared/bf-button/BfButton.vue'
@@ -111,9 +105,9 @@ const props = defineProps({
   }
 })
 
-// Stores
-const viewerStore = useViewerStore()
-const { viewerChannels } = storeToRefs(viewerStore)
+// Viewer controls from library (new 1.1.0 API)
+const viewerControls = useViewerInstance()
+const { channels: viewerChannels, selectedChannels } = viewerControls
 
 // State
 const channelColorMap = ref({
@@ -140,10 +134,8 @@ const selectedString = computed(() => {
   }
 })
 
-const numberSelectedChannels = computed( () => {
-  return viewerChannels.value.filter(channel => {
-    return propEq('selected', true, channel)
-  }).length
+const numberSelectedChannels = computed(() => {
+  return selectedChannels.value.length
 })
 
 // Local computed properties
@@ -179,75 +171,48 @@ const returnSort = (sortBy, list, dir) => {
 // Methods
 const toggleAllVisibility = () => {
   allVisible.value = !allVisible.value
-  if (numberSelectedChannels.value > 0 ){
-    let channels = viewerChannels.value
-    for (let ch in channels) {
-      if (channels[ch].selected) {
-        channels[ch].visible = allVisible.value
-      }
 
-
-    }
+  if (numberSelectedChannels.value > 0) {
+    // Toggle visibility only for selected channels
+    selectedChannels.value.forEach(channel => {
+      viewerControls.setChannelVisibility(channel.id, allVisible.value)
+    })
   } else {
-    let updatedChannels = viewerChannels.value
-    for (let ch in updatedChannels) {
-      updatedChannels[ch].visible = allVisible.value
+    // Toggle visibility for all channels
+    if (allVisible.value) {
+      viewerControls.showAllChannels()
+    } else {
+      viewerControls.hideAllChannels()
     }
   }
 
-
+  viewerControls.triggerRerender('channel-visibility')
 }
 
 const onChannelSelected = (selectionData) => {
-  console.log('Channel selected:', selectionData)
+  const { channelId, append } = selectionData
 
   // Find the clicked channel to check its current state
-  const clickedChannel = viewerChannels.value.find(ch => ch.id === selectionData.channelId)
+  const clickedChannel = viewerChannels.value.find(ch => ch.id === channelId)
   const isCurrentlySelected = clickedChannel?.selected || false
 
-  // 1. Update actual channel selection state
-  const updatedChannels = viewerChannels.value.map(channel => {
-    if (!selectionData.append) {
-      // Regular click behavior
-      if (channel.id === selectionData.channelId) {
-        // Toggle the clicked channel: if selected, deselect; if not selected, select
-        channel.selected = !isCurrentlySelected
-      } else if (!isCurrentlySelected) {
-        // Only deselect others if we're selecting the clicked channel
-        channel.selected = false
-      }
-      // If clicking on already selected channel to deselect it, leave others unchanged
-    } else {
-      // Cmd/Ctrl+click behavior (unchanged - toggle the clicked channel)
-      if (channel.id === selectionData.channelId) {
-        channel.selected = !channel.selected
-      }
-    }
+  if (isCurrentlySelected && !append) {
+    // Clicking on already selected channel - deselect it
+    viewerControls.clearChannelSelection()
+  } else if (append) {
+    // Cmd/Ctrl+click - toggle the clicked channel, keep others
+    viewerControls.selectChannels([channelId], true)
+  } else {
+    // Regular click - select only this channel
+    viewerControls.selectChannels([channelId], false)
+  }
 
-    return { ...channel }
-  })
-
-  // 2. Trigger TSViewer re-render
-  viewerStore.triggerRerender({
-    cause: 'channel-selection'
-  })
+  viewerControls.triggerRerender('channel-selection')
 }
 
 const onChannelVisibilityToggled = (visibilityData) => {
-  console.log('Channel visibility toggled:', visibilityData)
-
-  // 1. Update actual channel visibility state
-  const updatedChannels = viewerChannels.value.map(channel => {
-    if (channel.id === visibilityData.channelId) {
-      channel.visible = visibilityData.visible
-    }
-    return { ...channel }
-  })
-
-  // 2. Trigger TSViewer re-render
-  viewerStore.triggerRerender({
-    cause: 'channel-visibility'
-  })
+  viewerControls.setChannelVisibility(visibilityData.channelId, visibilityData.visible)
+  viewerControls.triggerRerender('channel-visibility')
 }
 
 
@@ -256,15 +221,10 @@ const getChannelsByType = (type) => {
 }
 
 const openFilterMenu = () => {
-  // Get selected channels
-  const selectedChannels = viewerChannels.value.filter(channel => {
-    return propEq('selected', true, channel)
-  })
-
   // Send selected channels if there are any, if not send all channels
-  let channelList = selectedChannels.length > 0 ?
-    selectedChannels :
-    viewerChannels.value
+  const channelList = selectedChannels.value.length > 0
+    ? selectedChannels.value
+    : viewerChannels.value
 
   EventBus.$emit('active-viewer-action', {
     method: 'openFilterWindow',
@@ -275,17 +235,7 @@ const openFilterMenu = () => {
   })
 }
 
-const reset = () => {
-  const channels = viewerChannels.value.map(channel => {
-    return channel
-  })
-  viewerStore.setChannels(channels)
-}
-
-// Lifecycle
-onBeforeUnmount(() => {
-  reset()
-})
+// Lifecycle - no cleanup needed, state persists in library store
 </script>
 
 <style lang="scss" scoped>

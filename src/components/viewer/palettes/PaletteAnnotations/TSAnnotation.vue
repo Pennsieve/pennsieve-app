@@ -47,8 +47,7 @@
 
 <script>
 import { mapState } from 'vuex'
-import { storeToRefs } from 'pinia'
-import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerInstance } from '@/composables/useViewerInstance'
 import EventBus from '../../../../utils/event-bus'
 import Request from '../../../../mixins/request'
 import IconPencil from "../../../icons/IconPencil.vue"
@@ -74,13 +73,11 @@ export default {
   },
 
   setup() {
-    // Setup Pinia store
-    const viewerStore = useViewerStore()
-    const { activeAnnotation } = storeToRefs(viewerStore)
+    // Setup viewer controls (new 1.1.0 API)
+    const viewerControls = useViewerInstance()
 
     return {
-      viewerStore,
-      activeAnnotation // Now from Pinia instead of Vuex
+      viewerControls
     }
   },
 
@@ -94,9 +91,8 @@ export default {
     ...mapState(['config']),
 
     isSelected: function() {
-      // Can use either the annotation's selected property or compare with activeAnnotation
-      return this.annotation.selected ||
-        (this.activeAnnotation && this.activeAnnotation.id === this.annotation.id)
+      // Check the annotation's selected property
+      return this.annotation.selected || false
     },
 
     startTime: function() {
@@ -153,8 +149,8 @@ export default {
      * Jump to annotation in viewer
      */
     onAnnotationSelect: function() {
-      // FIX: Use Pinia store instead of Vuex dispatch
-      this.viewerStore.setActiveAnnotation(this.annotation)
+      // Use viewer controls API to select annotation
+      this.viewerControls.selectAnnotation(this.annotation.id)
 
       EventBus.$emit('active-viewer-action', {
         method: 'selectAnnotation',
