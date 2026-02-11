@@ -18,6 +18,7 @@
     </div>
     <UMAP
       v-else
+      :instance-id="instanceId"
       :src-url="srcUrl"
       src-file-type="parquet"
     />
@@ -25,7 +26,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineProps } from 'vue';
+import { ref, computed, onMounted, defineProps } from 'vue';
 import { pathOr } from 'ramda';
 import { UMAP } from '@pennsieve-viz/core';
 import { useGetToken } from '@/composables/useGetToken';
@@ -41,6 +42,12 @@ const props = defineProps({
 const srcUrl = ref('');
 const isLoading = ref(true);
 const error = ref('');
+
+// Generate unique instance ID based on package ID
+const instanceId = computed(() => {
+  const pkgId = pathOr('', ['content', 'id'], props.pkg);
+  return pkgId ? `umap-${pkgId}` : `umap-${Date.now()}`;
+});
 
 /**
  * Fetch viewer assets for the package

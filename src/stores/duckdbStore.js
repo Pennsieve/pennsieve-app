@@ -11,6 +11,8 @@ export const useDuckDBStore = defineStore('duckdb', () => {
     const loadedFiles = ref(new Map()) // Map<fileId, { tableName, fileType, isLoading, error, fileUrl }>
     const connections = ref(new Map()) // Map<connectionId, { connection, viewerId, createdAt }>
     const fileUsage = ref(new Map()) // Map<fileId, Set<viewerId>> - track which viewers use which files
+    const sharedResultName = ref(null) // For sharing query results between components
+    const sharedVersion = ref(0) // Version counter for shared results
 
     // Getters
     const isReady = computed(() => isInitialized.value && !initError.value)
@@ -348,6 +350,38 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         return info
     }
 
+    // Helper to generate stable file ID from URL
+    const formatIdFromUrl = (srcUrl) => {
+        return 'url_' + btoa(srcUrl).replace(/=+$/, '').replace(/[+/]/g, '_')
+    }
+
+    // Helper to escape table/view names
+    const escapeIdentifier = (name) => {
+        return `"${String(name).replace(/"/g, '""')}"`
+    }
+
+    // Publish a view from a query (for sharing between components)
+    const publishViewFromQuery = async (viewName, query, connectionId) => {
+        const connData = connections.value.get(connectionId)
+        if (!connData) {
+            throw new Error(`Connection not found: ${connectionId}`)
+        }
+        await connData.connection.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(viewName)} AS ${query}`)
+        sharedResultName.value = viewName
+        sharedVersion.value++
+    }
+
+    // Publish a table from a query (for sharing between components)
+    const publishTableFromQuery = async (tableName, query, connectionId) => {
+        const connData = connections.value.get(connectionId)
+        if (!connData) {
+            throw new Error(`Connection not found: ${connectionId}`)
+        }
+        await connData.connection.query(`CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS ${query}`)
+        sharedResultName.value = tableName
+        sharedVersion.value++
+    }
+
     return {
         // State
         db,
@@ -357,6 +391,8 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         loadedFiles,
         connections,
         fileUsage,
+        sharedResultName,
+        sharedVersion,
 
         // Getters
         isReady,
@@ -377,6 +413,9 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         cleanup,
         performGlobalCleanup,
         getConnectionInfo,
-        getFileUsageInfo
+        getFileUsageInfo,
+        formatIdFromUrl,
+        publishViewFromQuery,
+        publishTableFromQuery
     }
 })
