@@ -15,7 +15,7 @@
       <div class="workflow-list">
         <NamedWorkflowListItem
           v-for="workflow in filteredWorkflows"
-          :key="workflow.id"
+          :key="workflow.uuid"
           :workflow="workflow"
         />
       </div>
