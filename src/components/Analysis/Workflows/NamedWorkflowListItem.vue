@@ -1,16 +1,8 @@
 <template>
   <div class="workflows-list-item" :class="{ inactive: !isActiveLocal }">
     <el-row class="info">
-      <el-col :span="16" class="workflow-title">
+      <el-col :span="24" class="workflow-title">
         <span>{{ workflow.name }}</span>
-      </el-col>
-      <el-col :span="8" class="active-switch">
-        <el-switch
-          v-model="isActiveLocal"
-          active-color="#5039F7"
-          inactive-color="#CAC5BF"
-          @change="toggleActive"
-        />
       </el-col>
     </el-row>
     <el-row class="workflow-body">
@@ -44,6 +36,15 @@
         </div>
       </div>
     </el-row>
+    <div class="active-switch-row">
+      <span class="active-label">{{ isActiveLocal ? 'Active' : 'Inactive' }}</span>
+      <el-switch
+        v-model="isActiveLocal"
+        active-color="#5039F7"
+        inactive-color="#CAC5BF"
+        @change="toggleActive"
+      />
+    </div>
   </div>
 </template>
 
@@ -126,10 +127,18 @@ export default {
   }
 }
 
-.active-switch {
+.active-switch-row {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid theme.$gray_3;
+}
+
+.active-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
 }
 
 .workflow-title {
