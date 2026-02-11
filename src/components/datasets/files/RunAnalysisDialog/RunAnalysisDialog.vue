@@ -1142,7 +1142,7 @@ export default {
     },
 
     setSelectedWorkflow: function (value) {
-      this.selectedWorkflow = this.workflows.find(
+      this.selectedWorkflow = this.activeWorkflows.find(
         (workflow) => workflow.name === value
       );
     },

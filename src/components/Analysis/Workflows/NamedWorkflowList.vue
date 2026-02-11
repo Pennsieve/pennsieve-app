@@ -65,9 +65,9 @@ export default {
     return {
       statusFilter: "active",
       filterOptions: [
-        { label: "All", value: "all" },
         { label: "Active", value: "active" },
         { label: "Inactive", value: "inactive" },
+        { label: "All", value: "all" },
       ],
     };
   },
