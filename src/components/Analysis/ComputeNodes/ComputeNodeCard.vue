@@ -130,13 +130,17 @@
             <span class="detail-label">Account ID:</span>
             <span class="detail-value">{{ formatAccountId(node.account?.accountId) }}</span>
           </div>
+          <div class="detail-row" v-if="node.accountOwnerId">
+            <span class="detail-label">Account Owner:</span>
+            <span class="detail-value">{{ getUserName(node.accountOwnerId) }}</span>
+          </div>
           <div class="detail-row">
             <span class="detail-label">Node UUID:</span>
             <span class="detail-value mono">{{ node.uuid }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Created By:</span>
-            <span class="detail-value">{{ getUserName(node.userId) }}</span>
+            <span class="detail-value">{{ getUserName(node.nodeOwnerId || node.userId) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Created At:</span>
