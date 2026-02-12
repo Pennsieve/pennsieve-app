@@ -1234,7 +1234,6 @@ export default {
     EventBus.$on("refresh-table-data", this.refreshTableData);
     
     // Fetch connected records when component mounts
-    console.log('Component mounted, calling fetchConnectedRecords');
     this.fetchConnectedRecords();
 
     // Open proper drawer component
@@ -2699,23 +2698,17 @@ export default {
      * Fetch connected records for the current package
      */
     async fetchConnectedRecords() {
-      console.log('fetchConnectedRecords called', { fileId: this.fileId, datasetId: this.datasetId });
-      
       if (!this.fileId || !this.datasetId) {
-        console.log('Missing fileId or datasetId, skipping fetch');
         this.connectedRecords = [];
         return;
       }
 
       try {
-        console.log('Calling metadataStore.fetchPackageConnectedRecords...');
         const response = await this.metadataStore.fetchPackageConnectedRecords(
           this.datasetId,
           this.fileId
         );
-        
-        console.log('API Response:', response);
-        
+
         // Handle the response format from metadataStore: { records, cursor, hasMore }
         if (response && response.records) {
           this.connectedRecords = response.records || [];
@@ -2724,9 +2717,6 @@ export default {
         } else {
           this.connectedRecords = [];
         }
-        
-        console.log('Connected records set to:', this.connectedRecords);
-        console.log('Number of connected records:', this.connectedRecords.length);
       } catch (error) {
         console.error('Error fetching connected records:', error);
         this.connectedRecords = [];
