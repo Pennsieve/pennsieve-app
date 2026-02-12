@@ -1,11 +1,24 @@
 <template>
   <bf-stage element-loading-background="transparent">
-    <div v-if="sortedWorkflows.length" class="workflow-list">
-      <NamedWorkflowListItem
-        v-for="workflow in sortedWorkflows"
-        :key="workflow.id"
-        :workflow="workflow"
-      />
+    <div v-if="workflows.length" class="workflow-list-container">
+      <div class="filter-bar">
+        <button
+          v-for="option in filterOptions"
+          :key="option.value"
+          class="filter-btn"
+          :class="{ active: statusFilter === option.value }"
+          @click="statusFilter = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <div class="workflow-list">
+        <NamedWorkflowListItem
+          v-for="workflow in filteredWorkflows"
+          :key="workflow.uuid"
+          :workflow="workflow"
+        />
+      </div>
     </div>
     <bf-empty-page-state v-else class="empty">
       <img
@@ -48,15 +61,29 @@ export default {
     NamedWorkflowListItem,
   },
 
+  data() {
+    return {
+      statusFilter: "active",
+      filterOptions: [
+        { label: "Active", value: "active" },
+        { label: "Inactive", value: "inactive" },
+        { label: "All", value: "all" },
+      ],
+    };
+  },
+
   computed: {
     ...mapState(["activeOrganization"]),
     ...mapState("analysisModule", ["workflows"]),
 
-    sortedWorkflows: function () {
-      const activeWorkflows = this.workflows.filter(
-        (workflow) => workflow.isActive
-      );
-      return [...activeWorkflows].sort((a, b) => {
+    filteredWorkflows: function () {
+      let filtered = this.workflows;
+      if (this.statusFilter === "active") {
+        filtered = filtered.filter((w) => w.isActive);
+      } else if (this.statusFilter === "inactive") {
+        filtered = filtered.filter((w) => !w.isActive);
+      }
+      return [...filtered].sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
         return dateB - dateA;
@@ -99,11 +126,44 @@ export default {
   text-align: center;
 }
 
+.workflow-list-container {
+  margin: 16px 0;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 0 8px;
+}
+
+.filter-btn {
+  padding: 6px 16px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: white;
+  color: theme.$gray_5;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &.active {
+    background: theme.$purple_1;
+    border-color: theme.$purple_1;
+    color: white;
+  }
+}
+
 .workflow-list {
   display: flex;
   flex-direction: column;
   flex-flow: wrap;
-  margin: 16px 0;
 }
 
 .copy {
