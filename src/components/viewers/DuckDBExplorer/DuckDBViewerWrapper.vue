@@ -1,20 +1,22 @@
-// DuckDBViewerWrapper.vue - Updated with stable file ID support
+// DuckDBViewerWrapper.vue - Updated to use @pennsieve-viz/core DataExplorer
 <template>
   <div class="app-container">
-    <dbduck-viewer
-      :url="presignedUrl"
-      :file-type="fileType"
-      :file-id="fileId"
+    <DataExplorer
+      v-if="presignedUrl"
+      :instance-id="instanceId"
+      :src-url="presignedUrl"
+      :src-file-type="fileType"
+      :src-file-id="fileId"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import {defineProps, onMounted, ref, watch} from 'vue';
+import {defineProps, onMounted, ref, computed} from 'vue';
 import {pathOr} from "ramda";
 import {useGetToken} from "@/composables/useGetToken";
 import * as siteConfig from '@/site-config/site.json'
-import DbduckViewer from "./dbduckViewer.vue";
+import { DataExplorer } from '@pennsieve-viz/core';
 
 const props = defineProps({
   pkg: {
@@ -26,7 +28,13 @@ const props = defineProps({
 const viewAssets = ref([])
 const fileType = ref("parquet")
 const presignedUrl = ref("")
-const fileId = ref("") // Add stable file ID
+const fileId = ref("")
+
+// Generate unique instance ID based on package ID for multi-instance support
+const instanceId = computed(() => {
+  const pkgId = pathOr('', ['content', 'id'], props.pkg);
+  return pkgId ? `data-explorer-${pkgId}` : `data-explorer-${Date.now()}`;
+});
 
 onMounted(async () => {
   try {
