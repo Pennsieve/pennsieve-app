@@ -31,8 +31,21 @@ import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
+import { configureDuckDB } from '@pennsieve-viz/core'
 
-
+// Configure DuckDB to use local WASM files instead of CDN (for CSP compliance)
+configureDuckDB({
+  bundlePaths: {
+    mvp: {
+      mainModule: '/static/duckdb/duckdb-mvp.wasm',
+      mainWorker: '/static/duckdb/duckdb-browser-mvp.worker.js'
+    },
+    eh: {
+      mainModule: '/static/duckdb/duckdb-eh.wasm',
+      mainWorker: '/static/duckdb/duckdb-browser-eh.worker.js'
+    }
+  }
+})
 
 import Pusher from 'pusher-js'
 
