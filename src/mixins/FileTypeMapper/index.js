@@ -478,8 +478,7 @@ export default {
       if (this.isOMETiff(pkg)) {
         return vueViewerMap['omeTiff']
       }
-
-      // Parquet file check - trigger UMAP viewer
+      // Parquet file check based on filename - for UMAP visualization
       if (this.isParquetFile(pkg)) {
         return vueViewerMap['parquet_umap_viewer']
       }

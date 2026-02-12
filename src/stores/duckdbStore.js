@@ -11,6 +11,8 @@ export const useDuckDBStore = defineStore('duckdb', () => {
     const loadedFiles = ref(new Map()) // Map<fileId, { tableName, fileType, isLoading, error, fileUrl }>
     const connections = ref(new Map()) // Map<connectionId, { connection, viewerId, createdAt }>
     const fileUsage = ref(new Map()) // Map<fileId, Set<viewerId>> - track which viewers use which files
+    const sharedResultName = ref(null) // For sharing query results between components
+    const sharedVersion = ref(0) // Version counter for shared results
 
     // Getters
     const isReady = computed(() => isInitialized.value && !initError.value)
@@ -54,7 +56,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             await db.value.instantiate(bundle.mainModule)
 
             isInitialized.value = true
-            console.log('DuckDB initialized successfully in store')
 
             return db.value
         } catch (err) {
@@ -80,7 +81,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             createdAt: new Date()
         })
 
-        console.log(`Created connection for viewer: ${id}`)
         return { connection: conn, connectionId: id }
     }
 
@@ -89,16 +89,9 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         if (connData) {
             await connData.connection.close()
             connections.value.delete(connectionId)
-            console.log(`Closed connection for viewer: ${connectionId}`)
 
             // Clean up file usage for this viewer
             cleanupViewerFileUsage(connectionId)
-
-            // If this was the last connection, consider global cleanup
-            if (connections.value.size === 0) {
-                console.log('No active connections remaining. Keeping DuckDB instance for potential reuse.')
-                // Optionally: await performGlobalCleanup() if you want to clean up immediately
-            }
         }
     }
 
@@ -108,11 +101,8 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             viewerSet.delete(viewerId)
 
             // If no viewers are using this file anymore, we could optionally remove it
-            if (viewerSet.size === 0) {
-                console.log(`File ${fileId} is no longer used by any viewers`)
-                // Optionally remove the file from DuckDB and loadedFiles
-                // unloadFile(fileId)
-            }
+            // Optionally remove the file from DuckDB and loadedFiles
+            // if (viewerSet.size === 0) { unloadFile(fileId) }
         }
     }
 
@@ -121,7 +111,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             fileUsage.value.set(fileId, new Set())
         }
         fileUsage.value.get(fileId).add(viewerId)
-        console.log(`Tracking file usage: ${fileId} by viewer ${viewerId}`)
     }
 
     const unloadFile = async (fileId) => {
@@ -132,7 +121,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
                 const tempConn = await db.value.connect()
                 await tempConn.query(`DROP TABLE IF EXISTS ${file.tableName};`)
                 await tempConn.close()
-                console.log(`Dropped table: ${file.tableName}`)
             } catch (err) {
                 console.warn(`Failed to drop table ${file.tableName}:`, err)
             }
@@ -140,7 +128,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
 
         loadedFiles.value.delete(fileId)
         fileUsage.value.delete(fileId)
-        console.log(`Unloaded file: ${fileId}`)
     }
 
     // Updated loadFile function with stable fileId parameter
@@ -151,7 +138,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         // Check if file is already loaded using stable key
         const existingFile = loadedFiles.value.get(stableKey)
         if (existingFile && !existingFile.isLoading && !existingFile.error) {
-            console.log(`File already loaded using stable key ${stableKey}, reusing table: ${existingFile.tableName}`)
             // Track usage by this viewer
             if (viewerId) {
                 trackFileUsage(stableKey, viewerId)
@@ -174,8 +160,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         })
 
         try {
-            console.log(`Loading ${fileType} file from: ${fileUrl} with stable key: ${stableKey}`)
-
             // Download file once
             const response = await fetch(fileUrl)
             if (!response.ok) {
@@ -243,7 +227,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
                     trackFileUsage(stableKey, viewerId)
                 }
 
-                console.log(`Successfully loaded ${rowCount} rows from ${fileType} file into table: ${tableName} (stable key: ${stableKey})`)
                 return tableName
 
             } finally {
@@ -280,13 +263,10 @@ export const useDuckDBStore = defineStore('duckdb', () => {
     }
 
     const performGlobalCleanup = async () => {
-        console.log('Performing global DuckDB cleanup...')
-
         // Close all remaining connections
         for (const [id, connData] of connections.value) {
             try {
                 await connData.connection.close()
-                console.log(`Closed connection: ${id}`)
             } catch (err) {
                 console.warn(`Error closing connection ${id}:`, err)
             }
@@ -297,7 +277,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         if (db.value) {
             try {
                 await db.value.terminate()
-                console.log('DuckDB instance terminated')
             } catch (err) {
                 console.warn('Error terminating DuckDB:', err)
             }
@@ -314,8 +293,6 @@ export const useDuckDBStore = defineStore('duckdb', () => {
     const cleanup = async (force = false) => {
         if (force || connections.value.size === 0) {
             await performGlobalCleanup()
-        } else {
-            console.log(`Skipping global cleanup. ${connections.value.size} active connections remaining.`)
         }
     }
 
@@ -348,6 +325,38 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         return info
     }
 
+    // Helper to generate stable file ID from URL
+    const formatIdFromUrl = (srcUrl) => {
+        return 'url_' + btoa(srcUrl).replace(/=+$/, '').replace(/[+/]/g, '_')
+    }
+
+    // Helper to escape table/view names
+    const escapeIdentifier = (name) => {
+        return `"${String(name).replace(/"/g, '""')}"`
+    }
+
+    // Publish a view from a query (for sharing between components)
+    const publishViewFromQuery = async (viewName, query, connectionId) => {
+        const connData = connections.value.get(connectionId)
+        if (!connData) {
+            throw new Error(`Connection not found: ${connectionId}`)
+        }
+        await connData.connection.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(viewName)} AS ${query}`)
+        sharedResultName.value = viewName
+        sharedVersion.value++
+    }
+
+    // Publish a table from a query (for sharing between components)
+    const publishTableFromQuery = async (tableName, query, connectionId) => {
+        const connData = connections.value.get(connectionId)
+        if (!connData) {
+            throw new Error(`Connection not found: ${connectionId}`)
+        }
+        await connData.connection.query(`CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS ${query}`)
+        sharedResultName.value = tableName
+        sharedVersion.value++
+    }
+
     return {
         // State
         db,
@@ -357,6 +366,8 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         loadedFiles,
         connections,
         fileUsage,
+        sharedResultName,
+        sharedVersion,
 
         // Getters
         isReady,
@@ -377,6 +388,9 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         cleanup,
         performGlobalCleanup,
         getConnectionInfo,
-        getFileUsageInfo
+        getFileUsageInfo,
+        formatIdFromUrl,
+        publishViewFromQuery,
+        publishTableFromQuery
     }
 })

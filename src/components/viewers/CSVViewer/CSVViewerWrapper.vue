@@ -35,7 +35,6 @@ onMounted(async () => {
 
     // Extract stable file ID
     fileId.value = viewAssets.value[0].content.id
-    console.log('Using stable file ID:', fileId.value)
 
     // Get presigned URL
     presignedUrl.value = await getFileUrl(fileId.value)

@@ -63,6 +63,7 @@ import {
 } from '@/composables/useViewerInstance'
 
 import "@pennsieve-viz/micro-ct/style.css";
+import "@pennsieve-viz/core/style.css";
 
 export default {
   name: "ViewerPane",
