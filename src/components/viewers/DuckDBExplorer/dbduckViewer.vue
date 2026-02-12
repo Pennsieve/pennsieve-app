@@ -246,10 +246,6 @@ const initialize = async () => {
       await duckDBStore.createConnection(props.viewerId);
     connectionId.value = connId;
 
-    console.log(
-      `Viewer ${props.viewerId} connected with connection ID: ${connId}`
-    );
-
     // Load file if URL is provided
     if (s3Url.value) {
       await loadFile();
@@ -268,17 +264,11 @@ const loadFile = async () => {
     return;
   }
 
-  console.log("Loading file:", s3Url.value);
-  console.log("Using stable file ID:", props.fileId);
-
   // Check if file is already loaded using stable ID
   const stableKey = props.fileId || s3Url.value;
   const existingFile = duckDBStore.getLoadedFile(stableKey);
   if (existingFile && !existingFile.isLoading && !existingFile.error) {
     tableName.value = existingFile.tableName;
-    console.log(
-      `File already loaded using stable key, reusing table: ${tableName.value}`
-    );
     setQuery(`SELECT * FROM data LIMIT 10;`);
     return;
   }
@@ -306,7 +296,6 @@ const loadFile = async () => {
     );
 
     tableName.value = loadedTableName;
-    console.log(`File loaded as table: ${tableName.value}`);
 
     // Auto-execute a sample query using "data"
     setQuery(`SELECT * FROM data LIMIT 10;`);
@@ -321,8 +310,6 @@ const loadFile = async () => {
 // Query interceptor to replace "data" with actual table name
 const interceptQuery = (query) => {
   if (!tableName.value || !query) return query;
-
-  console.log("Original query:", query);
 
   // Replace "data" table references with actual table name
   // This handles various SQL patterns:
@@ -343,11 +330,6 @@ const interceptQuery = (query) => {
       /\bPRAGMA\s+table_info\(\s*data\s*\)/gi,
       `PRAGMA table_info(${tableName.value})`
     );
-
-  if (interceptedQuery !== query) {
-    console.log("Intercepted query:", interceptedQuery);
-    console.log(`Replaced "data" references with "${tableName.value}"`);
-  }
 
   return interceptedQuery;
 };
@@ -372,15 +354,10 @@ const executeQuery = async () => {
     // Intercept and transform the query
     const transformedQuery = interceptQuery(sqlQuery.value.trim());
 
-    console.log("Executing transformed query:", transformedQuery);
     queryResults.value = await duckDBStore.executeQuery(
       transformedQuery,
       connectionId.value
     );
-    console.log(
-      `Query executed successfully, returned ${queryResults.value.length} rows`
-    );
-    console.log("Query result data:", queryResults.value);
   } catch (err) {
     console.error("Query execution failed:", err);
     error.value = `Query execution failed: ${err.message}`;
@@ -392,12 +369,10 @@ const executeQuery = async () => {
 
 // Pagination event handlers for Element Plus
 const handlePageChange = (page) => {
-  console.log("Page changed to:", page);
   currentPage.value = page;
 };
 
 const handleSizeChange = (newSize) => {
-  console.log("Page size changed to:", newSize);
   itemsPerPage.value = newSize;
   currentPage.value = 1; // Reset to first page when changing size
 };
@@ -454,9 +429,7 @@ const clearError = () => {
 
 // Debug method (optional)
 const logDebugInfo = () => {
-  console.log("Viewer Debug Info:", debugInfo.value);
-  console.log("Store Connection Info:", duckDBStore.getConnectionInfo());
-  console.log("Store File Usage Info:", duckDBStore.getFileUsageInfo());
+  // Debug info available via debugInfo computed property
 };
 
 // Lifecycle hooks
@@ -467,31 +440,7 @@ onMounted(async () => {
 onUnmounted(async () => {
   // Clean up this viewer's connection
   if (connectionId.value) {
-    console.log(`Cleaning up viewer ${props.viewerId}...`);
-
-    const beforeCleanup = {
-      activeConnections: duckDBStore.activeConnectionCount,
-      loadedFiles: duckDBStore.loadedFiles.size,
-    };
-
     await duckDBStore.closeConnection(connectionId.value);
-
-    const afterCleanup = {
-      activeConnections: duckDBStore.activeConnectionCount,
-      loadedFiles: duckDBStore.loadedFiles.size,
-    };
-
-    console.log(`Viewer ${props.viewerId} cleanup complete:`, {
-      beforeCleanup,
-      afterCleanup,
-      hasActiveConnections: duckDBStore.hasActiveConnections,
-    });
-
-    // If this was the last viewer and you want automatic global cleanup:
-    // if (!duckDBStore.hasActiveConnections) {
-    //   console.log('Last viewer closed, performing global cleanup...')
-    //   await duckDBStore.performGlobalCleanup()
-    // }
   }
 });
 </script>
