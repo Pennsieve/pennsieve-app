@@ -31,23 +31,7 @@ import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import { createPinia } from 'pinia'
-import { configureDuckDB } from '@pennsieve-viz/core'
-
-// Configure DuckDB to use local WASM files instead of CDN (for CSP compliance)
-// Workers need absolute URLs when loaded from blob contexts
-const origin = typeof window !== 'undefined' ? window.location.origin : ''
-configureDuckDB({
-  bundlePaths: {
-    mvp: {
-      mainModule: `${origin}/static/duckdb/duckdb-mvp.wasm`,
-      mainWorker: `${origin}/static/duckdb/duckdb-browser-mvp.worker.js`
-    },
-    eh: {
-      mainModule: `${origin}/static/duckdb/duckdb-eh.wasm`,
-      mainWorker: `${origin}/static/duckdb/duckdb-browser-eh.worker.js`
-    }
-  }
-})
+import { useDuckDBStore } from '@/stores/duckdbStore'
 
 import Pusher from 'pusher-js'
 
@@ -68,6 +52,11 @@ app.use(store);
 
 const pinia = createPinia()
 app.use(pinia)
+
+// Provide DuckDB store for @pennsieve-viz/core components
+const duckdbStore = useDuckDBStore()
+app.provide('duckdb', duckdbStore)
+
 app.use(ElementPlus)
 
 //Import Dashboard
