@@ -34,15 +34,17 @@ import { createPinia } from 'pinia'
 import { configureDuckDB } from '@pennsieve-viz/core'
 
 // Configure DuckDB to use local WASM files instead of CDN (for CSP compliance)
+// Workers need absolute URLs when loaded from blob contexts
+const origin = typeof window !== 'undefined' ? window.location.origin : ''
 configureDuckDB({
   bundlePaths: {
     mvp: {
-      mainModule: '/static/duckdb/duckdb-mvp.wasm',
-      mainWorker: '/static/duckdb/duckdb-browser-mvp.worker.js'
+      mainModule: `${origin}/static/duckdb/duckdb-mvp.wasm`,
+      mainWorker: `${origin}/static/duckdb/duckdb-browser-mvp.worker.js`
     },
     eh: {
-      mainModule: '/static/duckdb/duckdb-eh.wasm',
-      mainWorker: '/static/duckdb/duckdb-browser-eh.worker.js'
+      mainModule: `${origin}/static/duckdb/duckdb-eh.wasm`,
+      mainWorker: `${origin}/static/duckdb/duckdb-browser-eh.worker.js`
     }
   }
 })
