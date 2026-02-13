@@ -281,9 +281,11 @@
       },
 
       updateIsActive: function(value) {
-        this.integrations.filter(n => n.id === value.id)[0].isActive = value.isActive
+        const integration = this.integrations.find(n => n.id === value.id)
+        if (integration) {
+          integration.isActive = value.isActive
+        }
         this.checkActiveIntegrations()
-
       },
       checkActiveIntegrations: function() {
         this.hasActiveIntegrations = this.integrations.map(x => x.isActive).some( (x) => x === true)

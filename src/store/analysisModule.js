@@ -115,6 +115,12 @@ export const mutations = {
   UPDATE_WORKFLOWS(state, workflows) {
     state.workflows = workflows;
   },
+  UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
+    const workflow = state.workflows.find((w) => w.uuid === uuid);
+    if (workflow) {
+      workflow.isActive = isActive;
+    }
+  },
 };
 
 export const actions = {
@@ -291,6 +297,34 @@ export const actions = {
       return result;
     } catch (err) {
       console.error("Failed to workflow:", err.message);
+      throw err;
+    }
+  },
+  updateWorkflowActiveStatus: async ({ commit, rootState }, { uuid, isActive }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
+    const userToken = await useGetToken();
+
+    try {
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ isActive }),
+      });
+
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        throw new Error(
+          `Error ${response.status}: ${response.statusText} - ${errorDetails}`
+        );
+      }
+
+      commit("UPDATE_WORKFLOW_ACTIVE_STATUS", { uuid, isActive });
+      return await response.json();
+    } catch (err) {
+      console.error("Failed to update workflow active status:", err.message);
       throw err;
     }
   },
