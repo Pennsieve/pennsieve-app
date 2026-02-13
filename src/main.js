@@ -54,7 +54,11 @@ const pinia = createPinia()
 app.use(pinia)
 
 // Provide DuckDB store for @pennsieve-viz/core components
+// Pre-initialize to ensure db is ready before components mount
 const duckdbStore = useDuckDBStore()
+duckdbStore.initDuckDB().catch(err => {
+  console.warn('DuckDB pre-initialization failed (will retry on first use):', err)
+})
 app.provide('duckdb', duckdbStore)
 
 app.use(ElementPlus)
