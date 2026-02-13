@@ -1,8 +1,7 @@
 <template>
   <div class="node-card" :class="{ expanded: isExpanded }">
     <div 
-      class="node-header clickable"
-      @click="toggleExpansion"
+      class="node-header"
     >
       <div class="node-info">
         <h3>{{ node.name }}</h3>
@@ -15,6 +14,7 @@
         <div class="node-account">
           <strong>Account ID:</strong> {{ formatAccountId(node.account?.accountId) }}
         </div>
+
         <div class="node-identifier">
           <strong>Node ID:</strong> {{ node.identifier }}
         </div>
@@ -81,7 +81,7 @@
           
           <!-- Editable Name -->
           <div class="detail-row">
-            <span class="detail-label">Name:</span>
+            <span class="detail-label">Node Name:</span>
             <span class="detail-value" v-if="!isEditing">
               <span v-if="node.name">{{ node.name }}</span>
               <span v-else class="empty-value">No name set</span>
@@ -97,7 +97,7 @@
           
           <!-- Editable Description -->
           <div class="detail-row">
-            <span class="detail-label">Description:</span>
+            <span class="detail-label">Node Description:</span>
             <span class="detail-value" v-if="!isEditing">
               <span v-if="node.description">{{ node.description }}</span>
               <span v-else class="empty-value">No description set</span>
@@ -111,10 +111,14 @@
               />
             </div>
           </div>
+          <div class="detail-row">
+            <span class="detail-label">Node ID:</span>
+            <span class="detail-value mono">{{ node.uuid }}</span>
+          </div>
           
           <!-- Status (read-only) -->
           <div class="detail-row">
-            <span class="detail-label">Status:</span>
+            <span class="detail-label">Node Status:</span>
             <span class="detail-value">
               <span class="status-text" :class="{ paused: getStatusForNode(node) === 'Paused' }">
                 {{ getStatusForNode(node) }}
@@ -123,20 +127,22 @@
           </div>
           
           <div class="detail-row">
-            <span class="detail-label">Account Type:</span>
+            <span class="detail-label">Resource Type:</span>
             <span class="detail-value">{{ getAccountTypeLabel(node.account?.accountType) }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Account ID:</span>
+            <span class="detail-label">Resource ID:</span>
             <span class="detail-value">{{ formatAccountId(node.account?.accountId) }}</span>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Node UUID:</span>
-            <span class="detail-value mono">{{ node.uuid }}</span>
+          <div class="detail-row" v-if="node.account?.ownerId">
+            <span class="detail-label">Resource Owner:</span>
+            <span class="detail-value">{{ getUserName(node.account?.ownerId) }}</span>
           </div>
+
+
           <div class="detail-row">
             <span class="detail-label">Created By:</span>
-            <span class="detail-value">{{ getUserName(node.userId) }}</span>
+            <span class="detail-value">{{ getUserName(node.ownerId || node.userId) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Created At:</span>
@@ -704,7 +710,21 @@ async function updateStatus(newStatus) {
   line-height: 1.4;
 }
 
-.node-account,
+.node-account {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin-bottom: 4px;
+
+  strong {
+    color: theme.$gray_6;
+    font-weight: 500;
+  }
+  
+  .account-item {
+    margin-right: 16px;
+  }
+}
+
 .node-identifier {
   font-size: 13px;
   color: theme.$gray_5;

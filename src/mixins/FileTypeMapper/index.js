@@ -478,6 +478,10 @@ export default {
       if (this.isOMETiff(pkg)) {
         return vueViewerMap['omeTiff']
       }
+      // Parquet file check based on filename - for UMAP visualization
+      if (this.isParquetFile(pkg)) {
+        return vueViewerMap['parquet_umap_viewer']
+      }
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
 
@@ -516,6 +520,11 @@ export default {
     isOMETiff: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.ome.tiff') || fileName.endsWith('.ome.tif')
+    },
+
+    isParquetFile: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.parquet')
     }
   }
 
