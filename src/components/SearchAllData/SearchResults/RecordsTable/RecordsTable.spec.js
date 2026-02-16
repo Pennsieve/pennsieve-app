@@ -1,14 +1,28 @@
 import RecordsTable from './RecordsTable.vue'
 import { mount } from '@vue/test-utils'
-global.requestAnimationFrame = function () {}
 
-
+// Mock requestAnimationFrame and cancelAnimationFrame
+global.requestAnimationFrame = vi.fn((callback) => {
+  return setTimeout(callback, 16)
+})
+global.cancelAnimationFrame = vi.fn((id) => {
+  clearTimeout(id)
+})
 
 describe('RecordsTable.vue', () => {
   let cmp
 
   beforeEach( () => {
     cmp = mount(RecordsTable)
+  })
+
+  afterEach(() => {
+    // Properly unmount the component to clean up any timers/watchers
+    if (cmp) {
+      cmp.unmount()
+    }
+    // Clear all timers to prevent them from running after test completion
+    vi.clearAllTimers()
   })
 
   it('Sets the new sort order and property', () => {
