@@ -37,7 +37,7 @@
                   ? `selected ${tool.icon}`
                   : `${tool.icon}`,
               ]"
-              @click="setActiveTool(tool.eventName)"
+              @click="onSetActiveTool(tool.eventName)"
             >
               <component :is="tool.icon" :height="20" :width="20" />
             </button>
@@ -125,6 +125,7 @@ import {
   useHandleXhrError,
   useSendXhr,
 } from "@/mixins/request/request_composable";
+import { useViewerInstance } from "@/composables/useViewerInstance";
 
 export default {
   name: "PsViewer",
@@ -249,7 +250,7 @@ export default {
           this.availableTools
         );
         if (!toolExists) {
-          this.setActiveTool(viewerSidePanelTypes.POINTER);
+          this.onSetActiveTool(viewerToolTypes.POINTER);
         }
       }
     },
@@ -349,6 +350,21 @@ export default {
      */
     onConfirmLossOfChanges: function () {
       this.closeViewer();
+    },
+
+    /**
+     * Set active tool in both Vuex and TSViewer's Pinia store
+     * @param {String} toolName - The tool identifier
+     */
+    onSetActiveTool: function (toolName) {
+      // Update Vuex state (for toolbar UI highlighting)
+      this.setActiveTool(toolName);
+
+      // Bridge to TSViewer's Pinia store
+      const viewerControls = useViewerInstance();
+      if (viewerControls && viewerControls.setActiveTool) {
+        viewerControls.setActiveTool(toolName);
+      }
     },
   },
 };
