@@ -128,11 +128,16 @@ const generateNodesAndEdges = (workflowActivity) => {
   const startY = 100; // Starting Y position
   const baseX = 150; // Base X position with slight variation
 
-  // Generate nodes
-  const newNodes = processors.map((processor, index) => {
-    const nodeId = `${index + 1}`;
+  // Determine if we have DAG node info from the API
+  const hasNodesArray =
+    workflowActivity.nodes &&
+    Array.isArray(workflowActivity.nodes) &&
+    workflowActivity.nodes.length > 0;
 
-    // Use user-modified position if it exists, otherwise calculate default position
+  // Generate nodes — use processor.id if available, fall back to index-based
+  const newNodes = processors.map((processor, index) => {
+    const nodeId = processor.id || `${index + 1}`;
+
     const defaultPosition = {
       x: baseX + index * 20,
       y: startY + index * nodeSpacing,
@@ -155,13 +160,37 @@ const generateNodesAndEdges = (workflowActivity) => {
     };
   });
 
-  // Generate edges (connections between consecutive nodes)
-  const newEdges = processors.slice(0, -1).map((_, index) => ({
-    id: `e${index + 1}-${index + 2}`,
-    source: `${index + 1}`,
-    target: `${index + 2}`,
-    animated: false,
-  }));
+  let newEdges;
+
+  if (hasNodesArray) {
+    // Build edges from the nodes array's dependsOn fields
+    newEdges = [];
+    const nodeIdSet = new Set(newNodes.map((n) => n.id));
+
+    workflowActivity.nodes.forEach((node) => {
+      if (node.dependsOn && Array.isArray(node.dependsOn)) {
+        const targetId = node.id || "";
+        node.dependsOn.forEach((depId) => {
+          if (nodeIdSet.has(depId) && nodeIdSet.has(targetId)) {
+            newEdges.push({
+              id: `e${depId}-${targetId}`,
+              source: depId,
+              target: targetId,
+              animated: false,
+            });
+          }
+        });
+      }
+    });
+  } else {
+    // Fall back to linear chain edges (backward compat)
+    newEdges = newNodes.slice(0, -1).map((node, index) => ({
+      id: `e${node.id}-${newNodes[index + 1].id}`,
+      source: node.id,
+      target: newNodes[index + 1].id,
+      animated: false,
+    }));
+  }
 
   return { nodes: newNodes, edges: newEdges };
 };

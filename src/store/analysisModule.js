@@ -489,28 +489,39 @@ export const actions = {
           updatedResult.workflow = workflowWithApplications;
         }
 
-        // Sort processors based on executionOrder instead of startedAt time
-        const sortByExecutionOrder = (processors, executionOrder) => {
-          // Dummy data for testing
-          // const dummyExecutionOrder = [
-          //   ["git://github.com/Pennsieve/processor-pre-packages-v2"],
-          //   ["git://github.com/oscarruizbcm/trimgalore-docker-app"],
-          //   ["git://github.com/oscarruizbcm/hisat2-docker-app"],
-          //   ["git://github.com/oscarruizbcm/samtools-docker-app"],
-          //   ["git://github.com/oscarruizbcm/featurecounts-docker-app"],
-          //   ["git://github.com/Pennsieve/processor-post-agent-v2"]
-          // ];
+        // Sort processors based on nodes (new API) or executionOrder (legacy)
+        const sortByNodes = (processors, nodesArray, executionOrder) => {
+          // Prefer the new `nodes` array from the API if available
+          if (nodesArray && Array.isArray(nodesArray) && nodesArray.length > 0) {
+            const nodeOrderMap = new Map();
+            nodesArray.forEach((node, index) => {
+              // Map by node id and by source url for flexible matching
+              if (node.id) nodeOrderMap.set(node.id, index);
+              if (node.source?.url) nodeOrderMap.set(node.source.url, index);
+            });
 
-          // const orderToUse = executionOrder || dummyExecutionOrder;
-          const orderToUse = executionOrder;
+            const sorted = [...processors].sort((a, b) => {
+              const orderA =
+                nodeOrderMap.get(a.id) ??
+                nodeOrderMap.get(a.source?.url) ??
+                Number.MAX_SAFE_INTEGER;
+              const orderB =
+                nodeOrderMap.get(b.id) ??
+                nodeOrderMap.get(b.source?.url) ??
+                Number.MAX_SAFE_INTEGER;
+              return orderA - orderB;
+            });
 
-          if (!orderToUse || !Array.isArray(orderToUse)) {
+            return sorted;
+          }
+
+          // Fall back to legacy executionOrder
+          if (!executionOrder || !Array.isArray(executionOrder)) {
             return processors;
           }
 
-          // Create a map of git URLs to their execution order index
           const executionOrderMap = new Map();
-          orderToUse.forEach((orderGroup, groupIndex) => {
+          executionOrder.forEach((orderGroup, groupIndex) => {
             if (Array.isArray(orderGroup)) {
               orderGroup.forEach((gitUrl) => {
                 executionOrderMap.set(gitUrl, groupIndex);
@@ -529,8 +540,9 @@ export const actions = {
           return sorted;
         };
 
-        const sortedWorkflow = sortByExecutionOrder(
+        const sortedWorkflow = sortByNodes(
           updatedResult.workflow,
+          updatedResult.nodes,
           updatedResult.executionOrder
         );
         commit("SET_SELECTED_WORKFLOW_ACTIVITY", {
