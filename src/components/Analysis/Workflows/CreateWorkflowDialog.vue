@@ -103,11 +103,11 @@
             >
               <el-option
                 v-for="(prevApp, prevIndex) in getPreviousApps(index)"
-                :key="prevIndex"
+                :key="prevApp.id"
                 :label="`App ${prevIndex + 1}: ${getAppDisplayName(
                   prevApp.name
                 )}`"
-                :value="prevIndex"
+                :value="prevApp.id"
               />
             </el-select>
             <div
@@ -140,7 +140,9 @@ const defaultWorkflowValues = () => ({
   apps: [],
 });
 
-const getDefaultAppSelections = () => [{ name: null, dependencies: [] }];
+const generateStepId = () => `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const getDefaultAppSelections = () => [{ id: generateStepId(), name: null, dependencies: [] }];
 
 export default {
   name: "CreateWorkflowDialog",
@@ -227,21 +229,18 @@ export default {
     },
 
     addApp() {
-      this.appSelections.push({ name: null, dependencies: [] });
+      this.appSelections.push({ id: generateStepId(), name: null, dependencies: [] });
       this.updateWorkflowApps();
     },
 
     removeApp(index) {
+      const removedId = this.appSelections[index].id;
       this.appSelections.splice(index, 1);
 
-      // Clean up dependencies that reference the removed app
+      // Clean up dependencies that reference the removed app's ID
       this.appSelections.forEach((app) => {
         if (app.dependencies) {
-          // Remove dependencies that reference indices >= the removed index
-          app.dependencies = app.dependencies
-            .filter((depIndex) => depIndex < index)
-            // Adjust indices for apps that come after the removed one
-            .map((depIndex) => depIndex);
+          app.dependencies = app.dependencies.filter((depId) => depId !== removedId);
         }
       });
 
@@ -262,13 +261,14 @@ export default {
 
     formatDependencies(dependencies) {
       return dependencies
-        .map((depIndex) => {
-          const app = this.appSelections[depIndex];
+        .map((depId) => {
+          const depIndex = this.appSelections.findIndex((a) => a.id === depId);
+          const app = depIndex !== -1 ? this.appSelections[depIndex] : null;
           if (app && app.name) {
             const displayName = this.getAppDisplayName(app.name);
             return `App ${depIndex + 1} (${displayName})`;
           }
-          return `App ${depIndex + 1}`;
+          return depId;
         })
         .join(", ");
     },
@@ -278,11 +278,14 @@ export default {
       this.appSelections[index].name = value;
 
       // Clear dependencies for apps that come after the changed one
-      // since the workflow structure may have changed
+      // Only keep deps that reference apps before the changed one (by position)
+      const validIds = new Set(
+        this.appSelections.slice(0, index + 1).map((a) => a.id)
+      );
       for (let i = index + 1; i < this.appSelections.length; i++) {
         this.appSelections[i].dependencies = this.appSelections[
           i
-        ].dependencies.filter((depIndex) => depIndex < index + 1);
+        ].dependencies.filter((depId) => validIds.has(depId));
       }
 
       this.updateWorkflowApps();
@@ -317,25 +320,19 @@ export default {
         if (valid) {
           const processors = this.appSelections
             .filter((app) => app.name)
-            .map((app, index) => {
+            .map((app) => {
               // Find the app data by UUID since app.name now contains UUID
               const appData = this.applications.find(
                 (application) => application.uuid === app.name
               );
 
-              // Build dependsOn array based on selected dependencies
-              const dependsOn = (app.dependencies || []).map((depIndex) => {
-                const dependentApp = this.appSelections[depIndex];
-                const dependentAppData = this.applications.find(
-                  (application) => application.uuid === dependentApp.name
-                );
-
-                return {
-                  sourceUrl: dependentAppData?.source?.url,
-                };
-              });
+              // Build dependsOn as an array of step IDs
+              const dependsOn = (app.dependencies || []).filter((depId) =>
+                this.appSelections.some((a) => a.id === depId)
+              );
 
               return {
+                id: app.id,
                 sourceUrl: appData?.source?.url,
                 dependsOn: dependsOn,
               };

@@ -4,7 +4,7 @@ import { computed, watch, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 
 // Vue Flow Imports
-import { useVueFlow, VueFlow } from "@vue-flow/core";
+import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import EventBus from "../../../utils/event-bus";
@@ -12,10 +12,12 @@ import EventBus from "../../../utils/event-bus";
 const {
   onNodeClick,
   onNodesChange,
+  onConnect,
   addNodes,
   addEdges,
   removeNodes,
   removeEdges,
+  screenToFlowCoordinate,
 } = useVueFlow();
 
 /*
@@ -44,19 +46,11 @@ const generateNodeId = () => {
   return `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-const calculateNodePosition = () => {
-  const baseX = 200;
-  const baseY = 100;
-  const spacing = 150;
-
-  return {
-    x: baseX + nodes.value.length * 20,
-    y: baseY + nodes.value.length * spacing,
-  };
-};
-
-const onDragStart = (application) => {
+const onDragStart = (application, event) => {
   draggedApp.value = application;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+  }
 };
 
 const onDrop = (event) => {
@@ -64,24 +58,14 @@ const onDrop = (event) => {
 
   if (!draggedApp.value) return;
 
-  // Check if application already exists in workflow
-  const appAlreadyExists = nodes.value.some(
-    (node) => node.data.application.uuid === draggedApp.value.uuid
-  );
-
-  if (appAlreadyExists) {
-    EventBus.$emit("toast", {
-      detail: {
-        type: "error",
-        msg: `"${draggedApp.value.name}" is already in the workflow.`,
-      },
-    });
-    draggedApp.value = null;
-    return;
-  }
+  // Convert the drop position from screen coordinates to flow coordinates
+  // so the node appears exactly where the user dropped it
+  const position = screenToFlowCoordinate({
+    x: event.clientX,
+    y: event.clientY,
+  });
 
   const nodeId = generateNodeId();
-  const position = calculateNodePosition();
 
   const newNode = {
     id: nodeId,
@@ -95,24 +79,31 @@ const onDrop = (event) => {
 
   nodes.value.push(newNode);
 
-  // Create edge to previous node if exists
-  if (nodes.value.length > 1) {
-    const prevNode = nodes.value[nodes.value.length - 2];
-    const newEdge = {
-      id: `e${prevNode.id}-${nodeId}`,
-      source: prevNode.id,
-      target: nodeId,
-      animated: false,
-    };
-    edges.value.push(newEdge);
-  }
-
   draggedApp.value = null;
 };
 
 const onDragOver = (event) => {
   event.preventDefault();
 };
+
+// Handle edge connections from user dragging between node handles
+onConnect((params) => {
+  // Guard against self-loops
+  if (params.source === params.target) return;
+
+  // Guard against duplicate edges
+  const duplicate = edges.value.some(
+    (e) => e.source === params.source && e.target === params.target
+  );
+  if (duplicate) return;
+
+  edges.value.push({
+    id: `e${params.source}-${params.target}`,
+    source: params.source,
+    target: params.target,
+    animated: false,
+  });
+});
 
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
@@ -125,24 +116,6 @@ const removeNode = (nodeId) => {
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
-
-  // Reconnect remaining nodes
-  if (nodes.value.length > 0) {
-    edges.value = [];
-    for (let i = 0; i < nodes.value.length - 1; i++) {
-      edges.value.push({
-        id: `e${nodes.value[i].id}-${nodes.value[i + 1].id}`,
-        source: nodes.value[i].id,
-        target: nodes.value[i + 1].id,
-        animated: false,
-      });
-    }
-
-    // Update node types
-    nodes.value.forEach((node, idx) => {
-      node.type = "default";
-    });
-  }
 };
 
 const clearWorkflow = () => {
@@ -173,18 +146,14 @@ const saveWorkflow = async () => {
     return;
   }
 
-  const processors = nodes.value.map((node, index) => {
-    const dependsOn = [];
-
-    // Add dependsOn if this is not the first node
-    if (index > 0) {
-      const previousNode = nodes.value[index - 1];
-      dependsOn.push({
-        sourceUrl: previousNode.data.application?.source?.url,
-      });
-    }
+  const processors = nodes.value.map((node) => {
+    // Build dependsOn from incoming edges (edges whose target is this node)
+    const dependsOn = edges.value
+      .filter((e) => e.target === node.id)
+      .map((e) => e.source);
 
     return {
+      id: node.id,
       sourceUrl: node.data.application?.source?.url,
       dependsOn: dependsOn,
     };
@@ -288,13 +257,13 @@ watch(
       <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
         <div v-if="nodes.length === 0" class="empty-canvas">
           <h3>Drag applications here to build your workflow</h3>
-          <p>Applications will be connected in the order you add them</p>
+          <p>Drop apps onto the canvas, then connect them by dragging between handles</p>
         </div>
 
         <div v-else class="workflow-builder-flow">
           <VueFlow
-            :nodes="nodes"
-            :edges="edges"
+            v-model:nodes="nodes"
+            v-model:edges="edges"
             :default-viewport="{ zoom: 1 }"
             :min-zoom="0.2"
             :max-zoom="4"
@@ -303,6 +272,7 @@ watch(
             <Controls position="top-left" />
 
             <template #node-default="{ data, id }">
+              <Handle id="target" type="target" :position="Position.Top" />
               <div class="custom-node">
                 <div class="node-header">
                   <span class="node-title">{{ data.label }}</span>
@@ -321,9 +291,11 @@ watch(
                   {{ data.application.resources.memory || "N/A" }}
                 </div>
               </div>
+              <Handle id="source" type="source" :position="Position.Bottom" />
             </template>
 
             <template #node-input="{ data, id }">
+              <Handle id="target" type="target" :position="Position.Top" />
               <div class="custom-node input-node">
                 <div class="node-header">
                   <span class="node-title">{{ data.label }}</span>
@@ -343,9 +315,11 @@ watch(
                   {{ data.application.resources.memory || "N/A" }}
                 </div>
               </div>
+              <Handle id="source" type="source" :position="Position.Bottom" />
             </template>
 
             <template #node-output="{ data, id }">
+              <Handle id="target" type="target" :position="Position.Top" />
               <div class="custom-node output-node">
                 <div class="node-header">
                   <span class="node-title">{{ data.label }}</span>
@@ -365,6 +339,7 @@ watch(
                   {{ data.application.resources.memory || "N/A" }}
                 </div>
               </div>
+              <Handle id="source" type="source" :position="Position.Bottom" />
             </template>
           </VueFlow>
         </div>
@@ -380,7 +355,7 @@ watch(
             :key="app.uuid"
             class="application-item"
             draggable="true"
-            @dragstart="onDragStart(app)"
+            @dragstart="onDragStart(app, $event)"
           >
             <div class="app-name">{{ app.name }}</div>
             <div class="app-meta"></div>
@@ -413,6 +388,58 @@ watch(
 <style lang="scss">
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
+
+/* Handle styles — must be unscoped so VueFlow can render them */
+.workflow-builder-flow {
+  .vue-flow__handle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #6b7280;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #d1d5db;
+    cursor: crosshair;
+    transition: background-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    z-index: 10;
+
+    /* Invisible expanded hit area so it's easy to grab */
+    &::after {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      right: -10px;
+      bottom: -10px;
+      border-radius: 50%;
+    }
+
+    &:hover {
+      background-color: #111;
+      box-shadow: 0 0 0 3px #111, 0 0 0 6px rgba(17, 17, 17, 0.15);
+      transform: scale(1.25);
+    }
+
+    &.vue-flow__handle-top {
+      top: -8px;
+    }
+
+    &.vue-flow__handle-bottom {
+      bottom: -8px;
+    }
+
+    /* Valid connection target highlight */
+    &.valid {
+      background-color: #16a34a;
+      box-shadow: 0 0 0 3px #16a34a, 0 0 0 6px rgba(22, 163, 74, 0.2);
+    }
+
+    /* Active / connecting state */
+    &.connecting {
+      background-color: #111;
+      box-shadow: 0 0 0 3px #111, 0 0 0 6px rgba(17, 17, 17, 0.15);
+    }
+  }
+}
 </style>
 
 <style lang="scss" scoped>

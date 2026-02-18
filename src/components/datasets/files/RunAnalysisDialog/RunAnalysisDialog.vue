@@ -252,6 +252,54 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Per-Node Overrides -->
+              <div
+                v-if="selectedWorkflow && selectedWorkflow.processors && selectedWorkflow.processors.length"
+                class="node-overrides-section"
+              >
+                <div
+                  class="overrides-header"
+                  @click="nodeOverridesExpanded = !nodeOverridesExpanded"
+                >
+                  <span class="overrides-title">Per-Node Overrides</span>
+                  <span class="overrides-toggle">
+                    {{ nodeOverridesExpanded ? '▾' : '▸' }}
+                  </span>
+                </div>
+                <div v-if="nodeOverridesExpanded" class="overrides-content">
+                  <p class="overrides-hint">
+                    Optionally override compute type or version for individual processors.
+                  </p>
+                  <div
+                    v-for="processor in selectedWorkflow.processors"
+                    :key="processor.id || processor.sourceUrl"
+                    class="override-row"
+                  >
+                    <span class="override-label">
+                      {{ processor.id || processor.sourceUrl }}
+                    </span>
+                    <div class="override-fields">
+                      <el-select
+                        v-if="nodeOverrides[processor.id || processor.sourceUrl]"
+                        v-model="nodeOverrides[processor.id || processor.sourceUrl].computeType"
+                        placeholder="Compute type"
+                        size="small"
+                        clearable
+                      >
+                        <el-option label="ECS" value="ecs" />
+                        <el-option label="Lambda" value="lambda" />
+                      </el-select>
+                      <el-input
+                        v-if="nodeOverrides[processor.id || processor.sourceUrl]"
+                        v-model="nodeOverrides[processor.id || processor.sourceUrl].version"
+                        placeholder="Version"
+                        size="small"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </template>
 
             <!-- Custom Workflow Selection -->
@@ -585,6 +633,10 @@ export default {
       name: "",
       clearSelectedValues: false,
       warningMessage: "",
+
+      // Node Overrides (named workflow only)
+      nodeOverrides: {},
+      nodeOverridesExpanded: false,
     };
   },
   computed: {
@@ -677,6 +729,17 @@ export default {
         )) {
           this.selectedWorkflowParams.push({ name: key, value: value });
         }
+      }
+
+      // Initialize nodeOverrides for each processor in the workflow
+      this.nodeOverrides = {};
+      if (this.selectedWorkflow?.processors) {
+        this.selectedWorkflow.processors.forEach((processor) => {
+          const nodeId = processor.id || processor.sourceUrl;
+          if (nodeId) {
+            this.nodeOverrides[nodeId] = { computeType: "", version: "" };
+          }
+        });
       }
     },
     selectedProcessor: function () {
@@ -829,6 +892,8 @@ export default {
       this.updateFileCount();
       this.targetDirectory = "";
       this.name = "";
+      this.nodeOverrides = {};
+      this.nodeOverridesExpanded = false;
       this.handleClearSelectedValues();
       this.warningMessage = "";
     },
@@ -899,9 +964,25 @@ export default {
       return this.selectedProcessorParams.length > 0;
     },
 
-    runAnalysis: async function () {
-      const url = `${this.config.api2Url}/compute/workflows/instances`;
+    hasNodeOverrides: function () {
+      return Object.values(this.nodeOverrides).some(
+        (override) => override.computeType || override.version
+      );
+    },
 
+    buildNodeOverrides: function () {
+      const result = {};
+      for (const [nodeId, override] of Object.entries(this.nodeOverrides)) {
+        if (override.computeType || override.version) {
+          result[nodeId] = {};
+          if (override.computeType) result[nodeId].computeType = override.computeType;
+          if (override.version) result[nodeId].version = override.version;
+        }
+      }
+      return result;
+    },
+
+    runAnalysis: async function () {
       let arrayOfPackageIds = [];
       const keysInSelectedFilesForAnalysisArray = Object.keys(
         this.selectedFilesForAnalysis
@@ -914,10 +995,12 @@ export default {
         arrayOfPackageIds = [...arrayOfPackageIds, ...ids];
       });
 
+      let url;
       let body;
 
       if (this.workflowType === "named") {
-        // Named workflow API callƒ
+        url = `${this.config.api2Url}/compute/workflows/instances`;
+
         let paramsObject = {};
         if (this.selectedWorkflowParams.length > 0) {
           let paramsEntries = [];
@@ -930,20 +1013,19 @@ export default {
         body = {
           datasetId: this.datasetId,
           packageIds: arrayOfPackageIds,
-          computeNode: {
-            uuid: this.selectedComputeNode.uuid,
-            computeNodeGatewayUrl:
-              this.selectedComputeNode.computeNodeGatewayUrl,
-          },
+          computeNodeId: this.selectedComputeNode.uuid,
           name: this.name,
           workflowUuid: this.selectedWorkflow.uuid,
           params: {
             target_path: this.targetDirectory,
             ...paramsObject,
           },
+          ...(this.hasNodeOverrides() && { nodeOverrides: this.buildNodeOverrides() }),
         };
       } else {
-        // Custom workflow API call
+        // Custom workflow API call — uses original URL format
+        url = `${this.config.api2Url}/compute/workflows/instances`;
+
         const formatApplication = (application, parameters) => {
           let paramsObject = {};
           if (parameters != null) {
@@ -1598,6 +1680,74 @@ export default {
     border-radius: 12px;
     font-size: 12px;
     font-weight: 500;
+  }
+}
+
+// Node Overrides Section
+.node-overrides-section {
+  margin-top: 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+  overflow: hidden;
+
+  .overrides-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background-color: theme.$gray_1;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background-color: theme.$gray_2;
+    }
+  }
+
+  .overrides-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: theme.$gray_5;
+  }
+
+  .overrides-toggle {
+    font-size: 14px;
+    color: theme.$gray_4;
+  }
+
+  .overrides-content {
+    padding: 16px;
+  }
+
+  .overrides-hint {
+    font-size: 12px;
+    color: theme.$gray_4;
+    margin: 0 0 12px 0;
+  }
+
+  .override-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid theme.$gray_2;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .override-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: theme.$gray_5;
+    word-break: break-all;
+  }
+
+  .override-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 }
 
