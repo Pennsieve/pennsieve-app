@@ -1,6 +1,7 @@
 // composables/useAnnotationLayers.js
 import { ref, computed } from 'vue'
 import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerInstance } from '@/composables/useViewerInstance'
 import { useGetToken } from "@/composables/useGetToken"
 import { useHandleXhrError, useSendXhr } from "@/mixins/request/request_composable"
 import EventBus from '@/utils/event-bus'
@@ -8,6 +9,8 @@ import { hexToRgbA } from '@/utils/annotationUtils'
 
 export function useAnnotationLayers() {
     const viewerStore = useViewerStore()
+    // Use library's viewer controls for annotation state
+    const viewerControls = useViewerInstance()
 
     const annLayerInfo = ref([])
     const defaultColors = ref([
@@ -87,6 +90,14 @@ export function useAnnotationLayers() {
             viewerStore.createLayer(layer)
             viewerStore.setActiveAnnotationLayer(layer.id)
 
+            // Sync to library store so TSViewer sees the new layer
+            if (viewerControls.createLayer) {
+                viewerControls.createLayer(JSON.parse(JSON.stringify(layer)))
+            }
+            if (viewerControls.setActiveLayer) {
+                viewerControls.setActiveLayer(layer.id)
+            }
+
             EventBus.$emit('toast', {
                 detail: {
                     msg: `'${layer.name}' Layer Created`
@@ -105,40 +116,33 @@ export function useAnnotationLayers() {
     }
 
     const updateLayerVisibility = (layerId, visible) => {
-        console.log(`[useAnnotationLayers] Updating layer ${layerId} visibility to:`, visible)
-
-        const layer = viewerStore.viewerAnnotations.find(l => l.id === layerId)
+        // Use library's annotations from viewerControls
+        const annotations = viewerControls.annotations?.value || []
+        const layer = annotations.find(l => l.id === layerId)
 
         if (layer) {
-            console.log(`[useAnnotationLayers] Found layer:`, layer.name, 'current visible:', layer.visible)
-
             layer.visible = visible
-            viewerStore.updateLayer(layer)
-
-            console.log(`[useAnnotationLayers] Updated layer:`, layer.name, 'new visible:', layer.visible)
-
-            // Verify the update took effect
-            const updatedLayer = viewerStore.viewerAnnotations.find(l => l.id === layerId)
-            console.log(`[useAnnotationLayers] Verification - layer visible is now:`, updatedLayer?.visible)
-        } else {
-            console.error(`[useAnnotationLayers] Layer not found with ID:`, layerId)
-            console.log(`[useAnnotationLayers] Available layers:`, viewerStore.viewerAnnotations.map(l => ({ id: l.id, name: l.name })))
+            viewerControls.triggerRerender('layer-visibility')
         }
     }
 
     const selectLayer = (layerId) => {
+        // Use library's annotations from viewerControls
+        const annotations = viewerControls.annotations?.value || []
+
         // Deselect all layers
-        viewerStore.viewerAnnotations.forEach(layer => {
+        annotations.forEach(layer => {
             layer.selected = false
-            viewerStore.updateLayer(layer)
         })
 
         // Select the target layer
-        const layer = viewerStore.viewerAnnotations.find(l => l.id === layerId)
+        const layer = annotations.find(l => l.id === layerId)
         if (layer) {
             layer.selected = true
-            viewerStore.updateLayer(layer)
-            viewerStore.setActiveAnnotationLayer(layerId)
+            // Use library's setActiveLayer if available
+            if (viewerControls.setActiveLayer) {
+                viewerControls.setActiveLayer(layerId)
+            }
         }
     }
 
@@ -151,6 +155,11 @@ export function useAnnotationLayers() {
 
             // Remove from store
             viewerStore.removeLayer(layerId)
+
+            // Sync to library store
+            if (viewerControls.deleteLayer) {
+                viewerControls.deleteLayer({ id: layerId })
+            }
 
             EventBus.$emit('toast', {
                 detail: {
@@ -181,6 +190,11 @@ export function useAnnotationLayers() {
                 layer.bkColor = hexToRgbA(newColor, 0.15)
                 layer.selColor = hexToRgbA(newColor, 0.9)
                 viewerStore.updateLayer(layer)
+
+                // Sync to library store
+                if (viewerControls.updateLayer) {
+                    viewerControls.updateLayer(JSON.parse(JSON.stringify(layer)))
+                }
             }
 
             return response
