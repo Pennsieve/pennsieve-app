@@ -22,7 +22,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
     const viewerAnnotations = ref([])
     const activeAnnotationLayer = ref({})
     const activeAnnotation = ref({})
-    const viewerActiveTool = ref('POINTER')
 
     // Getters (from original Vuex getters)
     const getMontageMessageByName = computed(() => {
@@ -131,7 +130,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         })
 
         viewerAnnotations.value = validatedAnnotations
-        console.log('Set annotations with validated structure:', validatedAnnotations)
     }
 
     const setActiveAnnotationLayer = (layerId) => {
@@ -149,7 +147,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         const layerIndex = findIndex(propEq('id', layerId), viewerAnnotations.value)
         if (layerIndex >= 0) {
             viewerAnnotations.value[layerIndex].selected = true
-            console.log('Successfully set active layer:', viewerAnnotations.value[layerIndex])
         } else {
             console.error('Layer with ID not found:', layerId, 'Available layers:', viewerAnnotations.value)
         }
@@ -173,10 +170,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         }
 
         activeAnnotation.value = annotation
-    }
-
-    const setActiveTool = (tool) => {
-        viewerActiveTool.value = tool
     }
 
     const createLayer = (layer) => {
@@ -203,7 +196,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         }
 
         viewerAnnotations.value.push(validatedLayer)
-        console.log('Created layer with validated structure:', validatedLayer)
     }
 
 
@@ -284,7 +276,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerAnnotations.value = []
         activeAnnotationLayer.value = {}
         activeAnnotation.value = {}
-        viewerActiveTool.value = 'POINTER'
     }
 
     const fetchWorkspaceMontages = async () => {
@@ -341,7 +332,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerAnnotations,
         activeAnnotationLayer,
         activeAnnotation,
-        viewerActiveTool,
         config,
 
         // Getters
@@ -359,7 +349,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         setAnnotations,
         setActiveAnnotationLayer,
         setActiveAnnotation,
-        setActiveTool,
         createLayer,
         updateLayer,
         deleteLayer,
