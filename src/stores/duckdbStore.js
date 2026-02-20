@@ -25,46 +25,43 @@ export const useDuckDBStore = defineStore('duckdb', () => {
     const hasActiveConnections = computed(() => connections.value.size > 0)
 
     // Actions
-    const initDuckDB = async () => {
-        if (isInitialized.value || isInitializing.value) {
-            return db.value
-        }
+    let initPromise = null
 
-        isInitializing.value = true
+    const initDuckDB = async () => {
+        if (db.value) return db.value
+        if (initPromise) { await initPromise; return db.value }
+
         initError.value = ''
 
-        try {
-            // Import DuckDB-WASM
-            const duckdb = await import('@duckdb/duckdb-wasm')
+        initPromise = (async () => {
+            try {
+                const duckdb = await import('@duckdb/duckdb-wasm')
 
-            const bundles = {
-                mvp: {
-                    mainModule: '/static/duckdb/duckdb-mvp.wasm',
-                    mainWorker: '/static/duckdb/duckdb-browser-mvp.worker.js',
-                },
-                eh: {
-                    mainModule: '/static/duckdb/duckdb-eh.wasm',
-                    mainWorker: '/static/duckdb/duckdb-browser-eh.worker.js',
-                },
+                const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles())
+
+                // Wrap CDN worker URL in a Blob to avoid cross-origin restrictions
+                const workerUrl = URL.createObjectURL(
+                    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+                )
+                const worker = new Worker(workerUrl)
+                const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
+
+                db.value = new duckdb.AsyncDuckDB(logger, worker)
+                await db.value.instantiate(bundle.mainModule)
+
+                isInitialized.value = true
+
+                return db.value
+            } catch (err) {
+                console.error('Failed to initialize DuckDB:', err)
+                initError.value = `Failed to initialize DuckDB: ${err.message}`
+                initPromise = null
+                throw err
             }
+        })()
 
-            const bundle = await duckdb.selectBundle(bundles)
-            const worker = new Worker(bundle.mainWorker)
-            const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
-
-            db.value = new duckdb.AsyncDuckDB(logger, worker)
-            await db.value.instantiate(bundle.mainModule)
-
-            isInitialized.value = true
-
-            return db.value
-        } catch (err) {
-            console.error('Failed to initialize DuckDB:', err)
-            initError.value = `Failed to initialize DuckDB: ${err.message}`
-            throw err
-        } finally {
-            isInitializing.value = false
-        }
+        await initPromise
+        return db.value
     }
 
     const createConnection = async (viewerId = null) => {
