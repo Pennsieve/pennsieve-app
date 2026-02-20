@@ -22,7 +22,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
     const viewerAnnotations = ref([])
     const activeAnnotationLayer = ref({})
     const activeAnnotation = ref({})
-    const viewerActiveTool = ref('POINTER')
 
     // Getters (from original Vuex getters)
     const getMontageMessageByName = computed(() => {
@@ -173,10 +172,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         activeAnnotation.value = annotation
     }
 
-    const setActiveTool = (tool) => {
-        viewerActiveTool.value = tool
-    }
-
     const createLayer = (layer) => {
         // FIX: Validate layer structure before creating
         if (!layer.id && layer.id !== 0) {
@@ -281,7 +276,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerAnnotations.value = []
         activeAnnotationLayer.value = {}
         activeAnnotation.value = {}
-        viewerActiveTool.value = 'POINTER'
     }
 
     const fetchWorkspaceMontages = async () => {
@@ -338,7 +332,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         viewerAnnotations,
         activeAnnotationLayer,
         activeAnnotation,
-        viewerActiveTool,
         config,
 
         // Getters
@@ -356,7 +349,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         setAnnotations,
         setActiveAnnotationLayer,
         setActiveAnnotation,
-        setActiveTool,
         createLayer,
         updateLayer,
         deleteLayer,

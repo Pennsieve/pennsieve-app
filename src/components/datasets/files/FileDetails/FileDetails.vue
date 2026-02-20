@@ -315,6 +315,7 @@ import {
 import { useMetadataStore } from '@/stores/metadataStore';
 import IconArrowRight from '@/components/icons/IconArrowRight.vue';
 import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
+import { useViewerInstance } from '@/composables/useViewerInstance';
 
 export default {
   name: "FileDetails",
@@ -1251,8 +1252,11 @@ export default {
       this.hasSeenRelationshipsInfo = true;
     }
 
-    // In FileDetails window, the tool for viewing should be limited/set to PAN for panning the image/timeseries etc.
-    this.setActiveTool(viewerToolTypes.PAN);
+    // In FileDetails window, set the tool to PAN for panning the image/timeseries
+    const viewerControls = useViewerInstance();
+    if (viewerControls?.setActiveTool) {
+      viewerControls.setActiveTool(viewerToolTypes.PAN);
+    }
   },
 
   beforeUnmount() {
@@ -1268,7 +1272,7 @@ export default {
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
-    ...mapActions("viewerModule", ["setActiveViewer", "setActiveTool"]),
+    ...mapActions("viewerModule", ["setActiveViewer"]),
 
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
