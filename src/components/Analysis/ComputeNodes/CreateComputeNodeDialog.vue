@@ -194,20 +194,12 @@ const handleCreateComputeNode = async () => {
       isLoading.value = true
       
       try {
-        const selectedAccount = computeResourceAccounts.value.find(
-          (account) => account.accountId === computeNode.value.account
-        )
-        
-        if (!selectedAccount) {
-          throw new Error('Selected account not found')
-        }
-        
         const formattedComputeNode = {
           name: computeNode.value.name.trim(),
           description: computeNode.value.description.trim(),
-          account: selectedAccount
+          accountId: computeNode.value.account
         }
-        
+
         await createComputeNode(formattedComputeNode)
         
         ElMessage.success({
@@ -360,8 +352,8 @@ onMounted(() => {
             >
               <el-option
                 v-for="account in computeResourceAccounts"
-                :key="account.accountId"
-                :value="account.accountId"
+                :key="account.uuid"
+                :value="account.uuid"
                 class="account-option"
               >
                 <span class="account-name">{{ getResourceDisplayName(account) }}</span>

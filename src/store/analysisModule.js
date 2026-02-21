@@ -25,6 +25,7 @@ const initialState = () => ({
   cancelWorkflowDialogVisible: false,
   activityDialogVisible: false,
   workflows: [],
+  targetTypes: [],
 });
 
 export const state = initialState();
@@ -114,6 +115,9 @@ export const mutations = {
   },
   UPDATE_WORKFLOWS(state, workflows) {
     state.workflows = workflows;
+  },
+  UPDATE_TARGET_TYPES(state, targetTypes) {
+    state.targetTypes = targetTypes;
   },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
@@ -362,7 +366,7 @@ export const actions = {
   },
   fetchWorkflowInstances: async ({ commit, rootState }) => {
     try {
-      const url = `${rootState.config.api2Url}/compute/workflows/instances?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/compute/workflows/runs?organization_id=${rootState.activeOrganization.organization.id}`;
       const userToken = await useGetToken();
       const resp = await fetch(url, {
         method: "GET",
@@ -373,8 +377,9 @@ export const actions = {
 
       if (resp.ok) {
         const result = await resp.json();
+        const runs = result.runs || result;
 
-        const sortedWorkflows = result.sort((a, b) => {
+        const sortedWorkflows = runs.sort((a, b) => {
           const dateA = new Date(a.startedAt).getTime();
           const dateB = new Date(b.startedAt).getTime();
           if (isNaN(dateA)) return 1;
@@ -392,11 +397,11 @@ export const actions = {
   },
   fetchWorkflowLogs: async ({ commit, rootState }, [workflow, application]) => {
     const userToken = await useGetToken();
-    const integrationId = workflow.uuid;
+    const runId = workflow.uuid;
     const applicationId = application.uuid;
     // Fetch application logs
     try {
-      const url = `${rootState.config.api2Url}/compute/workflows/instances/${integrationId}/logs?applicationUuid=${applicationId}`;
+      const url = `${rootState.config.api2Url}/compute/workflows/runs/${runId}/logs?applicationUuid=${applicationId}`;
 
       const resp = await fetch(url, {
         method: "GET",
@@ -425,134 +430,86 @@ export const actions = {
       return;
     }
     try {
-      const url = `${rootState.config.api2Url}/compute/workflows/instances/${workflow.uuid}/status`;
-
       const userToken = await useGetToken();
-      const resp = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
+      const baseUrl = `${rootState.config.api2Url}/compute/workflows/runs/${workflow.uuid}`;
 
-      if (resp.ok) {
-        const result = await resp.json();
+      // Fetch run data and per-node status in parallel
+      const [runResp, statusResp] = await Promise.all([
+        fetch(baseUrl, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${userToken}` },
+        }),
+        fetch(`${baseUrl}/status`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${userToken}` },
+        }),
+      ]);
 
-        // This code combines two API responses (/status and /instances) we need properties from, matching on uuid
-        // The /instances response is missing status, and the /status response does not tell us the applicationType
+      if (!runResp.ok || !statusResp.ok) {
+        return Promise.reject(runResp.ok ? statusResp : runResp);
+      }
 
-        const updatedResult = {
-          ...workflow,
-          ...result,
-          workflow: [...result.workflow],
-        };
+      const runData = await runResp.json();
+      const statusData = await statusResp.json();
 
-        if (workflow.workflow) {
-          updatedResult.workflow = workflow.workflow.map(
-            (instanceProcessor) => {
-              const statusProcessor = result.workflow.find(
-                (statusProc) => statusProc.uuid === instanceProcessor.uuid
-              );
-              return { ...instanceProcessor, ...statusProcessor };
-            }
-          );
+      // The status response contains the workflow processors with their statuses.
+      // Use them directly — no need to fetch /applications/ individually.
+      const workflowProcessors = statusData.workflow && Array.isArray(statusData.workflow)
+        ? statusData.workflow
+        : [];
 
-          const workflowWithApplications = await Promise.all(
-            updatedResult.workflow.map(async (processor) => {
-              try {
-                const applicationUrl = `${rootState.config.api2Url}/applications/${processor.uuid}`;
-                const applicationResp = await fetch(applicationUrl, {
-                  method: "GET",
-                  headers: {
-                    Authorization: `Bearer ${userToken}`,
-                  },
-                });
-
-                if (applicationResp.ok) {
-                  const applicationData = await applicationResp.json();
-                  return { ...applicationData, ...processor };
-                } else {
-                  console.warn(
-                    `Failed to fetch application data for processor ${processor.uuid}`
-                  );
-                  return processor;
-                }
-              } catch (error) {
-                console.warn(
-                  `Error fetching application data for processor ${processor.uuid}:`,
-                  error
-                );
-                return processor;
-              }
-            })
-          );
-          updatedResult.workflow = workflowWithApplications;
-        }
-
-        // Sort processors based on nodes (new API) or executionOrder (legacy)
-        const sortByNodes = (processors, nodesArray, executionOrder) => {
-          // Prefer the new `nodes` array from the API if available
-          if (nodesArray && Array.isArray(nodesArray) && nodesArray.length > 0) {
-            const nodeOrderMap = new Map();
-            nodesArray.forEach((node, index) => {
-              // Map by node id and by source url for flexible matching
-              if (node.id) nodeOrderMap.set(node.id, index);
-              if (node.source?.url) nodeOrderMap.set(node.source.url, index);
-            });
-
-            const sorted = [...processors].sort((a, b) => {
-              const orderA =
-                nodeOrderMap.get(a.id) ??
-                nodeOrderMap.get(a.source?.url) ??
-                Number.MAX_SAFE_INTEGER;
-              const orderB =
-                nodeOrderMap.get(b.id) ??
-                nodeOrderMap.get(b.source?.url) ??
-                Number.MAX_SAFE_INTEGER;
-              return orderA - orderB;
-            });
-
-            return sorted;
-          }
-
-          // Fall back to legacy executionOrder
-          if (!executionOrder || !Array.isArray(executionOrder)) {
-            return processors;
-          }
-
-          const executionOrderMap = new Map();
-          executionOrder.forEach((orderGroup, groupIndex) => {
-            if (Array.isArray(orderGroup)) {
-              orderGroup.forEach((gitUrl) => {
-                executionOrderMap.set(gitUrl, groupIndex);
-              });
-            }
-          });
-
-          const sorted = [...processors].sort((a, b) => {
-            const orderA =
-              executionOrderMap.get(a.source?.url) ?? Number.MAX_SAFE_INTEGER;
-            const orderB =
-              executionOrderMap.get(b.source?.url) ?? Number.MAX_SAFE_INTEGER;
-            return orderA - orderB;
-          });
-
-          return sorted;
-        };
-
-        const sortedWorkflow = sortByNodes(
-          updatedResult.workflow,
-          updatedResult.nodes,
-          updatedResult.executionOrder
-        );
-        commit("SET_SELECTED_WORKFLOW_ACTIVITY", {
-          ...updatedResult,
-          workflow: sortedWorkflow,
+      // If we already have enriched data from a previous poll, merge the updated statuses
+      let enriched;
+      if (workflow.workflow && Array.isArray(workflow.workflow)) {
+        const statusMap = new Map();
+        workflowProcessors.forEach((entry) => {
+          if (entry.uuid) statusMap.set(entry.uuid, entry);
+          if (entry.id) statusMap.set(entry.id, entry);
         });
 
-        const updatedProcessor = updatedResult.workflow.find(
-          (processor) =>
-            processor.uuid === rootState.analysisModule.selectedProcessor.uuid
+        enriched = workflow.workflow.map((prev) => {
+          const statusEntry =
+            statusMap.get(prev.uuid) || statusMap.get(prev.id) || {};
+          return { ...prev, status: statusEntry.status || prev.status, startedAt: statusEntry.startedAt || prev.startedAt, completedAt: statusEntry.completedAt || prev.completedAt };
+        });
+      } else {
+        // First time — assign names based on type for non-processor nodes
+        enriched = workflowProcessors.map((processor) => {
+          if (processor.type === "data-source") {
+            return { ...processor, name: processor.name || "Data Source" };
+          }
+          if (processor.type === "data-target") {
+            return { ...processor, name: processor.name || "Data Target" };
+          }
+          return { ...processor, name: processor.name || processor.id || "Processor" };
+        });
+      }
+
+      // Only set nodes for DAG edge rendering if the entries have dependsOn info.
+      // The status endpoint may not include dependsOn — preserve existing nodes if available.
+      const hasDAGInfo = workflowProcessors.some(
+        (p) => p.dependsOn && Array.isArray(p.dependsOn)
+      );
+      const nodesForDAG = hasDAGInfo
+        ? workflowProcessors
+        : workflow.nodes && Array.isArray(workflow.nodes) && workflow.nodes.length > 0
+          ? workflow.nodes
+          : undefined;
+
+      commit("SET_SELECTED_WORKFLOW_ACTIVITY", {
+        ...runData,
+        status: statusData.status || runData.status,
+        nodes: nodesForDAG,
+        workflow: enriched,
+      });
+
+      // Update selected processor if still present
+      const currentActivity = rootState.analysisModule.selectedWorkflowActivity;
+      const selectedId = rootState.analysisModule.selectedProcessor?.uuid ||
+        rootState.analysisModule.selectedProcessor?.id;
+      if (selectedId && currentActivity.workflow) {
+        const updatedProcessor = currentActivity.workflow.find(
+          (p) => p.uuid === selectedId || p.id === selectedId
         );
         if (updatedProcessor) {
           commit("SET_SELECTED_PROCESSOR", updatedProcessor);
@@ -560,8 +517,6 @@ export const actions = {
             dispatch("fetchWorkflowLogs", [workflow, updatedProcessor]);
           }
         }
-      } else {
-        return Promise.reject(resp);
       }
     } catch (err) {
       commit("SET_SELECTED_WORKFLOW_ACTIVITY", {});
@@ -674,6 +629,29 @@ export const actions = {
   setSelectedProcessor: ({ commit, rootState }, processor) => {
     commit("SET_SELECTED_PROCESSOR", processor);
   },
+  fetchTargetTypes: async ({ commit, rootState }) => {
+    try {
+      const userToken = await useGetToken();
+      const url = `${rootState.config.api2Url}/compute/workflows/target-types`;
+
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      if (resp.ok) {
+        const result = await resp.json();
+        commit("UPDATE_TARGET_TYPES", result);
+      } else {
+        return Promise.reject(resp);
+      }
+    } catch (err) {
+      commit("UPDATE_TARGET_TYPES", []);
+      return Promise.reject(err);
+    }
+  },
   fetchWorkflows: async ({ commit, rootState }) => {
     try {
       const userToken = await useGetToken();
@@ -708,6 +686,7 @@ export const getters = {
   selectedProcessor: (state) => state.selectedProcessor,
   applications: (state) => state.applications,
   computeNodes: (state) => state.computeNodes,
+  targetTypes: (state) => state.targetTypes,
 };
 
 const analysisModule = {

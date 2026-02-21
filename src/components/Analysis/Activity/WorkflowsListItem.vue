@@ -9,7 +9,7 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
@@ -28,7 +28,7 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
         <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
@@ -60,7 +60,7 @@
     <div class="text">
       <div class="workflow-name">
         Workflow Run:
-        {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+        {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
       </div>
       <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
       <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
@@ -79,7 +79,7 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>
           Workflow Instance UUID: <br />

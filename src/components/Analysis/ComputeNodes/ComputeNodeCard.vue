@@ -136,7 +136,7 @@
           </div>
           <div class="detail-row">
             <span class="detail-label">Created By:</span>
-            <span class="detail-value">{{ getUserName(node.userId) }}</span>
+            <span class="detail-value">{{ getUserName(node.ownerId) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Created At:</span>
@@ -240,6 +240,25 @@
             <p>You don't have permission to view or manage access settings for this compute node.</p>
           </div>
         </div>
+
+        <!-- Destroy Node Section (owner only) -->
+        <div class="detail-section destroy-section" v-if="canManagePermissions">
+          <div class="detail-header">
+            <h4>Danger Zone</h4>
+          </div>
+          <div class="destroy-content">
+            <div class="destroy-info">
+              <p>Permanently destroy this compute node and all its associated infrastructure.</p>
+            </div>
+            <button
+              @click="showDestroyDialog = true"
+              class="destroy-button"
+              :disabled="isDestroying"
+            >
+              Destroy Compute Node
+            </button>
+          </div>
+        </div>
       </div>
     </transition>
     
@@ -280,8 +299,8 @@
     </el-dialog>
     
     <!-- Add Team Dialog -->
-    <el-dialog 
-      v-model="showAddTeamDialog" 
+    <el-dialog
+      v-model="showAddTeamDialog"
       title="Add Team Access"
       width="500px"
     >
@@ -303,8 +322,8 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="closeAddTeamDialog">Cancel</el-button>
-          <el-button 
-            type="primary" 
+          <el-button
+            type="primary"
             @click="addTeamAccess"
             :disabled="!selectedTeamId"
             :loading="isUpdatingPermissions"
@@ -314,11 +333,65 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Destroy Compute Node Dialog -->
+    <el-dialog
+      v-model="showDestroyDialog"
+      title="Destroy Compute Node"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <div class="destroy-node-dialog">
+        <div class="warning-section">
+          <div class="warning-icon">&#9888;&#65039;</div>
+          <div class="warning-content">
+            <h4>Are you sure you want to destroy this compute node?</h4>
+            <p class="warning-message">
+              Destroying <strong>{{ node.name }}</strong> will permanently remove this compute node
+              and all its associated infrastructure including running tasks.
+            </p>
+            <p class="impact-message">
+              This action cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div class="node-summary">
+          <div class="summary-row">
+            <strong>Node Name:</strong>
+            {{ node.name }}
+          </div>
+          <div class="summary-row">
+            <strong>Account:</strong>
+            {{ formatAccountId(node.account?.accountId) }}
+          </div>
+          <div class="summary-row">
+            <strong>Node UUID:</strong>
+            {{ node.uuid }}
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showDestroyDialog = false">
+            Cancel
+          </el-button>
+          <el-button
+            type="danger"
+            @click="confirmDestroyNode"
+            :loading="isDestroying"
+          >
+            Destroy Node
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElSelect, ElOption } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
@@ -352,14 +425,9 @@ const nodePermissions = computed(() => computeResourcesStore.getNodePermissions(
 const isLoadingPermissions = computed(() => computeResourcesStore.isNodePermissionsLoading(props.node.uuid))
 const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(props.node.uuid))
 
-// Check if current user is the owner of the node based on permissions
+// Check if current user is the owner of the node using node data directly
 const isNodeOwner = computed(() => {
-  const permissions = nodePermissions.value
-  if (!permissions || !permissions.owner) {
-    return false
-  }
-  const isOwner = permissions.owner === profile.value?.id
-  return isOwner
+  return props.node.ownerId === profile.value?.id
 })
 
 // User can manage permissions if they are the owner
@@ -402,8 +470,10 @@ const handleAccessScopeChange = async (newValue) => {
 // Dialog state
 const showAddUserDialog = ref(false)
 const showAddTeamDialog = ref(false)
+const showDestroyDialog = ref(false)
 const selectedUserId = ref('')
 const selectedTeamId = ref('')
+const isDestroying = ref(false)
 
 // Editing state
 const isEditing = ref(false)
@@ -425,15 +495,7 @@ const availableTeams = computed(() => {
   )
 })
 
-// Fetch permissions immediately on mount to determine ownership
-onMounted(async () => {
-  // Always fetch permissions on mount to determine if user is owner
-  if (Object.keys(nodePermissions.value).length === 0) {
-    await computeResourcesStore.fetchNodePermissions(props.node.uuid)
-  }
-})
-
-// Watch for expansion and fetch permissions when expanded (in case they weren't loaded)
+// Fetch permissions only when the card is expanded
 watch(isExpanded, async (newValue) => {
   if (newValue && Object.keys(nodePermissions.value).length === 0) {
     await computeResourcesStore.fetchNodePermissions(props.node.uuid)
@@ -476,20 +538,20 @@ function formatDate(dateString) {
 
 function getUserName(userId) {
   if (!userId) return 'Unknown'
-  
-  // Check if it's the current user
-  if (profile.value && profile.value.id === userId) {
+
+  // Check if it's the current user (match by both string id and integer intId)
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
     return `${profile.value.firstName} ${profile.value.lastName}`.trim() || 'You'
   }
-  
-  // Look for user in org members
-  const member = orgMembers.value.find(m => m.id === userId)
+
+  // Look for user in org members (match by both string id and integer intId)
+  const member = orgMembers.value.find(m => m.id === userId || m.intId === userId)
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || 'Unknown User'
   }
-  
+
   // Return the user ID if we can't find the name
-  return userId.split(':').pop() || userId
+  return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
 function getAccountTypeLabel(type) {
@@ -646,6 +708,20 @@ async function updateStatus(newStatus) {
   } catch (error) {
     console.error('Failed to update compute node status:', error)
     ElMessage.error('Failed to update compute node status')
+  }
+}
+
+async function confirmDestroyNode() {
+  isDestroying.value = true
+  try {
+    await computeResourcesStore.deleteComputeNode(props.node.uuid)
+    ElMessage.success('Compute node destroyed successfully')
+    showDestroyDialog.value = false
+  } catch (error) {
+    console.error('Failed to destroy compute node:', error)
+    ElMessage.error('Failed to destroy compute node')
+  } finally {
+    isDestroying.value = false
   }
 }
 </script>
@@ -1162,14 +1238,149 @@ async function updateStatus(newStatus) {
       background: rgba(theme.$yellow_1, 0.05);
       border: 1px solid rgba(theme.$yellow_1, 0.2);
       border-radius: 4px;
-      
+
       p {
         color: theme.$gray_6;
         font-size: 13px;
         margin: 0;
       }
     }
+
+    &.destroy-section {
+      margin-top: 20px;
+      border: 1px solid rgba(theme.$red_2, 0.2);
+      padding: 16px;
+
+      .detail-header {
+        border-bottom-color: rgba(theme.$red_2, 0.2);
+
+        h4 {
+          color: theme.$red_2;
+        }
+      }
+
+      .destroy-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+
+        .destroy-info p {
+          font-size: 13px;
+          color: theme.$gray_5;
+          margin: 0;
+          line-height: 1.5;
+        }
+
+        .destroy-button {
+          background: white;
+          color: theme.$red_2;
+          border: 1px solid theme.$red_2;
+          border-radius: 4px;
+          padding: 8px 16px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: theme.$red_1;
+            color: white;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+
+            &:hover {
+              background: white;
+              color: theme.$red_1;
+            }
+          }
+        }
+      }
+    }
   }
+}
+
+// Destroy dialog styles
+.destroy-node-dialog {
+  .warning-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: rgba(theme.$red_1, 0.05);
+    border: 1px solid rgba(theme.$red_1, 0.15);
+
+    .warning-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .warning-content {
+      flex: 1;
+
+      h4 {
+        font-size: 16px;
+        font-weight: 600;
+        color: theme.$gray_6;
+        margin: 0 0 12px 0;
+      }
+
+      .warning-message {
+        font-size: 14px;
+        color: theme.$gray_6;
+        margin: 0 0 12px 0;
+        line-height: 1.5;
+
+        strong {
+          font-weight: 600;
+        }
+      }
+
+      .impact-message {
+        font-size: 13px;
+        color: theme.$red_2;
+        margin: 0;
+        font-weight: 500;
+        line-height: 1.4;
+      }
+    }
+  }
+
+  .node-summary {
+    padding: 16px;
+    background: theme.$gray_1;
+    border: 1px solid theme.$gray_2;
+
+    .summary-row {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      margin-bottom: 8px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      strong {
+        color: theme.$gray_6;
+        font-weight: 600;
+        min-width: 100px;
+        margin-right: 8px;
+      }
+    }
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 // Vue transition styles for smooth expansion

@@ -215,23 +215,20 @@
                 </div>
 
                 <div
-                  v-if="
-                    selectedWorkflow.processors &&
-                    selectedWorkflow.processors.length
-                  "
+                  v-if="selectedWorkflowNodes.length"
                   class="processors-section"
                 >
                   <span class="section-label">Processors</span>
                   <div class="processors-list">
                     <a
-                      v-for="processor in selectedWorkflow.processors"
-                      :key="processor.sourceUrl"
-                      :href="getProcessorUrl(processor)"
+                      v-for="node in selectedWorkflowNodes"
+                      :key="node.sourceUrl"
+                      :href="getProcessorUrl(node)"
                       target="_blank"
                       rel="noopener noreferrer"
                       class="processor-chip"
                     >
-                      {{ getProcessorUrl(processor) }}
+                      {{ getProcessorUrl(node) }}
                     </a>
                   </div>
                 </div>
@@ -255,7 +252,7 @@
 
               <!-- Per-Node Overrides -->
               <div
-                v-if="selectedWorkflow && selectedWorkflow.processors && selectedWorkflow.processors.length"
+                v-if="selectedWorkflow && selectedWorkflowNodes.length"
                 class="node-overrides-section"
               >
                 <div
@@ -272,17 +269,17 @@
                     Optionally override compute type or version for individual processors.
                   </p>
                   <div
-                    v-for="processor in selectedWorkflow.processors"
-                    :key="processor.id || processor.sourceUrl"
+                    v-for="node in selectedWorkflowNodes"
+                    :key="node.id || node.sourceUrl"
                     class="override-row"
                   >
                     <span class="override-label">
-                      {{ processor.id || processor.sourceUrl }}
+                      {{ node.id || node.sourceUrl }}
                     </span>
                     <div class="override-fields">
                       <el-select
-                        v-if="nodeOverrides[processor.id || processor.sourceUrl]"
-                        v-model="nodeOverrides[processor.id || processor.sourceUrl].computeType"
+                        v-if="nodeOverrides[node.id || node.sourceUrl]"
+                        v-model="nodeOverrides[node.id || node.sourceUrl].computeType"
                         placeholder="Compute type"
                         size="small"
                         clearable
@@ -291,8 +288,8 @@
                         <el-option label="Lambda" value="lambda" />
                       </el-select>
                       <el-input
-                        v-if="nodeOverrides[processor.id || processor.sourceUrl]"
-                        v-model="nodeOverrides[processor.id || processor.sourceUrl].version"
+                        v-if="nodeOverrides[node.id || node.sourceUrl]"
+                        v-model="nodeOverrides[node.id || node.sourceUrl].version"
                         placeholder="Version"
                         size="small"
                       />
@@ -696,6 +693,14 @@ export default {
     activeWorkflows: function () {
       return this.workflows.filter((workflow) => workflow.isActive);
     },
+    selectedWorkflowNodes: function () {
+      if (!this.selectedWorkflow) return [];
+      // Prefer nodes (new API) over processors (legacy)
+      if (this.selectedWorkflow.nodes && this.selectedWorkflow.nodes.length) {
+        return this.selectedWorkflow.nodes;
+      }
+      return this.selectedWorkflow.processors || [];
+    },
   },
 
   watch: {
@@ -731,11 +736,12 @@ export default {
         }
       }
 
-      // Initialize nodeOverrides for each processor in the workflow
+      // Initialize nodeOverrides for each node in the workflow
       this.nodeOverrides = {};
-      if (this.selectedWorkflow?.processors) {
-        this.selectedWorkflow.processors.forEach((processor) => {
-          const nodeId = processor.id || processor.sourceUrl;
+      const nodes = this.selectedWorkflowNodes;
+      if (nodes) {
+        nodes.forEach((node) => {
+          const nodeId = node.id || node.sourceUrl;
           if (nodeId) {
             this.nodeOverrides[nodeId] = { computeType: "", version: "" };
           }
@@ -964,22 +970,23 @@ export default {
       return this.selectedProcessorParams.length > 0;
     },
 
-    hasNodeOverrides: function () {
+    hasProcessorConfigs: function () {
       return Object.values(this.nodeOverrides).some(
         (override) => override.computeType || override.version
       );
     },
 
-    buildNodeOverrides: function () {
-      const result = {};
+    buildProcessorConfigs: function () {
+      const configs = [];
       for (const [nodeId, override] of Object.entries(this.nodeOverrides)) {
         if (override.computeType || override.version) {
-          result[nodeId] = {};
-          if (override.computeType) result[nodeId].computeType = override.computeType;
-          if (override.version) result[nodeId].version = override.version;
+          const config = { nodeId };
+          if (override.version) config.version = override.version;
+          if (override.computeType) config.executionTarget = override.computeType;
+          configs.push(config);
         }
       }
-      return result;
+      return configs;
     },
 
     runAnalysis: async function () {
@@ -998,9 +1005,9 @@ export default {
       let url;
       let body;
 
-      if (this.workflowType === "named") {
-        url = `${this.config.api2Url}/compute/workflows/instances`;
+      url = `${this.config.api2Url}/compute/workflows/runs`;
 
+      if (this.workflowType === "named") {
         let paramsObject = {};
         if (this.selectedWorkflowParams.length > 0) {
           let paramsEntries = [];
@@ -1010,61 +1017,32 @@ export default {
           paramsObject = Object.fromEntries(paramsEntries);
         }
 
+        const workflowInstanceConfiguration = {
+          workflowId: this.selectedWorkflow.uuid,
+          computeNodeId: this.selectedComputeNode.uuid,
+          ...(this.hasProcessorConfigs() && { processorConfigs: this.buildProcessorConfigs() }),
+        };
+
         body = {
+          workflowInstanceConfiguration,
           datasetId: this.datasetId,
           packageIds: arrayOfPackageIds,
-          computeNodeId: this.selectedComputeNode.uuid,
-          name: this.name,
-          workflowUuid: this.selectedWorkflow.uuid,
           params: {
             target_path: this.targetDirectory,
             ...paramsObject,
           },
-          ...(this.hasNodeOverrides() && { nodeOverrides: this.buildNodeOverrides() }),
         };
       } else {
-        // Custom workflow API call — uses original URL format
-        url = `${this.config.api2Url}/compute/workflows/instances`;
-
-        const formatApplication = (application, parameters) => {
-          let paramsObject = {};
-          if (parameters != null) {
-            let paramsEntries = [];
-            parameters.forEach((param) => {
-              paramsEntries.push([param.name, param.value]);
-            });
-            paramsObject = Object.fromEntries(paramsEntries);
-          }
-          return {
-            name: application.name || "",
-            description: application.description || "",
-            uuid: application.uuid || "",
-            applicationId: application.applicationId || "",
-            applicationContainerName:
-              application.applicationContainerName || "",
-            applicationType: application.applicationType || "",
-            params: paramsObject,
-            commandArguments: application.commandArguments || [],
-          };
-        };
-
+        // Custom workflow — also uses POST /runs with inline config
+        // For custom pipelines, we don't have a workflow definition UUID,
+        // so we use workflowInstanceId if available, or pass configuration inline
         body = {
+          workflowInstanceConfiguration: {
+            workflowId: "",
+            computeNodeId: this.selectedComputeNode.uuid,
+          },
           datasetId: this.datasetId,
           packageIds: arrayOfPackageIds,
-          computeNode: {
-            uuid: this.selectedComputeNode.uuid,
-            computeNodeGatewayUrl:
-              this.selectedComputeNode.computeNodeGatewayUrl,
-          },
-          name: this.name,
-          workflow: [
-            formatApplication(this.selectedPreprocessor, null),
-            formatApplication(
-              this.selectedProcessor,
-              this.selectedProcessorParams
-            ),
-            formatApplication(this.selectedPostprocessor, null),
-          ],
           params: {
             target_path: this.targetDirectory,
           },
