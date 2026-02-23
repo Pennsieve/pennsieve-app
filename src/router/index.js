@@ -124,8 +124,8 @@ const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/Comp
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
+const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
-const NamedWorkflowList = () => import ('../components/Analysis/Workflows/NamedWorkflowList.vue')
 
 /**
  * Metadata Components
@@ -1476,7 +1476,7 @@ const router = createRouter({
         navigation: BfNavigation
       },
       redirect: {
-        name: 'activity'
+        name: 'runs'
       },
       props: true,
       children: [
@@ -1487,11 +1487,11 @@ const router = createRouter({
             stage: WorkflowBuilder,
           }
         },
-                 {
-          name: 'workflows',
-          path: 'workflows',
+        {
+          name: 'runs',
+          path: 'runs',
           components: {
-            stage: NamedWorkflowList,
+            stage: RunMonitor,
           }
         },
         {

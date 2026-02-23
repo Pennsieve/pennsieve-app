@@ -1,4 +1,4 @@
-import { useGetToken } from "@/composables/useGetToken";
+import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
 
 const initialState = () => ({
   computeNodes: [],
@@ -21,6 +21,7 @@ const initialState = () => ({
     */
   fileCount: 0,
   workflowInstances: [],
+  workflowInstancesCursor: null,
   selectedWorkflowActivity: {},
   cancelWorkflowDialogVisible: false,
   activityDialogVisible: false,
@@ -89,8 +90,13 @@ export const mutations = {
   SET_COMPUTE_RESOURCE_ACCOUNTS(state, accounts) {
     state.computeResourceAccounts = accounts;
   },
-  SET_WORKFLOW_INSTANCES(state, instances) {
-    state.workflowInstances = instances;
+  SET_WORKFLOW_INSTANCES(state, { runs, cursor }) {
+    state.workflowInstances = runs;
+    state.workflowInstancesCursor = cursor || null;
+  },
+  APPEND_WORKFLOW_INSTANCES(state, { runs, cursor }) {
+    state.workflowInstances = [...state.workflowInstances, ...runs];
+    state.workflowInstancesCursor = cursor || null;
   },
   SET_WORKFLOW_LOGS(state, logs) {
     state.workflowLogs = logs;
@@ -123,6 +129,13 @@ export const mutations = {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
     if (workflow) {
       workflow.isActive = isActive;
+    }
+  },
+  UPDATE_WORKFLOW_DETAILS(state, { uuid, name, description }) {
+    const workflow = state.workflows.find((w) => w.uuid === uuid);
+    if (workflow) {
+      if (name !== undefined) workflow.name = name;
+      if (description !== undefined) workflow.description = description;
     }
   },
 };
@@ -279,6 +292,12 @@ export const actions = {
   createWorkflow: async ({ commit, rootState }, newWorkflow) => {
     const url = `${rootState.config.api2Url}/compute/workflows/definitions`;
 
+    // Include organizationId when operating within an organization
+    const orgId = rootState.activeOrganization?.organization?.id;
+    const payload = orgId
+      ? { ...newWorkflow, organizationId: orgId }
+      : newWorkflow;
+
     try {
       const userToken = await useGetToken();
       const response = await fetch(url, {
@@ -287,7 +306,7 @@ export const actions = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,
         },
-        body: JSON.stringify(newWorkflow),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -329,6 +348,42 @@ export const actions = {
       return await response.json();
     } catch (err) {
       console.error("Failed to update workflow active status:", err.message);
+      throw err;
+    }
+  },
+  updateWorkflow: async ({ commit, rootState }, { uuid, payload }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
+    const userToken = await useGetToken();
+
+    try {
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        throw new Error(
+          `Error ${response.status}: ${response.statusText} - ${errorDetails}`
+        );
+      }
+
+      const result = await response.json();
+
+      if (payload.name !== undefined || payload.description !== undefined) {
+        commit("UPDATE_WORKFLOW_DETAILS", { uuid, ...payload });
+      }
+      if (payload.isActive !== undefined) {
+        commit("UPDATE_WORKFLOW_ACTIVE_STATUS", { uuid, isActive: payload.isActive });
+      }
+
+      return result;
+    } catch (err) {
+      console.error("Failed to update workflow:", err.message);
       throw err;
     }
   },
@@ -386,12 +441,36 @@ export const actions = {
           if (isNaN(dateB)) return -1;
           return dateB - dateA;
         });
-        commit("SET_WORKFLOW_INSTANCES", sortedWorkflows);
+        commit("SET_WORKFLOW_INSTANCES", { runs: sortedWorkflows, cursor: result.nextCursor });
       } else {
         return Promise.reject(resp);
       }
     } catch (err) {
-      commit("SET_WORKFLOW_INSTANCES", []);
+      commit("SET_WORKFLOW_INSTANCES", { runs: [], cursor: null });
+      return Promise.reject(err);
+    }
+  },
+  fetchMoreWorkflowInstances: async ({ commit, state, rootState }) => {
+    const cursor = state.workflowInstancesCursor;
+    if (!cursor) return;
+    try {
+      const url = `${rootState.config.api2Url}/compute/workflows/runs?organization_id=${rootState.activeOrganization.organization.id}&cursor=${encodeURIComponent(cursor)}`;
+      const userToken = await useGetToken();
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      if (resp.ok) {
+        const result = await resp.json();
+        const runs = result.runs || result;
+        commit("APPEND_WORKFLOW_INSTANCES", { runs, cursor: result.nextCursor });
+      } else {
+        return Promise.reject(resp);
+      }
+    } catch (err) {
       return Promise.reject(err);
     }
   },
@@ -452,63 +531,39 @@ export const actions = {
       const runData = await runResp.json();
       const statusData = await statusResp.json();
 
-      // The status response contains the workflow processors with their statuses.
-      // Use them directly — no need to fetch /applications/ individually.
-      const workflowProcessors = statusData.workflow && Array.isArray(statusData.workflow)
-        ? statusData.workflow
-        : [];
+      // The status response contains a dag array with status embedded per node.
+      // Merge status fields from statusData.dag onto runData.dag by node id.
+      const statusDag = Array.isArray(statusData.dag) ? statusData.dag : [];
+      const statusMap = new Map();
+      statusDag.forEach((entry) => {
+        if (entry.id) statusMap.set(entry.id, entry);
+      });
 
-      // If we already have enriched data from a previous poll, merge the updated statuses
-      let enriched;
-      if (workflow.workflow && Array.isArray(workflow.workflow)) {
-        const statusMap = new Map();
-        workflowProcessors.forEach((entry) => {
-          if (entry.uuid) statusMap.set(entry.uuid, entry);
-          if (entry.id) statusMap.set(entry.id, entry);
-        });
-
-        enriched = workflow.workflow.map((prev) => {
-          const statusEntry =
-            statusMap.get(prev.uuid) || statusMap.get(prev.id) || {};
-          return { ...prev, status: statusEntry.status || prev.status, startedAt: statusEntry.startedAt || prev.startedAt, completedAt: statusEntry.completedAt || prev.completedAt };
-        });
-      } else {
-        // First time — assign names based on type for non-processor nodes
-        enriched = workflowProcessors.map((processor) => {
-          if (processor.type === "data-source") {
-            return { ...processor, name: processor.name || "Data Source" };
-          }
-          if (processor.type === "data-target") {
-            return { ...processor, name: processor.name || "Data Target" };
-          }
-          return { ...processor, name: processor.name || processor.id || "Processor" };
-        });
-      }
-
-      // Only set nodes for DAG edge rendering if the entries have dependsOn info.
-      // The status endpoint may not include dependsOn — preserve existing nodes if available.
-      const hasDAGInfo = workflowProcessors.some(
-        (p) => p.dependsOn && Array.isArray(p.dependsOn)
-      );
-      const nodesForDAG = hasDAGInfo
-        ? workflowProcessors
-        : workflow.nodes && Array.isArray(workflow.nodes) && workflow.nodes.length > 0
-          ? workflow.nodes
-          : undefined;
+      // Merge status into the run's dag
+      const mergedDag = (runData.dag || []).map((node) => {
+        const statusEntry = statusMap.get(node.id) || {};
+        return {
+          ...node,
+          status: statusEntry.status || node.status,
+          startedAt: statusEntry.startedAt || node.startedAt,
+          completedAt: statusEntry.completedAt || node.completedAt,
+        };
+      });
 
       commit("SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...runData,
         status: statusData.status || runData.status,
-        nodes: nodesForDAG,
-        workflow: enriched,
+        startedAt: statusData.startedAt || runData.startedAt,
+        completedAt: statusData.completedAt || runData.completedAt,
+        dag: mergedDag,
       });
 
       // Update selected processor if still present
       const currentActivity = rootState.analysisModule.selectedWorkflowActivity;
       const selectedId = rootState.analysisModule.selectedProcessor?.uuid ||
         rootState.analysisModule.selectedProcessor?.id;
-      if (selectedId && currentActivity.workflow) {
-        const updatedProcessor = currentActivity.workflow.find(
+      if (selectedId && currentActivity.dag) {
+        const updatedProcessor = currentActivity.dag.find(
           (p) => p.uuid === selectedId || p.id === selectedId
         );
         if (updatedProcessor) {
@@ -626,6 +681,21 @@ export const actions = {
       throw err;
     }
   },
+  createRun: async ({ rootState }, payload) => {
+    const tokens = await useGetAllTokens();
+    const url = `${rootState.config.api2Url}/compute/workflows/runs`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokens.accessToken}`,
+        "Content-Type": "application/json",
+        "X-Refresh-Token": tokens.refreshToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error("Failed to create run");
+    return resp.json();
+  },
   setSelectedProcessor: ({ commit, rootState }, processor) => {
     commit("SET_SELECTED_PROCESSOR", processor);
   },
@@ -650,6 +720,23 @@ export const actions = {
     } catch (err) {
       commit("UPDATE_TARGET_TYPES", []);
       return Promise.reject(err);
+    }
+  },
+  fetchWorkflowDefinition: async ({ rootState }, uuid) => {
+    const userToken = await useGetToken();
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
+
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (resp.ok) {
+      return await resp.json();
+    } else {
+      throw new Error(`Failed to fetch workflow definition: ${resp.status}`);
     }
   },
   fetchWorkflows: async ({ commit, rootState }) => {
@@ -679,6 +766,7 @@ export const actions = {
 
 export const getters = {
   workflowInstances: (state) => state.workflowInstances,
+  workflowInstancesCursor: (state) => state.workflowInstancesCursor,
   workflowInstance: (state) => state.workflowInstance,
   workflowLogs: (state) => state.workflowLogs,
   selectedWorkflowActivity: (state) => state.selectedWorkflowActivity,
