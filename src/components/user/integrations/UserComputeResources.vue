@@ -643,7 +643,7 @@ function getNodeStatusForDisplay(node) {
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Owner:</span>
-                    <span class="detail-value">{{ getUserName(resource.userId) }}</span>
+                    <span class="detail-value">{{ getUserName(resource.ownerId || resource.userId) }}</span>
                   </div>
                 </div>
                 
@@ -734,7 +734,7 @@ function getNodeStatusForDisplay(node) {
                           <div class="node-info">
                             <span class="node-workspace">{{ getWorkspaceNameById(node.organizationId) }}</span>
                             <span class="node-separator">•</span>
-                            <span class="node-owner">{{ getUserName(node.userId) }}</span>
+                            <span class="node-owner">{{ getUserName(node.ownerId || node.userId) }}</span>
                           </div>
                         </div>
                         <div class="node-actions">
