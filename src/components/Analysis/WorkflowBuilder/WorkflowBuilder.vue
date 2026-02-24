@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, reactive, onMounted } from "vue";
 
 import { useStore } from "vuex";
 
@@ -13,6 +13,7 @@ import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
+import IconPencil from "../../icons/IconPencil.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 
 const {
@@ -46,6 +47,7 @@ const editName = ref("");
 const editDescription = ref("");
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
+const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
 
 // Resolve the original processor definition for the selected node
 const selectedNodeProcessor = computed(() => {
@@ -85,6 +87,26 @@ const availableApplications = computed(
 const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
+
+const getComputeTypesForTarget = (targetType) => {
+  if (!targetType) return [];
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.computeTypes || [];
+};
+
+const onTargetTypeChange = (data) => {
+  const types = getComputeTypesForTarget(data.targetType);
+  data.computeType = types.length ? types[0] : null;
+};
+
+const toggleTargetEdit = (nodeId) => {
+  if (editingTargetNodes.has(nodeId)) {
+    editingTargetNodes.delete(nodeId);
+  } else {
+    editingTargetNodes.add(nodeId);
+  }
+};
+
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
@@ -195,6 +217,7 @@ const definitionToNodesAndEdges = (workflow, applications) => {
       data: {
         label,
         targetType: p.targetType || null,
+        computeType: p.computeType || getComputeTypesForTarget(p.targetType)?.[0] || null,
         application: matchedApplication,
       },
       position: hasSavedPositions && p.position
@@ -354,6 +377,9 @@ const onDrop = (event) => {
         label: "Data Target",
         targetType:
           targetTypes.value.length === 1 ? targetTypes.value[0].targetType : null,
+        computeType:
+          targetTypes.value.length === 1 && targetTypes.value[0].computeTypes?.length
+            ? targetTypes.value[0].computeTypes[0] : null,
       },
       position,
     };
@@ -500,6 +526,7 @@ const saveWorkflow = async () => {
         id: node.id,
         type: "data-target",
         targetType: node.data.targetType,
+        computeType: node.data.computeType,
         dependsOn: dependsOn,
         position,
       };
@@ -649,6 +676,8 @@ onPaneClick(() => {
             :nodes-draggable="true"
             :nodes-connectable="!isReadOnly"
             :elements-selectable="true"
+            :pan-on-drag="true"
+            :zoom-on-scroll="true"
           >
             <Background pattern-color="#aaa" :gap="16" />
             <Controls position="top-left" />
@@ -779,7 +808,15 @@ onPaneClick(() => {
               <div class="custom-node data-target-node">
                 <div class="node-header">
                   <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ data.label }}</span>
+                  <span class="node-title">{{ data.targetType || 'No target selected' }}</span>
+                  <button
+                    v-if="!isReadOnly"
+                    class="edit-target-btn"
+                    :class="{ active: editingTargetNodes.has(id) }"
+                    @click.stop="toggleTargetEdit(id)"
+                  >
+                    <IconPencil :width="12" :height="12" />
+                  </button>
                   <button
                     v-if="!isReadOnly"
                     class="remove-btn"
@@ -789,47 +826,25 @@ onPaneClick(() => {
                   </button>
                 </div>
                 <div class="node-body">
-                  <div class="target-type-row">
-                    <el-select
-                      v-model="data.targetType"
-                      placeholder="Select target type"
-                      size="small"
-                      class="target-type-select"
-                      :disabled="isReadOnly"
-                    >
-                      <el-option
-                        v-for="tt in targetTypes"
-                        :key="tt.targetType"
-                        :label="tt.targetType"
-                        :value="tt.targetType"
-                      />
-                    </el-select>
-                    <el-popover
-                      trigger="hover"
-                      placement="right"
-                      :width="220"
-                    >
-                      <template #reference>
-                        <IconInfoSmall
-                          class="target-type-info-icon"
-                          :width="14"
-                          :height="14"
-                          color="#9ca3af"
-                        />
-                      </template>
-                      <div class="target-type-info">
-                        <div
+                  <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
+                  <!-- Edit view: only target type selection -->
+                  <div v-if="editingTargetNodes.has(id)" class="target-edit">
+                    <div class="target-edit-field">
+                      <label class="target-edit-label">Target type</label>
+                      <el-select
+                        v-model="data.targetType"
+                        placeholder="Select target type"
+                        size="small"
+                        @change="onTargetTypeChange(data)"
+                      >
+                        <el-option
                           v-for="tt in targetTypes"
                           :key="tt.targetType"
-                          class="target-type-info-item"
-                        >
-                          <div class="target-type-info-id">{{ tt.targetType }}</div>
-                          <div class="target-type-info-desc">
-                            {{ tt.description }}
-                          </div>
-                        </div>
-                      </div>
-                    </el-popover>
+                          :label="tt.targetType"
+                          :value="tt.targetType"
+                        />
+                      </el-select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -876,6 +891,12 @@ onPaneClick(() => {
                   <div class="info-row">
                     <span class="info-label">Target Type</span>
                     <span class="info-value">{{ selectedNode.data.targetType }}</span>
+                  </div>
+                </template>
+                <template v-if="selectedNode.data?.computeType">
+                  <div class="info-row">
+                    <span class="info-label">Runtime</span>
+                    <span class="info-value">{{ selectedNode.data.computeType }}</span>
                   </div>
                 </template>
               </div>
@@ -1160,6 +1181,7 @@ onPaneClick(() => {
 <style lang="scss">
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/core/dist/theme-default.css";
 
 /* Handle styles — must be unscoped so VueFlow can render them */
 .workflow-builder-flow {
@@ -1212,31 +1234,6 @@ onPaneClick(() => {
   }
 }
 
-/* Popover content — rendered outside scoped tree */
-.target-type-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  .target-type-info-item {
-    &:not(:last-child) {
-      padding-bottom: 8px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-  }
-
-  .target-type-info-id {
-    font-weight: 600;
-    font-size: 13px;
-    margin-bottom: 2px;
-  }
-
-  .target-type-info-desc {
-    font-size: 12px;
-    color: #6b7280;
-    line-height: 1.4;
-  }
-}
 </style>
 
 <style lang="scss" scoped>
@@ -1474,22 +1471,22 @@ onPaneClick(() => {
 }
 
 .data-source-item {
-  background-color: theme.$teal_tint;
-  border-color: theme.$teal_1;
+  background-color: #eef2ff;
+  border-color: #6366f1;
 
   &:not(.disabled):hover {
-    border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    border-color: #4f46e5;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
   }
 }
 
 .data-target-item {
-  background-color: theme.$yellow_tint;
-  border-color: theme.$yellow_1;
+  background-color: #ecfdf5;
+  border-color: #059669;
 
   &:not(.disabled):hover {
-    border-color: #8b5cf6;
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+    border-color: #047857;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
   }
 }
 
@@ -1638,8 +1635,8 @@ onPaneClick(() => {
     padding: 0 !important;
 
     &.selected .custom-node {
-      border-color: theme.$purple_1;
-      box-shadow: 0 0 0 2px rgba(80, 57, 247, 0.25);
+      border-color: theme.$gray_4;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
     }
   }
 }
@@ -1746,36 +1743,70 @@ onPaneClick(() => {
   }
 
   &.data-source-node {
-    border-color: theme.$teal_1;
-    background: theme.$teal_tint;
+    border-color: #6366f1;
+    background: #eef2ff;
+
+    .node-header {
+      align-items: center;
+      margin-bottom: 0;
+    }
   }
 
   &.data-target-node {
-    border-color: #8b5cf6;
-    background: #faf5ff;
+    border-color: #059669;
+    background: #ecfdf5;
 
     .node-body {
       margin-top: 8px;
     }
 
-    .target-type-row {
+    .edit-target-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 3px;
+      color: theme.$gray_4;
       display: flex;
       align-items: center;
-      gap: 6px;
+      transition: color 0.15s, background 0.15s;
+
+      &:hover, &.active {
+        color: #059669;
+        background: rgba(5, 150, 105, 0.1);
+      }
     }
 
-    .target-type-select {
-      flex: 1;
+    .runtime-tag {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+      white-space: nowrap;
+      display: inline-block;
     }
 
-    .target-type-info-icon {
-      cursor: help;
-      flex-shrink: 0;
-      opacity: 0.6;
-      transition: opacity 0.15s;
+    .target-edit {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
 
-      &:hover {
-        opacity: 1;
+      .target-edit-field {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .target-edit-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: theme.$gray_4;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
       }
     }
   }
@@ -1790,12 +1821,12 @@ onPaneClick(() => {
     flex-shrink: 0;
 
     &.source-badge {
-      background: #3b82f6;
+      background: #6366f1;
       color: white;
     }
 
     &.target-badge {
-      background: #8b5cf6;
+      background: #059669;
       color: white;
     }
   }

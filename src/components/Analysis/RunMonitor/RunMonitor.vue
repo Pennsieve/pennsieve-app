@@ -7,6 +7,7 @@ import { Controls } from "@vue-flow/controls";
 import dagre from "@dagrejs/dagre";
 import EventBus from "../../../utils/event-bus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
+import IconRotateRight from "../../icons/IconRotateRight.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -32,18 +33,21 @@ const isLoadingMore = ref(false);
 let pollIntervalId = null;
 
 // Initiate Workflow dialog state
-const initiateDialogVisible = ref(false);
 const initiateForm = ref({
   workflowId: "",
   computeNodeId: "",
   datasetId: "",
 });
+const wizardVisible = ref(false);
+const wizardStep = ref(0); // 0=workflow, 1=compute, 2=dataset, 3=confirm
+const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
 
 // Configure mode state
 const configDefinition = ref(null); // the workflow definition fetched for configuration
 const dataSourceFiles = reactive({}); // { [nodeId]: File[] }
-const nodeConfigs = reactive({}); // { [nodeId]: { executionTarget, version, params: { key: val } } }
+const nodeConfigs = reactive({}); // { [nodeId]: { executionTarget, version, params: [{ key, value }] } }
 const isExecuting = ref(false);
+const rerunSource = ref(null); // the run object to copy config from when rerunning
 
 // File picker dialog state
 const filePickerVisible = ref(false);
@@ -56,6 +60,10 @@ const logsDialogVisible = ref(false);
 const logsMessages = ref([]);
 const logsLoading = ref(false);
 const logsNodeLabel = ref("");
+
+// Metrics dialog state
+const metricsDialogVisible = ref(false);
+const nodeMetricsDialogVisible = ref(false);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
 
@@ -83,6 +91,16 @@ const selectedProcessor = computed(
 const availableApplications = computed(
   () => store.getters["analysisModule/applications"] || []
 );
+const targetTypes = computed(
+  () => store.getters["analysisModule/targetTypes"] || []
+);
+
+const getComputeTypesForTarget = (targetType) => {
+  if (!targetType) return [];
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.computeTypes || [];
+};
+
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
 const config = computed(() => store.state.config);
@@ -234,7 +252,7 @@ const findAppByUrl = (sourceUrl) => {
 
 const labelForDagNode = (d) => {
   if (d.type === "data-source") return "Data Source";
-  if (d.type === "data-target") return "Data Target";
+  if (d.type === "data-target") return d.targetType || "Data Target";
   const matchedApp = findAppByUrl(d.sourceUrl);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
 };
@@ -259,6 +277,8 @@ const definitionToNodesAndEdges = (definition) => {
         label: labelForDagNode(d),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
+        targetType: d.targetType || null,
+        computeType: d.computeType || getComputeTypesForTarget(d.targetType)?.[0] || null,
       },
       position:
         hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -296,10 +316,29 @@ const runToNodesAndEdges = (run) => {
     (d) => d.position && typeof d.position.x === "number"
   );
 
+  const runDataSources = run.dataSources || {};
+  const runDataTargets = run.dataTargets || {};
+  const runProcessorConfigs = run.processorConfigs || [];
+
   const resultNodes = dag.map((d) => {
     const nodeType = d.type === "data-source" ? "data-source"
       : d.type === "data-target" ? "data-target"
       : "default";
+
+    // Enrich node data based on type
+    const extra = {};
+    if (d.type === "data-source") {
+      const src = runDataSources[d.id];
+      extra.packageCount = src?.packageIds?.length || 0;
+    } else if (d.type === "data-target") {
+      extra.targetType = d.targetType || null;
+      const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
+      extra.computeType = cfg?.executionTarget || d.computeType || null;
+    } else {
+      const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
+      extra.executionTarget = cfg?.executionTarget || null;
+    }
+
     return {
       id: d.id,
       type: nodeType,
@@ -310,6 +349,7 @@ const runToNodesAndEdges = (run) => {
         sourceUrl: d.sourceUrl,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
+        ...extra,
       },
       position:
         hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -507,10 +547,92 @@ const onDatasetSearch = (query) => {
   datasetSearchTimer = setTimeout(() => fetchDatasetOptions(query), 300);
 };
 
-const openInitiateDialog = () => {
-  initiateForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  initiateDialogVisible.value = true;
+/*
+  Wizard dialog helpers
+*/
+const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
+
+const workflowSearch = ref("");
+const computeNodeSearch = ref("");
+
+const filteredWizardWorkflows = computed(() => {
+  const q = workflowSearch.value.toLowerCase().trim();
+  if (!q) return workflows.value;
+  return workflows.value.filter(w =>
+    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
+  );
+});
+
+const filteredWizardComputeNodes = computed(() => {
+  const q = computeNodeSearch.value.toLowerCase().trim();
+  if (!q) return computeNodes.value;
+  return computeNodes.value.filter(cn =>
+    cn.name?.toLowerCase().includes(q) || cn.description?.toLowerCase().includes(q)
+  );
+});
+
+const wizardSelectedWorkflow = computed(() =>
+  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
+);
+const wizardSelectedComputeNode = computed(() =>
+  computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
+);
+const wizardSelectedDataset = computed(() =>
+  datasetOptions.value.find(d => d.content?.id === wizardForm.value.datasetId) || null
+);
+
+const wizardCanNext = computed(() => {
+  if (wizardStep.value === 0) return !!wizardForm.value.workflowId;
+  if (wizardStep.value === 1) return !!wizardForm.value.computeNodeId;
+  if (wizardStep.value === 2) return !!wizardForm.value.datasetId;
+  return true;
+});
+
+const openWizardDialog = () => {
+  wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
+  workflowSearch.value = "";
+  computeNodeSearch.value = "";
+  wizardStep.value = 0;
+  rerunSource.value = null;
+  wizardVisible.value = true;
   fetchDatasetOptions();
+};
+
+const rerunFromRun = async (run) => {
+  // Fetch full run details to get dag config, processorParams, etc.
+  try {
+    await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
+    const fullRun = store.getters["analysisModule/selectedWorkflowActivity"];
+    rerunSource.value = fullRun || run;
+  } catch {
+    rerunSource.value = run;
+  }
+
+  wizardForm.value = {
+    workflowId: run.workflowUuid || "",
+    computeNodeId: run.computeNodeUuid || "",
+    datasetId: run.datasetId || "",
+  };
+  workflowSearch.value = "";
+  computeNodeSearch.value = "";
+  wizardStep.value = 3; // jump to confirmation
+  wizardVisible.value = true;
+  fetchDatasetOptions();
+};
+
+const wizardNext = () => {
+  if (wizardStep.value < 3) wizardStep.value++;
+};
+
+const wizardBack = () => {
+  if (wizardStep.value > 0) wizardStep.value--;
+};
+
+const wizardConfirm = () => {
+  // Copy wizard selections into initiateForm and trigger the existing flow
+  initiateForm.value = { ...wizardForm.value };
+  wizardVisible.value = false;
+  initiateWorkflow();
 };
 
 const initiateWorkflow = async () => {
@@ -530,19 +652,43 @@ const initiateWorkflow = async () => {
     );
 
     configDefinition.value = definition;
-    initiateDialogVisible.value = false;
+    wizardVisible.value = false;
 
     // Reset configuration state
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
-    // Initialize nodeConfigs for each processor node
+    // Initialize nodeConfigs for each processor and data-target node
     const dag = definition.dag || definition.processors || [];
+    const source = rerunSource.value;
+    const sourceConfigs = source?.processorConfigs || [];
+    const sourceParams = source?.processorParams || {};
+
     dag.forEach((d) => {
-      if (d.type !== "data-source" && d.type !== "data-target") {
-        nodeConfigs[d.id] = { executionTarget: "lambda", version: "", params: {} };
+      const srcCfg = sourceConfigs.find((c) => c.nodeId === d.id);
+      const srcParams = sourceParams[d.id] || {};
+
+      if (d.type === "data-target") {
+        const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
+        const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
+        const targetParams = Object.entries(srcTargetParams).map(([key, value]) => ({ key, value: String(value) }));
+        nodeConfigs[d.id] = {
+          computeType: srcCfg?.executionTarget || d.computeType || fallback,
+          targetType: d.targetType || null,
+          params: targetParams,
+        };
+      } else if (d.type !== "data-source") {
+        const params = Object.entries(srcParams).map(([key, value]) => ({ key, value: String(value) }));
+        nodeConfigs[d.id] = {
+          executionTarget: srcCfg?.executionTarget || "lambda",
+          version: srcCfg?.version || "",
+          params,
+        };
       }
     });
+
+    // Clear rerun source after applying
+    rerunSource.value = null;
 
     // Render the definition DAG on canvas
     const result = definitionToNodesAndEdges(definition);
@@ -593,13 +739,51 @@ const executeWorkflow = async () => {
       dataSources[nodeId] = { packageIds: ids };
     });
 
-    // Build processorConfigs array: [{ nodeId, version, executionTarget }]
+    const dag = configDefinition.value?.dag || [];
+
+    // Build processorConfigs: all runnable nodes (processors + data-targets)
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      const entry = { nodeId };
-      if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
-      if (cfg.version) entry.version = cfg.version;
-      processorConfigs.push(entry);
+      const dagNode = dag.find((n) => n.id === nodeId);
+      if (!dagNode) return;
+
+      if (dagNode.type === "data-target") {
+        // Data-target: executionTarget from computeType
+        if (cfg.computeType) {
+          processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
+        }
+      } else if (dagNode.type !== "data-source") {
+        // Processor node: version + executionTarget
+        const entry = { nodeId };
+        if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
+        if (cfg.version) entry.version = cfg.version;
+        processorConfigs.push(entry);
+      }
+    });
+
+    // Build processorParams: keyed by processor node ID, free-form params
+    const processorParams = {};
+    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
+      if (cfg.params && cfg.params.length > 0) {
+        const obj = {};
+        cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
+        if (Object.keys(obj).length > 0) {
+          processorParams[nodeId] = obj;
+        }
+      }
+    });
+
+    // Build dataTargets: keyed by data-target node ID
+    const dataTargets = {};
+    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
+      const dagNode = dag.find((n) => n.id === nodeId);
+      if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
+        const obj = {};
+        cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
+        if (Object.keys(obj).length > 0) {
+          dataTargets[nodeId] = { params: obj };
+        }
+      }
     });
 
     const payload = {
@@ -610,7 +794,8 @@ const executeWorkflow = async () => {
       },
       datasetId: initiateForm.value.datasetId,
       dataSources,
-      params: {},
+      ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
+      ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
 
     const newRun = await store.dispatch("analysisModule/createRun", payload);
@@ -735,13 +920,12 @@ const fileCountForNode = (nodeId) => {
 */
 const addParam = (nodeId) => {
   if (!nodeConfigs[nodeId]) return;
-  const key = `param_${Object.keys(nodeConfigs[nodeId].params).length + 1}`;
-  nodeConfigs[nodeId].params[key] = "";
+  nodeConfigs[nodeId].params.push({ key: "", value: "" });
 };
 
-const removeParam = (nodeId, key) => {
+const removeParam = (nodeId, index) => {
   if (!nodeConfigs[nodeId]) return;
-  delete nodeConfigs[nodeId].params[key];
+  nodeConfigs[nodeId].params.splice(index, 1);
 };
 
 /*
@@ -800,6 +984,74 @@ const formatDuration = (start, end) => {
 };
 
 /*
+  Metrics helpers
+*/
+const runMetrics = computed(() => selectedWorkflowActivity.value?.metrics || null);
+
+const formatCost = (cost) => {
+  if (cost == null) return "N/A";
+  if (cost === 0) return "$0.00";
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+};
+
+const formatBytes = (bytes) => {
+  if (bytes == null) return "N/A";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
+const formatDurationSec = (sec) => {
+  if (sec == null) return "N/A";
+  if (sec < 60) return `${sec.toFixed(1)}s`;
+  const m = Math.floor(sec / 60);
+  const s = (sec % 60).toFixed(0);
+  return `${m}m ${s}s`;
+};
+
+const nodeMetricLabel = (nodeId) => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.dag) return nodeId;
+  const d = activity.dag.find((n) => n.id === nodeId);
+  return d ? labelForDagNode(d) : nodeId;
+};
+
+const selectedNodeMetrics = computed(() => {
+  if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
+  return runMetrics.value.nodeMetrics.find(
+    (nm) => nm.nodeId === selectedNode.value.id
+  ) || null;
+});
+
+const formatMetricKey = (key) => {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase())
+    .replace(/Sec$/, "(s)")
+    .replace(/Ms$/, "(ms)")
+    .replace(/Mi B$/, "(MiB)")
+    .replace(/ G B/, " GB")
+    .trim();
+};
+
+const formatMetricValue = (key, value) => {
+  if (value == null) return "N/A";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") {
+    if (key === "nodeId") return String(value);
+    if (key.toLowerCase().includes("cost")) return formatCost(value);
+    if (key.toLowerCase().includes("bytes")) return formatBytes(value);
+    if (key.toLowerCase().endsWith("sec")) return formatDurationSec(value);
+    if (key.toLowerCase().endsWith("ms")) return `${value.toLocaleString()} ms`;
+    if (Number.isInteger(value)) return value.toLocaleString();
+    return value.toFixed(3);
+  }
+  return String(value);
+};
+
+/*
   Compute node / user name lookup
 */
 const computeNodeName = (uuid) => {
@@ -830,6 +1082,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchWorkflowInstances"),
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
+      store.dispatch("analysisModule/fetchTargetTypes"),
     ]);
   } catch (err) {
     console.error("Failed to load data:", err);
@@ -908,15 +1161,17 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <!-- Browse mode: status-colored node template -->
+            <!-- Processor node template -->
             <template #node-default="{ data, id }">
               <Handle id="target" type="target" :position="Position.Top" />
               <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                 <div class="node-header">
-                  <span v-if="mode === 'browse'" class="status-dot" :class="statusDotClass(data.status)"></span>
                   <span class="node-title">{{ data.label }}</span>
                 </div>
-                <div v-if="mode === 'browse'" class="node-status-label">{{ statusLabel(data.status) }}</div>
+                <div v-if="mode === 'browse'" class="node-meta">
+                  <span v-if="data.executionTarget" class="runtime-tag">{{ data.executionTarget }}</span>
+                  <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                </div>
                 <div v-if="mode === 'configure' && nodeConfigs[id]" class="node-config-hint">
                   Click to configure
                 </div>
@@ -931,6 +1186,9 @@ onUnmounted(() => {
                   <span class="node-type-badge source-badge">Source</span>
                   <span class="node-title">{{ data.label }}</span>
                 </div>
+                <div v-if="mode === 'browse' && data.packageCount != null" class="node-meta">
+                  {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                </div>
                 <template v-if="mode === 'configure'">
                   <div class="node-file-count">
                     {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
@@ -944,10 +1202,19 @@ onUnmounted(() => {
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
               <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node data-target-node">
+              <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                 <div class="node-header">
                   <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ data.label }}</span>
+                  <span class="node-title">{{ data.targetType || data.label }}</span>
+                </div>
+                <div class="node-body">
+                  <div class="node-meta">
+                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="runtime-tag">
+                      {{ nodeConfigs[id]?.computeType || data.computeType }}
+                    </span>
+                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'configure'" class="node-config-hint">Click to configure</div>
                 </div>
               </div>
             </template>
@@ -957,7 +1224,7 @@ onUnmounted(() => {
 
       <!-- Sidebar (RIGHT) -->
       <div class="applications-sidebar">
-        <bf-button v-if="mode !== 'configure'" class="new-workflow-btn" @click="openInitiateDialog">
+        <bf-button v-if="mode !== 'configure'" class="new-workflow-btn" @click="openWizardDialog">
           Initiate Workflow
         </bf-button>
 
@@ -966,7 +1233,7 @@ onUnmounted(() => {
           <el-collapse-item title="Information" name="information">
 
             <!-- CONFIGURE MODE: Selected processor node config -->
-            <template v-if="mode === 'configure' && selectedNode && nodeConfigs[selectedNode.id]">
+            <template v-if="mode === 'configure' && selectedNode && selectedNode.type !== 'data-target' && selectedNode.type !== 'data-source' && nodeConfigs[selectedNode.id]">
               <h4 class="sidebar-section-title">Processor Configuration</h4>
               <div class="info-card">
                 <div class="info-row">
@@ -1004,24 +1271,87 @@ onUnmounted(() => {
                 <div class="config-field">
                   <label>Parameters</label>
                   <div
-                    v-for="(val, key) in nodeConfigs[selectedNode.id].params"
-                    :key="key"
+                    v-for="(param, index) in nodeConfigs[selectedNode.id].params"
+                    :key="index"
                     class="param-row"
                   >
                     <el-input
-                      :model-value="key"
+                      v-model="param.key"
                       size="small"
                       placeholder="Key"
-                      disabled
                       class="param-key"
                     />
                     <el-input
-                      v-model="nodeConfigs[selectedNode.id].params[key]"
+                      v-model="param.value"
                       size="small"
                       placeholder="Value"
                       class="param-value"
                     />
-                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, key)">&times;</button>
+                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
+                  </div>
+                  <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
+                </div>
+              </div>
+
+              <button class="text-link-btn" @click="selectedNode = null">
+                Clear selection
+              </button>
+            </template>
+
+            <!-- CONFIGURE MODE: Selected data-target node -->
+            <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
+              <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <div class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Target Type</span>
+                  <span class="info-value">{{ selectedNode.data?.targetType || 'N/A' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Runtime</span>
+                  <span class="info-value">
+                    <span class="runtime-tag">{{ nodeConfigs[selectedNode.id].computeType || 'Not set' }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="config-form">
+                <div class="config-field">
+                  <label>Runtime</label>
+                  <el-select
+                    v-model="nodeConfigs[selectedNode.id].computeType"
+                    size="small"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="ct in getComputeTypesForTarget(selectedNode.data?.targetType)"
+                      :key="ct"
+                      :label="ct"
+                      :value="ct"
+                    />
+                  </el-select>
+                </div>
+
+                <!-- Per-node params -->
+                <div class="config-field">
+                  <label>Parameters</label>
+                  <div
+                    v-for="(param, index) in nodeConfigs[selectedNode.id].params"
+                    :key="index"
+                    class="param-row"
+                  >
+                    <el-input
+                      v-model="param.key"
+                      size="small"
+                      placeholder="Key"
+                      class="param-key"
+                    />
+                    <el-input
+                      v-model="param.value"
+                      size="small"
+                      placeholder="Value"
+                      class="param-value"
+                    />
+                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
                   </div>
                   <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
                 </div>
@@ -1064,8 +1394,9 @@ onUnmounted(() => {
                 </div>
               </div>
               <p class="configure-hint">
-                Click <strong>data-source</strong> nodes to select files.
-                Click <strong>processor</strong> nodes to set parameters.
+                Click <strong>data-source</strong> nodes to select files,
+                <strong>processor</strong> nodes to set parameters,
+                and <strong>data-target</strong> nodes to override the runtime.
               </p>
             </template>
 
@@ -1105,6 +1436,13 @@ onUnmounted(() => {
                 >
                   Open Logs
                 </bf-button>
+                <button
+                  v-if="selectedNodeMetrics"
+                  class="text-link-btn"
+                  @click="nodeMetricsDialogVisible = true"
+                >
+                  Show node metrics
+                </button>
                 <button class="text-link-btn" @click="selectedNode = null">
                   Clear selection
                 </button>
@@ -1151,6 +1489,32 @@ onUnmounted(() => {
                   <span class="info-value">{{ selectedWorkflowActivity.dag.length }}</span>
                 </div>
               </div>
+              <!-- Metrics summary -->
+              <template v-if="runMetrics">
+                <h4 class="sidebar-section-title">Metrics</h4>
+                <div class="metrics-summary">
+                  <div class="metrics-summary-item">
+                    <span class="metrics-summary-value">{{ formatDurationSec(runMetrics.executionTimeSec) }}</span>
+                    <span class="metrics-summary-label">Duration</span>
+                  </div>
+                  <div class="metrics-summary-item">
+                    <span class="metrics-summary-value">{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
+                    <span class="metrics-summary-label">Est. Cost</span>
+                  </div>
+                  <div class="metrics-summary-item">
+                    <span class="metrics-summary-value">{{ runMetrics.packagesProcessed ?? 'N/A' }}</span>
+                    <span class="metrics-summary-label">Files</span>
+                  </div>
+                </div>
+                <button class="text-link-btn" @click="metricsDialogVisible = true">
+                  Show metrics details
+                </button>
+              </template>
+
+              <bf-button class="secondary rerun-config-btn" @click="rerunFromRun(selectedWorkflowActivity)">
+                <IconRotateRight :width="14" :height="14" />
+                Rerun with configuration
+              </bf-button>
             </template>
 
             <div v-else class="info-empty">
@@ -1191,13 +1555,21 @@ onUnmounted(() => {
               >
                 <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
                 <div class="wf-item-info">
-                  <div class="wf-item-name">{{ formatTime(run.startedAt) }}</div>
+                  <div class="wf-item-name">{{ formatTime(run.startedAt) }} </div>
+                  <div class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
                   <div class="wf-item-meta">
-                    {{ statusLabel(run.status) }}
-                    &middot; {{ computeNodeName(run.computeNodeUuid) }}
+
+                    {{ computeNodeName(run.computeNodeUuid) }}
                   </div>
                   <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
                 </div>
+                <button
+                  class="rerun-btn"
+                  title="Rerun with this configuration"
+                  @click.stop="rerunFromRun(run)"
+                >
+                  <IconRotateRight :width="16" :height="16" />
+                </button>
               </div>
               <div v-if="filteredRuns.length === 0" class="workflow-list-empty">
                 No runs found
@@ -1218,71 +1590,147 @@ onUnmounted(() => {
 
     <!-- Initiate Workflow Dialog -->
     <el-dialog
-      v-model="initiateDialogVisible"
-      title="Initiate Workflow"
-      width="480px"
+      v-model="wizardVisible"
+      :title="wizardStepTitles[wizardStep]"
+      width="560px"
       :close-on-click-modal="false"
     >
-      <div class="run-dialog-form">
-        <div class="run-dialog-field">
-          <label>Workflow</label>
-          <el-select
-            v-model="initiateForm.workflowId"
-            placeholder="Select a workflow"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="wf in workflows"
+      <div class="wizard-body">
+        <!-- Progress dots -->
+        <div class="wizard-progress">
+          <span
+            v-for="(title, i) in wizardStepTitles"
+            :key="i"
+            class="wizard-dot"
+            :class="{ active: wizardStep === i, done: wizardStep > i }"
+          ></span>
+        </div>
+
+        <!-- Step 0: Workflow -->
+        <div v-if="wizardStep === 0" class="wizard-step">
+          <p class="wizard-step-desc">Choose a workflow definition to run.</p>
+          <div v-if="wizardSelectedWorkflow" class="wizard-selection">
+            <span class="wizard-selection-label">Selected:</span>
+            <span class="wizard-selection-name">{{ wizardSelectedWorkflow.name }}</span>
+            <button class="wizard-selection-clear" @click="wizardForm.workflowId = ''">&times;</button>
+          </div>
+          <el-input
+            v-model="workflowSearch"
+            placeholder="Filter workflows..."
+            clearable
+            class="wizard-search"
+          />
+          <div class="wizard-cards">
+            <div
+              v-for="wf in filteredWizardWorkflows"
               :key="wf.uuid"
-              :label="wf.name"
-              :value="wf.uuid"
-              :disabled="!wf.isActive"
-            />
-          </el-select>
+              class="wizard-card"
+              :class="{ selected: wizardForm.workflowId === wf.uuid, disabled: !wf.isActive }"
+              @click="wf.isActive && (wizardForm.workflowId = wf.uuid)"
+            >
+              <div class="wizard-card-name">{{ wf.name }}</div>
+              <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
+              <div class="wizard-card-meta">
+                {{ (wf.dag || []).length }} processors
+                <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
+              </div>
+            </div>
+            <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+          </div>
         </div>
-        <div class="run-dialog-field">
-          <label>Compute Node</label>
-          <el-select
-            v-model="initiateForm.computeNodeId"
-            placeholder="Select a compute node"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="cn in computeNodes"
+
+        <!-- Step 1: Compute Node -->
+        <div v-if="wizardStep === 1" class="wizard-step">
+          <p class="wizard-step-desc">Select the compute node to execute the workflow on.</p>
+          <div v-if="wizardSelectedComputeNode" class="wizard-selection">
+            <span class="wizard-selection-label">Selected:</span>
+            <span class="wizard-selection-name">{{ wizardSelectedComputeNode.name }}</span>
+            <button class="wizard-selection-clear" @click="wizardForm.computeNodeId = ''">&times;</button>
+          </div>
+          <el-input
+            v-model="computeNodeSearch"
+            placeholder="Filter compute nodes..."
+            clearable
+            class="wizard-search"
+          />
+          <div class="wizard-cards">
+            <div
+              v-for="cn in filteredWizardComputeNodes"
               :key="cn.uuid"
-              :label="cn.name"
-              :value="cn.uuid"
-            />
-          </el-select>
+              class="wizard-card"
+              :class="{ selected: wizardForm.computeNodeId === cn.uuid }"
+              @click="wizardForm.computeNodeId = cn.uuid"
+            >
+              <div class="wizard-card-name">{{ cn.name }}</div>
+              <div v-if="cn.description" class="wizard-card-desc">{{ cn.description }}</div>
+            </div>
+            <div v-if="filteredWizardComputeNodes.length === 0" class="wizard-cards-loading">No compute nodes found</div>
+          </div>
         </div>
-        <div class="run-dialog-field">
-          <label>Dataset</label>
-          <el-select
-            v-model="initiateForm.datasetId"
-            placeholder="Search for a dataset"
-            filterable
-            remote
-            :remote-method="onDatasetSearch"
-            :loading="datasetSearchLoading"
-            style="width: 100%"
-          >
-            <el-option
+
+        <!-- Step 2: Dataset -->
+        <div v-if="wizardStep === 2" class="wizard-step">
+          <p class="wizard-step-desc">Search and select the dataset to process.</p>
+          <div v-if="wizardSelectedDataset" class="wizard-selection">
+            <span class="wizard-selection-label">Selected:</span>
+            <span class="wizard-selection-name">{{ wizardSelectedDataset.content?.name }}</span>
+            <button class="wizard-selection-clear" @click="wizardForm.datasetId = ''">&times;</button>
+          </div>
+          <el-input
+            placeholder="Search datasets..."
+            :model-value="''"
+            @input="onDatasetSearch"
+            clearable
+            class="wizard-search"
+          />
+          <div class="wizard-cards">
+            <div v-if="datasetSearchLoading" class="wizard-cards-loading">Searching...</div>
+            <div
               v-for="ds in datasetOptions"
               :key="ds.content?.id"
-              :label="ds.content?.name"
-              :value="ds.content?.id"
-            />
-          </el-select>
+              class="wizard-card"
+              :class="{ selected: wizardForm.datasetId === ds.content?.id }"
+              @click="wizardForm.datasetId = ds.content?.id"
+            >
+              <div class="wizard-card-name">{{ ds.content?.name }}</div>
+              <div v-if="ds.content?.description" class="wizard-card-desc">{{ ds.content.description }}</div>
+            </div>
+            <div v-if="!datasetSearchLoading && datasetOptions.length === 0" class="wizard-cards-loading">No datasets found</div>
+          </div>
+        </div>
+
+        <!-- Step 3: Confirm -->
+        <div v-if="wizardStep === 3" class="wizard-step">
+          <p class="wizard-step-desc">Review your selections before proceeding.</p>
+          <div class="wizard-summary">
+            <div class="wizard-summary-row">
+              <span class="wizard-summary-label">Workflow</span>
+              <span class="wizard-summary-value">{{ wizardSelectedWorkflow?.name || wizardForm.workflowId }}</span>
+            </div>
+            <div class="wizard-summary-row">
+              <span class="wizard-summary-label">Compute Node</span>
+              <span class="wizard-summary-value">{{ wizardSelectedComputeNode?.name || wizardForm.computeNodeId }}</span>
+            </div>
+            <div class="wizard-summary-row">
+              <span class="wizard-summary-label">Dataset</span>
+              <span class="wizard-summary-value">{{ wizardSelectedDataset?.content?.name || wizardForm.datasetId }}</span>
+            </div>
+          </div>
+          <div class="wizard-hint">
+            After clicking <strong>Configure</strong>, you will be able to click on <strong>data source</strong> nodes to select files, and on <strong>processor</strong> nodes to adjust settings before executing the run.
+          </div>
         </div>
       </div>
+
       <template #footer>
-        <bf-button class="secondary" @click="initiateDialogVisible = false">Cancel</bf-button>
-        <bf-button
-          :disabled="!initiateForm.workflowId || !initiateForm.computeNodeId || !initiateForm.datasetId"
-          @click="initiateWorkflow"
-        >
-          Configure
-        </bf-button>
+        <div class="run-dialog-footer">
+          <bf-button class="secondary" @click="wizardVisible = false">Cancel</bf-button>
+          <div class="wizard-footer-right">
+            <bf-button v-if="wizardStep > 0" class="secondary" @click="wizardBack">Back</bf-button>
+            <bf-button v-if="wizardStep < 3" :disabled="!wizardCanNext" @click="wizardNext">Next</bf-button>
+            <bf-button v-else @click="wizardConfirm">Configure</bf-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
 
@@ -1354,12 +1802,228 @@ onUnmounted(() => {
         <bf-button class="secondary" @click="logsDialogVisible = false">Close</bf-button>
       </template>
     </el-dialog>
+
+    <!-- Metrics Detail Dialog -->
+    <el-dialog
+      v-model="metricsDialogVisible"
+      title="Run Metrics"
+      width="560px"
+      :close-on-click-modal="true"
+    >
+      <div v-if="runMetrics" class="metrics-receipt">
+        <!-- Header -->
+        <div class="receipt-header">
+          <div class="receipt-title">{{ runWorkflowName || 'Workflow Run' }}</div>
+          <div class="receipt-date">{{ formatTime(selectedWorkflowActivity?.startedAt) }}</div>
+        </div>
+
+        <!-- Summary row -->
+        <div class="receipt-section">
+          <div class="receipt-section-title">Summary</div>
+          <div class="receipt-row">
+            <span>Total Duration</span>
+            <span>{{ formatDurationSec(runMetrics.executionTimeSec) }}</span>
+          </div>
+          <div class="receipt-row">
+            <span>Processors</span>
+            <span>{{ runMetrics.processorCount ?? 'N/A' }}</span>
+          </div>
+          <div class="receipt-row">
+            <span>Targets</span>
+            <span>{{ runMetrics.targetCount ?? 'N/A' }}</span>
+          </div>
+          <div class="receipt-row">
+            <span>Files Processed</span>
+            <span>{{ runMetrics.packagesProcessed ?? 'N/A' }}</span>
+          </div>
+        </div>
+
+        <!-- Node Metrics -->
+        <div v-if="runMetrics.nodeMetrics?.length" class="receipt-section">
+          <div class="receipt-section-title">Node Performance</div>
+          <div
+            v-for="nm in runMetrics.nodeMetrics"
+            :key="nm.nodeId"
+            class="receipt-node"
+          >
+            <div class="receipt-node-header">
+              <span class="receipt-node-name">{{ nodeMetricLabel(nm.nodeId) }}</span>
+              <span class="receipt-node-badge" :class="nm.computeType">{{ nm.computeType }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Duration</span>
+              <span>{{ formatDurationSec(nm.durationSec) }}</span>
+            </div>
+            <div v-if="nm.billedDurationMs != null" class="receipt-row">
+              <span>Billed Duration</span>
+              <span>{{ (nm.billedDurationMs / 1000).toFixed(1) }}s</span>
+            </div>
+            <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
+              <span>Memory Used</span>
+              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div class="receipt-row">
+              <span>Status</span>
+              <span class="receipt-status" :class="statusDotClass(nm.status)">{{ statusLabel(nm.status) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cost Breakdown -->
+        <div v-if="runMetrics.costEstimate" class="receipt-section">
+          <div class="receipt-section-title">Cost Breakdown</div>
+
+          <div v-if="runMetrics.costEstimate.lambda" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">Lambda</div>
+            <div class="receipt-row">
+              <span>Invocations</span>
+              <span>{{ runMetrics.costEstimate.lambda.invocationCount }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>GB-Seconds</span>
+              <span>{{ runMetrics.costEstimate.lambda.totalGBSeconds?.toFixed(2) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.lambda.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.ecs" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">ECS</div>
+            <div class="receipt-row">
+              <span>Tasks</span>
+              <span>{{ runMetrics.costEstimate.ecs.taskCount }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>vCPU Hours</span>
+              <span>{{ runMetrics.costEstimate.ecs.vcpuHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Memory GB Hours</span>
+              <span>{{ runMetrics.costEstimate.ecs.memoryGBHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.ecs.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.stepFunctions" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">Step Functions</div>
+            <div class="receipt-row">
+              <span>State Transitions</span>
+              <span>{{ runMetrics.costEstimate.stepFunctions.stateTransitions }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.stepFunctions.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.data" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">Data Transfer</div>
+            <div class="receipt-row">
+              <span>Input</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.data.inputBytes) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.data.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.efsThroughput" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS Throughput</div>
+            <div class="receipt-row">
+              <span>Read</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Write</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsThroughput.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.cloudWatchLogs" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">CloudWatch Logs</div>
+            <div class="receipt-row">
+              <span>Ingest</span>
+              <span>{{ runMetrics.costEstimate.cloudWatchLogs.estimatedIngestGB?.toFixed(6) }} GB</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.cloudWatchLogs.estimatedCost) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="receipt-total">
+          <span>Total Estimated Cost</span>
+          <span>{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
+        </div>
+
+        <div v-if="runMetrics.costEstimate?.pricingVersion" class="receipt-footer">
+          Pricing: {{ runMetrics.costEstimate.pricingVersion }}
+        </div>
+      </div>
+
+      <template #footer>
+        <bf-button class="secondary" @click="metricsDialogVisible = false">Close</bf-button>
+      </template>
+    </el-dialog>
+
+    <!-- Node Metrics Detail Dialog -->
+    <el-dialog
+      v-model="nodeMetricsDialogVisible"
+      title="Node Metrics"
+      width="480px"
+      :close-on-click-modal="true"
+    >
+      <div v-if="selectedNodeMetrics" class="metrics-receipt">
+        <div class="receipt-header">
+          <div class="receipt-title">{{ selectedNode?.data?.label || 'Node' }}</div>
+          <div class="receipt-date">
+            <span class="receipt-node-badge" :class="selectedNodeMetrics.computeType">
+              {{ selectedNodeMetrics.computeType }}
+            </span>
+          </div>
+        </div>
+
+        <div class="receipt-section">
+          <div
+            v-for="(value, key) in selectedNodeMetrics"
+            :key="key"
+            class="receipt-row"
+          >
+            <template v-if="key !== 'nodeId'">
+              <span>{{ formatMetricKey(key) }}</span>
+              <span>{{ formatMetricValue(key, value) }}</span>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="info-empty">
+        No metrics available for this node
+      </div>
+
+      <template #footer>
+        <bf-button class="secondary" @click="nodeMetricsDialogVisible = false">Close</bf-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <style lang="scss">
 /* Unscoped styles for VueFlow handle rendering */
 @import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/core/dist/theme-default.css";
 
 .run-monitor-flow {
   .vue-flow__handle {
@@ -1507,7 +2171,7 @@ onUnmounted(() => {
     padding: 0 !important;
 
     &.selected .custom-node {
-      box-shadow: 0 0 0 2px rgba(80, 57, 247, 0.25);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
     }
   }
 }
@@ -1540,17 +2204,32 @@ onUnmounted(() => {
     line-height: 1.3;
   }
 
-  .node-status-label {
+  .node-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
     font-size: 11px;
     color: theme.$gray_4;
-    margin-top: 4px;
-    padding-left: 20px;
+  }
+
+  .node-status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+
+    &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
+    &.dot-blue { background: #dbeafe; color: #1d4ed8; }
+    &.dot-green { background: #dcfce7; color: #15803d; }
+    &.dot-red { background: #fee2e2; color: #b91c1c; }
   }
 
   .node-config-hint {
     font-size: 11px;
     color: theme.$purple_1;
-    margin-top: 4px;
+    margin-top: 6px;
     font-style: italic;
   }
 
@@ -1567,17 +2246,39 @@ onUnmounted(() => {
   &.red-node { border-color: theme.$status_red; }
 
   &.data-source-node {
-    border-color: theme.$teal_1;
-    background: theme.$teal_tint;
+    border-color: #6366f1;
+    background: #eef2ff;
 
-    &.has-files {
-      border-color: theme.$status_green;
-    }
+    &.has-files { border-color: theme.$status_green; }
+    &.green-node { border-color: theme.$status_green; }
+    &.red-node { border-color: theme.$status_red; }
+    &.blue-node { border-color: #3b82f6; }
   }
 
   &.data-target-node {
-    border-color: #8b5cf6;
-    background: #faf5ff;
+    background: #ecfdf5;
+    border-color: #059669;
+
+    &.green-node { border-color: theme.$status_green; }
+    &.red-node { border-color: theme.$status_red; }
+    &.blue-node { border-color: #3b82f6; }
+
+    .node-body {
+      margin-top: 6px;
+    }
+
+    .runtime-tag {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+      white-space: nowrap;
+      display: inline-block;
+    }
   }
 
   .node-type-badge {
@@ -1589,8 +2290,8 @@ onUnmounted(() => {
     border-radius: 4px;
     flex-shrink: 0;
 
-    &.source-badge { background: #3b82f6; color: white; }
-    &.target-badge { background: #8b5cf6; color: white; }
+    &.source-badge { background: #6366f1; color: white; }
+    &.target-badge { background: #059669; color: white; }
   }
 }
 
@@ -1698,6 +2399,31 @@ onUnmounted(() => {
   .wf-item-info {
     flex: 1;
     min-width: 0;
+  }
+
+  .rerun-btn {
+    background: none;
+    border: none;
+    color: theme.$gray_4;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+    flex-shrink: 0;
+    align-self: center;
+
+    &:hover {
+      color: theme.$purple_1;
+      background: rgba(0, 0, 0, 0.05);
+    }
+  }
+
+  &:hover .rerun-btn {
+    opacity: 1;
   }
 
   .wf-item-name {
@@ -1814,6 +2540,19 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
+.runtime-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(5, 150, 105, 0.12);
+  color: #047857;
+  white-space: nowrap;
+  display: inline-block;
+}
+
 /* Config form in sidebar */
 .config-form {
   display: flex;
@@ -1861,22 +2600,11 @@ onUnmounted(() => {
 }
 
 /* Dialogs */
-.run-dialog-form {
+.run-dialog-footer {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.run-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  label {
-    font-size: 13px;
-    font-weight: 600;
-    color: theme.$gray_5;
-  }
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 /* File picker */
@@ -1910,6 +2638,184 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 8px;
+}
+
+.rerun-config-btn {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Metrics summary in sidebar */
+.metrics-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.metrics-summary-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+}
+
+.metrics-summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: theme.$black;
+}
+
+.metrics-summary-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_4;
+  margin-top: 2px;
+}
+
+/* Metrics receipt dialog */
+.metrics-receipt {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.receipt-header {
+  text-align: center;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 2px dashed theme.$gray_2;
+}
+
+.receipt-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: theme.$black;
+}
+
+.receipt-date {
+  font-size: 12px;
+  color: theme.$gray_4;
+  margin-top: 2px;
+}
+
+.receipt-section {
+  margin-bottom: 16px;
+}
+
+.receipt-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: theme.$gray_4;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid theme.$gray_2;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 13px;
+  color: theme.$gray_5;
+
+  &.receipt-row-cost {
+    font-weight: 600;
+    color: theme.$black;
+    border-top: 1px dotted theme.$gray_2;
+    padding-top: 4px;
+    margin-top: 2px;
+  }
+}
+
+.receipt-node {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.receipt-node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.receipt-node-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: theme.$black;
+}
+
+.receipt-node-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+
+  &.lambda {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &.ecs {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.receipt-status {
+  font-weight: 600;
+  font-size: 12px;
+
+  &.dot-green { color: #15803d; }
+  &.dot-red { color: #b91c1c; }
+  &.dot-blue { color: #1d4ed8; }
+  &.dot-gray { color: theme.$gray_4; }
+}
+
+.receipt-cost-group {
+  margin-bottom: 10px;
+  padding-left: 8px;
+}
+
+.receipt-cost-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$black;
+  margin-bottom: 4px;
+}
+
+.receipt-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  margin-top: 8px;
+  border-top: 2px dashed theme.$gray_2;
+  font-size: 15px;
+  font-weight: 700;
+  color: theme.$black;
+}
+
+.receipt-footer {
+  text-align: center;
+  font-size: 11px;
+  color: theme.$gray_4;
   margin-top: 8px;
 }
 
@@ -1958,5 +2864,206 @@ onUnmounted(() => {
 .log-message {
   color: theme.$black;
   word-break: break-word;
+}
+
+/* Wizard dialog */
+.wizard-body {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: theme.$gray_2;
+  transition: background 0.2s;
+
+  &.active {
+    background: theme.$purple_1;
+  }
+
+  &.done {
+    background: theme.$green_1;
+  }
+}
+
+.wizard-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-step-desc {
+  font-size: 13px;
+  color: theme.$gray_4;
+  margin: 0 0 14px 0;
+}
+
+.wizard-selection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f0ff;
+  border: 1px solid theme.$purple_1;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.wizard-selection-label {
+  font-size: 12px;
+  color: theme.$gray_4;
+  flex-shrink: 0;
+}
+
+.wizard-selection-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$black;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.wizard-selection-clear {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: theme.$gray_4;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+
+  &:hover {
+    color: theme.$black;
+  }
+}
+
+.wizard-search {
+  margin-bottom: 12px;
+}
+
+.wizard-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.wizard-cards-loading {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+
+.wizard-card {
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover:not(.disabled) {
+    border-color: theme.$gray_3;
+    background: theme.$gray_1;
+  }
+
+  &.selected {
+    border-color: theme.$gray_3;
+    background: theme.$gray_1;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.wizard-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$black;
+  margin-bottom: 2px;
+}
+
+.wizard-card-desc {
+  font-size: 12px;
+  color: theme.$gray_4;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.wizard-card-meta {
+  font-size: 11px;
+  color: theme.$gray_4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-card-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: theme.$gray_2;
+  color: theme.$gray_5;
+}
+
+.wizard-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.wizard-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid theme.$gray_2;
+  }
+}
+
+.wizard-summary-label {
+  color: theme.$gray_4;
+  font-weight: 500;
+}
+
+.wizard-summary-value {
+  color: theme.$black;
+  font-weight: 600;
+}
+
+.wizard-hint {
+  padding: 12px 14px;
+  background: #eff6ff;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+}
+
+.wizard-footer-right {
+  display: flex;
+  gap: 8px;
 }
 </style>
