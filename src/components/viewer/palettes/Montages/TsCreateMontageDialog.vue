@@ -10,10 +10,12 @@ import {useGetToken} from "@/composables/useGetToken";
 import toQueryParams from "@/utils/toQueryParams";
 import {useSendXhr} from "@/mixins/request/request_composable";
 import { useViewerStore } from '@/stores/tsviewer'
+import { useViewerInstance } from '@/composables/useViewerInstance'
 
 // Stores
 const store = useStore(); // Keep for config and activeOrganization
-const viewerStore = useViewerStore(); // Use for viewer-related data
+const appViewerStore = useViewerStore(); // App-specific store for workspace montages
+const viewerControls = useViewerInstance(); // Library viewer controls
 
 const emit = defineEmits('close')
 
@@ -27,8 +29,8 @@ const props = defineProps({
 const montageFormRef = ref()
 const montageList = ref()
 
-// Computed property to get channels from viewerStore
-const viewerChannels = computed(() => viewerStore.viewerChannels)
+// Computed property to get channels from library viewer controls
+const viewerChannels = computed(() => viewerControls.channels.value)
 
 // DRAG AND DROP
 function handleDragStart(event, itemData) {
@@ -106,7 +108,6 @@ function submitMontage() {
 
   montageFormRef.value.validate((valid) => {
     if (!valid) {
-      console.log('Form not valid')
       return;
     }
 
@@ -138,10 +139,12 @@ function submitMontage() {
           displayName: submitMontageForm.value.name,
           channelPairs: channels,
         },
-      }).then(() => {
-        console.log('SUCCESS')
-        // Use viewerStore instead of Vuex for fetching workspace montages
-        viewerStore.fetchWorkspaceMontages()
+      }).then(async () => {
+        // Fetch and sync montages to both stores
+        const montages = await appViewerStore.fetchWorkspaceMontages()
+        if (viewerControls.store?.setWorkspaceMontages) {
+          viewerControls.store.setWorkspaceMontages(montages)
+        }
         emit('close')
       });
     });

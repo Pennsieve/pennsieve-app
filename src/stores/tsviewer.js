@@ -131,7 +131,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         })
 
         viewerAnnotations.value = validatedAnnotations
-        console.log('Set annotations with validated structure:', validatedAnnotations)
     }
 
     const setActiveAnnotationLayer = (layerId) => {
@@ -149,7 +148,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         const layerIndex = findIndex(propEq('id', layerId), viewerAnnotations.value)
         if (layerIndex >= 0) {
             viewerAnnotations.value[layerIndex].selected = true
-            console.log('Successfully set active layer:', viewerAnnotations.value[layerIndex])
         } else {
             console.error('Layer with ID not found:', layerId, 'Available layers:', viewerAnnotations.value)
         }
@@ -203,7 +201,6 @@ export const useViewerStore = defineStore('tsviewer', () => {
         }
 
         viewerAnnotations.value.push(validatedLayer)
-        console.log('Created layer with validated structure:', validatedLayer)
     }
 
 
