@@ -52,6 +52,7 @@ import TagPill from "@/components/shared/TagPill/TagPill.vue";
 import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 
 import "@pennsieve-viz/micro-ct/style.css";
+import "@pennsieve-viz/core/style.css";
 
 export default {
   name: "ViewerPane",
@@ -131,6 +132,11 @@ export default {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
+          // Only fetch timeseries data for timeseries packages
+          const packageType = pathOr('', ['content', 'packageType'], pkg).toLowerCase();
+          if (packageType === 'timeseries') {
+            this.fetchTimeseriesData();
+          }
         }
       },
       immediate: true,
