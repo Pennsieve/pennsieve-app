@@ -707,53 +707,47 @@ const PropertyTree = defineComponent({
         const tags = []
         
         if (props.required.includes(propName)) {
-          tags.push(h(ElTag, { 
-            type: '', 
-            size: 'small', 
+          tags.push(h(ElTag, {
+            size: 'small',
             effect: 'plain',
             class: 'tag-required'
           }, () => 'Required'))
         }
         
         if (property['x-pennsieve-key']) {
-          tags.push(h(ElTag, { 
-            type: '', 
-            size: 'small', 
+          tags.push(h(ElTag, {
+            size: 'small',
             effect: 'plain',
             class: 'tag-key'
           }, () => 'Key'))
         }
         
         if (property['x-pennsieve-sensitive']) {
-          tags.push(h(ElTag, { 
-            type: '', 
-            size: 'small', 
+          tags.push(h(ElTag, {
+            size: 'small',
             effect: 'plain',
             class: 'tag-sensitive'
           }, () => 'Sensitive'))
         }
         
         if (property.deprecated) {
-          tags.push(h(ElTag, { 
-            type: '', 
-            size: 'small', 
+          tags.push(h(ElTag, {
+            size: 'small',
             effect: 'plain',
             class: 'tag-deprecated'
           }, () => 'Deprecated'))
         }
         
         if (property.readOnly) {
-          tags.push(h(ElTag, { 
-            type: '', 
-            size: 'small', 
+          tags.push(h(ElTag, {
+            size: 'small',
             effect: 'plain',
             class: 'tag-readonly'
           }, () => 'Read-only'))
         }
         
-        tags.push(h(ElTag, { 
-          type: '', 
-          size: 'small', 
+        tags.push(h(ElTag, {
+          size: 'small',
           effect: 'plain',
           class: 'tag-type'
         }, () => formatType(property)))
@@ -769,7 +763,6 @@ const PropertyTree = defineComponent({
             'raw-content': true
           }, {
             default: () => h(ElTag, {
-              type: '',
               size: 'small',
               effect: 'plain',
               class: 'tag-hidden-features'
@@ -1061,62 +1054,55 @@ const PropertyTree = defineComponent({
                 {{ propName }}
               </span>
               <div class="property-tags">
-                <el-tag 
+                <el-tag
                   v-if="isRequired(effectiveModelData.latest_version.schema, propName)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-required"
                 >
                   Required
                 </el-tag>
-                <el-tag 
+                <el-tag
                   v-if="isKey(property)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-key"
                 >
                   Key
                 </el-tag>
-                <el-tag 
+                <el-tag
                   v-if="isSensitive(property)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-sensitive"
                 >
                   Sensitive
                 </el-tag>
-                <el-tag 
+                <el-tag
                   v-if="isDeprecated(property)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-deprecated"
                 >
                   Deprecated
                 </el-tag>
-                <el-tag 
+                <el-tag
                   v-if="isReadOnly(property)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-readonly"
                 >
                   Read-only
                 </el-tag>
-                <el-tag 
+                <el-tag
                   v-if="isWriteOnly(property)"
-                  type="" 
                   size="small"
                   effect="plain"
                   class="tag-writeonly"
                 >
                   Write-only
                 </el-tag>
-                <el-tag 
-                  type="" 
+                <el-tag
                   size="small"
                   effect="plain"
                   class="tag-type"
@@ -1130,8 +1116,7 @@ const PropertyTree = defineComponent({
                   raw-content
                   :content="`This property has advanced JSON Schema features not shown in Simple View:<br><strong>${hasHiddenFeatures(property).join(', ')}</strong><br>Switch to JSON View to see the complete specification.`"
                 >
-                  <el-tag 
-                    type="" 
+                  <el-tag
                     size="small"
                     effect="plain"
                     class="tag-hidden-features"

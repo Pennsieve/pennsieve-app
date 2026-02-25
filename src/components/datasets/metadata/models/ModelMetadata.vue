@@ -44,7 +44,8 @@
     
     <el-descriptions-item label="Description">
       <div v-if="!editingDescription" class="editable-field">
-        <span>{{ modelData.description || 'No description' }}</span>
+        <span v-if="parsedDescription" class="markdown-body" v-html="parsedDescription"></span>
+        <span v-else>No description</span>
         <el-button 
           v-if="canEdit" 
           @click="startEditDescription" 
@@ -109,6 +110,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ElDescriptions, ElDescriptionsItem, ElButton, ElInput, ElMessage } from 'element-plus'
+import { marked } from 'marked'
 import IconPencil from "@/components/icons/IconPencil.vue"
 import IconCopyDocument from "@/components/icons/IconCopyDocument.vue"
 import { usePropertyFormatting } from '@/composables/usePropertyFormatting.js'
@@ -153,6 +155,11 @@ const savingMetadata = ref(false)
 // Can edit if we have modelId and datasetId, regardless of model prop
 const canEdit = computed(() => {
   return !!(props.modelId && props.datasetId)
+})
+
+const parsedDescription = computed(() => {
+  if (!props.modelData?.description) return ''
+  return marked.parse(props.modelData.description)
 })
 
 // Editing functions
@@ -243,7 +250,8 @@ const copyModelId = async () => {
 :deep(.el-descriptions__content) {
   min-height: 18px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex: 1;
 }
 
 // Inline editing styles
@@ -278,6 +286,13 @@ const copyModelId = async () => {
 }
 
 .edit-container {
+  width: 100%;
+
+  :deep(.el-textarea__inner) {
+    min-height: 100px !important;
+    width: 100%;
+  }
+
   .edit-actions {
     display: flex;
     gap: 8px;
