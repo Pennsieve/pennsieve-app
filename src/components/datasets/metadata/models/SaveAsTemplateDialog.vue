@@ -98,7 +98,7 @@ watch(() => props.visible, (newVisible) => {
     templateForm.value = {
       name: props.modelData.name + '_template',
       display_name: (props.modelData.display_name || props.modelData.name) + ' Template',
-      description: `Template created from model: ${props.modelData.display_name || props.modelData.name}`
+      description: props.modelData.description || ''
     }
   }
 })
