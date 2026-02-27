@@ -118,6 +118,7 @@ const githubUsername = computed(() => {
 })
 
 const oauthWindow = ref(null)
+const popupPollTimer = ref(null)
 
 const githubMessageListener = async (event) => {
   if (
@@ -125,6 +126,9 @@ const githubMessageListener = async (event) => {
     event.data.source === 'github-redirect-response' &&
     event.data.code
   ) {
+    // Clear the popup poll since we got a proper redirect with a code
+    clearPopupPoll()
+
     const oauthCode = event.data.code
     if (oauthCode !== '') {
       try {
@@ -150,6 +154,13 @@ const githubMessageListener = async (event) => {
         }
         await store.dispatch('updateProfile', updatedProfile)
 
+        // Refresh the cached repository list with updated GitHub permissions
+        const paginationParams = store.state.codeReposModule.myReposPaginationParams
+        await store.dispatch('codeReposModule/fetchMyRepos', {
+          page: 1,
+          size: paginationParams.size,
+        })
+
         instance.proxy.$message({
           message: 'Your GitHub integration has been updated successfully!',
           type: 'success',
@@ -171,6 +182,39 @@ const githubMessageListener = async (event) => {
   }
 }
 
+function clearPopupPoll() {
+  if (popupPollTimer.value) {
+    clearInterval(popupPollTimer.value)
+    popupPollTimer.value = null
+  }
+}
+
+async function onPopupClosed() {
+  clearPopupPoll()
+
+  try {
+    // Re-fetch the GitHub profile from the backend
+    await fetchGithubProfile()
+
+    // Refresh the cached repository list
+    const paginationParams = store.state.codeReposModule.myReposPaginationParams
+    await store.dispatch('codeReposModule/fetchMyRepos', {
+      page: 1,
+      size: paginationParams.size,
+    })
+
+    instance.proxy.$message({
+      message: 'GitHub integration refreshed.',
+      type: 'success',
+      center: true,
+      duration: 3000,
+      showClose: true,
+    })
+  } catch (error) {
+    console.error('Error refreshing GitHub data after popup closed:', error)
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('message', githubMessageListener)
   // Only fetch GitHub profile if we don't already have it
@@ -181,19 +225,27 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('message', githubMessageListener)
+  clearPopupPoll()
 })
 
 function updateGithubIntegration() {
-  // Open the same GitHub OAuth flow as initial connection
-  const redirectUri = `${window.location.origin}/github-redirect`
   const githubAppUrl = siteConfig.githubAppUrl || 'https://github.com/apps/pennsieve'
+  const redirectUri = `${window.location.origin}/github-redirect`
   const url = `${githubAppUrl}?redirect_uri=${redirectUri}`
-  
+
   oauthWindow.value = window.open(
     url,
     "_blank",
     "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
   )
+
+  // Poll for popup closure — GitHub does not redirect back on installation updates
+  clearPopupPoll()
+  popupPollTimer.value = setInterval(() => {
+    if (oauthWindow.value && oauthWindow.value.closed) {
+      onPopupClosed()
+    }
+  }, 500)
 }
 
 async function fetchGithubProfile() {
