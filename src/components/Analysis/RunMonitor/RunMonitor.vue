@@ -63,6 +63,7 @@ const logsNodeLabel = ref("");
 
 // Metrics dialog state
 const metricsDialogVisible = ref(false);
+const durationDialogVisible = ref(false);
 const nodeMetricsDialogVisible = ref(false);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
@@ -200,6 +201,23 @@ const statusClass = (status) => {
   }
 };
 
+const statusBorderColor = (status) => {
+  switch (status) {
+    case "NOT_STARTED": return "#999999";
+    case "STARTED": return "#3b82f6";
+    case "SUCCEEDED": return "#17BB62";
+    case "FAILED": return "#E94B4B";
+    default: return "#999999";
+  }
+};
+
+const nodeBorderColor = (type, status) => {
+  if (status) return statusBorderColor(status);
+  if (type === "data-source") return "#6366f1";
+  if (type === "data-target") return "#059669";
+  return "#cccccc";
+};
+
 const statusDotClass = (status) => {
   switch (status) {
     case "NOT_STARTED": return "dot-gray";
@@ -287,14 +305,17 @@ const definitionToNodesAndEdges = (definition) => {
     };
   });
 
+  const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = [];
   for (const d of dag) {
     for (const dep of d.dependsOn || []) {
+      const srcNode = dagMap[dep];
       resultEdges.push({
         id: `e${dep}-${d.id}`,
         source: dep,
         target: d.id,
         animated: false,
+        style: { stroke: nodeBorderColor(srcNode?.type, null) },
       });
     }
   }
@@ -358,14 +379,17 @@ const runToNodesAndEdges = (run) => {
     };
   });
 
+  const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = [];
   for (const d of dag) {
     for (const dep of d.dependsOn || []) {
+      const srcNode = dagMap[dep];
       resultEdges.push({
         id: `e${dep}-${d.id}`,
         source: dep,
         target: d.id,
         animated: false,
+        style: { stroke: nodeBorderColor(srcNode?.type, srcNode?.status) },
       });
     }
   }
@@ -594,6 +618,7 @@ const openWizardDialog = () => {
   computeNodeSearch.value = "";
   wizardStep.value = 0;
   rerunSource.value = null;
+  accordionActiveNames.value = ["information"];
   wizardVisible.value = true;
   fetchDatasetOptions();
 };
@@ -995,6 +1020,12 @@ const formatCost = (cost) => {
   return `$${cost.toFixed(2)}`;
 };
 
+const formatModelName = (model) => {
+  if (!model) return "N/A";
+  // Strip AWS Bedrock prefixes like "us." or ARN paths
+  return model.replace(/^(us|eu|ap)\./,  "").replace(/^arn:.*\//, "");
+};
+
 const formatBytes = (bytes) => {
   if (bytes == null) return "N/A";
   if (bytes < 1024) return `${bytes} B`;
@@ -1122,9 +1153,6 @@ onUnmounted(() => {
           <template v-if="selectedRun">
             {{ runTimeLabel }}
             <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
-            <span class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status || selectedRun.status)">
-              {{ statusLabel(selectedWorkflowActivity?.status || selectedRun.status) }}
-            </span>
           </template>
           <template v-else>
             Runs
@@ -1156,6 +1184,9 @@ onUnmounted(() => {
             <Controls position="top-left" />
 
             <div v-if="nodes.length > 0" class="canvas-toolbar">
+              <span v-if="selectedRun" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status || selectedRun.status)">
+                {{ statusLabel(selectedWorkflowActivity?.status || selectedRun.status) }}
+              </span>
               <button class="auto-layout-btn" @click="autoLayout">
                 Auto Layout
               </button>
@@ -1163,58 +1194,64 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
-                <div class="node-header">
-                  <span class="node-title">{{ data.label }}</span>
+              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc' }">
+                <Handle type="target" :position="Position.Top" />
+                <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <div class="node-header">
+                    <span class="node-title">{{ data.label }}</span>
+                  </div>
+                  <div v-if="mode === 'browse'" class="node-meta">
+                    <span v-if="data.executionTarget" class="runtime-tag">{{ data.executionTarget }}</span>
+                    <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'configure' && nodeConfigs[id]" class="node-config-hint">
+                    Click to configure
+                  </div>
                 </div>
-                <div v-if="mode === 'browse'" class="node-meta">
-                  <span v-if="data.executionTarget" class="runtime-tag">{{ data.executionTarget }}</span>
-                  <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
-                </div>
-                <div v-if="mode === 'configure' && nodeConfigs[id]" class="node-config-hint">
-                  Click to configure
-                </div>
+                <Handle type="source" :position="Position.Bottom" />
               </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
             </template>
 
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
-              <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
-                <div class="node-header">
-                  <span class="node-type-badge source-badge">Source</span>
-                  <span class="node-title">{{ data.label }}</span>
-                </div>
-                <div v-if="mode === 'browse' && data.packageCount != null" class="node-meta">
-                  {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
-                </div>
-                <template v-if="mode === 'configure'">
-                  <div class="node-file-count">
-                    {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
+              <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
+                <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                  <div class="node-header">
+                    <span class="node-type-badge source-badge">Source</span>
+                    <span class="node-title">{{ data.label }}</span>
                   </div>
-                  <div class="node-config-hint">Click to select files</div>
-                </template>
+                  <div v-if="mode === 'browse' && data.packageCount != null" class="node-meta">
+                    {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                  </div>
+                  <template v-if="mode === 'configure'">
+                    <div class="node-file-count">
+                      {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
+                    </div>
+                    <div class="node-config-hint">Click to select files</div>
+                  </template>
+                </div>
+                <Handle type="source" :position="Position.Bottom" />
               </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
             </template>
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
-                <div class="node-header">
-                  <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ data.targetType || data.label }}</span>
-                </div>
-                <div class="node-body">
-                  <div class="node-meta">
-                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="runtime-tag">
-                      {{ nodeConfigs[id]?.computeType || data.computeType }}
-                    </span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#059669' }">
+                <Handle type="target" :position="Position.Top" />
+                <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <div class="node-header">
+                    <span class="node-type-badge target-badge">Target</span>
+                    <span class="node-title">{{ data.targetType || data.label }}</span>
                   </div>
-                  <div v-if="mode === 'configure'" class="node-config-hint">Click to configure</div>
+                  <div class="node-body">
+                    <div class="node-meta">
+                      <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="runtime-tag">
+                        {{ nodeConfigs[id]?.computeType || data.computeType }}
+                      </span>
+                      <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                    </div>
+                    <div v-if="mode === 'configure'" class="node-config-hint">Click to configure</div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -1400,14 +1437,30 @@ onUnmounted(() => {
               </p>
             </template>
 
-            <!-- BROWSE MODE: Selected Node Info -->
-            <template v-else-if="mode === 'browse' && selectedNode">
-              <h4 class="sidebar-section-title">Processor Details</h4>
+            <!-- BROWSE MODE: Selected Data Source Node -->
+            <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
+              <h4 class="sidebar-section-title">Data Source</h4>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
                   <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
                 </div>
+                <div v-if="selectedNode.data?.packageCount != null" class="info-row">
+                  <span class="info-label">Files</span>
+                  <span class="info-value">{{ selectedNode.data.packageCount }} file{{ selectedNode.data.packageCount !== 1 ? 's' : '' }}</span>
+                </div>
+              </div>
+              <div class="info-actions">
+                <button class="text-link-btn" @click="selectedNode = null">
+                  Clear selection
+                </button>
+              </div>
+            </template>
+
+            <!-- BROWSE MODE: Selected Node Info (processors & data targets) -->
+            <template v-else-if="mode === 'browse' && selectedNode">
+              <h4 class="sidebar-section-title">{{ selectedNode.data?.label || 'Node Details' }}</h4>
+              <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Status</span>
                   <span class="info-value">
@@ -1419,34 +1472,36 @@ onUnmounted(() => {
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
                 </div>
-                <div v-if="selectedNode.data?.startedAt" class="info-row">
-                  <span class="info-label">Started</span>
-                  <span class="info-value">{{ formatTime(selectedNode.data.startedAt) }}</span>
+              </div>
+
+              <div class="metrics-summary">
+                <div
+                  class="metrics-summary-item"
+                  :class="{ clickable: selectedNodeMetrics }"
+                  @click="selectedNodeMetrics && (nodeMetricsDialogVisible = true)"
+                >
+                  <span class="metrics-summary-value">{{ selectedNodeMetrics ? formatDurationSec(selectedNodeMetrics.durationSec) : 'N/A' }}</span>
+                  <span class="metrics-summary-label">Duration</span>
                 </div>
-                <div v-if="selectedNode.data?.completedAt" class="info-row">
-                  <span class="info-label">Completed</span>
-                  <span class="info-value">{{ formatTime(selectedNode.data.completedAt) }}</span>
+                <div class="metrics-summary-item">
+                  <span class="metrics-summary-value">{{ selectedNodeMetrics?.computeType || selectedNode.data?.executionTarget || 'N/A' }}</span>
+                  <span class="metrics-summary-label">Runtime</span>
+                </div>
+                <div
+                  class="metrics-summary-item"
+                  :class="{ clickable: selectedNode.data?.processorType === 'processor' }"
+                  @click="selectedNode.data?.processorType === 'processor' && openLogs(selectedNode.id, selectedNode.data?.label)"
+                >
+                  <span class="metrics-summary-value">
+                    <IconFile :width="16" :height="16" />
+                  </span>
+                  <span class="metrics-summary-label">Logs</span>
                 </div>
               </div>
-              <div class="info-actions">
-                <bf-button
-                  v-if="selectedNode.data?.processorType === 'processor'"
-                  class="secondary"
-                  @click="openLogs(selectedNode.id, selectedNode.data?.label)"
-                >
-                  Open Logs
-                </bf-button>
-                <button
-                  v-if="selectedNodeMetrics"
-                  class="text-link-btn"
-                  @click="nodeMetricsDialogVisible = true"
-                >
-                  Show node metrics
-                </button>
-                <button class="text-link-btn" @click="selectedNode = null">
-                  Clear selection
-                </button>
-              </div>
+
+              <button class="text-link-btn" @click="selectedNode = null">
+                Clear selection
+              </button>
             </template>
 
             <!-- BROWSE MODE: Run Info (no node selected) -->
@@ -1472,6 +1527,10 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value">{{ computeNodeName(selectedWorkflowActivity.computeNodeUuid) }}</span>
                 </div>
+                <div v-if="selectedWorkflowActivity.createdBy" class="info-row">
+                  <span class="info-label">Invoked By</span>
+                  <span class="info-value">{{ getUserName(selectedWorkflowActivity.createdBy) }}</span>
+                </div>
                 <div v-if="selectedWorkflowActivity.startedAt" class="info-row">
                   <span class="info-label">Started</span>
                   <span class="info-value">{{ formatTime(selectedWorkflowActivity.startedAt) }}</span>
@@ -1493,11 +1552,11 @@ onUnmounted(() => {
               <template v-if="runMetrics">
                 <h4 class="sidebar-section-title">Metrics</h4>
                 <div class="metrics-summary">
-                  <div class="metrics-summary-item">
+                  <div class="metrics-summary-item clickable" @click="durationDialogVisible = true">
                     <span class="metrics-summary-value">{{ formatDurationSec(runMetrics.executionTimeSec) }}</span>
                     <span class="metrics-summary-label">Duration</span>
                   </div>
-                  <div class="metrics-summary-item">
+                  <div class="metrics-summary-item clickable" @click="metricsDialogVisible = true">
                     <span class="metrics-summary-value">{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
                     <span class="metrics-summary-label">Est. Cost</span>
                   </div>
@@ -1506,9 +1565,6 @@ onUnmounted(() => {
                     <span class="metrics-summary-label">Files</span>
                   </div>
                 </div>
-                <button class="text-link-btn" @click="metricsDialogVisible = true">
-                  Show metrics details
-                </button>
               </template>
 
               <bf-button class="secondary rerun-config-btn" @click="rerunFromRun(selectedWorkflowActivity)">
@@ -1610,93 +1666,104 @@ onUnmounted(() => {
         <div v-if="wizardStep === 0" class="wizard-step">
           <p class="wizard-step-desc">Choose a workflow definition to run.</p>
           <div v-if="wizardSelectedWorkflow" class="wizard-selection">
-            <span class="wizard-selection-label">Selected:</span>
-            <span class="wizard-selection-name">{{ wizardSelectedWorkflow.name }}</span>
-            <button class="wizard-selection-clear" @click="wizardForm.workflowId = ''">&times;</button>
-          </div>
-          <el-input
-            v-model="workflowSearch"
-            placeholder="Filter workflows..."
-            clearable
-            class="wizard-search"
-          />
-          <div class="wizard-cards">
-            <div
-              v-for="wf in filteredWizardWorkflows"
-              :key="wf.uuid"
-              class="wizard-card"
-              :class="{ selected: wizardForm.workflowId === wf.uuid, disabled: !wf.isActive }"
-              @click="wf.isActive && (wizardForm.workflowId = wf.uuid)"
-            >
-              <div class="wizard-card-name">{{ wf.name }}</div>
-              <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
-              <div class="wizard-card-meta">
-                {{ (wf.dag || []).length }} processors
-                <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
-              </div>
+            <div class="wizard-selection-header">
+              <span class="wizard-selection-name">{{ wizardSelectedWorkflow.name }}</span>
+              <button class="wizard-selection-clear" @click="wizardForm.workflowId = ''">&times;</button>
             </div>
-            <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+            <div v-if="wizardSelectedWorkflow.description" class="wizard-selection-desc">{{ wizardSelectedWorkflow.description }}</div>
+            <div class="wizard-selection-meta">{{ (wizardSelectedWorkflow.dag || []).length }} processors</div>
           </div>
+          <template v-else>
+            <el-input
+              v-model="workflowSearch"
+              placeholder="Filter workflows..."
+              clearable
+              class="wizard-search"
+            />
+            <div class="wizard-cards">
+              <div
+                v-for="wf in filteredWizardWorkflows"
+                :key="wf.uuid"
+                class="wizard-card"
+                :class="{ disabled: !wf.isActive }"
+                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
+              >
+                <div class="wizard-card-name">{{ wf.name }}</div>
+                <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
+                <div class="wizard-card-meta">
+                  {{ (wf.dag || []).length }} processors
+                  <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
+                </div>
+              </div>
+              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+            </div>
+          </template>
         </div>
 
         <!-- Step 1: Compute Node -->
         <div v-if="wizardStep === 1" class="wizard-step">
           <p class="wizard-step-desc">Select the compute node to execute the workflow on.</p>
           <div v-if="wizardSelectedComputeNode" class="wizard-selection">
-            <span class="wizard-selection-label">Selected:</span>
-            <span class="wizard-selection-name">{{ wizardSelectedComputeNode.name }}</span>
-            <button class="wizard-selection-clear" @click="wizardForm.computeNodeId = ''">&times;</button>
-          </div>
-          <el-input
-            v-model="computeNodeSearch"
-            placeholder="Filter compute nodes..."
-            clearable
-            class="wizard-search"
-          />
-          <div class="wizard-cards">
-            <div
-              v-for="cn in filteredWizardComputeNodes"
-              :key="cn.uuid"
-              class="wizard-card"
-              :class="{ selected: wizardForm.computeNodeId === cn.uuid }"
-              @click="wizardForm.computeNodeId = cn.uuid"
-            >
-              <div class="wizard-card-name">{{ cn.name }}</div>
-              <div v-if="cn.description" class="wizard-card-desc">{{ cn.description }}</div>
+            <div class="wizard-selection-header">
+              <span class="wizard-selection-name">{{ wizardSelectedComputeNode.name }}</span>
+              <button class="wizard-selection-clear" @click="wizardForm.computeNodeId = ''">&times;</button>
             </div>
-            <div v-if="filteredWizardComputeNodes.length === 0" class="wizard-cards-loading">No compute nodes found</div>
+            <div v-if="wizardSelectedComputeNode.description" class="wizard-selection-desc">{{ wizardSelectedComputeNode.description }}</div>
           </div>
+          <template v-else>
+            <el-input
+              v-model="computeNodeSearch"
+              placeholder="Filter compute nodes..."
+              clearable
+              class="wizard-search"
+            />
+            <div class="wizard-cards">
+              <div
+                v-for="cn in filteredWizardComputeNodes"
+                :key="cn.uuid"
+                class="wizard-card"
+                @click="wizardForm.computeNodeId = cn.uuid"
+              >
+                <div class="wizard-card-name">{{ cn.name }}</div>
+                <div v-if="cn.description" class="wizard-card-desc">{{ cn.description }}</div>
+              </div>
+              <div v-if="filteredWizardComputeNodes.length === 0" class="wizard-cards-loading">No compute nodes found</div>
+            </div>
+          </template>
         </div>
 
         <!-- Step 2: Dataset -->
         <div v-if="wizardStep === 2" class="wizard-step">
           <p class="wizard-step-desc">Search and select the dataset to process.</p>
           <div v-if="wizardSelectedDataset" class="wizard-selection">
-            <span class="wizard-selection-label">Selected:</span>
-            <span class="wizard-selection-name">{{ wizardSelectedDataset.content?.name }}</span>
-            <button class="wizard-selection-clear" @click="wizardForm.datasetId = ''">&times;</button>
-          </div>
-          <el-input
-            placeholder="Search datasets..."
-            :model-value="''"
-            @input="onDatasetSearch"
-            clearable
-            class="wizard-search"
-          />
-          <div class="wizard-cards">
-            <div v-if="datasetSearchLoading" class="wizard-cards-loading">Searching...</div>
-            <div
-              v-for="ds in datasetOptions"
-              :key="ds.content?.id"
-              class="wizard-card"
-              :class="{ selected: wizardForm.datasetId === ds.content?.id }"
-              @click="wizardForm.datasetId = ds.content?.id"
-            >
-              <div class="wizard-card-name">{{ ds.content?.name }}</div>
-              <div v-if="ds.content?.description" class="wizard-card-desc">{{ ds.content.description }}</div>
+            <div class="wizard-selection-header">
+              <span class="wizard-selection-name">{{ wizardSelectedDataset.content?.name }}</span>
+              <button class="wizard-selection-clear" @click="wizardForm.datasetId = ''">&times;</button>
             </div>
-            <div v-if="!datasetSearchLoading && datasetOptions.length === 0" class="wizard-cards-loading">No datasets found</div>
+            <div v-if="wizardSelectedDataset.content?.description" class="wizard-selection-desc">{{ wizardSelectedDataset.content.description }}</div>
           </div>
+          <template v-else>
+            <el-input
+              placeholder="Search datasets..."
+              :model-value="''"
+              @input="onDatasetSearch"
+              clearable
+              class="wizard-search"
+            />
+            <div class="wizard-cards">
+              <div v-if="datasetSearchLoading" class="wizard-cards-loading">Searching...</div>
+              <div
+                v-for="ds in datasetOptions"
+                :key="ds.content?.id"
+                class="wizard-card"
+                @click="wizardForm.datasetId = ds.content?.id"
+              >
+                <div class="wizard-card-name">{{ ds.content?.name }}</div>
+                <div v-if="ds.content?.description" class="wizard-card-desc">{{ ds.content.description }}</div>
+              </div>
+              <div v-if="!datasetSearchLoading && datasetOptions.length === 0" class="wizard-cards-loading">No datasets found</div>
+            </div>
+          </template>
         </div>
 
         <!-- Step 3: Confirm -->
@@ -1960,6 +2027,30 @@ onUnmounted(() => {
               <span>{{ formatCost(runMetrics.costEstimate.cloudWatchLogs.estimatedCost) }}</span>
             </div>
           </div>
+
+          <div v-if="runMetrics.costEstimate.llm" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">LLM</div>
+            <div class="receipt-row">
+              <span>Model</span>
+              <span class="receipt-model-name">{{ formatModelName(runMetrics.costEstimate.llm.lastModel) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Requests</span>
+              <span>{{ runMetrics.costEstimate.llm.requestCount }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Input Tokens</span>
+              <span>{{ runMetrics.costEstimate.llm.inputTokens?.toLocaleString() }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Output Tokens</span>
+              <span>{{ runMetrics.costEstimate.llm.outputTokens?.toLocaleString() }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.llm.estimatedCost) }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Total -->
@@ -1975,6 +2066,57 @@ onUnmounted(() => {
 
       <template #footer>
         <bf-button class="secondary" @click="metricsDialogVisible = false">Close</bf-button>
+      </template>
+    </el-dialog>
+
+    <!-- Duration Breakdown Dialog -->
+    <el-dialog
+      v-model="durationDialogVisible"
+      title="Duration Breakdown"
+      width="480px"
+      :close-on-click-modal="true"
+    >
+      <div v-if="runMetrics" class="metrics-receipt">
+        <div class="receipt-header">
+          <div class="receipt-title">{{ selectedWorkflowActivity?.workflowName || 'Workflow' }}</div>
+          <div class="receipt-date">Total: {{ formatDurationSec(runMetrics.executionTimeSec) }}</div>
+        </div>
+
+        <div v-if="runMetrics.nodeMetrics?.length" class="receipt-section">
+          <div class="receipt-section-title">Node Durations</div>
+          <div
+            v-for="nm in [...runMetrics.nodeMetrics].sort((a, b) => (b.durationSec || 0) - (a.durationSec || 0))"
+            :key="nm.nodeId"
+            class="receipt-node"
+          >
+            <div class="receipt-node-header">
+              <span class="receipt-node-name">{{ nodeMetricLabel(nm.nodeId) }}</span>
+              <span class="receipt-node-badge" :class="nm.computeType">{{ nm.computeType }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Duration</span>
+              <span>{{ formatDurationSec(nm.durationSec) }}</span>
+            </div>
+            <div v-if="nm.billedDurationMs != null" class="receipt-row">
+              <span>Billed Duration</span>
+              <span>{{ (nm.billedDurationMs / 1000).toFixed(1) }}s</span>
+            </div>
+            <div class="receipt-row">
+              <span>Status</span>
+              <span class="receipt-status" :class="statusDotClass(nm.status)">{{ statusLabel(nm.status) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="receipt-section">
+          <div class="receipt-row">
+            <span>No per-node duration data available</span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <bf-button class="secondary" @click="durationDialogVisible = false">Close</bf-button>
       </template>
     </el-dialog>
 
@@ -2030,10 +2172,10 @@ onUnmounted(() => {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #6b7280;
+    background: var(--node-border-color, #cccccc) !important;
     border: 2px solid #fff;
-    box-shadow: 0 0 0 1px #d1d5db;
-    z-index: 10;
+    box-shadow: 0 0 0 1px var(--node-border-color, #cccccc);
+    z-index: 0;
 
     &::after {
       content: "";
@@ -2047,10 +2189,14 @@ onUnmounted(() => {
 
     &.vue-flow__handle-top {
       top: -5px;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
     }
 
     &.vue-flow__handle-bottom {
       bottom: -5px;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
     }
   }
 }
@@ -2076,18 +2222,18 @@ onUnmounted(() => {
   min-height: 48px;
 
   .header-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: theme.$black;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .header-workflow-name {
     font-weight: 400;
     font-size: 13px;
     color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-workflow-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: theme.$black;
   }
 
   .header-actions {
@@ -2141,6 +2287,21 @@ onUnmounted(() => {
   top: 10px;
   right: 10px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .header-status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    color: white;
+
+    &.dot-gray { background-color: theme.$gray_4; }
+    &.dot-blue { background-color: #3b82f6; }
+    &.dot-green { background-color: theme.$status_green; }
+    &.dot-red { background-color: theme.$status_red; }
+  }
 }
 
 .auto-layout-btn {
@@ -2169,6 +2330,7 @@ onUnmounted(() => {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    width: auto !important;
 
     &.selected .custom-node {
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
@@ -2179,16 +2341,18 @@ onUnmounted(() => {
 /* Nodes */
 .custom-node {
   background: white;
-  border: 2px solid theme.$gray_3;
-  border-radius: 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 2px;
   padding: 14px;
   min-width: 250px;
   max-width: 350px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
 
-  &:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
+  &:hover { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
 
   .node-header {
     display: flex;
@@ -2666,6 +2830,16 @@ onUnmounted(() => {
   background: theme.$gray_1;
   border: 1px solid theme.$gray_2;
   border-radius: 6px;
+
+  &.clickable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+
+    &:hover {
+      border-color: theme.$purple_2;
+      background: theme.$purple_tint;
+    }
+  }
 }
 
 .metrics-summary-value {
@@ -2736,6 +2910,15 @@ onUnmounted(() => {
     padding-top: 4px;
     margin-top: 2px;
   }
+
+  .receipt-model-name {
+    font-family: Monaco, monospace;
+    font-size: 11px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .receipt-node {
@@ -2745,6 +2928,7 @@ onUnmounted(() => {
   padding: 10px 12px;
   margin-bottom: 8px;
 }
+
 
 .receipt-node-header {
   display: flex;
@@ -2905,34 +3089,45 @@ onUnmounted(() => {
 .wizard-step-desc {
   font-size: 13px;
   color: theme.$gray_4;
-  margin: 0 0 14px 0;
+  margin: 0 0 16px 0;
 }
 
 .wizard-selection {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #f5f0ff;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background: theme.$purple_tint;
   border: 1px solid theme.$purple_1;
-  border-radius: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.wizard-selection-label {
-  font-size: 12px;
-  color: theme.$gray_4;
-  flex-shrink: 0;
+.wizard-selection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .wizard-selection-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: theme.$black;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.wizard-selection-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  line-height: 1.4;
+}
+
+.wizard-selection-meta {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-top: 2px;
 }
 
 .wizard-selection-clear {
@@ -2972,16 +3167,10 @@ onUnmounted(() => {
 .wizard-card {
   padding: 12px 14px;
   border: 1px solid theme.$gray_2;
-  border-radius: 6px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 
   &:hover:not(.disabled) {
-    border-color: theme.$gray_3;
-    background: theme.$gray_1;
-  }
-
-  &.selected {
     border-color: theme.$gray_3;
     background: theme.$gray_1;
   }
@@ -3027,7 +3216,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0;
   border: 1px solid theme.$gray_2;
-  border-radius: 6px;
   overflow: hidden;
   margin-bottom: 16px;
 }
@@ -3055,8 +3243,7 @@ onUnmounted(() => {
 
 .wizard-hint {
   padding: 12px 14px;
-  background: #eff6ff;
-  border-radius: 6px;
+  background: theme.$yellow_tint;
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_5;

@@ -137,7 +137,7 @@ const enterCreateMode = () => {
   selectedNode.value = null;
   isEditingDetails.value = false;
   clearWorkflow();
-  accordionActiveNames.value = ["workflows", "data-and-apps"];
+  accordionActiveNames.value = ["data-and-apps"];
 };
 
 const cancelCreate = () => {
@@ -166,6 +166,12 @@ const findAppByUrl = (applications, sourceUrl) => {
   return applications.find(
     (app) => normalizeUrl(app.source?.url) === normalized
   ) || null;
+};
+
+const nodeTypeColor = (type) => {
+  if (type === "data-source") return "#6366f1";
+  if (type === "data-target") return "#059669";
+  return "#cccccc";
 };
 
 const definitionToNodesAndEdges = (workflow, applications) => {
@@ -227,14 +233,17 @@ const definitionToNodesAndEdges = (workflow, applications) => {
   });
 
   // Build edges from dependsOn
+  const procMap = Object.fromEntries(processors.map((p) => [p.id, p]));
   const resultEdges = [];
   for (const p of processors) {
     for (const dep of p.dependsOn || []) {
+      const srcNode = procMap[dep];
       resultEdges.push({
         id: `e${dep}-${p.id}`,
         source: dep,
         target: p.id,
         animated: false,
+        style: { stroke: nodeTypeColor(srcNode?.type) },
       });
     }
   }
@@ -421,11 +430,13 @@ onConnect((params) => {
   );
   if (duplicate) return;
 
+  const srcNode = nodes.value.find((n) => n.id === params.source);
   edges.value.push({
     id: `e${params.source}-${params.target}`,
     source: params.source,
     target: params.target,
     animated: false,
+    style: { stroke: nodeTypeColor(srcNode?.type) },
   });
 });
 
@@ -1185,16 +1196,25 @@ onPaneClick(() => {
 
 /* Handle styles — must be unscoped so VueFlow can render them */
 .workflow-builder-flow {
+  .vue-flow__node {
+    --node-border-color: #cccccc;
+
+    &:has(.input-node) { --node-border-color: #17BB62; }
+    &:has(.output-node) { --node-border-color: #17BB62; }
+    &:has(.data-source-node) { --node-border-color: #6366f1; }
+    &:has(.data-target-node) { --node-border-color: #059669; }
+  }
+
   .vue-flow__handle {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #6b7280;
+    background: var(--node-border-color, #cccccc) !important;
     border: 2px solid #fff;
-    box-shadow: 0 0 0 1px #d1d5db;
+    box-shadow: 0 0 0 1px var(--node-border-color, #cccccc);
     cursor: crosshair;
     transition: background-color 0.15s, box-shadow 0.15s;
-    z-index: 10;
+    z-index: 0;
 
     /* Invisible expanded hit area so it's easy to grab */
     &::after {
@@ -1214,10 +1234,14 @@ onPaneClick(() => {
 
     &.vue-flow__handle-top {
       top: -5px;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
     }
 
     &.vue-flow__handle-bottom {
       bottom: -5px;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
     }
 
     /* Valid connection target highlight */
@@ -1633,6 +1657,7 @@ onPaneClick(() => {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    width: auto !important;
 
     &.selected .custom-node {
       border-color: theme.$gray_4;
@@ -1650,6 +1675,8 @@ onPaneClick(() => {
   max-width: 350px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
+  position: relative;
+  z-index: 1;
 
   &:hover {
     border-color: theme.$black;
