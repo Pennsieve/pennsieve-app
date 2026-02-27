@@ -13,16 +13,17 @@ describe('RecordsTable.vue', () => {
   let cmp
 
   beforeEach( () => {
+    vi.useFakeTimers()
     cmp = mount(RecordsTable)
   })
 
   afterEach(() => {
-    // Properly unmount the component to clean up any timers/watchers
+    // Flush all pending timers (including debounced doLayout) before unmounting
+    vi.runAllTimers()
     if (cmp) {
       cmp.unmount()
     }
-    // Clear all timers to prevent them from running after test completion
-    vi.clearAllTimers()
+    vi.useRealTimers()
   })
 
   it('Sets the new sort order and property', () => {
