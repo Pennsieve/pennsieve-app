@@ -86,15 +86,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, getCurrentInstance, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
 import { useGetToken } from '@/composables/useGetToken'
+import { useSendXhr } from '@/mixins/request/request_composable'
 import * as siteConfig from '@/site-config/site.json'
 import IntegrationCard from './IntegrationCard.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import orcidImage from '@/assets/images/orcid_24x24.png'
 
 const store = useStore()
+const instance = getCurrentInstance()
 const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
 const profile = computed(() => store.state.profile)
@@ -117,11 +119,68 @@ const githubUsername = computed(() => {
 
 const oauthWindow = ref(null)
 
+const githubMessageListener = async (event) => {
+  if (
+    event.data &&
+    event.data.source === 'github-redirect-response' &&
+    event.data.code
+  ) {
+    const oauthCode = event.data.code
+    if (oauthCode !== '') {
+      try {
+        const token = await useGetToken()
+        const response = await useSendXhr(
+          `${siteConfig.api2Url}/accounts/github/register`,
+          {
+            method: 'POST',
+            header: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: {
+              code: oauthCode,
+              installation_id: event.data.installationId,
+            },
+          }
+        )
+
+        // Update store with refreshed GitHub profile
+        const updatedProfile = {
+          ...profile.value,
+          githubProfile: response,
+        }
+        await store.dispatch('updateProfile', updatedProfile)
+
+        instance.proxy.$message({
+          message: 'Your GitHub integration has been updated successfully!',
+          type: 'success',
+          center: true,
+          duration: 3000,
+          showClose: true,
+        })
+      } catch (error) {
+        console.error('GitHub update integration error:', error)
+        instance.proxy.$message({
+          message: 'Failed to update GitHub integration. Please try again.',
+          type: 'error',
+          center: true,
+          duration: 5000,
+          showClose: true,
+        })
+      }
+    }
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener('message', githubMessageListener)
   // Only fetch GitHub profile if we don't already have it
   if (!profile.value?.githubProfile) {
     await fetchGithubProfile()
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('message', githubMessageListener)
 })
 
 function updateGithubIntegration() {
