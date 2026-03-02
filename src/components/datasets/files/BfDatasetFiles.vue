@@ -4,6 +4,8 @@
     slot="stage"
     element-loading-background="transparent"
     @drop="onDrop"
+    @dragover.prevent
+    @dragenter="onDragEnter"
   >
     <template #actions>
       <stage-actions>
@@ -278,6 +280,7 @@ export default {
     DeletedFiles,
     FileMetadataInfo,
     RunAnalysisDialog,
+    OldRunAnalysisDialog,
     PsButtonDropdown,
   },
 

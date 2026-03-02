@@ -76,34 +76,22 @@ export default {
       event.preventDefault()
       event.stopPropagation()
 
-      // Toggle the layer visibility
       const newVisibility = !(this.layer.visible === false ? false : true)
-      console.log(`Toggling layer ${this.layer.id} visibility to:`, newVisibility)
-
       this.updateLayerVisibility(this.layer.id, newVisibility)
 
-      // Also emit an event to trigger canvas re-render
       this.$emit('visibility-changed', {
         layerId: this.layer.id,
         visible: newVisibility
       })
     },
 
-    // Method for the bulk toggle in PaletteAnnotations
     toggleLayer: function(visible) {
-      console.log(`[AnnotationGroup] Bulk toggling layer ${this.layer.id} (${this.layer.name}) visibility to:`, visible)
+      this.updateLayerVisibility(this.layer.id, visible)
 
-      try {
-        this.updateLayerVisibility(this.layer.id, visible)
-        console.log(`[AnnotationGroup] Successfully updated layer ${this.layer.id} visibility`)
-
-        this.$emit('visibility-changed', {
-          layerId: this.layer.id,
-          visible: visible
-        })
-      } catch (error) {
-        console.error(`[AnnotationGroup] Error updating layer ${this.layer.id} visibility:`, error)
-      }
+      this.$emit('visibility-changed', {
+        layerId: this.layer.id,
+        visible: visible
+      })
     }
   }
 }

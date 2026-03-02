@@ -1,16 +1,20 @@
 <template>
   <div class="model-details">
     <div v-if="!isEmpty" class="processor-details">
-      <bf-button @click="handleLogsClick">View Logs</bf-button>
+      <bf-button v-if="isProcessor" @click="handleLogsClick">View Logs</bf-button>
       <div class="processor-item">
         <span class="label">Name: </span>
         <span class="value">{{ selectedProcessor.name }}</span>
       </div>
       <div class="processor-item">
-        <span class="label">UUID: </span>
-        <span class="value">{{ selectedProcessor.uuid }}</span>
+        <span class="label">ID: </span>
+        <span class="value">{{ selectedProcessor.id }}</span>
       </div>
       <div class="processor-item">
+        <span class="label">Type: </span>
+        <span class="value">{{ selectedProcessor.type || 'processor' }}</span>
+      </div>
+      <div v-if="selectedProcessor.description" class="processor-item">
         <span class="label">Description: </span>
         <span class="value">{{ selectedProcessor.description }}</span>
       </div>
@@ -20,94 +24,100 @@
           selectedProcessor.status
         }}</span>
       </div>
-      <div class="processor-item">
+      <div v-if="selectedProcessor.targetType" class="processor-item">
+        <span class="label">Target Type: </span>
+        <span class="value">{{ selectedProcessor.targetType }}</span>
+      </div>
+      <div v-if="selectedProcessor.applicationType" class="processor-item">
         <span class="label">Application Type: </span>
         <span class="value">{{ selectedProcessor.applicationType }}</span>
       </div>
-      <div class="processor-item">
+      <div v-if="selectedProcessor.environment" class="processor-item">
         <span class="label">Environment: </span>
         <span class="value">{{ selectedProcessor.environment }}</span>
       </div>
-      <div class="processor-item">
+      <div v-if="selectedProcessor.createdAt" class="processor-item">
         <span class="label">Created At: </span>
         <span class="value">{{ formatDate(selectedProcessor.createdAt) }}</span>
       </div>
-      <div class="processor-item">
+      <div v-if="selectedProcessor.startedAt" class="processor-item">
         <span class="label">Started At: </span>
         <span class="value">{{ formatDate(selectedProcessor.startedAt) }}</span>
       </div>
-      <div class="processor-item">
+      <div v-if="selectedProcessor.completedAt" class="processor-item">
         <span class="label">Completed At: </span>
         <span class="value">{{
           formatDate(selectedProcessor.completedAt)
         }}</span>
       </div>
 
-      <!-- Parameters Section -->
-      <div class="section-title">Parameters</div>
-      <div v-if="!hasParams" class="processor-item">
-        <span class="value">none</span>
-      </div>
-      <div class="table-container" v-if="hasParams">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(value, key) in selectedProcessor.params" :key="key">
-              <td>{{ key }}</td>
-              <td>{{ value }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- Parameters Section (processor only) -->
+      <template v-if="isProcessor">
+        <div class="section-title">Parameters</div>
+        <div v-if="!hasParams" class="processor-item">
+          <span class="value">none</span>
+        </div>
+        <div class="table-container" v-if="hasParams">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(value, key) in selectedProcessor.params" :key="key">
+                <td>{{ key }}</td>
+                <td>{{ value }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <!-- Resources Section -->
-      <div class="section-title">Resources</div>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Resource</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>CPU</td>
-              <td>{{ selectedProcessor.resources?.cpu || "N/A" }}</td>
-            </tr>
-            <tr>
-              <td>Memory</td>
-              <td>{{ formatMemory(selectedProcessor.resources?.memory) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- Resources Section -->
+        <div class="section-title">Resources</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Resource</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CPU</td>
+                <td>{{ selectedProcessor.resources?.cpu || "N/A" }}</td>
+              </tr>
+              <tr>
+                <td>Memory</td>
+                <td>{{ formatMemory(selectedProcessor.resources?.memory) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <!-- Source Information -->
-      <div class="section-title">Source Information</div>
-      <div class="processor-item">
-        <span class="label">Type: </span>
-        <span class="value">{{ selectedProcessor.source?.type }}</span>
-      </div>
-      <div class="processor-item">
-        <span class="label">URL: </span>
-        <span class="value">
-          <a
-            v-if="selectedProcessor.source?.url"
-            :href="formatGitHubUrl(selectedProcessor.source.url)"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ selectedProcessor.source.url }}
-          </a>
-          <span v-else>N/A</span>
-        </span>
-      </div>
+        <!-- Source Information -->
+        <div class="section-title">Source Information</div>
+        <div class="processor-item">
+          <span class="label">Type: </span>
+          <span class="value">{{ selectedProcessor.source?.type }}</span>
+        </div>
+        <div class="processor-item">
+          <span class="label">URL: </span>
+          <span class="value">
+            <a
+              v-if="selectedProcessor.source?.url"
+              :href="formatGitHubUrl(selectedProcessor.source.url)"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ selectedProcessor.source.url }}
+            </a>
+            <span v-else>N/A</span>
+          </span>
+        </div>
+      </template>
     </div>
     <div v-else>
       <div class="img-container">
@@ -151,6 +161,10 @@ export default {
         !this.selectedProcessor ||
         Object.keys(this.selectedProcessor).length === 0
       );
+    },
+    isProcessor() {
+      const type = this.selectedProcessor?.type;
+      return !type || type === "processor";
     },
     hasParams() {
       return (
