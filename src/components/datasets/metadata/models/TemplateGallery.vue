@@ -202,7 +202,8 @@
           <div class="template-preview">
             <div class="template-info">
               <h3 class="template-title" @click="navigateToTemplateDetails(template, $event)">{{ template.display_name || template.name }}</h3>
-              <p class="template-description">{{ template.description || 'No description available' }}</p>
+              <div class="template-description markdown-body" v-if="template.description" v-html="renderMarkdown(template.description)"></div>
+              <p class="template-description" v-else>No description available</p>
               <div class="template-meta">
                 <span class="property-count">
                   {{ getPropertyCount(template) }} properties
@@ -241,7 +242,7 @@
       <div v-if="selectedTemplate" class="selection-actions">
         <div class="selected-info">
           <h3>Selected: {{ selectedTemplate.display_name || selectedTemplate.name }}</h3>
-          <p>{{ selectedTemplate.description }}</p>
+          <div class="markdown-body" v-if="selectedTemplate.description" v-html="renderMarkdown(selectedTemplate.description)"></div>
         </div>
         <div class="actions">
           <bf-button @click="selectedTemplate = null">
@@ -275,7 +276,7 @@
           >
             <div class="template-info">
               <h4>{{ template.original.display_name || template.original.name }}</h4>
-              <p>{{ template.description }}</p>
+              <div class="markdown-body" v-if="template.description" v-html="renderMarkdown(template.description)"></div>
             </div>
             
             <div class="name-inputs">
@@ -319,6 +320,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { marked } from 'marked'
 import { useRouter } from 'vue-router'
 import { ElInput, ElSelect, ElOption, ElButton, ElTag, ElMessage, ElMessageBox, ElDialog, ElFormItem } from 'element-plus'
 import { Search, SortUp, SortDown } from '@element-plus/icons-vue'
@@ -1028,6 +1030,11 @@ const formatCategoryName = (category) => {
   return category.charAt(0).toUpperCase() + category.slice(1).replace(/[_-]/g, ' ')
 }
 
+const renderMarkdown = (text) => {
+  if (!text) return ''
+  return marked.parse(text)
+}
+
 const formatTagName = (tag) => {
   return tag.charAt(0).toUpperCase() + tag.slice(1).replace(/[_-]/g, ' ')
 }
@@ -1378,6 +1385,28 @@ onMounted(() => {
           color: theme.$gray_5;
           margin: 0 0 12px 0;
           line-height: 1.4;
+
+          &.markdown-body {
+            :deep(p) {
+              margin: 0 0 4px 0;
+
+              &:last-child {
+                margin-bottom: 0;
+              }
+            }
+
+            :deep(ul), :deep(ol) {
+              margin: 4px 0;
+              padding-left: 20px;
+            }
+
+            :deep(code) {
+              font-size: 12px;
+              background: theme.$gray_1;
+              padding: 1px 4px;
+              border-radius: 2px;
+            }
+          }
         }
         
         .template-meta {
