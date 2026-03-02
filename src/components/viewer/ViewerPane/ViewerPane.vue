@@ -143,11 +143,7 @@ export default {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
-          // Only fetch timeseries data for timeseries packages
-          const packageType = pathOr('', ['content', 'packageType'], pkg).toLowerCase();
-          if (packageType === 'timeseries') {
-            this.fetchTimeseriesData();
-          }
+          this.fetchTimeseriesData();
         }
       },
       immediate: true,
