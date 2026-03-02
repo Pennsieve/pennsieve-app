@@ -20,8 +20,8 @@
         </div>
       </div>
       <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending'">
-          <el-select 
+        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending' && getStatusForNode(node) !== 'Destroying'">
+          <el-select
             :model-value="getStatusForNode(node)"
             @change="(value) => updateStatus(value)"
             :loading="isUpdatingPermissions"
@@ -112,33 +112,29 @@
             </div>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Node ID:</span>
+            <span class="detail-label">Compute Node ID:</span>
             <span class="detail-value mono">{{ node.uuid }}</span>
           </div>
-          
+          <div class="detail-row" v-if="node.provisionerImage">
+            <span class="detail-label">Provisioner:</span>
+            <span class="detail-value mono">{{ node.provisionerImage }}:{{ node.provisionerImageTag }}</span>
+          </div>
+
+
           <!-- Status (read-only) -->
           <div class="detail-row">
             <span class="detail-label">Node Status:</span>
             <span class="detail-value">
-              <span class="status-text" :class="{ paused: getStatusForNode(node) === 'Paused' }">
+              <span class="status-text" :class="{ paused: getStatusForNode(node) === 'Paused', destroying: getStatusForNode(node) === 'Destroying' }">
                 {{ getStatusForNode(node) }}
               </span>
             </span>
           </div>
-          
-          <div class="detail-row">
-            <span class="detail-label">Resource Type:</span>
-            <span class="detail-value">{{ getAccountTypeLabel(node.account?.accountType) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Resource ID:</span>
-            <span class="detail-value">{{ formatAccountId(node.account?.accountId) }}</span>
-          </div>
-          <div class="detail-row" v-if="node.account?.ownerId">
-            <span class="detail-label">Resource Owner:</span>
-            <span class="detail-value">{{ getUserName(node.account?.ownerId) }}</span>
-          </div>
 
+          <div class="detail-row">
+            <span class="detail-label">LLM Enabled:</span>
+            <span class="detail-value">{{ node.llmEnabled ? 'Yes' : 'No' }}</span>
+          </div>
 
           <div class="detail-row">
             <span class="detail-label">Created By:</span>
@@ -148,6 +144,30 @@
             <span class="detail-label">Created At:</span>
             <span class="detail-value">{{ formatDate(node.createdAt) }}</span>
           </div>
+
+          <hr>
+
+          <div class="detail-row">
+            <span class="detail-label">Resource Type:</span>
+            <span class="detail-value">{{ getAccountTypeLabel(node.account?.accountType) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Resource ID:</span>
+            <span class="detail-value">{{ formatAccountId(node.account?.accountId) }}</span>
+          </div>
+          <div class="detail-row" v-if="node.account?.uuid">
+            <span class="detail-label">Resource Node ID:</span>
+            <span class="detail-value mono">{{ node.account.uuid }}</span>
+          </div>
+          <div class="detail-row" v-if="node.account?.ownerId">
+            <span class="detail-label">Resource Owner:</span>
+            <span class="detail-value">{{ getUserName(node.account?.ownerId) }}</span>
+          </div>
+
+
+
+
+
         </div>
         
         <!-- Permissions Section -->
@@ -586,6 +606,8 @@ function getStatusForNode(node) {
     case 'stopped':
     case 'disabled':
       return 'Paused'
+    case 'destroying':
+      return 'Destroying'
     default:
       return 'Pending'
   }
@@ -820,6 +842,7 @@ async function confirmDestroyNode() {
 
 .node-status-badge {
   display: inline-block;
+  text-align: center;
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 500;
@@ -843,12 +866,19 @@ async function confirmDestroyNode() {
     color: #D97706;
     border: 1px solid rgba(#F59E0B, 0.2);
   }
+
+  &.destroying {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(#F59E0B, 0.2);
+  }
 }
 
 .status-select {
-  min-width: 90px;
-  
+  min-width: 120px;
+
   :deep(.el-select__wrapper) {
+    min-width: 120px;
     border: 1px solid transparent;
     font-size: 12px;
     font-weight: 500;
@@ -1058,6 +1088,11 @@ async function confirmDestroyNode() {
           &.paused {
             background: rgba(#F59E0B, 0.1);
             color: #F59E0B;
+          }
+
+          &.destroying {
+            background: rgba(#F59E0B, 0.1);
+            color: #D97706;
           }
         }
         

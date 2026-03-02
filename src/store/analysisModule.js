@@ -27,6 +27,7 @@ const initialState = () => ({
   activityDialogVisible: false,
   workflows: [],
   targetTypes: [],
+  analyticsChannel: null,
 });
 
 export const state = initialState();
@@ -136,6 +137,25 @@ export const mutations = {
     if (workflow) {
       if (name !== undefined) workflow.name = name;
       if (description !== undefined) workflow.description = description;
+    }
+  },
+  SET_ANALYTICS_CHANNEL(state, channel) {
+    state.analyticsChannel = channel;
+  },
+  CLEAR_ANALYTICS_CHANNEL(state) {
+    state.analyticsChannel = null;
+  },
+  UPDATE_RUN_STATUS(state, { runId, status }) {
+    const run = state.workflowInstances.find((r) => r.uuid === runId);
+    if (run) {
+      run.status = status;
+    }
+  },
+  UPDATE_NODE_STATUS(state, { nodeId, status }) {
+    if (!state.selectedWorkflowActivity?.dag) return;
+    const node = state.selectedWorkflowActivity.dag.find((n) => n.id === nodeId);
+    if (node) {
+      node.status = status;
     }
   },
 };
@@ -775,6 +795,7 @@ export const getters = {
   applications: (state) => state.applications,
   computeNodes: (state) => state.computeNodes,
   targetTypes: (state) => state.targetTypes,
+  analyticsChannel: (state) => state.analyticsChannel,
 };
 
 const analysisModule = {

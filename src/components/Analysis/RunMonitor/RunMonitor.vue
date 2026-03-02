@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive, onMounted, onBeforeUnmount, onUnmounted } from "vue";
+import { computed, ref, reactive, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -14,9 +14,10 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 
-const { onNodeClick, onPaneClick, fitView } = useVueFlow();
+const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
 const store = useStore();
+const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
 
 /*
   Local State
@@ -30,7 +31,8 @@ const nodes = ref([]);
 const edges = ref([]);
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
-let pollIntervalId = null;
+let analyticsChannel = null;
+let analyticsChannelName = null;
 
 // Initiate Workflow dialog state
 const initiateForm = ref({
@@ -65,6 +67,8 @@ const logsNodeLabel = ref("");
 const metricsDialogVisible = ref(false);
 const durationDialogVisible = ref(false);
 const nodeMetricsDialogVisible = ref(false);
+const cancelRunDialogVisible = ref(false);
+const cancellingRun = ref(false);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
 
@@ -214,7 +218,7 @@ const statusBorderColor = (status) => {
 const nodeBorderColor = (type, status) => {
   if (status) return statusBorderColor(status);
   if (type === "data-source") return "#6366f1";
-  if (type === "data-target") return "#059669";
+  if (type === "data-target") return "#64748b";
   return "#cccccc";
 };
 
@@ -398,38 +402,47 @@ const runToNodesAndEdges = (run) => {
 };
 
 /*
-  Polling
+  Pusher event handlers
 */
-const stopPolling = () => {
-  if (pollIntervalId) {
-    clearInterval(pollIntervalId);
-    pollIntervalId = null;
+const parsePusherData = (data) => {
+  if (typeof data === "string") {
+    try { return JSON.parse(data); } catch { return data; }
   }
+  return data;
 };
 
-const startPolling = () => {
-  stopPolling();
-  if (!selectedRun.value) return;
+const onRunStatusUpdate = async (raw) => {
+  const data = parsePusherData(raw);
 
-  const currentStatus = selectedWorkflowActivity.value?.status;
-  if (isTerminalStatus(currentStatus)) return;
+  // Update the run in the instances list
+  store.commit("analysisModule/UPDATE_RUN_STATUS", {
+    runId: data.runId,
+    status: data.status,
+  });
 
-  pollIntervalId = setInterval(async () => {
-    if (!selectedRun.value) {
-      stopPolling();
-      return;
-    }
-    try {
+  // If this is the currently selected run, update the detailed view
+  const currentRunId = selectedWorkflowActivity.value?.uuid;
+  if (data.runId === currentRunId) {
+    if (isTerminalStatus(data.status)) {
+      // Update status immediately so the UI reflects terminal state
+      store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
+        ...selectedWorkflowActivity.value,
+        status: data.status,
+      });
+
+      // Delay to allow DynamoDB eventual consistency before fetching metrics
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Full refresh to fetch metrics/costs from the run instance endpoint
       await store.dispatch(
         "analysisModule/setSelectedWorkflowActivity",
         selectedWorkflowActivity.value
       );
       const activity = selectedWorkflowActivity.value;
-      if (activity && activity.dag && activity.dag.length > 0) {
+      if (activity?.dag?.length > 0) {
         const result = runToNodesAndEdges(activity);
         const posMap = new Map();
         nodes.value.forEach((n) => posMap.set(n.id, n.position));
-
         nodes.value = result.nodes.map((n) => ({
           ...n,
           position: posMap.get(n.id) || n.position,
@@ -438,13 +451,40 @@ const startPolling = () => {
           edges.value = result.edges;
         }
       }
-      if (isTerminalStatus(activity?.status)) {
-        stopPolling();
-      }
-    } catch (err) {
-      console.error("Polling error:", err);
+    } else {
+      // Non-terminal: update status in-place
+      store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
+        ...selectedWorkflowActivity.value,
+        status: data.status,
+      });
     }
-  }, 5000);
+  }
+};
+
+const onProcessorStatusUpdate = (raw) => {
+  const data = parsePusherData(raw);
+  const currentRunId = selectedWorkflowActivity.value?.uuid;
+  if (data.runId !== currentRunId) return;
+
+  // Update node status in store
+  store.commit("analysisModule/UPDATE_NODE_STATUS", {
+    nodeId: data.nodeId,
+    status: data.status,
+  });
+
+  // Update VueFlow node styling via VueFlow's own API
+  updateNodeData(data.nodeId, { status: data.status });
+
+  // Update edge colors for edges sourced from this node
+  edges.value = edges.value.map((edge) => {
+    if (edge.source === data.nodeId) {
+      return {
+        ...edge,
+        style: { ...edge.style, stroke: statusBorderColor(data.status) },
+      };
+    }
+    return edge;
+  });
 };
 
 /*
@@ -452,7 +492,6 @@ const startPolling = () => {
 */
 const selectRun = async (run) => {
   if (mode.value === "configure") return; // don't switch away mid-configure
-  stopPolling();
   mode.value = "browse";
   selectedRun.value = run;
   selectedNode.value = null;
@@ -473,8 +512,6 @@ const selectRun = async (run) => {
         setTimeout(() => fitView({ padding: 0.2 }), 50);
       }
     }
-
-    startPolling();
   } catch (err) {
     console.error("Failed to load run details:", err);
     EventBus.$emit("toast", {
@@ -730,7 +767,6 @@ const initiateWorkflow = async () => {
     mode.value = "configure";
     selectedRun.value = null;
     selectedNode.value = null;
-    stopPolling();
     accordionActiveNames.value = ["information"];
   } catch (err) {
     console.error("Failed to load workflow definition:", err);
@@ -834,8 +870,12 @@ const executeWorkflow = async () => {
 
     // Refresh runs list and auto-select the new run
     await store.dispatch("analysisModule/fetchWorkflowInstances");
-    if (newRun && newRun.uuid) {
-      await selectRun(newRun);
+    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
+    const runToSelect = runId
+      ? workflowInstances.value.find((r) => r.uuid === runId) || newRun
+      : workflowInstances.value[0]; // fallback to newest
+    if (runToSelect) {
+      await selectRun(runToSelect);
     }
   } catch (err) {
     console.error("Failed to execute workflow:", err);
@@ -985,6 +1025,45 @@ const openLogs = async (nodeId, label) => {
 };
 
 /*
+  Cancel run
+*/
+const cancelRun = async () => {
+  if (!selectedWorkflowActivity.value?.uuid) return;
+  cancellingRun.value = true;
+  try {
+    const token = await useGetToken();
+    const runId = selectedWorkflowActivity.value.uuid;
+    const url = `${config.value.api2Url}/compute/workflows/runs/${runId}/cancel`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (resp.status === 409) {
+      const data = await resp.json();
+      EventBus.$emit("toast", {
+        detail: { type: "info", msg: data.message || "Run is already in a terminal state." },
+      });
+    } else if (!resp.ok) {
+      throw new Error("Failed to cancel run");
+    } else {
+      EventBus.$emit("toast", {
+        detail: { type: "success", msg: "Run cancellation initiated." },
+      });
+    }
+    cancelRunDialogVisible.value = false;
+    // Refresh run status
+    await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
+  } catch (err) {
+    console.error("Failed to cancel run:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: "Failed to cancel run." },
+    });
+  } finally {
+    cancellingRun.value = false;
+  }
+};
+
+/*
   Time formatting
 */
 const formatTime = (dateStr) => {
@@ -1123,9 +1202,38 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
+
+  // Subscribe to Pusher analytics channel for real-time status updates
+  if (pusher) {
+    const rawOrgId = store.state.activeOrganization?.organization?.id;
+    const rawUserId = store.state.profile?.id;
+    const orgUuid = rawOrgId?.replace(/^N:organization:/, '');
+    const userUuid = rawUserId?.replace(/^N:user:/, '');
+    analyticsChannelName = orgUuid
+      ? `organization-${orgUuid}-analytics`
+      : `user-${userUuid}-analytics`;
+
+    analyticsChannel = pusher.subscribe(analyticsChannelName);
+    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
+
+    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
+    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
+  }
 });
 
-onBeforeUnmount(() => stopPolling());
+onBeforeUnmount(() => {
+  // Unsubscribe from Pusher analytics channel
+  if (analyticsChannel) {
+    analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
+    analyticsChannel.unbind("workflow-processor-status", onProcessorStatusUpdate);
+    if (pusher && analyticsChannelName) {
+      pusher.unsubscribe(analyticsChannelName);
+    }
+    analyticsChannel = null;
+    analyticsChannelName = null;
+    store.commit("analysisModule/CLEAR_ANALYTICS_CHANNEL");
+  }
+});
 
 onUnmounted(() => {
   store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
@@ -1236,7 +1344,7 @@ onUnmounted(() => {
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#059669' }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b' }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
@@ -1571,6 +1679,14 @@ onUnmounted(() => {
                 <IconRotateRight :width="14" :height="14" />
                 Rerun with configuration
               </bf-button>
+
+              <bf-button
+                v-if="!isTerminalStatus(selectedWorkflowActivity.status)"
+                class="danger cancel-run-btn"
+                @click="cancelRunDialogVisible = true"
+              >
+                Cancel Run
+              </bf-button>
             </template>
 
             <div v-else class="info-empty">
@@ -1783,7 +1899,10 @@ onUnmounted(() => {
               <span class="wizard-summary-value">{{ wizardSelectedDataset?.content?.name || wizardForm.datasetId }}</span>
             </div>
           </div>
-          <div class="wizard-hint">
+          <div v-if="rerunSource" class="wizard-hint">
+            All processor parameters and execution targets will be copied from the previous run. You will still need to configure <strong>data source</strong> nodes to select files before executing.
+          </div>
+          <div v-else class="wizard-hint">
             After clicking <strong>Configure</strong>, you will be able to click on <strong>data source</strong> nodes to select files, and on <strong>processor</strong> nodes to adjust settings before executing the run.
           </div>
         </div>
@@ -2159,6 +2278,23 @@ onUnmounted(() => {
         <bf-button class="secondary" @click="nodeMetricsDialogVisible = false">Close</bf-button>
       </template>
     </el-dialog>
+
+    <!-- Cancel Run Confirmation Dialog -->
+    <el-dialog
+      v-model="cancelRunDialogVisible"
+      title="Cancel Run"
+      width="500"
+      center
+      @close="cancelRunDialogVisible = false"
+    >
+      <span>Are you sure you want to cancel this run?</span>
+      <template #footer>
+        <div class="cancel-dialog-footer">
+          <bf-button class="secondary" @click="cancelRunDialogVisible = false">No</bf-button>
+          <bf-button :disabled="cancellingRun" @click="cancelRun">Yes</bf-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -2405,7 +2541,7 @@ onUnmounted(() => {
 
   &.gray-node { border-color: theme.$gray_4; }
   &.blue-node { border-color: #3b82f6; }
-  &.blue-node.animate { animation: border-glow-activity 5s ease-in-out infinite; }
+  &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
   &.green-node { border-color: theme.$status_green; }
   &.red-node { border-color: theme.$status_red; }
 
@@ -2420,8 +2556,8 @@ onUnmounted(() => {
   }
 
   &.data-target-node {
-    background: #ecfdf5;
-    border-color: #059669;
+    background: #f1f5f9;
+    border-color: #64748b;
 
     &.green-node { border-color: theme.$status_green; }
     &.red-node { border-color: theme.$status_red; }
@@ -2438,8 +2574,8 @@ onUnmounted(() => {
       letter-spacing: 0.5px;
       padding: 2px 8px;
       border-radius: 10px;
-      background: rgba(5, 150, 105, 0.12);
-      color: #047857;
+      background: rgba(100, 116, 139, 0.12);
+      color: #64748b;
       white-space: nowrap;
       display: inline-block;
     }
@@ -2455,14 +2591,14 @@ onUnmounted(() => {
     flex-shrink: 0;
 
     &.source-badge { background: #6366f1; color: white; }
-    &.target-badge { background: #059669; color: white; }
+    &.target-badge { background: #64748b; color: white; }
   }
 }
 
-@keyframes border-glow-activity {
-  0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.3); }
-  50% { box-shadow: 0 0 15px rgba(23, 187, 98, 0.5); }
-  100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.3); }
+@keyframes node-pulse {
+  0% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
+  50% { background: #dbeafe; box-shadow: 0 0 18px rgba(59, 130, 246, 0.5); }
+  100% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
 }
 
 /* Status dots */
@@ -2812,6 +2948,21 @@ onUnmounted(() => {
   gap: 6px;
   width: 100%;
   justify-content: center;
+}
+.cancel-run-btn {
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
+  &:hover {
+    background: theme.$red_1;
+    border-color: theme.$red_1;
+    color: white;
+  }
+}
+.cancel-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
 }
 
 /* Metrics summary in sidebar */

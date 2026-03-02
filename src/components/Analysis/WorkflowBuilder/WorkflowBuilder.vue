@@ -170,7 +170,7 @@ const findAppByUrl = (applications, sourceUrl) => {
 
 const nodeTypeColor = (type) => {
   if (type === "data-source") return "#6366f1";
-  if (type === "data-target") return "#059669";
+  if (type === "data-target") return "#64748b";
   return "#cccccc";
 };
 
@@ -1202,7 +1202,7 @@ onPaneClick(() => {
     &:has(.input-node) { --node-border-color: #17BB62; }
     &:has(.output-node) { --node-border-color: #17BB62; }
     &:has(.data-source-node) { --node-border-color: #6366f1; }
-    &:has(.data-target-node) { --node-border-color: #059669; }
+    &:has(.data-target-node) { --node-border-color: #64748b; }
   }
 
   .vue-flow__handle {
@@ -1505,8 +1505,8 @@ onPaneClick(() => {
 }
 
 .data-target-item {
-  background-color: #ecfdf5;
-  border-color: #059669;
+  background-color: #f1f5f9;
+  border-color: #64748b;
 
   &:not(.disabled):hover {
     border-color: #047857;
@@ -1780,8 +1780,8 @@ onPaneClick(() => {
   }
 
   &.data-target-node {
-    border-color: #059669;
-    background: #ecfdf5;
+    border-color: #64748b;
+    background: #f1f5f9;
 
     .node-body {
       margin-top: 8px;
@@ -1799,8 +1799,8 @@ onPaneClick(() => {
       transition: color 0.15s, background 0.15s;
 
       &:hover, &.active {
-        color: #059669;
-        background: rgba(5, 150, 105, 0.1);
+        color: #64748b;
+        background: rgba(100, 116, 139, 0.1);
       }
     }
 
@@ -1853,7 +1853,7 @@ onPaneClick(() => {
     }
 
     &.target-badge {
-      background: #059669;
+      background: #64748b;
       color: white;
     }
   }
