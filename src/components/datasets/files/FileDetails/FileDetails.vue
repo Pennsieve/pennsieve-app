@@ -1,5 +1,5 @@
 <template>
-  <bf-stage slot="stage" ref="bfStage" :is-editing="editingInstance">
+  <bf-stage slot="stage" ref="bfStage" :is-editing="editingInstance" :no-padding="noPadding">
     <template #actions>
       <stage-actions>
         <template #right>
@@ -49,24 +49,15 @@
                   </el-dropdown-item>
                 </template>
                 <template v-else>
+
                   <el-dropdown-item
-                    v-if="!isExternalFile"
                     class="bf-menu-item"
                     :disabled="datasetLocked"
                     command="rename-file"
                   >
                     Rename
                   </el-dropdown-item>
-
-                  <el-dropdown-item
-                    v-else
-                    class="bf-menu-item"
-                    :disabled="datasetLocked"
-                    command="edit-file"
-                  >
-                    Update
-                  </el-dropdown-item>
-
+                  
                   <el-dropdown-item
                     class="bf-menu-item"
                     :disabled="datasetLocked"
@@ -89,6 +80,31 @@
         </template>
       </stage-actions>
     </template>
+
+    <bf-delete-dialog
+      ref="deleteDialog"
+      :dialog-visible="deleteDialogVisible"
+      :selected-files="selectedFiles"
+      @file-delete="onDelete"
+      @close="onCloseDeleteDialog"
+    />
+
+    <RenameFileDialog
+      v-model:dialog-visible="renameDialogVisible"
+      :file="proxyRecord"
+      @file-renamed="onFileRenamed"
+      @close="onCloseRenameFileDialog"
+    />
+
+    <bf-move-dialog
+      ref="moveDialog"
+      v-model:dialog-visible="moveDialogVisible"
+      v-model:move-conflict="moveConflict"
+      :selected-files="selectedFiles"
+      @rename-conflicts="onRenameConflicts"
+      @completeMove="moveItems"
+      @close="onCloseMoveDialog"
+    />
 
     <div class="concept-instance-section">
       <div files-section class="file-list">
@@ -125,7 +141,7 @@
         <concept-instance-static-property
           label="Created by"
           :user="ownerId"
-          :date="proxyRecord.content.createdAt"
+          :date="proxyRecord.created_at || proxyRecord.content.createdAt"
         />
       </div>
     </div>
@@ -149,220 +165,7 @@
       />
     </el-collapse>
 
-    <!--        &lt;!&ndash; BEGIN PROPERTIES TABLE &ndash;&gt;-->
-    <!--        <div class="property-list"-->
-    <!--           v-if="!isFile && !isRecordsLoading">-->
-    <!--          <concept-instance-property-->
-    <!--            v-for="property in properties"-->
-    <!--            :key="property.name"-->
-    <!--            :property="property"-->
-    <!--            :string-subtypes="stringSubtypes"-->
-    <!--            @edit-instance="enableEditFocus(property.name)"-->
-    <!--          />-->
 
-    <!--          <concept-instance-linked-property-->
-    <!--            v-for="property in linkedProperties"-->
-    <!--            :key="property.to.modelId"-->
-    <!--            :property="property"-->
-    <!--            :label="property.schemaLinkedProperty.displayName"-->
-    <!--            @edit-linked-property="editLinkedProperty"-->
-    <!--            @confirm-remove-linked-property="openLinkedPropertyModal"-->
-    <!--          />-->
-
-    <!--          <div class="static-prop-section">-->
-    <!--            <concept-instance-static-property-->
-    <!--              label="Pennsieve id"-->
-    <!--              :value="instance.id"-->
-    <!--            />-->
-
-    <!--            <concept-instance-static-property-->
-    <!--              label="Created by"-->
-    <!--              :user="instance.createdBy"-->
-    <!--              :date="instance.createdAt"-->
-    <!--            />-->
-
-    <!--            <concept-instance-static-property-->
-    <!--              label="Updated by"-->
-    <!--              :user="instance.updatedBy"-->
-    <!--              :date="instance.updatedAt"-->
-    <!--            />-->
-    <!--          </div>-->
-    <!--        </div>-->
-    <!--        &lt;!&ndash; END PROPERTIES TABLE &ndash;&gt;-->
-
-    <!--        &lt;!&ndash; BEGIN FILES TABLE EMPTY STATE &ndash;&gt;-->
-    <!--        <template-->
-    <!--          v-if="!isFile && !isFilesLoading && !hasFiles && !isRecordsLoading && !datasetLocked"-->
-    <!--        >-->
-    <!--          <el-collapse-->
-    <!--            v-if="getPermission('editor')"-->
-    <!--            key="package"-->
-    <!--            v-model="activeSections"-->
-    <!--            class="concept-instance-section files-empty-state"-->
-    <!--          >-->
-    <!--            <el-collapse-item-->
-    <!--              title="Files"-->
-    <!--              name="package"-->
-    <!--            >-->
-    <!--              <div-->
-    <!--                slot="title"-->
-    <!--                class="relationship-title"-->
-    <!--              >-->
-    <!--                <svg-icon-->
-    <!--                  name="icon-arrow-up"-->
-    <!--                  :dir="arrowDirection('package')"-->
-    <!--                  height="10"-->
-    <!--                  width="10"-->
-    <!--                  color="#404554"-->
-    <!--                />-->
-    <!--                <h2>Files</h2>-->
-    <!--              </div>-->
-
-    <!--              <div-->
-    <!--                class="bf-upload-dropzone"-->
-    <!--                :class="isDraggingFiles ? 'is-dragging' : ''"-->
-    <!--                @dragenter.prevent="setIsDragging(true)"-->
-    <!--                @dragover.prevent="setIsDragging(true)"-->
-    <!--                @dragleave.prevent="setIsDragging(false)"-->
-    <!--                @drop.prevent="onDrop"-->
-    <!--              >-->
-    <!--                <div class="dropzone-content">-->
-    <!--                  <div class="upload-icons-wrap">-->
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item pdf icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('PDF', 'PDF')"-->
-    <!--                    >-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item timeseries icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Timeseries', 'TimeSeries')"-->
-    <!--                    >-->
-
-    <!--                    <iron-icon-->
-    <!--                      class="icon-upload"-->
-    <!--                      icon="blackfynn:icon-upload"-->
-    <!--                    />-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item image icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Image', 'Image')"-->
-    <!--                    >-->
-
-    <!--                    <img-->
-    <!--                      class="svg-icon icon-item slide icon-upload-extra outside"-->
-    <!--                      :src="fileIcon('Microscope', 'Slide')"-->
-    <!--                    >-->
-    <!--                  </div>-->
-    <!--                  <h3>-->
-    <!--                    Drag and drop files here or-->
-    <!--                    <a-->
-    <!--                      href="#"-->
-    <!--                      @click.prevent="handleChooseExistingFiles"-->
-    <!--                    >-->
-    <!--                      choose your files.-->
-    <!--                    </a>-->
-    <!--                  </h3>-->
-    <!--                  <p>-->
-    <!--                    We don’t recommend uploading more than 10GB through the web UI, due to browser-->
-    <!--                    limitations. If you’re uploading large amounts of data, please use the-->
-    <!--                    <a-->
-    <!--                      href="https://docs.pennsieve.io/"-->
-    <!--                      target="_blank"-->
-    <!--                    >-->
-    <!--                      Pennsieve API-->
-    <!--                    </a>-->
-    <!--                    .-->
-    <!--                  </p>-->
-    <!--                </div>-->
-    <!--                <input-->
-    <!--                  ref="inputFile"-->
-    <!--                  class="visuallyhidden"-->
-    <!--                  type="file"-->
-    <!--                  multiple="multiple"-->
-    <!--                  @change="onInputFileChange"-->
-    <!--                >-->
-    <!--              </div>-->
-    <!--            </el-collapse-item>-->
-    <!--          </el-collapse>-->
-    <!--        </template>-->
-    <!--        &lt;!&ndash; END FILES TABLE EMPTY STATE &ndash;&gt;-->
-
-    <!-- BEGIN FILES TABLE -->
-    <!--        <template v-if="!editingInstance && hasFiles">-->
-    <!--          <el-collapse-->
-    <!--            v-model="activeSections"-->
-    <!--            class="concept-instance-section zero-padding no-border"-->
-    <!--          >-->
-    <!--            <relationships-table-->
-    <!--              id="Files"-->
-    <!--              ref="package"-->
-    <!--              :active-sections="activeSections"-->
-    <!--              :relationship="fileRelationship"-->
-    <!--              :show-collapse="true"-->
-    <!--              source-type="recordFile"-->
-    <!--              :url="getRecordFileRelationshipsUrl"-->
-    <!--              @remove-relationships="handleRemoveRelationships"-->
-    <!--              @set-related-files="handleSetRelatedFiles"-->
-    <!--              @unlink-files="handleUnlinkFiles"-->
-    <!--              @delete-files="handleDeleteFiles"-->
-    <!--            />-->
-    <!--          </el-collapse>-->
-    <!--        </template>-->
-    <!-- END FILES TABLE -->
-
-    <!-- Directory View -->
-    <!--        <el-collapse-->
-    <!--          v-if="displayDirectoryViewer"-->
-    <!--          key="filecontent"-->
-    <!--          v-model="activeSections"-->
-    <!--          class="concept-instance-section zero-padding no-border"-->
-    <!--        >-->
-    <!--          <el-collapse-item-->
-    <!--            name="filecontent"-->
-    <!--            title="File Content"-->
-    <!--          >-->
-    <!--            <div-->
-    <!--              slot="title"-->
-    <!--              class="relationship-title"-->
-    <!--            >-->
-    <!--              <svg-icon-->
-    <!--                class="icon-collapse"-->
-    <!--                name="icon-arrow-up"-->
-    <!--                :dir="arrowDirection('filecontent')"-->
-    <!--                height="10"-->
-    <!--                width="10"-->
-    <!--                color="#404554"-->
-    <!--              />-->
-    <!--              <h2>File Content</h2>-->
-    <!--            </div>-->
-    <!--            <directory-viewer :pkg="proxyRecord" />-->
-    <!--          </el-collapse-item>-->
-    <!--        </el-collapse>-->
-
-    <!-- Relationships Table Empty State -->
-    <div
-      v-if="!hasSeenRelationshipsInfo && !hasRelationships && !datasetLocked"
-      class="relationships-empty-state"
-    >
-      <div class="relationships-empty-state-inner">
-        <h3>Create Relationships</h3>
-        <div>
-          <p class="relationship-inner-text">
-            Connect <b>{{ $sanitize(formattedConceptTitle) }}</b> with other
-            objects in your graph by clicking the "Link to ..." button above.
-          </p>
-          <a
-            href="https://docs.pennsieve.io/docs/creating-links-between-metadata-records"
-            target="_blank"
-          >
-            <bf-button class="primary learn-more"> Learn More </bf-button>
-          </a>
-          <div>
-            <a href="#" @click.prevent="dismissRelationshipsInfo"> Got it </a>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- BEGIN RELATIONSHIPS TABLE -->
     <template v-if="hasRelationships">
@@ -387,13 +190,51 @@
       </el-collapse>
     </template>
 
-    <add-relationship-drawer
-      ref="addRelationshipDrawer"
-      :relationship-types="relationshipTypes"
-      :record="proxyRecord.content"
-      :record-name="drawerOriginatingName"
-      :is-file="true"
-    />
+    <!-- CONNECTED RECORDS SECTION -->
+    <div class="concept-instance-section connected-records-section">
+      <div class="header">
+        <div>Connected Records</div>
+        <div class="header-actions">
+          <el-tag size="small" class="record-tag connected-records-tag">
+            {{ connectedRecords.length > 0 ? `${connectedRecords.length} records` : 'No records' }}
+          </el-tag>
+          <span class="attach-record-link" @click="startRecordAttachment">
+            Attach Record
+          </span>
+        </div>
+      </div>
+      <div v-if="connectedRecords && connectedRecords.length > 0" class="connected-records-container">
+        <div
+          v-for="(records, modelId) in groupedConnectedRecords"
+          :key="modelId"
+          class="model-group"
+        >
+          <div class="record-items">
+            <div
+              v-for="record in records"
+              :key="record.id"
+              class="record-item"
+              :title="'Click to view record details'"
+            >
+              <div class="record-content clickable" @click="navigateToConnectedRecord(record)">
+                <el-tag size="small" class="record-type">{{ getModelDisplayName(modelId) }}</el-tag>
+                <span class="record-details">{{ formatRecordKeyValues(record) }}</span>
+                <IconArrowRight class="nav-icon" :width="12" :height="12" />
+              </div>
+              <el-button
+                @click.stop="deleteConnectedRecord(record)"
+                link
+                size="small"
+                class="delete-record-btn"
+                title="Remove record connection"
+              >
+                ✕
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="viewer-pane-wrap">
       <div class="header">
@@ -419,8 +260,6 @@
       <viewer-pane class="viewer-pane" :is-preview="true" :pkg="proxyRecord" />
     </div>
   </bf-stage>
-
-
 </template>
 
 <script>
@@ -468,8 +307,14 @@ import SourceFilesTable from "./SourceFilesTable.vue";
 import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
 import { viewerToolTypes } from "../../../../utils/constants";
-import {useGetToken} from "@/composables/useGetToken";
-import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable";
+import { useGetToken } from "@/composables/useGetToken";
+import {
+  useHandleXhrError,
+  useSendXhr,
+} from "@/mixins/request/request_composable";
+import { useMetadataStore } from '@/stores/metadataStore';
+import IconArrowRight from '@/components/icons/IconArrowRight.vue';
+import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
 
 export default {
   name: "FileDetails",
@@ -479,6 +324,7 @@ export default {
     SourceFilesTable,
     StageActions,
     IconMenu,
+    IconArrowRight,
     BfButton,
     ConceptInstanceStaticProperty,
     LinkRecordMenu,
@@ -497,6 +343,18 @@ export default {
       type: String,
       default: "",
     },
+    noPadding: {
+      type: Boolean,
+      default: false
+    }
+  },
+
+  setup() {
+    const { formatRecordKeyValues } = useRecordKeyProperties();
+    
+    return {
+      formatRecordKeyValues
+    };
   },
 
   data() {
@@ -554,6 +412,11 @@ export default {
       packageSourceFiles: {},
       isDisabled: false,
       stringSubtypes: [],
+      deleteDialogVisible: false,
+      renameDialogVisible: false,
+      moveDialogVisible: false,
+      connectedRecords: [],
+      metadataStore: useMetadataStore()
     };
   },
 
@@ -561,13 +424,13 @@ export default {
     ...mapGetters([
       "config",
       "concepts",
-      "lastRoute",
       "editingInstance",
       "getModelById",
       "hasFeature",
       "getPermission",
       "datasetLocked",
       "isOrgSynced",
+      "orgMembers",
     ]),
 
     ...mapState(["conceptsHash", "dataset"]),
@@ -592,7 +455,6 @@ export default {
         this.checkViewerType(this.proxyRecord) !== "UnknownViewer" &&
         !this.isUploading &&
         this.getFileStatus !== "Failed" &&
-        this.getFileStatus !== "Unprocessed" &&
         this.computePackageType !== "Unknown" &&
         !this.displayDirectoryViewer &&
         this.fileType !== "External File"
@@ -604,11 +466,10 @@ export default {
      * @returns {String}
      */
     exportFileUrl: async function () {
-      return useGetToken().then(token => {
+      return useGetToken().then((token) => {
         const packageId = pathOr("", ["content", "id"], this.proxyRecord);
         return `${this.config.apiUrl}/packages/${packageId}/export?api_key=${token}`;
-      })
-
+      });
     },
 
     /**
@@ -620,7 +481,10 @@ export default {
     },
 
     ownerId: function () {
-      return pathOr(0, ["content", "ownerId"], this.proxyRecord);
+      // Try direct owner_id first (for collections), then fallback to content.ownerId (for regular packages)
+      const directOwnerId = pathOr(null, ["owner_id"], this.proxyRecord);
+      const contentOwnerId = pathOr(0, ["content", "ownerId"], this.proxyRecord);
+      return String(directOwnerId || contentOwnerId);
     },
     fileTypeLabel: function () {
       return this.packageSourceFiles.length > 1 ? "Package type" : "File type";
@@ -676,11 +540,11 @@ export default {
      * @returns {String}
      */
     packageFilesUrl: async function () {
-      return useGetToken().then(token => {
+      return useGetToken().then((token) => {
         const url = pathOr("", ["config", "apiUrl"])(this);
         const packageId = this.fileId;
         return `${url}/packages/${packageId}/sources-paged?api_key=${token}`;
-      })
+      });
     },
 
     sourceFilesUrl: function () {
@@ -759,16 +623,6 @@ export default {
      */
     externalFile: function () {
       return propOr({}, "externalFile", this.proxyRecord);
-    },
-
-    /**
-     * Compute if package is an external file
-     * @returns {Boolean}
-     */
-    isExternalFile: function () {
-      return Boolean(
-        pathOr("", ["externalFile", "location"], this.proxyRecord)
-      );
     },
 
     /**
@@ -860,9 +714,9 @@ export default {
      * @returns {String}
      */
     moveUrl: async function () {
-      return useGetToken().then(token => {
+      return useGetToken().then((token) => {
         return `${this.config.apiUrl}/data/move?api_key=${token}`;
-      })
+      });
     },
 
     /**
@@ -898,10 +752,9 @@ export default {
      * @returns {String}
      */
     packageDetailsUrl: async function () {
-      return await useGetToken().then(token => {
+      return await useGetToken().then((token) => {
         return `${this.config.apiUrl}/packages/${this.fileId}?api_key=${token}&includeAncestors=true`;
-
-      })
+      });
     },
 
     /**
@@ -948,6 +801,17 @@ export default {
      * @returns {Array}
      */
     properties: function () {
+      // For files (packages), check proxyRecord.properties first
+      if (this.isFile && this.proxyRecord && this.proxyRecord.properties) {
+        // The API returns properties in nested format: [{ category: "...", properties: [...] }]
+        // Flatten the nested structure to get all properties
+        const flatProperties = this.proxyRecord.properties
+          .map(categoryGroup => categoryGroup.properties || [])
+          .flat();
+        return flatProperties;
+      }
+      
+      // For records, use the original logic
       const values = propOr([], "values", this.instance);
       return Array.isArray(values) ? values : [];
     },
@@ -997,8 +861,10 @@ export default {
      * @returns {Boolean}
      */
     isFile: function () {
-      const id = pathOr("", ["params", "fileId"], this.$route);
-      return id.indexOf("package") >= 0;
+      // Check prop first (for use in GraphExplorer), then fall back to route param
+      const id = this.fileId || pathOr("", ["params", "fileId"], this.$route);
+      // Match both regular package IDs and collection node IDs
+      return id.indexOf("package") >= 0 || id.indexOf("collection") >= 0;
     },
 
     /**
@@ -1009,7 +875,6 @@ export default {
       const datasetId = pathOr("", ["params", "datasetId"], this.$route);
       const modelId = pathOr("", ["params", "conceptId"], this.$route);
       return `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${modelId}`;
-
     },
 
     getRecordFileRelationshipsUrl: function () {
@@ -1058,10 +923,10 @@ export default {
      * @returns {String}
      */
     processFileUrl: async function () {
-      return useGetToken().then(token => {
+      return useGetToken().then((token) => {
         const packageId = this.fileId;
-        return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`
-      })
+        return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
+      });
     },
 
     /**
@@ -1202,13 +1067,11 @@ export default {
       return val !== undefined ? val.toString() : val;
     },
 
-
     /**
      * Linked Properties URL
      * @returns {String}
      */
     linkedPropertiesUrl: function () {
-
       const datasetId = pathOr("", ["params", "datasetId"], this.$route);
       const modelId = pathOr("", ["params", "conceptId"], this.$route);
       const instanceId = pathOr("", ["params", "instanceId"], this.$route);
@@ -1225,15 +1088,42 @@ export default {
      * @returns {String}
      */
     stringSubtypeUrl: async function () {
-      return await useGetToken().then(token => {
+      return await useGetToken().then((token) => {
         return `${this.config.apiUrl}/models/datasets/${this.datasetId}/properties/strings?api_key=${token}`;
-      })
+      });
+    },
 
-
+    /**
+     * Group connected records by model
+     * @returns {Object}
+     */
+    groupedConnectedRecords: function() {
+      const grouped = {};
+      if (Array.isArray(this.connectedRecords)) {
+        this.connectedRecords.forEach(record => {
+          if (record && record.model_id) {
+            if (!grouped[record.model_id]) {
+              grouped[record.model_id] = [];
+            }
+            grouped[record.model_id].push(record);
+          }
+        });
+      }
+      return grouped;
     },
   },
 
   watch: {
+    fileId: {
+      handler: function (val, oldVal) {
+        if (val) {
+          this.getInstanceDetails();
+          this.fetchConnectedRecords();
+        }
+      },
+      immediate: true,
+    },
+
     packageDetailsUrl: {
       handler: function (val) {
         if (val) {
@@ -1342,6 +1232,9 @@ export default {
 
     // Fetch new data for a given table
     EventBus.$on("refresh-table-data", this.refreshTableData);
+    
+    // Fetch connected records when component mounts
+    this.fetchConnectedRecords();
 
     // Open proper drawer component
     EventBus.$on("add-relationship", this.handleAddRelationship);
@@ -1357,8 +1250,6 @@ export default {
       this.hasSeenRelationshipsInfo = true;
     }
 
-    EventBus.$on("update-external-file", this.onExternalFileUpdate);
-
     // In FileDetails window, the tool for viewing should be limited/set to PAN for panning the image/timeseries etc.
     this.setActiveTool(viewerToolTypes.PAN);
   },
@@ -1369,14 +1260,10 @@ export default {
     EventBus.$off("refresh-table-data", this.refreshTableData);
     EventBus.$off("add-relationship", this.handleAddRelationship);
     EventBus.$off("update-relationships-list", this.updateRelationshipsList);
-    EventBus.$off("update-external-file", this.onExternalFileUpdate);
   },
 
   methods: {
-    ...mapActions([
-      "updateEditingInstance",
-      "updateConcepts",
-    ]),
+    ...mapActions(["updateEditingInstance", "updateConcepts"]),
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
@@ -1386,23 +1273,28 @@ export default {
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function () {
-
-      this.stringSubtypeUrl.then((url)=> {
+      this.stringSubtypeUrl.then((url) => {
         useSendXhr(url)
           .then((subTypes) => {
-          this.stringSubtypes = Object.entries(subTypes).reduce(
-            (options, [val, config]) => [
-              ...options,
-              { value: val, label: config.label, regex: config.regex },
-            ],
-            []
-          );
-        })
+            this.stringSubtypes = Object.entries(subTypes).reduce(
+              (options, [val, config]) => [
+                ...options,
+                { value: val, label: config.label, regex: config.regex },
+              ],
+              []
+            );
+          })
           .catch((response) => {
             this.handleXhrError(response);
           });
-      })
+      });
+    },
 
+    onCloseRenameFileDialog: function () {
+      this.renameDialogVisible = false;
+    },
+    showRenameFileDialog: function () {
+      this.renameDialogVisible = true;
     },
 
     /**
@@ -1422,11 +1314,10 @@ export default {
         fileType: command,
       };
 
-      this.exportFileUrl.then(url => {
+      this.exportFileUrl.then((url) => {
         this.sendXhr(url, {
           method: "PUT",
-          header: {
-          },
+          header: {},
           body: payload,
         })
           .then((response) => {
@@ -1440,9 +1331,7 @@ export default {
             });
           })
           .catch(this.handleXhrError.bind(this));
-      })
-
-
+      });
     },
 
     /**
@@ -1450,7 +1339,7 @@ export default {
      * of an unprocessed state
      */
     processFile: function () {
-      this.processFileUrl.then(url => {
+      this.processFileUrl.then((url) => {
         this.sendXhr(url, {
           method: "PUT",
         })
@@ -1459,28 +1348,21 @@ export default {
             this.getFileStatus;
           })
           .catch(this.handleXhrError.bind(this));
-      })
+      });
     },
 
     /**
      * API call to get source files data for table
      */
     getSourceFiles: function () {
-      this.packageFilesUrl.then(url => {
+      this.packageFilesUrl.then((url) => {
         this.sendXhr(url)
           .then((response) => {
             this.packageSourceFiles = response.results;
           })
           .catch(this.handleXhrError.bind(this));
-      })
-
+      });
     },
-
-    // showMove: function() {
-    //   const moveDialog = this.$refs.moveDialog
-    //   moveDialog.file = this.file
-    //   moveDialog.visible = true
-    // },
 
     /**
      * Determines if destination record exists and user can add relationship
@@ -1498,55 +1380,54 @@ export default {
      */
     getRelationshipTypes: function () {
       if (this.relationshipsUrl) {
-
         useGetToken()
-          .then(token => {
-            return useSendXhr(this.relationshipsUrl,{
+          .then((token) => {
+            return useSendXhr(this.relationshipsUrl, {
               header: {
                 Authorization: `bearer ${token}`,
-              }
-            })
+              },
+            });
           })
           .then((response) => {
-          // get model id
-          const modelId = pathOr("", ["params", "conceptId"], this.$route);
+            // get model id
+            const modelId = pathOr("", ["params", "conceptId"], this.$route);
 
-          // check to see which relationship types are related to the current record id
-          const relatedRelationshipTypes = response.filter((relType) =>
-            Boolean(relType.from === modelId || relType.to === modelId)
-          );
+            // check to see which relationship types are related to the current record id
+            const relatedRelationshipTypes = response.filter((relType) =>
+              Boolean(relType.from === modelId || relType.to === modelId)
+            );
 
-          // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
-          const relationships = relatedRelationshipTypes.map((relType) => {
-            const { to, from } = relType;
-            const isFrom = Boolean(from === modelId);
-            const relModelId = isFrom ? to : from;
-            const { displayName, name, id } = this.getModelById(relModelId);
+            // format objects for relationships state (relationship count pill buttons) and relationshipTypes state
+            const relationships = relatedRelationshipTypes.map((relType) => {
+              const { to, from } = relType;
+              const isFrom = Boolean(from === modelId);
+              const relModelId = isFrom ? to : from;
+              const { displayName, name, id } = this.getModelById(relModelId);
 
-            // update relationship types state, adding modelName and modelId to DTO
-            this.relationshipTypes.push({
-              ...relType,
-              modelName: name,
-              modelId: id,
+              // update relationship types state, adding modelName and modelId to DTO
+              this.relationshipTypes.push({
+                ...relType,
+                modelName: name,
+                modelId: id,
+              });
+
+              // return relationship count object
+              return { count: 0, displayName, name };
             });
 
-            // return relationship count object
-            return { count: 0, displayName, name };
+            // update relationships state
+            this.relationships = uniqBy(prop("displayName"), [
+              ...this.relationships,
+              ...relationships,
+            ]);
+
+            // update active sections state
+            const relationshipNames = pluck("name", this.relationships);
+            this.activeSections = uniq([
+              ...this.activeSections,
+              ...relationshipNames,
+            ]);
           });
-
-          // update relationships state
-          this.relationships = uniqBy(prop("displayName"), [
-            ...this.relationships,
-            ...relationships,
-          ]);
-
-          // update active sections state
-          const relationshipNames = pluck("name", this.relationships);
-          this.activeSections = uniq([
-            ...this.activeSections,
-            ...relationshipNames,
-          ]);
-        });
       }
     },
 
@@ -1613,46 +1494,42 @@ export default {
 
       this.isRelationshipsLoading = true;
 
-      useGetToken()
-        .then(token => {
-          useSendXhr(url, {
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-          })
-            .then((resp) => {
-              resp.forEach((obj) => {
-                this.activeSections.push(obj.name);
-              });
-              const filesIdx = findIndex(propEq("name", "package"), resp);
-              if (filesIdx >= 0) {
-                const filesObj = resp[filesIdx];
-                resp.splice(filesIdx, 1);
-                resp.unshift(filesObj);
-                this.relationships = resp;
-              } else {
-                this.relationships = resp;
-              }
-              if (this.relationships.count !== this.lastRelationshipCount) {
-                this.relationships.count = this.lastRelationshipCount;
-              }
-
-              this.isRelationshipsLoading = false;
-            })
-            .catch(() => {
-              this.handleXhrError.bind(this);
-            });
+      useGetToken().then((token) => {
+        useSendXhr(url, {
+          header: {
+            Authorization: `bearer ${token}`,
+          },
         })
+          .then((resp) => {
+            resp.forEach((obj) => {
+              this.activeSections.push(obj.name);
+            });
+            const filesIdx = findIndex(propEq("name", "package"), resp);
+            if (filesIdx >= 0) {
+              const filesObj = resp[filesIdx];
+              resp.splice(filesIdx, 1);
+              resp.unshift(filesObj);
+              this.relationships = resp;
+            } else {
+              this.relationships = resp;
+            }
+            if (this.relationships.count !== this.lastRelationshipCount) {
+              this.relationships.count = this.lastRelationshipCount;
+            }
 
+            this.isRelationshipsLoading = false;
+          })
+          .catch(() => {
+            this.handleXhrError.bind(this);
+          });
+      });
     },
     /**
      * Gets instance details
      */
     getInstanceDetails: function () {
-
-      this.packageDetailsUrl.then(url => {
-        return this.sendXhr(url, {
-        })
+      this.packageDetailsUrl.then((url) => {
+        return this.sendXhr(url, {})
           .then((resp) => {
             if (this.isFile) {
               this.setProxyAsRecord(resp);
@@ -1660,9 +1537,10 @@ export default {
               this.instance = resp;
             }
           })
-          .catch(this.handleXhrError.bind(this));
-      })
-
+          .catch((error) => {
+            this.handleXhrError.bind(this)(error);
+          });
+      });
     },
 
     /**
@@ -1980,7 +1858,7 @@ export default {
 
         try {
           // Make request to create new instance
-          useGetToken().then(token => {
+          useGetToken().then((token) => {
             this.sendXhr(url, {
               header: {
                 Authorization: `bearer ${token}`,
@@ -1989,7 +1867,7 @@ export default {
               body: {
                 values,
               },
-            }).then(async response => {
+            }).then(async (response) => {
               const batchUrl = `${url}/${record.id}/linked/batch`;
               await this.createBatchLinkedProperties(
                 batchUrl,
@@ -2019,8 +1897,8 @@ export default {
                 this.changedProperties = [];
                 this.errorProperties = [];
               });
-            })
-          })
+            });
+          });
         } catch (e) {
           this.processing = false;
           this.savingChanges = false;
@@ -2046,7 +1924,7 @@ export default {
           };
         });
 
-      return useGetToken().then(token => {
+      return useGetToken().then((token) => {
         return this.sendXhr(url, {
           header: {
             Authorization: `bearer ${token}`,
@@ -2056,8 +1934,7 @@ export default {
             data: properties,
           },
         });
-      })
-
+      });
     },
 
     /**
@@ -2155,7 +2032,7 @@ export default {
         const url = this.packageDetailsUrl;
         const values = this.formatSavedValues();
 
-        useGetToken().then(token => {
+        useGetToken().then((token) => {
           this.sendXhr(url, {
             header: {
               Authorization: `bearer ${token}`,
@@ -2189,8 +2066,7 @@ export default {
               this.savingChanges = false;
               this.handleXhrError(err);
             });
-        })
-
+        });
       }
     },
 
@@ -2203,7 +2079,6 @@ export default {
         archive: this.showArchiveDialog,
         addProperty: this.openAddProperty,
         "rename-file": this.showRenameFileDialog,
-        "edit-file": this.showEditFileDialog,
         "move-file": this.showMove,
         "delete-file": this.showDeleteDialog,
       };
@@ -2214,13 +2089,6 @@ export default {
     },
 
     /**
-     * Show edit file dialog
-     */
-    showEditFileDialog: function () {
-      EventBus.$emit("open-external-file-modal", this.proxyRecord);
-    },
-
-    /**
      * Show archive dialog
      */
     showArchiveDialog: function () {
@@ -2228,17 +2096,14 @@ export default {
     },
 
     /**
-     * Show rename file dialog
-     */
-    showRenameFileDialog: function () {
-      EventBus.$emit("rename-file", this.proxyRecord);
-    },
-
-    /**
      * Show delete dialog
      */
     showDeleteDialog: function () {
-      this.$refs.deleteFilesDialog.visible = true;
+      this.deleteDialogVisible = true;
+    },
+
+    onCloseDeleteDialog: function () {
+      this.deleteDialogVisible = false;
     },
 
     /**
@@ -2247,30 +2112,27 @@ export default {
     archiveRecord: function () {
       const name = propOr("", "value", this.conceptTitle);
 
-
-      useGetToken()
-        .then(token => {
-          useSendXhr(this.packageDetailsUrl, {
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-            method: "DELETE",
-          })
-            .then(() => {
-              this.$router.replace({ name: "dataset-records" });
-
-              EventBus.$emit("toast", {
-                detail: {
-                  type: "success",
-                  msg: `${name} deleted`,
-                },
-              });
-            })
-            .catch((response) => {
-              this.handleXhrError(response);
-            });
+      useGetToken().then((token) => {
+        useSendXhr(this.packageDetailsUrl, {
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+          method: "DELETE",
         })
+          .then(() => {
+            this.$router.replace({ name: "dataset-records" });
 
+            EventBus.$emit("toast", {
+              detail: {
+                type: "success",
+                msg: `${name} deleted`,
+              },
+            });
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      });
     },
 
     /**
@@ -2315,28 +2177,26 @@ export default {
       properties = this.checkModelTitle(property, properties);
       properties.push(property);
 
-      useGetToken()
-        .then(token => {
-          useSendXhr(this.getModelSchemaUrl, {
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-            method: "PUT",
-            body: properties,
-          })
-            .then(() => {
-              // Check model title for existing properties before adding new one
-              this.checkModelTitle(property, this.instance.values);
-
-              this.instance.values.push(property);
-
-              this.addEditPropertyDialogVisible = false;
-            })
-            .catch((response) => {
-              this.handleXhrError(response);
-            });
+      useGetToken().then((token) => {
+        useSendXhr(this.getModelSchemaUrl, {
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+          method: "PUT",
+          body: properties,
         })
+          .then(() => {
+            // Check model title for existing properties before adding new one
+            this.checkModelTitle(property, this.instance.values);
 
+            this.instance.values.push(property);
+
+            this.addEditPropertyDialogVisible = false;
+          })
+          .catch((response) => {
+            this.handleXhrError(response);
+          });
+      });
     },
 
     /**
@@ -2357,15 +2217,13 @@ export default {
      * Get model schema from API
      */
     getModelSchema: function () {
-      useGetToken()
-        .then(token => {
-          return useSendXhr(this.getModelSchemaUrl, {
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-          });
-        })
-
+      useGetToken().then((token) => {
+        return useSendXhr(this.getModelSchemaUrl, {
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+        });
+      });
     },
 
     /**
@@ -2426,15 +2284,22 @@ export default {
      * @param {Object} response
      */
     setProxyAsRecord: function (response) {
-      // Set the proxyRecord
-      this.proxyRecord = response;
+      // Handle different response structures from the packages API
+      let packageData = response;
+      
+      // ONLY handle the specific case where we get an array response with nested package data (collections)
+      // This preserves the original behavior for regular packages
+      if (Array.isArray(response) && response.length > 0 && response[0].package) {
+        packageData = response[0].package;
+      }
+      
+      // Set the proxyRecord to the extracted package data
+      this.proxyRecord = packageData;
 
       // Set Active Viewer
-      console.log('Setting active viewer')
-      console.log(this.proxyRecord)
       this.setActiveViewer(this.proxyRecord);
 
-      this.selectedFiles.push(response);
+      this.selectedFiles.push(packageData);
     },
 
     /**
@@ -2480,22 +2345,20 @@ export default {
       // check if belongs_to relationship exists in dataset
       const url = this.relationshipsUrl;
       if (url) {
-        useGetToken()
-          .then(token => {
-            useSendXhr(url, {
-              header: {
-                Authorization: `bearer ${token}`,
-              },
-            })
-              .then((resp) => {
-                const belongsTo = find(propEq("name", "belongs_to"), resp);
-                if (resp.length === 0 || !belongsTo) {
-                  this.createDefaultRelationship();
-                }
-              })
-              .catch(this.handleXhrError.bind(this));
+        useGetToken().then((token) => {
+          useSendXhr(url, {
+            header: {
+              Authorization: `bearer ${token}`,
+            },
           })
-
+            .then((resp) => {
+              const belongsTo = find(propEq("name", "belongs_to"), resp);
+              if (resp.length === 0 || !belongsTo) {
+                this.createDefaultRelationship();
+              }
+            })
+            .catch(this.handleXhrError.bind(this));
+        });
       }
     },
 
@@ -2503,22 +2366,20 @@ export default {
      * Creates default relationship
      */
     createDefaultRelationship: function () {
-      useGetToken()
-        .then(token => {
-          useSendXhr(this.relationshipsUrl, {
-            method: "POST",
-            header: {
-              Authorization: `bearer ${token}`,
-            },
-            body: {
-              name: "belongs_to",
-              displayName: "Belongs To",
-              description: "",
-              schema: [],
-            },
-          }).catch(this.handleXhrError.bind(this));
-        })
-
+      useGetToken().then((token) => {
+        useSendXhr(this.relationshipsUrl, {
+          method: "POST",
+          header: {
+            Authorization: `bearer ${token}`,
+          },
+          body: {
+            name: "belongs_to",
+            displayName: "Belongs To",
+            description: "",
+            schema: [],
+          },
+        }).catch(this.handleXhrError.bind(this));
+      });
     },
 
     /**
@@ -2568,42 +2429,6 @@ export default {
         file
       );
     },
-
-    /**
-     * Set new name and description for external file
-     * @param {Object} file
-     */
-    onExternalFileUpdate: function (file) {
-      const oldName = pathOr("", ["content", "name"], this.proxyRecord);
-      const oldDescription = pathOr(
-        "",
-        ["externalFile", "description"],
-        this.proxyRecord
-      );
-      this.proxyRecord.content.name = pathOr(
-        oldName,
-        ["content", "name"],
-        file
-      );
-      this.proxyRecord.externalFile.location = pathOr(
-        "",
-        ["externalFile", "location"],
-        file
-      );
-      this.proxyRecord.externalFile.description = pathOr(
-        oldDescription,
-        ["externalFile", "description"],
-        file
-      );
-
-      EventBus.$emit("toast", {
-        detail: {
-          msg: "External file was updated",
-          type: "success",
-        },
-      });
-    },
-
     /**
      * Show move dialog after getting the parent's (or dataset's) children
      */
@@ -2619,15 +2444,17 @@ export default {
       const baseUrl = this.proxyRecord.parent ? "packages" : "datasets";
 
       useGetToken()
-        .then(token => {
+        .then((token) => {
           const url = `${this.config.apiUrl}/${baseUrl}/${parentId}?api_key=${token}&includeAncestors=true`;
           return this.sendXhr(url).then((response) => {
-            moveDialog.file = response;
-            moveDialog.visible = true;
+            moveDialog.currentFolder = response;
+            this.moveDialogVisible = true;
           });
-        }).catch(err => useHandleXhrError(err))
-
-
+        })
+        .catch((err) => useHandleXhrError(err));
+    },
+    onCloseMoveDialog: function () {
+      this.moveDialogVisible = false;
     },
 
     /**
@@ -2636,9 +2463,8 @@ export default {
      * @param {Array} items
      */
     moveItems: function (destination, items) {
-
-      this.moveUrl.then(url => {
-        const things = items.map(window.R.path(["content", "id"]));
+      this.moveUrl.then((url) => {
+        const things = items.map((item) => item.content.id);
         this.sendXhr(url, {
           method: "POST",
           body: {
@@ -2647,11 +2473,10 @@ export default {
           },
         })
           .then((response) => {
-            if (response.success.length > 0) {
-              /*
-              Get the file again to update all values of the file.
-              Move response doesn't give as much info as needed
-            */
+              if (response.success.length > 0) {
+                /*
+                Get the file again to update all values of the file.
+              */
               this.getInstanceDetails();
 
               EventBus.$emit("toast", {
@@ -2668,7 +2493,7 @@ export default {
           .catch((response) => {
             this.handleXhrError(response);
           });
-      })
+      });
     },
 
     /**
@@ -2684,9 +2509,7 @@ export default {
         files: failures,
         destination: propOr("", "destination", response),
       };
-
-      // Show user notice of conflicts
-      this.$refs.moveDialog.visible = true;
+      this.moveDialogVisible = true;
     },
 
     /**
@@ -2696,12 +2519,10 @@ export default {
      */
     onRenameConflicts: function (destination, files) {
       // Rename each file with proposed new name
-
-      useGetToken().then(token =>{
-        const promises = files.map((obj) => {
-          const id = propOr("", "id", obj);
+      const promises = files.map((obj) => {
+        const id = propOr("", "id", obj);
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -2709,21 +2530,16 @@ export default {
             },
           });
         });
-        Promise.all(promises).then((response) => {
-          // Update name
-          this.onFileRenamed(head(response));
+      });
+      Promise.all(promises).then((response) => {
+        // Update name
+        this.onFileRenamed(response[0]);
+        this.moveItems(destination, this.moveConflict.display);
 
-          // Move files again, now with new name
-          this.moveItems(destination, response);
-
-          // Reset
-          this.moveConflict = {};
-
-          // Hide user notice of conflicts
-          this.$refs.moveDialog.visible = false;
-        });
-      })
-
+        // Reset
+        this.moveDialogVisible = false;
+        this.moveConflict = {};
+      });
     },
 
     /**
@@ -2756,7 +2572,7 @@ export default {
      */
     getLinkedProperties: function () {
       if (this.linkedPropertiesUrl) {
-        useGetToken().then(token => {
+        useGetToken().then((token) => {
           this.sendXhr(this.linkedPropertiesUrl, {
             header: {
               Authorization: `bearer ${token}`,
@@ -2780,8 +2596,7 @@ export default {
             .catch((response) => {
               this.handleXhrError(response);
             });
-        })
-
+        });
       }
     },
 
@@ -2853,7 +2668,7 @@ export default {
 
       const packageDetailsUrl = `${this.config.conceptsUrl}/datasets/${datasetId}/concepts/${conceptId}/instances/${instanceId}`;
 
-      useGetToken().then(token => {
+      useGetToken().then((token) => {
         this.sendXhr(packageDetailsUrl, {
           header: {
             Authorization: `bearer ${token}`,
@@ -2865,8 +2680,7 @@ export default {
             this.linkedProperties.splice(index, 1, linkedProperty);
           })
           .catch(this.handleXhrError.bind(this));
-      })
-
+      });
     },
 
     /**
@@ -2879,6 +2693,118 @@ export default {
         ? this.onRemoveLinkedProperty(property)
         : this.openLinkedPropertyModal(property);
     },
+
+    /**
+     * Fetch connected records for the current package
+     */
+    async fetchConnectedRecords() {
+      if (!this.fileId || !this.datasetId) {
+        this.connectedRecords = [];
+        return;
+      }
+
+      try {
+        const response = await this.metadataStore.fetchPackageConnectedRecords(
+          this.datasetId,
+          this.fileId
+        );
+
+        // Handle the response format from metadataStore: { records, cursor, hasMore }
+        if (response && response.records) {
+          this.connectedRecords = response.records || [];
+        } else if (Array.isArray(response)) {
+          this.connectedRecords = response;
+        } else {
+          this.connectedRecords = [];
+        }
+      } catch (error) {
+        console.error('Error fetching connected records:', error);
+        this.connectedRecords = [];
+      }
+    },
+
+    /**
+     * Get model display name for connected records
+     * @param {String} modelId
+     * @returns {String}
+     */
+    getModelDisplayName(modelId) {
+      const model = this.metadataStore.models.find(m => m.id === modelId);
+      return model ? (model.display_name || model.name) : modelId;
+    },
+
+    /**
+     * Navigate to record details page
+     * @param {Object} record
+     */
+    navigateToConnectedRecord(record) {
+      this.$router.push({
+        name: 'record-details',
+        params: {
+          datasetId: this.datasetId,
+          modelId: record.model_id,
+          recordId: record.id
+        }
+      });
+    },
+
+    /**
+     * Delete connected record from package
+     * @param {Object} record
+     */
+    async deleteConnectedRecord(record) {
+      try {
+        await this.$confirm(
+          `Are you sure you want to remove the connection to "${this.formatRecordKeyValues(record)}"? This will not delete the record from the dataset.`,
+          'Remove Record Connection',
+          {
+            confirmButtonText: 'Remove',
+            cancelButtonText: 'Cancel',
+            type: 'warning',
+            center: true,
+            lockScroll: true,
+            closeOnClickModal: false,
+            closeOnPressEscape: true,
+            showClose: true,
+            beforeClose: null,
+            distinguishCancelAndClose: true,
+            roundButton: false
+          }
+        )
+
+        await this.metadataStore.deletePackageFromRecord(
+          this.datasetId,
+          record.id,
+          this.fileId
+        )
+
+        this.$message.success('Record connection removed successfully')
+
+        // Refresh the connected records list
+        await this.fetchConnectedRecords()
+      } catch (action) {
+        if (action === 'cancel' || action === 'close') {
+          // User cancelled or closed dialog
+          return
+        }
+        console.error('Error deleting connected record:', action)
+        this.$message.error(`Failed to remove connection: ${action.message || 'Unknown error'}`)
+      }
+    },
+
+    /**
+     * Start record attachment flow - placeholder for future implementation
+     */
+    startRecordAttachment() {
+      // Get the package info from the current file
+      const packageId = this.proxyRecord.content.id
+      const datasetId = this.$route.params.datasetId
+      const packageName = this.proxyRecord.content.name || this.proxyRecord.content.filename || 'Unknown File'
+      
+      // Start the record attachment process
+      this.metadataStore.startRecordAttachment(packageId, datasetId, packageName)
+    },
+
   },
 };
 </script>
@@ -2886,6 +2812,9 @@ export default {
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
 @use "../../../../styles/_icon-item-colors";
+@use "../../../../styles/element/dialog";
+@use "../../../../styles/spacing";
+
 
 #file-name-header {
   font-size: 20px;
@@ -2903,10 +2832,6 @@ export default {
 .highlight-property {
   color: theme.$gray_6;
   font-weight: 500;
-}
-
-.source-files-table {
-  //display: flex;
 }
 
 .concept-instance {
@@ -3192,5 +3117,160 @@ export default {
   color: theme.$gray_4;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+// Connected Records Section Styling - matching recordSpecViewer attached files
+.connected-records-section {
+  background: white;
+  padding: 8px;
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid theme.$gray_2;
+    
+    div:first-child {
+      font-size: 14px;
+      font-weight: 500;
+      color: theme.$gray_6;
+      margin: 0;
+    }
+    
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .record-tag {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        
+        &.connected-records-tag {
+          background-color: theme.$teal_tint !important;
+          border-color: theme.$teal_1 !important;
+          color: theme.$teal_2 !important;
+        }
+      }
+      
+      .attach-record-link {
+        color: theme.$teal_2;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          color: theme.$teal_1;
+          text-decoration: underline;
+        }
+        
+        &:active {
+          color: theme.$teal_1;
+        }
+      }
+    }
+  }
+
+  .connected-records-container {
+    .model-group {
+      margin-bottom: 8px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .record-items {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .record-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          background: white;
+          border: 1px solid theme.$gray_2;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          justify-content: space-between;
+
+          .record-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+
+            &.clickable {
+              cursor: pointer;
+            }
+          }
+
+          &:hover {
+            border-color: theme.$purple_1;
+            background-color: theme.$gray_1;
+
+            .nav-icon {
+              color: theme.$purple_2;
+            }
+
+            .delete-record-btn {
+              opacity: 1;
+            }
+          }
+
+          .delete-record-btn {
+            opacity: 0;
+            transition: all 0.2s ease;
+            padding: 2px 4px !important;
+            min-height: unset !important;
+            height: 18px !important;
+            width: 18px !important;
+            font-size: 12px;
+            color: theme.$gray_4;
+            flex-shrink: 0;
+            
+            &:hover {
+              color: theme.$red_2 !important;
+              background-color: theme.$red_tint !important;
+            }
+          }
+
+          .record-type {
+            font-size: 10px;
+            font-weight: 500;
+            padding: 2px 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            background: theme.$gray_1 !important;
+            border-color: theme.$gray_3 !important;
+            color: theme.$gray_5 !important;
+          }
+
+          .record-details {
+            flex: 1;
+            font-size: 13px;
+            color: theme.$gray_6;
+            font-weight: 400;
+            line-height: 1.3;
+          }
+
+          .nav-icon {
+            color: theme.$gray_4;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+          }
+        }
+      }
+    }
+  }
 }
 </style>

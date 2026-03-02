@@ -2,7 +2,7 @@
   <div>
     <locked-banner slot="banner" />
 
-    <bf-rafter  class="overview">
+    <bf-rafter class="overview" :hide-dataset-name="true">
       <template #heading>
         <div
           class="flex-heading"

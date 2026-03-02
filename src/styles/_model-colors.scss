@@ -1,0 +1,165 @@
+// Model Colors Palette
+// 20 distinct colors for differentiating models in visualizations
+// Each color has a background (light tint) and border (main color) variant
+
+// Purple shades (based on theme purples)
+$model_purple_bg: #f3f0ff;
+$model_purple_border: #8b5cf6;
+
+$model_indigo_bg: #eef2ff;
+$model_indigo_border: #6366f1;
+
+$model_navy_bg: #e8eaf5;
+$model_navy_border: #3b4d7a;
+
+// Blue shades
+$model_blue_bg: #eff6ff;
+$model_blue_border: #3b82f6;
+
+$model_sky_bg: #e0f2fe;
+$model_sky_border: #0ea5e9;
+
+$model_cyan_bg: #e6f8f7;
+$model_cyan_border: #08b3af;
+
+// Green shades
+$model_green_bg: #f0f9ff;
+$model_green_border: #10b981;
+
+$model_emerald_bg: #ecfdf5;
+$model_emerald_border: #059669;
+
+$model_lime_bg: #f7fee7;
+$model_lime_border: #65a30d;
+
+// Yellow/Orange shades
+$model_yellow_bg: #fffbeb;
+$model_yellow_border: #f59e0b;
+
+$model_amber_bg: #fff7ed;
+$model_amber_border: #f97316;
+
+$model_orange_bg: #fef6eb;
+$model_orange_border: #ea580c;
+
+// Red/Pink shades
+$model_red_bg: #fef2f2;
+$model_red_border: #ef4444;
+
+$model_rose_bg: #fff1f2;
+$model_rose_border: #f43f5e;
+
+$model_pink_bg: #fdf2f8;
+$model_pink_border: #ec4899;
+
+$model_fuchsia_bg: #fdf4ff;
+$model_fuchsia_border: #d946ef;
+
+// Additional unique colors
+$model_violet_bg: #f5f3ff;
+$model_violet_border: #9333ea;
+
+$model_slate_bg: #f8fafc;
+$model_slate_border: #64748b;
+
+$model_teal_bg: #f0fdfa;
+$model_teal_border: #14b8a6;
+
+$model_bronze_bg: #fef3e2;
+$model_bronze_border: #b45309;
+
+// Gray for packages/files (special case)
+$model_gray_bg: #f9fafb;
+$model_gray_border: #6b7280;
+
+// Export as a list for programmatic access
+$model-colors: (
+  'purple': (
+    'bg': $model_purple_bg,
+    'border': $model_purple_border
+  ),
+  'indigo': (
+    'bg': $model_indigo_bg,
+    'border': $model_indigo_border
+  ),
+  'navy': (
+    'bg': $model_navy_bg,
+    'border': $model_navy_border
+  ),
+  'blue': (
+    'bg': $model_blue_bg,
+    'border': $model_blue_border
+  ),
+  'sky': (
+    'bg': $model_sky_bg,
+    'border': $model_sky_border
+  ),
+  'cyan': (
+    'bg': $model_cyan_bg,
+    'border': $model_cyan_border
+  ),
+  'green': (
+    'bg': $model_green_bg,
+    'border': $model_green_border
+  ),
+  'emerald': (
+    'bg': $model_emerald_bg,
+    'border': $model_emerald_border
+  ),
+  'lime': (
+    'bg': $model_lime_bg,
+    'border': $model_lime_border
+  ),
+  'yellow': (
+    'bg': $model_yellow_bg,
+    'border': $model_yellow_border
+  ),
+  'amber': (
+    'bg': $model_amber_bg,
+    'border': $model_amber_border
+  ),
+  'orange': (
+    'bg': $model_orange_bg,
+    'border': $model_orange_border
+  ),
+  'red': (
+    'bg': $model_red_bg,
+    'border': $model_red_border
+  ),
+  'rose': (
+    'bg': $model_rose_bg,
+    'border': $model_rose_border
+  ),
+  'pink': (
+    'bg': $model_pink_bg,
+    'border': $model_pink_border
+  ),
+  'fuchsia': (
+    'bg': $model_fuchsia_bg,
+    'border': $model_fuchsia_border
+  ),
+  'violet': (
+    'bg': $model_violet_bg,
+    'border': $model_violet_border
+  ),
+  'slate': (
+    'bg': $model_slate_bg,
+    'border': $model_slate_border
+  ),
+  'teal': (
+    'bg': $model_teal_bg,
+    'border': $model_teal_border
+  ),
+  'bronze': (
+    'bg': $model_bronze_bg,
+    'border': $model_bronze_border
+  )
+);
+
+// Mixin for applying model colors
+@mixin model-color($color-name) {
+  $color-map: map-get($model-colors, $color-name);
+  background-color: map-get($color-map, 'bg');
+  border-color: map-get($color-map, 'border');
+  color: map-get($color-map, 'border');
+}

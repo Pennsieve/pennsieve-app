@@ -68,37 +68,30 @@ export const actions = {
         }).catch(err => useHandleXhrError(err))
   },
 
-  createCollection: async ({commit, rootState, dispatch}, { datasetId, collectionName }) => {
-
-    useGetToken()
-      .then(token => {
-        const url = `${rootState.config.apiUrl}/collections?api_key=${token}`
-        return fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({name: collectionName})
-        })
-          .then(resp => {
-            if (resp.ok) {
-              return resp.json()
-                  .then(collection => {
-
-                    const p1 = commit('CREATE_COLLECTION', collection)
-                    const p2 = dispatch('addCollection', { datasetId, collectionId: collection.id })
-
-                    return Promise.all([p1,p2])
-
-                  })
-            } else {
-              return Promise.reject(resp)
-            }
-          })
-
+  createCollection: async ({commit, rootState}, { name, description }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.api2Url}/collections/`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, description })
       })
-      .catch(err => useHandleXhrError(err))
-
+      
+      if (response.ok) {
+        const collection = await response.json()
+        commit('CREATE_COLLECTION', collection)
+        return collection
+      } else {
+        throw new Error(response.statusText)
+      }
+    } catch (err) {
+      useHandleXhrError(err)
+      throw err
+    }
   },
 
   addCollection: async({ commit, rootState }, { datasetId, collectionId}) => {
@@ -177,6 +170,55 @@ export const actions = {
               }
             })
       }).catch(err => useHandleXhrError(err))
+  },
+
+  fetchCollectionDatasets: async({ rootState }, collectionId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.api2Url}/collections/${collectionId}/datasets`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const datasets = await response.json()
+        return datasets
+      } else {
+        throw new Error(response.statusText)
+      }
+    } catch (err) {
+      useHandleXhrError(err)
+      throw err
+    }
+  },
+
+  publishCollection: async({ rootState }, { collectionId, license, tags }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.api2Url}/collections/${collectionId}/publish`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ license, tags })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        return result
+      } else {
+        throw new Error(response.statusText)
+      }
+    } catch (err) {
+      useHandleXhrError(err)
+      throw err
+    }
   }
 }
 

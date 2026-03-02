@@ -161,19 +161,31 @@ export default {
     }
     .primary & {
       color: theme.$white;
+      position: relative;
+      
       &:hover, &:focus, &.active {
-        background: var(--color-hover);
+        background: rgba(255, 255, 255, 0.1);
         color: theme.$white;
         .svg-icon {
           color: theme.$white;
         }
       }
       &.router-link-active {
-        background: theme.$gray_1;
-        color: var(--color-hover);
+        background: rgba(255, 255, 255, 0.15);
+        color: theme.$white !important;
 
         .svg-icon {
-          color: var(--color-hover);
+          color: theme.$white !important;
+        }
+        
+        &::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: #ff8300;
         }
       }
       .svg-icon {

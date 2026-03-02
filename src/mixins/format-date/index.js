@@ -17,6 +17,10 @@ export default {
       return formatFNS(date, 'MMMM d, yyyy')
     },
     formatDateAndTimeFNS: function(date) {
+
+      if (!date || isNaN(new Date(date).getTime())) {
+      return 'Invalid date';
+      }
       return formatFNS(date, 'MMMM d, yyyy hh:mm a')
     },
     /**

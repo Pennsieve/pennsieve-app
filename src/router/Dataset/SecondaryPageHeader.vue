@@ -6,20 +6,12 @@ let route = useRoute();
 <template>
   <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading">
+  <bf-rafter slot="heading" :breadcrumbs="breadcrumbs">
     <template #breadcrumb v-if="route.meta.showBackToFiles">
       <a @click="$router.go(-1)" class="link-to-files">
         <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
-    </template>
-
-    <template #heading>
-      <div class="title-wrapper">
-        <h1 class="flex-heading">
-          {{ pageName }}
-        </h1>
-      </div>
     </template>
   </bf-rafter>
 </template>
@@ -51,6 +43,14 @@ export default {
   },
 
   computed: {
+    /**
+     * Compute breadcrumbs based on current route
+     * @returns {Array}
+     */
+    breadcrumbs: function() {
+      return this.$route.meta.breadcrumbs || []
+    },
+
     pageName: function () {
       const r = useRoute();
 

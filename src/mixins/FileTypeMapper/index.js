@@ -13,7 +13,8 @@ export default {
         Video: 'video',
         Text: 'text',
         ZIP: 'zip',
-        CSV: 'csv'
+        CSV: 'csv',
+        OMETIFF: 'omeTiff'
       },
       fileTypes: [
         {
@@ -399,7 +400,7 @@ export default {
       ],
 
       whitelist: [
-          'go',
+        'go',
         'c#',
         'c++',
         'java',
@@ -440,7 +441,7 @@ export default {
       const packageType = pathOr('unknown', ['content', 'packageType'], pkg)
       const packageProperties = propOr([], 'properties', pkg)
       let component = packageType.toLowerCase()
-      if (isNil(this.typeMapper[packageType]) || packageState === 'ERROR') {
+      if ((isNil(this.typeMapper[packageType]) || packageState === 'ERROR')) {
         component = 'unknown';
       }
 
@@ -454,19 +455,36 @@ export default {
         component = 'xls'
       }
 
-      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds']
-      const vueViewerMap = {
-        image: 'ImageViewer',
-        pdf: 'PDFViewer',
-        text: 'TextViewer',
-        unknown:'UnknownViewer',
-        video:'VideoViewer',
-        slide:'SlideViewer',
-        timeseries:'TimeseriesViewer',
-        csv:'CSVViewer',
-        xls: 'XLSViewer',
-        parquet_umap_viewer: 'UMAPViewer'
+      if (this.isCollectionWithAViewer(pkg)) {
+        component = 'timeseries'
       }
+      const vueViewerMap = {
+        image: ['ImageViewer'],
+        pdf: ['PDFViewer'],
+        text: ['TextViewer'],
+        unknown:['UnknownViewer'],
+        video: ['VideoViewer'],
+        slide: ['SlideViewer'],
+        timeseries: ['TimeseriesViewer'],
+        csv: ['CSVViewer', 'DataExplorer'],
+        xls: ['XLSViewer'],
+        parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
+        mri: ['NiiViewer'],
+        tabular: ['CSVViewer','DataExplorer'],
+        omeTiff: ['OmeViewer'],
+      }
+
+      // OME-TIFF check based solely on filename - takes precedence over packageType
+      if (this.isOMETiff(pkg)) {
+        return vueViewerMap['omeTiff']
+      }
+
+      // Parquet file check based on filename - for UMAP visualization
+      if (this.isParquetFile(pkg)) {
+        return vueViewerMap['parquet_umap_viewer']
+      }
+
+      const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
 
       // TODO: This currently picks the first of the viewers and should be replaced by more solid support
       for (let i in packageProperties) {
@@ -485,9 +503,28 @@ export default {
         return vueViewerMap[component]
       } else{
         console.error('Error loading viewer')
-        return 'UnknownViewer'
+        return ['UnknownViewer']
       }
 
+    },
+
+    isCollectionWithAViewer: function(pkg) {
+      const packageType = pathOr('', ['content', 'packageType'], pkg)
+      if (packageType !== 'Collection') {
+        return false
+      }
+      const packageProperties = propOr([], 'properties', pkg)
+      const collectionSubtype = this.getFilePropertyVal(packageProperties, 'subtype', 'Viewer')
+      const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
+      return isTimeseriesCollection
+    },
+    isOMETiff: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.ome.tiff') || fileName.endsWith('.ome.tif')
+    },
+    isParquetFile: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.parquet')
     }
   }
 

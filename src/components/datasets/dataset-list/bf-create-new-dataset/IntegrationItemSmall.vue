@@ -65,17 +65,16 @@ export default {
 
   data: function() {
     return {
-      isActive: false
+      isActive: this.integration ? this.integration.isDefault : false,
+      syncing: false
     }
-  },
-
-  mounted: function() {
-    this.isActive = this.integration.isDefault
   },
 
   watch: {
     openIndex: function() {
+      this.syncing = true
       this.isActive = this.integration.isDefault
+      this.$nextTick(() => { this.syncing = false })
     },
     /**
      * When switch is toggled, send event to parent. We are not using sync because the parent
@@ -83,8 +82,8 @@ export default {
      * @param val
      */
     isActive: function(val) {
-      this.integration.isActive = val
-      this.$emit('updateIsActive', this.integration)
+      if (this.syncing) return
+      this.$emit('updateIsActive', { id: this.integration.id, isActive: val })
     }
   },
 

@@ -1,43 +1,45 @@
 <template>
-  <el-dialog
-    :modelValue="visible"
-    :show-close="false"
-    @close="close"
-    @closed="resetDialog"
-    module
-  >
-    <template #header>
-      <bf-dialog-header title="Describe the Reason for Rejection" />
-    </template>
-    <dialog-body>
-      <p>
-        Please provide a reason for rejection of the publishing request. This
-        will be included in the email that will be send to all collaborators on
-        the dataset.
-      </p>
+  <div>
+    <el-dialog
+      :modelValue="visible"
+      :show-close="false"
+      @close="close"
+      @closed="resetDialog"
+      module
+    >
+      <template #header>
+        <bf-dialog-header title="Describe the Reason for Rejection" />
+      </template>
+      <dialog-body>
+        <p>
+          Please provide a reason for rejection of the publishing request. This
+          will be included in the email that will be send to all collaborators
+          on the dataset.
+        </p>
 
-      <div class="input-area">
-        <el-input
-          type="textarea"
-          :rows="8"
-          v-model="rejectRationale"
-          maxlength="1024"
-          show-word-limit
-        />
-      </div>
-    </dialog-body>
+        <div class="input-area">
+          <el-input
+            type="textarea"
+            :rows="8"
+            v-model="rejectRationale"
+            maxlength="1024"
+            show-word-limit
+          />
+        </div>
+      </dialog-body>
 
-    <template #footer class="dialog-footer">
-      <bf-button class="secondary" @click="close"> Cancel </bf-button>
-      <bf-button
-        processing-text="Submitting"
-        :processing="isSubmitting"
-        @click="rejectRequest"
-      >
-        Reject
-      </bf-button>
-    </template>
-  </el-dialog>
+      <template #footer class="dialog-footer">
+        <bf-button class="secondary" @click="close"> Cancel </bf-button>
+        <bf-button
+          processing-text="Submitting"
+          :processing="isSubmitting"
+          @click="rejectRequest"
+        >
+          Reject
+        </bf-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script>
@@ -122,7 +124,9 @@ export default {
 };
 </script>
 
-<style>
+<style scoped lang="scss">
+@use "../../../styles/theme";
+@use "../../../styles/element/dialog";
 .el-select,
 .el-date-editor {
   width: 100%;

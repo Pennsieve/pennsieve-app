@@ -26,9 +26,18 @@ export default {
   justify-content: space-between;
 }
 
-.right-actions, .left-actions {
+.left-actions {
   display: flex;
   flex-direction: row;
-       }
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.right-actions {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
 
 </style>

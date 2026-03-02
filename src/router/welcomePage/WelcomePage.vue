@@ -1,73 +1,58 @@
 <template>
   <bf-page>
-    <bf-rafter
-      slot="heading"
-      title="Submit Datsaet Proposals"
-      class="primary"
-    >
+    <bf-rafter slot="heading" title="Submit Dataset Proposals" class="primary">
       <template #description>
-        <p> Submit and track any dataset proposals.</p>
-
+        <p>Submit and track any dataset proposals.</p>
       </template>
 
       <template #tabs>
-        <router-tabs :tabs="tabs"/>
+        <router-tabs :tabs="tabs" />
       </template>
-
     </bf-rafter>
-    <router-view
-      name="stage"
-      :repositories="repositories"/>
+    <router-view name="stage" :repositories="repositories" />
   </bf-page>
-
 </template>
 
 <script>
-import {mapActions, mapState} from "vuex";
+import { mapActions, mapState } from "vuex";
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 
 export default {
   name: "WelcomePage",
-  components: {RouterTabs, BfRafter},
+  components: { RouterTabs, BfRafter },
   props: {
     orgId: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
 
   computed: {
-    ...mapState('repositoryModule', [
-      'repositories',
-      'requestModalVisible'
-
-    ]),
+    ...mapState("repositoryModule", ["repositories", "requestModalVisible"]),
   },
 
   data() {
     return {
       tabs: [
-
         {
           name: "My Dataset Submissions",
-          to: "submit"
+          to: "submit",
         },
         {
           name: "Open Repositories",
-          to: "welcome"
+          to: "welcome",
         },
-
-      ]
-    }
+      ],
+    };
   },
-  mounted () {
-    this.fetchRepositories()
-    this.fetchProposals()
+  mounted() {
+    this.fetchRepositories();
+    this.fetchProposals();
   },
 
   methods: {
-    ...mapActions('repositoryModule', ['fetchRepositories','fetchProposals']),
-  }
-}
+    ...mapActions("repositoryModule", ["fetchRepositories", "fetchProposals"]),
+  },
+};
 </script>

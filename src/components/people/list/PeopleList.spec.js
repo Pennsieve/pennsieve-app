@@ -59,6 +59,13 @@ describe('PeopleList.vue', () => {
     })
   })
 
+  afterEach(() => {
+    // Properly unmount the component to clean up any timers/watchers
+    if (cmp) {
+      cmp.unmount()
+    }
+  })
+
   it('hasAdminRights: not an admin or owner', () => {
     cmp.vm.activeOrganization.isAdmin = false
     cmp.vm.activeOrganization.isOwner = false

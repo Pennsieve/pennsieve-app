@@ -124,11 +124,13 @@
 
 <script>
 import {mapActions, mapGetters, mapState} from "vuex";
+import { computed } from 'vue'
+import { useProposalStore } from '@/stores/proposalStore'
 import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue';
 import PublishingProposalsListItem from "./PublishingProposalsListItem.vue";
 import DatasetSortMenu from '../../datasets/DatasetSortMenu/DatasetSortMenu.vue'
 import PaginationPageMenu from '../../shared/PaginationPageMenu/PaginationPageMenu.vue'
-import RequestSurvey from "../../welcome/request-survey/RequestSurvey.vue";
+import RequestSurvey from "../../user/publishing/ProposalSurvey.vue";
 import ConfirmationDialog from "../../shared/ConfirmationDialog/ConfirmationDialog.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
@@ -145,6 +147,19 @@ export default {
     PaginationPageMenu,
     RequestSurvey,
     ConfirmationDialog
+  },
+
+  setup() {
+    const proposalStore = useProposalStore()
+    
+    const requestModalVisible = computed(() => proposalStore.requestModalVisible)
+    const getRepositoryByNodeId = computed(() => proposalStore.getRepositoryByNodeId)
+    
+    return {
+      proposalStore,
+      requestModalVisible,
+      getRepositoryByNodeId
+    }
   },
 
   props: {
@@ -192,14 +207,6 @@ export default {
       'getDatasets'
     ]),
 
-    ...mapState('repositoryModule', [
-      'requestModalVisible',
-    ]),
-
-    ...mapGetters('repositoryModule',[
-        'getRepositoryByNodeId'
-      ]
-    ),
 
     proposals: function() {
       return this.getDatasets(this.$route.name)
@@ -250,22 +257,15 @@ export default {
       'clearSearchParams',
       'fetchDatasetProposals',
       'updatePublishingSearchLimit',
-      'updatePublishingSearchOrderBy'
-    ]),
-    ...mapActions('repositoryModule', [
-      'fetchRepositories',
-      'fetchProposals',
-      'updateRequestModalVisible',
-      'setSelectedRepo',
-      'setSelectedProposal',
-      'acceptProposal',
-      'rejectProposal'
+      'updatePublishingSearchOrderBy',
+      'updatePublishingSearchOrderDirection',
+      'updatePublishingOffset'
     ]),
 
     getInitialData: function(){
       this.clearSearchParams()
         .then(() => {
-          this.fetchRepositories()
+          this.proposalStore.fetchRepositories()
           this.fetchDatasetProposals()
         })
     },
@@ -314,15 +314,15 @@ export default {
       // set selected proposal
       if (proposal) {
         this.selectedRequest = proposal
-        this.setSelectedProposal(proposal)
+        this.proposalStore.setSelectedProposal(proposal)
       }
       // set selected repo
       if (proposal && proposal.organizationNodeId) {
         let repository = this.getRepositoryByNodeId(proposal.organizationNodeId)
-        this.setSelectedRepo(repository)
+        this.proposalStore.setSelectedRepo(repository)
       }
       // enable modal visibility
-      this.updateRequestModalVisible(true)
+      this.proposalStore.updateRequestModalVisible(true)
     },
 
     resetConfirmation: function() {
@@ -340,7 +340,7 @@ export default {
     },
 
     confirmedAction: async function(event) {
-      this.updateRequestModalVisible(false)
+      this.proposalStore.updateRequestModalVisible(false)
       this.resetConfirmation()
       if (event.action && event.resource) {
         switch (event.action) {
@@ -372,8 +372,8 @@ export default {
 
     acceptDatasetProposal: async function(proposal) {
       // invoke repositoryModule::acceptProposal()
-      this.acceptProposal(proposal)
-        .then(() => this.fetchDatasetProposals())
+      await this.proposalStore.acceptProposal(proposal)
+      await this.fetchDatasetProposals()
         .catch(err => console.error(err))
     },
 
@@ -391,10 +391,10 @@ export default {
       this.confirmationDialogVisible = true
     },
 
-    rejectDatasetProposal: function(proposal) {
+    rejectDatasetProposal: async function(proposal) {
       // invoke repositoryModule::rejectProposal()
-      this.rejectProposal(proposal)
-        .then(() => this.fetchDatasetProposals())
+      await this.proposalStore.rejectProposal(proposal)
+      await this.fetchDatasetProposals()
         .catch(err => console.error(err))
     },
 

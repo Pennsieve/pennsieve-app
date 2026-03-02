@@ -1,233 +1,233 @@
 <template>
-  <el-dialog class="timeseries-filter-modal" ref="filter-modal" title="Set Filter" :modelValue="visible"
-    @update:modelValue="visible = $event" @close='close'>
-
+  <el-dialog
+    class="timeseries-filter-modal"
+    ref="filter-modal"
+    title="Set Filter"
+    :modelValue="visible"
+    @update:modelValue="visible = $event"
+    @close="close"
+  >
     <template #default>
       <div slot="body">
         <div class="select-wrapper">
           <el-select v-model="selectedFilter" placeholder="Select">
-            <el-option v-for="item in filterOptions" :key="item.value" :label="item.label" :value="item.value">
+            <el-option
+              v-for="item in filterOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            >
             </el-option>
           </el-select>
 
           <div v-if="computeVisible0" class="filter-input-wrapper">
-            {{computePlaceholder1}}
-            <el-input-number class="filterInput" v-model="input0" controls-position="right" :precision="2"
-              @change="handleChange"></el-input-number>
+            {{ computePlaceholder1 }}
+            <el-input-number
+              class="filterInput"
+              v-model="input0"
+              controls-position="right"
+              :precision="2"
+              @change="handleChange"
+            ></el-input-number>
           </div>
 
           <div v-if="computeVisible1" class="filter-input-wrapper">
-            {{computePlaceholder2}}
-            <el-input-number class="filterInput" v-model="input1" controls-position="right" :precision="2"
-              @change="handleChange"></el-input-number>
+            {{ computePlaceholder2 }}
+            <el-input-number
+              class="filterInput"
+              v-model="input1"
+              controls-position="right"
+              :precision="2"
+              @change="handleChange"
+            ></el-input-number>
           </div>
 
-          <el-select v-model="selectedNotch" v-if="computeVisible2" placeholder="Select" class="filter-input-wrapper">
-            <el-option v-for="item in notchOptions" :key="item.value" :label="item.label" :value="item.value">
+          <el-select
+            v-model="selectedNotch"
+            v-if="computeVisible2"
+            placeholder="Select"
+            class="filter-input-wrapper"
+          >
+            <el-option
+              v-for="item in notchOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            >
             </el-option>
           </el-select>
-
         </div>
       </div>
-
     </template>
 
     <template #footer>
       <div slot="footer">
         <div class="button-wrapper">
           <div class="channels-selected">
-            <IconSelection
-            :height="24"
-            :width="24"
-            />
-            <div v-if="onSingleChannel">
-              Adding to single channel
-            </div>
-            <div v-else>
-              Adding to {{selectedChannels}} Selected Channels
-            </div>
-
+            <IconSelection :height="24" :width="24" />
+            <div v-if="onSingleChannel">Adding to single channel</div>
+            <div v-else>Adding to {{ selectedChannels }} Selected Channels</div>
           </div>
           <div class="buttons">
-            <bf-button @click="submitForm">Set Filter
-            </bf-button>
+            <bf-button @click="submitForm">Set Filter </bf-button>
           </div>
         </div>
-
       </div>
     </template>
-
-
   </el-dialog>
-
 </template>
 
 <script>
-import {
-  mapState
-} from 'vuex'
+import { mapState } from "vuex";
 
-import EventBus from '../../../utils/event-bus'
-import IconSelection from "../../icons/IconSelection.vue"
+import EventBus from "../../../utils/event-bus";
+import IconSelection from "../../icons/IconSelection.vue";
 
 export default {
-  name: 'TimeseriesFilterModal',
+  name: "TimeseriesFilterModal",
 
   components: {
-    'bf-button': () => import('@/components/shared/bf-button/BfButton.vue'),
-    IconSelection
+    "bf-button": () => import("@/components/shared/bf-button/BfButton.vue"),
+    IconSelection,
   },
 
-  mixins: [
-  ],
-  watch: {
-
-  },
+  mixins: [],
+  watch: {},
   computed: {
-    ...mapState([
-      'config'
-    ]),
-    ...mapState('viewerModule', [
-      'activeViewer',
-    ]),
+    ...mapState(["config"]),
+    ...mapState("viewerModule", ["activeViewer"]),
     computeVisible0: function () {
       switch (this.selectedFilter) {
-        case 'lowpass':
-          return true
-        case 'highpass':
-          return true
-        case 'bandpass':
-          return true
+        case "lowpass":
+          return true;
+        case "highpass":
+          return true;
+        case "bandpass":
+          return true;
         default:
-          return false
+          return false;
       }
     },
     onSingleChannel: function () {
-      return (this.onChannels.length == 1)
+      return this.onChannels.length == 1;
     },
     selectedChannels: function () {
-      return this.onChannels.length
+      return this.onChannels.length;
     },
     computeVisible1: function () {
       switch (this.selectedFilter) {
-        case 'lowpass':
-          return false
-        case 'highpass':
-          return false
-        case 'bandpass':
-          return true
+        case "lowpass":
+          return false;
+        case "highpass":
+          return false;
+        case "bandpass":
+          return true;
         default:
-          return false
+          return false;
       }
     },
     computeVisible2: function () {
       switch (this.selectedFilter) {
-        case 'bandstop':
-          return true
+        case "bandstop":
+          return true;
         default:
-          return false
+          return false;
       }
     },
     computePlaceholder1: function (option) {
       switch (this.selectedFilter) {
-        case 'lowpass':
-          return 'Low Pass Cutoff Frequency (Hz)'
-        case 'highpass':
-          return 'High Pass Cutoff Frequency (Hz)'
-        case 'bandpass':
-          return 'Low Pass Cutoff Frequency (Hz)'
+        case "lowpass":
+          return "Low Pass Cutoff Frequency (Hz)";
+        case "highpass":
+          return "High Pass Cutoff Frequency (Hz)";
+        case "bandpass":
+          return "Low Pass Cutoff Frequency (Hz)";
         default:
-          return ''
+          return "";
       }
     },
     computePlaceholder2: function (option) {
       switch (this.selectedFilter) {
-        case 'bandpass':
-          return 'High Pass Cutoff Frequency (Hz)'
+        case "bandpass":
+          return "High Pass Cutoff Frequency (Hz)";
         default:
-          return ''
+          return "";
       }
     },
-
   },
   props: {
     visible: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   data: function () {
     return {
       selectedFilter: null,
       filterOptions: [
         {
-          label: 'No Filter',
-          value: 'clear'
+          label: "No Filter",
+          value: "clear",
         },
         {
-          label: 'Low Pass',
-          value: 'lowpass'
+          label: "Low Pass",
+          value: "lowpass",
         },
         {
-          label: 'High Pass',
-          value: 'highpass'
+          label: "High Pass",
+          value: "highpass",
         },
         {
-          label: 'Band Pass',
-          value: 'bandpass'
+          label: "Band Pass",
+          value: "bandpass",
         },
         {
-          label: 'Notch',
-          value: 'bandstop'
-        }
+          label: "Notch",
+          value: "bandstop",
+        },
       ],
       selectedNotch: null,
       notchOptions: [
         {
-          label: '50Hz',
-          value: 50
+          label: "50Hz",
+          value: 50,
         },
         {
-          label: '60Hz',
-          value: 60
-        }
+          label: "60Hz",
+          value: 60,
+        },
       ],
       input0: null,
       input1: null,
-      onChannels: []
-
-    }
-
+      onChannels: [],
+    };
   },
 
   methods: {
     close: function () {
-      this.$emit('closeWindow')
+      this.$emit("closeWindow");
     },
-    handleChange: function () {
-    },
-    onButtonClick: function () {
-    },
+    handleChange: function () {},
+    onButtonClick: function () {},
     submitForm: function (e) {
-      EventBus.$emit('active-viewer-action', {
-        method: 'setTimeseriesFilters',
+      EventBus.$emit("active-viewer-action", {
+        method: "setTimeseriesFilters",
         payload: {
           selChannels: this.onChannels,
           filterType: this.selectedFilter,
           input0: this.input0,
           input1: this.input1,
-          notchFreq: this.selectedNotch
-        }
-      })
-      this.$emit('closeWindow')
+          notchFreq: this.selectedNotch,
+        },
+      });
+      this.$emit("closeWindow");
     },
-  }
-    }
-
+  },
+};
 </script>
 
 <style lang="scss" scoped>
-@use '../../../styles/theme' as *;
+@use "../../../styles/theme";
 
 .timeseries-filter-modal {
   display: block;
@@ -235,13 +235,13 @@ export default {
 }
 
 .filterInput {
-  width: 100%
+  width: 100%;
 }
 
 .select-wrapper {
   display: flex;
   flex-direction: column;
-  border-left: 5px solid var(--dopamine)
+  border-left: 5px solid var(--dopamine);
 }
 
 #layerSelect {

@@ -1,6 +1,34 @@
 <template>
   <div class="viewer-pane" v-if="cmpViewer">
+    <div class="viewer-btn-wrapper" v-if="availableViewers.length > 1">
+      <div v-for="viewer in availableViewers">
+        <tag-pill
+          :class="[
+            viewer === this.cmpViewer
+              ? 'active viewer-selector'
+              : 'viewer-selector',
+          ]"
+          :indicator-color="viewer === this.cmpViewer ? '#F9A23A' : '#CCCCCC'"
+          :has-indicator="false"
+          :label="viewerNameMapper(viewer)"
+          @click="selectViewer(viewer)"
+        >
+          <template #prefix>
+            <div class="icon-wrapper">
+              <icon-analysis />
+            </div>
+          </template>
+        </tag-pill>
+      </div>
+    </div>
+    <OmeViewer
+      v-if="cmpViewer === 'OmeViewer'"
+      ref="viewer"
+      :source="omeTiffSource"
+      source-type="ome-tiff"
+    />
     <component
+      v-else
       :is="cmpViewer"
       :is-preview="isPreview"
       ref="viewer"
@@ -12,17 +40,27 @@
 </template>
 
 <script>
-import { propOr, pathOr, path, isNil } from "ramda";
+import { propOr, pathOr } from "ramda";
 import { defineAsyncComponent } from "vue";
+import { mapActions } from "vuex";
 
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import TagPill from "@/components/shared/TagPill/TagPill.vue";
+import IconAnalysis from "@/components/icons/IconAnalysis.vue";
+
+import "@pennsieve-viz/micro-ct/style.css";
+import "@pennsieve-viz/core/style.css";
 
 export default {
   name: "ViewerPane",
 
   components: {
+    IconAnalysis,
+    TagPill,
+    BfButton,
     SlideViewer: defineAsyncComponent(() =>
       import("../../viewers/SlideViewer/SlideViewer.vue")
     ),
@@ -44,15 +82,24 @@ export default {
     TimeseriesViewer: defineAsyncComponent(() =>
       import("../../viewers/TSViewer/TSViewer.vue")
     ),
-    CSVViewer: defineAsyncComponent(() =>
-      import("../../viewers/CSVViewer.vue")
-    ),
     XLSViewer: defineAsyncComponent(() =>
       import("../../viewers/XLSViewer.vue")
     ),
-    UMAPViewer: defineAsyncComponent( () =>
-      import ("../../viewers/UmapViewer/wrapper.vue")
+    UMAPViewer: defineAsyncComponent(() =>
+      import("../../viewers/UmapViewer/wrapper.vue")
     ),
+    NiiViewer: defineAsyncComponent(() =>
+      import("../../viewers/NiiViewer/NiiViewerWrapper.vue")
+    ),
+    DataExplorer: defineAsyncComponent(() =>
+      import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
+    ),
+    CSVViewer: defineAsyncComponent(() =>
+      import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
+    ),
+    OmeViewer: defineAsyncComponent(()=>
+    import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
+    )
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -69,12 +116,14 @@ export default {
     sidePanelOpen: {
       type: Boolean,
       default: false,
-    }
+    },
   },
 
   data: function () {
     return {
       cmpViewer: "",
+      availableViewers: [],
+      omeTiffSource: "",
     };
   },
 
@@ -83,6 +132,11 @@ export default {
       handler: function (pkg) {
         if (Object.keys(pkg).length > 0) {
           this.loadViewer(pkg);
+          // Only fetch timeseries data for timeseries packages
+          const packageType = pathOr('', ['content', 'packageType'], pkg).toLowerCase();
+          if (packageType === 'timeseries') {
+            this.fetchTimeseriesData();
+          }
         }
       },
       immediate: true,
@@ -90,6 +144,8 @@ export default {
   },
 
   methods: {
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+
     /**
      * Invoke method on viewer
      * Event emitted from palettes
@@ -108,23 +164,57 @@ export default {
       }
     },
 
+    viewerNameMapper: function (viewer) {
+      switch (viewer) {
+        case "DataExplorer":
+          return "Data Explorer";
+        case "CSVViewer":
+          return "CSV Viewer";
+        default:
+          return viewer;
+      }
+    },
+
+    selectViewer: function (evt) {
+      this.cmpViewer = evt;
+    },
+
     /**
      * loads appropriate viewer based on package type
      */
-    loadViewer: function (activeViewer) {
-
+    loadViewer: async function (activeViewer) {
       // Reset viewers
       this.cmpViewer = "";
+      this.omeTiffSource = "";
       const viewerWrap = this.$refs.viewerWrap;
       if (viewerWrap) {
         viewerWrap.innerHTML = "";
       }
 
-      const viewerType = this.checkViewerType(activeViewer);
-      if(this.isTimeseriesPackageUnprocessed(activeViewer)) {
+      this.availableViewers = this.checkViewerType(activeViewer);
+
+      if (this.isTimeseriesPackageUnprocessed(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
-        this.loadVueViewer(viewerType);
+        const viewerToLoad = this.availableViewers[0];
+
+        // Handle viewer source - fetch presigned URL
+        // use this when migrating instead of a wrapper for every component
+        if (viewerToLoad === 'OmeViewer') {
+          try {
+            const pkgId = pathOr('', ['content', 'id'], activeViewer);
+            const viewerAssets = await this.fetchViewerAssets(pkgId);
+
+            if (viewerAssets && viewerAssets.length > 0) {
+              const fileId = pathOr('', ['content', 'id'], viewerAssets[0]);
+              this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
+            }
+          } catch (err) {
+            console.error('Failed to fetch file URL:', err);
+          }
+        }
+
+        this.loadVueViewer(viewerToLoad);
       }
     },
 
@@ -137,16 +227,35 @@ export default {
     },
 
     isTimeseriesPackageUnprocessed: function (pkg) {
-      const isTimeseriesFile = pathOr('unknown', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries'
-      const isUnprocessed = pathOr('unknown', ['content', 'state'], pkg).toLowerCase() === "uploaded"
-      return (isTimeseriesFile && isUnprocessed)
-    }
+      const isTimeseriesFile =
+        pathOr("unknown", ["content", "packageType"], pkg).toLowerCase() ===
+        "timeseries";
+      const isUnprocessed =
+        pathOr("unknown", ["content", "state"], pkg).toLowerCase() ===
+        "uploaded";
+      return isTimeseriesFile && isUnprocessed;
+    },
   },
 };
 </script>
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+
+.viewer-selector {
+  margin: 4px;
+  padding: 4px;
+  text-align: center;
+  vertical-align: center;
+  font-weight: 500;
+  color: theme.$purple_3;
+  border: 1px solid theme.$gray_4;
+  background: theme.$purple_tint;
+  height: 32px;
+  min-width: 120px;
+  align-content: center;
+  cursor: pointer;
+}
 
 .viewer-pane,
 .viewer-wrap {
@@ -155,5 +264,16 @@ export default {
   flex: 1;
   flex-direction: column;
   position: relative;
+}
+
+.viewer-btn-wrapper {
+  margin: 8px;
+  display: flex;
+  flex-direction: row;
+}
+
+.icon-wrapper {
+  display: flex;
+  margin-right: 4px;
 }
 </style>

@@ -5,12 +5,10 @@ import * as R from "ramda";
 
 import datasetModule from './datasetModule'
 import integrationsModule from './integrationsModule'
-import collectionsModule from './collectionsModule'
 import viewerModule from './viewerModule'
-import repositoryModule from "./repositoryModule"
 import publishingModule from "./publishingModule"
 import filesModule from "./filesModule";
-import metadataModule from "./metadataModule";
+// import metadataModule from "./metadataModule";
 import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
 import codeReposModule from "./codeReposModule";
@@ -51,6 +49,7 @@ const initialState = () => ({
   organizations: [],
   activeOrganization: {},
   activeOrgSynced: false,
+  isSwitchingOrganization: false,
   isLoadingDatasets: true,
   isLoadingDatasetsError: false,
   isLoadingDatasetBanner: true,
@@ -163,9 +162,12 @@ export const mutations = {
         state.orgMembers = members;
       },
       UPDATE_ACTIVE_ORGANIZATION(state, activeOrganization) {
-        state.orgMembers = [];
-        state.teams = [];
+        // Don't clear orgMembers and teams here - they will be updated
+        // when getPrimaryData() fetches the new workspace data
         state.activeOrganization = activeOrganization;
+      },
+      SET_IS_SWITCHING_ORGANIZATION(state, isSwitching) {
+        state.isSwitchingOrganization = isSwitching;
       },
       UPDATE_ORGANIZATIONS(state, organizations) {
         state.organizations = organizations;
@@ -183,6 +185,9 @@ export const mutations = {
         state.profile = profile;
       },
       CLEAR_STATE(state) {
+        // Preserve the switching organization state
+        const isSwitching = state.isSwitchingOrganization;
+        
         state.profile = {};
         state.activeOrganization = {};
         state.organizations = {};
@@ -199,7 +204,10 @@ export const mutations = {
         state.datasetTemplates = [];
         state.searchModalVisible = false;
         state.cognitoUser = {};
-        state.sessionTimer = null
+        state.sessionTimer = null;
+        
+        // Restore the switching organization state
+        state.isSwitchingOrganization = isSwitching;
       },
       UPDATE_CUR_DATASET(state, dataset) {
         state.curDataset = dataset;
@@ -645,6 +653,8 @@ export const actions = {
       commit("UPDATE_ORG_DATASET_STATUSES", evt),
   updateActiveOrganization: ({ commit }, evt) =>
       commit("UPDATE_ACTIVE_ORGANIZATION", evt),
+  setIsSwitchingOrganization: ({ commit }, evt) =>
+      commit("SET_IS_SWITCHING_ORGANIZATION", evt),
   updateOrganizations: ({ commit }, evt) =>
       commit("UPDATE_ORGANIZATIONS", evt),
   updateProfile: ({ commit }, evt) => commit("UPDATE_PROFILE", evt),
@@ -1006,7 +1016,7 @@ export const getters = {
   isUserPublisher: (state) => {
     return state.publishers.map((p) => p.id).includes(state.profile.id);
   },
-  datasetLocked: (state) => {
+  datasetLocked: (werstate) => {
     return state.dataset.locked;
   },
   publisherTeam: (state) =>
@@ -1032,13 +1042,10 @@ export default createStore({
   modules: {
     datasetModule,
     integrationsModule,
-    collectionsModule,
     viewerModule,
-    repositoryModule,
     publishingModule,
     filesModule,
     uploadModule,
-    metadataModule,
     analysisModule,
     codeReposModule
   }

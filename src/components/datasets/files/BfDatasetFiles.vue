@@ -28,6 +28,17 @@
               Run Analysis
             </bf-button>
 
+            <!-- <bf-button
+              :disabled="!isFeatureFlagEnabled"
+              @click="openOldRunAnalysisDialog"
+              class="mr-8 flex"
+            >
+              <template #prefix>
+                <IconAnalysis class="mr-8" :height="20" :width="20" />
+              </template>
+              Run Analysis (Choose Processors)
+            </bf-button> -->
+
             <bf-button
               v-if="getPermission('editor')"
               class="flex mr-8"
@@ -91,7 +102,7 @@
                   <IconTrash class="mr-8" :height="20" :width="20" />
                 </template>
 
-                Restore
+                Restore Files
               </bf-button>
             </template>
           </ps-button-dropdown>
@@ -102,16 +113,18 @@
     <div class="file-meta-wrapper">
       <div class="table-container" ref="tableContainer" @scroll="handleScroll">
         <files-table
+          ref="filesTable"
           :data="files"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
+          :is-package-attachment-active="isPackageAttachmentActive"
           @move="showMove"
           @delete="showDeleteDialog"
-          @rename-file="showRenameFileDialog"
           @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
           @click-file-label="onClickLabel"
+          @select-for-attachment="onSelectForAttachment"
         />
         <div class="loading-spinner-container" v-if="filesLoading && !lastPage">
           <!-- <el-spinner class="loading-spinner" /> -->
@@ -141,17 +154,16 @@
 
     <bf-move-dialog
       ref="moveDialog"
-      :dialog-visible="moveDialogVisible"
-      :file="file"
-      :move-conflict.sync="moveConflict"
+      v-model:dialog-visible="moveDialogVisible"
+      v-model:move-conflict="moveConflict"
       :selected-files="selectedFiles"
       @rename-conflicts="onRenameConflicts"
-      @move="moveItems"
+      @completeMove="moveItems"
       @close="onCloseMoveDialog"
     />
 
     <RenameFileDialog
-      :dialog-visible="renameDialogVisible"
+      v-model:dialog-visible="renameDialogVisible"
       :files="files"
       :file="selectedFileForAction"
       @file-renamed="onFileRenamed"
@@ -178,6 +190,12 @@
       :file="file"
     />
 
+    <old-run-analysis-dialog
+      :datasetId="datasetId"
+      :dialog-visible="oldRunAnalysisDialogVisible"
+      @close="onCloseOldRunAnalysisDialog"
+    />
+
     <bf-upload-info v-if="showUploadInfo" />
   </bf-stage>
 </template>
@@ -200,6 +218,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
 import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
+import OldRunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -214,6 +233,7 @@ import EventBus from "../../../utils/event-bus";
 import GetFileProperty from "../../../mixins/get-file-property";
 import FileMetadataInfo from "./Metadata/FileMetadataInfo.vue";
 import LockedBanner from "../LockedBanner/LockedBanner.vue";
+import { useMetadataStore } from "../../../stores/metadataStore.js";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
@@ -282,7 +302,7 @@ export default {
           name: "",
         },
       },
-      ancestors: null,
+      ancestors: [],
       files: [],
       sortedFiles: [],
       selectedFiles: [],
@@ -304,6 +324,7 @@ export default {
       pusherChannelName: "",
       pusherChannel: {},
       runAnalysisDialogVisible: false,
+      oldRunAnalysisDialogVisible: false,
     };
   },
 
@@ -325,7 +346,7 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete"]),
+    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete", "getUploadMap"]),
 
     ...mapGetters("datasetModule", [
       "getPusherChannel",
@@ -333,7 +354,8 @@ export default {
     ]),
 
     showUploadInfo: function () {
-      return this.getUploadComplete() || this.getIsUploading();
+      const hasFiles = this.getUploadMap().size > 0;
+      return hasFiles && (this.getUploadComplete() || this.getIsUploading());
     },
 
     /**
@@ -393,19 +415,31 @@ export default {
         isEnabledForAllDevOrgs(this.config.apiUrl)
       );
     },
+    
+    /**
+     * Check if package attachment is active
+     * @returns {Boolean}
+     */
+    isPackageAttachmentActive: function () {
+      const metadataStore = this.getMetadataStore();
+      return !!metadataStore.activePackageAttachment;
+    },
   },
 
   watch: {
     getManifestNotification: {
       handler(newValue, oldValue) {
-        EventBus.$emit("toast", {
-          detail: {
-            type: "warning",
-            msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
-            duration: 0,
-            showClose: true,
-          },
-        });
+        // Only show toast if we have a valid URL (prevents banner on mount with empty state)
+        if (newValue && newValue.url) {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "warning",
+              msg: `The manifest has been generated: <a href=${newValue.url} download>Download Manifest</a>`,
+              duration: 0,
+              showClose: true,
+            },
+          });
+        }
       },
       deep: true,
     },
@@ -476,7 +510,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$on("update-external-file", this.onFileRenamed);
     EventBus.$on("openDeletedModal", (data) => {
       this.deletedDialogOpen = data;
       this.fetchDeleted();
@@ -504,7 +537,6 @@ export default {
       "update-uploaded-file-state",
       this.onUpdateUploadedFileState.bind(this)
     );
-    EventBus.$off("update-external-file", this.onFileRenamed);
   },
 
   /**
@@ -528,6 +560,11 @@ export default {
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
 
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
+
+    // Helper method to get metadataStore instance
+    getMetadataStore() {
+      return useMetadataStore();
+    },
 
     generateManifest: function () {
       this.createDatasetManifest();
@@ -571,6 +608,9 @@ export default {
     onCloseRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = false;
     },
+    onCloseOldRunAnalysisDialog: function () {
+      this.oldRunAnalysisDialogVisible = false;
+    },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
 
@@ -613,6 +653,8 @@ export default {
     resetSelectedFiles: function () {
       this.selectedFiles = [];
       this.lastSelectedFile = {};
+      // Clear the table's internal selection state
+      this.$refs.filesTable?.clearAllSelected();
     },
 
     /**
@@ -703,6 +745,7 @@ export default {
      * @param {Object} file
      */
     onClickLabel: function (file) {
+      // Normal file navigation logic
       this.files = [];
       this.offset = 0;
       const id = pathOr("", ["content", "id"], file);
@@ -719,6 +762,25 @@ export default {
           params: { fileId: id },
         });
       }
+    },
+
+    /**
+     * Handler for selecting file/folder for package attachment
+     * @param {Object} file
+     */
+    onSelectForAttachment: function (file) {
+      // Dispatch package selection event for the PackageAttachmentWidget
+      const packageData = {
+        id: pathOr("", ["content", "id"], file),
+        name: pathOr("", ["content", "name"], file),
+        type: pathOr("", ["content", "packageType"], file),
+        path: pathOr("", ["content", "path"], file)
+      };
+      
+      const event = new CustomEvent('package-selected', {
+        detail: packageData
+      });
+      window.dispatchEvent(event);
     },
 
     /**
@@ -829,10 +891,9 @@ export default {
      * Show move dialog
      */
     showMove: function () {
-      this.moveDialogVisible = true;
       const moveDialog = this.$refs.moveDialog;
-      moveDialog.file = this.file;
-      moveDialog.visible = true;
+      moveDialog.currentFolder = this.file;
+      this.moveDialogVisible = true;
     },
     onCloseMoveDialog: function () {
       this.moveDialogVisible = false;
@@ -885,9 +946,7 @@ export default {
           files: failures,
           destination: propOr(null, "destination", response),
         };
-
-        // Show user notice of conflicts
-        this.$refs.moveDialog.visible = true;
+        this.moveDialogVisible = true;
       }
     },
 
@@ -900,10 +959,8 @@ export default {
       // Rename each file with proposed new name
       const promises = files.map((obj) => {
         const id = propOr("", "id", obj);
-
-        useGetToken().then((token) => {
+        return useGetToken().then((token) => {
           const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
-
           return this.sendXhr(url, {
             method: "PUT",
             body: {
@@ -912,15 +969,13 @@ export default {
           });
         });
       });
-      Promise.all(promises).then((response) => {
+      Promise.all(promises).then(() => {
         // Move files again, now with new name
-        this.moveItems(destination, response);
+        this.moveItems(destination, this.moveConflict.display);
 
         // Reset
+        this.moveDialogVisible = false;
         this.moveConflict = {};
-
-        // Hide user notice of conflicts
-        this.$refs.moveDialog.visible = false;
       });
     },
 
@@ -1179,6 +1234,9 @@ export default {
     },
     openRunAnalysisDialog: function () {
       this.runAnalysisDialogVisible = true;
+    },
+    openOldRunAnalysisDialog: function () {
+      this.oldRunAnalysisDialogVisible = true;
     },
 
     handleRouteChange: function (to, from) {

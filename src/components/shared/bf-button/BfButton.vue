@@ -9,7 +9,6 @@
       hasPrefixSlot ? 'hasPrefix' : '',
     ]"
   >
-
     <span v-if="hasPrefixSlot" class="prefix">
       <slot name="prefix" />
     </span>
@@ -169,6 +168,30 @@ export default {
       }
     }
   }
+  &.viewer-selector {
+    background: theme.$purple_tint;
+    border: 1px solid theme.$purple_0_7;
+    min-height: 40px;
+    margin: 0;
+    min-width: 140px;
+    &:not([disabled]) {
+      &:hover,
+      &:focus {
+        background: theme.$purple_0_7;
+      }
+    }
+    &.active {
+      color: white;
+      background-color: theme.$purple_1;
+      &:not([disabled]) {
+        &:active,
+        &:focus {
+          background: theme.$purple_1;
+          color: white;
+        }
+      }
+    }
+  }
   &.green {
     background: theme.$green_1;
     &:not([disabled]) {
@@ -190,11 +213,11 @@ export default {
     }
   }
   &.red {
-    background: theme.$red_1;
+    background: theme.$red_2;
     &:not([disabled]) {
       &:hover,
       &:focus {
-        background: theme.$red_2;
+        background: theme.$red_1;
       }
     }
     &.ghost {

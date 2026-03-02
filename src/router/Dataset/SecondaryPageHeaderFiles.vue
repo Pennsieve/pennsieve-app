@@ -9,6 +9,10 @@ import { getPreviousCollection } from "../index.js";
 const route = useRoute();
 const router = useRouter();
 
+const breadcrumbs = computed(() => {
+  return route.meta.breadcrumbs || []
+});
+
 function backToFiles(){
     const { datasetId } = route.params;
   const previousCollection = getPreviousCollection(); // ✅ Get stored collection ID
@@ -31,20 +35,12 @@ function backToFiles(){
 <template>
   <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading">
+  <bf-rafter slot="heading" :breadcrumbs="breadcrumbs">
     <template #breadcrumb v-if="route.meta.showBackToFiles">
       <a @click="backToFiles()" class="link-to-files">
         <IconArrowLeft :height="10" :width="10" />
         Back to Files
       </a>
-    </template>
-
-    <template #heading>
-      <div class="title-wrapper">
-        <h1 class="flex-heading">
-          Files
-        </h1>
-      </div>
     </template>
   </bf-rafter>
 </template>

@@ -1,0 +1,7 @@
+@use '../theme';
+
+:deep(.el-tag) {
+  --el-tag-border-radius: 0px;
+  --el-tag-text-color: #{theme.$purple_3};
+  --el-tag-bg-color:#{theme.$purple_tint};
+}

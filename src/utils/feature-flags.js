@@ -46,7 +46,13 @@ export function isEnabledForSpecificOrgs(orgId) {
 
    const isReJoinProd = orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f";
 
-   return isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics;
+   const isIHSurgeProd = orgId === "N:organization:6eb2d536-ff28-4ad0-b9e0-3f6ed7a2d7c1";
+
+   const isNIHPRECISIONHumanPainNetwork = orgId === "N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae"
+
+    const isBE5210 = orgId === "N:organization:e642b431-0def-4f6c-b452-e538a86958b5"
+
+   return isBE5210 || isImmuneHealthProd || isCNTProd || isHackathonProd || isSPARCProd || isStandardBiotools || isBMIN5100 || isSEED || isPedQuest || isEpilepsyScience || isReJoinProd || isTranslationalNeuroinformatics || isIHSurgeProd || isNIHPRECISIONHumanPainNetwork;
 }
 
 export function isEnabledForAllDevOrgs(url) {

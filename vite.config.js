@@ -1,11 +1,10 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-// import ElementPlus from 'unplugin-element-plus/vite'
-
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 
 // https://vitejs.dev/config/
@@ -20,6 +19,7 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         additionalData: `@use "./src/styles/index.scss" as *;`,
+        silenceDeprecations: ['global-builtin', 'legacy-js-api', 'new-global', 'color-functions'],
       },
     },
   },
@@ -32,10 +32,18 @@ export default defineConfig({
       resolvers: [ElementPlusResolver()],
     }),
     Components({
-      resolvers: [ElementPlusResolver({importStyle: "sass",})],
+      resolvers: [ElementPlusResolver({importStyle: false})],
+    }),
+    nodePolyfills({
+      include: ['util'],
+      globals: {
+        process: true,
+        Buffer: true,
+      },
     }),
   ],
   define: {
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
   },
   resolve: {
     alias: {
@@ -44,6 +52,7 @@ export default defineConfig({
   },
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
+    exclude: ['@duckdb/duckdb-wasm'],
     esbuildOptions: {
       target: "esnext",
     },

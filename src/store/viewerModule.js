@@ -39,10 +39,6 @@ const initialState = () => ({
   viewerAnnotations: [],
   activeAnnotationLayer: {},
   activeAnnotation: {},
-  viewerDiscussions: {
-    comments: {},
-    discussions: []
-  },
   viewerErrors: {},
   //TODO make strings enum constants
   viewerSidePanelView: viewerSidePanelTypes.INFO_PANEL,
@@ -146,65 +142,6 @@ export const mutations = {
     annotations.splice(annotationIndex, 1)
   },
 
-  SET_DISCUSSIONS (state, { discussions, comments }) {
-    state.viewerDiscussions = {
-      discussions,
-      comments
-    }
-  },
-
-  //TODO the business logic in here should be moved to an action which also uses CREATE_COMMENT
-  CREATE_DISCUSSION (state, data) {
-    // Add comment
-    const commentDiscussionId = pathOr('', ['comment', 'discussion_id'], data)
-    const comments = state.viewerDiscussions.comments[commentDiscussionId]
-
-    if (comments) {
-      comments.push(data.comment)
-    }
-
-    /*
-     * Add discussion if needed
-     * Also create comment for discussion
-     */
-    const discussions = state.viewerDiscussions.discussions
-    const hasDiscussion = includes(data.discussion, discussions)
-
-    if (hasDiscussion === false) {
-      discussions.push(data.discussion)
-      state.viewerDiscussions.comments[commentDiscussionId] = [data.comment]
-    }
-  },
-
-  REMOVE_DISCUSSION (state, discussionIndex) {
-    state.viewerDiscussions.discussions.splice(discussionIndex, 1)
-  },
-
-  CREATE_COMMENT (state, { comment, discussionId }) {
-    propOr([], discussionId, state.viewerDiscussions.comments).push(comment)
-  },
-
-  //TODO move logic to action, use removeDiscussion action instead of manually doing it if no more comments
-  REMOVE_COMMENT (state, data) {
-    const discussionId = propOr(0, 'discussion_id', data)
-    const comments = propOr([], discussionId, state.viewerDiscussions.comments)
-
-    const commentId = propOr(0, 'id', data)
-    const commentIdx = findIndex(propEq('id', commentId), comments)
-
-    const updatedComments = remove(commentIdx, 1, comments)
-
-    state.viewerDiscussions.comments[discussionId] = updatedComments
-
-    // Remove discussion if there are no more comments
-    if (updatedComments.length === 0) {
-      const discussions = state.viewerDiscussions.discussions
-      const discussionIdx = findIndex(propEq('id', discussionId), discussions)
-
-      state.viewerDiscussions.discussions.splice(discussionIdx, 1)
-    }
-
-  },
 
   SET_VIEWER_ERRORS (state, data) {
     state.viewerErrors = data
@@ -273,27 +210,6 @@ export const actions = {
 
     commit('UPDATE_VIEWER_SLIDE_INFO', newSlideInfo)
   },
-  setDiscussions: ({commit}, discussionData) => {
-    const discussions = propOr([], 'discussions', discussionData)
-    const comments = propOr({}, 'comments', discussionData)
-
-    commit('SET_DISCUSSIONS', { discussions, comments })
-  },
-  createDiscussion: ({commit}, evt) =>
-    commit('CREATE_DISCUSSION', evt),
-  removeDiscussion: ({commit}, evt) => {
-    const discussionIndex = findIndex(
-      propEq('id', evt),
-      state.viewerDiscussions.discussions
-    )
-    commit('REMOVE_DISCUSSION', discussionIndex)
-  },
-  createComment: ({commit}, comment) => {
-    const discussionId = propOr(0, 'discussion_id', comment)
-    commit('CREATE_COMMENT', { comment, discussionId })
-  },
-  removeComment: ({commit}, evt) =>
-    commit('REMOVE_COMMENT', evt),
   setViewerErrors: ({ commit }, evt) =>
     commit('SET_VIEWER_ERRORS', evt),
   setViewerMontageScheme: ({commit}, evt) =>
@@ -302,6 +218,91 @@ export const actions = {
     commit('SET_VIEWER_MONTAGE_SCHEME', evt.montageScheme)
     commit('SET_CUSTOM_MONTAGE_MAP', JSON.parse(evt.customMontageMap))
   },
+  fetchCloudFrontUrl: async ({rootState}, { packageId, datasetId }) => {
+    try {
+      const token = await useGetToken()
+      const queryParams = toQueryParams({
+        package_id: packageId,
+        dataset_id: datasetId
+      })
+      const url = `${rootState.config.apiUrl}/packages/cloudfront/sign?${queryParams}`
+
+      const myHeaders = new Headers()
+      myHeaders.append('Authorization', 'Bearer ' + token)
+      myHeaders.append('Accept', 'application/json')
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: myHeaders
+      })
+
+      if (resp.ok) {
+        const result = await resp.json()
+        return result.url
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
+  /**
+   * Get viewer assets for a package
+   * @param {String} packageId
+   * @returns {Promise<Array>} Array of file assets
+   */
+  fetchViewerAssets: async ({rootState}, packageId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.apiUrl}/packages/${packageId}/view?api_key=${token}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (resp.ok) {
+        return await resp.json()
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
+  /**
+   * Get presigned URL for a file
+   * @param {String} packageId
+   * @param {String} fileId
+   * @returns {Promise<String>} Presigned URL
+   */
+  fetchFileUrl: async ({rootState}, { packageId, fileId }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (resp.ok) {
+        const result = await resp.json()
+        return result.url
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
   fetchWorkspaceMontages: async ({commit, rootState}, evt) => {
     try {
       let endpoint = `${rootState.config.api2Url}/timeseries/montages`

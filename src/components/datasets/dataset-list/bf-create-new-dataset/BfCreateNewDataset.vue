@@ -22,7 +22,7 @@
         :model="newDatasetForm"
         label-position="top"
         :rules="rules"
-        @submit.native.prevent="createDataset()"
+        @submit.prevent="createDataset()"
       >
         <el-form-item
           label="Dataset Name"
@@ -53,7 +53,7 @@
         ref="newDatasetFormStep2"
         :model="newDatasetForm"
         :rules="rules"
-        @submit.native.prevent="createDataset('newDatasetForm')"
+        @submit.prevent="createDataset('newDatasetForm')"
       >
         <div
           class="section-title"
@@ -281,9 +281,11 @@
       },
 
       updateIsActive: function(value) {
-        this.integrations.filter(n => n.id === value.id)[0].isActive = value.isActive
+        const integration = this.integrations.find(n => n.id === value.id)
+        if (integration) {
+          integration.isActive = value.isActive
+        }
         this.checkActiveIntegrations()
-
       },
       checkActiveIntegrations: function() {
         this.hasActiveIntegrations = this.integrations.map(x => x.isActive).some( (x) => x === true)
@@ -363,7 +365,7 @@
       /**
        * Create Dataset
        */
-      createDataset: function() {
+      createDataset: async function() {
         this.duplicateName = false
         let isValid = true
 
@@ -371,14 +373,14 @@
         this.newDatasetForm.includedWebhookIds= this.integrations.filter(n => n.isActive === true).map(x => x.id)
         this.newDatasetForm.excludedWebhookIds = this.integrations.filter(n => n.isActive === false).map(x => x.id)
 
-        this.$refs.newDatasetFormStep1.validate( (valid) => {
+        await this.$refs.newDatasetFormStep1.validate( (valid) => {
           if (!valid) {
             isValid = false
             return this.processStep = 1
           }
         })
 
-        this.$refs.newDatasetFormStep2.validate( (valid) => {
+        await this.$refs.newDatasetFormStep2.validate( (valid) => {
           if (!valid) {
             isValid = false
             return this.processStep = 2
@@ -423,7 +425,7 @@
           })
 
           const id = pathOr('', ['content', 'id'], response)
-          this.$router.push({ name: 'dataset', params: { datasetId: id }})
+          this.$router.push({ name: 'dataset-overview', params: { datasetId: id }})
           this.isCreating = false
         })
       },

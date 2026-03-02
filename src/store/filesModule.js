@@ -9,17 +9,9 @@ const initialState = () => ({
   isOfficeDialogVisible: false,
   officeFile: {},
   shouldOpenOfficeFile: false,
-  packageMetadata:[],
 })
 
 
-const getPackageMetadataQueryParams = (params, dataset_id, package_id) => {
-
-  return toQueryParams({
-    dataset_id: dataset_id,
-    package_id: package_id
-  })
-}
 export const state = initialState()
 
 export const mutations = {
@@ -40,9 +32,6 @@ export const mutations = {
     state.shouldOpenOfficeFile = true
   },
 
-  UPDATE_PACKAGE_META(state, metadata) {
-    state.packageMetadata = metadata
-  },
 }
 
 export const actions = {
@@ -55,42 +44,9 @@ export const actions = {
   },
   closeOffice365Dialog: ({commit}) => commit('CLEAR_STATE'),
 
-  fetchMetadataForPackage: async ({state,commit, rootState}, packageId) => {
-
-    const currentRoute = router.currentRoute.value
-    const datasetId = currentRoute.params.datasetId
-    const endpoint = `${rootState.config.api2Url}/metadata_legacy/package`
-
-    const apiKey = await useGetToken()
-    const queryParams = getPackageMetadataQueryParams(state.datasetManifestParams, datasetId, packageId)
-
-    const url = `${endpoint}?${queryParams}`
-    const myHeaders = new Headers();
-    myHeaders.append('Authorization', 'Bearer ' + apiKey)
-    myHeaders.append('Accept', 'application/json')
-    try {
-      const resp = await fetch(url, { headers: myHeaders })
-      if (resp.ok) {
-        const  metadata = await resp.json()
-        commit('UPDATE_PACKAGE_META', metadata)
-
-      } else {
-        commit('UPDATE_PACKAGE_META', [])
-        throw new Error(resp.statusText)
-      }
-    } catch (err) {
-      EventBus.$emit('ajaxError', err)
-      commit('UPDATE_PACKAGE_META', [])
-    }
-
-  }
 }
 
-export const getters = {
-  curPackageMetaData: state => {
-    return state.packageMetadata
-  }
-}
+export const getters = {}
 
 const filesModule = {
   namespaced: true,
