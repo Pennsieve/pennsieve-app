@@ -4,11 +4,9 @@
       <template #description>
         <div class="description">
           <p>
-            Pennsieve Analytics enables users to integrate custom applications
-            that extend platform capabilities through specialized actions and
-            webhook integrations.
+            Pennsieve Analytics enables users to run workflows over data on external compute nodes.
           </p>
-          <hr />
+<!--          <hr />-->
         </div>
         <!-- <div slot="description" class="description">
           <p v-if="this.$route.name === 'applications'">

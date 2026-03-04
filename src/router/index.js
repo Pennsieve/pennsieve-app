@@ -122,7 +122,8 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
-const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
+const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
+const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
@@ -1521,7 +1522,17 @@ const router = createRouter({
           name: 'applications',
           path: 'applications',
           components: {
-            stage: ApplicationsList,
+            stage: ApplicationsGrid,
+          }
+        },
+        {
+          name: 'application-detail',
+          path: 'applications/:uuid',
+          components: {
+            stage: ApplicationDetail,
+          },
+          props: {
+            stage: true
           }
         }
       ]

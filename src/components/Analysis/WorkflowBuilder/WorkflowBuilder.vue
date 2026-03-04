@@ -1264,7 +1264,7 @@ onPaneClick(() => {
 @use "../../../styles/theme";
 
 .workflow-builder {
-  height: calc(100vh - 190px);
+  height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
   overflow: hidden;

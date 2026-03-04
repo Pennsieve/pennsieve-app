@@ -325,6 +325,7 @@ const definitionToNodesAndEdges = (definition) => {
     }
   }
 
+
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -403,6 +404,7 @@ const runToNodesAndEdges = (run) => {
       });
     }
   }
+
 
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
@@ -1309,12 +1311,12 @@ onUnmounted(() => {
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
-                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
-                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
                     <span class="node-title">{{ data.label }}</span>
                   </div>
-                  <div v-if="mode === 'browse'" class="node-meta">
-                    <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  <div class="node-tags">
+                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
+                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
+                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1345,18 +1347,20 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
                 <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <div class="node-header">
-                    <span class="node-type-badge source-badge">Source</span>
                     <span class="node-title">{{ data.label }}</span>
                   </div>
-                  <div v-if="mode === 'browse' && data.packageCount != null" class="node-meta">
-                    {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                  <div class="node-tags">
+                    <span class="node-type-badge source-badge">Source</span>
+                    <span v-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
+                      {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                    </span>
+                    <template v-if="mode === 'configure'">
+                      <span class="node-tag-info">
+                        {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
+                      </span>
+                    </template>
                   </div>
-                  <template v-if="mode === 'configure'">
-                    <div class="node-file-count">
-                      {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
-                    </div>
-                    <div class="node-config-hint">Click to select files</div>
-                  </template>
+                  <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
                 </div>
                 <Handle type="source" :position="Position.Bottom" />
               </div>
@@ -1368,16 +1372,16 @@ onUnmounted(() => {
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
+                    <span class="node-title">{{ data.targetType || data.label }}</span>
+                  </div>
+                  <div class="node-tags">
                     <span class="node-type-badge target-badge">Target</span>
                     <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
                       {{ nodeConfigs[id]?.computeType || data.computeType }}
                     </span>
-                    <span class="node-title">{{ data.targetType || data.label }}</span>
+                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div class="node-body">
-                    <div v-if="mode === 'browse'" class="node-meta">
-                      <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
-                    </div>
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
                       <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
                         <span class="param-key">{{ p.key }}</span>
@@ -2386,7 +2390,7 @@ onUnmounted(() => {
 @use "../../../styles/theme";
 
 .run-monitor {
-  height: calc(100vh - 190px);
+  height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2530,6 +2534,7 @@ onUnmounted(() => {
   transition: all 0.2s;
   cursor: pointer;
   position: relative;
+  text-align: left;
   z-index: 1;
 
   &:hover { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
@@ -2538,6 +2543,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+    text-align: left;
   }
 
   .node-title {
@@ -2546,6 +2552,21 @@ onUnmounted(() => {
     color: theme.$black;
     flex: 1;
     line-height: 1.3;
+    text-align: left;
+  }
+
+  .node-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .node-tag-info {
+    font-size: 10px;
+    color: theme.$gray_4;
+    white-space: nowrap;
   }
 
   .node-meta {
