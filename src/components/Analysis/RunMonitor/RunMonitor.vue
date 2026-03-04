@@ -228,6 +228,7 @@ const statusDotClass = (status) => {
     case "STARTED": return "dot-blue";
     case "SUCCEEDED": return "dot-green";
     case "FAILED": return "dot-red";
+    case "CANCELLED": return "dot-amber";
     default: return "dot-gray";
   }
 };
@@ -324,6 +325,7 @@ const definitionToNodesAndEdges = (definition) => {
     }
   }
 
+
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -344,6 +346,7 @@ const runToNodesAndEdges = (run) => {
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
+  const runProcessorParams = run.processorParams || {};
 
   const resultNodes = dag.map((d) => {
     const nodeType = d.type === "data-source" ? "data-source"
@@ -359,9 +362,13 @@ const runToNodesAndEdges = (run) => {
       extra.targetType = d.targetType || null;
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.computeType = cfg?.executionTarget || d.computeType || null;
+      const targetParams = runDataTargets[d.id]?.params || {};
+      extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      const nodeParams = runProcessorParams[d.id] || {};
+      extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
 
     return {
@@ -398,6 +405,7 @@ const runToNodesAndEdges = (run) => {
     }
   }
 
+
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -429,9 +437,6 @@ const onRunStatusUpdate = async (raw) => {
         ...selectedWorkflowActivity.value,
         status: data.status,
       });
-
-      // Delay to allow DynamoDB eventual consistency before fetching metrics
-      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Full refresh to fetch metrics/costs from the run instance endpoint
       await store.dispatch(
@@ -1308,12 +1313,29 @@ onUnmounted(() => {
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
-                  <div v-if="mode === 'browse'" class="node-meta">
-                    <span v-if="data.executionTarget" class="runtime-tag">{{ data.executionTarget }}</span>
-                    <span class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  <div class="node-tags">
+                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
+                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
+                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
-                  <div v-if="mode === 'configure' && nodeConfigs[id]" class="node-config-hint">
-                    Click to configure
+                  <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
+                    <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
+                      <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
+                        <span class="param-key">{{ p.key }}</span>
+                        <span v-if="p.value" class="param-val">{{ p.value }}</span>
+                      </div>
+                      <span v-if="data.params.length > 3" class="param-more">+{{ data.params.length - 3 }} more</span>
+                    </div>
+                    <template v-if="mode === 'configure' && nodeConfigs[id]">
+                      <div v-if="nodeConfigs[id].params?.length > 0" class="param-preview">
+                        <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
+                          <span class="param-key">{{ p.key }}</span>
+                          <span v-if="p.value" class="param-val">{{ p.value }}</span>
+                        </div>
+                        <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
+                      </div>
+                      <div class="node-config-hint">Click to configure</div>
+                    </template>
                   </div>
                 </div>
                 <Handle type="source" :position="Position.Bottom" />
@@ -1325,18 +1347,20 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
                 <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <div class="node-header">
-                    <span class="node-type-badge source-badge">Source</span>
                     <span class="node-title">{{ data.label }}</span>
                   </div>
-                  <div v-if="mode === 'browse' && data.packageCount != null" class="node-meta">
-                    {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                  <div class="node-tags">
+                    <span class="node-type-badge source-badge">Source</span>
+                    <span v-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
+                      {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                    </span>
+                    <template v-if="mode === 'configure'">
+                      <span class="node-tag-info">
+                        {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
+                      </span>
+                    </template>
                   </div>
-                  <template v-if="mode === 'configure'">
-                    <div class="node-file-count">
-                      {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
-                    </div>
-                    <div class="node-config-hint">Click to select files</div>
-                  </template>
+                  <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
                 </div>
                 <Handle type="source" :position="Position.Bottom" />
               </div>
@@ -1348,17 +1372,33 @@ onUnmounted(() => {
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
-                    <span class="node-type-badge target-badge">Target</span>
                     <span class="node-title">{{ data.targetType || data.label }}</span>
                   </div>
+                  <div class="node-tags">
+                    <span class="node-type-badge target-badge">Target</span>
+                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
+                      {{ nodeConfigs[id]?.computeType || data.computeType }}
+                    </span>
+                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
                   <div class="node-body">
-                    <div class="node-meta">
-                      <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="runtime-tag">
-                        {{ nodeConfigs[id]?.computeType || data.computeType }}
-                      </span>
-                      <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                    <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
+                      <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
+                        <span class="param-key">{{ p.key }}</span>
+                        <span v-if="p.value" class="param-val">{{ p.value }}</span>
+                      </div>
+                      <span v-if="data.params.length > 3" class="param-more">+{{ data.params.length - 3 }} more</span>
                     </div>
-                    <div v-if="mode === 'configure'" class="node-config-hint">Click to configure</div>
+                    <template v-if="mode === 'configure'">
+                      <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
+                        <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
+                          <span class="param-key">{{ p.key }}</span>
+                          <span v-if="p.value" class="param-val">{{ p.value }}</span>
+                        </div>
+                        <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
+                      </div>
+                      <div class="node-config-hint">Click to configure</div>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1579,6 +1619,14 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
+                </div>
+              </div>
+
+              <div v-if="selectedNode.data?.params?.length > 0" class="info-card params-card">
+                <h5 class="params-title">Parameters</h5>
+                <div v-for="(p, i) in selectedNode.data.params" :key="i" class="info-row">
+                  <span class="info-label">{{ p.key }}</span>
+                  <span class="info-value">{{ p.value }}</span>
                 </div>
               </div>
 
@@ -2342,7 +2390,7 @@ onUnmounted(() => {
 @use "../../../styles/theme";
 
 .run-monitor {
-  height: calc(100vh - 190px);
+  height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2486,6 +2534,7 @@ onUnmounted(() => {
   transition: all 0.2s;
   cursor: pointer;
   position: relative;
+  text-align: left;
   z-index: 1;
 
   &:hover { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
@@ -2494,6 +2543,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+    text-align: left;
   }
 
   .node-title {
@@ -2502,6 +2552,21 @@ onUnmounted(() => {
     color: theme.$black;
     flex: 1;
     line-height: 1.3;
+    text-align: left;
+  }
+
+  .node-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .node-tag-info {
+    font-size: 10px;
+    color: theme.$gray_4;
+    white-space: nowrap;
   }
 
   .node-meta {
@@ -2516,14 +2581,64 @@ onUnmounted(() => {
   .node-status-badge {
     font-size: 10px;
     font-weight: 600;
-    padding: 1px 8px;
-    border-radius: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
     white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 
     &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
     &.dot-blue { background: #dbeafe; color: #1d4ed8; }
-    &.dot-green { background: #dcfce7; color: #15803d; }
+    &.dot-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
     &.dot-red { background: #fee2e2; color: #b91c1c; }
+    &.dot-amber { background: #fef3c7; color: #92400e; }
+  }
+
+  .node-config-summary {
+    margin-top: 6px;
+    text-align: left;
+
+    .runtime-tag {
+      margin-bottom: 4px;
+    }
+  }
+
+  .param-preview {
+    margin-top: 4px;
+    text-align: left;
+
+    .param-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      font-size: 10px;
+      line-height: 1.6;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .param-key {
+      color: theme.$gray_5;
+      font-weight: 500;
+      flex-shrink: 0;
+
+      &::after {
+        content: ":";
+      }
+    }
+
+    .param-val {
+      color: theme.$gray_4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .param-more {
+      font-size: 10px;
+      color: theme.$gray_4;
+      font-style: italic;
+    }
   }
 
   .node-config-hint {
@@ -2531,6 +2646,7 @@ onUnmounted(() => {
     color: theme.$purple_1;
     margin-top: 6px;
     font-style: italic;
+    text-align: left;
   }
 
   .node-file-count {
@@ -2592,6 +2708,7 @@ onUnmounted(() => {
 
     &.source-badge { background: #6366f1; color: white; }
     &.target-badge { background: #64748b; color: white; }
+    &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }
 }
 
@@ -2776,6 +2893,13 @@ onUnmounted(() => {
   border: 1px solid theme.$gray_2;
   padding: 12px;
   margin-bottom: 12px;
+
+  .params-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: theme.$gray_5;
+    margin: 0 0 6px 0;
+  }
 }
 
 .info-row {
