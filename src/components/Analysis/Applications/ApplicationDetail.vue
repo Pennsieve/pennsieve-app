@@ -8,6 +8,7 @@ import { pathOr, propOr } from "ramda";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import EventBus from "../../../utils/event-bus";
+import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 
 import {
   isEnabledForAllDevOrgs,
@@ -334,10 +335,15 @@ onBeforeUnmount(() => removeGuard());
     <div v-else class="builder-content">
       <!-- Left: Main Panel -->
       <div class="main-panel">
-        <!-- Metrics Placeholder -->
+        <!-- Metrics -->
         <div class="metrics-section">
-          <div class="metrics-placeholder">
-            <span>Application metrics will appear here</span>
+          <MetricsDashboard
+            v-if="selectedApplication?.source?.url"
+            filter-column="sourceUrl"
+            :filter-value="selectedApplication.source.url"
+          />
+          <div v-else class="metrics-placeholder">
+            <span>No source URL available for metrics</span>
           </div>
         </div>
 

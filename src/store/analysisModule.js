@@ -349,7 +349,7 @@ export const actions = {
 
     try {
       const response = await fetch(url, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,
@@ -377,7 +377,7 @@ export const actions = {
 
     try {
       const response = await fetch(url, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,

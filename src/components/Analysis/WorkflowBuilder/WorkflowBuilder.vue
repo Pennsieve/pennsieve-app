@@ -2,6 +2,7 @@
 import { computed, ref, reactive, onMounted } from "vue";
 
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 // Vue Flow Imports
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
@@ -15,6 +16,8 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
+import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import { useMetricsExport } from "@/composables/useMetricsExport";
 
 const {
   onNodeClick,
@@ -23,6 +26,15 @@ const {
   screenToFlowCoordinate,
   fitView,
 } = useVueFlow();
+
+const props = defineProps({
+  uuid: {
+    type: String,
+    default: "",
+  },
+});
+
+const router = useRouter();
 
 /*
 Local State
@@ -47,6 +59,35 @@ const editName = ref("");
 const editDescription = ref("");
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
+const metricsExpanded = ref(false);
+
+// Metrics summary for collapsed header (from parquet via DuckDB)
+const metricsFilterValue = computed(() => selectedWorkflow.value?.uuid || "");
+const {
+  totalRuns: metricsTotalRuns,
+  medianDuration: metricsDuration,
+  medianCost: metricsCost,
+  isLoading: metricsLoading,
+} = useMetricsExport({
+  filterColumn: ref("workflowUuid"),
+  filterValue: metricsFilterValue,
+  viewerId: "wf_detail_inline_metrics",
+});
+
+const formatDuration = (v) => {
+  if (v == null) return "--";
+  if (v < 1) return `${(v * 1000).toFixed(0)}ms`;
+  if (v < 60) return `${v.toFixed(1)}s`;
+  if (v < 3600) return `${(v / 60).toFixed(1)}m`;
+  return `${(v / 3600).toFixed(1)}h`;
+};
+
+const formatCost = (v) => {
+  if (v == null) return "--";
+  if (v < 0.01) return `$${v.toFixed(4)}`;
+  if (v < 1) return `$${v.toFixed(3)}`;
+  return `$${v.toFixed(2)}`;
+};
 const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
 
 // Resolve the original processor definition for the selected node
@@ -318,7 +359,7 @@ const selectWorkflow = (workflow) => {
   selectedWorkflow.value = workflow;
   selectedNode.value = null;
   isEditingDetails.value = false;
-  accordionActiveNames.value = ["workflows", "information"];
+  accordionActiveNames.value = ["information"];
   workflowName.value = workflow.name || "";
   workflowDescription.value = workflow.description || "";
 
@@ -595,6 +636,15 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchTargetTypes"),
       store.dispatch("analysisModule/fetchWorkflows"),
     ]);
+
+    if (props.uuid) {
+      const wf = workflows.value.find((w) => w.uuid === props.uuid);
+      if (wf) {
+        selectWorkflow(wf);
+      }
+    } else {
+      enterCreateMode();
+    }
   } catch (err) {
     console.error(err);
     EventBus.$emit("toast", {
@@ -619,8 +669,11 @@ onNodeClick(({ node }) => {
   if (target) target.selected = true;
 
   selectedNode.value = node;
-  if (!accordionActiveNames.value.includes("information")) {
-    accordionActiveNames.value = [...accordionActiveNames.value, "information"];
+  const toOpen = ["information", "node-metrics"];
+  const current = accordionActiveNames.value;
+  const missing = toOpen.filter((n) => !current.includes(n));
+  if (missing.length) {
+    accordionActiveNames.value = [...current, ...missing];
   }
 });
 
@@ -634,6 +687,7 @@ onPaneClick(() => {
   <div class="workflow-builder">
     <!-- Header -->
     <div class="builder-header">
+      <router-link :to="{ name: 'workflows' }" class="back-link">&larr; Workflows</router-link>
       <template v-if="mode === 'create'">
         <el-input
           v-model="workflowName"
@@ -646,7 +700,6 @@ onPaneClick(() => {
           class="header-desc-input"
         />
         <div class="header-actions">
-          <bf-button class="secondary" @click="cancelCreate">Cancel</bf-button>
           <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
           <bf-button @click="saveWorkflow">Save</bf-button>
         </div>
@@ -659,8 +712,32 @@ onPaneClick(() => {
     </div>
 
     <div class="builder-content">
-      <!-- Workflow Canvas -->
-      <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
+      <!-- Left: Main Panel -->
+      <div class="main-panel">
+        <!-- Metrics (browse mode only) -->
+        <div v-if="mode === 'browse' && selectedWorkflow" class="metrics-section">
+          <div class="metrics-toggle" @click="metricsExpanded = !metricsExpanded">
+            <span class="metrics-toggle-icon">{{ metricsExpanded ? '&#9660;' : '&#9654;' }}</span>
+            <span class="metrics-toggle-label">Workflow Metrics</span>
+            <template v-if="!metricsExpanded && !metricsLoading && metricsTotalRuns > 0">
+              <span class="metrics-inline-stat">{{ metricsTotalRuns }} runs</span>
+              <span class="metrics-inline-divider">|</span>
+              <span class="metrics-inline-stat">{{ formatDuration(metricsDuration) }}</span>
+              <span class="metrics-inline-divider">|</span>
+              <span class="metrics-inline-stat">{{ formatCost(metricsCost) }}</span>
+            </template>
+            <span v-if="!metricsExpanded && metricsLoading" class="metrics-inline-stat">Loading...</span>
+          </div>
+          <MetricsDashboard
+            v-show="metricsExpanded"
+            filter-column="workflowUuid"
+            :filter-value="selectedWorkflow.uuid"
+            hide-header
+          />
+        </div>
+
+        <!-- Workflow Canvas -->
+        <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
         <div v-if="nodes.length === 0" class="empty-canvas">
           <template v-if="mode === 'create'">
             <h3>Drag items here to build your workflow</h3>
@@ -670,9 +747,9 @@ onPaneClick(() => {
             </p>
           </template>
           <template v-else>
-            <h3>Select a workflow</h3>
+            <h3>No workflow loaded</h3>
             <p>
-              Choose a workflow from the sidebar to view it, or create a new one
+              Return to the workflows gallery to select a workflow
             </p>
           </template>
         </div>
@@ -863,14 +940,10 @@ onPaneClick(() => {
           </VueFlow>
         </div>
       </div>
+      </div>
 
       <!-- Sidebar (Right) -->
       <div class="applications-sidebar">
-        <!-- New Workflow Button -->
-        <bf-button class="new-workflow-btn" @click="enterCreateMode">
-          + New Workflow
-        </bf-button>
-
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
           <el-collapse-item title="Information" name="information">
@@ -1062,49 +1135,23 @@ onPaneClick(() => {
             </div>
           </el-collapse-item>
 
-          <!-- Workflows Section -->
-          <el-collapse-item title="Workflows" name="workflows">
-            <!-- Filter Buttons -->
-            <div class="filter-bar">
-              <button
-                v-for="option in filterOptions"
-                :key="option.value"
-                class="filter-btn"
-                :class="{ active: statusFilter === option.value }"
-                @click="statusFilter = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-
-            <!-- Workflow List -->
-            <div class="workflow-list">
-              <div
-                v-for="wf in filteredWorkflows"
-                :key="wf.uuid"
-                class="workflow-list-item"
-                :class="{ selected: selectedWorkflow && selectedWorkflow.uuid === wf.uuid }"
-                @click="selectWorkflow(wf)"
-              >
-                <IconAnalysis class="wf-item-icon" :width="20" :height="20" />
-                <div class="wf-item-info">
-                  <div class="wf-item-name">{{ wf.name }}</div>
-                  <div class="wf-item-description">
-                    {{ wf.description || "No description" }}
-                  </div>
-                  <div class="wf-item-meta">
-                    {{ (wf.dag || []).length }} nodes
-                  </div>
-                </div>
-              </div>
-              <div v-if="filteredWorkflows.length === 0" class="workflow-list-empty">
-                No workflows found
-              </div>
-            </div>
+          <!-- Node Metrics Section -->
+          <el-collapse-item
+            v-if="selectedNode && selectedNodeProcessor?.sourceUrl"
+            title="Node Metrics"
+            name="node-metrics"
+          >
+            <MetricsDashboard
+              :key="selectedNodeProcessor.sourceUrl"
+              filter-column="sourceUrl"
+              :filter-value="selectedNodeProcessor.sourceUrl"
+              vertical
+              hide-header
+            />
           </el-collapse-item>
 
-          <!-- Data & Applications Section -->
-          <el-collapse-item title="Data & Applications" name="data-and-apps">
+          <!-- Data & Applications Section (create mode only) -->
+          <el-collapse-item v-if="mode === 'create'" title="Data & Applications" name="data-and-apps">
             <!-- Data Section -->
             <h4 class="sidebar-section-title">Data</h4>
             <div class="data-items-list">
@@ -1270,6 +1317,18 @@ onPaneClick(() => {
   overflow: hidden;
 }
 
+.back-link {
+  font-size: 13px;
+  color: theme.$purple_1;
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .builder-header {
   display: flex;
   align-items: center;
@@ -1307,6 +1366,48 @@ onPaneClick(() => {
   display: flex;
   flex: 1;
   overflow: hidden;
+}
+
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.metrics-section {
+  padding: 12px 16px;
+}
+
+.metrics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0 8px;
+  user-select: none;
+}
+
+.metrics-toggle-icon {
+  font-size: 10px;
+  color: theme.$gray_4;
+}
+
+.metrics-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
+
+.metrics-inline-stat {
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$gray_4;
+}
+
+.metrics-inline-divider {
+  font-size: 12px;
+  color: theme.$gray_3;
 }
 
 .applications-sidebar {

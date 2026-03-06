@@ -231,6 +231,7 @@ const onAddApplicationConfirm = (application) => {
             {{ tag }}
           </span>
         </div>
+        <div class="card-spacer" />
         <a
           v-if="parseGitHubDisplay(app.source?.url)"
           :href="app.source.url"
@@ -264,6 +265,8 @@ const onAddApplicationConfirm = (application) => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+@use "../../../styles/element/input";
+
 
 .applications-grid-page {
   height: calc(100vh - 112px);
@@ -382,6 +385,7 @@ const onAddApplicationConfirm = (application) => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 160px;
 
   &:hover {
     border-color: theme.$purple_1;
@@ -436,6 +440,10 @@ const onAddApplicationConfirm = (application) => {
   border-radius: 10px;
   background: theme.$gray_2;
   color: theme.$gray_5;
+}
+
+.card-spacer {
+  flex: 1;
 }
 
 .card-github-link {

@@ -118,12 +118,7 @@ export default {
 
   data() {
     return {
-      tabs: [
-        {
-          name: "Webhooks",
-          to: "webhooks",
-        },
-      ],
+      tabs: [],
       pennsieveAnalysisFeature: [
         {
           name: "Runs",
@@ -131,19 +126,11 @@ export default {
         },
         {
           name: "Workflows",
-          to: "workflow-builder",
+          to: "workflows",
         },
         {
           name: "Applications",
           to: "applications",
-        },
-        {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
-          name: "Webhooks",
-          to: "webhooks",
         },
       ],
     };
