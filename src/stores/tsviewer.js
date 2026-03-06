@@ -283,8 +283,15 @@ export const useViewerStore = defineStore('tsviewer', () => {
             let endpoint = `${site.api2Url}/timeseries/montages`
             const token = await useGetToken()
 
+            const activeOrg = vuexStore.getters.activeOrganization
+            const organizationId = activeOrg?.organization?.id
+            if (!organizationId) {
+                console.warn('fetchWorkspaceMontages: activeOrganization not yet available')
+                return []
+            }
+
             const queryParams = toQueryParams({
-                organization_id: vuexStore.getters.activeOrganization.organization.id
+                organization_id: organizationId
             })
 
             const url = `${endpoint}?${queryParams}`
