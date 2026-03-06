@@ -187,10 +187,13 @@ export const mutations = {
       CLEAR_STATE(state) {
         // Preserve the switching organization state
         const isSwitching = state.isSwitchingOrganization;
-        
-        state.profile = {};
+        // Preserve user-level data needed for org switching
+        const profile = state.profile;
+        const organizations = state.organizations;
+
+        state.profile = profile;
         state.activeOrganization = {};
-        state.organizations = {};
+        state.organizations = organizations;
         state.orgMembers = [];
         state.concepts = [];
         state.teams = [];

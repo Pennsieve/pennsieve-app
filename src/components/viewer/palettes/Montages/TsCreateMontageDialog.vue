@@ -122,8 +122,13 @@ function submitMontage() {
     }
 
     const endpoint = `${store.state.config.api2Url}/timeseries/montages`;
+    const organizationId = store.state.activeOrganization?.organization?.id
+    if (!organizationId) {
+      console.error('submitMontage: activeOrganization not available')
+      return
+    }
     const queryParams = toQueryParams({
-      organization_id: store.state.activeOrganization.organization.id,
+      organization_id: organizationId,
     })
 
     const url = `${endpoint}?${queryParams}`
