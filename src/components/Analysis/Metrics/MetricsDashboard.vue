@@ -1,6 +1,7 @@
 <script setup>
 import { computed, toRef } from 'vue'
 import { useMetricsExport } from '@/composables/useMetricsExport'
+import { useMetricsCounters } from '@/composables/useMetricsCounters'
 import SparkHistogram from './SparkHistogram.vue'
 
 const props = defineProps({
@@ -12,14 +13,23 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  vertical: {
+    type: Boolean,
+    default: false,
+  },
+  hideHeader: {
+    type: Boolean,
+    default: false,
+  },
 })
 
+// Histograms: loaded in background from parquet/DuckDB
 const {
-  isLoading,
-  error,
+  isLoading: histogramLoading,
+  error: histogramError,
   durationBins,
   costBins,
-  totalRuns,
+  totalRuns: histogramTotalRuns,
   medianDuration,
   medianCost,
   refresh,
@@ -29,7 +39,25 @@ const {
   viewerId: `metrics_${props.filterColumn}`,
 })
 
-const hasData = computed(() => totalRuns.value > 0)
+// Counters: instant summary from DynamoDB
+const { counters, isLoading: countersLoading, error: countersError, fetchCounters } = useMetricsCounters({
+  scope: toRef(props, 'filterColumn'),
+  id: toRef(props, 'filterValue'),
+})
+
+const counterTotalRuns = computed(() => counters.value?.allTime?.totalRuns ?? 0)
+const displayTotalRuns = computed(() => counterTotalRuns.value || histogramTotalRuns.value)
+const avgDuration = computed(() => {
+  const c = counters.value?.allTime
+  if (c && c.totalRuns) return c.totalDurationSec / c.totalRuns
+  return medianDuration.value
+})
+const avgCost = computed(() => {
+  const c = counters.value?.allTime
+  if (c && c.totalRuns) return c.totalCost / c.totalRuns
+  return medianCost.value
+})
+const hasData = computed(() => counterTotalRuns.value > 0 || durationBins.value.length > 0 || costBins.value.length > 0)
 
 const formatDuration = (v) => {
   if (v == null) return '--'
@@ -48,50 +76,47 @@ const formatCost = (v) => {
 </script>
 
 <template>
-  <div class="metrics-dashboard">
-    <div class="metrics-header">
+  <div class="metrics-dashboard" :class="{ vertical, 'hide-header': hideHeader }">
+    <div v-if="!hideHeader" class="metrics-header">
       <span class="metrics-title">Metrics</span>
     </div>
 
-    <!-- Loading -->
-    <div v-if="isLoading" class="metrics-state">
+    <!-- Loading (both sources still loading) -->
+    <div v-if="countersLoading && histogramLoading" class="metrics-state">
       <span>Loading metrics...</span>
     </div>
 
-    <!-- Error -->
-    <div v-else-if="error" class="metrics-state metrics-error">
-      <span>{{ error }}</span>
-      <button class="metrics-retry" @click="refresh">Retry</button>
-    </div>
-
-    <!-- Empty -->
-    <div v-else-if="!hasData" class="metrics-state">
+    <!-- Empty (neither source has data) -->
+    <div v-else-if="!hasData && !countersLoading && !histogramLoading" class="metrics-state">
       <span>No metrics data available</span>
     </div>
 
     <!-- Data -->
     <div v-else class="metrics-panels">
-      <!-- Summary card -->
+      <!-- Summary card (from counters — loads instantly) -->
       <div class="metrics-panel summary-panel">
         <div class="summary-stat">
-          <span class="stat-value">{{ totalRuns }}</span>
+          <span class="stat-value">{{ displayTotalRuns }}</span>
           <span class="stat-label">Total Runs</span>
         </div>
         <div class="summary-divider" />
         <div class="summary-stat">
-          <span class="stat-value">{{ formatDuration(medianDuration) }}</span>
-          <span class="stat-label">Median Duration</span>
+          <span class="stat-value">{{ formatDuration(avgDuration) }}</span>
+          <span class="stat-label">Avg Duration</span>
         </div>
         <div class="summary-divider" />
         <div class="summary-stat">
-          <span class="stat-value">{{ formatCost(medianCost) }}</span>
-          <span class="stat-label">Median Cost</span>
+          <span class="stat-value">{{ formatCost(avgCost) }}</span>
+          <span class="stat-label">Avg Cost</span>
         </div>
       </div>
 
-      <!-- Duration histogram -->
+      <!-- Duration histogram (from parquet/DuckDB — loads in background) -->
       <div class="metrics-panel chart-panel">
+        <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
+        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
         <SparkHistogram
+          v-else
           :bins="durationBins"
           label="Duration Distribution"
           color="#7C3AED"
@@ -103,7 +128,10 @@ const formatCost = (v) => {
 
       <!-- Cost histogram -->
       <div class="metrics-panel chart-panel">
+        <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
+        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
         <SparkHistogram
+          v-else
           :bins="costBins"
           label="Cost Distribution"
           color="#2563EB"
@@ -123,6 +151,11 @@ const formatCost = (v) => {
   background: theme.$white;
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
+
+  &.hide-header {
+    border: none;
+    border-radius: 0;
+  }
 }
 
 .metrics-header {
@@ -135,6 +168,7 @@ const formatCost = (v) => {
   font-size: 13px;
   color: theme.$black;
 }
+
 
 .metrics-state {
   display: flex;
@@ -166,6 +200,10 @@ const formatCost = (v) => {
 
 .metrics-panels {
   display: flex;
+
+  .vertical & {
+    flex-direction: column;
+  }
 }
 
 .metrics-panel {
@@ -175,6 +213,15 @@ const formatCost = (v) => {
   &:last-child {
     border-right: none;
   }
+
+  .vertical & {
+    border-right: none;
+    border-bottom: 1px solid theme.$gray_3;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
 }
 
 .summary-panel {
@@ -182,6 +229,12 @@ const formatCost = (v) => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+
+  .vertical & {
+    flex: none;
+    flex-direction: row;
+    justify-content: space-evenly;
+  }
 }
 
 .chart-panel {
@@ -225,5 +278,25 @@ const formatCost = (v) => {
   height: 1px;
   background: theme.$gray_2;
   margin: 0 8px;
+
+  .vertical & {
+    height: auto;
+    width: 1px;
+    margin: 4px 0;
+  }
+}
+
+.histogram-loading,
+.histogram-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+
+.histogram-error {
+  color: theme.$status_red;
 }
 </style>

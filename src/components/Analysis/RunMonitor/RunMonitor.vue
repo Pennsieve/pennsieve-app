@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
+import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -8,10 +8,12 @@ import dagre from "@dagrejs/dagre";
 import EventBus from "../../../utils/event-bus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
+import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
@@ -139,6 +141,55 @@ const filteredRuns = computed(() => {
   return [...runs].sort(
     (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
   );
+});
+
+/*
+  Dashboard: active runs & aggregate stats (shown when no run is selected)
+*/
+const dashboardRange = ref("allTime"); // 'allTime' | 'lastYear' | 'lastMonth'
+const dashboardRangeOptions = [
+  { label: "Last Month", value: "lastMonth" },
+  { label: "Last Year", value: "lastYear" },
+  { label: "All time", value: "allTime" },
+];
+
+// Org-level counters from the metrics API
+const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchOrgCounters } = useMetricsCounters({
+  range: dashboardRange,
+});
+
+// Re-fetch when the range changes
+watch(dashboardRange, () => fetchOrgCounters());
+
+const dashboardRuns = computed(() => workflowInstances.value);
+
+const activeRuns = computed(() =>
+  workflowInstances.value.filter((r) => r.status === "STARTED")
+);
+
+const recentCompletedRuns = computed(() =>
+  dashboardRuns.value
+    .filter((r) => isTerminalStatus(r.status))
+    .sort((a, b) => new Date(b.completedAt || b.startedAt) - new Date(a.completedAt || a.startedAt))
+    .slice(0, 5)
+);
+
+const dashboardStats = computed(() => {
+  const data = orgCounters.value;
+  if (!data) return null;
+
+  const bucket = data.allTime || data;
+  if (!bucket || !bucket.totalRuns) return null;
+
+  const total = bucket.totalRuns;
+  const succeeded = bucket.succeeded || 0;
+  const failed = bucket.failed || 0;
+  const canceled = bucket.canceled || 0;
+  const successRate = (succeeded + failed) > 0
+    ? Math.round((succeeded / (succeeded + failed)) * 100)
+    : 0;
+
+  return { total, succeeded, failed, canceled, successRate };
 });
 
 /*
@@ -525,6 +576,14 @@ const selectRun = async (run) => {
   }
 };
 
+const clearRunSelection = () => {
+  selectedRun.value = null;
+  selectedNode.value = null;
+  nodes.value = [];
+  edges.value = [];
+  store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
+};
+
 const loadMoreRuns = async () => {
   isLoadingMore.value = true;
   try {
@@ -663,6 +722,20 @@ const openWizardDialog = () => {
   accordionActiveNames.value = ["information"];
   wizardVisible.value = true;
   fetchDatasetOptions();
+};
+
+const exportRunConfig = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity) return;
+
+  const json = JSON.stringify(activity, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `run-${activity.uuid}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 const rerunFromRun = async (run) => {
@@ -1198,6 +1271,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       store.dispatch("analysisModule/fetchTargetTypes"),
+      fetchOrgCounters(),
     ]);
   } catch (err) {
     console.error("Failed to load data:", err);
@@ -1264,6 +1338,8 @@ onUnmounted(() => {
       <template v-else>
         <span class="header-title">
           <template v-if="selectedRun">
+            <a class="header-back-link" @click="clearRunSelection">Runs</a>
+            <span class="header-breadcrumb-sep">/</span>
             {{ runTimeLabel }}
             <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
           </template>
@@ -1277,7 +1353,103 @@ onUnmounted(() => {
     <div class="builder-content">
       <!-- Canvas (LEFT) -->
       <div class="workflow-canvas">
-        <div v-if="nodes.length === 0" class="empty-canvas">
+        <div v-if="nodes.length === 0 && !selectedRun" class="runs-dashboard">
+          <!-- Active Runs Strip -->
+          <div v-if="activeRuns.length > 0" class="dashboard-section">
+            <h3 class="dashboard-section-title">
+              <span class="active-pulse" />
+              {{ activeRuns.length }} Active Run{{ activeRuns.length !== 1 ? 's' : '' }}
+            </h3>
+            <div class="active-runs-grid">
+              <div
+                v-for="run in activeRuns"
+                :key="run.uuid"
+                class="active-run-card"
+                @click="selectRun(run)"
+              >
+                <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                <div class="active-run-meta">
+                  <span class="run-status-dot dot-blue" />
+                  <span>Running</span>
+                  <span class="active-run-time">{{ formatTime(run.startedAt) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Aggregate Stats -->
+          <div class="dashboard-section">
+            <div class="dashboard-section-header">
+              <h3 class="dashboard-section-title">
+                Overview
+                <el-tooltip content="Metrics update approximately every 15 minutes" placement="top">
+                  <IconInfoSmall :width="24" :height="24" color="#9ca3af" class="dashboard-info-icon" />
+                </el-tooltip>
+              </h3>
+              <div class="dashboard-range-buttons">
+                <button
+                  v-for="opt in dashboardRangeOptions"
+                  :key="opt.value"
+                  class="range-btn"
+                  :class="{ active: dashboardRange === opt.value }"
+                  @click="dashboardRange = opt.value"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+            <div v-if="countersLoading && !dashboardStats" class="dashboard-empty-range">
+              Loading metrics...
+            </div>
+            <div v-else-if="dashboardStats" class="dashboard-stats">
+              <div class="dash-stat">
+                <span class="dash-stat-value">{{ dashboardStats.total }}</span>
+                <span class="dash-stat-label">Total Runs</span>
+              </div>
+              <div class="dash-stat">
+                <span class="dash-stat-value dash-stat-green">{{ dashboardStats.succeeded }}</span>
+                <span class="dash-stat-label">Succeeded</span>
+              </div>
+              <div class="dash-stat">
+                <span class="dash-stat-value dash-stat-red">{{ dashboardStats.failed }}</span>
+                <span class="dash-stat-label">Failed</span>
+              </div>
+              <div class="dash-stat">
+                <span class="dash-stat-value">{{ dashboardStats.successRate }}%</span>
+                <span class="dash-stat-label">Success Rate</span>
+              </div>
+            </div>
+            <div v-else class="dashboard-empty-range">
+              No runs in this time range
+            </div>
+          </div>
+
+          <!-- Recent Completions -->
+          <div v-if="recentCompletedRuns.length > 0" class="dashboard-section">
+            <h3 class="dashboard-section-title">Recent Completions</h3>
+            <div class="recent-runs-list">
+              <div
+                v-for="run in recentCompletedRuns"
+                :key="run.uuid"
+                class="recent-run-row"
+                @click="selectRun(run)"
+              >
+                <span class="run-status-dot" :class="statusDotClass(run.status)" />
+                <span class="recent-run-name">{{ run.workflowName || 'Unnamed' }}</span>
+                <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
+                <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty fallback -->
+          <div v-if="!dashboardStats && activeRuns.length === 0" class="empty-canvas">
+            <h3>No runs yet</h3>
+            <p>Initiate a workflow to see run activity here</p>
+          </div>
+        </div>
+
+        <div v-else-if="nodes.length === 0" class="empty-canvas">
           <h3>Select a run to view its status</h3>
           <p>Choose a run from the sidebar, or initiate a new workflow</p>
         </div>
@@ -1726,6 +1898,10 @@ onUnmounted(() => {
               <bf-button class="secondary rerun-config-btn" @click="rerunFromRun(selectedWorkflowActivity)">
                 <IconRotateRight :width="14" :height="14" />
                 Rerun with configuration
+              </bf-button>
+
+              <bf-button class="secondary export-run-btn" @click="exportRunConfig">
+                Export Run Config
               </bf-button>
 
               <bf-button
@@ -2388,6 +2564,8 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+@use "../../../styles/element/select";
+
 
 .run-monitor {
   height: calc(100vh - 112px);
@@ -2418,6 +2596,21 @@ onUnmounted(() => {
     font-weight: 600;
     font-size: 14px;
     color: theme.$black;
+  }
+
+  .header-back-link {
+    color: theme.$purple_3;
+    cursor: pointer;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .header-breadcrumb-sep {
+    color: theme.$gray_4;
+    font-weight: 400;
   }
 
   .header-actions {
@@ -2464,6 +2657,210 @@ onUnmounted(() => {
 
   h3 { margin: 0 0 10px 0; }
   p { margin: 0; font-size: 14px; }
+}
+
+/* Runs Dashboard */
+.runs-dashboard {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: theme.$gray_1;
+}
+
+.dashboard-section {
+  margin-bottom: 24px;
+}
+
+.dashboard-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.dashboard-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .dashboard-section-header & {
+    margin-bottom: 0;
+  }
+}
+
+.dashboard-info-icon {
+  cursor: help;
+}
+
+.dashboard-range-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.range-btn {
+  padding: 4px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$gray_5;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &.active {
+    background: theme.$purple_1;
+    border-color: theme.$purple_1;
+    color: white;
+  }
+}
+
+.active-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+}
+
+.dashboard-empty-range {
+  font-size: 13px;
+  color: theme.$gray_4;
+  padding: 16px 0;
+}
+
+.active-runs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.active-run-card {
+  background: theme.$white;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.active-run-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$black;
+  margin-bottom: 6px;
+}
+
+.active-run-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
+.active-run-time {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.dashboard-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.dash-stat {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+}
+
+.dash-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: theme.$black;
+  line-height: 1.2;
+}
+
+.dash-stat-green { color: #17BB62; }
+.dash-stat-red { color: #e02d2d; }
+
+.dash-stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_4;
+  margin-top: 4px;
+}
+
+.recent-runs-list {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.recent-run-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid theme.$gray_2;
+  transition: background 0.15s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: theme.$gray_1; }
+}
+
+.recent-run-name {
+  font-weight: 500;
+  color: theme.$black;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-run-status {
+  font-size: 12px;
+  color: theme.$gray_4;
+  white-space: nowrap;
+}
+
+.recent-run-time {
+  font-size: 12px;
+  color: theme.$gray_4;
+  white-space: nowrap;
 }
 
 .canvas-toolbar {
@@ -3070,6 +3467,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
+.export-run-btn {
+  margin-top: 8px;
   width: 100%;
   justify-content: center;
 }

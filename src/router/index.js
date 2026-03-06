@@ -127,6 +127,7 @@ const ApplicationDetail = () => import ('../components/Analysis/Applications/App
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
+const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
 /**
  * Metadata Components
@@ -1481,11 +1482,28 @@ const router = createRouter({
       },
       props: true,
       children: [
-           {
-          name: 'workflow-builder',
-          path: 'workflow-builder',
+        {
+          name: 'workflows',
+          path: 'workflows',
+          components: {
+            stage: WorkflowsGrid,
+          }
+        },
+        {
+          name: 'workflow-create',
+          path: 'workflows/new',
           components: {
             stage: WorkflowBuilder,
+          }
+        },
+        {
+          name: 'workflow-detail',
+          path: 'workflows/:uuid',
+          components: {
+            stage: WorkflowBuilder,
+          },
+          props: {
+            stage: true
           }
         },
         {

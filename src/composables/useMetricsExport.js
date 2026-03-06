@@ -31,7 +31,7 @@ export function useMetricsExport({ filterColumn, filterValue, viewerId = 'metric
 
   const escapeSqlString = (val) => String(val).replace(/'/g, "''")
 
-  const fetchExportUrl = async () => {
+  const fetchExportUrls = async () => {
     const token = await useGetToken()
     const api2Url = store.state.config.api2Url
     const orgId = store.state.activeOrganization?.organization?.id
@@ -46,19 +46,17 @@ export function useMetricsExport({ filterColumn, filterValue, viewerId = 'metric
       throw new Error(`Failed to fetch metrics export (${resp.status})`)
     }
     const data = await resp.json()
-    return data.url
+    if (Array.isArray(data.urls) && data.urls.length > 0) return data.urls
+    if (data.url) return [data.url]
+    return []
   }
 
+  // Returns true if data was loaded, false if no export files exist
   const loadParquet = async () => {
-    const parquetUrl = await fetchExportUrl()
-    await duckdb.loadFile(
-      parquetUrl,
-      'parquet',
-      METRICS_TABLE,
-      {},
-      viewerId,
-      METRICS_FILE_ID
-    )
+    const urls = await fetchExportUrls()
+    if (urls.length === 0) return false
+    await duckdb.loadFiles(urls, 'parquet', METRICS_TABLE, viewerId, METRICS_FILE_ID)
+    return true
   }
 
   const buildHistogramQuery = (metricColumn, col, val) => {
@@ -112,7 +110,8 @@ export function useMetricsExport({ filterColumn, filterValue, viewerId = 'metric
 
     try {
       // Ensure parquet is loaded (cached after first call)
-      await loadParquet()
+      const hasData = await loadParquet()
+      if (!hasData) return
 
       // Create a connection for querying
       if (!connectionId) {
