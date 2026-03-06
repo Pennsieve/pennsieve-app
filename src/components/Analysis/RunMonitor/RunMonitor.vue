@@ -164,7 +164,7 @@ watch(dashboardRange, () => fetchOrgCounters());
 const dashboardRuns = computed(() => workflowInstances.value);
 
 const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "STARTED")
+  workflowInstances.value.filter((r) => r.status === "STARTED" || r.status === "FINALIZING")
 );
 
 const recentCompletedRuns = computed(() =>
@@ -277,6 +277,7 @@ const statusDotClass = (status) => {
   switch (status) {
     case "NOT_STARTED": return "dot-gray";
     case "STARTED": return "dot-blue";
+    case "FINALIZING": return "dot-amber";
     case "SUCCEEDED": return "dot-green";
     case "FAILED": return "dot-red";
     case "CANCELLED": return "dot-amber";
@@ -288,6 +289,7 @@ const statusLabel = (status) => {
   switch (status) {
     case "NOT_STARTED": return "Pending";
     case "STARTED": return "Running";
+    case "FINALIZING": return "Finalizing";
     case "SUCCEEDED": return "Complete";
     case "FAILED": return "Failed";
     case "CANCELLED": return "Cancelled";
@@ -943,12 +945,22 @@ const executeWorkflow = async () => {
       detail: { type: "success", msg: "Workflow executed successfully." },
     });
 
-    // Clean up configure state and switch to browse
-    cancelConfigure();
+    // Clean up configure state but keep a placeholder selectedRun
+    // to prevent the dashboard from flashing during the transition
+    mode.value = "browse";
+    configDefinition.value = null;
+    Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
+    selectedNode.value = null;
+
+    // Set a temporary placeholder so the canvas doesn't show the dashboard
+    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
+    selectedRun.value = newRun || { uuid: runId, status: "STARTED" };
+    nodes.value = [];
+    edges.value = [];
 
     // Refresh runs list and auto-select the new run
     await store.dispatch("analysisModule/fetchWorkflowInstances");
-    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
     const runToSelect = runId
       ? workflowInstances.value.find((r) => r.uuid === runId) || newRun
       : workflowInstances.value[0]; // fallback to newest
@@ -1447,6 +1459,10 @@ onUnmounted(() => {
             <h3>No runs yet</h3>
             <p>Initiate a workflow to see run activity here</p>
           </div>
+        </div>
+
+        <div v-else-if="nodes.length === 0 && selectedRun" class="empty-canvas">
+          <span class="loading-text">Loading run...</span>
         </div>
 
         <div v-else-if="nodes.length === 0" class="empty-canvas">
@@ -2628,6 +2644,7 @@ onUnmounted(() => {
 
     &.dot-gray { background-color: theme.$gray_4; }
     &.dot-blue { background-color: #3b82f6; }
+    &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
   }
@@ -2880,6 +2897,7 @@ onUnmounted(() => {
 
     &.dot-gray { background-color: theme.$gray_4; }
     &.dot-blue { background-color: #3b82f6; }
+    &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
   }
@@ -3125,6 +3143,7 @@ onUnmounted(() => {
 
   &.dot-gray { background-color: theme.$gray_4; }
   &.dot-blue { background-color: #3b82f6; }
+  &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
 }
@@ -3139,6 +3158,7 @@ onUnmounted(() => {
 
   &.dot-gray { background-color: theme.$gray_4; }
   &.dot-blue { background-color: #3b82f6; }
+  &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
 }
@@ -3647,6 +3667,7 @@ onUnmounted(() => {
   &.dot-green { color: #15803d; }
   &.dot-red { color: #b91c1c; }
   &.dot-blue { color: #1d4ed8; }
+  &.dot-amber { color: #92400e; }
   &.dot-gray { color: theme.$gray_4; }
 }
 
