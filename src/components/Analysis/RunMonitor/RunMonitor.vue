@@ -113,6 +113,26 @@ const orgMembers = computed(() => store.state.orgMembers || []);
 const config = computed(() => store.state.config);
 
 /*
+  Fargate CPU / Memory combinations
+*/
+const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096"];
+const FARGATE_MEMORY_MAP = {
+  "256":  ["512", "1024", "2048"],
+  "512":  ["1024", "2048", "3072", "4096"],
+  "1024": ["2048", "3072", "4096", "5120", "6144", "7168", "8192"],
+  "2048": ["4096", "5120", "6144", "7168", "8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384"],
+  "4096": ["8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384", "17408", "18432", "19456", "20480", "21504", "22528", "23552", "24576", "25600", "26624", "27648", "28672", "29696", "30720"],
+};
+
+const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
+
+const formatResourceLabel = (val) => {
+  const n = parseInt(val, 10);
+  if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
+  return `${n} MB`;
+};
+
+/*
   Run title: workflow definition name + run date/time
 */
 const runTimeLabel = computed(() => {
@@ -259,7 +279,7 @@ const statusClass = (status) => {
 const statusBorderColor = (status) => {
   switch (status) {
     case "NOT_STARTED": return "#999999";
-    case "STARTED": return "#3b82f6";
+    case "STARTED": return "#06b6d4";
     case "SUCCEEDED": return "#17BB62";
     case "FAILED": return "#E94B4B";
     default: return "#999999";
@@ -824,6 +844,8 @@ const initiateWorkflow = async () => {
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || "lambda",
           version: srcCfg?.version || "",
+          cpu: srcCfg?.cpu || "",
+          memory: srcCfg?.memory || "",
           params,
         };
       }
@@ -894,10 +916,12 @@ const executeWorkflow = async () => {
           processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
         }
       } else if (dagNode.type !== "data-source") {
-        // Processor node: version + executionTarget
+        // Processor node: version + executionTarget + optional cpu/memory
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
         if (cfg.version) entry.version = cfg.version;
+        if (cfg.cpu) entry.cpu = cfg.cpu;
+        if (cfg.memory) entry.memory = cfg.memory;
         processorConfigs.push(entry);
       }
     });
@@ -1381,8 +1405,8 @@ onUnmounted(() => {
               >
                 <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
                 <div class="active-run-meta">
-                  <span class="run-status-dot dot-blue" />
-                  <span>Running</span>
+                  <span class="run-status-dot" :class="statusDotClass(run.status)" />
+                  <span>{{ statusLabel(run.status) }}</span>
                   <span class="active-run-time">{{ formatTime(run.startedAt) }}</span>
                 </div>
               </div>
@@ -1597,8 +1621,15 @@ onUnmounted(() => {
 
       <!-- Sidebar (RIGHT) -->
       <div class="applications-sidebar">
-        <bf-button v-if="mode !== 'configure'" class="new-workflow-btn" @click="openWizardDialog">
+        <bf-button v-if="mode !== 'configure' && !selectedRun" class="new-workflow-btn" @click="openWizardDialog">
           Initiate Workflow
+        </bf-button>
+        <bf-button
+          v-if="selectedRun && selectedWorkflowActivity && !isTerminalStatus(selectedWorkflowActivity.status)"
+          class="new-workflow-btn danger"
+          @click="cancelRunDialogVisible = true"
+        >
+          Cancel Run
         </bf-button>
 
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
@@ -1626,6 +1657,7 @@ onUnmounted(() => {
                     v-model="nodeConfigs[selectedNode.id].executionTarget"
                     size="small"
                     style="width: 100%"
+                    @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
                   >
                     <el-option label="Lambda" value="lambda" />
                     <el-option label="ECS" value="ecs" />
@@ -1639,6 +1671,61 @@ onUnmounted(() => {
                     placeholder="latest"
                   />
                 </div>
+
+                <!-- CPU / Memory (ECS only) -->
+                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'ecs'">
+                  <div class="config-field">
+                    <label>CPU</label>
+                    <el-select
+                      v-model="nodeConfigs[selectedNode.id].cpu"
+                      size="small"
+                      style="width: 100%"
+                      placeholder="Default"
+                      clearable
+                      @change="() => { nodeConfigs[selectedNode.id].memory = '' }"
+                    >
+                      <el-option
+                        v-for="cpu in FARGATE_CPU_OPTIONS"
+                        :key="cpu"
+                        :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                        :value="cpu"
+                      />
+                    </el-select>
+                  </div>
+                  <div class="config-field">
+                    <label>Memory</label>
+                    <el-select
+                      v-model="nodeConfigs[selectedNode.id].memory"
+                      size="small"
+                      style="width: 100%"
+                      placeholder="Default"
+                      clearable
+                      :disabled="!nodeConfigs[selectedNode.id].cpu"
+                    >
+                      <el-option
+                        v-for="mem in getMemoryOptionsForCpu(nodeConfigs[selectedNode.id].cpu)"
+                        :key="mem"
+                        :label="formatResourceLabel(mem)"
+                        :value="mem"
+                      />
+                    </el-select>
+                  </div>
+                </template>
+
+                <!-- Lambda memory -->
+                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'lambda'">
+                  <div class="config-field">
+                    <label>Memory (MB)</label>
+                    <el-input
+                      v-model="nodeConfigs[selectedNode.id].memory"
+                      size="small"
+                      placeholder="Default (e.g. 3008)"
+                      type="number"
+                      :min="128"
+                      :max="10240"
+                    />
+                  </div>
+                </template>
 
                 <!-- Per-node params -->
                 <div class="config-field">
@@ -1920,13 +2007,6 @@ onUnmounted(() => {
                 Export Run Config
               </bf-button>
 
-              <bf-button
-                v-if="!isTerminalStatus(selectedWorkflowActivity.status)"
-                class="danger cancel-run-btn"
-                @click="cancelRunDialogVisible = true"
-              >
-                Cancel Run
-              </bf-button>
             </template>
 
             <div v-else class="info-empty">
@@ -2643,7 +2723,7 @@ onUnmounted(() => {
     color: white;
 
     &.dot-gray { background-color: theme.$gray_4; }
-    &.dot-blue { background-color: #3b82f6; }
+    &.dot-blue { background-color: #06b6d4; }
     &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
@@ -2747,13 +2827,13 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #06b6d4;
   animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
 .dashboard-empty-range {
@@ -2770,15 +2850,15 @@ onUnmounted(() => {
 
 .active-run-card {
   background: theme.$white;
-  border: 1px solid #93c5fd;
+  border: 1px solid #67e8f9;
   border-radius: 4px;
   padding: 14px 16px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    border-color: #06b6d4;
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15);
   }
 }
 
@@ -2896,7 +2976,7 @@ onUnmounted(() => {
     color: white;
 
     &.dot-gray { background-color: theme.$gray_4; }
-    &.dot-blue { background-color: #3b82f6; }
+    &.dot-blue { background-color: #06b6d4; }
     &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
@@ -2932,7 +3012,8 @@ onUnmounted(() => {
     width: auto !important;
 
     &.selected .custom-node {
-      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+      outline: 2px solid theme.$purple_1;
+      outline-offset: 2px;
     }
   }
 }
@@ -3003,7 +3084,7 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 
     &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
-    &.dot-blue { background: #dbeafe; color: #1d4ed8; }
+    &.dot-blue { background: #e0f7fa; color: #0e7490; }
     &.dot-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
     &.dot-red { background: #fee2e2; color: #b91c1c; }
     &.dot-amber { background: #fef3c7; color: #92400e; }
@@ -3071,7 +3152,7 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  &.blue-node { border-color: #3b82f6; }
+  &.blue-node { border-color: #06b6d4; }
   &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
   &.green-node { border-color: theme.$status_green; }
   &.red-node { border-color: theme.$status_red; }
@@ -3083,7 +3164,7 @@ onUnmounted(() => {
     &.has-files { border-color: theme.$status_green; }
     &.green-node { border-color: theme.$status_green; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #3b82f6; }
+    &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
@@ -3092,7 +3173,7 @@ onUnmounted(() => {
 
     &.green-node { border-color: theme.$status_green; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #3b82f6; }
+    &.blue-node { border-color: #06b6d4; }
 
     .node-body {
       margin-top: 6px;
@@ -3128,9 +3209,9 @@ onUnmounted(() => {
 }
 
 @keyframes node-pulse {
-  0% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
-  50% { background: #dbeafe; box-shadow: 0 0 18px rgba(59, 130, 246, 0.5); }
-  100% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
+  0% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
+  50% { background: #e0f7fa; box-shadow: 0 0 18px rgba(6, 182, 212, 0.5); }
+  100% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
 }
 
 /* Status dots */
@@ -3142,7 +3223,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &.dot-gray { background-color: theme.$gray_4; }
-  &.dot-blue { background-color: #3b82f6; }
+  &.dot-blue { background-color: #06b6d4; }
   &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
@@ -3154,10 +3235,9 @@ onUnmounted(() => {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 5px;
 
   &.dot-gray { background-color: theme.$gray_4; }
-  &.dot-blue { background-color: #3b82f6; }
+  &.dot-blue { background-color: #06b6d4; }
   &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
@@ -3655,7 +3735,7 @@ onUnmounted(() => {
   }
 
   &.ecs {
-    background: #dbeafe;
+    background: #e0f7fa;
     color: #1e40af;
   }
 }
@@ -3666,7 +3746,7 @@ onUnmounted(() => {
 
   &.dot-green { color: #15803d; }
   &.dot-red { color: #b91c1c; }
-  &.dot-blue { color: #1d4ed8; }
+  &.dot-blue { color: #0e7490; }
   &.dot-amber { color: #92400e; }
   &.dot-gray { color: theme.$gray_4; }
 }

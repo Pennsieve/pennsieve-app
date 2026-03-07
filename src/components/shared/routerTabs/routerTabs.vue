@@ -28,8 +28,12 @@ export default {
   },
   methods: {
     isTabActive(tab) {
-      const resolved = this.$router.resolve({ name: tab.to })
-      return this.$route.path.startsWith(resolved.path)
+      try {
+        const resolved = this.$router.resolve({ name: tab.to })
+        return this.$route.path.startsWith(resolved.path)
+      } catch {
+        return false
+      }
     },
   },
 }
