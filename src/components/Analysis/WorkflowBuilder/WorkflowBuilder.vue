@@ -17,7 +17,7 @@ import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { useMetricsExport } from "@/composables/useMetricsExport";
+import { useMetricsCounters } from "@/composables/useMetricsCounters";
 
 const {
   onNodeClick,
@@ -61,17 +61,22 @@ const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
 const metricsExpanded = ref(false);
 
-// Metrics summary for collapsed header (from parquet via DuckDB)
+// Metrics summary for collapsed header (from counters API)
 const metricsFilterValue = computed(() => selectedWorkflow.value?.uuid || "");
-const {
-  totalRuns: metricsTotalRuns,
-  medianDuration: metricsDuration,
-  medianCost: metricsCost,
-  isLoading: metricsLoading,
-} = useMetricsExport({
-  filterColumn: ref("workflowUuid"),
-  filterValue: metricsFilterValue,
-  viewerId: "wf_detail_inline_metrics",
+const { counters: wfCounters, isLoading: metricsLoading } = useMetricsCounters({
+  scope: ref("workflowUuid"),
+  id: metricsFilterValue,
+});
+const metricsTotalRuns = computed(() => wfCounters.value?.allTime?.totalRuns ?? 0);
+const metricsDuration = computed(() => {
+  const c = wfCounters.value?.allTime;
+  if (c && c.totalRuns) return c.totalDurationSec / c.totalRuns;
+  return null;
+});
+const metricsCost = computed(() => {
+  const c = wfCounters.value?.allTime;
+  if (c && c.totalRuns) return c.totalCost / c.totalRuns;
+  return null;
 });
 
 const formatDuration = (v) => {

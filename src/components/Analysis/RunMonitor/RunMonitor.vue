@@ -63,6 +63,7 @@ const filePickerAncestorList = ref([]);
 const logsDialogVisible = ref(false);
 const logsMessages = ref([]);
 const logsLoading = ref(false);
+const logsNodeId = ref("");
 const logsNodeLabel = ref("");
 
 // Metrics dialog state
@@ -102,10 +103,20 @@ const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
 
+const incomingEdgeColor = (nodeId) => {
+  const edge = edges.value.find((e) => e.target === nodeId);
+  return edge?.style?.stroke || "#cccccc";
+};
+
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   return tt?.computeTypes || [];
+};
+
+const getTargetTypeDefinition = (targetType) => {
+  if (!targetType) return null;
+  return targetTypes.value.find((t) => t.targetType === targetType) || null;
 };
 
 const profile = computed(() => store.state.profile);
@@ -833,7 +844,18 @@ const initiateWorkflow = async () => {
       if (d.type === "data-target") {
         const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
-        const targetParams = Object.entries(srcTargetParams).map(([key, value]) => ({ key, value: String(value) }));
+        const ttDef = getTargetTypeDefinition(d.targetType);
+        const paramDefs = ttDef?.params || [];
+
+        // Build params from the target type definition, pre-filling from rerun source or defaults
+        const targetParams = paramDefs.map((pd) => ({
+          name: pd.name,
+          type: pd.type || "string",
+          description: pd.description || "",
+          required: !!pd.required,
+          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
+        }));
+
         nodeConfigs[d.id] = {
           computeType: srcCfg?.executionTarget || d.computeType || fallback,
           targetType: d.targetType || null,
@@ -893,6 +915,22 @@ const cancelConfigure = () => {
   Execute Workflow — actually create the run
 */
 const executeWorkflow = async () => {
+  // Validate required data-target params before executing
+  const dag = configDefinition.value?.dag || [];
+  for (const [nodeId, cfg] of Object.entries(nodeConfigs)) {
+    const dagNode = dag.find((n) => n.id === nodeId);
+    if (dagNode?.type !== "data-target") continue;
+    const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
+    if (missing.length > 0) {
+      const nodeLabel = dagNode.targetType || nodeId;
+      const names = missing.map((p) => p.name).join(", ");
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
+      });
+      return;
+    }
+  }
+
   isExecuting.value = true;
   try {
     // Build dataSources map (top-level): { nodeId: { packageIds: [...] } }
@@ -944,7 +982,7 @@ const executeWorkflow = async () => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
         const obj = {};
-        cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
+        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
         if (Object.keys(obj).length > 0) {
           dataTargets[nodeId] = { params: obj };
         }
@@ -1112,6 +1150,7 @@ const removeParam = (nodeId, index) => {
 */
 const openLogs = async (nodeId, label) => {
   if (!selectedRun.value) return;
+  logsNodeId.value = nodeId;
   logsNodeLabel.value = label || nodeId;
   logsMessages.value = [];
   logsLoading.value = true;
@@ -1519,7 +1558,7 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc' }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
@@ -1580,7 +1619,7 @@ onUnmounted(() => {
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b' }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
@@ -1791,29 +1830,26 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
-                <!-- Per-node params -->
-                <div class="config-field">
+                <!-- Target type params -->
+                <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
                   <div
-                    v-for="(param, index) in nodeConfigs[selectedNode.id].params"
-                    :key="index"
-                    class="param-row"
+                    v-for="param in nodeConfigs[selectedNode.id].params"
+                    :key="param.name"
+                    class="target-param"
                   >
-                    <el-input
-                      v-model="param.key"
-                      size="small"
-                      placeholder="Key"
-                      class="param-key"
-                    />
+                    <div class="target-param-header">
+                      <span class="target-param-name">{{ param.name }}</span>
+                      <span v-if="param.required" class="target-param-required">required</span>
+                      <span v-else class="target-param-optional">optional</span>
+                    </div>
+                    <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
                     <el-input
                       v-model="param.value"
                       size="small"
-                      placeholder="Value"
-                      class="param-value"
+                      :placeholder="param.required ? 'Required' : 'Optional'"
                     />
-                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
                   </div>
-                  <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
                 </div>
               </div>
 
@@ -2288,6 +2324,12 @@ onUnmounted(() => {
       width="700px"
       :close-on-click-modal="true"
     >
+      <div class="logs-toolbar">
+        <button class="logs-refresh-btn" :disabled="logsLoading" @click="openLogs(logsNodeId, logsNodeLabel)">
+          <IconRotateRight :width="14" :height="14" />
+          Refresh
+        </button>
+      </div>
       <div class="logs-content">
         <div v-if="logsLoading" class="logs-loading">Loading logs...</div>
         <div v-else-if="logsMessages.length === 0" class="logs-empty">
@@ -2647,6 +2689,8 @@ onUnmounted(() => {
       top: -5px;
       left: 50% !important;
       transform: translateX(-50%) !important;
+      background: var(--handle-target-color, #cccccc) !important;
+      box-shadow: 0 0 0 1px var(--handle-target-color, #cccccc);
     }
 
     &.vue-flow__handle-bottom {
@@ -3520,6 +3564,47 @@ onUnmounted(() => {
   }
 }
 
+.target-param {
+  margin-bottom: 10px;
+  padding: 8px;
+  background: theme.$gray_1;
+  border-radius: 4px;
+}
+
+.target-param-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.target-param-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$black;
+}
+
+.target-param-required {
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$status_red;
+  text-transform: uppercase;
+}
+
+.target-param-optional {
+  font-size: 10px;
+  font-weight: 500;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+}
+
+.target-param-description {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
 /* Dialogs */
 .run-dialog-footer {
   display: flex;
@@ -3782,6 +3867,35 @@ onUnmounted(() => {
 }
 
 /* Logs dialog */
+.logs-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.logs-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
 .logs-content {
   min-height: 200px;
   max-height: 500px;
@@ -3826,6 +3940,12 @@ onUnmounted(() => {
 .log-message {
   color: theme.$black;
   word-break: break-word;
+}
+
+:deep(.el-dialog__footer) {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Wizard dialog */
