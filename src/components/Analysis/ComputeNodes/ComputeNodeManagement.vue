@@ -1,52 +1,77 @@
 <script setup>
-import { reactive, ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
-import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
-import IconInfo from '@/components/icons/IconInfo.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
-import IconPerson from '@/components/icons/IconPerson.vue'
-import IconTeam from '@/components/icons/IconTeam.vue'
+import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
+import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useStore()
+const computeResourcesStore = useComputeResourcesStore()
+
 const profile = computed(() => store.state.profile)
 const activeOrganization = computed(() => store.getters.activeOrganization)
 const orgMembers = computed(() => store.state.orgMembers || [])
 const teams = computed(() => store.state.teams || [])
 
+// Route params
+const nodeUuid = computed(() => route.params.nodeId)
+const orgId = computed(() => route.params.orgId)
+
 // Component state
 const computeNode = ref(null)
-const permissions = ref(null)
 const isLoading = ref(false)
 const isUpdating = ref(false)
 const isEditingInfo = ref(false)
 const editingData = ref({})
+const showDestroyDialog = ref(false)
+const isDestroying = ref(false)
 
-// Permission management state
-const accessScope = ref('private')
-const sharedUsers = ref([])
-const sharedTeams = ref([])
+// Permissions via Pinia store
+const nodePermissions = computed(() => computeResourcesStore.getNodePermissions(nodeUuid.value))
+const isLoadingPermissions = computed(() => computeResourcesStore.isNodePermissionsLoading(nodeUuid.value))
+const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(nodeUuid.value))
+
+const localAccessScope = ref('private')
+const isUpdatingScope = ref(false)
+const sharedUsers = computed(() => nodePermissions.value?.sharedWithUsers || [])
+const sharedTeams = computed(() => nodePermissions.value?.sharedWithTeams || [])
+
+// Dialog state
 const showAddUserDialog = ref(false)
 const showAddTeamDialog = ref(false)
 const selectedUserId = ref('')
 const selectedTeamId = ref('')
-const isUpdatingPermissions = ref(false)
 
-// Get node UUID from route
-const nodeUuid = computed(() => route.params.nodeId)
-const orgId = computed(() => route.params.orgId)
+// Check if current user is the owner of the node
+const isNodeOwner = computed(() => {
+  return computeNode.value?.ownerId === profile.value?.id
+})
 
-// Get current organization from store
-const currentOrganization = computed(() => store.getters.activeOrganization?.organization)
+const canManagePermissions = computed(() => isNodeOwner.value)
 
-// Check if user has admin rights
+const deploymentModeDescription = computed(() => {
+  const mode = (computeNode.value?.deploymentMode || 'basic').toLowerCase()
+  switch (mode) {
+    case 'basic':
+      return 'A cost-effective setup ideal for development and testing. Processors have direct internet access and use standard encryption. Best suited for non-production workloads and proof-of-concepts.'
+    case 'secure':
+      return 'A production-ready setup with enhanced security. Processors run in an isolated network with controlled internet access. All data is encrypted with dedicated keys, and network activity is logged for auditing.'
+    case 'compliant':
+      return 'Designed for regulated environments such as healthcare and government. Processors have no internet access — all communication stays within the cloud provider\'s private network. Includes dedicated encryption keys and full network audit logging. Suitable for HIPAA and NIST 800-171 compliance.'
+    default:
+      return ''
+  }
+})
+
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
     return activeOrganization.value.isAdmin || activeOrganization.value.isOwner
@@ -54,42 +79,50 @@ const hasAdminRights = computed(() => {
   return false
 })
 
-// Check if current user is the owner of the node
-const isNodeOwner = computed(() => {
-  return computeNode.value?.userId === profile.value?.id
-})
-
-// Check if user can manage permissions (must be owner)
-const canManagePermissions = computed(() => isNodeOwner.value)
-
 // Available users for sharing (exclude owner and already shared users)
 const availableUsers = computed(() => {
   if (!computeNode.value) return []
-  const ownerId = computeNode.value.userId
   const sharedUserIds = new Set(sharedUsers.value)
-  return orgMembers.value.filter(member => 
-    member.id !== ownerId && !sharedUserIds.has(member.id)
+  return orgMembers.value.filter(member =>
+    !sharedUserIds.has(member.id) &&
+    member.id !== profile.value?.id
   )
 })
 
 // Available teams for sharing (exclude already shared teams)
 const availableTeams = computed(() => {
   const sharedTeamIds = new Set(sharedTeams.value)
-  return teams.value.filter(team => !sharedTeamIds.has(team.id))
+  return teams.value.filter(team => !sharedTeamIds.has(team.team.id))
 })
 
-// Format account ID for display
-const formatAccountId = (accountId) => {
+// Sync localAccessScope with store data
+watch(nodePermissions, (newPermissions) => {
+  if (!isUpdatingScope.value && newPermissions && typeof newPermissions === 'object' && !newPermissions.error) {
+    if (newPermissions.hasOwnProperty('accessScope')) {
+      localAccessScope.value = newPermissions.accessScope || 'private'
+    }
+  }
+}, { immediate: true })
+
+// Helpers
+async function copyUuid() {
+  try {
+    await navigator.clipboard.writeText(computeNode.value.uuid)
+    ElMessage.success('UUID copied to clipboard')
+  } catch {
+    ElMessage.error('Failed to copy')
+  }
+}
+
+function formatAccountId(accountId) {
   if (!accountId) return ''
-  // Add dashes for AWS account IDs (12 digits)
   if (accountId.length === 12) {
     return `${accountId.slice(0, 4)}-${accountId.slice(4, 8)}-${accountId.slice(8)}`
   }
   return accountId
 }
 
-// Format date
-const formatDate = (dateString) => {
+function formatDate(dateString) {
   if (!dateString) return 'N/A'
   try {
     const date = new Date(dateString)
@@ -105,33 +138,24 @@ const formatDate = (dateString) => {
   }
 }
 
-// Get user name from org members
-const getUserName = (userId) => {
+function getUserName(userId) {
   if (!userId) return 'Unknown'
-  
-  // Check if it's the current user
-  if (profile.value && profile.value.id === userId) {
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
     return `${profile.value.firstName} ${profile.value.lastName}`.trim() || 'You'
   }
-  
-  // Look for user in org members
-  const member = orgMembers.value.find(m => m.id === userId)
+  const member = orgMembers.value.find(m => m.id === userId || m.intId === userId)
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || 'Unknown User'
   }
-  
-  // Return the user ID if we can't find the name
-  return userId.split(':').pop() || userId
+  return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
-// Get team name
-const getTeamName = (teamId) => {
-  const team = teams.value.find(t => t.id === teamId)
-  return team ? team.name : teamId.split(':').pop() || teamId
+function getTeamName(teamId) {
+  const team = teams.value.find(t => t.team.id === teamId)
+  return team ? team.team.name : 'Unknown Team'
 }
 
-// Get account type label
-const getAccountTypeLabel = (type) => {
+function getAccountTypeLabel(type) {
   switch (type) {
     case 'AWS': return 'Amazon Web Services'
     case 'GCP': return 'Google Cloud Platform'
@@ -140,28 +164,22 @@ const getAccountTypeLabel = (type) => {
   }
 }
 
-// Get status for node
-const getStatusForNode = (node) => {
-  return node?.status || 'Enabled'
-}
-
-// Get access scope label
-const getAccessScopeLabel = (scope) => {
-  switch (scope) {
-    case 'private':
-      return 'Private - Only you can access this node'
-    case 'workspace':
-      return 'Workspace - All workspace members can access this node'
-    case 'shared':
-      return 'Shared - Specific users and teams can access this node'
-    default:
-      return 'Unknown'
+function getStatusForNode(node) {
+  if (!node?.status) return 'Pending'
+  const status = node.status.toLowerCase()
+  switch (status) {
+    case 'pending': return 'Pending'
+    case 'enabled': case 'active': case 'running': case 'ready': return 'Enabled'
+    case 'paused': case 'stopped': case 'disabled': return 'Paused'
+    case 'destroying': return 'Destroying'
+    default: return 'Pending'
   }
 }
 
-onMounted(() => {
-  fetchComputeNode()
-  fetchPermissions()
+// Data fetching
+onMounted(async () => {
+  await fetchComputeNode()
+  await computeResourcesStore.fetchNodePermissions(nodeUuid.value)
 })
 
 async function fetchComputeNode() {
@@ -169,7 +187,6 @@ async function fetchComputeNode() {
   try {
     const token = await useGetToken()
     const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}`
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -177,13 +194,10 @@ async function fetchComputeNode() {
         'Content-Type': 'application/json'
       }
     })
-    
     if (response.ok) {
       computeNode.value = await response.json()
     } else {
-      console.error('Failed to fetch compute node:', response.status, response.statusText)
       ElMessage.error('Failed to load compute node details')
-      // Navigate back to list
       router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
     }
   } catch (error) {
@@ -195,43 +209,12 @@ async function fetchComputeNode() {
   }
 }
 
-async function fetchPermissions() {
-  try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      permissions.value = data
-      accessScope.value = data.accessScope || 'private'
-      sharedUsers.value = data.sharedWithUsers || []
-      sharedTeams.value = data.sharedWithTeams || []
-    } else if (response.status === 403) {
-      // User doesn't have permission to view permissions
-      console.log('User cannot view permissions for this node')
-    } else {
-      console.error('Failed to fetch permissions:', response.status, response.statusText)
-    }
-  } catch (error) {
-    console.error('Failed to fetch permissions:', error)
-  }
-}
-
-
+// Node info editing
 function startEditingInfo() {
   isEditingInfo.value = true
   editingData.value = {
     name: computeNode.value.name || '',
-    description: computeNode.value.description || '',
-    status: computeNode.value.status || 'Enabled'
+    description: computeNode.value.description || ''
   }
 }
 
@@ -243,31 +226,14 @@ function cancelEditingInfo() {
 async function saveNodeInfo() {
   isUpdating.value = true
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}`
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: editingData.value.name,
-        description: editingData.value.description,
-        // Note: Status updates might need different endpoint/method
-      })
+    await computeResourcesStore.updateComputeNode(nodeUuid.value, {
+      name: editingData.value.name || null,
+      description: editingData.value.description || null
     })
-    
-    if (response.ok) {
-      const updatedNode = await response.json()
-      computeNode.value = { ...computeNode.value, ...updatedNode }
-      cancelEditingInfo()
-      ElMessage.success('Compute node updated successfully')
-    } else {
-      console.error('Failed to update node:', response.status, response.statusText)
-      ElMessage.error('Failed to update compute node')
-    }
+    // Refresh local data
+    await fetchComputeNode()
+    cancelEditingInfo()
+    ElMessage.success('Compute node updated successfully')
   } catch (error) {
     console.error('Failed to update node:', error)
     ElMessage.error('Failed to update compute node')
@@ -276,183 +242,29 @@ async function saveNodeInfo() {
   }
 }
 
-async function updateAccessScope(newScope) {
-  isUpdatingPermissions.value = true
+// Status management
+async function updateStatus(newStatus) {
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions`
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        accessScope: newScope
-      })
-    })
-    
-    if (response.ok) {
-      const updatedPermissions = await response.json()
-      permissions.value = updatedPermissions
-      accessScope.value = newScope
-      
-      // Clear shared lists if switching to private or workspace
-      if (newScope === 'private') {
-        sharedUsers.value = []
-        sharedTeams.value = []
-      }
-      
-      ElMessage.success(`Access scope updated to ${newScope}`)
-    } else {
-      console.error('Failed to update access scope:', response.status, response.statusText)
-      ElMessage.error('Failed to update access scope')
-      // Revert the change
-      accessScope.value = permissions.value?.accessScope || 'private'
-    }
+    await computeResourcesStore.updateComputeNodeStatus(nodeUuid.value, newStatus)
+    computeNode.value = { ...computeNode.value, status: newStatus }
+    ElMessage.success(`Status updated to ${newStatus}`)
   } catch (error) {
-    console.error('Failed to update access scope:', error)
+    console.error('Failed to update status:', error)
+    ElMessage.error('Failed to update compute node status')
+  }
+}
+
+// Permissions management
+async function handleAccessScopeChange(newValue) {
+  isUpdatingScope.value = true
+  try {
+    await computeResourcesStore.updateAccessScope(nodeUuid.value, newValue)
+    ElMessage.success(`Access scope updated to ${newValue}`)
+  } catch (error) {
+    localAccessScope.value = nodePermissions.value?.accessScope || 'private'
     ElMessage.error('Failed to update access scope')
-    accessScope.value = permissions.value?.accessScope || 'private'
   } finally {
-    isUpdatingPermissions.value = false
-  }
-}
-
-async function addUserAccess() {
-  if (!selectedUserId.value) return
-  
-  isUpdatingPermissions.value = true
-  try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions/users`
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: selectedUserId.value
-      })
-    })
-    
-    if (response.ok) {
-      sharedUsers.value.push(selectedUserId.value)
-      // If scope was private or workspace, it should now be shared
-      if (accessScope.value !== 'shared') {
-        accessScope.value = 'shared'
-      }
-      ElMessage.success('User access granted successfully')
-      closeAddUserDialog()
-    } else {
-      console.error('Failed to add user access:', response.status, response.statusText)
-      ElMessage.error('Failed to grant user access')
-    }
-  } catch (error) {
-    console.error('Failed to add user access:', error)
-    ElMessage.error('Failed to grant user access')
-  } finally {
-    isUpdatingPermissions.value = false
-  }
-}
-
-async function removeUserAccess(userId) {
-  isUpdatingPermissions.value = true
-  try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions/users/${userId}`
-    
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      sharedUsers.value = sharedUsers.value.filter(id => id !== userId)
-      ElMessage.success('User access revoked successfully')
-    } else {
-      console.error('Failed to remove user access:', response.status, response.statusText)
-      ElMessage.error('Failed to revoke user access')
-    }
-  } catch (error) {
-    console.error('Failed to remove user access:', error)
-    ElMessage.error('Failed to revoke user access')
-  } finally {
-    isUpdatingPermissions.value = false
-  }
-}
-
-async function addTeamAccess() {
-  if (!selectedTeamId.value) return
-  
-  isUpdatingPermissions.value = true
-  try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions/teams`
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        teamId: selectedTeamId.value
-      })
-    })
-    
-    if (response.ok) {
-      sharedTeams.value.push(selectedTeamId.value)
-      // If scope was private or workspace, it should now be shared
-      if (accessScope.value !== 'shared') {
-        accessScope.value = 'shared'
-      }
-      ElMessage.success('Team access granted successfully')
-      closeAddTeamDialog()
-    } else {
-      console.error('Failed to add team access:', response.status, response.statusText)
-      ElMessage.error('Failed to grant team access')
-    }
-  } catch (error) {
-    console.error('Failed to add team access:', error)
-    ElMessage.error('Failed to grant team access')
-  } finally {
-    isUpdatingPermissions.value = false
-  }
-}
-
-async function removeTeamAccess(teamId) {
-  isUpdatingPermissions.value = true
-  try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid.value}/permissions/teams/${teamId}`
-    
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      sharedTeams.value = sharedTeams.value.filter(id => id !== teamId)
-      ElMessage.success('Team access revoked successfully')
-    } else {
-      console.error('Failed to remove team access:', response.status, response.statusText)
-      ElMessage.error('Failed to revoke team access')
-    }
-  } catch (error) {
-    console.error('Failed to remove team access:', error)
-    ElMessage.error('Failed to revoke team access')
-  } finally {
-    isUpdatingPermissions.value = false
+    isUpdatingScope.value = false
   }
 }
 
@@ -460,40 +272,103 @@ function openAddUserDialog() {
   selectedUserId.value = ''
   showAddUserDialog.value = true
 }
-
 function closeAddUserDialog() {
   selectedUserId.value = ''
   showAddUserDialog.value = false
 }
-
 function openAddTeamDialog() {
   selectedTeamId.value = ''
   showAddTeamDialog.value = true
 }
-
 function closeAddTeamDialog() {
   selectedTeamId.value = ''
   showAddTeamDialog.value = false
 }
 
-function goBack() {
-  router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
+async function addUserAccess() {
+  if (!selectedUserId.value) return
+  try {
+    await computeResourcesStore.addUserAccess(nodeUuid.value, selectedUserId.value)
+    ElMessage.success('User access granted successfully')
+    closeAddUserDialog()
+  } catch (error) {
+    ElMessage.error('Failed to grant user access')
+  }
 }
+
+async function removeUserAccess(userId) {
+  try {
+    await computeResourcesStore.removeUserAccess(nodeUuid.value, userId)
+    ElMessage.success('User access revoked successfully')
+  } catch (error) {
+    ElMessage.error('Failed to revoke user access')
+  }
+}
+
+async function addTeamAccess() {
+  if (!selectedTeamId.value) return
+  try {
+    await computeResourcesStore.addTeamAccess(nodeUuid.value, selectedTeamId.value)
+    ElMessage.success('Team access granted successfully')
+    closeAddTeamDialog()
+  } catch (error) {
+    ElMessage.error('Failed to grant team access')
+  }
+}
+
+async function removeTeamAccess(teamId) {
+  try {
+    await computeResourcesStore.removeTeamAccess(nodeUuid.value, teamId)
+    ElMessage.success('Team access revoked successfully')
+  } catch (error) {
+    ElMessage.error('Failed to revoke team access')
+  }
+}
+
+// Destroy node
+async function confirmDestroyNode() {
+  isDestroying.value = true
+  try {
+    await computeResourcesStore.deleteComputeNode(nodeUuid.value)
+    ElMessage.success('Compute node destroyed successfully')
+    showDestroyDialog.value = false
+    router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
+  } catch (error) {
+    console.error('Failed to destroy compute node:', error)
+    ElMessage.error('Failed to destroy compute node')
+  } finally {
+    isDestroying.value = false
+  }
+}
+
+
 </script>
 
 <template>
   <bf-stage element-loading-background="transparent" v-loading="isLoading">
-    <template #actions>
-      <bf-button @click="goBack" class="secondary">
-        <IconArrowLeft :width="16" :height="16" style="margin-right: 4px;" />
-        Back to Compute Nodes
-      </bf-button>
-    </template>
-    
     <div class="compute-node-management" v-if="computeNode">
       <!-- Node Header -->
       <div class="node-header-section">
-        <h1>{{ computeNode.name }}</h1>
+        <div class="node-header-top">
+          <h1>{{ computeNode.name }}</h1>
+          <div class="node-header-right">
+            <div class="node-status-control" v-if="canManagePermissions && getStatusForNode(computeNode) !== 'Pending' && getStatusForNode(computeNode) !== 'Destroying'">
+              <el-select
+                :model-value="getStatusForNode(computeNode)"
+                @change="updateStatus"
+                :loading="isUpdatingPermissions"
+                size="default"
+                :class="['status-select', getStatusForNode(computeNode).toLowerCase()]"
+              >
+                <el-option label="Enabled" value="Enabled" />
+                <el-option label="Paused" value="Paused" />
+              </el-select>
+            </div>
+            <span v-else class="status-badge" :class="getStatusForNode(computeNode).toLowerCase()">
+              {{ getStatusForNode(computeNode) }}
+            </span>
+          </div>
+        </div>
         <p class="node-subtitle">
           {{ getAccountTypeLabel(computeNode.account?.accountType) }} Compute Node
         </p>
@@ -507,23 +382,23 @@ function goBack() {
         <div class="section-header">
           <h2>Node Information</h2>
           <div class="section-actions">
-            <bf-button 
-              v-if="!isEditingInfo && hasAdminRights" 
-              @click="startEditingInfo" 
+            <bf-button
+              v-if="!isEditingInfo && canManagePermissions"
+              @click="startEditingInfo"
               class="secondary small"
             >
               Edit
             </bf-button>
             <div v-else-if="isEditingInfo" class="edit-actions">
-              <bf-button 
-                @click="saveNodeInfo" 
+              <bf-button
+                @click="saveNodeInfo"
                 :loading="isUpdating"
                 class="primary small"
               >
                 Save
               </bf-button>
-              <bf-button 
-                @click="cancelEditingInfo" 
+              <bf-button
+                @click="cancelEditingInfo"
                 class="secondary small"
               >
                 Cancel
@@ -531,24 +406,16 @@ function goBack() {
             </div>
           </div>
         </div>
-        
+
         <div class="info-content">
-          <!-- Editable Name -->
           <div class="info-row">
             <span class="info-label">Name:</span>
-            <span class="info-value" v-if="!isEditingInfo">
-              {{ computeNode.name }}
-            </span>
+            <span class="info-value" v-if="!isEditingInfo">{{ computeNode.name }}</span>
             <div class="info-value" v-else>
-              <el-input 
-                v-model="editingData.name"
-                placeholder="Enter node name"
-                size="default"
-              />
+              <el-input v-model="editingData.name" placeholder="Enter node name" size="default" />
             </div>
           </div>
-          
-          <!-- Editable Description -->
+
           <div class="info-row">
             <span class="info-label">Description:</span>
             <span class="info-value" v-if="!isEditingInfo">
@@ -556,17 +423,10 @@ function goBack() {
               <span v-else class="empty-value">No description set</span>
             </span>
             <div class="info-value" v-else>
-              <el-input 
-                v-model="editingData.description"
-                type="textarea"
-                placeholder="Enter node description"
-                :rows="3"
-                size="default"
-              />
+              <el-input v-model="editingData.description" type="textarea" placeholder="Enter node description" :rows="3" size="default" />
             </div>
           </div>
-          
-          <!-- Status -->
+
           <div class="info-row">
             <span class="info-label">Status:</span>
             <span class="info-value">
@@ -575,38 +435,32 @@ function goBack() {
               </span>
             </span>
           </div>
-          
-          <!-- Account Information -->
+
           <div class="info-row">
             <span class="info-label">Account Type:</span>
             <span class="info-value">{{ getAccountTypeLabel(computeNode.account?.accountType) }}</span>
           </div>
-          
+
           <div class="info-row">
             <span class="info-label">Account ID:</span>
             <span class="info-value mono">{{ formatAccountId(computeNode.account?.accountId) }}</span>
           </div>
-          
-          <div class="info-row">
-            <span class="info-label">Node Identifier:</span>
-            <span class="info-value mono">{{ computeNode.identifier }}</span>
-          </div>
-          
+
           <div class="info-row">
             <span class="info-label">Node UUID:</span>
-            <span class="info-value mono">{{ computeNode.uuid }}</span>
+            <span class="info-value mono">
+              {{ computeNode.uuid }}
+              <button class="copy-button" @click="copyUuid" title="Copy to clipboard">
+                <IconCopyDocument :width="14" :height="14" />
+              </button>
+            </span>
           </div>
-          
-          <div class="info-row">
-            <span class="info-label">Gateway URL:</span>
-            <span class="info-value mono">{{ computeNode.computeNodeGatewayUrl || 'N/A' }}</span>
-          </div>
-          
+
           <div class="info-row">
             <span class="info-label">Created By:</span>
-            <span class="info-value">{{ getUserName(computeNode.userId) }}</span>
+            <span class="info-value">{{ getUserName(computeNode.ownerId || computeNode.userId) }}</span>
           </div>
-          
+
           <div class="info-row">
             <span class="info-label">Created At:</span>
             <span class="info-value">{{ formatDate(computeNode.createdAt) }}</span>
@@ -614,165 +468,181 @@ function goBack() {
         </div>
       </div>
 
-      <!-- Permissions Section -->
-      <div class="management-section" v-if="canManagePermissions">
+      <!-- Deployment Configuration Section -->
+      <div class="management-section">
         <div class="section-header">
-          <h2>Access & Permissions</h2>
-          <el-tooltip 
-            content="Only the node owner can manage permissions"
-            placement="top"
-            v-if="!canManagePermissions"
-          >
-            <IconInfo :width="16" :height="16" class="info-icon" />
-          </el-tooltip>
+          <h2>Deployment Configuration</h2>
         </div>
-        
-        <div class="permissions-content">
-          <!-- Access Scope Selection -->
-          <div class="access-scope-section">
-            <h3>Access Scope</h3>
-            <el-radio-group 
-              v-model="accessScope" 
-              @change="updateAccessScope"
-              :disabled="!canManagePermissions || isUpdatingPermissions"
-              class="scope-radio-group"
-            >
-              <el-radio value="private" class="scope-radio">
-                <div class="scope-option">
-                  <div class="scope-title">Private</div>
-                  <div class="scope-description">Only you can access this compute node</div>
-                </div>
-              </el-radio>
-              <el-radio value="workspace" class="scope-radio">
-                <div class="scope-option">
-                  <div class="scope-title">Workspace</div>
-                  <div class="scope-description">All members of this workspace can access this compute node</div>
-                </div>
-              </el-radio>
-              <el-radio value="shared" class="scope-radio">
-                <div class="scope-option">
-                  <div class="scope-title">Shared</div>
-                  <div class="scope-description">Share with specific users and teams</div>
-                </div>
-              </el-radio>
-            </el-radio-group>
+        <div class="info-content">
+          <div class="info-row">
+            <span class="info-label">Mode:</span>
+            <span class="info-value">
+              <span class="deployment-mode-detail">
+                <span class="mode-header">
+                  <span class="tag" :class="computeNode.deploymentMode || 'basic'">
+                    {{ (computeNode.deploymentMode || 'basic').charAt(0).toUpperCase() + (computeNode.deploymentMode || 'basic').slice(1) }}
+                  </span>
+                </span>
+                <span class="mode-explanation">{{ deploymentModeDescription }}</span>
+              </span>
+            </span>
           </div>
 
-          <!-- Shared Users and Teams (only visible when scope is 'shared') -->
-          <div v-if="accessScope === 'shared'" class="sharing-section">
-            <!-- Shared Users -->
-            <div class="shared-subsection">
-              <div class="subsection-header">
-                <h3>
-                  <IconPerson :width="18" :height="18" style="margin-right: 6px; vertical-align: middle;" />
-                  Shared Users
-                </h3>
-                <bf-button 
-                  @click="openAddUserDialog"
-                  :disabled="!canManagePermissions"
-                  class="small primary"
-                >
-                  Add User
-                </bf-button>
-              </div>
-              
-              <div v-if="sharedUsers.length > 0" class="shared-list">
-                <div 
-                  v-for="userId in sharedUsers" 
-                  :key="userId"
-                  class="shared-item"
-                >
-                  <span class="shared-name">{{ getUserName(userId) }}</span>
-                  <button 
-                    @click="removeUserAccess(userId)"
-                    :disabled="!canManagePermissions || isUpdatingPermissions"
-                    class="remove-button"
-                    title="Remove access"
-                  >
-                    <IconRemove :width="16" :height="16" />
-                  </button>
-                </div>
-              </div>
-              <div v-else class="empty-shared">
-                No users have been granted access yet
-              </div>
-            </div>
+          <div class="info-row">
+            <span class="info-label">LLM Access:</span>
+            <span class="info-value">
+              <span class="deployment-mode-detail">
+                <span class="mode-header">
+                  <span v-if="computeNode.enableLLMAccess" class="tag llm">Enabled</span>
+                  <span v-else class="tag disabled">Disabled</span>
+                </span>
+                <span class="mode-explanation" v-if="computeNode.enableLLMAccess">
+                  Workflows on this node can use large language models for AI-powered processing.
+                </span>
+                <span class="mode-explanation" v-else>
+                  LLM-based processors are not available on this node.
+                </span>
+              </span>
+            </span>
+          </div>
 
-            <!-- Shared Teams -->
-            <div class="shared-subsection">
-              <div class="subsection-header">
-                <h3>
-                  <IconTeam :width="18" :height="18" style="margin-right: 6px; vertical-align: middle;" />
-                  Shared Teams
-                </h3>
-                <bf-button 
-                  @click="openAddTeamDialog"
-                  :disabled="!canManagePermissions"
-                  class="small primary"
-                >
-                  Add Team
-                </bf-button>
-              </div>
-              
-              <div v-if="sharedTeams.length > 0" class="shared-list">
-                <div 
-                  v-for="teamId in sharedTeams" 
-                  :key="teamId"
-                  class="shared-item"
-                >
-                  <span class="shared-name">{{ getTeamName(teamId) }}</span>
-                  <button 
-                    @click="removeTeamAccess(teamId)"
-                    :disabled="!canManagePermissions || isUpdatingPermissions"
-                    class="remove-button"
-                    title="Remove access"
-                  >
-                    <IconRemove :width="16" :height="16" />
-                  </button>
-                </div>
-              </div>
-              <div v-else class="empty-shared">
-                No teams have been granted access yet
-              </div>
-            </div>
+          <div class="info-row" v-if="computeNode.provisionerImage">
+            <span class="info-label">Provisioner:</span>
+            <span class="info-value mono">{{ computeNode.provisionerImage }}:{{ computeNode.provisionerImageTag }}</span>
           </div>
         </div>
       </div>
 
-      <!-- No permissions message -->
-      <div class="management-section" v-else-if="permissions && !canManagePermissions">
+      <!-- Access & Permissions Section -->
+      <div class="management-section" v-loading="isLoadingPermissions">
         <div class="section-header">
           <h2>Access & Permissions</h2>
         </div>
-        <div class="no-permissions-message">
-          <p>Only the owner of this compute node can manage permissions.</p>
-          <p>Current owner: <strong>{{ getUserName(computeNode.userId) }}</strong></p>
+
+        <div class="permissions-content" v-if="!isLoadingPermissions && (canManagePermissions || nodePermissions.accessScope)">
+          <div class="info-content">
+            <div class="info-row" v-if="nodePermissions.owner">
+              <span class="info-label">Owner:</span>
+              <span class="info-value">{{ getUserName(nodePermissions.owner) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Access Scope:</span>
+              <span class="info-value">
+                <el-select
+                  v-if="canManagePermissions"
+                  v-model="localAccessScope"
+                  @change="handleAccessScopeChange"
+                  :loading="isUpdatingPermissions"
+                  size="small"
+                  class="access-scope-select"
+                >
+                  <el-option label="Private - Only I can access" value="private" />
+                  <el-option label="Workspace - All workspace members can access" value="workspace" />
+                  <el-option label="Shared - Specific users and teams" value="shared" />
+                </el-select>
+                <span v-else class="access-scope-badge" :class="localAccessScope">
+                  {{ localAccessScope === 'private' ? 'Private' : localAccessScope === 'workspace' ? 'Workspace' : 'Shared' }}
+                </span>
+                <span v-if="!canManagePermissions" class="scope-description-text">
+                  <span v-if="localAccessScope === 'private'">Only the owner can access this compute node</span>
+                  <span v-else-if="localAccessScope === 'workspace'">All workspace members can access this compute node</span>
+                  <span v-else>Shared with specific users and teams</span>
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Shared Users -->
+          <div v-if="localAccessScope === 'shared'" class="sharing-section">
+            <div class="shared-subsection">
+              <div class="subsection-header">
+                <h3>Shared Users</h3>
+                <bf-button @click="openAddUserDialog" v-if="canManagePermissions" class="small primary">
+                  Add User
+                </bf-button>
+              </div>
+              <div v-if="sharedUsers.length > 0" class="shared-list">
+                <div v-for="userId in sharedUsers" :key="userId" class="shared-item">
+                  <span class="shared-name">{{ getUserName(userId) }}</span>
+                  <button
+                    v-if="canManagePermissions"
+                    @click="removeUserAccess(userId)"
+                    :disabled="isUpdatingPermissions"
+                    class="remove-button"
+                    title="Remove access"
+                  >
+                    <IconRemove :width="16" :height="16" />
+                  </button>
+                </div>
+              </div>
+              <div v-else class="empty-shared">No users have been granted access yet</div>
+            </div>
+
+            <div class="shared-subsection">
+              <div class="subsection-header">
+                <h3>Shared Teams</h3>
+                <bf-button @click="openAddTeamDialog" v-if="canManagePermissions" class="small primary">
+                  Add Team
+                </bf-button>
+              </div>
+              <div v-if="sharedTeams.length > 0" class="shared-list">
+                <div v-for="teamId in sharedTeams" :key="teamId" class="shared-item">
+                  <span class="shared-name">{{ getTeamName(teamId) }}</span>
+                  <button
+                    v-if="canManagePermissions"
+                    @click="removeTeamAccess(teamId)"
+                    :disabled="isUpdatingPermissions"
+                    class="remove-button"
+                    title="Remove access"
+                  >
+                    <IconRemove :width="16" :height="16" />
+                  </button>
+                </div>
+              </div>
+              <div v-else class="empty-shared">No teams have been granted access yet</div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="!isLoadingPermissions && !canManagePermissions && !nodePermissions.accessScope" class="no-permissions-message">
+          <p>You don't have permission to view or manage access settings for this compute node.</p>
+        </div>
+      </div>
+
+      <!-- Secrets Section -->
+      <div class="management-section">
+        <div class="section-header">
+          <h2>Secrets</h2>
+        </div>
+        <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="management-section danger-section" v-if="canManagePermissions">
+        <div class="section-header">
+          <h2>Danger Zone</h2>
+        </div>
+        <div class="destroy-content">
+          <div class="destroy-info">
+            <p>Permanently destroy this compute node and all its associated infrastructure.</p>
+          </div>
+          <bf-button
+            @click="showDestroyDialog = true"
+            :disabled="isDestroying"
+            class="danger-button"
+          >
+            Destroy Compute Node
+          </bf-button>
         </div>
       </div>
     </div>
 
     <!-- Add User Dialog -->
-    <el-dialog
-      v-model="showAddUserDialog"
-      title="Add User Access"
-      width="500px"
-      :close-on-click-modal="true"
-    >
+    <el-dialog v-model="showAddUserDialog" title="Add User Access" width="500px" :close-on-click-modal="true">
       <div class="add-access-dialog">
         <p>Select a user to grant access to this compute node:</p>
-        <el-select
-          v-model="selectedUserId"
-          placeholder="Select a user"
-          style="width: 100%"
-          size="default"
-          filterable
-        >
-          <el-option
-            v-for="user in availableUsers"
-            :key="user.id"
-            :label="`${user.firstName} ${user.lastName}`"
-            :value="user.id"
-          >
+        <el-select v-model="selectedUserId" placeholder="Select a user" style="width: 100%" size="default" filterable>
+          <el-option v-for="user in availableUsers" :key="user.id" :label="`${user.firstName} ${user.lastName}`" :value="user.id">
             <div class="user-option">
               <span class="user-name">{{ user.firstName }} {{ user.lastName }}</span>
               <span class="user-email">{{ user.email }}</span>
@@ -780,62 +650,57 @@ function goBack() {
           </el-option>
         </el-select>
       </div>
-      
       <template #footer>
         <div class="dialog-footer">
-          <bf-button @click="closeAddUserDialog" class="secondary">
-            Cancel
-          </bf-button>
-          <bf-button 
-            @click="addUserAccess" 
-            :loading="isUpdatingPermissions"
-            :disabled="!selectedUserId"
-            class="primary"
-          >
+          <el-button @click="closeAddUserDialog">Cancel</el-button>
+          <el-button type="primary" @click="addUserAccess" :disabled="!selectedUserId" :loading="isUpdatingPermissions">
             Grant Access
-          </bf-button>
+          </el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- Add Team Dialog -->
-    <el-dialog
-      v-model="showAddTeamDialog"
-      title="Add Team Access"
-      width="500px"
-      :close-on-click-modal="true"
-    >
+    <el-dialog v-model="showAddTeamDialog" title="Add Team Access" width="500px" :close-on-click-modal="true">
       <div class="add-access-dialog">
         <p>Select a team to grant access to this compute node:</p>
-        <el-select
-          v-model="selectedTeamId"
-          placeholder="Select a team"
-          style="width: 100%"
-          size="default"
-          filterable
-        >
-          <el-option
-            v-for="team in availableTeams"
-            :key="team.id"
-            :label="team.name"
-            :value="team.id"
-          />
+        <el-select v-model="selectedTeamId" placeholder="Select a team" style="width: 100%" size="default" filterable>
+          <el-option v-for="team in availableTeams" :key="team.team.id" :label="team.team.name" :value="team.team.id" />
         </el-select>
       </div>
-      
       <template #footer>
         <div class="dialog-footer">
-          <bf-button @click="closeAddTeamDialog" class="secondary">
-            Cancel
-          </bf-button>
-          <bf-button 
-            @click="addTeamAccess" 
-            :loading="isUpdatingPermissions"
-            :disabled="!selectedTeamId"
-            class="primary"
-          >
+          <el-button @click="closeAddTeamDialog">Cancel</el-button>
+          <el-button type="primary" @click="addTeamAccess" :disabled="!selectedTeamId" :loading="isUpdatingPermissions">
             Grant Access
-          </bf-button>
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Destroy Compute Node Dialog -->
+    <el-dialog v-model="showDestroyDialog" title="Destroy Compute Node" width="480px" :close-on-click-modal="false">
+      <div class="destroy-node-dialog" v-if="computeNode">
+        <div class="warning-section">
+          <div class="warning-content">
+            <h4>Are you sure you want to destroy this compute node?</h4>
+            <p class="warning-message">
+              Destroying <strong>{{ computeNode.name }}</strong> will permanently remove this compute node
+              and all its associated infrastructure including running tasks.
+            </p>
+            <p class="impact-message">This action cannot be undone.</p>
+          </div>
+        </div>
+        <div class="node-summary">
+          <div class="summary-row"><strong>Node Name:</strong> {{ computeNode.name }}</div>
+          <div class="summary-row"><strong>Account:</strong> {{ formatAccountId(computeNode.account?.accountId) }}</div>
+          <div class="summary-row"><strong>Node UUID:</strong> {{ computeNode.uuid }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showDestroyDialog = false">Cancel</el-button>
+          <el-button type="danger" @click="confirmDestroyNode" :loading="isDestroying">Destroy Node</el-button>
         </div>
       </template>
     </el-dialog>
@@ -846,27 +711,71 @@ function goBack() {
 @use '../../../styles/_theme.scss';
 
 .compute-node-management {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
+  max-width: 900px;
+  margin: 0;
+  padding: 0;
 }
 
 .node-header-section {
   margin-bottom: 32px;
-  
+
+  .node-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
   h1 {
     font-size: 28px;
     font-weight: 300;
     color: theme.$gray_6;
-    margin: 0 0 8px 0;
+    margin: 0;
   }
-  
+
   .node-subtitle {
     font-size: 14px;
     color: theme.$gray_5;
     margin: 0 0 8px 0;
   }
-  
+
+  .node-tags {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+
+      &.basic {
+        background: rgba(#6B7280, 0.1);
+        color: #6B7280;
+      }
+
+      &.secure {
+        background: rgba(#3B82F6, 0.1);
+        color: #2563EB;
+      }
+
+      &.compliant {
+        background: rgba(#8B5CF6, 0.1);
+        color: #7C3AED;
+      }
+
+      &.llm {
+        background: rgba(#10B981, 0.1);
+        color: #059669;
+      }
+    }
+  }
+
   .node-description {
     font-size: 16px;
     color: theme.$gray_5;
@@ -875,12 +784,72 @@ function goBack() {
   }
 }
 
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+
+  &.enabled {
+    background: rgba(#10B981, 0.1);
+    color: #059669;
+  }
+
+  &.paused {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+  }
+
+  &.pending {
+    background: rgba(#6B7280, 0.1);
+    color: #6B7280;
+  }
+
+  &.destroying {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+  }
+}
+
+.status-select {
+  min-width: 120px;
+
+  :deep(.el-select__wrapper) {
+    min-width: 120px;
+    border: 1px solid transparent;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    height: 32px;
+    padding: 8px 16px;
+  }
+
+  &.enabled :deep(.el-select__wrapper) {
+    background: rgba(#10B981, 0.1);
+    color: #059669;
+    border: 1px solid rgba(#10B981, 0.2);
+  }
+
+  &.paused :deep(.el-select__wrapper) {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(#F59E0B, 0.2);
+  }
+}
+
+.node-status-control {
+  flex-shrink: 0;
+}
+
 .management-section {
   background: white;
   border: 1px solid theme.$gray_2;
   margin-bottom: 24px;
   padding: 24px;
-  
+
   .section-header {
     display: flex;
     justify-content: space-between;
@@ -888,30 +857,33 @@ function goBack() {
     margin-bottom: 24px;
     padding-bottom: 16px;
     border-bottom: 1px solid theme.$gray_2;
-    
+
     h2 {
       font-size: 20px;
       font-weight: 500;
       color: theme.$gray_6;
       margin: 0;
     }
-    
+
     .section-actions {
       display: flex;
       gap: 8px;
-      
+
       .edit-actions {
         display: flex;
         gap: 8px;
       }
     }
-    
-    .info-icon {
-      color: theme.$gray_4;
-      cursor: help;
-      
-      &:hover {
-        color: theme.$purple_2;
+  }
+
+  &.danger-section {
+    border-color: rgba(theme.$red_2, 0.2);
+
+    .section-header {
+      border-bottom-color: rgba(theme.$red_2, 0.2);
+
+      h2 {
+        color: theme.$red_2;
       }
     }
   }
@@ -922,23 +894,23 @@ function goBack() {
     display: flex;
     padding: 12px 0;
     border-bottom: 1px solid theme.$gray_1;
-    
+
     &:last-child {
       border-bottom: none;
     }
-    
+
     .info-label {
       flex: 0 0 160px;
       color: theme.$gray_5;
       font-weight: 500;
       font-size: 14px;
     }
-    
+
     .info-value {
       flex: 1;
       color: theme.$gray_6;
       font-size: 14px;
-      
+
       &.mono {
         font-family: 'Courier New', monospace;
         font-size: 13px;
@@ -947,28 +919,79 @@ function goBack() {
         border-radius: 4px;
         display: inline-block;
       }
-      
+
       .empty-value {
         color: theme.$gray_4;
         font-style: italic;
       }
-      
-      .status-badge {
+
+      .copy-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: theme.$gray_4;
+        padding: 2px 4px;
+        margin-left: 6px;
+        border-radius: 3px;
+        vertical-align: middle;
+        transition: all 0.2s ease;
+
+        &:hover {
+          color: theme.$purple_2;
+          background: rgba(theme.$purple_1, 0.1);
+        }
+      }
+
+      .deployment-mode-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        .mode-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .mode-explanation {
+          color: theme.$gray_5;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+      }
+
+      .tag {
         display: inline-block;
-        padding: 4px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: capitalize;
-        
-        &.enabled {
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        &.basic {
+          background: rgba(#6B7280, 0.1);
+          color: #6B7280;
+        }
+
+        &.secure {
+          background: rgba(#3B82F6, 0.1);
+          color: #2563EB;
+        }
+
+        &.compliant {
+          background: rgba(#8B5CF6, 0.1);
+          color: #7C3AED;
+        }
+
+        &.llm {
           background: rgba(#10B981, 0.1);
           color: #059669;
         }
-        
-        &.paused {
-          background: rgba(#F59E0B, 0.1);
-          color: #D97706;
+
+        &.disabled {
+          background: rgba(#6B7280, 0.1);
+          color: #6B7280;
         }
       }
     }
@@ -976,86 +999,75 @@ function goBack() {
 }
 
 .permissions-content {
-  .access-scope-section {
-    margin-bottom: 32px;
-    
-    h3 {
-      font-size: 16px;
-      font-weight: 500;
-      color: theme.$gray_6;
-      margin: 0 0 16px 0;
-    }
-    
-    .scope-radio-group {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      
-      .scope-radio {
-        border: 1px solid theme.$gray_2;
-        border-radius: 8px;
-        padding: 16px;
-        transition: all 0.2s ease;
-        
-        &:hover {
-          border-color: theme.$purple_1;
-          background: rgba(theme.$purple_1, 0.02);
-        }
-        
-        :deep(.el-radio__input.is-checked + .el-radio__label) {
-          color: inherit;
-        }
-        
-        :deep(.el-radio__label) {
-          width: 100%;
-        }
-        
-        .scope-option {
-          .scope-title {
-            font-size: 15px;
-            font-weight: 500;
-            color: theme.$gray_6;
-            margin-bottom: 4px;
-          }
-          
-          .scope-description {
-            font-size: 13px;
-            color: theme.$gray_5;
-          }
-        }
-      }
+  .access-scope-select {
+    min-width: 300px;
+
+    :deep(.el-select__wrapper) {
+      border-radius: 4px;
     }
   }
-  
+
+  .access-scope-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 12px;
+
+    &.private {
+      background: rgba(theme.$gray_5, 0.1);
+      color: theme.$gray_6;
+    }
+
+    &.workspace {
+      background: rgba(theme.$purple_1, 0.1);
+      color: theme.$purple_2;
+    }
+
+    &.shared {
+      background: rgba(theme.$teal_1, 0.1);
+      color: theme.$teal_2;
+    }
+  }
+
+  .scope-description-text {
+    color: theme.$gray_5;
+    font-size: 13px;
+    margin-left: 12px;
+  }
+
   .sharing-section {
+    margin-top: 24px;
+
     .shared-subsection {
       margin-bottom: 32px;
-      
+
       &:last-child {
         margin-bottom: 0;
       }
-      
+
       .subsection-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 16px;
-        
+
         h3 {
           font-size: 16px;
           font-weight: 500;
           color: theme.$gray_6;
           margin: 0;
-          display: flex;
-          align-items: center;
         }
       }
-      
+
       .shared-list {
         border: 1px solid theme.$gray_2;
         border-radius: 6px;
         padding: 8px;
-        
+
         .shared-item {
           display: flex;
           justify-content: space-between;
@@ -1063,16 +1075,16 @@ function goBack() {
           padding: 8px 12px;
           border-radius: 4px;
           transition: background 0.2s ease;
-          
+
           &:hover {
             background: theme.$gray_1;
           }
-          
+
           .shared-name {
             font-size: 14px;
             color: theme.$gray_6;
           }
-          
+
           .remove-button {
             background: none;
             border: none;
@@ -1081,12 +1093,12 @@ function goBack() {
             color: theme.$gray_4;
             border-radius: 4px;
             transition: all 0.2s ease;
-            
+
             &:hover:not(:disabled) {
               background: theme.$red_2;
               color: white;
             }
-            
+
             &:disabled {
               cursor: not-allowed;
               opacity: 0.5;
@@ -1094,7 +1106,7 @@ function goBack() {
           }
         }
       }
-      
+
       .empty-shared {
         padding: 24px;
         text-align: center;
@@ -1112,19 +1124,48 @@ function goBack() {
   background: theme.$gray_1;
   border-radius: 6px;
   text-align: center;
-  
+
   p {
-    margin: 0 0 8px 0;
+    margin: 0;
     font-size: 14px;
     color: theme.$gray_5;
-    
-    &:last-child {
-      margin-bottom: 0;
-    }
-    
-    strong {
-      color: theme.$gray_6;
-    }
+  }
+}
+
+.destroy-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+
+  .destroy-info p {
+    font-size: 13px;
+    color: theme.$gray_5;
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.danger-button {
+  background: white;
+  color: theme.$red_2;
+  border: 1px solid theme.$red_2;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: theme.$red_1;
+    color: white;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
@@ -1135,19 +1176,75 @@ function goBack() {
     font-size: 14px;
     color: theme.$gray_6;
   }
-  
+
   .user-option {
     display: flex;
     flex-direction: column;
-    
+
     .user-name {
       font-size: 14px;
       color: theme.$gray_6;
     }
-    
+
     .user-email {
       font-size: 12px;
       color: theme.$gray_5;
+    }
+  }
+}
+
+.destroy-node-dialog {
+  .warning-section {
+    margin-bottom: 24px;
+    padding: 20px;
+    background: rgba(theme.$red_1, 0.05);
+    border: 1px solid rgba(theme.$red_1, 0.15);
+
+    .warning-content {
+      h4 {
+        font-size: 16px;
+        font-weight: 600;
+        color: theme.$gray_6;
+        margin: 0 0 12px 0;
+      }
+
+      .warning-message {
+        font-size: 14px;
+        color: theme.$gray_6;
+        margin: 0 0 12px 0;
+        line-height: 1.5;
+
+        strong { font-weight: 600; }
+      }
+
+      .impact-message {
+        font-size: 13px;
+        color: theme.$red_2;
+        margin: 0;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .node-summary {
+    padding: 16px;
+    background: theme.$gray_1;
+    border: 1px solid theme.$gray_2;
+
+    .summary-row {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      margin-bottom: 8px;
+
+      &:last-child { margin-bottom: 0; }
+
+      strong {
+        color: theme.$gray_6;
+        font-weight: 600;
+        min-width: 100px;
+        margin-right: 8px;
+      }
     }
   }
 }
@@ -1158,12 +1255,11 @@ function goBack() {
   justify-content: flex-end;
 }
 
-// Button styles
 :deep(.bf-button) {
   &.small {
     padding: 6px 12px;
     font-size: 13px;
-    
+
     svg {
       width: 14px;
       height: 14px;
