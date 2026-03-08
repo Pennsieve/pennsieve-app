@@ -46,16 +46,16 @@ const { counters, isLoading: countersLoading, error: countersError, fetchCounter
 })
 
 const counterTotalRuns = computed(() => counters.value?.allTime?.totalRuns ?? 0)
-const displayTotalRuns = computed(() => counterTotalRuns.value || histogramTotalRuns.value)
+const displayTotalRuns = computed(() => counterTotalRuns.value)
 const avgDuration = computed(() => {
   const c = counters.value?.allTime
   if (c && c.totalRuns) return c.totalDurationSec / c.totalRuns
-  return medianDuration.value
+  return null
 })
 const avgCost = computed(() => {
   const c = counters.value?.allTime
   if (c && c.totalRuns) return c.totalCost / c.totalRuns
-  return medianCost.value
+  return null
 })
 const hasData = computed(() => counterTotalRuns.value > 0 || durationBins.value.length > 0 || costBins.value.length > 0)
 

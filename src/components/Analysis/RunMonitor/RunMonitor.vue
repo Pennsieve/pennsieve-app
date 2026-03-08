@@ -63,6 +63,7 @@ const filePickerAncestorList = ref([]);
 const logsDialogVisible = ref(false);
 const logsMessages = ref([]);
 const logsLoading = ref(false);
+const logsNodeId = ref("");
 const logsNodeLabel = ref("");
 
 // Metrics dialog state
@@ -102,15 +103,45 @@ const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
 
+const incomingEdgeColor = (nodeId) => {
+  const edge = edges.value.find((e) => e.target === nodeId);
+  return edge?.style?.stroke || "#cccccc";
+};
+
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   return tt?.computeTypes || [];
 };
 
+const getTargetTypeDefinition = (targetType) => {
+  if (!targetType) return null;
+  return targetTypes.value.find((t) => t.targetType === targetType) || null;
+};
+
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
 const config = computed(() => store.state.config);
+
+/*
+  Fargate CPU / Memory combinations
+*/
+const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096"];
+const FARGATE_MEMORY_MAP = {
+  "256":  ["512", "1024", "2048"],
+  "512":  ["1024", "2048", "3072", "4096"],
+  "1024": ["2048", "3072", "4096", "5120", "6144", "7168", "8192"],
+  "2048": ["4096", "5120", "6144", "7168", "8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384"],
+  "4096": ["8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384", "17408", "18432", "19456", "20480", "21504", "22528", "23552", "24576", "25600", "26624", "27648", "28672", "29696", "30720"],
+};
+
+const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
+
+const formatResourceLabel = (val) => {
+  const n = parseInt(val, 10);
+  if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
+  return `${n} MB`;
+};
 
 /*
   Run title: workflow definition name + run date/time
@@ -164,7 +195,7 @@ watch(dashboardRange, () => fetchOrgCounters());
 const dashboardRuns = computed(() => workflowInstances.value);
 
 const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "STARTED")
+  workflowInstances.value.filter((r) => r.status === "STARTED" || r.status === "FINALIZING")
 );
 
 const recentCompletedRuns = computed(() =>
@@ -259,7 +290,7 @@ const statusClass = (status) => {
 const statusBorderColor = (status) => {
   switch (status) {
     case "NOT_STARTED": return "#999999";
-    case "STARTED": return "#3b82f6";
+    case "STARTED": return "#06b6d4";
     case "SUCCEEDED": return "#17BB62";
     case "FAILED": return "#E94B4B";
     default: return "#999999";
@@ -277,6 +308,7 @@ const statusDotClass = (status) => {
   switch (status) {
     case "NOT_STARTED": return "dot-gray";
     case "STARTED": return "dot-blue";
+    case "FINALIZING": return "dot-amber";
     case "SUCCEEDED": return "dot-green";
     case "FAILED": return "dot-red";
     case "CANCELLED": return "dot-amber";
@@ -288,6 +320,7 @@ const statusLabel = (status) => {
   switch (status) {
     case "NOT_STARTED": return "Pending";
     case "STARTED": return "Running";
+    case "FINALIZING": return "Finalizing";
     case "SUCCEEDED": return "Complete";
     case "FAILED": return "Failed";
     case "CANCELLED": return "Cancelled";
@@ -811,7 +844,18 @@ const initiateWorkflow = async () => {
       if (d.type === "data-target") {
         const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
-        const targetParams = Object.entries(srcTargetParams).map(([key, value]) => ({ key, value: String(value) }));
+        const ttDef = getTargetTypeDefinition(d.targetType);
+        const paramDefs = ttDef?.params || [];
+
+        // Build params from the target type definition, pre-filling from rerun source or defaults
+        const targetParams = paramDefs.map((pd) => ({
+          name: pd.name,
+          type: pd.type || "string",
+          description: pd.description || "",
+          required: !!pd.required,
+          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
+        }));
+
         nodeConfigs[d.id] = {
           computeType: srcCfg?.executionTarget || d.computeType || fallback,
           targetType: d.targetType || null,
@@ -822,6 +866,8 @@ const initiateWorkflow = async () => {
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || "lambda",
           version: srcCfg?.version || "",
+          cpu: srcCfg?.cpu || "",
+          memory: srcCfg?.memory || "",
           params,
         };
       }
@@ -869,6 +915,22 @@ const cancelConfigure = () => {
   Execute Workflow — actually create the run
 */
 const executeWorkflow = async () => {
+  // Validate required data-target params before executing
+  const dag = configDefinition.value?.dag || [];
+  for (const [nodeId, cfg] of Object.entries(nodeConfigs)) {
+    const dagNode = dag.find((n) => n.id === nodeId);
+    if (dagNode?.type !== "data-target") continue;
+    const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
+    if (missing.length > 0) {
+      const nodeLabel = dagNode.targetType || nodeId;
+      const names = missing.map((p) => p.name).join(", ");
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
+      });
+      return;
+    }
+  }
+
   isExecuting.value = true;
   try {
     // Build dataSources map (top-level): { nodeId: { packageIds: [...] } }
@@ -892,10 +954,12 @@ const executeWorkflow = async () => {
           processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
         }
       } else if (dagNode.type !== "data-source") {
-        // Processor node: version + executionTarget
+        // Processor node: version + executionTarget + optional cpu/memory
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
         if (cfg.version) entry.version = cfg.version;
+        if (cfg.cpu) entry.cpu = cfg.cpu;
+        if (cfg.memory) entry.memory = cfg.memory;
         processorConfigs.push(entry);
       }
     });
@@ -918,7 +982,7 @@ const executeWorkflow = async () => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
         const obj = {};
-        cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
+        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
         if (Object.keys(obj).length > 0) {
           dataTargets[nodeId] = { params: obj };
         }
@@ -943,12 +1007,22 @@ const executeWorkflow = async () => {
       detail: { type: "success", msg: "Workflow executed successfully." },
     });
 
-    // Clean up configure state and switch to browse
-    cancelConfigure();
+    // Clean up configure state but keep a placeholder selectedRun
+    // to prevent the dashboard from flashing during the transition
+    mode.value = "browse";
+    configDefinition.value = null;
+    Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
+    selectedNode.value = null;
+
+    // Set a temporary placeholder so the canvas doesn't show the dashboard
+    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
+    selectedRun.value = newRun || { uuid: runId, status: "STARTED" };
+    nodes.value = [];
+    edges.value = [];
 
     // Refresh runs list and auto-select the new run
     await store.dispatch("analysisModule/fetchWorkflowInstances");
-    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
     const runToSelect = runId
       ? workflowInstances.value.find((r) => r.uuid === runId) || newRun
       : workflowInstances.value[0]; // fallback to newest
@@ -1076,6 +1150,7 @@ const removeParam = (nodeId, index) => {
 */
 const openLogs = async (nodeId, label) => {
   if (!selectedRun.value) return;
+  logsNodeId.value = nodeId;
   logsNodeLabel.value = label || nodeId;
   logsMessages.value = [];
   logsLoading.value = true;
@@ -1369,8 +1444,8 @@ onUnmounted(() => {
               >
                 <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
                 <div class="active-run-meta">
-                  <span class="run-status-dot dot-blue" />
-                  <span>Running</span>
+                  <span class="run-status-dot" :class="statusDotClass(run.status)" />
+                  <span>{{ statusLabel(run.status) }}</span>
                   <span class="active-run-time">{{ formatTime(run.startedAt) }}</span>
                 </div>
               </div>
@@ -1449,6 +1524,10 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <div v-else-if="nodes.length === 0 && selectedRun" class="empty-canvas">
+          <span class="loading-text">Loading run...</span>
+        </div>
+
         <div v-else-if="nodes.length === 0" class="empty-canvas">
           <h3>Select a run to view its status</h3>
           <p>Choose a run from the sidebar, or initiate a new workflow</p>
@@ -1479,7 +1558,7 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc' }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
@@ -1540,7 +1619,7 @@ onUnmounted(() => {
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b' }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <div class="node-header">
@@ -1581,8 +1660,15 @@ onUnmounted(() => {
 
       <!-- Sidebar (RIGHT) -->
       <div class="applications-sidebar">
-        <bf-button v-if="mode !== 'configure'" class="new-workflow-btn" @click="openWizardDialog">
+        <bf-button v-if="mode !== 'configure' && !selectedRun" class="new-workflow-btn" @click="openWizardDialog">
           Initiate Workflow
+        </bf-button>
+        <bf-button
+          v-if="selectedRun && selectedWorkflowActivity && !isTerminalStatus(selectedWorkflowActivity.status)"
+          class="new-workflow-btn danger"
+          @click="cancelRunDialogVisible = true"
+        >
+          Cancel Run
         </bf-button>
 
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
@@ -1610,6 +1696,7 @@ onUnmounted(() => {
                     v-model="nodeConfigs[selectedNode.id].executionTarget"
                     size="small"
                     style="width: 100%"
+                    @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
                   >
                     <el-option label="Lambda" value="lambda" />
                     <el-option label="ECS" value="ecs" />
@@ -1623,6 +1710,61 @@ onUnmounted(() => {
                     placeholder="latest"
                   />
                 </div>
+
+                <!-- CPU / Memory (ECS only) -->
+                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'ecs'">
+                  <div class="config-field">
+                    <label>CPU</label>
+                    <el-select
+                      v-model="nodeConfigs[selectedNode.id].cpu"
+                      size="small"
+                      style="width: 100%"
+                      placeholder="Default"
+                      clearable
+                      @change="() => { nodeConfigs[selectedNode.id].memory = '' }"
+                    >
+                      <el-option
+                        v-for="cpu in FARGATE_CPU_OPTIONS"
+                        :key="cpu"
+                        :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                        :value="cpu"
+                      />
+                    </el-select>
+                  </div>
+                  <div class="config-field">
+                    <label>Memory</label>
+                    <el-select
+                      v-model="nodeConfigs[selectedNode.id].memory"
+                      size="small"
+                      style="width: 100%"
+                      placeholder="Default"
+                      clearable
+                      :disabled="!nodeConfigs[selectedNode.id].cpu"
+                    >
+                      <el-option
+                        v-for="mem in getMemoryOptionsForCpu(nodeConfigs[selectedNode.id].cpu)"
+                        :key="mem"
+                        :label="formatResourceLabel(mem)"
+                        :value="mem"
+                      />
+                    </el-select>
+                  </div>
+                </template>
+
+                <!-- Lambda memory -->
+                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'lambda'">
+                  <div class="config-field">
+                    <label>Memory (MB)</label>
+                    <el-input
+                      v-model="nodeConfigs[selectedNode.id].memory"
+                      size="small"
+                      placeholder="Default (e.g. 3008)"
+                      type="number"
+                      :min="128"
+                      :max="10240"
+                    />
+                  </div>
+                </template>
 
                 <!-- Per-node params -->
                 <div class="config-field">
@@ -1688,29 +1830,26 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
-                <!-- Per-node params -->
-                <div class="config-field">
+                <!-- Target type params -->
+                <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
                   <div
-                    v-for="(param, index) in nodeConfigs[selectedNode.id].params"
-                    :key="index"
-                    class="param-row"
+                    v-for="param in nodeConfigs[selectedNode.id].params"
+                    :key="param.name"
+                    class="target-param"
                   >
-                    <el-input
-                      v-model="param.key"
-                      size="small"
-                      placeholder="Key"
-                      class="param-key"
-                    />
+                    <div class="target-param-header">
+                      <span class="target-param-name">{{ param.name }}</span>
+                      <span v-if="param.required" class="target-param-required">required</span>
+                      <span v-else class="target-param-optional">optional</span>
+                    </div>
+                    <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
                     <el-input
                       v-model="param.value"
                       size="small"
-                      placeholder="Value"
-                      class="param-value"
+                      :placeholder="param.required ? 'Required' : 'Optional'"
                     />
-                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
                   </div>
-                  <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
                 </div>
               </div>
 
@@ -1904,13 +2043,6 @@ onUnmounted(() => {
                 Export Run Config
               </bf-button>
 
-              <bf-button
-                v-if="!isTerminalStatus(selectedWorkflowActivity.status)"
-                class="danger cancel-run-btn"
-                @click="cancelRunDialogVisible = true"
-              >
-                Cancel Run
-              </bf-button>
             </template>
 
             <div v-else class="info-empty">
@@ -2192,6 +2324,12 @@ onUnmounted(() => {
       width="700px"
       :close-on-click-modal="true"
     >
+      <div class="logs-toolbar">
+        <button class="logs-refresh-btn" :disabled="logsLoading" @click="openLogs(logsNodeId, logsNodeLabel)">
+          <IconRotateRight :width="14" :height="14" />
+          Refresh
+        </button>
+      </div>
       <div class="logs-content">
         <div v-if="logsLoading" class="logs-loading">Loading logs...</div>
         <div v-else-if="logsMessages.length === 0" class="logs-empty">
@@ -2551,6 +2689,8 @@ onUnmounted(() => {
       top: -5px;
       left: 50% !important;
       transform: translateX(-50%) !important;
+      background: var(--handle-target-color, #cccccc) !important;
+      box-shadow: 0 0 0 1px var(--handle-target-color, #cccccc);
     }
 
     &.vue-flow__handle-bottom {
@@ -2627,7 +2767,8 @@ onUnmounted(() => {
     color: white;
 
     &.dot-gray { background-color: theme.$gray_4; }
-    &.dot-blue { background-color: #3b82f6; }
+    &.dot-blue { background-color: #06b6d4; }
+    &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
   }
@@ -2730,13 +2871,13 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #06b6d4;
   animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
 .dashboard-empty-range {
@@ -2753,15 +2894,15 @@ onUnmounted(() => {
 
 .active-run-card {
   background: theme.$white;
-  border: 1px solid #93c5fd;
+  border: 1px solid #67e8f9;
   border-radius: 4px;
   padding: 14px 16px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    border-color: #06b6d4;
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15);
   }
 }
 
@@ -2879,7 +3020,8 @@ onUnmounted(() => {
     color: white;
 
     &.dot-gray { background-color: theme.$gray_4; }
-    &.dot-blue { background-color: #3b82f6; }
+    &.dot-blue { background-color: #06b6d4; }
+    &.dot-amber { background-color: #f59e0b; }
     &.dot-green { background-color: theme.$status_green; }
     &.dot-red { background-color: theme.$status_red; }
   }
@@ -2914,7 +3056,8 @@ onUnmounted(() => {
     width: auto !important;
 
     &.selected .custom-node {
-      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+      outline: 2px solid theme.$purple_1;
+      outline-offset: 2px;
     }
   }
 }
@@ -2985,7 +3128,7 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 
     &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
-    &.dot-blue { background: #dbeafe; color: #1d4ed8; }
+    &.dot-blue { background: #e0f7fa; color: #0e7490; }
     &.dot-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
     &.dot-red { background: #fee2e2; color: #b91c1c; }
     &.dot-amber { background: #fef3c7; color: #92400e; }
@@ -3053,7 +3196,7 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  &.blue-node { border-color: #3b82f6; }
+  &.blue-node { border-color: #06b6d4; }
   &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
   &.green-node { border-color: theme.$status_green; }
   &.red-node { border-color: theme.$status_red; }
@@ -3065,7 +3208,7 @@ onUnmounted(() => {
     &.has-files { border-color: theme.$status_green; }
     &.green-node { border-color: theme.$status_green; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #3b82f6; }
+    &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
@@ -3074,7 +3217,7 @@ onUnmounted(() => {
 
     &.green-node { border-color: theme.$status_green; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #3b82f6; }
+    &.blue-node { border-color: #06b6d4; }
 
     .node-body {
       margin-top: 6px;
@@ -3110,9 +3253,9 @@ onUnmounted(() => {
 }
 
 @keyframes node-pulse {
-  0% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
-  50% { background: #dbeafe; box-shadow: 0 0 18px rgba(59, 130, 246, 0.5); }
-  100% { background: #f8faff; box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); }
+  0% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
+  50% { background: #e0f7fa; box-shadow: 0 0 18px rgba(6, 182, 212, 0.5); }
+  100% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
 }
 
 /* Status dots */
@@ -3124,7 +3267,8 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &.dot-gray { background-color: theme.$gray_4; }
-  &.dot-blue { background-color: #3b82f6; }
+  &.dot-blue { background-color: #06b6d4; }
+  &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
 }
@@ -3135,10 +3279,10 @@ onUnmounted(() => {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 5px;
 
   &.dot-gray { background-color: theme.$gray_4; }
-  &.dot-blue { background-color: #3b82f6; }
+  &.dot-blue { background-color: #06b6d4; }
+  &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
 }
@@ -3420,6 +3564,47 @@ onUnmounted(() => {
   }
 }
 
+.target-param {
+  margin-bottom: 10px;
+  padding: 8px;
+  background: theme.$gray_1;
+  border-radius: 4px;
+}
+
+.target-param-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.target-param-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$black;
+}
+
+.target-param-required {
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$status_red;
+  text-transform: uppercase;
+}
+
+.target-param-optional {
+  font-size: 10px;
+  font-weight: 500;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+}
+
+.target-param-description {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
 /* Dialogs */
 .run-dialog-footer {
   display: flex;
@@ -3635,7 +3820,7 @@ onUnmounted(() => {
   }
 
   &.ecs {
-    background: #dbeafe;
+    background: #e0f7fa;
     color: #1e40af;
   }
 }
@@ -3646,7 +3831,8 @@ onUnmounted(() => {
 
   &.dot-green { color: #15803d; }
   &.dot-red { color: #b91c1c; }
-  &.dot-blue { color: #1d4ed8; }
+  &.dot-blue { color: #0e7490; }
+  &.dot-amber { color: #92400e; }
   &.dot-gray { color: theme.$gray_4; }
 }
 
@@ -3681,6 +3867,35 @@ onUnmounted(() => {
 }
 
 /* Logs dialog */
+.logs-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.logs-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
 .logs-content {
   min-height: 200px;
   max-height: 500px;
@@ -3725,6 +3940,12 @@ onUnmounted(() => {
 .log-message {
   color: theme.$black;
   word-break: break-word;
+}
+
+:deep(.el-dialog__footer) {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Wizard dialog */
