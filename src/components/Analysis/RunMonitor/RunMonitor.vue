@@ -674,6 +674,7 @@ onPaneClick(() => {
 */
 const datasetOptions = ref([]);
 const datasetSearchLoading = ref(false);
+const datasetSearchQuery = ref("");
 let datasetSearchTimer = null;
 
 const fetchDatasetOptions = async (query = "") => {
@@ -750,6 +751,7 @@ const openWizardDialog = () => {
   wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
   workflowSearch.value = "";
   computeNodeSearch.value = "";
+  datasetSearchQuery.value = "";
   wizardStep.value = 0;
   rerunSource.value = null;
   accordionActiveNames.value = ["information"];
@@ -2217,7 +2219,7 @@ onUnmounted(() => {
           <template v-else>
             <el-input
               placeholder="Search datasets..."
-              :model-value="''"
+              v-model="datasetSearchQuery"
               @input="onDatasetSearch"
               clearable
               class="wizard-search"
