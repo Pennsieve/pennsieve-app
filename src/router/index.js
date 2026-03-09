@@ -126,6 +126,8 @@ const ApplicationsGrid = () => import ('../components/Analysis/Applications/Appl
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
+const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
+const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
@@ -1510,7 +1512,24 @@ const router = createRouter({
           name: 'runs',
           path: 'runs',
           components: {
-            stage: RunMonitor,
+            stage: RunsOverview,
+          }
+        },
+        {
+          name: 'run-configure',
+          path: 'runs/configure',
+          components: {
+            stage: RunDetail,
+          }
+        },
+        {
+          name: 'run-detail',
+          path: 'runs/:runId',
+          components: {
+            stage: RunDetail,
+          },
+          props: {
+            stage: true
           }
         },
         {

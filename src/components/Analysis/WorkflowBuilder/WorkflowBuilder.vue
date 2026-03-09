@@ -692,7 +692,17 @@ onPaneClick(() => {
   <div class="workflow-builder">
     <!-- Header -->
     <div class="builder-header">
-      <router-link :to="{ name: 'workflows' }" class="back-link">&larr; Workflows</router-link>
+      <span class="header-title">
+        <router-link :to="{ name: 'workflows' }" class="header-back-link">Workflows</router-link>
+        <template v-if="mode === 'create'">
+          <span class="header-breadcrumb-sep">/</span>
+          <span class="header-detail-name">New Workflow</span>
+        </template>
+        <template v-else-if="selectedWorkflow">
+          <span class="header-breadcrumb-sep">/</span>
+          <span class="header-detail-name">{{ selectedWorkflow.name }}</span>
+        </template>
+      </span>
       <template v-if="mode === 'create'">
         <el-input
           v-model="workflowName"
@@ -708,11 +718,6 @@ onPaneClick(() => {
           <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
           <bf-button @click="saveWorkflow">Save</bf-button>
         </div>
-      </template>
-      <template v-else>
-        <span class="header-title">
-          {{ selectedWorkflow ? selectedWorkflow.name : 'Workflows' }}
-        </span>
       </template>
     </div>
 
@@ -1322,18 +1327,6 @@ onPaneClick(() => {
   overflow: hidden;
 }
 
-.back-link {
-  font-size: 13px;
-  color: theme.$purple_1;
-  text-decoration: none;
-  font-weight: 500;
-  white-space: nowrap;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
 .builder-header {
   display: flex;
   align-items: center;
@@ -1344,8 +1337,33 @@ onPaneClick(() => {
   min-height: 48px;
 
   .header-title {
+    font-weight: 400;
+    font-size: 13px;
+    color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-back-link {
+    color: theme.$purple_3;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .header-breadcrumb-sep {
+    color: theme.$gray_4;
+    font-weight: 400;
+  }
+
+  .header-detail-name {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 14px;
     color: theme.$black;
   }
 

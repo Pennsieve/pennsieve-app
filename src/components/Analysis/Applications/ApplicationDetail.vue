@@ -304,11 +304,12 @@ onBeforeUnmount(() => removeGuard());
   <div class="applications-page">
     <!-- Header -->
     <div class="builder-header">
-      <router-link :to="{ name: 'applications' }" class="back-link">
-        &larr; Applications
-      </router-link>
-      <span v-if="selectedApplication" class="header-title">
-        {{ selectedApplication.name }}
+      <span class="header-title">
+        <router-link :to="{ name: 'applications' }" class="header-back-link">Applications</router-link>
+        <template v-if="selectedApplication">
+          <span class="header-breadcrumb-sep">/</span>
+          <span class="header-detail-name">{{ selectedApplication.name }}</span>
+        </template>
       </span>
       <div class="header-actions">
         <template v-if="hasUnsavedChanges">
@@ -519,8 +520,33 @@ onBeforeUnmount(() => removeGuard());
   min-height: 48px;
 
   .header-title {
+    font-weight: 400;
+    font-size: 13px;
+    color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-back-link {
+    color: theme.$purple_3;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .header-breadcrumb-sep {
+    color: theme.$gray_4;
+    font-weight: 400;
+  }
+
+  .header-detail-name {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 14px;
     color: theme.$black;
   }
 
@@ -529,20 +555,6 @@ onBeforeUnmount(() => removeGuard());
     align-items: center;
     gap: 8px;
     margin-left: auto;
-  }
-}
-
-.back-link {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: theme.$purple_3;
-  text-decoration: none;
-  font-weight: 500;
-
-  &:hover {
-    text-decoration: underline;
   }
 }
 

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
@@ -8,69 +9,73 @@ import dagre from "@dagrejs/dagre";
 import EventBus from "../../../utils/event-bus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
-import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
-import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
+import {
+  statusClass,
+  statusBorderColor,
+  nodeBorderColor,
+  statusDotClass,
+  statusLabel,
+  isTerminalStatus,
+  labelForDagNode,
+  formatTime,
+  formatDuration,
+  formatCost,
+  formatModelName,
+  formatBytes,
+  formatDurationSec,
+  formatMetricKey,
+  formatMetricValue,
+  formatResourceLabel,
+  computeNodeName as computeNodeNameFn,
+  getUserName as getUserNameFn,
+  FARGATE_CPU_OPTIONS,
+  getMemoryOptionsForCpu,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+} from "./runHelpers";
+
+const props = defineProps({
+  runId: { type: String, default: "" },
+});
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
 const store = useStore();
+const router = useRouter();
 const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
 
 /*
   Local State
 */
 const mode = ref("browse"); // 'browse' | 'configure'
-const selectedRun = ref(null);
 const selectedNode = ref(null);
-const computeNodeFilter = ref("all");
-const statusFilter = ref("all");
-const workflowFilter = ref("all");
-
-const runStatusOptions = [
-  { label: "All Statuses", value: "all" },
-  { label: "Not Started", value: "NOT_STARTED" },
-  { label: "Started", value: "STARTED" },
-  { label: "Finalizing", value: "FINALIZING" },
-  { label: "Succeeded", value: "SUCCEEDED" },
-  { label: "Failed", value: "FAILED" },
-  { label: "Canceling", value: "CANCELING" },
-  { label: "Canceled", value: "CANCELED" },
-];
-const accordionActiveNames = ref(["runs"]);
+const accordionActiveNames = ref(["information"]);
 const nodes = ref([]);
 const edges = ref([]);
 const isLoading = ref(false);
-const isLoadingMore = ref(false);
 let analyticsChannel = null;
 let analyticsChannelName = null;
 
-// Initiate Workflow dialog state
-const initiateForm = ref({
-  workflowId: "",
-  computeNodeId: "",
-  datasetId: "",
-});
-const wizardVisible = ref(false);
-const wizardStep = ref(0); // 0=workflow, 1=compute, 2=dataset, 3=confirm
-const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
-
 // Configure mode state
-const configDefinition = ref(null); // the workflow definition fetched for configuration
-const dataSourceFiles = reactive({}); // { [nodeId]: File[] }
-const nodeConfigs = reactive({}); // { [nodeId]: { executionTarget, version, params: [{ key, value }] } }
+const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
+const configDefinition = ref(null);
+const dataSourceFiles = reactive({});
+const nodeConfigs = reactive({});
 const isExecuting = ref(false);
-const rerunSource = ref(null); // the run object to copy config from when rerunning
+const rerunSource = ref(null);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
 const filePickerAncestorList = ref([]);
+const filePickerCurrentFile = ref({ content: { name: "" } });
+const clearSelectedValues = ref(false);
 
 // Logs dialog state
 const logsDialogVisible = ref(false);
@@ -85,18 +90,14 @@ const durationDialogVisible = ref(false);
 const nodeMetricsDialogVisible = ref(false);
 const cancelRunDialogVisible = ref(false);
 const cancellingRun = ref(false);
-const filePickerCurrentFile = ref({ content: { name: "" } });
-const clearSelectedValues = ref(false);
+
+// Dataset options for configure summary
+const datasetOptions = ref([]);
+const datasetSearchLoading = ref(false);
 
 /*
   Store computed
 */
-const workflowInstances = computed(
-  () => store.getters["analysisModule/workflowInstances"] || []
-);
-const hasMoreRuns = computed(
-  () => !!store.getters["analysisModule/workflowInstancesCursor"]
-);
 const selectedWorkflowActivity = computed(
   () => store.getters["analysisModule/selectedWorkflowActivity"]
 );
@@ -106,15 +107,18 @@ const computeNodes = computed(
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
-const selectedProcessor = computed(
-  () => store.getters["analysisModule/selectedProcessor"]
-);
 const availableApplications = computed(
   () => store.getters["analysisModule/applications"] || []
 );
 const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
+const profile = computed(() => store.state.profile);
+const orgMembers = computed(() => store.state.orgMembers || []);
+const config = computed(() => store.state.config);
+
+const computeNodeName = (uuid) => computeNodeNameFn(uuid, computeNodes.value);
+const getUserName = (userId) => getUserNameFn(userId, profile.value, orgMembers.value);
 
 const incomingEdgeColor = (nodeId) => {
   const edge = edges.value.find((e) => e.target === nodeId);
@@ -132,111 +136,19 @@ const getTargetTypeDefinition = (targetType) => {
   return targetTypes.value.find((t) => t.targetType === targetType) || null;
 };
 
-const profile = computed(() => store.state.profile);
-const orgMembers = computed(() => store.state.orgMembers || []);
-const config = computed(() => store.state.config);
-
 /*
-  Fargate CPU / Memory combinations
-*/
-const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096"];
-const FARGATE_MEMORY_MAP = {
-  "256":  ["512", "1024", "2048"],
-  "512":  ["1024", "2048", "3072", "4096"],
-  "1024": ["2048", "3072", "4096", "5120", "6144", "7168", "8192"],
-  "2048": ["4096", "5120", "6144", "7168", "8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384"],
-  "4096": ["8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384", "17408", "18432", "19456", "20480", "21504", "22528", "23552", "24576", "25600", "26624", "27648", "28672", "29696", "30720"],
-};
-
-const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
-
-const formatResourceLabel = (val) => {
-  const n = parseInt(val, 10);
-  if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
-  return `${n} MB`;
-};
-
-/*
-  Run title: workflow definition name + run date/time
+  Run title
 */
 const runTimeLabel = computed(() => {
-  const run = selectedRun.value;
-  if (!run) return '';
   const activity = selectedWorkflowActivity.value;
-  const timeStr = formatTime(activity?.startedAt || run.startedAt);
-  return timeStr !== 'N/A' ? timeStr : run.uuid;
+  if (!activity?.uuid) return "";
+  const timeStr = formatTime(activity.startedAt);
+  return timeStr !== "N/A" ? timeStr : activity.uuid;
 });
 
 const runWorkflowName = computed(() => {
-  const run = selectedRun.value;
-  if (!run) return '';
   const activity = selectedWorkflowActivity.value;
-  return activity?.workflowName || run.workflowName || '';
-});
-
-/*
-  Filtered Runs
-*/
-const filteredRuns = computed(() => {
-  let runs = workflowInstances.value;
-  if (computeNodeFilter.value !== "all") {
-    runs = runs.filter((r) => r.computeNodeUuid === computeNodeFilter.value);
-  }
-  return [...runs].sort(
-    (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
-  );
-});
-
-/*
-  Dashboard: active runs & aggregate stats (shown when no run is selected)
-*/
-const dashboardRange = ref("allTime"); // 'allTime' | 'lastYear' | 'lastMonth'
-const dashboardRangeOptions = [
-  { label: "Last Month", value: "lastMonth" },
-  { label: "Last Year", value: "lastYear" },
-  { label: "All time", value: "allTime" },
-];
-
-// Org-level counters from the metrics API
-const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchOrgCounters } = useMetricsCounters({
-  range: dashboardRange,
-});
-
-// Re-fetch counters and runs when the range changes
-watch(dashboardRange, () => {
-  fetchOrgCounters();
-  fetchRunsWithFilters();
-});
-
-const dashboardRuns = computed(() => workflowInstances.value);
-
-const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "STARTED" || r.status === "FINALIZING")
-);
-
-const recentCompletedRuns = computed(() =>
-  dashboardRuns.value
-    .filter((r) => isTerminalStatus(r.status))
-    .sort((a, b) => new Date(b.completedAt || b.startedAt) - new Date(a.completedAt || a.startedAt))
-    .slice(0, 5)
-);
-
-const dashboardStats = computed(() => {
-  const data = orgCounters.value;
-  if (!data) return null;
-
-  const bucket = data.allTime || data;
-  if (!bucket || !bucket.totalRuns) return null;
-
-  const total = bucket.totalRuns;
-  const succeeded = bucket.succeeded || 0;
-  const failed = bucket.failed || 0;
-  const canceled = bucket.canceled || 0;
-  const successRate = (succeeded + failed) > 0
-    ? Math.round((succeeded / (succeeded + failed)) * 100)
-    : 0;
-
-  return { total, succeeded, failed, canceled, successRate };
+  return activity?.workflowName || "";
 });
 
 /*
@@ -257,127 +169,19 @@ const allDataSourcesHaveFiles = computed(() => {
 /*
   DAG Layout
 */
-const NODE_WIDTH = 280;
-const NODE_HEIGHT = 80;
-
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
-
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
-
-  for (const node of nodes.value) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-  for (const edge of edges.value) {
-    g.setEdge(edge.source, edge.target);
-  }
-
+  for (const node of nodes.value) g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
-
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return {
-      ...node,
-      position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
-      },
-    };
+    return { ...node, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
   });
-
   setTimeout(() => fitView({ padding: 0.2 }), 50);
-};
-
-/*
-  Status helpers
-*/
-const statusClass = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "gray-node";
-    case "STARTED": return "blue-node animate";
-    case "SUCCEEDED": return "green-node";
-    case "FAILED": return "red-node";
-    default: return "gray-node";
-  }
-};
-
-const statusBorderColor = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "#999999";
-    case "STARTED": return "#06b6d4";
-    case "SUCCEEDED": return "#17BB62";
-    case "FAILED": return "#E94B4B";
-    default: return "#999999";
-  }
-};
-
-const nodeBorderColor = (type, status) => {
-  if (status) return statusBorderColor(status);
-  if (type === "data-source") return "#6366f1";
-  if (type === "data-target") return "#64748b";
-  return "#cccccc";
-};
-
-const statusDotClass = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "dot-gray";
-    case "STARTED": return "dot-blue";
-    case "FINALIZING": return "dot-amber";
-    case "SUCCEEDED": return "dot-green";
-    case "FAILED": return "dot-red";
-    case "CANCELLED": return "dot-amber";
-    default: return "dot-gray";
-  }
-};
-
-const statusLabel = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "Pending";
-    case "STARTED": return "Running";
-    case "FINALIZING": return "Finalizing";
-    case "SUCCEEDED": return "Complete";
-    case "FAILED": return "Failed";
-    case "CANCELLED": return "Cancelled";
-    default: return status || "Unknown";
-  }
-};
-
-const isTerminalStatus = (status) => {
-  return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(status);
-};
-
-/*
-  Label helpers
-*/
-const extractRepoName = (gitUrl) => {
-  if (!gitUrl) return "";
-  const parts = gitUrl.split("/");
-  const name = parts[parts.length - 1] || gitUrl;
-  return name.replace(/\.git$/, "");
-};
-
-const normalizeUrl = (url) => {
-  if (!url) return "";
-  return url.replace(/\.git$/, "").replace(/\/$/, "");
-};
-
-const findAppByUrl = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const normalized = normalizeUrl(sourceUrl);
-  return (
-    availableApplications.value.find(
-      (app) => normalizeUrl(app.source?.url) === normalized
-    ) || null
-  );
-};
-
-const labelForDagNode = (d) => {
-  if (d.type === "data-source") return "Data Source";
-  if (d.type === "data-target") return d.targetType || "Data Target";
-  const matchedApp = findAppByUrl(d.sourceUrl);
-  return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
 };
 
 /*
@@ -386,30 +190,24 @@ const labelForDagNode = (d) => {
 const definitionToNodesAndEdges = (definition) => {
   const dag = definition.dag || definition.processors || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-
-  const hasSavedPositions = dag.some(
-    (d) => d.position && typeof d.position.x === "number"
-  );
-
+  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
   const resultNodes = dag.map((d) => {
     const nodeType = d.type === "data-source" ? "data-source" : d.type === "data-target" ? "data-target" : "default";
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, availableApplications.value),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
         computeType: d.computeType || getComputeTypesForTarget(d.targetType)?.[0] || null,
       },
-      position:
-        hasSavedPositions && d.position && typeof d.position.x === "number"
-          ? { x: d.position.x, y: d.position.y }
-          : { x: 0, y: 0 },
+      position: hasSavedPositions && d.position && typeof d.position.x === "number"
+        ? { x: d.position.x, y: d.position.y }
+        : { x: 0, y: 0 },
     };
   });
-
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = [];
   for (const d of dag) {
@@ -424,36 +222,23 @@ const definitionToNodesAndEdges = (definition) => {
       });
     }
   }
-
-
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
 /*
-  Convert run data to VueFlow nodes/edges (for browse mode).
-  The dag array from GET /runs/{runId} is the source of truth.
-  Status is merged from the enriched workflow array.
+  Convert run data to VueFlow nodes/edges (for browse mode)
 */
 const runToNodesAndEdges = (run) => {
   const dag = run.dag || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-
-  // Status is now merged directly onto each dag node by the store.
-  const hasSavedPositions = dag.some(
-    (d) => d.position && typeof d.position.x === "number"
-  );
-
+  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
   const runProcessorParams = run.processorParams || {};
 
   const resultNodes = dag.map((d) => {
-    const nodeType = d.type === "data-source" ? "data-source"
-      : d.type === "data-target" ? "data-target"
-      : "default";
-
-    // Enrich node data based on type
+    const nodeType = d.type === "data-source" ? "data-source" : d.type === "data-target" ? "data-target" : "default";
     const extra = {};
     if (d.type === "data-source") {
       const src = runDataSources[d.id];
@@ -470,12 +255,11 @@ const runToNodesAndEdges = (run) => {
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
-
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, availableApplications.value),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -483,13 +267,11 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         ...extra,
       },
-      position:
-        hasSavedPositions && d.position && typeof d.position.x === "number"
-          ? { x: d.position.x, y: d.position.y }
-          : { x: 0, y: 0 },
+      position: hasSavedPositions && d.position && typeof d.position.x === "number"
+        ? { x: d.position.x, y: d.position.y }
+        : { x: 0, y: 0 },
     };
   });
-
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = [];
   for (const d of dag) {
@@ -504,8 +286,6 @@ const runToNodesAndEdges = (run) => {
       });
     }
   }
-
-
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -521,28 +301,16 @@ const parsePusherData = (data) => {
 
 const onRunStatusUpdate = async (raw) => {
   const data = parsePusherData(raw);
+  store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
 
-  // Update the run in the instances list
-  store.commit("analysisModule/UPDATE_RUN_STATUS", {
-    runId: data.runId,
-    status: data.status,
-  });
-
-  // If this is the currently selected run, update the detailed view
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId === currentRunId) {
     if (isTerminalStatus(data.status)) {
-      // Update status immediately so the UI reflects terminal state
       store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...selectedWorkflowActivity.value,
         status: data.status,
       });
-
-      // Full refresh to fetch metrics/costs from the run instance endpoint
-      await store.dispatch(
-        "analysisModule/setSelectedWorkflowActivity",
-        selectedWorkflowActivity.value
-      );
+      await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
       const activity = selectedWorkflowActivity.value;
       if (activity?.dag?.length > 0) {
         const result = runToNodesAndEdges(activity);
@@ -552,12 +320,9 @@ const onRunStatusUpdate = async (raw) => {
           ...n,
           position: posMap.get(n.id) || n.position,
         }));
-        if (result.edges.length > 0) {
-          edges.value = result.edges;
-        }
+        if (result.edges.length > 0) edges.value = result.edges;
       }
     } else {
-      // Non-terminal: update status in-place
       store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...selectedWorkflowActivity.value,
         status: data.status,
@@ -570,114 +335,46 @@ const onProcessorStatusUpdate = (raw) => {
   const data = parsePusherData(raw);
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId !== currentRunId) return;
-
-  // Update node status in store
-  store.commit("analysisModule/UPDATE_NODE_STATUS", {
-    nodeId: data.nodeId,
-    status: data.status,
-  });
-
-  // Update VueFlow node styling via VueFlow's own API
+  store.commit("analysisModule/UPDATE_NODE_STATUS", { nodeId: data.nodeId, status: data.status });
   updateNodeData(data.nodeId, { status: data.status });
-
-  // Update edge colors for edges sourced from this node
   edges.value = edges.value.map((edge) => {
     if (edge.source === data.nodeId) {
-      return {
-        ...edge,
-        style: { ...edge.style, stroke: statusBorderColor(data.status) },
-      };
+      return { ...edge, style: { ...edge.style, stroke: statusBorderColor(data.status) } };
     }
     return edge;
   });
 };
 
 /*
-  Select a run (browse mode)
+  Load run (browse mode)
 */
-const selectRun = async (run) => {
-  if (mode.value === "configure") return; // don't switch away mid-configure
-  mode.value = "browse";
-  selectedRun.value = run;
-  selectedNode.value = null;
-  accordionActiveNames.value = ["information", "runs"];
-
+const loadRun = async (runId) => {
+  if (!runId) return;
+  isLoading.value = true;
   try {
+    const instances = store.getters["analysisModule/workflowInstances"] || [];
+    const run = instances.find((r) => r.uuid === runId) || { uuid: runId };
     await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
-
     const activity = selectedWorkflowActivity.value;
     if (activity && activity.dag && activity.dag.length > 0) {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
-
-      if (result.needsAutoLayout) {
-        autoLayout();
-      } else {
-        setTimeout(() => fitView({ padding: 0.2 }), 50);
-      }
+      if (result.needsAutoLayout) autoLayout();
+      else setTimeout(() => fitView({ padding: 0.2 }), 50);
     }
   } catch (err) {
     console.error("Failed to load run details:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Failed to load run details." },
-    });
-  }
-};
-
-const clearRunSelection = () => {
-  selectedRun.value = null;
-  selectedNode.value = null;
-  nodes.value = [];
-  edges.value = [];
-  store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
-};
-
-const getRunFilterParams = () => {
-  const params = {
-    status: statusFilter.value !== "all" ? statusFilter.value : undefined,
-    workflowId: workflowFilter.value !== "all" ? workflowFilter.value : undefined,
-  };
-
-  // Convert dashboard range to start_date/end_date
-  const now = new Date();
-  if (dashboardRange.value === "lastMonth") {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    params.startDate = start.toISOString();
-    params.endDate = now.toISOString();
-  } else if (dashboardRange.value === "lastYear") {
-    const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-    params.startDate = start.toISOString();
-    params.endDate = now.toISOString();
-  }
-
-  return params;
-};
-
-const fetchRunsWithFilters = async () => {
-  isLoading.value = true;
-  try {
-    await store.dispatch("analysisModule/fetchWorkflowInstances", getRunFilterParams());
-  } catch (err) {
-    console.error("Failed to fetch runs:", err);
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load run details." } });
   } finally {
     isLoading.value = false;
   }
 };
 
-const loadMoreRuns = async () => {
-  isLoadingMore.value = true;
-  try {
-    await store.dispatch("analysisModule/fetchMoreWorkflowInstances", getRunFilterParams());
-  } catch (err) {
-    console.error("Failed to load more runs:", err);
-  } finally {
-    isLoadingMore.value = false;
-  }
+const goBack = () => {
+  store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
+  router.push({ name: "runs" });
 };
-
-watch(statusFilter, () => fetchRunsWithFilters());
-watch(workflowFilter, () => fetchRunsWithFilters());
 
 /*
   Node click handlers
@@ -689,27 +386,21 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    // Data-source node → open file picker
     if (node.type === "data-source") {
       openFilePicker(node.id);
       return;
     }
-    // Processor node → show config in sidebar
     if (!accordionActiveNames.value.includes("information")) {
       accordionActiveNames.value = [...accordionActiveNames.value, "information"];
     }
     return;
   }
 
-  // Browse mode — update selected processor in store
   const activity = selectedWorkflowActivity.value;
   if (activity && activity.dag) {
     const proc = activity.dag.find((p) => p.id === node.id);
-    if (proc) {
-      store.dispatch("analysisModule/setSelectedProcessor", proc);
-    }
+    if (proc) store.dispatch("analysisModule/setSelectedProcessor", proc);
   }
-
   if (!accordionActiveNames.value.includes("information")) {
     accordionActiveNames.value = [...accordionActiveNames.value, "information"];
   }
@@ -721,172 +412,20 @@ onPaneClick(() => {
 });
 
 /*
-  Initiate Workflow dialog — dataset search
+  Configure mode — initiate workflow from pending config
 */
-const datasetOptions = ref([]);
-const datasetSearchLoading = ref(false);
-const datasetSearchQuery = ref("");
-let datasetSearchTimer = null;
-
-const fetchDatasetOptions = async (query = "") => {
-  datasetSearchLoading.value = true;
-  try {
-    const token = await useGetToken();
-    const params = toQueryParams({
-      limit: 25,
-      offset: 0,
-      query,
-      orderBy: "IntId",
-      orderDirection: "Desc",
-      type: "research",
-      api_key: token,
-    });
-    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
-    const response = await useSendXhr(url);
-    datasetOptions.value = response?.datasets || response || [];
-  } catch (err) {
-    console.error("Failed to fetch datasets:", err);
-    datasetOptions.value = [];
-  } finally {
-    datasetSearchLoading.value = false;
-  }
-};
-
-const onDatasetSearch = (query) => {
-  clearTimeout(datasetSearchTimer);
-  datasetSearchTimer = setTimeout(() => fetchDatasetOptions(query), 300);
-};
-
-/*
-  Wizard dialog helpers
-*/
-const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
-
-const workflowSearch = ref("");
-const computeNodeSearch = ref("");
-
-const filteredWizardWorkflows = computed(() => {
-  const q = workflowSearch.value.toLowerCase().trim();
-  if (!q) return workflows.value;
-  return workflows.value.filter(w =>
-    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
-  );
-});
-
-const filteredWizardComputeNodes = computed(() => {
-  const q = computeNodeSearch.value.toLowerCase().trim();
-  if (!q) return computeNodes.value;
-  return computeNodes.value.filter(cn =>
-    cn.name?.toLowerCase().includes(q) || cn.description?.toLowerCase().includes(q)
-  );
-});
-
-const wizardSelectedWorkflow = computed(() =>
-  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
-);
-const wizardSelectedComputeNode = computed(() =>
-  computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
-);
-const wizardSelectedDataset = computed(() =>
-  datasetOptions.value.find(d => d.content?.id === wizardForm.value.datasetId) || null
-);
-
-const wizardCanNext = computed(() => {
-  if (wizardStep.value === 0) return !!wizardForm.value.workflowId;
-  if (wizardStep.value === 1) return !!wizardForm.value.computeNodeId;
-  if (wizardStep.value === 2) return !!wizardForm.value.datasetId;
-  return true;
-});
-
-const openWizardDialog = () => {
-  wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  workflowSearch.value = "";
-  computeNodeSearch.value = "";
-  datasetSearchQuery.value = "";
-  wizardStep.value = 0;
-  rerunSource.value = null;
-  accordionActiveNames.value = ["information"];
-  wizardVisible.value = true;
-  fetchDatasetOptions();
-};
-
-const exportRunConfig = () => {
-  const activity = selectedWorkflowActivity.value;
-  if (!activity) return;
-
-  const json = JSON.stringify(activity, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `run-${activity.uuid}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-const rerunFromRun = async (run) => {
-  // Fetch full run details to get dag config, processorParams, etc.
-  try {
-    await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
-    const fullRun = store.getters["analysisModule/selectedWorkflowActivity"];
-    rerunSource.value = fullRun || run;
-  } catch {
-    rerunSource.value = run;
-  }
-
-  wizardForm.value = {
-    workflowId: run.workflowUuid || "",
-    computeNodeId: run.computeNodeUuid || "",
-    datasetId: run.datasetId || "",
-  };
-  workflowSearch.value = "";
-  computeNodeSearch.value = "";
-  wizardStep.value = 3; // jump to confirmation
-  wizardVisible.value = true;
-  fetchDatasetOptions();
-};
-
-const wizardNext = () => {
-  if (wizardStep.value < 3) wizardStep.value++;
-};
-
-const wizardBack = () => {
-  if (wizardStep.value > 0) wizardStep.value--;
-};
-
-const wizardConfirm = () => {
-  // Copy wizard selections into initiateForm and trigger the existing flow
-  initiateForm.value = { ...wizardForm.value };
-  wizardVisible.value = false;
-  initiateWorkflow();
-};
-
-const initiateWorkflow = async () => {
-  const { workflowId, computeNodeId, datasetId } = initiateForm.value;
-  if (!workflowId || !computeNodeId || !datasetId) {
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Please select a workflow, compute node, and dataset." },
-    });
-    return;
-  }
+const initiateWorkflowFromConfig = async (pendingConfig) => {
+  const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
+  initiateForm.value = { workflowId, computeNodeId, datasetId };
 
   try {
-    // Fetch the workflow definition to get the DAG
-    const definition = await store.dispatch(
-      "analysisModule/fetchWorkflowDefinition",
-      workflowId
-    );
-
+    const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
     configDefinition.value = definition;
-    wizardVisible.value = false;
 
-    // Reset configuration state
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
-    // Initialize nodeConfigs for each processor and data-target node
     const dag = definition.dag || definition.processors || [];
-    const source = rerunSource.value;
     const sourceConfigs = source?.processorConfigs || [];
     const sourceParams = source?.processorParams || {};
 
@@ -899,8 +438,6 @@ const initiateWorkflow = async () => {
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
         const ttDef = getTargetTypeDefinition(d.targetType);
         const paramDefs = ttDef?.params || [];
-
-        // Build params from the target type definition, pre-filling from rerun source or defaults
         const targetParams = paramDefs.map((pd) => ({
           name: pd.name,
           type: pd.type || "string",
@@ -908,7 +445,6 @@ const initiateWorkflow = async () => {
           required: !!pd.required,
           value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
         }));
-
         nodeConfigs[d.id] = {
           computeType: srcCfg?.executionTarget || d.computeType || fallback,
           targetType: d.targetType || null,
@@ -926,30 +462,21 @@ const initiateWorkflow = async () => {
       }
     });
 
-    // Clear rerun source after applying
     rerunSource.value = null;
 
-    // Render the definition DAG on canvas
     const result = definitionToNodesAndEdges(definition);
     nodes.value = result.nodes;
     edges.value = result.edges;
+    if (result.needsAutoLayout) autoLayout();
+    else setTimeout(() => fitView({ padding: 0.2 }), 50);
 
-    if (result.needsAutoLayout) {
-      autoLayout();
-    } else {
-      setTimeout(() => fitView({ padding: 0.2 }), 50);
-    }
-
-    // Enter configure mode
     mode.value = "configure";
-    selectedRun.value = null;
     selectedNode.value = null;
     accordionActiveNames.value = ["information"];
   } catch (err) {
     console.error("Failed to load workflow definition:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Failed to load workflow definition." },
-    });
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load workflow definition." } });
+    router.push({ name: "runs" });
   }
 };
 
@@ -961,14 +488,13 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
-  accordionActiveNames.value = ["runs"];
+  router.push({ name: "runs" });
 };
 
 /*
-  Execute Workflow — actually create the run
+  Execute Workflow
 */
 const executeWorkflow = async () => {
-  // Validate required data-target params before executing
   const dag = configDefinition.value?.dag || [];
   for (const [nodeId, cfg] of Object.entries(nodeConfigs)) {
     const dagNode = dag.find((n) => n.id === nodeId);
@@ -986,28 +512,19 @@ const executeWorkflow = async () => {
 
   isExecuting.value = true;
   try {
-    // Build dataSources map (top-level): { nodeId: { packageIds: [...] } }
     const dataSources = {};
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
       dataSources[nodeId] = { packageIds: ids };
     });
 
-    const dag = configDefinition.value?.dag || [];
-
-    // Build processorConfigs: all runnable nodes (processors + data-targets)
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (!dagNode) return;
-
       if (dagNode.type === "data-target") {
-        // Data-target: executionTarget from computeType
-        if (cfg.computeType) {
-          processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
-        }
+        if (cfg.computeType) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
       } else if (dagNode.type !== "data-source") {
-        // Processor node: version + executionTarget + optional cpu/memory
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
         if (cfg.version) entry.version = cfg.version;
@@ -1017,28 +534,22 @@ const executeWorkflow = async () => {
       }
     });
 
-    // Build processorParams: keyed by processor node ID, free-form params
     const processorParams = {};
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
       if (cfg.params && cfg.params.length > 0) {
         const obj = {};
         cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
-        if (Object.keys(obj).length > 0) {
-          processorParams[nodeId] = obj;
-        }
+        if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
       }
     });
 
-    // Build dataTargets: keyed by data-target node ID
     const dataTargets = {};
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
         const obj = {};
         cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
-        if (Object.keys(obj).length > 0) {
-          dataTargets[nodeId] = { params: obj };
-        }
+        if (Object.keys(obj).length > 0) dataTargets[nodeId] = { params: obj };
       }
     });
 
@@ -1055,45 +566,32 @@ const executeWorkflow = async () => {
     };
 
     const newRun = await store.dispatch("analysisModule/createRun", payload);
+    EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
-    EventBus.$emit("toast", {
-      detail: { type: "success", msg: "Workflow executed successfully." },
-    });
-
-    // Clean up configure state but keep a placeholder selectedRun
-    // to prevent the dashboard from flashing during the transition
     mode.value = "browse";
     configDefinition.value = null;
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
     selectedNode.value = null;
 
-    // Set a temporary placeholder so the canvas doesn't show the dashboard
-    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
-    selectedRun.value = newRun || { uuid: runId, status: "STARTED" };
-    nodes.value = [];
-    edges.value = [];
-
-    // Refresh runs list and auto-select the new run
-    await store.dispatch("analysisModule/fetchWorkflowInstances");
-    const runToSelect = runId
-      ? workflowInstances.value.find((r) => r.uuid === runId) || newRun
-      : workflowInstances.value[0]; // fallback to newest
-    if (runToSelect) {
-      await selectRun(runToSelect);
+    const newRunId = newRun?.uuid || newRun?.id || newRun?.runId;
+    if (newRunId) {
+      await store.dispatch("analysisModule/fetchWorkflowInstances");
+      router.replace({ name: "run-detail", params: { runId: newRunId } });
+      await loadRun(newRunId);
+    } else {
+      router.push({ name: "runs" });
     }
   } catch (err) {
     console.error("Failed to execute workflow:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Failed to execute workflow." },
-    });
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to execute workflow." } });
   } finally {
     isExecuting.value = false;
   }
 };
 
 /*
-  File Picker — browse dataset files for data-source nodes
+  File Picker
 */
 const openFilePicker = (nodeId) => {
   filePickerNodeId.value = nodeId;
@@ -1119,14 +617,11 @@ const fetchDatasetFiles = async () => {
 
 const onClickFileLabel = async (file) => {
   if (file.content.packageType !== "Collection") return;
-
   try {
     const token = await useGetToken();
     const url = `${config.value.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
     filePickerFiles.value = [...(response.children || [])];
-
-    // Update breadcrumb
     if (
       !filePickerAncestorList.value.some(
         (a) => a.content.id === filePickerCurrentFile.value.content?.id
@@ -1160,7 +655,10 @@ const handleNavigateBreadcrumb = async (id) => {
       );
       if (idx >= 0) {
         filePickerCurrentFile.value = filePickerAncestorList.value[idx];
-        filePickerAncestorList.value = filePickerAncestorList.value.slice(0, idx);
+        filePickerAncestorList.value = filePickerAncestorList.value.slice(
+          0,
+          idx
+        );
       }
     }
     const response = await useSendXhr(url);
@@ -1202,7 +700,6 @@ const removeParam = (nodeId, index) => {
   Logs dialog
 */
 const openLogs = async (nodeId, label) => {
-  if (!selectedRun.value) return;
   logsNodeId.value = nodeId;
   logsNodeLabel.value = label || nodeId;
   logsMessages.value = [];
@@ -1211,7 +708,7 @@ const openLogs = async (nodeId, label) => {
 
   try {
     const token = await useGetToken();
-    const runId = selectedWorkflowActivity.value?.uuid || selectedRun.value.uuid;
+    const runId = selectedWorkflowActivity.value?.uuid || props.runId;
     const url = `${config.value.api2Url}/compute/workflows/runs/${runId}/logs?nodeId=${nodeId}`;
     const resp = await fetch(url, {
       method: "GET",
@@ -1257,8 +754,10 @@ const cancelRun = async () => {
       });
     }
     cancelRunDialogVisible.value = false;
-    // Refresh run status
-    await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
+    await store.dispatch(
+      "analysisModule/setSelectedWorkflowActivity",
+      selectedWorkflowActivity.value
+    );
   } catch (err) {
     console.error("Failed to cancel run:", err);
     EventBus.$emit("toast", {
@@ -1270,169 +769,124 @@ const cancelRun = async () => {
 };
 
 /*
-  Time formatting
-*/
-const formatTime = (dateStr) => {
-  if (!dateStr) return "N/A";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "N/A";
-  return d.toLocaleString();
-};
-
-const formatDuration = (start, end) => {
-  if (!start || !end) return "N/A";
-  const ms = new Date(end) - new Date(start);
-  if (isNaN(ms) || ms < 0) return "N/A";
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSec = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${remainingSec}s`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMin = minutes % 60;
-  return `${hours}h ${remainingMin}m`;
-};
-
-/*
   Metrics helpers
 */
-const runMetrics = computed(() => selectedWorkflowActivity.value?.metrics || null);
-
-const formatCost = (cost) => {
-  if (cost == null) return "N/A";
-  if (cost === 0) return "$0.00";
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  return `$${cost.toFixed(2)}`;
-};
-
-const formatModelName = (model) => {
-  if (!model) return "N/A";
-  // Strip AWS Bedrock prefixes like "us." or ARN paths
-  return model.replace(/^(us|eu|ap)\./,  "").replace(/^arn:.*\//, "");
-};
-
-const formatBytes = (bytes) => {
-  if (bytes == null) return "N/A";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
-
-const formatDurationSec = (sec) => {
-  if (sec == null) return "N/A";
-  if (sec < 60) return `${sec.toFixed(1)}s`;
-  const m = Math.floor(sec / 60);
-  const s = (sec % 60).toFixed(0);
-  return `${m}m ${s}s`;
-};
+const runMetrics = computed(
+  () => selectedWorkflowActivity.value?.metrics || null
+);
 
 const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value) : nodeId;
 };
 
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
-  return runMetrics.value.nodeMetrics.find(
-    (nm) => nm.nodeId === selectedNode.value.id
-  ) || null;
+  return (
+    runMetrics.value.nodeMetrics.find(
+      (nm) => nm.nodeId === selectedNode.value.id
+    ) || null
+  );
 });
 
-const formatMetricKey = (key) => {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (s) => s.toUpperCase())
-    .replace(/Sec$/, "(s)")
-    .replace(/Ms$/, "(ms)")
-    .replace(/Mi B$/, "(MiB)")
-    .replace(/ G B/, " GB")
-    .trim();
+/*
+  Rerun & Export
+*/
+const exportRunConfig = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity) return;
+  const json = JSON.stringify(activity, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `run-${activity.uuid}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
-const formatMetricValue = (key, value) => {
-  if (value == null) return "N/A";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "number") {
-    if (key === "nodeId") return String(value);
-    if (key.toLowerCase().includes("cost")) return formatCost(value);
-    if (key.toLowerCase().includes("bytes")) return formatBytes(value);
-    if (key.toLowerCase().endsWith("sec")) return formatDurationSec(value);
-    if (key.toLowerCase().endsWith("ms")) return `${value.toLocaleString()} ms`;
-    if (Number.isInteger(value)) return value.toLocaleString();
-    return value.toFixed(3);
-  }
-  return String(value);
+const rerunFromRun = async () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity) return;
+  store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
+    workflowId: activity.workflowUuid || "",
+    computeNodeId: activity.computeNodeUuid || "",
+    datasetId: activity.datasetId || "",
+    rerunSource: activity,
+  });
+  router.push({ name: "run-configure" });
 };
 
 /*
-  Compute node / user name lookup
+  Fetch dataset options for configure summary
 */
-const computeNodeName = (uuid) => {
-  if (!uuid) return "N/A";
-  const node = computeNodes.value.find((n) => n.uuid === uuid);
-  return node ? node.name : uuid;
-};
-
-const getUserName = (userId) => {
-  if (!userId) return "Unknown";
-  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
-    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You";
+const fetchDatasetOptions = async (query = "") => {
+  datasetSearchLoading.value = true;
+  try {
+    const token = await useGetToken();
+    const params = toQueryParams({
+      limit: 25, offset: 0, query,
+      orderBy: "IntId", orderDirection: "Desc",
+      type: "research", api_key: token,
+    });
+    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
+    const response = await useSendXhr(url);
+    datasetOptions.value = response?.datasets || response || [];
+  } catch (err) {
+    datasetOptions.value = [];
+  } finally {
+    datasetSearchLoading.value = false;
   }
-  const member = orgMembers.value.find((m) => m.id === userId || m.intId === userId);
-  if (member) {
-    return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
-  }
-  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
 };
 
 /*
   Lifecycle
 */
 onMounted(async () => {
-  isLoading.value = true;
-  try {
-    await Promise.all([
-      store.dispatch("analysisModule/fetchWorkflowInstances"),
-      store.dispatch("analysisModule/fetchComputeNodes"),
-      store.dispatch("analysisModule/fetchWorkflows"),
-      store.dispatch("analysisModule/fetchTargetTypes"),
-      fetchOrgCounters(),
-    ]);
-  } catch (err) {
-    console.error("Failed to load data:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Failed to load data." },
-    });
-  } finally {
-    isLoading.value = false;
+  await Promise.all([
+    store.dispatch("analysisModule/fetchComputeNodes"),
+    store.dispatch("analysisModule/fetchWorkflows"),
+    store.dispatch("analysisModule/fetchTargetTypes"),
+  ]);
+
+  // Check for pending configure mode
+  const pendingConfig = store.state.analysisModule.pendingRunConfig;
+  if (pendingConfig) {
+    store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
+    fetchDatasetOptions();
+    await initiateWorkflowFromConfig(pendingConfig);
+  } else if (props.runId) {
+    if (!store.getters["analysisModule/workflowInstances"]?.length) {
+      await store.dispatch("analysisModule/fetchWorkflowInstances");
+    }
+    await loadRun(props.runId);
   }
 
-  // Subscribe to Pusher analytics channel for real-time status updates
+  // Subscribe to Pusher
   if (pusher) {
     const rawOrgId = store.state.activeOrganization?.organization?.id;
     const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, '');
-    const userUuid = rawUserId?.replace(/^N:user:/, '');
+    const orgUuid = rawOrgId?.replace(/^N:organization:/, "");
+    const userUuid = rawUserId?.replace(/^N:user:/, "");
     analyticsChannelName = orgUuid
       ? `organization-${orgUuid}-analytics`
       : `user-${userUuid}-analytics`;
-
     analyticsChannel = pusher.subscribe(analyticsChannelName);
     store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
-
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
   }
 });
 
 onBeforeUnmount(() => {
-  // Unsubscribe from Pusher analytics channel
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
-    analyticsChannel.unbind("workflow-processor-status", onProcessorStatusUpdate);
+    analyticsChannel.unbind(
+      "workflow-processor-status",
+      onProcessorStatusUpdate
+    );
     if (pusher && analyticsChannelName) {
       pusher.unsubscribe(analyticsChannelName);
     }
@@ -1448,7 +902,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="run-monitor">
+  <div class="run-detail">
     <!-- Header -->
     <div class="builder-header">
       <template v-if="mode === 'configure'">
@@ -1464,16 +918,11 @@ onUnmounted(() => {
         </div>
       </template>
       <template v-else>
-        <span class="header-title" :class="{ 'header-title-primary': !selectedRun }">
-          <template v-if="selectedRun">
-            <a class="header-back-link" @click="clearRunSelection">Runs</a>
-            <span class="header-breadcrumb-sep">/</span>
-            {{ runTimeLabel }}
-            <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
-          </template>
-          <template v-else>
-            Runs
-          </template>
+        <span class="header-title">
+          <a class="header-back-link" @click="goBack">Runs</a>
+          <span class="header-breadcrumb-sep">/</span>
+          {{ runTimeLabel }}
+          <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
       </template>
     </div>
@@ -1481,109 +930,13 @@ onUnmounted(() => {
     <div class="builder-content">
       <!-- Canvas (LEFT) -->
       <div class="workflow-canvas">
-        <div v-if="nodes.length === 0 && !selectedRun" class="runs-dashboard">
-          <!-- Active Runs Strip -->
-          <div v-if="activeRuns.length > 0" class="dashboard-section">
-            <h3 class="dashboard-section-title">
-              <span class="active-pulse" />
-              {{ activeRuns.length }} Active Run{{ activeRuns.length !== 1 ? 's' : '' }}
-            </h3>
-            <div class="active-runs-grid">
-              <div
-                v-for="run in activeRuns"
-                :key="run.uuid"
-                class="active-run-card"
-                @click="selectRun(run)"
-              >
-                <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
-                <div class="active-run-meta">
-                  <span class="run-status-dot" :class="statusDotClass(run.status)" />
-                  <span>{{ statusLabel(run.status) }}</span>
-                  <span class="active-run-time">{{ formatTime(run.startedAt) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Aggregate Stats -->
-          <div class="dashboard-section">
-            <div class="dashboard-section-header">
-              <h3 class="dashboard-section-title">
-                Overview
-                <el-tooltip content="Metrics update approximately every 15 minutes" placement="top">
-                  <IconInfoSmall :width="24" :height="24" color="#9ca3af" class="dashboard-info-icon" />
-                </el-tooltip>
-              </h3>
-              <div class="dashboard-range-buttons">
-                <button
-                  v-for="opt in dashboardRangeOptions"
-                  :key="opt.value"
-                  class="range-btn"
-                  :class="{ active: dashboardRange === opt.value }"
-                  @click="dashboardRange = opt.value"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
-            <div v-if="countersLoading && !dashboardStats" class="dashboard-empty-range">
-              Loading metrics...
-            </div>
-            <div v-else-if="dashboardStats" class="dashboard-stats">
-              <div class="dash-stat">
-                <span class="dash-stat-value">{{ dashboardStats.total }}</span>
-                <span class="dash-stat-label">Total Runs</span>
-              </div>
-              <div class="dash-stat">
-                <span class="dash-stat-value dash-stat-green">{{ dashboardStats.succeeded }}</span>
-                <span class="dash-stat-label">Succeeded</span>
-              </div>
-              <div class="dash-stat">
-                <span class="dash-stat-value dash-stat-red">{{ dashboardStats.failed }}</span>
-                <span class="dash-stat-label">Failed</span>
-              </div>
-              <div class="dash-stat">
-                <span class="dash-stat-value">{{ dashboardStats.successRate }}%</span>
-                <span class="dash-stat-label">Success Rate</span>
-              </div>
-            </div>
-            <div v-else class="dashboard-empty-range">
-              No runs in this time range
-            </div>
-          </div>
-
-          <!-- Recent Completions -->
-          <div v-if="recentCompletedRuns.length > 0" class="dashboard-section">
-            <h3 class="dashboard-section-title">Recent Completions</h3>
-            <div class="recent-runs-list">
-              <div
-                v-for="run in recentCompletedRuns"
-                :key="run.uuid"
-                class="recent-run-row"
-                @click="selectRun(run)"
-              >
-                <span class="run-status-dot" :class="statusDotClass(run.status)" />
-                <span class="recent-run-name">{{ run.workflowName || 'Unnamed' }}</span>
-                <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
-                <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty fallback -->
-          <div v-if="!dashboardStats && activeRuns.length === 0" class="empty-canvas">
-            <h3>No runs yet</h3>
-            <p>Initiate a workflow to see run activity here</p>
-          </div>
-        </div>
-
-        <div v-else-if="nodes.length === 0 && selectedRun" class="empty-canvas">
+        <div v-if="nodes.length === 0 && isLoading" class="empty-canvas">
           <span class="loading-text">Loading run...</span>
         </div>
 
         <div v-else-if="nodes.length === 0" class="empty-canvas">
-          <h3>Select a run to view its status</h3>
-          <p>Choose a run from the sidebar, or initiate a new workflow</p>
+          <h3>Loading run details</h3>
+          <p>Please wait...</p>
         </div>
 
         <div class="run-monitor-flow">
@@ -1601,8 +954,8 @@ onUnmounted(() => {
             <Controls position="top-left" />
 
             <div v-if="nodes.length > 0" class="canvas-toolbar">
-              <span v-if="selectedRun" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status || selectedRun.status)">
-                {{ statusLabel(selectedWorkflowActivity?.status || selectedRun.status) }}
+              <span v-if="mode === 'browse'" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status)">
+                {{ statusLabel(selectedWorkflowActivity?.status) }}
               </span>
               <button class="auto-layout-btn" @click="autoLayout">
                 Auto Layout
@@ -1713,11 +1066,8 @@ onUnmounted(() => {
 
       <!-- Sidebar (RIGHT) -->
       <div class="applications-sidebar">
-        <bf-button v-if="mode !== 'configure' && !selectedRun" class="new-workflow-btn" @click="openWizardDialog">
-          Initiate Workflow
-        </bf-button>
         <bf-button
-          v-if="selectedRun && selectedWorkflowActivity && !isTerminalStatus(selectedWorkflowActivity.status)"
+          v-if="mode === 'browse' && selectedWorkflowActivity && !isTerminalStatus(selectedWorkflowActivity.status)"
           class="new-workflow-btn danger"
           @click="cancelRunDialogVisible = true"
         >
@@ -1827,18 +1177,8 @@ onUnmounted(() => {
                     :key="index"
                     class="param-row"
                   >
-                    <el-input
-                      v-model="param.key"
-                      size="small"
-                      placeholder="Key"
-                      class="param-key"
-                    />
-                    <el-input
-                      v-model="param.value"
-                      size="small"
-                      placeholder="Value"
-                      class="param-value"
-                    />
+                    <el-input v-model="param.key" size="small" placeholder="Key" class="param-key" />
+                    <el-input v-model="param.value" size="small" placeholder="Value" class="param-value" />
                     <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
                   </div>
                   <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
@@ -2012,10 +1352,8 @@ onUnmounted(() => {
                   :class="{ clickable: selectedNode.data?.processorType === 'processor' }"
                   @click="selectedNode.data?.processorType === 'processor' && openLogs(selectedNode.id, selectedNode.data?.label)"
                 >
-                  <span class="metrics-summary-value">
-                    <IconFile :width="16" :height="16" />
-                  </span>
-                  <span class="metrics-summary-label">Logs</span>
+                  <span class="metrics-summary-value">Logs</span>
+                  <span class="metrics-summary-label">View</span>
                 </div>
               </div>
 
@@ -2025,7 +1363,7 @@ onUnmounted(() => {
             </template>
 
             <!-- BROWSE MODE: Run Info (no node selected) -->
-            <template v-else-if="mode === 'browse' && selectedRun && selectedWorkflowActivity?.uuid">
+            <template v-else-if="mode === 'browse' && selectedWorkflowActivity?.uuid">
               <h4 class="sidebar-section-title">Run Details</h4>
               <div class="info-card">
                 <div v-if="runWorkflowName" class="info-row">
@@ -2087,7 +1425,7 @@ onUnmounted(() => {
                 </div>
               </template>
 
-              <bf-button class="secondary rerun-config-btn" @click="rerunFromRun(selectedWorkflowActivity)">
+              <bf-button class="secondary rerun-config-btn" @click="rerunFromRun">
                 <IconRotateRight :width="14" :height="14" />
                 Rerun with configuration
               </bf-button>
@@ -2095,266 +1433,15 @@ onUnmounted(() => {
               <bf-button class="secondary export-run-btn" @click="exportRunConfig">
                 Export Run Config
               </bf-button>
-
             </template>
 
             <div v-else class="info-empty">
-              Select a run to see details
-            </div>
-          </el-collapse-item>
-
-          <!-- Runs List -->
-          <el-collapse-item title="Runs" name="runs">
-            <div class="filter-bar">
-              <el-select
-                v-model="statusFilter"
-                placeholder="Filter by status"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option
-                  v-for="opt in runStatusOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-              <el-select
-                v-model="workflowFilter"
-                placeholder="Filter by workflow"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Workflows" value="all" />
-                <el-option
-                  v-for="wf in workflows"
-                  :key="wf.uuid"
-                  :label="wf.name"
-                  :value="wf.uuid"
-                />
-              </el-select>
-              <el-select
-                v-model="computeNodeFilter"
-                placeholder="Filter by compute node"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Compute Nodes" value="all" />
-                <el-option
-                  v-for="cn in computeNodes"
-                  :key="cn.uuid"
-                  :label="cn.name"
-                  :value="cn.uuid"
-                />
-              </el-select>
-            </div>
-
-            <div v-if="isLoading" class="loading">Loading runs...</div>
-            <div v-else class="workflow-list">
-              <div
-                v-for="run in filteredRuns"
-                :key="run.uuid"
-                class="workflow-list-item"
-                :class="{
-                  selected: selectedRun && selectedRun.uuid === run.uuid,
-                  disabled: mode === 'configure',
-                }"
-                @click="selectRun(run)"
-              >
-                <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
-                <div class="wf-item-info">
-                  <div class="wf-item-name">{{ formatTime(run.startedAt) }} </div>
-                  <div class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
-                  <div class="wf-item-meta">
-
-                    {{ computeNodeName(run.computeNodeUuid) }}
-                  </div>
-                  <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
-                </div>
-                <button
-                  class="rerun-btn"
-                  title="Rerun with this configuration"
-                  @click.stop="rerunFromRun(run)"
-                >
-                  <IconRotateRight :width="16" :height="16" />
-                </button>
-              </div>
-              <div v-if="filteredRuns.length === 0" class="workflow-list-empty">
-                No runs found
-              </div>
-              <button
-                v-if="hasMoreRuns"
-                class="load-more-btn"
-                :disabled="isLoadingMore"
-                @click="loadMoreRuns"
-              >
-                {{ isLoadingMore ? 'Loading...' : 'Load more runs' }}
-              </button>
+              Loading run details...
             </div>
           </el-collapse-item>
         </el-collapse>
       </div>
     </div>
-
-    <!-- Initiate Workflow Dialog -->
-    <el-dialog
-      v-model="wizardVisible"
-      :title="wizardStepTitles[wizardStep]"
-      width="560px"
-      :close-on-click-modal="false"
-    >
-      <div class="wizard-body">
-        <!-- Progress dots -->
-        <div class="wizard-progress">
-          <span
-            v-for="(title, i) in wizardStepTitles"
-            :key="i"
-            class="wizard-dot"
-            :class="{ active: wizardStep === i, done: wizardStep > i }"
-          ></span>
-        </div>
-
-        <!-- Step 0: Workflow -->
-        <div v-if="wizardStep === 0" class="wizard-step">
-          <p class="wizard-step-desc">Choose a workflow definition to run.</p>
-          <div v-if="wizardSelectedWorkflow" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedWorkflow.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.workflowId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedWorkflow.description" class="wizard-selection-desc">{{ wizardSelectedWorkflow.description }}</div>
-            <div class="wizard-selection-meta">{{ (wizardSelectedWorkflow.dag || []).length }} processors</div>
-          </div>
-          <template v-else>
-            <el-input
-              v-model="workflowSearch"
-              placeholder="Filter workflows..."
-              clearable
-              class="wizard-search"
-            />
-            <div class="wizard-cards">
-              <div
-                v-for="wf in filteredWizardWorkflows"
-                :key="wf.uuid"
-                class="wizard-card"
-                :class="{ disabled: !wf.isActive }"
-                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
-              >
-                <div class="wizard-card-name">{{ wf.name }}</div>
-                <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
-                <div class="wizard-card-meta">
-                  {{ (wf.dag || []).length }} processors
-                  <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
-                </div>
-              </div>
-              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 1: Compute Node -->
-        <div v-if="wizardStep === 1" class="wizard-step">
-          <p class="wizard-step-desc">Select the compute node to execute the workflow on.</p>
-          <div v-if="wizardSelectedComputeNode" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedComputeNode.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.computeNodeId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedComputeNode.description" class="wizard-selection-desc">{{ wizardSelectedComputeNode.description }}</div>
-          </div>
-          <template v-else>
-            <el-input
-              v-model="computeNodeSearch"
-              placeholder="Filter compute nodes..."
-              clearable
-              class="wizard-search"
-            />
-            <div class="wizard-cards">
-              <div
-                v-for="cn in filteredWizardComputeNodes"
-                :key="cn.uuid"
-                class="wizard-card"
-                @click="wizardForm.computeNodeId = cn.uuid"
-              >
-                <div class="wizard-card-name">{{ cn.name }}</div>
-                <div v-if="cn.description" class="wizard-card-desc">{{ cn.description }}</div>
-              </div>
-              <div v-if="filteredWizardComputeNodes.length === 0" class="wizard-cards-loading">No compute nodes found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 2: Dataset -->
-        <div v-if="wizardStep === 2" class="wizard-step">
-          <p class="wizard-step-desc">Search and select the dataset to process.</p>
-          <div v-if="wizardSelectedDataset" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedDataset.content?.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.datasetId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedDataset.content?.description" class="wizard-selection-desc">{{ wizardSelectedDataset.content.description }}</div>
-          </div>
-          <template v-else>
-            <el-input
-              placeholder="Search datasets..."
-              v-model="datasetSearchQuery"
-              @input="onDatasetSearch"
-              clearable
-              class="wizard-search"
-            />
-            <div class="wizard-cards">
-              <div v-if="datasetSearchLoading" class="wizard-cards-loading">Searching...</div>
-              <div
-                v-for="ds in datasetOptions"
-                :key="ds.content?.id"
-                class="wizard-card"
-                @click="wizardForm.datasetId = ds.content?.id"
-              >
-                <div class="wizard-card-name">{{ ds.content?.name }}</div>
-                <div v-if="ds.content?.description" class="wizard-card-desc">{{ ds.content.description }}</div>
-              </div>
-              <div v-if="!datasetSearchLoading && datasetOptions.length === 0" class="wizard-cards-loading">No datasets found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 3: Confirm -->
-        <div v-if="wizardStep === 3" class="wizard-step">
-          <p class="wizard-step-desc">Review your selections before proceeding.</p>
-          <div class="wizard-summary">
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Workflow</span>
-              <span class="wizard-summary-value">{{ wizardSelectedWorkflow?.name || wizardForm.workflowId }}</span>
-            </div>
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Compute Node</span>
-              <span class="wizard-summary-value">{{ wizardSelectedComputeNode?.name || wizardForm.computeNodeId }}</span>
-            </div>
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Dataset</span>
-              <span class="wizard-summary-value">{{ wizardSelectedDataset?.content?.name || wizardForm.datasetId }}</span>
-            </div>
-          </div>
-          <div v-if="rerunSource" class="wizard-hint">
-            All processor parameters and execution targets will be copied from the previous run. You will still need to configure <strong>data source</strong> nodes to select files before executing.
-          </div>
-          <div v-else class="wizard-hint">
-            After clicking <strong>Configure</strong>, you will be able to click on <strong>data source</strong> nodes to select files, and on <strong>processor</strong> nodes to adjust settings before executing the run.
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="run-dialog-footer">
-          <bf-button class="secondary" @click="wizardVisible = false">Cancel</bf-button>
-          <div class="wizard-footer-right">
-            <bf-button v-if="wizardStep > 0" class="secondary" @click="wizardBack">Back</bf-button>
-            <bf-button v-if="wizardStep < 3" :disabled="!wizardCanNext" @click="wizardNext">Next</bf-button>
-            <bf-button v-else @click="wizardConfirm">Configure</bf-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
 
     <!-- File Picker Dialog -->
     <el-dialog
@@ -2439,13 +1526,11 @@ onUnmounted(() => {
       :close-on-click-modal="true"
     >
       <div v-if="runMetrics" class="metrics-receipt">
-        <!-- Header -->
         <div class="receipt-header">
           <div class="receipt-title">{{ runWorkflowName || 'Workflow Run' }}</div>
           <div class="receipt-date">{{ formatTime(selectedWorkflowActivity?.startedAt) }}</div>
         </div>
 
-        <!-- Summary row -->
         <div class="receipt-section">
           <div class="receipt-section-title">Summary</div>
           <div class="receipt-row">
@@ -2466,7 +1551,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Node Metrics -->
         <div v-if="runMetrics.nodeMetrics?.length" class="receipt-section">
           <div class="receipt-section-title">Node Performance</div>
           <div
@@ -2497,7 +1581,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Cost Breakdown -->
         <div v-if="runMetrics.costEstimate" class="receipt-section">
           <div class="receipt-section-title">Cost Breakdown</div>
 
@@ -2614,7 +1697,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Total -->
         <div class="receipt-total">
           <span>Total Estimated Cost</span>
           <span>{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
@@ -2786,8 +1868,7 @@ onUnmounted(() => {
 @use "../../../styles/theme";
 @use "../../../styles/element/select";
 
-
-.run-monitor {
+.run-detail {
   height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
@@ -2810,12 +1891,6 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-
-    &.header-title-primary {
-      font-weight: 600;
-      font-size: 15px;
-      color: theme.$black;
-    }
   }
 
   .header-workflow-name {
@@ -2884,210 +1959,6 @@ onUnmounted(() => {
 
   h3 { margin: 0 0 10px 0; }
   p { margin: 0; font-size: 14px; }
-}
-
-/* Runs Dashboard */
-.runs-dashboard {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  overflow-y: auto;
-  padding: 24px 32px;
-  background: theme.$gray_1;
-}
-
-.dashboard-section {
-  margin-bottom: 24px;
-}
-
-.dashboard-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 32px;
-}
-
-.dashboard-section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  margin: 0 0 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .dashboard-section-header & {
-    margin-bottom: 0;
-  }
-}
-
-.dashboard-info-icon {
-  cursor: help;
-}
-
-.dashboard-range-buttons {
-  display: flex;
-  gap: 4px;
-}
-
-.range-btn {
-  padding: 4px 10px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  background: theme.$white;
-  color: theme.$gray_5;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_1;
-  }
-
-  &.active {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
-}
-
-.active-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #06b6d4;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4); }
-  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
-}
-
-.dashboard-empty-range {
-  font-size: 13px;
-  color: theme.$gray_4;
-  padding: 16px 0;
-}
-
-.active-runs-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-}
-
-.active-run-card {
-  background: theme.$white;
-  border: 1px solid #67e8f9;
-  border-radius: 4px;
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: #06b6d4;
-    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15);
-  }
-}
-
-.active-run-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-  margin-bottom: 6px;
-}
-
-.active-run-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-
-.active-run-time {
-  margin-left: auto;
-  font-size: 11px;
-}
-
-.dashboard-stats {
-  display: flex;
-  gap: 16px;
-}
-
-.dash-stat {
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 100px;
-}
-
-.dash-stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: theme.$black;
-  line-height: 1.2;
-}
-
-.dash-stat-green { color: #17BB62; }
-.dash-stat-red { color: #e02d2d; }
-
-.dash-stat-label {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: theme.$gray_4;
-  margin-top: 4px;
-}
-
-.recent-runs-list {
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.recent-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  border-bottom: 1px solid theme.$gray_2;
-  transition: background 0.15s;
-
-  &:last-child { border-bottom: none; }
-  &:hover { background: theme.$gray_1; }
-}
-
-.recent-run-name {
-  font-weight: 500;
-  color: theme.$black;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.recent-run-status {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
-}
-
-.recent-run-time {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
 }
 
 .canvas-toolbar {
@@ -3359,20 +2230,6 @@ onUnmounted(() => {
   &.dot-red { background-color: theme.$status_red; }
 }
 
-.run-status-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-
-  &.dot-gray { background-color: theme.$gray_4; }
-  &.dot-blue { background-color: #06b6d4; }
-  &.dot-amber { background-color: #f59e0b; }
-  &.dot-green { background-color: theme.$status_green; }
-  &.dot-red { background-color: theme.$status_red; }
-}
-
 /* Sidebar */
 .applications-sidebar {
   width: 350px;
@@ -3383,12 +2240,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-
-  .loading {
-    text-align: center;
-    padding: 20px;
-    color: theme.$gray_4;
-  }
 }
 
 .new-workflow-btn { width: 100%; }
@@ -3401,122 +2252,6 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: theme.$gray_4;
-}
-
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.run-filter-select { width: 100%; }
-
-.workflow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.workflow-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  background-color: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover:not(.disabled) {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  &.selected {
-    border-color: theme.$purple_1;
-    background-color: theme.$purple_tint;
-    box-shadow: 0 2px 8px rgba(80, 57, 247, 0.15);
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .wf-item-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .rerun-btn {
-    background: none;
-    border: none;
-    color: theme.$gray_4;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s, background 0.15s;
-    flex-shrink: 0;
-    align-self: center;
-
-    &:hover {
-      color: theme.$purple_1;
-      background: rgba(0, 0, 0, 0.05);
-    }
-  }
-
-  &:hover .rerun-btn {
-    opacity: 1;
-  }
-
-  .wf-item-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: theme.$black;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .wf-item-meta {
-    font-size: 11px;
-    color: theme.$gray_4;
-    margin-top: 2px;
-  }
-}
-
-.workflow-list-empty {
-  padding: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: theme.$gray_4;
-}
-
-.load-more-btn {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  border: none;
-  background: none;
-  color: theme.$purple_1;
-  font-size: 13px;
-  cursor: pointer;
-  border-top: 1px solid theme.$gray_2;
-
-  &:hover:not(:disabled) {
-    background: theme.$gray_1;
-  }
-
-  &:disabled {
-    color: theme.$gray_4;
-    cursor: default;
-  }
 }
 
 /* Information panel */
@@ -3696,40 +2431,6 @@ onUnmounted(() => {
   line-height: 1.3;
 }
 
-/* Dialogs */
-.run-dialog-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-/* File picker */
-.file-picker-content {
-  min-height: 400px;
-}
-
-.file-picker-header {
-  margin-bottom: 12px;
-
-  .selected-count {
-    font-size: 13px;
-    color: theme.$gray_5;
-  }
-}
-
-.file-browser {
-  .breadcrumb-wrapper {
-    margin-bottom: 8px;
-  }
-
-  .files-table-container {
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid theme.$gray_2;
-  }
-}
-
 /* Info actions */
 .info-actions {
   display: flex;
@@ -3750,16 +2451,6 @@ onUnmounted(() => {
   margin-top: 8px;
   width: 100%;
   justify-content: center;
-}
-.cancel-run-btn {
-  margin-top: 8px;
-  width: 100%;
-  justify-content: center;
-  &:hover {
-    background: theme.$red_1;
-    border-color: theme.$red_1;
-    color: white;
-  }
 }
 .cancel-dialog-footer {
   display: flex;
@@ -3882,7 +2573,6 @@ onUnmounted(() => {
   margin-bottom: 8px;
 }
 
-
 .receipt-node-header {
   display: flex;
   justify-content: space-between;
@@ -3955,6 +2645,40 @@ onUnmounted(() => {
   font-size: 11px;
   color: theme.$gray_4;
   margin-top: 8px;
+}
+
+/* Dialogs */
+.run-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* File picker */
+.file-picker-content {
+  min-height: 400px;
+}
+
+.file-picker-header {
+  margin-bottom: 12px;
+
+  .selected-count {
+    font-size: 13px;
+    color: theme.$gray_5;
+  }
+}
+
+.file-browser {
+  .breadcrumb-wrapper {
+    margin-bottom: 8px;
+  }
+
+  .files-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid theme.$gray_2;
+  }
 }
 
 /* Logs dialog */
@@ -4036,210 +2760,6 @@ onUnmounted(() => {
 :deep(.el-dialog__footer) {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-}
-
-/* Wizard dialog */
-.wizard-body {
-  min-height: 320px;
-  display: flex;
-  flex-direction: column;
-}
-
-.wizard-progress {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.wizard-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: theme.$gray_2;
-  transition: background 0.2s;
-
-  &.active {
-    background: theme.$purple_1;
-  }
-
-  &.done {
-    background: theme.$green_1;
-  }
-}
-
-.wizard-step {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.wizard-step-desc {
-  font-size: 13px;
-  color: theme.$gray_4;
-  margin: 0 0 16px 0;
-}
-
-.wizard-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: theme.$purple_tint;
-  border: 1px solid theme.$purple_1;
-  margin-bottom: 8px;
-}
-
-.wizard-selection-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wizard-selection-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.wizard-selection-desc {
-  font-size: 12px;
-  color: theme.$gray_5;
-  line-height: 1.4;
-}
-
-.wizard-selection-meta {
-  font-size: 11px;
-  color: theme.$gray_4;
-  margin-top: 2px;
-}
-
-.wizard-selection-clear {
-  background: none;
-  border: none;
-  font-size: 16px;
-  color: theme.$gray_4;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  flex-shrink: 0;
-
-  &:hover {
-    color: theme.$black;
-  }
-}
-
-.wizard-search {
-  margin-bottom: 12px;
-}
-
-.wizard-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.wizard-cards-loading {
-  padding: 20px;
-  text-align: center;
-  font-size: 13px;
-  color: theme.$gray_4;
-}
-
-.wizard-card {
-  padding: 12px 14px;
-  border: 1px solid theme.$gray_2;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-
-  &:hover:not(.disabled) {
-    border-color: theme.$gray_3;
-    background: theme.$gray_1;
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-.wizard-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-  margin-bottom: 2px;
-}
-
-.wizard-card-desc {
-  font-size: 12px;
-  color: theme.$gray_4;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.wizard-card-meta {
-  font-size: 11px;
-  color: theme.$gray_4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wizard-card-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: theme.$gray_2;
-  color: theme.$gray_5;
-}
-
-.wizard-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 1px solid theme.$gray_2;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-
-.wizard-summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 14px;
-  font-size: 13px;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid theme.$gray_2;
-  }
-}
-
-.wizard-summary-label {
-  color: theme.$gray_4;
-  font-weight: 500;
-}
-
-.wizard-summary-value {
-  color: theme.$black;
-  font-weight: 600;
-}
-
-.wizard-hint {
-  padding: 12px 14px;
-  background: theme.$yellow_tint;
-  font-size: 13px;
-  line-height: 1.5;
-  color: theme.$gray_5;
-}
-
-.wizard-footer-right {
-  display: flex;
   gap: 8px;
 }
 </style>
