@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
@@ -47,6 +47,7 @@ const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
 
 /*
@@ -862,6 +863,21 @@ onMounted(async () => {
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
   }
 });
+
+// Handle same-component navigation (e.g. run-detail → run-configure)
+watch(
+  () => route.name,
+  async (newName) => {
+    if (newName === "run-configure") {
+      const pendingConfig = store.state.analysisModule.pendingRunConfig;
+      if (pendingConfig) {
+        store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
+        fetchDatasetOptions();
+        await initiateWorkflowFromConfig(pendingConfig);
+      }
+    }
+  }
+);
 
 onBeforeUnmount(() => {
   if (analyticsChannel) {
