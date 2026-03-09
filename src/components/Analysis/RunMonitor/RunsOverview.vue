@@ -74,7 +74,7 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 const dashboardRuns = computed(() => workflowInstances.value);
 
 const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "STARTED" || r.status === "FINALIZING")
+  workflowInstances.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
 );
 
 const recentCompletedRuns = computed(() =>

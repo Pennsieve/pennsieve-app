@@ -17,7 +17,7 @@ import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { useMetricsCounters } from "@/composables/useMetricsCounters";
+
 
 const {
   onNodeClick,
@@ -50,7 +50,6 @@ const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
 // Mode & workflow list state
 const mode = ref("browse"); // 'browse' | 'create'
 const selectedWorkflow = ref(null);
-const statusFilter = ref("active");
 const accordionActiveNames = ref(["workflows"]);
 
 // Information panel state
@@ -59,40 +58,6 @@ const editName = ref("");
 const editDescription = ref("");
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
-const metricsExpanded = ref(false);
-
-// Metrics summary for collapsed header (from counters API)
-const metricsFilterValue = computed(() => selectedWorkflow.value?.uuid || "");
-const { counters: wfCounters, isLoading: metricsLoading } = useMetricsCounters({
-  scope: ref("workflowUuid"),
-  id: metricsFilterValue,
-});
-const metricsTotalRuns = computed(() => wfCounters.value?.allTime?.totalRuns ?? 0);
-const metricsDuration = computed(() => {
-  const c = wfCounters.value?.allTime;
-  if (c && c.totalRuns) return c.totalDurationSec / c.totalRuns;
-  return null;
-});
-const metricsCost = computed(() => {
-  const c = wfCounters.value?.allTime;
-  if (c && c.totalRuns) return c.totalCost / c.totalRuns;
-  return null;
-});
-
-const formatDuration = (v) => {
-  if (v == null) return "--";
-  if (v < 1) return `${(v * 1000).toFixed(0)}ms`;
-  if (v < 60) return `${v.toFixed(1)}s`;
-  if (v < 3600) return `${(v / 60).toFixed(1)}m`;
-  return `${(v / 3600).toFixed(1)}h`;
-};
-
-const formatCost = (v) => {
-  if (v == null) return "--";
-  if (v < 0.01) return `$${v.toFixed(4)}`;
-  if (v < 1) return `$${v.toFixed(3)}`;
-  return `$${v.toFixed(2)}`;
-};
 const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
 
 // Resolve the original processor definition for the selected node
@@ -153,24 +118,9 @@ const toggleTargetEdit = (nodeId) => {
   }
 };
 
-const workflows = computed(
-  () => store.state.analysisModule.workflows || []
-);
-
 /*
 Filtered Workflow List
 */
-const filteredWorkflows = computed(() => {
-  let filtered = workflows.value;
-  if (statusFilter.value === "active") {
-    filtered = filtered.filter((w) => w.isActive);
-  } else if (statusFilter.value === "inactive") {
-    filtered = filtered.filter((w) => !w.isActive);
-  }
-  return [...filtered].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-});
 
 /*
 Mode Management
@@ -364,7 +314,7 @@ const selectWorkflow = (workflow) => {
   selectedWorkflow.value = workflow;
   selectedNode.value = null;
   isEditingDetails.value = false;
-  accordionActiveNames.value = ["information"];
+  accordionActiveNames.value = ["information", "workflow-metrics"];
   workflowName.value = workflow.name || "";
   workflowDescription.value = workflow.description || "";
 
@@ -639,11 +589,10 @@ onMounted(async () => {
     await Promise.all([
       store.dispatch("analysisModule/fetchApplications"),
       store.dispatch("analysisModule/fetchTargetTypes"),
-      store.dispatch("analysisModule/fetchWorkflows"),
     ]);
 
     if (props.uuid) {
-      const wf = workflows.value.find((w) => w.uuid === props.uuid);
+      const wf = await store.dispatch("analysisModule/fetchWorkflowDefinition", props.uuid);
       if (wf) {
         selectWorkflow(wf);
       }
@@ -724,28 +673,6 @@ onPaneClick(() => {
     <div class="builder-content">
       <!-- Left: Main Panel -->
       <div class="main-panel">
-        <!-- Metrics (browse mode only) -->
-        <div v-if="mode === 'browse' && selectedWorkflow" class="metrics-section">
-          <div class="metrics-toggle" @click="metricsExpanded = !metricsExpanded">
-            <span class="metrics-toggle-icon">{{ metricsExpanded ? '&#9660;' : '&#9654;' }}</span>
-            <span class="metrics-toggle-label">Workflow Metrics</span>
-            <template v-if="!metricsExpanded && !metricsLoading && metricsTotalRuns > 0">
-              <span class="metrics-inline-stat">{{ metricsTotalRuns }} runs</span>
-              <span class="metrics-inline-divider">|</span>
-              <span class="metrics-inline-stat">{{ formatDuration(metricsDuration) }}</span>
-              <span class="metrics-inline-divider">|</span>
-              <span class="metrics-inline-stat">{{ formatCost(metricsCost) }}</span>
-            </template>
-            <span v-if="!metricsExpanded && metricsLoading" class="metrics-inline-stat">Loading...</span>
-          </div>
-          <MetricsDashboard
-            v-show="metricsExpanded"
-            filter-column="workflowUuid"
-            :filter-value="selectedWorkflow.uuid"
-            hide-header
-          />
-        </div>
-
         <!-- Workflow Canvas -->
         <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
         <div v-if="nodes.length === 0" class="empty-canvas">
@@ -1145,6 +1072,21 @@ onPaneClick(() => {
             </div>
           </el-collapse-item>
 
+          <!-- Workflow Metrics Section -->
+          <el-collapse-item
+            v-if="mode === 'browse' && selectedWorkflow"
+            title="Workflow Metrics"
+            name="workflow-metrics"
+          >
+            <MetricsDashboard
+              :key="selectedWorkflow.uuid"
+              filter-column="workflowUuid"
+              :filter-value="selectedWorkflow.uuid"
+              vertical
+              hide-header
+            />
+          </el-collapse-item>
+
           <!-- Node Metrics Section -->
           <el-collapse-item
             v-if="selectedNode && selectedNodeProcessor?.sourceUrl"
@@ -1396,41 +1338,6 @@ onPaneClick(() => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-}
-
-.metrics-section {
-  padding: 12px 16px;
-}
-
-.metrics-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 4px 0 8px;
-  user-select: none;
-}
-
-.metrics-toggle-icon {
-  font-size: 10px;
-  color: theme.$gray_4;
-}
-
-.metrics-toggle-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: theme.$gray_5;
-}
-
-.metrics-inline-stat {
-  font-size: 12px;
-  font-weight: 500;
-  color: theme.$gray_4;
-}
-
-.metrics-inline-divider {
-  font-size: 12px;
-  color: theme.$gray_3;
 }
 
 .applications-sidebar {

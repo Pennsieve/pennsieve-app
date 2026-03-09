@@ -28,6 +28,7 @@ const initialState = () => ({
   workflows: [],
   workflowsNextCursor: "",
   targetTypes: [],
+  targetTypesLoaded: false,
   analyticsChannel: null,
   pendingRunConfig: null,
 });
@@ -94,7 +95,12 @@ export const mutations = {
     state.computeResourceAccounts = accounts;
   },
   SET_WORKFLOW_INSTANCES(state, { runs, cursor }) {
-    state.workflowInstances = runs;
+    // Preserve optimistically-added PENDING runs not yet returned by the API
+    const incomingIds = new Set(runs.map((r) => r.uuid));
+    const pendingLocal = state.workflowInstances.filter(
+      (r) => r.status === "NOT_STARTED" && !incomingIds.has(r.uuid)
+    );
+    state.workflowInstances = [...pendingLocal, ...runs];
     state.workflowInstancesCursor = cursor || null;
   },
   APPEND_WORKFLOW_INSTANCES(state, { runs, cursor }) {
@@ -132,6 +138,7 @@ export const mutations = {
   },
   UPDATE_TARGET_TYPES(state, targetTypes) {
     state.targetTypes = targetTypes;
+    state.targetTypesLoaded = true;
   },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
@@ -158,6 +165,9 @@ export const mutations = {
   CLEAR_PENDING_RUN_CONFIG(state) {
     state.pendingRunConfig = null;
   },
+  PREPEND_WORKFLOW_INSTANCE(state, run) {
+    state.workflowInstances = [run, ...state.workflowInstances];
+  },
   UPDATE_RUN_STATUS(state, { runId, status }) {
     const run = state.workflowInstances.find((r) => r.uuid === runId);
     if (run) {
@@ -174,7 +184,8 @@ export const mutations = {
 };
 
 export const actions = {
-  fetchComputeNodes: async ({ commit, rootState }) => {
+  fetchComputeNodes: async ({ state, commit, rootState }, { force } = {}) => {
+    if (!force && state.computeNodesLoaded) return;
     return useGetToken()
       .then((token) => {
         const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
@@ -198,7 +209,8 @@ export const actions = {
         return Promise.reject();
       });
   },
-  fetchApplications: async ({ commit, rootState }) => {
+  fetchApplications: async ({ state, commit, rootState }, { force } = {}) => {
+    if (!force && state.applicationsLoaded) return;
     try {
       const userToken = await useGetToken();
 
@@ -733,7 +745,7 @@ export const actions = {
       throw err;
     }
   },
-  createRun: async ({ rootState }, payload) => {
+  createRun: async ({ commit, rootState }, payload) => {
     const tokens = await useGetAllTokens();
     const url = `${rootState.config.api2Url}/compute/workflows/runs`;
     const resp = await fetch(url, {
@@ -746,12 +758,15 @@ export const actions = {
       body: JSON.stringify(payload),
     });
     if (!resp.ok) throw new Error("Failed to create run");
-    return resp.json();
+    const newRun = await resp.json();
+    commit("PREPEND_WORKFLOW_INSTANCE", newRun);
+    return newRun;
   },
   setSelectedProcessor: ({ commit, rootState }, processor) => {
     commit("SET_SELECTED_PROCESSOR", processor);
   },
-  fetchTargetTypes: async ({ commit, rootState }) => {
+  fetchTargetTypes: async ({ state, commit, rootState }, { force } = {}) => {
+    if (!force && state.targetTypesLoaded) return;
     try {
       const userToken = await useGetToken();
       const url = `${rootState.config.api2Url}/compute/workflows/target-types`;

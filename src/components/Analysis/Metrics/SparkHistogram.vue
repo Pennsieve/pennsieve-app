@@ -69,7 +69,7 @@ const renderChart = () => {
     .call((g) =>
       g.selectAll('.tick text')
         .attr('fill', '#9ca3af')
-        .attr('font-size', '8px')
+        .attr('font-size', '10px')
     )
 
   // Y axis
@@ -86,7 +86,7 @@ const renderChart = () => {
     .call((g) =>
       g.selectAll('.tick text')
         .attr('fill', '#9ca3af')
-        .attr('font-size', '8px')
+        .attr('font-size', '10px')
     )
 
   // Bars
