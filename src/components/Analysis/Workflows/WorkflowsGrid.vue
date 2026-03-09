@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -11,36 +11,27 @@ const router = useRouter();
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
+const pageSize = ref(20);
+const isSearching = ref(false);
+const isLoadingMore = ref(false);
+
+const pageSizeOptions = [10, 20, 50, 100];
 
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
+const nextCursor = computed(
+  () => store.state.analysisModule.workflowsNextCursor || ""
+);
 
 const filterOptions = [
   { label: "Active", value: "active" },
-  { label: "Archived", value: "inactive" },
+  { label: "Archived", value: "archived" },
   { label: "All", value: "all" },
 ];
 
 const filteredWorkflows = computed(() => {
-  let list = workflows.value;
-
-  if (statusFilter.value === "active") {
-    list = list.filter((w) => w.isActive);
-  } else if (statusFilter.value === "inactive") {
-    list = list.filter((w) => !w.isActive);
-  }
-
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
-    list = list.filter(
-      (wf) =>
-        (wf.name || "").toLowerCase().includes(q) ||
-        (wf.description || "").toLowerCase().includes(q)
-    );
-  }
-
-  return [...list].sort(
+  return [...workflows.value].sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
 });
@@ -74,8 +65,59 @@ const goToDetail = (wf) => {
   router.push({ name: "workflow-detail", params: { uuid: wf.uuid } });
 };
 
+const getStatusParam = () => {
+  return statusFilter.value !== "all" ? statusFilter.value : undefined;
+};
+
+const fetchWorkflows = async ({ search, cursor, append } = {}) => {
+  await store.dispatch("analysisModule/fetchWorkflows", {
+    search: search || undefined,
+    cursor: cursor || undefined,
+    limit: pageSize.value,
+    status: getStatusParam(),
+    append: !!append,
+  });
+};
+
+const loadMore = async () => {
+  if (!nextCursor.value || isLoadingMore.value) return;
+  isLoadingMore.value = true;
+  try {
+    await fetchWorkflows({
+      search: searchQuery.value.trim() || undefined,
+      cursor: nextCursor.value,
+      append: true,
+    });
+  } finally {
+    isLoadingMore.value = false;
+  }
+};
+
+// Debounced server-side search
+let searchTimer = null;
+watch(searchQuery, (val) => {
+  clearTimeout(searchTimer);
+  isSearching.value = true;
+  searchTimer = setTimeout(async () => {
+    try {
+      await fetchWorkflows({ search: val.trim() || undefined });
+    } finally {
+      isSearching.value = false;
+    }
+  }, 300);
+});
+
+// Re-fetch when page size or status filter changes
+watch(pageSize, () => {
+  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
+});
+
+watch(statusFilter, () => {
+  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
+});
+
 onMounted(async () => {
-  await store.dispatch("analysisModule/fetchWorkflows");
+  await fetchWorkflows();
 });
 </script>
 
@@ -111,6 +153,18 @@ onMounted(async () => {
         >
           {{ option.label }}
         </button>
+      </div>
+
+      <div class="page-size-selector">
+        <span class="page-size-label">Show</span>
+        <el-select v-model="pageSize" size="small" class="page-size-select">
+          <el-option
+            v-for="size in pageSizeOptions"
+            :key="size"
+            :label="size"
+            :value="size"
+          />
+        </el-select>
       </div>
     </div>
 
@@ -158,10 +212,22 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- Load More -->
+    <div v-if="filteredWorkflows.length > 0 && nextCursor" class="load-more-container">
+      <button
+        class="load-more-btn"
+        :disabled="isLoadingMore"
+        @click="loadMore"
+      >
+        {{ isLoadingMore ? 'Loading...' : 'Load More' }}
+      </button>
+    </div>
+
     <!-- Empty State -->
-    <div v-else class="empty-state">
+    <div v-else-if="filteredWorkflows.length === 0" class="empty-state">
       <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-      <span v-if="workflows.length === 0">No workflows yet</span>
+      <span v-if="isSearching">Searching...</span>
+      <span v-else-if="workflows.length === 0 && !searchQuery">No workflows yet</span>
       <span v-else>No workflows match your filters</span>
     </div>
   </div>
@@ -170,6 +236,8 @@ onMounted(async () => {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
+@use "../../../styles/element/select";
+
 
 .workflows-grid-page {
   height: calc(100vh - 112px);
@@ -212,6 +280,23 @@ onMounted(async () => {
 
 .search-input {
   max-width: 300px;
+}
+
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+
+  .page-size-label {
+    font-size: 12px;
+    color: theme.$gray_4;
+    white-space: nowrap;
+  }
+
+  .page-size-select {
+    width: 72px;
+  }
 }
 
 .status-buttons {
@@ -352,6 +437,34 @@ onMounted(async () => {
 
 .meta-text {
   color: theme.$gray_4;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px 24px;
+}
+
+.load-more-btn {
+  padding: 8px 24px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: white;
+  color: theme.$gray_5;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .empty-state {

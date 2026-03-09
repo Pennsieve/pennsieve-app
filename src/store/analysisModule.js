@@ -26,8 +26,10 @@ const initialState = () => ({
   cancelWorkflowDialogVisible: false,
   activityDialogVisible: false,
   workflows: [],
+  workflowsNextCursor: "",
   targetTypes: [],
   analyticsChannel: null,
+  pendingRunConfig: null,
 });
 
 export const state = initialState();
@@ -120,8 +122,13 @@ export const mutations = {
   SET_SELECTED_PROCESSOR(state, processor) {
     state.selectedProcessor = processor;
   },
-  UPDATE_WORKFLOWS(state, workflows) {
-    state.workflows = workflows;
+  UPDATE_WORKFLOWS(state, { workflows, nextCursor, append }) {
+    if (append) {
+      state.workflows = [...state.workflows, ...workflows];
+    } else {
+      state.workflows = workflows;
+    }
+    state.workflowsNextCursor = nextCursor || "";
   },
   UPDATE_TARGET_TYPES(state, targetTypes) {
     state.targetTypes = targetTypes;
@@ -144,6 +151,12 @@ export const mutations = {
   },
   CLEAR_ANALYTICS_CHANNEL(state) {
     state.analyticsChannel = null;
+  },
+  SET_PENDING_RUN_CONFIG(state, config) {
+    state.pendingRunConfig = config;
+  },
+  CLEAR_PENDING_RUN_CONFIG(state) {
+    state.pendingRunConfig = null;
   },
   UPDATE_RUN_STATUS(state, { runId, status }) {
     const run = state.workflowInstances.find((r) => r.uuid === runId);
@@ -439,9 +452,18 @@ export const actions = {
   updateFileCount: async ({ commit, rootState }) => {
     commit("UPDATE_SELECTED_FILE_COUNT");
   },
-  fetchWorkflowInstances: async ({ commit, rootState }) => {
+  fetchWorkflowInstances: async ({ commit, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     try {
-      const url = `${rootState.config.api2Url}/compute/workflows/runs?organization_id=${rootState.activeOrganization.organization.id}`;
+      const params = new URLSearchParams({
+        organization_id: rootState.activeOrganization.organization.id,
+      });
+      if (status) params.set("status", status);
+      if (workflowId) params.set("workflow_id", workflowId);
+      if (limit) params.set("limit", limit);
+      if (startDate) params.set("start_date", startDate);
+      if (endDate) params.set("end_date", endDate);
+
+      const url = `${rootState.config.api2Url}/compute/workflows/runs?${params}`;
       const userToken = await useGetToken();
       const resp = await fetch(url, {
         method: "GET",
@@ -470,11 +492,21 @@ export const actions = {
       return Promise.reject(err);
     }
   },
-  fetchMoreWorkflowInstances: async ({ commit, state, rootState }) => {
+  fetchMoreWorkflowInstances: async ({ commit, state, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     const cursor = state.workflowInstancesCursor;
     if (!cursor) return;
     try {
-      const url = `${rootState.config.api2Url}/compute/workflows/runs?organization_id=${rootState.activeOrganization.organization.id}&cursor=${encodeURIComponent(cursor)}`;
+      const params = new URLSearchParams({
+        organization_id: rootState.activeOrganization.organization.id,
+        cursor,
+      });
+      if (status) params.set("status", status);
+      if (workflowId) params.set("workflow_id", workflowId);
+      if (limit) params.set("limit", limit);
+      if (startDate) params.set("start_date", startDate);
+      if (endDate) params.set("end_date", endDate);
+
+      const url = `${rootState.config.api2Url}/compute/workflows/runs?${params}`;
       const userToken = await useGetToken();
       const resp = await fetch(url, {
         method: "GET",
@@ -759,10 +791,18 @@ export const actions = {
       throw new Error(`Failed to fetch workflow definition: ${resp.status}`);
     }
   },
-  fetchWorkflows: async ({ commit, rootState }) => {
+  fetchWorkflows: async ({ commit, rootState }, { search, cursor, limit, status, append } = {}) => {
     try {
       const userToken = await useGetToken();
-      const url = `${rootState.config.api2Url}/compute/workflows/definitions?organization_id=${rootState.activeOrganization.organization.id}`;
+      const params = new URLSearchParams({
+        organization_id: rootState.activeOrganization.organization.id,
+      });
+      if (limit) params.set("limit", limit);
+      if (search) params.set("search", search);
+      if (cursor) params.set("cursor", cursor);
+      if (status) params.set("status", status);
+
+      const url = `${rootState.config.api2Url}/compute/workflows/definitions?${params}`;
 
       const resp = await fetch(url, {
         method: "GET",
@@ -773,12 +813,15 @@ export const actions = {
 
       if (resp.ok) {
         const result = await resp.json();
-        commit("UPDATE_WORKFLOWS", result);
+        // Handle both new paginated { workflows, nextCursor } and legacy array response
+        const workflows = Array.isArray(result) ? result : (result.workflows || []);
+        const nextCursor = Array.isArray(result) ? "" : (result.nextCursor || "");
+        commit("UPDATE_WORKFLOWS", { workflows, nextCursor, append: !!append });
       } else {
         return Promise.reject(resp);
       }
     } catch (err) {
-      commit("UPDATE_WORKFLOWS", []);
+      commit("UPDATE_WORKFLOWS", { workflows: [], nextCursor: "", append: false });
       return Promise.reject(err);
     }
   },
