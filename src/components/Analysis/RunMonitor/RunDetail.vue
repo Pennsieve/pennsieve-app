@@ -104,9 +104,6 @@ const selectedWorkflowActivity = computed(
 const computeNodes = computed(
   () => store.getters["analysisModule/computeNodes"] || []
 );
-const workflows = computed(
-  () => store.state.analysisModule.workflows || []
-);
 const availableApplications = computed(
   () => store.getters["analysisModule/applications"] || []
 );
@@ -565,23 +562,10 @@ const executeWorkflow = async () => {
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
 
-    const newRun = await store.dispatch("analysisModule/createRun", payload);
+    await store.dispatch("analysisModule/createRun", payload);
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
-    mode.value = "browse";
-    configDefinition.value = null;
-    Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
-    Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
-    selectedNode.value = null;
-
-    const newRunId = newRun?.uuid || newRun?.id || newRun?.runId;
-    if (newRunId) {
-      await store.dispatch("analysisModule/fetchWorkflowInstances");
-      router.replace({ name: "run-detail", params: { runId: newRunId } });
-      await loadRun(newRunId);
-    } else {
-      router.push({ name: "runs" });
-    }
+    router.push({ name: "runs" });
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to execute workflow." } });
@@ -847,7 +831,6 @@ const fetchDatasetOptions = async (query = "") => {
 onMounted(async () => {
   await Promise.all([
     store.dispatch("analysisModule/fetchComputeNodes"),
-    store.dispatch("analysisModule/fetchWorkflows"),
     store.dispatch("analysisModule/fetchTargetTypes"),
   ]);
 
