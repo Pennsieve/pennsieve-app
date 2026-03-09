@@ -10,35 +10,30 @@
             class="repo-name-link"
             :title="`View ${repo.full_name || repo.name} on GitHub`"
           >
-            <IconGitHub/>
+            <IconGitHub />
             <h3 class="repo-name">{{ repo.full_name || repo.name }}</h3>
           </a>
-          <div class="repo-badges">
-            <span v-if="repo.private" class="privacy-badge private">Private</span>
-            <span class="repo-language" v-if="repo.language">{{ repo.language }}</span>
-          </div>
         </div>
-        <div class="publishing-box">
-          <div class="publishing-box-header">
-            <span class="publishing-box-title">Publishing Settings</span>
-            <button
-              class="settings-button"
-              @click="handleManageSettings"
-              title="Edit publishing settings"
-            >
-              <IconSettings :width="24" :height="24" />
-            </button>
-          </div>
-          <div class="publishing-box-rows">
-            <div class="status-icon-row discover" :class="repo.publishing_to_discover ? 'enabled' : 'disabled'">
-              <span class="status-icon-label">Discover</span>
-              <span class="status-icon-state">{{ repo.publishing_to_discover ? 'On' : 'Off' }}</span>
-            </div>
-            <div class="status-icon-row appstore" :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'">
-              <span class="status-icon-label">App Store</span>
-              <span class="status-icon-state">{{ repo.publishing_to_appstore ? 'On' : 'Off' }}</span>
-            </div>
-          </div>
+        <div class="repo-actions">
+          <span
+            class="publishing-badge"
+            :class="repo.publishing_to_discover ? 'enabled' : 'disabled'"
+          >
+            Discover {{ repo.publishing_to_discover ? "On" : "Off" }}
+          </span>
+          <span
+            class="publishing-badge"
+            :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'"
+          >
+            App Store {{ repo.publishing_to_appstore ? "On" : "Off" }}
+          </span>
+          <button
+            class="settings-button"
+            @click="handleManageSettings"
+            title="Publishing Settings"
+          >
+            <IconSettings :width="20" :height="20" />
+          </button>
         </div>
       </div>
 
@@ -49,6 +44,12 @@
         </p>
 
         <div class="repo-stats">
+          <span v-if="repo.private" class="privacy-badge private"
+            >Private</span
+          >
+          <span class="repo-language" v-if="repo.language">{{
+            repo.language
+          }}</span>
           <span class="stat-item" v-if="repo.stargazers_count !== undefined">
             ⭐ {{ repo.stargazers_count }}
           </span>
@@ -65,62 +66,82 @@
 </template>
 
 <script>
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import IconSettings from '@/components/icons/IconSettings.vue'
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import IconSettings from "@/components/icons/IconSettings.vue";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 
 export default {
-  name: 'CodeRepoListItem',
+  name: "CodeRepoListItem",
 
   components: {
     IconGitHub,
     BfButton,
-    IconSettings
+    IconSettings,
   },
 
   props: {
     repo: {
       type: Object,
-      default: () => ({})
-    }
+      default: () => ({}),
+    },
   },
 
   computed: {
     hasPublishingInfo() {
-      return this.repo.publishing_to_discover || this.repo.publishing_to_appstore
+      return (
+        this.repo.publishing_to_discover || this.repo.publishing_to_appstore
+      );
+    },
+    publishingStatus() {
+      if (this.repo.publishing_to_discover && this.repo.publishing_to_appstore) {
+        return "published";
+      } else if (this.repo.publishing_to_discover || this.repo.publishing_to_appstore) {
+        return "partial";
+      }
+      return "unpublished";
+    },
+    publishingLabel() {
+      if (this.repo.publishing_to_discover && this.repo.publishing_to_appstore) {
+        return "Published";
+      } else if (this.repo.publishing_to_discover) {
+        return "Discover Only";
+      } else if (this.repo.publishing_to_appstore) {
+        return "App Store Only";
+      }
+      return "Unpublished";
     },
   },
 
   methods: {
     handleManageSettings() {
-      this.$emit('manage-settings', this.repo)
+      this.$emit("manage-settings", this.repo);
     },
 
     formatDate(dateString) {
-      if (!dateString) return ''
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffTime = Math.abs(now - date)
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now - date);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays === 1) {
-        return '1 day ago'
+        return "1 day ago";
       } else if (diffDays < 30) {
-        return `${diffDays} days ago`
+        return `${diffDays} days ago`;
       } else if (diffDays < 365) {
-        const months = Math.ceil(diffDays / 30)
-        return `${months} month${months > 1 ? 's' : ''} ago`
+        const months = Math.ceil(diffDays / 30);
+        return `${months} month${months > 1 ? "s" : ""} ago`;
       } else {
-        const years = Math.ceil(diffDays / 365)
-        return `${years} year${years > 1 ? 's' : ''} ago`
+        const years = Math.ceil(diffDays / 365);
+        return `${years} year${years > 1 ? "s" : ""} ago`;
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use "../../../styles/_theme.scss";
 
 .repo-list-item {
   background: white;
@@ -129,7 +150,6 @@ export default {
   //margin-bottom: 8px;
   transition: all 0.2s ease;
   overflow: hidden;
-  max-width: 1200px;
 
   &:hover {
     border-color: theme.$gray_3;
@@ -145,7 +165,7 @@ export default {
 // Header section with title, badges, status, and action
 .repo-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 24px;
   margin-bottom: 16px;
 
@@ -215,64 +235,27 @@ export default {
   font-weight: 500;
 }
 
-// Publishing settings box
-.publishing-box {
+// Right side actions: badges + gear inline
+.repo-actions {
   flex-shrink: 0;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  padding: 16px 20px;
-  min-width: 240px;
-
-  @media (max-width: 768px) {
-    width: 100%;
-  }
-}
-
-.publishing-box-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.publishing-box-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.publishing-box-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.status-icon-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+.publishing-badge {
+  padding: 8px 16px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
 
-  .status-icon-label {
-    font-weight: 600;
-  }
-
-  .status-icon-state {
-    font-weight: 600;
-    margin-left: auto;
-  }
-
   &.enabled {
-    background: lighten(theme.$status_green, 40%);
-    color: theme.$status_green;
+    background: theme.$green_tint;
+    color: theme.$green_1;
   }
 
   &.disabled {
@@ -282,21 +265,43 @@ export default {
 }
 
 .settings-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
+  width: 36px;
+  height: 36px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+  background: white;
   color: theme.$gray_4;
   cursor: pointer;
   transition: all 0.2s ease;
 
+  &::after {
+    content: "Publishing Settings";
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 4px 8px;
+    background: theme.$gray_6;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
   &:hover {
     color: theme.$gray_5;
     background: theme.$gray_2;
+
+    &::after {
+      opacity: 1;
+    }
   }
 
   &:focus {
