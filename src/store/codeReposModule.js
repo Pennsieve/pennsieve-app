@@ -79,7 +79,7 @@ export const actions = {
                         const myRepos = json.repos
                         commit('SET_MY_REPOS', myRepos);
                         commit('SET_MY_REPOS_CURRENT_PAGE', page);
-                        commit('SET_MY_REPOS_COUNT', json.count);
+                        commit('SET_MY_REPOS_COUNT', json.total);
                         commit('SET_MY_REPOS_LOADED', true);
                       })
                   } else {
@@ -254,24 +254,25 @@ export const actions = {
     }
   },
 
-  updateRepoPublishingSettings: async({ rootState }, { repositoryId, publishing_to_discover, publishing_to_appstore }) => {
+  updateRepoPublishingSettings: async({ rootState }, { repoUrl, publish_to_discover, publish_to_appstore }) => {
     try {
       const token = await useGetToken()
-      const url = `${rootState.config.api2Url}/repositories/${repositoryId}`
+      const url = `${rootState.config.api2Url}/repositories`
       const myHeaders = new Headers()
       myHeaders.append('Authorization', 'Bearer ' + token)
       myHeaders.append('Accept', 'application/json')
       myHeaders.append('Content-Type', 'application/json')
-      
+
       const response = await fetch(url, {
-        method: 'PUT',
+        method: 'POST',
         headers: myHeaders,
         body: JSON.stringify({
-          publishing_to_discover,
-          publishing_to_appstore
+          url: repoUrl,
+          publish_to_discover,
+          publish_to_appstore
         })
       })
-      
+
       if (response.ok) {
         const responseJson = await response.json()
         return {

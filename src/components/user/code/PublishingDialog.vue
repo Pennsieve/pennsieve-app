@@ -162,16 +162,16 @@ export default {
       
       try {
         await this.$store.dispatch('codeReposModule/updateRepoPublishingSettings', {
-          repositoryId: this.repo.id,
-          publishing_to_discover: this.localSettings.publishToDiscover,
-          publishing_to_appstore: false // App Store is disabled, always save as false
+          repoUrl: this.repo.url,
+          publish_to_discover: this.localSettings.publishToDiscover,
+          publish_to_appstore: false // App Store is disabled, always save as false
         })
-        
+
         this.$emit('save', {
           repo: this.repo,
           settings: {
-            publishing_to_discover: this.localSettings.publishToDiscover,
-            publishing_to_appstore: false // App Store is disabled, always save as false
+            publish_to_discover: this.localSettings.publishToDiscover,
+            publish_to_appstore: false // App Store is disabled, always save as false
           }
         })
         this.closeDialog()
