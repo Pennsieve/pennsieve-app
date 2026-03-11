@@ -20,28 +20,6 @@
         <template #right>
           <template v-if="quickActionsVisible">
             <bf-button
-              :disabled="!isFeatureFlagEnabled"
-              @click="openRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis
-            </bf-button>
-
-            <!-- <bf-button
-              :disabled="!isFeatureFlagEnabled"
-              @click="openOldRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis (Choose Processors)
-            </bf-button> -->
-
-            <bf-button
               v-if="getPermission('editor')"
               class="flex mr-8"
               :disabled="datasetLocked"
@@ -59,17 +37,6 @@
             :menu-open="!quickActionsVisible"
           >
             <template #buttons>
-              <bf-button
-                :disabled="!isFeatureFlagEnabled"
-                @click="openRunAnalysisDialog"
-                class="dropdown-button"
-              >
-                <template #prefix>
-                  <IconAnalysis class="mr-8" :height="20" :width="20" />
-                </template>
-                Run Analysis
-              </bf-button>
-
               <bf-button
                 v-if="getPermission('editor')"
                 class="dropdown-button"
@@ -180,22 +147,10 @@
       @close="onCloseDeleteDialog"
     />
 
-    <run-analysis-dialog
-      :datasetId="datasetId"
-      :dialog-visible="runAnalysisDialogVisible"
-      @close="onCloseRunAnalysisDialog"
-    />
-
     <bf-drop-info
       v-if="showDropInfo"
       v-model:show-drop-info="showDropInfo"
       :file="file"
-    />
-
-    <old-run-analysis-dialog
-      :datasetId="datasetId"
-      :dialog-visible="oldRunAnalysisDialogVisible"
-      @close="onCloseOldRunAnalysisDialog"
     />
 
     <bf-upload-info v-if="showUploadInfo" />
@@ -219,8 +174,6 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
-import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
-import OldRunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -238,17 +191,11 @@ import LockedBanner from "../LockedBanner/LockedBanner.vue";
 import { useMetadataStore } from "../../../stores/metadataStore.js";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
-import IconAnalysis from "../../icons/IconAnalysis.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
 
-import {
-  isEnabledForSpecificOrgs,
-  isEnabledForTestOrgs,
-  isEnabledForAllDevOrgs,
-} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -259,7 +206,6 @@ export default {
 
   components: {
     IconAnnotation,
-    IconAnalysis,
     IconUpload,
     RenameFileDialog,
     StageActions,
@@ -279,8 +225,6 @@ export default {
     LockedBanner,
     DeletedFiles,
     FileMetadataInfo,
-    RunAnalysisDialog,
-    OldRunAnalysisDialog,
     PsButtonDropdown,
   },
 
@@ -326,19 +270,10 @@ export default {
       selectedFileForAction: {},
       pusherChannelName: "",
       pusherChannel: {},
-      runAnalysisDialogVisible: false,
-      oldRunAnalysisDialogVisible: false,
     };
   },
 
   computed: {
-    ...mapState("analysisModule", [
-      "computeNodes",
-      "preprocessors",
-      "processors",
-      "postprocessors",
-      "selectedFilesForAnalysis",
-    ]),
     ...mapState(["activeOrganization"]),
     ...mapGetters([
       "config",
@@ -410,15 +345,6 @@ export default {
     isExploreEnabled: function () {
       return this.hasFeature("concepts_feature");
     },
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForSpecificOrgs(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
-    
     /**
      * Check if package attachment is active
      * @returns {Boolean}
@@ -607,12 +533,6 @@ export default {
     },
     onClosePackageDialog: function () {
       this.packageDialogVisible = false;
-    },
-    onCloseRunAnalysisDialog: function () {
-      this.runAnalysisDialogVisible = false;
-    },
-    onCloseOldRunAnalysisDialog: function () {
-      this.oldRunAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
@@ -1235,13 +1155,6 @@ export default {
           });
       });
     },
-    openRunAnalysisDialog: function () {
-      this.runAnalysisDialogVisible = true;
-    },
-    openOldRunAnalysisDialog: function () {
-      this.oldRunAnalysisDialogVisible = true;
-    },
-
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
         "dataset-files",
