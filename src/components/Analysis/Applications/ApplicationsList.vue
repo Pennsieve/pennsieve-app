@@ -4,18 +4,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { pathOr, propOr } from "ramda";
+import { propOr } from "ramda";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 import EventBus from "../../../utils/event-bus";
 
-import {
-  isEnabledForAllDevOrgs,
-  isEnabledForSpecificOrgs,
-  isEnabledForTestOrgs,
-} from "../../../utils/feature-flags.js";
 
 /*
   Local State
@@ -40,16 +35,6 @@ const applications = computed(
   () => store.state.analysisModule.applications || []
 );
 const activeOrganization = computed(() => store.state.activeOrganization);
-const config = computed(() => store.state.config);
-
-const isFeatureFlagEnabled = computed(() => {
-  const orgId = pathOr("", ["organization", "id"], activeOrganization.value);
-  return (
-    isEnabledForTestOrgs(orgId) ||
-    isEnabledForSpecificOrgs(orgId) ||
-    isEnabledForAllDevOrgs(config.value.apiUrl)
-  );
-});
 
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
@@ -371,7 +356,7 @@ onBeforeUnmount(() => removeGuard());
         </template>
         <template v-else>
           <bf-button
-            :disabled="!isFeatureFlagEnabled || !hasAdminRights"
+            :disabled="!hasAdminRights"
             @click="openCreateApplicationDialog"
           >
             + New Application
