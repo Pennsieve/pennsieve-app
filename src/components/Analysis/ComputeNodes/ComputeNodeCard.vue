@@ -22,6 +22,9 @@
         <div class="node-identifier">
           <strong>Node UUID:</strong> {{ node.uuid }}
         </div>
+        <div v-if="ownerName" class="node-owner">
+          <strong>Node Owner:</strong> {{ ownerName }}
+        </div>
         <div class="node-tags">
           <el-tooltip
             :content="deploymentModeTooltip"
@@ -37,7 +40,7 @@
         </div>
       </div>
       <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending' && getStatusForNode(node) !== 'Destroying'">
+        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending' && getStatusForNode(node) !== 'Destroying' && getStatusForNode(node) !== 'Failed'">
           <el-select
             :model-value="getStatusForNode(node)"
             @change="(value) => updateStatus(value)"
@@ -95,6 +98,14 @@ const isNodeOwner = computed(() => {
 
 const canManagePermissions = computed(() => isNodeOwner.value)
 
+const ownerName = computed(() => {
+  const member = store.getters.getOrgMember(props.node.ownerId)
+  if (member?.firstName) {
+    return `${member.firstName} ${member.lastName}`.trim()
+  }
+  return null
+})
+
 const deploymentModeTooltip = computed(() => {
   const mode = (props.node.deploymentMode || 'basic').toLowerCase()
   switch (mode) {
@@ -134,6 +145,7 @@ function getStatusForNode(node) {
     case 'enabled': case 'active': case 'running': case 'ready': return 'Enabled'
     case 'paused': case 'stopped': case 'disabled': return 'Paused'
     case 'destroying': return 'Destroying'
+    case 'failed': return 'Failed'
     default: return 'Pending'
   }
 }
@@ -242,7 +254,8 @@ async function updateStatus(newStatus) {
 }
 
 .node-account,
-.node-identifier {
+.node-identifier,
+.node-owner {
   font-size: 13px;
   color: theme.$gray_5;
   margin-bottom: 4px;
@@ -290,6 +303,12 @@ async function updateStatus(newStatus) {
     background: rgba(#F59E0B, 0.1);
     color: #D97706;
     border: 1px solid rgba(#F59E0B, 0.2);
+  }
+
+  &.failed {
+    background: rgba(#EF4444, 0.1);
+    color: #DC2626;
+    border: 1px solid rgba(#EF4444, 0.2);
   }
 }
 

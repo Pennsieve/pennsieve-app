@@ -32,6 +32,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const isLoadingSecrets = ref({})
   const isLoadingSharedSecrets = ref({})
 
+  // Allowed processors cache - keyed by nodeId
+  const nodeAllowedProcessors = ref({})       // { [nodeId]: string[] }
+  const allowedProcessorsLoaded = ref({})     // { [nodeId]: boolean }
+  const isLoadingAllowedProcessors = ref({})
+
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
@@ -67,6 +72,14 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
 
   const isNodePermissionsLoading = computed(() => (nodeId) => {
     return isLoadingPermissions.value[nodeId] || false
+  })
+
+  const getNodeAllowedProcessors = computed(() => (nodeId) => {
+    return nodeAllowedProcessors.value[nodeId] || []
+  })
+
+  const isNodeAllowedProcessorsLoading = computed(() => (nodeId) => {
+    return isLoadingAllowedProcessors.value[nodeId] || false
   })
 
 
@@ -118,6 +131,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     permissionsLoaded.value = {}
     isLoadingPermissions.value = {}
     updateStates.value = {}
+    nodeAllowedProcessors.value = {}
+    allowedProcessorsLoaded.value = {}
+    isLoadingAllowedProcessors.value = {}
   }
 
   const setNodeUpdating = (nodeId, isUpdating) => {
@@ -942,6 +958,38 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // PUT method for compute node update (provisioner image)
+  const updateComputeNodeDeployment = async (nodeUuid, { provisionerImage, provisionerImageTag }) => {
+    setNodeUpdating(nodeUuid, true)
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid}`
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provisionerImage, provisionerImageTag })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        return result
+      } else {
+        const errorDetails = await response.text()
+        console.error('Failed to update compute node deployment:', response.status, response.statusText, errorDetails)
+        return Promise.reject(new Error(`Failed to update compute node deployment: ${response.statusText} - ${errorDetails}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node deployment:', error)
+      return Promise.reject(error)
+    } finally {
+      setNodeUpdating(nodeUuid, false)
+    }
+  }
+
   // Secrets Actions
   const fetchSecrets = async (nodeId, forceRefresh = false) => {
     if (!forceRefresh && secretsLoaded.value[nodeId]) {
@@ -1173,6 +1221,70 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // Allowed Processors
+  const fetchAllowedProcessors = async (nodeId, forceRefresh = false) => {
+    if (!forceRefresh && allowedProcessorsLoaded.value[nodeId]) {
+      return nodeAllowedProcessors.value[nodeId]
+    }
+    isLoadingAllowedProcessors.value[nodeId] = true
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/allowed-processors`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        nodeAllowedProcessors.value[nodeId] = data.processors || []
+        allowedProcessorsLoaded.value[nodeId] = true
+        return nodeAllowedProcessors.value[nodeId]
+      } else if (response.status === 403) {
+        // Non-owner — no access to manage processors
+        nodeAllowedProcessors.value[nodeId] = []
+        allowedProcessorsLoaded.value[nodeId] = true
+        return []
+      } else {
+        console.error('Failed to fetch allowed processors:', response.status)
+        return Promise.reject(new Error(`Failed to fetch allowed processors: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to fetch allowed processors:', error)
+      return Promise.reject(error)
+    } finally {
+      isLoadingAllowedProcessors.value[nodeId] = false
+    }
+  }
+
+  const updateAllowedProcessors = async (nodeId, processors) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/allowed-processors`
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ processors })
+      })
+      if (response.ok) {
+        nodeAllowedProcessors.value[nodeId] = [...processors]
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update allowed processors:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update allowed processors: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update allowed processors:', error)
+      return Promise.reject(error)
+    }
+  }
+
   return {
     // State - Accounts
     computeAccounts,
@@ -1218,6 +1330,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // PATCH Operations for compute nodes
     updateComputeNode,
     updateComputeNodeStatus,
+    updateComputeNodeDeployment,
     
     // Getters - Secrets
     getNodeSecrets,
@@ -1234,6 +1347,14 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     patchSharedSecrets,
     deleteSharedSecret,
     deleteAllSharedSecrets,
+
+    // Getters - Allowed Processors
+    getNodeAllowedProcessors,
+    isNodeAllowedProcessorsLoading,
+
+    // Actions - Allowed Processors
+    fetchAllowedProcessors,
+    updateAllowedProcessors,
 
     // Actions - Accounts
     fetchComputeAccounts,
