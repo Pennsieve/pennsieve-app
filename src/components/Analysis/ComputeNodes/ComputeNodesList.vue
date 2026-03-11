@@ -24,10 +24,17 @@ const orgMembers = computed(() => store.state.orgMembers || [])
 const orgId = computed(() => props.orgId)
 
 // Use Pinia store for compute nodes data - use scoped system
+const statusOrder = { 'enabled': 0, 'active': 0, 'running': 0, 'ready': 0, 'paused': 1, 'stopped': 1, 'disabled': 1, 'destroying': 2, 'pending': 3 }
+
 const computeNodes = computed(() => {
-  // For organization context, use workspace scope
   const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
-  return computeResourcesStore.getScopedComputeNodes(scope) || []
+  const nodes = computeResourcesStore.getScopedComputeNodes(scope) || []
+  return [...nodes].sort((a, b) => {
+    const statusA = statusOrder[(a.status || 'pending').toLowerCase()] ?? 4
+    const statusB = statusOrder[(b.status || 'pending').toLowerCase()] ?? 4
+    if (statusA !== statusB) return statusA - statusB
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
+  })
 })
 const isLoading = computed(() => {
   const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
@@ -94,20 +101,20 @@ const formatDate = (dateString) => {
 // Get user name from org members
 const getUserName = (userId) => {
   if (!userId) return 'Unknown'
-  
-  // Check if it's the current user
-  if (profile.value && profile.value.id === userId) {
+
+  // Check if it's the current user (match by both string id and integer intId)
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
     return `${profile.value.firstName} ${profile.value.lastName}`.trim() || 'You'
   }
-  
-  // Look for user in org members
-  const member = orgMembers.value.find(m => m.id === userId)
+
+  // Look for user in org members (match by both string id and integer intId)
+  const member = orgMembers.value.find(m => m.id === userId || m.intId === userId)
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || 'Unknown User'
   }
-  
+
   // Return the user ID if we can't find the name
-  return userId.split(':').pop() || userId
+  return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
 onMounted(() => {

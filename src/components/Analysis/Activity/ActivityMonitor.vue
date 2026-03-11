@@ -11,7 +11,7 @@ import {
 import { useStore } from "vuex";
 
 // Vue Flow Imports
-import { useVueFlow, VueFlow } from "@vue-flow/core";
+import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
@@ -85,14 +85,12 @@ const getApplicationsStatus = async (selectedWorkflow) => {
 Helpers
 */
 
-const getLabel = (workflow, type, index) => {
-  if (workflow?.name) {
-    return `${workflow.name}`;
+const getLabel = (processor, type, index) => {
+  if (processor?.name) {
+    return processor.name;
   }
-
-  // Generate default labels based on position
-  // if (index === 0) return "Preprocessor";
-  // if (workflow && index === workflow.length - 1) return "Postprocessor";
+  if (processor?.type === "data-source") return "Data Source";
+  if (processor?.type === "data-target") return "Data Target";
   return "Loading...";
 };
 
@@ -128,11 +126,16 @@ const generateNodesAndEdges = (workflowActivity) => {
   const startY = 100; // Starting Y position
   const baseX = 150; // Base X position with slight variation
 
-  // Generate nodes
-  const newNodes = processors.map((processor, index) => {
-    const nodeId = `${index + 1}`;
+  // Determine if we have DAG node info from the API
+  const hasNodesArray =
+    workflowActivity.nodes &&
+    Array.isArray(workflowActivity.nodes) &&
+    workflowActivity.nodes.length > 0;
 
-    // Use user-modified position if it exists, otherwise calculate default position
+  // Generate nodes — use processor.id if available, fall back to index-based
+  const newNodes = processors.map((processor, index) => {
+    const nodeId = processor.id || `${index + 1}`;
+
     const defaultPosition = {
       x: baseX + index * 20,
       y: startY + index * nodeSpacing,
@@ -142,26 +145,62 @@ const generateNodesAndEdges = (workflowActivity) => {
       ? userModifiedPositions.value.get(nodeId)
       : defaultPosition;
 
+    // Determine Vue Flow node type based on DAG node type
+    let vueFlowType = "default";
+    if (processor.type === "data-source") {
+      vueFlowType = "data-source";
+    } else if (processor.type === "data-target") {
+      vueFlowType = "data-target";
+    }
+
     return {
       id: nodeId,
-      type: index === processors.length - 1 ? "output" : "default",
+      type: vueFlowType,
       data: {
         label: getLabel(processor, "Processor", index),
         status: processor.status,
+        nodeType: processor.type,
+        targetType: processor.targetType,
       },
       position,
       class: getClass(workflowActivity, index),
-      selected: selectedProcessor.value.uuid === processor.uuid,
+      selected:
+        selectedProcessor.value.uuid === processor.uuid ||
+        selectedProcessor.value.id === processor.id,
     };
   });
 
-  // Generate edges (connections between consecutive nodes)
-  const newEdges = processors.slice(0, -1).map((_, index) => ({
-    id: `e${index + 1}-${index + 2}`,
-    source: `${index + 1}`,
-    target: `${index + 2}`,
-    animated: false,
-  }));
+  let newEdges;
+
+  if (hasNodesArray) {
+    // Build edges from the nodes array's dependsOn fields
+    newEdges = [];
+    const nodeIdSet = new Set(newNodes.map((n) => n.id));
+
+    workflowActivity.nodes.forEach((node) => {
+      if (node.dependsOn && Array.isArray(node.dependsOn)) {
+        const targetId = node.id || "";
+        node.dependsOn.forEach((depId) => {
+          if (nodeIdSet.has(depId) && nodeIdSet.has(targetId)) {
+            newEdges.push({
+              id: `e${depId}-${targetId}`,
+              source: depId,
+              target: targetId,
+              animated: false,
+            });
+          }
+        });
+      }
+    });
+  } else {
+    // Fall back to linear chain edges (backward compat)
+    newEdges = newNodes.slice(0, -1).map((node, index) => ({
+      id: `e${node.id}-${newNodes[index + 1].id}`,
+      source: node.id,
+      target: newNodes[index + 1].id,
+      animated: false,
+    }));
+  }
 
   return { nodes: newNodes, edges: newEdges };
 };
@@ -274,7 +313,7 @@ Event Handler for Node Click
 
 onNodeClick(({ node }) => {
   const selectedApplication = selectedWorkflowActivity.value.workflow.find(
-    (x) => x.name === node.data.label
+    (x) => x.id === node.id || x.name === node.data.label
   );
   if (selectedApplication) {
     selectedNode.value = selectedApplication;
@@ -327,6 +366,25 @@ onNodeDragStop(({ node }) => {
         >
           <Background pattern-color="#aaa" :gap="16" />
           <Controls position="top-left" />
+
+          <!-- Data Source Node: output only -->
+          <template #node-data-source="{ data }">
+            <div class="activity-node data-source-node">
+              <span class="node-type-badge source-badge">Source</span>
+              {{ data.label }}
+            </div>
+            <Handle type="source" :position="Position.Bottom" />
+          </template>
+
+          <!-- Data Target Node: input only -->
+          <template #node-data-target="{ data }">
+            <Handle type="target" :position="Position.Top" />
+            <div class="activity-node data-target-node">
+              <span class="node-type-badge target-badge">Target</span>
+              {{ data.label }}
+              <span v-if="data.targetType" class="target-type-label">{{ data.targetType }}</span>
+            </div>
+          </template>
         </VueFlow>
       </div>
 
@@ -371,6 +429,52 @@ onNodeDragStop(({ node }) => {
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/minimap/dist/style.css";
+
+/* Data node styles — must be unscoped for Vue Flow */
+.activity-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.activity-node .node-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+
+  &.source-badge {
+    background: #0f766e;
+    color: white;
+  }
+
+  &.target-badge {
+    background: #8b5cf6;
+    color: white;
+  }
+}
+
+.activity-node .target-type-label {
+  font-size: 10px;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.activity-monitor-flow {
+  .vue-flow__node-data-source {
+    background: #f0fdfa !important;
+    border: 2px solid #0f766e !important;
+  }
+
+  .vue-flow__node-data-target {
+    background: #faf5ff !important;
+    border: 2px solid #8b5cf6 !important;
+  }
+}
 </style>
 
 <style lang="scss" scoped>
@@ -381,7 +485,7 @@ onNodeDragStop(({ node }) => {
 }
 
 .graph-browser {
-  height: calc(100vh - 190px);
+  height: calc(100vh - 112px);
   overflow: hidden;
   position: relative;
 }

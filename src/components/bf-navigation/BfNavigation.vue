@@ -191,11 +191,6 @@ import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
 import CustomTheme from "../../mixins/custom-theme";
-import {
-  isEnabledForTestOrgs,
-  isEnabledForAllDevOrgs,
-  isEnabledForSpecificOrgs,
-} from "../../utils/feature-flags";
 
 export default {
   name: "BfNavigation",

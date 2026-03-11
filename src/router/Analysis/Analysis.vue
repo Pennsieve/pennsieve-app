@@ -4,11 +4,9 @@
       <template #description>
         <div class="description">
           <p>
-            Pennsieve Analytics enables users to integrate custom applications
-            that extend platform capabilities through specialized actions and
-            webhook integrations.
+            Pennsieve Analytics enables users to run workflows over data on external compute nodes.
           </p>
-          <hr />
+<!--          <hr />-->
         </div>
         <!-- <div slot="description" class="description">
           <p v-if="this.$route.name === 'applications'">
@@ -44,7 +42,7 @@
       </template>
       <template #tabs>
         <router-tabs
-          :tabs="isFeatureFlagEnabled ? pennsieveAnalysisFeature : tabs"
+          :tabs="tabs"
         />
       </template>
     </bf-rafter>
@@ -60,12 +58,6 @@ import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
-import { pathOr, propOr } from "ramda";
-import {
-  isEnabledForAllDevOrgs,
-  isEnabledForSpecificOrgs,
-  isEnabledForTestOrgs,
-} from "../../utils/feature-flags";
 
 export default {
   name: "IntegrationView",
@@ -77,21 +69,6 @@ export default {
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
-    ...mapState(["activeOrganization", "config"]),
-    activeOrganizationId: function () {
-      return pathOr(
-        "Organization",
-        ["organization", "id"],
-        this.activeOrganization
-      );
-    },
-    isFeatureFlagEnabled: function () {
-      return (
-        isEnabledForTestOrgs(this.activeOrganizationId) ||
-        isEnabledForSpecificOrgs(this.activeOrganizationId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
   },
   // From Router
   props: {
@@ -122,18 +99,8 @@ export default {
     return {
       tabs: [
         {
-          name: "Webhooks",
-          to: "webhooks",
-        },
-      ],
-      pennsieveAnalysisFeature: [
-        {
-          name: "Activity",
-          to: "activity",
-        },
-        {
-          name: "Workflow Builder",
-          to: "workflow-builder",
+          name: "Runs",
+          to: "runs",
         },
         {
           name: "Workflows",
@@ -142,14 +109,6 @@ export default {
         {
           name: "Applications",
           to: "applications",
-        },
-        {
-          name: "Integrations",
-          to: "integrations",
-        },
-        {
-          name: "Webhooks",
-          to: "webhooks",
         },
       ],
     };

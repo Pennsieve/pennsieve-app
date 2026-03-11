@@ -23,7 +23,20 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   
   // Update states - keyed by nodeId
   const updateStates = ref({})
-  
+
+  // Secrets cache - keyed by nodeId
+  const nodeSecrets = ref({})         // { [nodeId]: { key: value, ... } }
+  const nodeSharedSecrets = ref({})   // { [nodeId]: { key: value, ... } }
+  const secretsLoaded = ref({})       // { [nodeId]: boolean }
+  const sharedSecretsLoaded = ref({}) // { [nodeId]: boolean }
+  const isLoadingSecrets = ref({})
+  const isLoadingSharedSecrets = ref({})
+
+  // Allowed processors cache - keyed by nodeId
+  const nodeAllowedProcessors = ref({})       // { [nodeId]: string[] }
+  const allowedProcessorsLoaded = ref({})     // { [nodeId]: boolean }
+  const isLoadingAllowedProcessors = ref({})
+
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
@@ -41,8 +54,32 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return updateStates.value[nodeId] || false
   })
 
+  const getNodeSecrets = computed(() => (nodeId) => {
+    return nodeSecrets.value[nodeId] || []
+  })
+
+  const getNodeSharedSecrets = computed(() => (nodeId) => {
+    return nodeSharedSecrets.value[nodeId] || []
+  })
+
+  const isNodeSecretsLoading = computed(() => (nodeId) => {
+    return isLoadingSecrets.value[nodeId] || false
+  })
+
+  const isNodeSharedSecretsLoading = computed(() => (nodeId) => {
+    return isLoadingSharedSecrets.value[nodeId] || false
+  })
+
   const isNodePermissionsLoading = computed(() => (nodeId) => {
     return isLoadingPermissions.value[nodeId] || false
+  })
+
+  const getNodeAllowedProcessors = computed(() => (nodeId) => {
+    return nodeAllowedProcessors.value[nodeId] || []
+  })
+
+  const isNodeAllowedProcessorsLoading = computed(() => (nodeId) => {
+    return isLoadingAllowedProcessors.value[nodeId] || false
   })
 
 
@@ -94,6 +131,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     permissionsLoaded.value = {}
     isLoadingPermissions.value = {}
     updateStates.value = {}
+    nodeAllowedProcessors.value = {}
+    allowedProcessorsLoaded.value = {}
+    isLoadingAllowedProcessors.value = {}
   }
 
   const setNodeUpdating = (nodeId, isUpdating) => {
@@ -918,6 +958,333 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // PUT method for compute node update (provisioner image)
+  const updateComputeNodeDeployment = async (nodeUuid, { provisionerImage, provisionerImageTag }) => {
+    setNodeUpdating(nodeUuid, true)
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeUuid}`
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provisionerImage, provisionerImageTag })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        return result
+      } else {
+        const errorDetails = await response.text()
+        console.error('Failed to update compute node deployment:', response.status, response.statusText, errorDetails)
+        return Promise.reject(new Error(`Failed to update compute node deployment: ${response.statusText} - ${errorDetails}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node deployment:', error)
+      return Promise.reject(error)
+    } finally {
+      setNodeUpdating(nodeUuid, false)
+    }
+  }
+
+  // Secrets Actions
+  const fetchSecrets = async (nodeId, forceRefresh = false) => {
+    if (!forceRefresh && secretsLoaded.value[nodeId]) {
+      return nodeSecrets.value[nodeId]
+    }
+    isLoadingSecrets.value[nodeId] = true
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/secrets`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        nodeSecrets.value[nodeId] = data.keys || []
+        secretsLoaded.value[nodeId] = true
+        return nodeSecrets.value[nodeId]
+      } else if (response.status === 404) {
+        nodeSecrets.value[nodeId] = []
+        secretsLoaded.value[nodeId] = true
+        return []
+      } else {
+        console.error('Failed to fetch secrets:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to fetch secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to fetch secrets:', error)
+      return Promise.reject(error)
+    } finally {
+      isLoadingSecrets.value[nodeId] = false
+    }
+  }
+
+  const patchSecrets = async (nodeId, secrets) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/secrets`
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ secrets })
+      })
+      if (response.ok) {
+        // Merge new keys into existing cache
+        const existing = new Set(nodeSecrets.value[nodeId] || [])
+        for (const key of Object.keys(secrets)) {
+          existing.add(key)
+        }
+        nodeSecrets.value[nodeId] = [...existing]
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update secrets:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update secrets:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const deleteSecret = async (nodeId, key) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/secrets?key=${encodeURIComponent(key)}`
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        nodeSecrets.value[nodeId] = (nodeSecrets.value[nodeId] || []).filter(k => k !== key)
+        return true
+      } else {
+        console.error('Failed to delete secret:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to delete secret: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to delete secret:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const deleteAllSecrets = async (nodeId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/secrets?deleteAll=true`
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        nodeSecrets.value[nodeId] = []
+        return true
+      } else {
+        console.error('Failed to delete all secrets:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to delete all secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to delete all secrets:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const fetchSharedSecrets = async (nodeId, forceRefresh = false) => {
+    if (!forceRefresh && sharedSecretsLoaded.value[nodeId]) {
+      return nodeSharedSecrets.value[nodeId]
+    }
+    isLoadingSharedSecrets.value[nodeId] = true
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/shared-secrets`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        nodeSharedSecrets.value[nodeId] = data.keys || []
+        sharedSecretsLoaded.value[nodeId] = true
+        return nodeSharedSecrets.value[nodeId]
+      } else if (response.status === 404) {
+        nodeSharedSecrets.value[nodeId] = []
+        sharedSecretsLoaded.value[nodeId] = true
+        return []
+      } else {
+        console.error('Failed to fetch shared secrets:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to fetch shared secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to fetch shared secrets:', error)
+      return Promise.reject(error)
+    } finally {
+      isLoadingSharedSecrets.value[nodeId] = false
+    }
+  }
+
+  const patchSharedSecrets = async (nodeId, secrets) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/shared-secrets`
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ secrets })
+      })
+      if (response.ok) {
+        // Merge new keys into existing cache
+        const existing = new Set(nodeSharedSecrets.value[nodeId] || [])
+        for (const key of Object.keys(secrets)) {
+          existing.add(key)
+        }
+        nodeSharedSecrets.value[nodeId] = [...existing]
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update shared secrets:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update shared secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update shared secrets:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const deleteSharedSecret = async (nodeId, key) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/shared-secrets?key=${encodeURIComponent(key)}`
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        nodeSharedSecrets.value[nodeId] = (nodeSharedSecrets.value[nodeId] || []).filter(k => k !== key)
+        return true
+      } else {
+        console.error('Failed to delete shared secret:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to delete shared secret: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to delete shared secret:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const deleteAllSharedSecrets = async (nodeId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/shared-secrets?deleteAll=true`
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        nodeSharedSecrets.value[nodeId] = []
+        return true
+      } else {
+        console.error('Failed to delete all shared secrets:', response.status, response.statusText)
+        return Promise.reject(new Error(`Failed to delete all shared secrets: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to delete all shared secrets:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  // Allowed Processors
+  const fetchAllowedProcessors = async (nodeId, forceRefresh = false) => {
+    if (!forceRefresh && allowedProcessorsLoaded.value[nodeId]) {
+      return nodeAllowedProcessors.value[nodeId]
+    }
+    isLoadingAllowedProcessors.value[nodeId] = true
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/allowed-processors`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        nodeAllowedProcessors.value[nodeId] = data.processors || []
+        allowedProcessorsLoaded.value[nodeId] = true
+        return nodeAllowedProcessors.value[nodeId]
+      } else if (response.status === 403) {
+        // Non-owner — no access to manage processors
+        nodeAllowedProcessors.value[nodeId] = []
+        allowedProcessorsLoaded.value[nodeId] = true
+        return []
+      } else {
+        console.error('Failed to fetch allowed processors:', response.status)
+        return Promise.reject(new Error(`Failed to fetch allowed processors: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to fetch allowed processors:', error)
+      return Promise.reject(error)
+    } finally {
+      isLoadingAllowedProcessors.value[nodeId] = false
+    }
+  }
+
+  const updateAllowedProcessors = async (nodeId, processors) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/allowed-processors`
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ processors })
+      })
+      if (response.ok) {
+        nodeAllowedProcessors.value[nodeId] = [...processors]
+        return true
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update allowed processors:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update allowed processors: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update allowed processors:', error)
+      return Promise.reject(error)
+    }
+  }
+
   return {
     // State - Accounts
     computeAccounts,
@@ -963,7 +1330,32 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // PATCH Operations for compute nodes
     updateComputeNode,
     updateComputeNodeStatus,
+    updateComputeNodeDeployment,
     
+    // Getters - Secrets
+    getNodeSecrets,
+    getNodeSharedSecrets,
+    isNodeSecretsLoading,
+    isNodeSharedSecretsLoading,
+
+    // Actions - Secrets
+    fetchSecrets,
+    patchSecrets,
+    deleteSecret,
+    deleteAllSecrets,
+    fetchSharedSecrets,
+    patchSharedSecrets,
+    deleteSharedSecret,
+    deleteAllSharedSecrets,
+
+    // Getters - Allowed Processors
+    getNodeAllowedProcessors,
+    isNodeAllowedProcessorsLoading,
+
+    // Actions - Allowed Processors
+    fetchAllowedProcessors,
+    updateAllowedProcessors,
+
     // Actions - Accounts
     fetchComputeAccounts,
     updateAccount,

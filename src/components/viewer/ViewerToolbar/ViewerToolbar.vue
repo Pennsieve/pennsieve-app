@@ -20,6 +20,8 @@ export default {
   flex-direction: column;
   padding: 10px;
   width: 20px;
+  position: relative;
+  z-index: 10;
   &.left {
     border-right: 2px solid theme.$gray_2;
   }

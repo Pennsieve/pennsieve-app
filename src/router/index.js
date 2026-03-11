@@ -122,10 +122,14 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
-const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
+const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
+const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
+const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
+const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
+const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
-const NamedWorkflowList = () => import ('../components/Analysis/Workflows/NamedWorkflowList.vue')
+const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
 /**
  * Metadata Components
@@ -1476,22 +1480,56 @@ const router = createRouter({
         navigation: BfNavigation
       },
       redirect: {
-        name: 'activity'
+        name: 'runs'
       },
       props: true,
       children: [
-           {
-          name: 'workflow-builder',
-          path: 'workflow-builder',
+        {
+          name: 'workflows',
+          path: 'workflows',
+          components: {
+            stage: WorkflowsGrid,
+          }
+        },
+        {
+          name: 'workflow-create',
+          path: 'workflows/new',
           components: {
             stage: WorkflowBuilder,
           }
         },
-                 {
-          name: 'workflows',
-          path: 'workflows',
+        {
+          name: 'workflow-detail',
+          path: 'workflows/:uuid',
           components: {
-            stage: NamedWorkflowList,
+            stage: WorkflowBuilder,
+          },
+          props: {
+            stage: true
+          }
+        },
+        {
+          name: 'runs',
+          path: 'runs',
+          components: {
+            stage: RunsOverview,
+          }
+        },
+        {
+          name: 'run-configure',
+          path: 'runs/configure',
+          components: {
+            stage: RunDetail,
+          }
+        },
+        {
+          name: 'run-detail',
+          path: 'runs/:runId',
+          components: {
+            stage: RunDetail,
+          },
+          props: {
+            stage: true
           }
         },
         {
@@ -1521,7 +1559,17 @@ const router = createRouter({
           name: 'applications',
           path: 'applications',
           components: {
-            stage: ApplicationsList,
+            stage: ApplicationsGrid,
+          }
+        },
+        {
+          name: 'application-detail',
+          path: 'applications/:uuid',
+          components: {
+            stage: ApplicationDetail,
+          },
+          props: {
+            stage: true
           }
         }
       ]
