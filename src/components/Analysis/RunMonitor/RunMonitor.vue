@@ -9,6 +9,8 @@ import EventBus from "../../../utils/event-bus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
+import IconFile from "../../icons/IconFile.vue";
+import IconCollection from "../../icons/IconCollection.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -457,7 +459,8 @@ const runToNodesAndEdges = (run) => {
     const extra = {};
     if (d.type === "data-source") {
       const src = runDataSources[d.id];
-      extra.packageCount = src?.packageIds?.length || 0;
+      extra.packageIds = src?.packageIds || [];
+      extra.packageCount = extra.packageIds.length;
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
@@ -1100,7 +1103,22 @@ const openFilePicker = (nodeId) => {
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
   filePickerCurrentFile.value = { content: { name: "" } };
-  clearSelectedValues.value = !clearSelectedValues.value;
+
+  // Seed the store with existing selections so the table pre-selects them
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  const existingFiles = dataSourceFiles[nodeId] || [];
+  if (existingFiles.length > 0) {
+    const byParent = {};
+    for (const file of existingFiles) {
+      const pid = file.content?.parentId || "root";
+      if (!byParent[pid]) byParent[pid] = [];
+      byParent[pid].push(file);
+    }
+    for (const [parentId, files] of Object.entries(byParent)) {
+      store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles: files, parentId });
+    }
+  }
+
   filePickerVisible.value = true;
   fetchDatasetFiles();
 };
@@ -1170,20 +1188,69 @@ const handleNavigateBreadcrumb = async (id) => {
   }
 };
 
-const onFileSelect = (selectedFiles) => {
+const onFileSelect = (selectedFiles, parentId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
-  dataSourceFiles[nodeId] = selectedFiles;
+
+  // Update the store so navigating folders preserves selections
+  store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
+
+  // Rebuild dataSourceFiles from the full store state
+  const allFiles = [];
+  const storeFiles = store.state.analysisModule.selectedFilesForAnalysis;
+  for (const pid in storeFiles) {
+    allFiles.push(...storeFiles[pid]);
+  }
+  dataSourceFiles[nodeId] = allFiles;
 };
 
 const closeFilePicker = () => {
   filePickerVisible.value = false;
   filePickerNodeId.value = null;
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
 };
 
 const fileCountForNode = (nodeId) => {
   return (dataSourceFiles[nodeId] || []).length;
 };
+
+const removeFileFromNode = (nodeId, index) => {
+  if (!dataSourceFiles[nodeId]) return;
+  dataSourceFiles[nodeId].splice(index, 1);
+};
+
+// Browse mode: resolve package IDs to names
+const browseFileInfo = ref({});
+
+const fetchPackageNames = async (packageIds) => {
+  if (!packageIds || packageIds.length === 0) return;
+  const token = await useGetToken();
+  const idsToFetch = packageIds.filter((id) => !browseFileInfo.value[id]);
+  for (const id of idsToFetch) {
+    try {
+      const url = `${config.value.apiUrl}/packages/${id}?api_key=${token}`;
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const pkg = await resp.json();
+        browseFileInfo.value[id] = {
+          name: pkg.content?.name || id,
+          packageType: pkg.content?.packageType || "",
+        };
+      }
+    } catch {
+      // leave as ID if fetch fails
+    }
+  }
+};
+
+watch(
+  () => selectedNode.value,
+  (node) => {
+    if (node?.type === "data-source" && mode.value === "browse" && node.data?.packageIds?.length > 0) {
+      fetchPackageNames(node.data.packageIds);
+    }
+  }
+);
 
 /*
   Node params helpers (configure mode)
@@ -1920,7 +1987,25 @@ onUnmounted(() => {
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
                 </div>
               </div>
-              <bf-button class="secondary" @click="openFilePicker(selectedNode.id)">Select Files</bf-button>
+              <h4 class="sidebar-section-title">Source Files</h4>
+              <div v-if="dataSourceFiles[selectedNode.id]?.length > 0" class="selected-files-list">
+                <div
+                  v-for="(file, idx) in dataSourceFiles[selectedNode.id]"
+                  :key="file.content?.id || idx"
+                  class="selected-file-item"
+                >
+                  <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
+                  <span class="selected-file-name">{{ file.content?.name || 'Unnamed file' }}</span>
+                  <button class="selected-file-remove" @click="removeFileFromNode(selectedNode.id, idx)" title="Remove file">&times;</button>
+                </div>
+              </div>
+              <div v-else class="selected-files-empty">
+                No files selected yet.
+              </div>
+              <div class="info-actions">
+                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
+              </div>
             </template>
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
@@ -1957,9 +2042,21 @@ onUnmounted(() => {
                   <span class="info-label">Name</span>
                   <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
                 </div>
-                <div v-if="selectedNode.data?.packageCount != null" class="info-row">
+                <div class="info-row">
                   <span class="info-label">Files</span>
-                  <span class="info-value">{{ selectedNode.data.packageCount }} file{{ selectedNode.data.packageCount !== 1 ? 's' : '' }}</span>
+                  <span class="info-value">{{ selectedNode.data?.packageCount || 0 }} file{{ selectedNode.data?.packageCount !== 1 ? 's' : '' }}</span>
+                </div>
+              </div>
+              <h4 class="sidebar-section-title">Source Files</h4>
+              <div v-if="selectedNode.data?.packageIds?.length > 0" class="selected-files-list">
+                <div
+                  v-for="pkgId in selectedNode.data.packageIds"
+                  :key="pkgId"
+                  class="selected-file-item"
+                >
+                  <IconCollection v-if="browseFileInfo[pkgId]?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
+                  <span class="selected-file-name">{{ browseFileInfo[pkgId]?.name || pkgId }}</span>
                 </div>
               </div>
               <div class="info-actions">
@@ -3415,7 +3512,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 500px;
   overflow-y: auto;
 }
 
@@ -3736,6 +3832,53 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin-top: 8px;
+}
+
+.selected-files-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
+.selected-file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.selected-file-icon {
+  flex-shrink: 0;
+  color: theme.$purple_2;
+}
+
+.selected-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$black;
+}
+
+.selected-file-remove {
+  background: none;
+  border: none;
+  color: theme.$gray_4;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+
+  &:hover { color: theme.$red_1; }
+}
+
+.selected-files-empty {
+  font-size: 12px;
+  color: theme.$gray_4;
+  padding: 6px 0;
 }
 
 .rerun-config-btn {

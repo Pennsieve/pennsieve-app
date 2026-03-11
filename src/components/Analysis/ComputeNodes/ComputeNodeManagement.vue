@@ -179,7 +179,10 @@ function getStatusForNode(node) {
 // Data fetching
 onMounted(async () => {
   await fetchComputeNode()
-  await computeResourcesStore.fetchNodePermissions(nodeUuid.value)
+  await Promise.all([
+    computeResourcesStore.fetchNodePermissions(nodeUuid.value),
+    computeResourcesStore.fetchAllowedProcessors(nodeUuid.value),
+  ])
 })
 
 async function fetchComputeNode() {
@@ -322,6 +325,114 @@ async function removeTeamAccess(teamId) {
     ElMessage.success('Team access revoked successfully')
   } catch (error) {
     ElMessage.error('Failed to revoke team access')
+  }
+}
+
+// Allowed Processors
+const allowedProcessors = computed(() => computeResourcesStore.getNodeAllowedProcessors(nodeUuid.value))
+const isLoadingAllowedProcessors = computed(() => computeResourcesStore.isNodeAllowedProcessorsLoading(nodeUuid.value))
+const isEditingProcessors = ref(false)
+const editingProcessorsList = ref([])
+const newProcessorUrl = ref('')
+const isSavingProcessors = ref(false)
+
+const processorAccessMode = computed(() => {
+  return allowedProcessors.value.length === 0 ? 'open' : 'restricted'
+})
+
+const availableApplications = computed(() => {
+  const apps = store.state.analysisModule?.applications || []
+  const seen = new Set()
+  return apps.filter(app => {
+    if (!app.source?.url) return false
+    if (seen.has(app.source.url)) return false
+    seen.add(app.source.url)
+    return true
+  })
+})
+
+function startEditingProcessors() {
+  editingProcessorsList.value = [...allowedProcessors.value]
+  isEditingProcessors.value = true
+  store.dispatch('analysisModule/fetchApplications')
+}
+
+function cancelEditingProcessors() {
+  isEditingProcessors.value = false
+  editingProcessorsList.value = []
+  newProcessorUrl.value = ''
+}
+
+function addProcessorEntry(url) {
+  if (!url || editingProcessorsList.value.includes(url)) return
+  editingProcessorsList.value.push(url)
+}
+
+function addProcessorFromSelect(url) {
+  addProcessorEntry(url)
+}
+
+function addProcessorManual() {
+  const url = newProcessorUrl.value.trim()
+  if (!url) return
+  addProcessorEntry(url)
+  newProcessorUrl.value = ''
+}
+
+function removeProcessorEntry(index) {
+  editingProcessorsList.value.splice(index, 1)
+}
+
+async function saveAllowedProcessors() {
+  isSavingProcessors.value = true
+  try {
+    await computeResourcesStore.updateAllowedProcessors(nodeUuid.value, editingProcessorsList.value)
+    ElMessage.success('Allowed processors updated successfully')
+    isEditingProcessors.value = false
+    newProcessorUrl.value = ''
+  } catch (error) {
+    ElMessage.error('Failed to update allowed processors')
+  } finally {
+    isSavingProcessors.value = false
+  }
+}
+
+// Update deployment (provisioner image)
+const isEditingDeployment = ref(false)
+const isUpdatingDeployment = ref(false)
+const deploymentForm = ref({ provisionerImage: '', provisionerImageTag: '' })
+
+function startEditingDeployment() {
+  deploymentForm.value = {
+    provisionerImage: computeNode.value?.provisionerImage || '',
+    provisionerImageTag: computeNode.value?.provisionerImageTag || ''
+  }
+  isEditingDeployment.value = true
+}
+
+function cancelEditingDeployment() {
+  isEditingDeployment.value = false
+  deploymentForm.value = { provisionerImage: '', provisionerImageTag: '' }
+}
+
+async function saveDeployment() {
+  if (!deploymentForm.value.provisionerImage || !deploymentForm.value.provisionerImageTag) {
+    ElMessage.warning('Both image and tag are required')
+    return
+  }
+  isUpdatingDeployment.value = true
+  try {
+    await computeResourcesStore.updateComputeNodeDeployment(nodeUuid.value, {
+      provisionerImage: deploymentForm.value.provisionerImage,
+      provisionerImageTag: deploymentForm.value.provisionerImageTag
+    })
+    ElMessage.success('Compute node update initiated')
+    isEditingDeployment.value = false
+  } catch (error) {
+    console.error('Failed to update deployment:', error)
+    ElMessage.error('Failed to update compute node deployment')
+  } finally {
+    isUpdatingDeployment.value = false
   }
 }
 
@@ -472,6 +583,17 @@ async function confirmDestroyNode() {
       <div class="management-section">
         <div class="section-header">
           <h2>Deployment Configuration</h2>
+          <div class="section-actions" v-if="canManagePermissions">
+            <template v-if="!isEditingDeployment">
+              <button class="processor-edit-button" @click="startEditingDeployment">Update</button>
+            </template>
+            <template v-else>
+              <button class="processor-edit-button" :disabled="isUpdatingDeployment" @click="saveDeployment">
+                {{ isUpdatingDeployment ? 'Updating...' : 'Update' }}
+              </button>
+              <button class="processor-cancel-button" @click="cancelEditingDeployment">Cancel</button>
+            </template>
+          </div>
         </div>
         <div class="info-content">
           <div class="info-row">
@@ -506,9 +628,26 @@ async function confirmDestroyNode() {
             </span>
           </div>
 
-          <div class="info-row" v-if="computeNode.provisionerImage">
+          <div class="info-row">
             <span class="info-label">Provisioner:</span>
-            <span class="info-value mono">{{ computeNode.provisionerImage }}:{{ computeNode.provisionerImageTag }}</span>
+            <template v-if="isEditingDeployment">
+              <span class="info-value">
+                <div class="deployment-form">
+                  <div class="deployment-form-row">
+                    <label class="deployment-form-label">Image</label>
+                    <el-input v-model="deploymentForm.provisionerImage" placeholder="e.g. pennsieve/compute-node-aws-provisioner-v2" size="default" />
+                  </div>
+                  <div class="deployment-form-row">
+                    <label class="deployment-form-label">Tag</label>
+                    <el-input v-model="deploymentForm.provisionerImageTag" placeholder="e.g. 20260310-1" size="default" />
+                  </div>
+                </div>
+              </span>
+            </template>
+            <template v-else>
+              <span v-if="computeNode.provisionerImage" class="info-value mono">{{ computeNode.provisionerImage }}:{{ computeNode.provisionerImageTag }}</span>
+              <span v-else class="info-value empty-value">Not set</span>
+            </template>
           </div>
         </div>
       </div>
@@ -615,6 +754,105 @@ async function confirmDestroyNode() {
           <h2>Secrets</h2>
         </div>
         <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
+      </div>
+
+      <!-- Allowed Processors Section -->
+      <div class="management-section" v-if="isNodeOwner" v-loading="isLoadingAllowedProcessors">
+        <div class="section-header">
+          <h2>Allowed Processors</h2>
+          <div class="section-actions">
+            <span v-if="!isEditingProcessors" class="processor-mode-badge" :class="processorAccessMode">
+              {{ processorAccessMode === 'open' ? 'Open — All Allowed' : 'Restricted' }}
+            </span>
+            <button v-if="!isEditingProcessors" @click="startEditingProcessors" class="processor-edit-button">
+              Configure
+            </button>
+            <template v-else>
+              <button @click="saveAllowedProcessors" :disabled="isSavingProcessors" class="processor-edit-button">
+                {{ isSavingProcessors ? 'Saving...' : 'Save' }}
+              </button>
+              <button @click="cancelEditingProcessors" class="processor-cancel-button">
+                Cancel
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Read-only view -->
+        <div v-if="!isEditingProcessors" class="processors-content">
+          <div v-if="processorAccessMode === 'open'" class="processors-empty">
+            No processor restrictions configured — all processors are allowed
+          </div>
+          <div v-else>
+            <p class="processors-description">Only the following processors are allowed to run on this node. Data targets and service processors are always allowed.</p>
+            <div class="processors-list">
+              <div v-for="(url, index) in allowedProcessors" :key="index" class="processor-item">
+                <span class="processor-url">{{ url }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit view -->
+        <div v-else class="processors-edit">
+          <p class="processors-description">Add processor source URLs to restrict this node. Leave empty for open access. Data targets and service processors are always allowed.</p>
+
+          <!-- Add from known applications -->
+          <div class="add-processor-row">
+            <el-select
+              placeholder="Pick from known applications..."
+              filterable
+              @change="addProcessorFromSelect"
+              :model-value="''"
+              style="flex: 1"
+              popper-class="processor-select-popper"
+            >
+              <el-option
+                v-for="app in availableApplications"
+                :key="app.uuid"
+                :label="app.name"
+                :value="app.source.url"
+              >
+                <div style="display: flex; flex-direction: column; line-height: 1.4; padding: 2px 0;">
+                  <span style="font-size: 14px;">{{ app.name }}</span>
+                  <span style="font-size: 12px; color: #9ca3af; font-family: 'Courier New', monospace;">{{ app.source.url }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </div>
+
+          <!-- Manual entry -->
+          <div class="add-processor-row">
+            <el-input
+              v-model="newProcessorUrl"
+              placeholder="git://github.com/org/repo"
+              @keyup.enter="addProcessorManual"
+            />
+            <bf-button @click="addProcessorManual" class="secondary small" :disabled="!newProcessorUrl.trim()">
+              Add
+            </bf-button>
+          </div>
+
+          <!-- Current list -->
+          <div v-if="editingProcessorsList.length > 0" class="processors-list">
+            <div v-for="(url, index) in editingProcessorsList" :key="index" class="processor-item">
+              <span class="processor-url">{{ url }}</span>
+              <button @click="removeProcessorEntry(index)" class="remove-button" title="Remove">
+                <IconRemove :width="16" :height="16" />
+              </button>
+            </div>
+          </div>
+          <div v-else class="processors-empty">No processors in whitelist — all processors will be allowed (open mode)</div>
+
+          <bf-button
+            v-if="editingProcessorsList.length > 0"
+            @click="editingProcessorsList = []"
+            class="secondary small"
+            style="margin-top: 8px"
+          >
+            Clear All (Switch to Open)
+          </bf-button>
+        </div>
       </div>
 
       <!-- Danger Zone -->
@@ -1255,6 +1493,124 @@ async function confirmDestroyNode() {
   justify-content: flex-end;
 }
 
+.processor-edit-button,
+.processor-cancel-button {
+  background: theme.$purple_1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: theme.$purple_2;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.processor-cancel-button {
+  background: white;
+  color: theme.$gray_5;
+  border: 1px solid theme.$gray_3;
+
+  &:hover {
+    border-color: theme.$gray_4;
+    color: theme.$gray_6;
+    background: white;
+  }
+}
+
+.processor-mode-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+
+  &.open {
+    background: rgba(#10B981, 0.1);
+    color: #059669;
+    border: 1px solid rgba(#10B981, 0.2);
+  }
+  &.restricted {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(#F59E0B, 0.2);
+  }
+}
+
+.processors-description {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.add-processor-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.processors-list {
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  padding: 8px;
+
+  .processor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: theme.$gray_1;
+    }
+
+    .processor-url {
+      font-size: 13px;
+      font-family: 'Courier New', monospace;
+      color: theme.$gray_6;
+    }
+
+    .remove-button {
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: theme.$gray_4;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: theme.$red_2;
+        color: white;
+      }
+    }
+  }
+}
+
+.processors-empty {
+  padding: 24px;
+  text-align: center;
+  color: theme.$gray_4;
+  font-size: 14px;
+  background: theme.$gray_1;
+  border-radius: 6px;
+}
+
 :deep(.bf-button) {
   &.small {
     padding: 6px 12px;
@@ -1265,5 +1621,31 @@ async function confirmDestroyNode() {
       height: 14px;
     }
   }
+}
+
+.deployment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deployment-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deployment-form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$gray_5;
+}
+</style>
+
+<style lang="scss">
+.processor-select-popper .el-select-dropdown__item {
+  height: auto;
+  padding: 8px 12px;
+  line-height: 1.4;
 }
 </style>

@@ -757,7 +757,15 @@ export const actions = {
       },
       body: JSON.stringify(payload),
     });
-    if (!resp.ok) throw new Error("Failed to create run");
+    if (!resp.ok) {
+      let message = "Failed to create run";
+      try {
+        const body = await resp.json();
+        if (body.message) message = body.message;
+        else if (body.error) message = body.error;
+      } catch {}
+      throw new Error(message);
+    }
     const newRun = await resp.json();
     commit("PREPEND_WORKFLOW_INSTANCE", newRun);
     return newRun;
