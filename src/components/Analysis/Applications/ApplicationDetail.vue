@@ -4,17 +4,12 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { pathOr, propOr } from "ramda";
+import { propOr } from "ramda";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import EventBus from "../../../utils/event-bus";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 
-import {
-  isEnabledForAllDevOrgs,
-  isEnabledForSpecificOrgs,
-  isEnabledForTestOrgs,
-} from "../../../utils/feature-flags.js";
 
 const props = defineProps({
   uuid: {
@@ -45,20 +40,10 @@ const applicationsLoaded = computed(
   () => store.state.analysisModule.applicationsLoaded
 );
 const activeOrganization = computed(() => store.state.activeOrganization);
-const config = computed(() => store.state.config);
 
 const selectedApplication = computed(() =>
   applications.value.find((a) => a.uuid === props.uuid)
 );
-
-const isFeatureFlagEnabled = computed(() => {
-  const orgId = pathOr("", ["organization", "id"], activeOrganization.value);
-  return (
-    isEnabledForTestOrgs(orgId) ||
-    isEnabledForSpecificOrgs(orgId) ||
-    isEnabledForAllDevOrgs(config.value.apiUrl)
-  );
-});
 
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
