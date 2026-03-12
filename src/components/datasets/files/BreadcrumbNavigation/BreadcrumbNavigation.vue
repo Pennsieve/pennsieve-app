@@ -4,35 +4,6 @@
       Files
     </template>
     <template v-else>
-      <!-- Dropdown menu for quick navigation -->
-      <el-dropdown
-        trigger="click"
-        placement="bottom-start"
-        :class="isLightBackground && 'dark-text'"
-        @command="breadcrumbNavigate"
-      >
-        <span class="el-dropdown-link button-icon">
-          <IconMenu :height="16" :width="16" />
-        </span>
-        <template #dropdown>
-          <el-dropdown-menu
-            slot="dropdown"
-            class="breadcrumb-menu bf-menu"
-            :arrow-offset="0"
-          >
-            <el-dropdown-item
-              v-for="breadcrumb in breadcrumbs"
-              :key="breadcrumb.content.id"
-              :command="breadcrumb.content.id"
-            >
-              {{ breadcrumb.content.name }}
-            </el-dropdown-item>
-            <el-dropdown-item command="">Files</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
-      <!-- Full path display -->
       <div class="full-path">
         <span
           class="breadcrumb-item clickable"
@@ -41,7 +12,42 @@
         >
           Files
         </span>
-        <template v-for="breadcrumb in breadcrumbs" :key="breadcrumb.content.id">
+
+        <!-- Overflow dropdown for collapsed middle ancestors -->
+        <template v-if="overflowBreadcrumbs.length > 0">
+          <span class="breadcrumb-separator">
+            <IconArrowRight
+              class="breadcrumb-caret"
+              :height="10"
+              :width="10"
+            />
+          </span>
+          <el-dropdown
+            trigger="click"
+            placement="bottom-start"
+            :class="isLightBackground && 'dark-text'"
+            @command="breadcrumbNavigate"
+          >
+            <span class="breadcrumb-item clickable overflow-trigger">...</span>
+            <template #dropdown>
+              <el-dropdown-menu
+                class="breadcrumb-menu bf-menu"
+                :arrow-offset="0"
+              >
+                <el-dropdown-item
+                  v-for="breadcrumb in overflowBreadcrumbs"
+                  :key="breadcrumb.content.id"
+                  :command="breadcrumb.content.id"
+                >
+                  {{ breadcrumb.content.name }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
+
+        <!-- Visible tail breadcrumbs -->
+        <template v-for="breadcrumb in visibleBreadcrumbs" :key="breadcrumb.content.id">
           <span class="breadcrumb-separator">
             <IconArrowRight
               class="breadcrumb-caret"
@@ -57,6 +63,7 @@
             {{ breadcrumb.content.name }}
           </span>
         </template>
+
         <span class="breadcrumb-separator">
           <IconArrowRight
             class="breadcrumb-caret"
@@ -74,12 +81,13 @@
 
 <script>
 import { defaultTo, isEmpty } from 'ramda'
-import IconMenu from "../../../icons/IconMenu.vue";
 import IconArrowRight from "../../../icons/IconArrowRight.vue";
+
+const MAX_VISIBLE_ANCESTORS = 2
 
 export default {
   name: 'BreadcrumbNavigation',
-  components: { IconArrowRight, IconMenu },
+  components: { IconArrowRight },
   props: {
     isLightBackground: {
       type: Boolean,
@@ -100,12 +108,14 @@ export default {
   },
 
   computed: {
-    /**
-     * Reverse ancestors to show in correct order
-     * @returns {Array}
-     */
     breadcrumbs: function() {
-      return JSON.parse(JSON.stringify(defaultTo([], this.ancestors))).reverse()
+      return defaultTo([], this.ancestors)
+    },
+    visibleBreadcrumbs: function() {
+      return this.breadcrumbs.slice(-MAX_VISIBLE_ANCESTORS)
+    },
+    overflowBreadcrumbs: function() {
+      return this.breadcrumbs.slice(0, -MAX_VISIBLE_ANCESTORS)
     }
   },
 
@@ -145,7 +155,11 @@ export default {
     color: theme.$purple_3;
     display: inline-flex;
     flex-shrink: 0;
-    margin-right: 8px;
+  }
+
+  .overflow-trigger {
+    font-weight: 600;
+    letter-spacing: 1px;
   }
 
   .breadcrumb-menu {
