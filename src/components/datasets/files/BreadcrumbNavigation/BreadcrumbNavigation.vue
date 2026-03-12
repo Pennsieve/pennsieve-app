@@ -101,11 +101,11 @@ export default {
 
   computed: {
     /**
-     * Reverse ancestors to show in correct order
+     * Ancestors in root-first order
      * @returns {Array}
      */
     breadcrumbs: function() {
-      return JSON.parse(JSON.stringify(defaultTo([], this.ancestors))).reverse()
+      return defaultTo([], this.ancestors)
     }
   },
 
