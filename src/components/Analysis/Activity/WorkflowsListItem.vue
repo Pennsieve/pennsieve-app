@@ -9,10 +9,10 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
-        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
         <div v-if="workflow.startedAt">
           Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}
         </div>
@@ -28,10 +28,10 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
-        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
         <div>Status: {{ workflow.status }}</div>
       </div>
@@ -60,10 +60,10 @@
     <div class="text">
       <div class="workflow-name">
         Workflow Run:
-        {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+        {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
       </div>
       <div>Workflow Instance UUID: {{ workflow.uuid }}</div>
-      <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+      <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
       <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
       <div>Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}</div>
       <div>Status: {{ workflow.status }}</div>
@@ -79,13 +79,13 @@
       <div class="text">
         <div class="workflow-name">
           Workflow Run:
-          {{ workflow.name.length ? workflow.name : "No Custom Name" }}
+          {{ workflow.name?.length ? workflow.name : "No Custom Name" }}
         </div>
         <div>
           Workflow Instance UUID: <br />
           {{ workflow.uuid }}
         </div>
-        <div>Compute Node UUID: {{ workflow.computeNode.uuid }}</div>
+        <div>Compute Node UUID: {{ workflow.computeNodeId || workflow.computeNode?.uuid }}</div>
         <div>Started At: {{ formatDateAndTimeFNS(workflow.startedAt) }}</div>
         <div>
           Completed At: {{ formatDateAndTimeFNS(workflow.completedAt) }}

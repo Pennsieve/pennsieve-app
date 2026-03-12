@@ -1,7 +1,10 @@
 <template >
   <ul class="tabs">
     <li v-for="tab in tabs" :key="tab.to">
-      <router-link :to="{ name: tab.to }">
+      <router-link
+        :to="{ name: tab.to }"
+        :class="{ active: isTabActive(tab) }"
+      >
         {{ tab.name }}
       </router-link>
     </li>
@@ -23,7 +26,16 @@ export default {
       ]
     },
   },
-
+  methods: {
+    isTabActive(tab) {
+      try {
+        const resolved = this.$router.resolve({ name: tab.to })
+        return this.$route.path.startsWith(resolved.path)
+      } catch {
+        return false
+      }
+    },
+  },
 }
 </script>
 

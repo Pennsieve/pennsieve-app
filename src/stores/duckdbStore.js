@@ -46,9 +46,13 @@ export const useDuckDBStore = defineStore('duckdb', () => {
                 const worker = new Worker(workerUrl)
                 const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING)
 
-                db.value = new duckdb.AsyncDuckDB(logger, worker)
-                await db.value.instantiate(bundle.mainModule)
+                // Create and fully instantiate before setting db.value
+                // to prevent race conditions where another caller sees
+                // a non-null db.value that isn't yet instantiated
+                const instance = new duckdb.AsyncDuckDB(logger, worker)
+                await instance.instantiate(bundle.mainModule)
 
+                db.value = instance
                 isInitialized.value = true
 
                 return db.value
@@ -243,6 +247,126 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         }
     }
 
+    // Load multiple files into a single table (e.g. monthly parquet partitions)
+    const loadFiles = async (fileUrls, fileType, tableName = 'my_data', viewerId = null, fileId = null) => {
+        const stableKey = fileId || tableName
+
+        // Cache check: compare serialized URLs array
+        const existingFile = loadedFiles.value.get(stableKey)
+        const serializedUrls = JSON.stringify(fileUrls)
+        if (existingFile && !existingFile.isLoading && !existingFile.error && existingFile.fileUrl === serializedUrls) {
+            if (viewerId) {
+                trackFileUsage(stableKey, viewerId)
+            }
+            return existingFile.tableName
+        }
+
+        if (!isReady.value) {
+            await initDuckDB()
+        }
+
+        loadedFiles.value.set(stableKey, {
+            tableName,
+            fileType,
+            fileUrl: serializedUrls,
+            isLoading: true,
+            error: null
+        })
+
+        try {
+            // Ensure DuckDB is fully initialized before proceeding
+            if (!db.value) {
+                await initDuckDB()
+            }
+
+            const fileNames = []
+
+            for (let i = 0; i < fileUrls.length; i++) {
+                let arrayBuffer
+                try {
+                    const response = await fetch(fileUrls[i])
+                    if (!response.ok) {
+                        console.warn(`Skipping file ${i}: ${response.status} ${response.statusText}`)
+                        continue
+                    }
+                    arrayBuffer = await response.arrayBuffer()
+                    if (arrayBuffer.byteLength === 0) {
+                        console.warn(`Skipping file ${i}: empty response`)
+                        continue
+                    }
+                } catch (fetchErr) {
+                    console.warn(`Skipping file ${i}: fetch failed - ${fetchErr.message}`)
+                    continue
+                }
+
+                const uint8Array = new Uint8Array(arrayBuffer)
+                const fileName = `${stableKey}_${i}.${fileType}`
+                await db.value.registerFileBuffer(fileName, uint8Array)
+                fileNames.push(fileName)
+            }
+
+            if (fileNames.length === 0) {
+                throw new Error('No valid files could be loaded')
+            }
+
+            const tempConn = await db.value.connect()
+            try {
+                // Validate each file individually and keep only valid ones
+                const validFiles = []
+                for (const fileName of fileNames) {
+                    try {
+                        await tempConn.query(`SELECT 1 FROM read_parquet('${fileName}') LIMIT 1`)
+                        validFiles.push(fileName)
+                    } catch {
+                        console.warn(`Skipping invalid parquet file: ${fileName}`)
+                    }
+                }
+
+                if (validFiles.length === 0) {
+                    throw new Error('No valid parquet files found')
+                }
+
+                const fileList = validFiles.map(f => `'${f}'`).join(', ')
+                const createTableQuery = `
+                    CREATE OR REPLACE TABLE ${tableName} AS
+                    SELECT * FROM read_parquet([${fileList}]);
+                `
+                await tempConn.query(createTableQuery)
+
+                const result = await tempConn.query(`SELECT COUNT(*) as count FROM ${tableName};`)
+                const rowCount = result.toArray()[0].count
+
+                loadedFiles.value.set(stableKey, {
+                    tableName,
+                    fileType,
+                    fileUrl: serializedUrls,
+                    isLoading: false,
+                    error: null,
+                    rowCount,
+                    loadedAt: new Date()
+                })
+
+                if (viewerId) {
+                    trackFileUsage(stableKey, viewerId)
+                }
+
+                return tableName
+            } finally {
+                await tempConn.close()
+            }
+        } catch (err) {
+            console.error(`Failed to load ${fileType} files:`, err)
+            loadedFiles.value.set(stableKey, {
+                tableName,
+                fileType,
+                fileUrl: serializedUrls,
+                isLoading: false,
+                error: err.message
+            })
+            throw err
+        }
+    }
+
     const executeQuery = async (query, connectionId) => {
         const connData = connections.value.get(connectionId)
         if (!connData) {
@@ -381,6 +505,7 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         trackFileUsage,
         unloadFile,
         loadFile,
+        loadFiles,
         executeQuery,
         cleanup,
         performGlobalCleanup,
