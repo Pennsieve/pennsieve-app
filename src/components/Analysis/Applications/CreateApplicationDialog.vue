@@ -45,26 +45,6 @@
           </div>
         </el-form-item>
 
-        <el-form-item prop="applicationType">
-          <template #label>
-            Application Type <span class="label-helper"> required </span>
-          </template>
-          <el-select
-            ref="enum"
-            v-model="application.applicationType"
-            class="input-property"
-            filterable
-            placeholder="Choose an application type"
-          >
-            <el-option
-              v-for="item in typeItems"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </el-select>
-        </el-form-item>
-
         <el-form-item prop="resources.cpu">
           <template #label>
             CPU <span class="label-helper"> required </span>
@@ -116,11 +96,12 @@
             v-model="application.computeNode"
             class="input-property"
             filterable
+            value-key="uuid"
             placeholder="Choose a Compute Node"
           >
             <el-option
               v-for="computeNode in computeNodes"
-              :key="computeNode.name"
+              :key="computeNode.uuid"
               :label="computeNode.name"
               :value="computeNode"
             />
@@ -234,7 +215,7 @@ import { CircleClose, Plus } from "@element-plus/icons-vue";
 const defaultApplicationFormValues = () => ({
   name: "",
   description: "",
-  applicationType: "",
+  applicationType: "processor",
   resources: {
     cpu: "",
     memory: "",
@@ -270,20 +251,6 @@ export default {
   data() {
     return {
       application: defaultApplicationFormValues(),
-      typeItems: [
-        {
-          value: "processor",
-          label: "Processor",
-        },
-        {
-          value: "preprocessor",
-          label: "Preprocessor",
-        },
-        {
-          value: "postprocessor",
-          label: "Postprocessor",
-        },
-      ],
       cpuItems:[
         {
           value: 1024,
@@ -338,13 +305,6 @@ export default {
             required: true,
             message: "Please input the description",
             trigger: "blur",
-          },
-        ],
-        applicationType: [
-          {
-            required: true,
-            message: "Please select an application type",
-            trigger: "change",
           },
         ],
         "resources.cpu": [
