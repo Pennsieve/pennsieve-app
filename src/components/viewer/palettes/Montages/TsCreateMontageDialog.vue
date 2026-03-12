@@ -122,8 +122,13 @@ function submitMontage() {
     }
 
     const endpoint = `${store.state.config.api2Url}/timeseries/montages`;
+    const organizationId = store.state.activeOrganization?.organization?.id
+    if (!organizationId) {
+      console.error('submitMontage: activeOrganization not available')
+      return
+    }
     const queryParams = toQueryParams({
-      organization_id: store.state.activeOrganization.organization.id,
+      organization_id: organizationId,
     })
 
     const url = `${endpoint}?${queryParams}`
@@ -304,12 +309,12 @@ function cancel() {
 }
 
 .create-montage-dialog {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(153, 153, 153, 0.8);;
+  background: rgba(153, 153, 153, 0.8);
   z-index: 100;
 
 
@@ -318,6 +323,7 @@ function cancel() {
     flex: 1;
     background: theme.$gray_1;
     width: calc(100% - 48px);
+    height: calc(100% - 48px);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
