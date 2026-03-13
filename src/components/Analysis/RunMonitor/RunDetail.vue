@@ -130,7 +130,7 @@ const incomingEdgeColor = (nodeId) => {
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.computeTypes || [];
+  return tt?.runtimeConfig?.computeTypes || [];
 };
 
 const getTargetTypeDefinition = (targetType) => {
@@ -1133,7 +1133,7 @@ onUnmounted(() => {
                     <template v-if="mode === 'configure'">
                       <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
                         <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
-                          <span class="param-key">{{ p.key }}</span>
+                          <span class="param-key">{{ p.name || p.key }}</span>
                           <span v-if="p.value" class="param-val">{{ p.value }}</span>
                         </div>
                         <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
@@ -1186,7 +1186,7 @@ onUnmounted(() => {
                     @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
                   >
                     <el-option label="Lambda" value="lambda" />
-                    <el-option label="ECS" value="ecs" />
+                    <el-option label="Standard" value="standard" />
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -1198,8 +1198,8 @@ onUnmounted(() => {
                   />
                 </div>
 
-                <!-- CPU / Memory (ECS only) -->
-                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'ecs'">
+                <!-- CPU / Memory (Standard only) -->
+                <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'standard'">
                   <div class="config-field">
                     <label>CPU</label>
                     <el-select
@@ -2345,7 +2345,7 @@ onUnmounted(() => {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: 2px;
       background: rgba(100, 116, 139, 0.12);
       color: #64748b;
       white-space: nowrap;
@@ -2496,7 +2496,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 2px;
   background: rgba(5, 150, 105, 0.12);
   color: #047857;
   white-space: nowrap;
