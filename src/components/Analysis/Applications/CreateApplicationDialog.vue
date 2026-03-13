@@ -45,13 +45,13 @@
           </div>
         </el-form-item>
 
-        <el-form-item prop="resources.cpu">
+        <el-form-item prop="runtimeConfig.cpu">
           <template #label>
             CPU <span class="label-helper"> required </span>
           </template>
           <el-select
             ref="enum"
-            v-model="application.resources.cpu"
+            v-model="application.runtimeConfig.cpu"
             class="input-property"
             filterable
             autofocus
@@ -66,13 +66,13 @@
             </el-select>
         </el-form-item>
 
-        <el-form-item prop="resources.memory">
+        <el-form-item prop="runtimeConfig.memory">
           <template #label>
             Memory <span class="label-helper"> required </span>
           </template>
           <el-select
             ref="enum"
-            v-model="application.resources.memory"
+            v-model="application.runtimeConfig.memory"
             class="input-property"
             filterable
             autofocus
@@ -85,6 +85,23 @@
               :value="item.value"
             />
             </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <template #label>
+            Compute Types
+          </template>
+          <el-checkbox
+            :model-value="true"
+            disabled
+          >
+            Standard
+          </el-checkbox>
+          <el-checkbox
+            v-model="lambdaEnabled"
+          >
+            Lambda
+          </el-checkbox>
         </el-form-item>
 
         <el-form-item prop="computeNode">
@@ -216,7 +233,7 @@ const defaultApplicationFormValues = () => ({
   name: "",
   description: "",
   applicationType: "processor",
-  resources: {
+  runtimeConfig: {
     cpu: "",
     memory: "",
   },
@@ -250,6 +267,7 @@ export default {
 
   data() {
     return {
+      lambdaEnabled: false,
       application: defaultApplicationFormValues(),
       cpuItems:[
         {
@@ -307,10 +325,10 @@ export default {
             trigger: "blur",
           },
         ],
-        "resources.cpu": [
+        "runtimeConfig.cpu": [
           { required: true, message: "Please input the CPU", trigger: "blur" },
         ],
-        "resources.memory": [
+        "runtimeConfig.memory": [
           {
             required: true,
             message: "Please input the memory",
@@ -348,7 +366,7 @@ export default {
     ...mapState("analysisModule", ["computeNodes"])
   },
     watch:{
-      "application.resources.cpu": {
+      "application.runtimeConfig.cpu": {
       handler: function(val) {
         const vm = this;
         createMemoryItems(val,vm);
@@ -376,6 +394,7 @@ export default {
     closeDialog() {
       this.$emit("close", false);
       this.application = defaultApplicationFormValues();
+      this.lambdaEnabled = false;
       this.$refs.form.clearValidate();
     },
 
@@ -406,37 +425,34 @@ export default {
     async handleCreateApplication() {
       this.$refs.form.validate(async (valid) => {
         if (valid) {
-          const accountDetails = {
-            uuid: this.application.computeNode.account.uuid,
-            accountId: this.application.computeNode.account.accountId,
-            accountType: this.application.computeNode.account.accountType,
-          };
-          const computeNodeDetails = {
-            uuid: this.application.computeNode.uuid,
-            efsId: this.application.computeNode.efsId,
-          };
-          const formattedResources = {
-            cpu: Number(this.application.resources.cpu),
-            memory: Number(this.application.resources.memory),
-          };
-          const formattedSource = {
-            type: this.application.source.type,
-            url: `git://${this.application.source.url}`,
-          };
-
-          const formattedParams = this.getApplicationParams()
+          const computeTypes = ["standard"];
+          if (this.lambdaEnabled) computeTypes.push("lambda");
 
           const formattedNewApplication = {
-            ...this.application,
-            account: accountDetails,
-            computeNode: computeNodeDetails,
-            resources: formattedResources,
-            source: formattedSource,
-            params: formattedParams,
+            name: this.application.name,
+            description: this.application.description,
+            applicationType: this.application.applicationType,
+            runtimeConfig: {
+              cpu: Number(this.application.runtimeConfig.cpu),
+              memory: Number(this.application.runtimeConfig.memory),
+              computeTypes,
+            },
+            account: {
+              uuid: this.application.computeNode.account.uuid,
+              accountId: this.application.computeNode.account.accountId,
+              accountType: this.application.computeNode.account.accountType,
+            },
+            computeNode: {
+              uuid: this.application.computeNode.uuid,
+            },
+            source: {
+              type: this.application.source.type,
+              url: `git://${this.application.source.url}`,
+            },
           };
 
-          // remove formattedNewApplication.parameters ('params' is what is stored)
-          delete formattedNewApplication.parameters
+          const params = this.getApplicationParams();
+          if (params) formattedNewApplication.params = params;
 
           try {
             await this.createApplication(formattedNewApplication);

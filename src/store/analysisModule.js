@@ -223,7 +223,19 @@ export const actions = {
       });
 
       if (resp.ok) {
-        const result = await resp.json();
+        const raw = await resp.json();
+        const result = raw.map((app) => {
+          const rc = app.runtimeConfig || {};
+          return {
+            ...app,
+            runtimeConfig: {
+              cpu: rc.cpu || null,
+              memory: rc.memory || null,
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
+                .map((t) => (t === "ecs" ? "standard" : t)),
+            },
+          };
+        });
         commit("UPDATE_APPLICATIONS", result);
         const preprocessors = result.filter(
           (application) => application.applicationType === "preprocessor"
@@ -787,7 +799,19 @@ export const actions = {
       });
 
       if (resp.ok) {
-        const result = await resp.json();
+        const raw = await resp.json();
+        const result = raw.map((tt) => {
+          const rc = tt.runtimeConfig || {};
+          return {
+            ...tt,
+            runtimeConfig: {
+              cpu: rc.cpu || null,
+              memory: rc.memory || null,
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
+                .map((t) => (t === "ecs" ? "standard" : t)),
+            },
+          };
+        });
         commit("UPDATE_TARGET_TYPES", result);
       } else {
         return Promise.reject(resp);

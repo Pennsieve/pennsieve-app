@@ -445,16 +445,20 @@ onBeforeUnmount(() => removeGuard());
               </div>
 
               <!-- Resources -->
-              <template v-if="selectedApplication.resources">
-                <h4 class="sidebar-section-title">Default Resources</h4>
+              <template v-if="selectedApplication.runtimeConfig">
+                <h4 class="sidebar-section-title">Runtime Configuration</h4>
                 <div class="info-card">
                   <div class="info-row">
                     <span class="info-label">CPU</span>
-                    <span class="info-value">{{ selectedApplication.resources.cpu || 'N/A' }}</span>
+                    <span class="info-value">{{ selectedApplication.runtimeConfig.cpu || 'N/A' }}</span>
                   </div>
                   <div class="info-row">
                     <span class="info-label">Memory</span>
-                    <span class="info-value">{{ selectedApplication.resources.memory || 'N/A' }}</span>
+                    <span class="info-value">{{ selectedApplication.runtimeConfig.memory || 'N/A' }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Compute Types</span>
+                    <span class="info-value">{{ (selectedApplication.runtimeConfig.computeTypes || []).join(', ') || 'N/A' }}</span>
                   </div>
                 </div>
               </template>

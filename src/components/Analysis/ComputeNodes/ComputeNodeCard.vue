@@ -36,6 +36,7 @@
               {{ (node.deploymentMode || 'basic').charAt(0).toUpperCase() + (node.deploymentMode || 'basic').slice(1) }}
             </span>
           </el-tooltip>
+          <span v-if="node.defaultComputeType" class="tag compute-type">{{ node.defaultComputeType }}</span>
           <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">LLM</span>
         </div>
       </div>
