@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive, onMounted } from "vue";
+import { computed, ref, reactive, onMounted, nextTick } from "vue";
 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -15,6 +15,13 @@ import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
+import {
+  FARGATE_CPU_OPTIONS,
+  getMemoryOptionsForCpu,
+  LAMBDA_MEMORY_OPTIONS,
+  getCpuForMemory,
+  formatResourceLabel,
+} from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 
@@ -59,6 +66,7 @@ const editDescription = ref("");
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
 const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
+const sidebarRef = ref(null);
 
 // Resolve the original processor definition for the selected node
 const selectedNodeProcessor = computed(() => {
@@ -98,11 +106,25 @@ const availableApplications = computed(
 const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
+const profile = computed(() => store.state.profile);
+const orgMembers = computed(() => store.state.orgMembers || []);
+
+const getUserName = (userId) => {
+  if (!userId) return "Unknown";
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
+    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You";
+  }
+  const member = orgMembers.value.find((m) => m.id === userId || m.intId === userId);
+  if (member) {
+    return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
+  }
+  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+};
 
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.computeTypes || [];
+  return tt?.runtimeConfig?.computeTypes || [];
 };
 
 const onTargetTypeChange = (data) => {
@@ -219,7 +241,11 @@ const definitionToNodesAndEdges = (workflow, applications) => {
       data: {
         label,
         targetType: p.targetType || null,
-        computeType: p.computeType || getComputeTypesForTarget(p.targetType)?.[0] || null,
+        computeType: p.computeType || (nodeType === "default"
+          ? (matchedApplication?.runtimeConfig?.computeTypes?.[0] || "standard")
+          : getComputeTypesForTarget(p.targetType)?.[0] || null),
+        cpu: String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
+        memory: String(p.memory || matchedApplication?.runtimeConfig?.memory || "") || "",
         application: matchedApplication,
       },
       position: hasSavedPositions && p.position
@@ -340,10 +366,20 @@ const generateNodeId = () => {
   return `node_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
+const dragOffset = ref({ x: 0, y: 0 });
+
 const onDragStart = (item, event, type = "application") => {
   if (isReadOnly.value) return;
   draggedType.value = type;
   draggedApp.value = type === "application" ? item : null;
+
+  // Capture where within the element the user clicked
+  const rect = event.target.getBoundingClientRect();
+  dragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
   }
@@ -355,12 +391,15 @@ const onDrop = (event) => {
 
   if (!draggedType.value) return;
 
-  // Convert the drop position from screen coordinates to flow coordinates
-  // so the node appears exactly where the user dropped it
-  const position = screenToFlowCoordinate({
+  // Convert drop position to flow coordinates, applying the grab offset
+  const flowPos = screenToFlowCoordinate({
     x: event.clientX,
     y: event.clientY,
   });
+  const position = {
+    x: flowPos.x - dragOffset.value.x,
+    y: flowPos.y - dragOffset.value.y,
+  };
 
   const nodeId = generateNodeId();
   let newNode;
@@ -383,8 +422,8 @@ const onDrop = (event) => {
         targetType:
           targetTypes.value.length === 1 ? targetTypes.value[0].targetType : null,
         computeType:
-          targetTypes.value.length === 1 && targetTypes.value[0].computeTypes?.length
-            ? targetTypes.value[0].computeTypes[0] : null,
+          targetTypes.value.length === 1 && targetTypes.value[0].runtimeConfig?.computeTypes?.length
+            ? targetTypes.value[0].runtimeConfig.computeTypes[0] : null,
       },
       position,
     };
@@ -395,6 +434,9 @@ const onDrop = (event) => {
       data: {
         label: draggedApp.value.name,
         application: draggedApp.value,
+        computeType: draggedApp.value.runtimeConfig?.computeTypes?.[0] || "standard",
+        cpu: String(draggedApp.value.runtimeConfig?.cpu || "") || "",
+        memory: String(draggedApp.value.runtimeConfig?.memory || "") || "",
       },
       position,
     };
@@ -540,13 +582,17 @@ const saveWorkflow = async () => {
     }
 
     // Default: processor
-    return {
+    const proc = {
       id: node.id,
       type: "processor",
       sourceUrl: node.data.application?.source?.url,
+      computeType: node.data.computeType || "standard",
       dependsOn: dependsOn,
       position,
     };
+    if (node.data.cpu) proc.cpu = node.data.cpu;
+    if (node.data.memory) proc.memory = node.data.memory;
+    return proc;
   });
 
   const workflowData = {
@@ -635,6 +681,22 @@ onPaneClick(() => {
   nodes.value.forEach((n) => (n.selected = false));
   selectedNode.value = null;
 });
+
+const openNodeSettings = (id) => {
+  nodes.value.forEach((n) => (n.selected = false));
+  const target = nodes.value.find((n) => n.id === id);
+  if (target) target.selected = true;
+  selectedNode.value = target;
+
+  // Ensure information accordion is open
+  if (!accordionActiveNames.value.includes("information")) {
+    accordionActiveNames.value = [...accordionActiveNames.value, "information"];
+  }
+
+  nextTick(() => {
+    sidebarRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+  });
+};
 </script>
 
 <template>
@@ -724,6 +786,14 @@ onPaneClick(() => {
                   <span class="node-title">{{ data.label }}</span>
                   <button
                     v-if="!isReadOnly"
+                    class="settings-btn"
+                    @click.stop="openNodeSettings(id)"
+                    title="Configure"
+                  >
+                    <IconPencil :width="12" :height="12" />
+                  </button>
+                  <button
+                    v-if="!isReadOnly"
                     class="remove-btn"
                     @click.stop="removeNode(id)"
                   >
@@ -736,12 +806,12 @@ onPaneClick(() => {
                 >
                   {{ data.application.description }}
                 </div>
-                <div
-                  v-if="data.application && data.application.resources"
-                  class="node-resources"
-                >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                <div class="node-resources">
+                  <template v-if="data.computeType !== 'lambda'">
+                    CPU: {{ data.cpu || data.application?.runtimeConfig?.cpu || "N/A" }} |
+                  </template>
+                  Memory: {{ data.memory ? formatResourceLabel(data.memory) : (data.application?.runtimeConfig?.memory || "N/A") }}
+                  <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -768,11 +838,11 @@ onPaneClick(() => {
                   {{ data.application.description }}
                 </div>
                 <div
-                  v-if="data.application && data.application.resources"
+                  v-if="data.application && data.application.runtimeConfig"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
+                  {{ data.application.runtimeConfig.memory || "N/A" }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -799,11 +869,11 @@ onPaneClick(() => {
                   {{ data.application.description }}
                 </div>
                 <div
-                  v-if="data.application && data.application.resources"
+                  v-if="data.application && data.application.runtimeConfig"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
+                  {{ data.application.runtimeConfig.memory || "N/A" }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -836,9 +906,9 @@ onPaneClick(() => {
                   <span class="node-title">{{ data.targetType || 'No target selected' }}</span>
                   <button
                     v-if="!isReadOnly"
-                    class="edit-target-btn"
-                    :class="{ active: editingTargetNodes.has(id) }"
-                    @click.stop="toggleTargetEdit(id)"
+                    class="settings-btn"
+                    @click.stop="openNodeSettings(id)"
+                    title="Configure"
                   >
                     <IconPencil :width="12" :height="12" />
                   </button>
@@ -852,25 +922,6 @@ onPaneClick(() => {
                 </div>
                 <div class="node-body">
                   <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
-                  <!-- Edit view: only target type selection -->
-                  <div v-if="editingTargetNodes.has(id)" class="target-edit">
-                    <div class="target-edit-field">
-                      <label class="target-edit-label">Target type</label>
-                      <el-select
-                        v-model="data.targetType"
-                        placeholder="Select target type"
-                        size="small"
-                        @change="onTargetTypeChange(data)"
-                      >
-                        <el-option
-                          v-for="tt in targetTypes"
-                          :key="tt.targetType"
-                          :label="tt.targetType"
-                          :value="tt.targetType"
-                        />
-                      </el-select>
-                    </div>
-                  </div>
                 </div>
               </div>
             </template>
@@ -880,7 +931,7 @@ onPaneClick(() => {
       </div>
 
       <!-- Sidebar (Right) -->
-      <div class="applications-sidebar">
+      <div ref="sidebarRef" class="applications-sidebar">
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
           <el-collapse-item title="Information" name="information">
@@ -908,19 +959,157 @@ onPaneClick(() => {
                     <span class="info-value">{{ selectedNode.data.application.applicationType }}</span>
                   </div>
                 </template>
-                <template v-if="selectedNode.data?.targetType">
+                <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
                     <span class="info-label">Target Type</span>
-                    <span class="info-value">{{ selectedNode.data.targetType }}</span>
+                    <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.targetType || 'Not set' }}</span>
+                    <el-select
+                      v-else
+                      v-model="selectedNode.data.targetType"
+                      size="small"
+                      placeholder="Select target type"
+                      class="info-inline-select"
+                      @change="onTargetTypeChange(selectedNode.data)"
+                    >
+                      <el-option
+                        v-for="tt in targetTypes"
+                        :key="tt.targetType"
+                        :label="tt.targetType"
+                        :value="tt.targetType"
+                      />
+                    </el-select>
                   </div>
                 </template>
-                <template v-if="selectedNode.data?.computeType">
+                <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
-                    <span class="info-label">Runtime</span>
+                    <span class="info-label">Compute Type</span>
                     <span class="info-value">{{ selectedNode.data.computeType }}</span>
                   </div>
                 </template>
               </div>
+
+              <!-- Data target runtime config (editable in create mode) -->
+              <template v-if="selectedNode.type === 'data-target' && !isReadOnly">
+                <h4 class="sidebar-section-title">Runtime Configuration</h4>
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Compute Type</span>
+                    <el-select
+                      v-model="selectedNode.data.computeType"
+                      size="small"
+                      class="info-inline-select"
+                    >
+                      <el-option
+                        v-for="ct in getComputeTypesForTarget(selectedNode.data.targetType)"
+                        :key="ct"
+                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :value="ct"
+                      />
+                    </el-select>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Processor settings (editable in create mode) -->
+              <template v-if="selectedNode.type === 'default' && !isReadOnly">
+                <h4 class="sidebar-section-title">Runtime Configuration</h4>
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Compute Type</span>
+                    <el-select
+                      v-model="selectedNode.data.computeType"
+                      size="small"
+                      class="info-inline-select"
+                    >
+                      <el-option
+                        v-for="ct in (selectedNode.data.application?.runtimeConfig?.computeTypes || ['standard'])"
+                        :key="ct"
+                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :value="ct"
+                      />
+                    </el-select>
+                  </div>
+                  <!-- Standard: CPU then dependent Memory -->
+                  <template v-if="selectedNode.data.computeType !== 'lambda'">
+                    <div class="info-row">
+                      <span class="info-label">CPU</span>
+                      <el-select
+                        v-model="selectedNode.data.cpu"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        class="info-inline-select"
+                        @change="() => { selectedNode.data.memory = '' }"
+                      >
+                        <el-option
+                          v-for="cpu in FARGATE_CPU_OPTIONS"
+                          :key="cpu"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :value="cpu"
+                        />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Memory</span>
+                      <el-select
+                        v-model="selectedNode.data.memory"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        :disabled="!selectedNode.data.cpu"
+                        class="info-inline-select"
+                      >
+                        <el-option
+                          v-for="mem in getMemoryOptionsForCpu(selectedNode.data.cpu)"
+                          :key="mem"
+                          :label="formatResourceLabel(mem)"
+                          :value="mem"
+                        />
+                      </el-select>
+                    </div>
+                  </template>
+                  <!-- Lambda: Memory + auto-matched CPU -->
+                  <template v-else>
+                    <div class="info-row">
+                      <span class="info-label">CPU</span>
+                      <el-select
+                        v-model="selectedNode.data.cpu"
+                        size="small"
+                        disabled
+                        class="info-inline-select"
+                      >
+                        <el-option
+                          v-for="cpu in FARGATE_CPU_OPTIONS"
+                          :key="cpu"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :value="cpu"
+                        />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Memory</span>
+                      <el-select
+                        v-model="selectedNode.data.memory"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        class="info-inline-select"
+                        @change="(val) => { selectedNode.data.cpu = getCpuForMemory(val) }"
+                      >
+                        <el-option
+                          v-for="mem in LAMBDA_MEMORY_OPTIONS"
+                          :key="mem"
+                          :label="formatResourceLabel(mem)"
+                          :value="mem"
+                        />
+                      </el-select>
+                    </div>
+                    <p class="runtime-note">
+                      Lambda allocates CPU proportionally to memory. CPU and Fargate memory settings are only applied if the run is overridden to execute as a standard processor.
+                    </p>
+                  </template>
+                </div>
+              </template>
 
               <!-- Processor configuration -->
               <template v-if="selectedNodeProcessor">
@@ -948,21 +1137,6 @@ onPaneClick(() => {
                       </template>
                       <template v-else>None</template>
                     </span>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Resources -->
-              <template v-if="selectedNode.data?.application?.resources">
-                <h4 class="sidebar-section-title">Resources</h4>
-                <div class="info-card">
-                  <div class="info-row">
-                    <span class="info-label">CPU</span>
-                    <span class="info-value">{{ selectedNode.data.application.resources.cpu || 'N/A' }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">Memory</span>
-                    <span class="info-value">{{ selectedNode.data.application.resources.memory || 'N/A' }}</span>
                   </div>
                 </div>
               </template>
@@ -1055,6 +1229,10 @@ onPaneClick(() => {
                     <span class="info-label">Created</span>
                     <span class="info-value">{{ new Date(selectedWorkflow.createdAt).toLocaleDateString() }}</span>
                   </div>
+                  <div v-if="selectedWorkflow.createdBy" class="info-row">
+                    <span class="info-label">Created By</span>
+                    <span class="info-value">{{ getUserName(selectedWorkflow.createdBy) }}</span>
+                  </div>
                 </div>
                 <div class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
@@ -1117,7 +1295,7 @@ onPaneClick(() => {
                 <div class="data-item-info">
                   <div class="data-item-name">Source</div>
                   <div class="data-item-description">
-                    Select input packages
+                    Select input sources
                   </div>
                 </div>
               </div>
@@ -1135,7 +1313,7 @@ onPaneClick(() => {
                 <div class="data-item-info">
                   <div class="data-item-name">Target</div>
                   <div class="data-item-description">
-                    Select output folder
+                    Select output target
                   </div>
                 </div>
               </div>
@@ -1163,8 +1341,8 @@ onPaneClick(() => {
                     {{ app.description || "No description" }}
                   </div>
                   <div class="app-resources">
-                    CPU: {{ app.resources?.cpu || "N/A" }} | Memory:
-                    {{ app.resources?.memory || "N/A" }}
+                    CPU: {{ app.runtimeConfig?.cpu || "N/A" }} | Memory:
+                    {{ app.runtimeConfig?.memory || "N/A" }}
                   </div>
                 </div>
               </div>
@@ -1730,6 +1908,24 @@ onPaneClick(() => {
     line-height: 1.3;
   }
 
+  .settings-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px;
+    border-radius: 3px;
+    color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+      color: theme.$purple_1;
+      background: rgba(theme.$purple_1, 0.1);
+    }
+  }
+
   .remove-btn {
     background: theme.$status_red;
     color: white;
@@ -1769,6 +1965,22 @@ onPaneClick(() => {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid theme.$gray_2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .runtime-tag {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: rgba(5, 150, 105, 0.12);
+    color: #047857;
+    white-space: nowrap;
+    margin-left: auto;
   }
 
   .node-badge {
@@ -1841,7 +2053,7 @@ onPaneClick(() => {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: 2px;
       background: rgba(5, 150, 105, 0.12);
       color: #047857;
       white-space: nowrap;
@@ -1942,6 +2154,19 @@ onPaneClick(() => {
   text-align: right;
   word-break: break-word;
 }
+
+.info-inline-select {
+  width: 130px;
+}
+
+.runtime-note {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin: 8px 0 0 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
 
 .info-url {
   font-family: monospace;

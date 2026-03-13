@@ -186,6 +186,35 @@ export const FARGATE_MEMORY_MAP = {
 };
 export const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
 
+// Lambda supports 128–10240 MB. Provide sensible presets.
+export const LAMBDA_MEMORY_OPTIONS = [
+  "128", "256", "512", "1024", "1769", "2048", "3072", "4096", "5120", "6144", "7168", "8192", "10240",
+];
+
+// Find a reasonable Fargate CPU for a given memory value.
+// Targets a ~2:1 memory-to-CPU ratio for a balanced configuration.
+export const getCpuForMemory = (memory) => {
+  const mem = parseInt(memory, 10);
+  if (!mem) return "";
+  // Target CPU is memory / 2, then find the closest CPU option >= that target
+  const targetCpu = mem / 2;
+  for (const cpu of FARGATE_CPU_OPTIONS) {
+    if (parseInt(cpu, 10) >= targetCpu) {
+      // Verify this CPU actually supports the memory value
+      const supported = FARGATE_MEMORY_MAP[cpu] || [];
+      const maxMem = parseInt(supported[supported.length - 1], 10) || 0;
+      if (mem <= maxMem) return cpu;
+    }
+  }
+  // Fallback: find smallest CPU that supports this memory
+  for (const cpu of FARGATE_CPU_OPTIONS) {
+    const supported = FARGATE_MEMORY_MAP[cpu] || [];
+    const maxMem = parseInt(supported[supported.length - 1], 10) || 0;
+    if (mem <= maxMem) return cpu;
+  }
+  return FARGATE_CPU_OPTIONS[FARGATE_CPU_OPTIONS.length - 1];
+};
+
 export const formatResourceLabel = (val) => {
   const n = parseInt(val, 10);
   if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
