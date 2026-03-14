@@ -92,9 +92,15 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-export const labelForDagNode = (d, applications) => {
+export const getTargetTypeLabel = (targetType, targetTypes = []) => {
+  if (!targetType) return "Data Target";
+  const tt = targetTypes.find((t) => t.targetType === targetType);
+  return tt?.label || targetType;
+};
+
+export const labelForDagNode = (d, applications, targetTypes = []) => {
   if (d.type === "data-source") return "Data Source";
-  if (d.type === "data-target") return d.targetType || "Data Target";
+  if (d.type === "data-target") return getTargetTypeLabel(d.targetType, targetTypes);
   const matchedApp = findAppByUrl(d.sourceUrl, applications);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
 };

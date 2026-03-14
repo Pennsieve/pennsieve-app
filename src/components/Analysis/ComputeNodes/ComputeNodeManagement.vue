@@ -11,6 +11,7 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
+import ComputeNodeLayers from './ComputeNodeLayers.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -853,6 +854,14 @@ async function confirmDestroyNode() {
             Clear All (Switch to Open)
           </bf-button>
         </div>
+      </div>
+
+      <!-- Persistent Layers Section -->
+      <div class="management-section">
+        <div class="section-header">
+          <h2>Persistent Layers</h2>
+        </div>
+        <ComputeNodeLayers :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
       <!-- Danger Zone -->
