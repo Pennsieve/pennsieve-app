@@ -17,6 +17,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
+import LayerNameSelector from "./LayerNameSelector.vue";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -375,9 +376,15 @@ const findAppByUrl = (sourceUrl) => {
   );
 };
 
+const getTargetTypeLabel = (targetType) => {
+  if (!targetType) return "Data Target";
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.label || targetType;
+};
+
 const labelForDagNode = (d) => {
   if (d.type === "data-source") return "Data Source";
-  if (d.type === "data-target") return d.targetType || "Data Target";
+  if (d.type === "data-target") return getTargetTypeLabel(d.targetType);
   const matchedApp = findAppByUrl(d.sourceUrl);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
 };
@@ -1923,7 +1930,7 @@ onUnmounted(() => {
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
-                  <span class="info-value">{{ selectedNode.data?.targetType || 'N/A' }}</span>
+                  <span class="info-value">{{ getTargetTypeLabel(selectedNode.data?.targetType) || 'N/A' }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Runtime</span>
@@ -1964,7 +1971,13 @@ onUnmounted(() => {
                       <span v-else class="target-param-optional">optional</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
+                    <LayerNameSelector
+                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
+                      v-model="param.value"
+                      :compute-node-id="initiateForm.computeNodeId"
+                    />
                     <el-input
+                      v-else
                       v-model="param.value"
                       size="small"
                       :placeholder="param.required ? 'Required' : 'Optional'"

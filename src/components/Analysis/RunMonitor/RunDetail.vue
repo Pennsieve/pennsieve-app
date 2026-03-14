@@ -16,6 +16,7 @@ import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/Brea
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
+import LayerNameSelector from "./LayerNameSelector.vue";
 import {
   statusClass,
   statusBorderColor,
@@ -24,6 +25,7 @@ import {
   statusLabel,
   isTerminalStatus,
   labelForDagNode,
+  getTargetTypeLabel,
   formatTime,
   formatDuration,
   formatCost,
@@ -199,7 +201,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -262,7 +264,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -836,7 +838,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d, availableApplications.value) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1280,7 +1282,7 @@ onUnmounted(() => {
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
-                  <span class="info-value">{{ selectedNode.data?.targetType || 'N/A' }}</span>
+                  <span class="info-value">{{ getTargetTypeLabel(selectedNode.data?.targetType, targetTypes) || 'N/A' }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Runtime</span>
@@ -1321,7 +1323,13 @@ onUnmounted(() => {
                       <span v-else class="target-param-optional">optional</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
+                    <LayerNameSelector
+                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
+                      v-model="param.value"
+                      :compute-node-id="initiateForm.computeNodeId"
+                    />
                     <el-input
+                      v-else
                       v-model="param.value"
                       size="small"
                       :placeholder="param.required ? 'Required' : 'Optional'"
