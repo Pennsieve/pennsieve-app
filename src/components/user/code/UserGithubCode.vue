@@ -71,12 +71,11 @@
             <!-- Repositories Section -->
             <div class="repositories-section">
               <div class="repos-header">
-                <h3>My Repositories ({{ totalRepoCount }})</h3>
-                <div class="header-actions">
-
+                <div class="repos-header-left">
+                  <h3>My Repositories ({{ totalRepoCount }})</h3>
                   <el-tooltip
                     ref="refresh-tooltip"
-                    placement="bottom-end"
+                    placement="bottom"
                     content="Refresh list"
                   >
                     <button @click="refreshRepositories" class="refresh-icon-button" :disabled="refreshing" :title="refreshing ? 'Refreshing...' : 'Refresh'">
@@ -85,12 +84,22 @@
                       </el-icon>
                     </button>
                   </el-tooltip>
-
-                  <router-link to="/my-workspace/settings/integrations/github" class="manage-link">
-                    Manage GitHub Settings
-                  </router-link>
                 </div>
+                <router-link to="/my-workspace/settings/integrations/github" class="manage-link">
+                  Manage GitHub Settings
+                </router-link>
               </div>
+
+              <el-pagination
+                v-if="totalRepoCount > pageSize && !reposLoading"
+                class="repo-pagination mb-16"
+                :page-size="pageSize"
+                :pager-count="5"
+                :current-page="currentPage"
+                layout="prev, pager, next"
+                :total="totalRepoCount"
+                @current-change="onPaginationPageChange"
+              />
 
               <div v-if="reposLoading" class="loading-state">
                 <div class="loading-spinner">
@@ -103,35 +112,27 @@
                 <p>No repositories found. Make sure you have repositories in your connected GitHub account.</p>
               </div>
 
-              <div v-else class="repos-list">
-                <code-repo-list-item
-                  v-for="repo in repositories"
-                  :key="repo.id"
-                  :repo="repo"
-                  @manage-settings="openPublishingDialog"
-                />
-              </div>
+              <template v-else>
+                <div class="repos-list">
+                  <code-repo-list-item
+                    v-for="repo in repositories"
+                    :key="repo.id"
+                    :repo="repo"
+                    @manage-settings="openPublishingDialog"
+                  />
+                </div>
 
-              <!-- Pagination -->
-              <div v-if="totalRepoCount > pageSize" class="pagination">
-                <button
-                  @click="previousPage"
-                  :disabled="currentPage === 1"
-                  class="page-button"
-                >
-                  Previous
-                </button>
-                <span class="page-info">
-                  Page {{ currentPage }} of {{ totalPages }}
-                </span>
-                <button
-                  @click="nextPage"
-                  :disabled="currentPage === totalPages"
-                  class="page-button"
-                >
-                  Next
-                </button>
-              </div>
+                <el-pagination
+                  v-if="totalRepoCount > pageSize"
+                  class="repo-pagination mt-16"
+                  :page-size="pageSize"
+                  :pager-count="5"
+                  :current-page="currentPage"
+                  layout="prev, pager, next"
+                  :total="totalRepoCount"
+                  @current-change="onPaginationPageChange"
+                />
+              </template>
             </div>
           </div>
         </div>
@@ -356,20 +357,9 @@ export default {
       await this.fetchRepositories()
     },
 
-    previousPage() {
-      if (this.currentPage > 1) {
-        const newPage = this.currentPage - 1
-        this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', newPage)
-        this.fetchRepositories()
-      }
-    },
-
-    nextPage() {
-      if (this.currentPage < this.totalPages) {
-        const newPage = this.currentPage + 1
-        this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', newPage)
-        this.fetchRepositories()
-      }
+    onPaginationPageChange(page) {
+      this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', page)
+      this.fetchRepositories()
     },
 
     openPublishingDialog(repo) {
@@ -405,6 +395,7 @@ export default {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use '../../../styles/element/pagination';
 
 
 
@@ -655,22 +646,22 @@ export default {
     max-width: 1200px;
 
     h3 {
-      font-size: 16px;
+      font-size: 20px;
       font-weight: 500;
       color: theme.$gray_6;
       margin: 0;
     }
 
-    .header-actions {
+    .repos-header-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
     }
 
     .manage-link {
       color: theme.$purple_2;
       text-decoration: none;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 500;
 
       &:hover {
@@ -722,36 +713,10 @@ export default {
     gap: 12px;
   }
 
-  .pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 16px;
-    margin-top: 24px;
-
-    .page-button {
-      padding: 8px 16px;
-      background: theme.$purple_2;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.2s ease;
-
-      &:hover:not(:disabled) {
-        background: theme.$purple_3;
-      }
-
-      &:disabled {
-        background: theme.$gray_3;
-        cursor: not-allowed;
-      }
-    }
-
-    .page-info {
-      color: theme.$gray_5;
-      font-size: 14px;
-    }
+  .repo-pagination {
+    justify-content: flex-end;
+    max-width: 1200px;
+    --el-pagination-hover-color: #{theme.$purple_3};
   }
 }
 
