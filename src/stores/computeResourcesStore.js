@@ -1300,6 +1300,60 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // Update compute node infrastructure config (GPU, LLM)
+  const updateComputeNodeConfig = async (nodeId, config) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/update-config`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+      })
+      if (response.ok) {
+        return await response.json()
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update compute node config:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update config: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node config:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  // Fetch GPU tiers
+  const gpuTiers = ref([])
+  const gpuTiersLoaded = ref(false)
+
+  const fetchGpuTiers = async (orgId) => {
+    if (gpuTiersLoaded.value) return gpuTiers.value
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        gpuTiers.value = await response.json()
+        gpuTiersLoaded.value = true
+        return gpuTiers.value
+      }
+      return []
+    } catch (error) {
+      console.error('Failed to fetch GPU tiers:', error)
+      return []
+    }
+  }
+
   // Persistent Layers (uses workflow service base path)
   const fetchNodeLayers = async (nodeId, forceRefresh = false) => {
     if (!forceRefresh && layersLoaded.value[nodeId]) {
@@ -1467,6 +1521,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // Getters - Layers
     getNodeLayers,
     isNodeLayersLoading,
+
+    // Actions - Infrastructure Config
+    updateComputeNodeConfig,
+    gpuTiers,
+    fetchGpuTiers,
 
     // Actions - Layers
     fetchNodeLayers,

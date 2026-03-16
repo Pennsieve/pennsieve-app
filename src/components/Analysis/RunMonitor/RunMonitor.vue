@@ -130,6 +130,12 @@ const getComputeTypesForTarget = (targetType) => {
   return tt?.runtimeConfig?.computeTypes || [];
 };
 
+const getComputeTypesForProcessor = (sourceUrl) => {
+  if (!sourceUrl) return ["standard", "lambda"];
+  const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
+  return app?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+};
+
 const getTargetTypeDefinition = (targetType) => {
   if (!targetType) return null;
   return targetTypes.value.find((t) => t.targetType === targetType) || null;
@@ -927,7 +933,7 @@ const initiateWorkflow = async () => {
       } else if (d.type !== "data-source") {
         const params = Object.entries(srcParams).map(([key, value]) => ({ key, value: String(value) }));
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || "lambda",
+          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
           version: srcCfg?.version || "",
           cpu: srcCfg?.cpu || "",
           memory: srcCfg?.memory || "",
@@ -1825,8 +1831,12 @@ onUnmounted(() => {
                     style="width: 100%"
                     @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
                   >
-                    <el-option label="Lambda" value="lambda" />
-                    <el-option label="Standard" value="standard" />
+                    <el-option
+                      v-for="ct in getComputeTypesForProcessor(selectedNode.data?.sourceUrl)"
+                      :key="ct"
+                      :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                      :value="ct"
+                    />
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -2728,6 +2738,10 @@ onUnmounted(() => {
         <div class="receipt-total">
           <span>Total Estimated Cost</span>
           <span>{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
+        </div>
+
+        <div v-if="runMetrics.nodeMetrics?.some(nm => nm.computeType === 'gpu')" class="receipt-gpu-notice">
+          GPU instance costs are estimates and may not reflect spin-down time.
         </div>
 
         <div v-if="runMetrics.costEstimate?.pricingVersion" class="receipt-footer">
@@ -4066,9 +4080,14 @@ onUnmounted(() => {
     color: #92400e;
   }
 
-  &.ecs {
+  &.ecs, &.standard {
     background: #e0f7fa;
     color: #1e40af;
+  }
+
+  &.gpu {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
   }
 }
 
@@ -4104,6 +4123,16 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 700;
   color: theme.$black;
+}
+
+.receipt-gpu-notice {
+  font-size: 11px;
+  color: #D97706;
+  background: rgba(#F59E0B, 0.08);
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 
 .receipt-footer {

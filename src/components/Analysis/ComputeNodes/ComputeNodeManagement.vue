@@ -183,6 +183,9 @@ onMounted(async () => {
   await Promise.all([
     computeResourcesStore.fetchNodePermissions(nodeUuid.value),
     computeResourcesStore.fetchAllowedProcessors(nodeUuid.value),
+    computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id).then(tiers => {
+      availableGpuTiers.value = tiers || []
+    }).catch(() => {}),
   ])
 })
 
@@ -453,6 +456,62 @@ async function confirmDestroyNode() {
   }
 }
 
+// GPU Configuration editing
+const currentGpuTierInfo = computed(() => {
+  const tier = computeNode.value?.gpuTier
+  if (!tier || !availableGpuTiers.value.length) return null
+  return availableGpuTiers.value.find(t => t.tier === tier)
+})
+
+const isEditingGpu = ref(false)
+const isUpdatingGpu = ref(false)
+const availableGpuTiers = ref([])
+const gpuForm = ref({
+  enableLLMAccess: false,
+  enableGpu: false,
+  gpuTier: 'small',
+  maxGpuInstances: 2
+})
+
+async function startEditingGpu() {
+  gpuForm.value = {
+    enableLLMAccess: !!computeNode.value?.enableLLMAccess,
+    enableGpu: (computeNode.value?.maxGpuInstances || 0) > 0,
+    gpuTier: computeNode.value?.gpuTier || 'small',
+    maxGpuInstances: computeNode.value?.maxGpuInstances || 2
+  }
+  isEditingGpu.value = true
+  try {
+    const tiers = await computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id)
+    availableGpuTiers.value = tiers || []
+  } catch (error) {
+    console.error('Failed to fetch GPU tiers:', error)
+  }
+}
+
+function cancelEditingGpu() {
+  isEditingGpu.value = false
+  gpuForm.value = { enableLLMAccess: false, enableGpu: false, gpuTier: 'small', maxGpuInstances: 2 }
+}
+
+async function saveGpuConfig() {
+  isUpdatingGpu.value = true
+  try {
+    await computeResourcesStore.updateComputeNodeConfig(nodeUuid.value, {
+      enableLLMAccess: gpuForm.value.enableLLMAccess,
+      maxGpuInstances: gpuForm.value.enableGpu ? gpuForm.value.maxGpuInstances : 0,
+      gpuTier: gpuForm.value.enableGpu ? gpuForm.value.gpuTier : 'small'
+    })
+    await fetchComputeNode()
+    ElMessage.success('GPU configuration updated')
+    isEditingGpu.value = false
+  } catch (error) {
+    console.error('Failed to update GPU config:', error)
+    ElMessage.error('Failed to update GPU configuration')
+  } finally {
+    isUpdatingGpu.value = false
+  }
+}
 
 </script>
 
@@ -612,24 +671,6 @@ async function confirmDestroyNode() {
           </div>
 
           <div class="info-row">
-            <span class="info-label">LLM Access:</span>
-            <span class="info-value">
-              <span class="deployment-mode-detail">
-                <span class="mode-header">
-                  <span v-if="computeNode.enableLLMAccess" class="tag llm">Enabled</span>
-                  <span v-else class="tag disabled">Disabled</span>
-                </span>
-                <span class="mode-explanation" v-if="computeNode.enableLLMAccess">
-                  Workflows on this node can use large language models for AI-powered processing.
-                </span>
-                <span class="mode-explanation" v-else>
-                  LLM-based processors are not available on this node.
-                </span>
-              </span>
-            </span>
-          </div>
-
-          <div class="info-row">
             <span class="info-label">Provisioner:</span>
             <template v-if="isEditingDeployment">
               <span class="info-value">
@@ -650,6 +691,102 @@ async function confirmDestroyNode() {
               <span v-else class="info-value empty-value">Not set</span>
             </template>
           </div>
+        </div>
+      </div>
+
+      <!-- Accelerators Section -->
+      <div class="management-section" v-if="canManagePermissions">
+        <div class="section-header">
+          <h2>Accelerators</h2>
+          <div class="section-actions">
+            <template v-if="!isEditingGpu">
+              <button class="processor-edit-button" @click="startEditingGpu">Update</button>
+            </template>
+            <template v-else>
+              <button class="processor-edit-button" :disabled="isUpdatingGpu" @click="saveGpuConfig">
+                {{ isUpdatingGpu ? 'Updating...' : 'Update' }}
+              </button>
+              <button class="processor-cancel-button" @click="cancelEditingGpu">Cancel</button>
+            </template>
+          </div>
+        </div>
+        <div class="info-content">
+          <div class="info-row">
+            <span class="info-label">LLM Access:</span>
+            <span class="info-value">
+              <template v-if="!isEditingGpu">
+                <span class="deployment-mode-detail">
+                  <span class="mode-header">
+                    <span v-if="computeNode.enableLLMAccess" class="tag llm">Enabled</span>
+                    <span v-else class="tag disabled">Disabled</span>
+                  </span>
+                  <span class="mode-explanation" v-if="computeNode.enableLLMAccess">
+                    Workflows on this node can use large language models for AI-powered processing.
+                  </span>
+                  <span class="mode-explanation" v-else>
+                    LLM-based processors are not available on this node.
+                  </span>
+                </span>
+              </template>
+              <el-switch v-else v-model="gpuForm.enableLLMAccess" />
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">GPU Support:</span>
+            <span class="info-value">
+              <template v-if="!isEditingGpu">
+                <span class="deployment-mode-detail">
+                  <span class="mode-header">
+                    <span v-if="computeNode.maxGpuInstances > 0" class="tag gpu">Enabled</span>
+                    <span v-else class="tag disabled">Disabled</span>
+                  </span>
+                  <span class="mode-explanation" v-if="computeNode.maxGpuInstances > 0">
+                    GPU-accelerated instances are available for compute-intensive workloads.
+                  </span>
+                  <span class="mode-explanation" v-else>
+                    GPU instances are not enabled on this node.
+                  </span>
+                </span>
+              </template>
+              <el-switch v-else v-model="gpuForm.enableGpu" />
+            </span>
+          </div>
+          <template v-if="!isEditingGpu && computeNode.maxGpuInstances > 0">
+            <div class="info-row">
+              <span class="info-label">GPU Tier:</span>
+              <span class="info-value">
+                {{ computeNode.gpuTier || 'small' }}
+                <span v-if="currentGpuTierInfo" class="gpu-tier-detail">
+                  — {{ currentGpuTierInfo.gpu }} ({{ currentGpuTierInfo.gpuMemoryGB }}GB VRAM, ${{ currentGpuTierInfo.pricePerHour.toFixed(2) }}/hr)
+                </span>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Max Instances:</span>
+              <span class="info-value">{{ computeNode.maxGpuInstances }}</span>
+            </div>
+          </template>
+          <template v-if="isEditingGpu && gpuForm.enableGpu">
+            <div class="info-row">
+              <span class="info-label">GPU Tier:</span>
+              <span class="info-value">
+                <el-select v-model="gpuForm.gpuTier" size="default" style="width: 200px">
+                  <el-option
+                    v-for="tier in availableGpuTiers"
+                    :key="tier.tier"
+                    :label="`${tier.tier} — ${tier.gpu} (${tier.gpuMemoryGB}GB VRAM, $${tier.pricePerHour.toFixed(2)}/hr)`"
+                    :value="tier.tier"
+                  />
+                </el-select>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Max Instances:</span>
+              <span class="info-value">
+                <el-input-number v-model="gpuForm.maxGpuInstances" :min="1" :max="10" size="default" />
+              </span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -757,6 +894,14 @@ async function confirmDestroyNode() {
         <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
+      <!-- Persistent Layers Section -->
+      <div class="management-section">
+        <div class="section-header">
+          <h2>Persistent Layers</h2>
+        </div>
+        <ComputeNodeLayers :node-id="nodeUuid" :is-owner="isNodeOwner" />
+      </div>
+
       <!-- Allowed Processors Section -->
       <div class="management-section" v-if="isNodeOwner" v-loading="isLoadingAllowedProcessors">
         <div class="section-header">
@@ -854,14 +999,6 @@ async function confirmDestroyNode() {
             Clear All (Switch to Open)
           </bf-button>
         </div>
-      </div>
-
-      <!-- Persistent Layers Section -->
-      <div class="management-section">
-        <div class="section-header">
-          <h2>Persistent Layers</h2>
-        </div>
-        <ComputeNodeLayers :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
       <!-- Danger Zone -->
@@ -1207,6 +1344,11 @@ async function confirmDestroyNode() {
         }
       }
 
+      .gpu-tier-detail {
+        color: theme.$gray_5;
+        font-size: 13px;
+      }
+
       .tag {
         display: inline-block;
         padding: 2px 8px;
@@ -1234,6 +1376,11 @@ async function confirmDestroyNode() {
         &.llm {
           background: rgba(#10B981, 0.1);
           color: #059669;
+        }
+
+        &.gpu {
+          background: rgba(#F59E0B, 0.1);
+          color: #D97706;
         }
 
         &.disabled {
