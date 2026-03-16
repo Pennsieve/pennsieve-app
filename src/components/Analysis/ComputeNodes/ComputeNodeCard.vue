@@ -38,6 +38,7 @@
           </el-tooltip>
           <span v-if="node.defaultComputeType" class="tag compute-type">{{ node.defaultComputeType }}</span>
           <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">LLM</span>
+          <span v-if="node.maxGpuInstances > 0" class="tag gpu">GPU</span>
         </div>
       </div>
       <div class="node-header-actions">
@@ -250,6 +251,11 @@ async function updateStatus(newStatus) {
     &.llm {
       background: rgba(#10B981, 0.1);
       color: #059669;
+    }
+
+    &.gpu {
+      background: rgba(#F59E0B, 0.1);
+      color: #D97706;
     }
   }
 }

@@ -127,6 +127,12 @@ const getComputeTypesForTarget = (targetType) => {
   return tt?.runtimeConfig?.computeTypes || [];
 };
 
+const getTargetTypeLabel = (targetType) => {
+  if (!targetType) return "No target selected";
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.label || targetType;
+};
+
 const onTargetTypeChange = (data) => {
   const types = getComputeTypesForTarget(data.targetType);
   data.computeType = types.length ? types[0] : null;
@@ -903,7 +909,7 @@ const openNodeSettings = (id) => {
               <div class="custom-node data-target-node">
                 <div class="node-header">
                   <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ data.targetType || 'No target selected' }}</span>
+                  <span class="node-title">{{ getTargetTypeLabel(data.targetType) }}</span>
                   <button
                     v-if="!isReadOnly"
                     class="settings-btn"
@@ -962,7 +968,7 @@ const openNodeSettings = (id) => {
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
                     <span class="info-label">Target Type</span>
-                    <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.targetType || 'Not set' }}</span>
+                    <span class="info-value" v-if="isReadOnly">{{ getTargetTypeLabel(selectedNode.data.targetType) }}</span>
                     <el-select
                       v-else
                       v-model="selectedNode.data.targetType"
@@ -974,7 +980,7 @@ const openNodeSettings = (id) => {
                       <el-option
                         v-for="tt in targetTypes"
                         :key="tt.targetType"
-                        :label="tt.targetType"
+                        :label="tt.label || tt.targetType"
                         :value="tt.targetType"
                       />
                     </el-select>

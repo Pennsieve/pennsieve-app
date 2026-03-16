@@ -16,6 +16,7 @@ import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/Brea
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
+import LayerNameSelector from "./LayerNameSelector.vue";
 import {
   statusClass,
   statusBorderColor,
@@ -24,6 +25,7 @@ import {
   statusLabel,
   isTerminalStatus,
   labelForDagNode,
+  getTargetTypeLabel,
   formatTime,
   formatDuration,
   formatCost,
@@ -133,6 +135,12 @@ const getComputeTypesForTarget = (targetType) => {
   return tt?.runtimeConfig?.computeTypes || [];
 };
 
+const getComputeTypesForProcessor = (sourceUrl) => {
+  if (!sourceUrl) return ["standard", "lambda"];
+  const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
+  return app?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+};
+
 const getTargetTypeDefinition = (targetType) => {
   if (!targetType) return null;
   return targetTypes.value.find((t) => t.targetType === targetType) || null;
@@ -199,7 +207,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -262,7 +270,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -456,7 +464,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       } else if (d.type !== "data-source") {
         const params = Object.entries(srcParams).map(([key, value]) => ({ key, value: String(value) }));
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || "lambda",
+          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
           version: srcCfg?.version || "",
           cpu: srcCfg?.cpu || "",
           memory: srcCfg?.memory || "",
@@ -836,7 +844,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d, availableApplications.value) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1185,8 +1193,12 @@ onUnmounted(() => {
                     style="width: 100%"
                     @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
                   >
-                    <el-option label="Lambda" value="lambda" />
-                    <el-option label="Standard" value="standard" />
+                    <el-option
+                      v-for="ct in getComputeTypesForProcessor(selectedNode.data?.sourceUrl)"
+                      :key="ct"
+                      :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                      :value="ct"
+                    />
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -1280,7 +1292,7 @@ onUnmounted(() => {
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
-                  <span class="info-value">{{ selectedNode.data?.targetType || 'N/A' }}</span>
+                  <span class="info-value">{{ getTargetTypeLabel(selectedNode.data?.targetType, targetTypes) || 'N/A' }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Runtime</span>
@@ -1321,7 +1333,13 @@ onUnmounted(() => {
                       <span v-else class="target-param-optional">optional</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
+                    <LayerNameSelector
+                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
+                      v-model="param.value"
+                      :compute-node-id="initiateForm.computeNodeId"
+                    />
                     <el-input
+                      v-else
                       v-model="param.value"
                       size="small"
                       :placeholder="param.required ? 'Required' : 'Optional'"
@@ -1814,6 +1832,10 @@ onUnmounted(() => {
         <div class="receipt-total">
           <span>Total Estimated Cost</span>
           <span>{{ formatCost(runMetrics.totalEstimatedCost) }}</span>
+        </div>
+
+        <div v-if="runMetrics.nodeMetrics?.some(nm => nm.computeType === 'gpu')" class="receipt-gpu-notice">
+          GPU instance costs are estimates and may not reflect spin-down time.
         </div>
 
         <div v-if="runMetrics.costEstimate?.pricingVersion" class="receipt-footer">
@@ -2806,9 +2828,14 @@ onUnmounted(() => {
     color: #92400e;
   }
 
-  &.ecs {
+  &.ecs, &.standard {
     background: #e0f7fa;
     color: #1e40af;
+  }
+
+  &.gpu {
+    background: rgba(#F59E0B, 0.1);
+    color: #D97706;
   }
 }
 
@@ -2844,6 +2871,16 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 700;
   color: theme.$black;
+}
+
+.receipt-gpu-notice {
+  font-size: 11px;
+  color: #D97706;
+  background: rgba(#F59E0B, 0.08);
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 
 .receipt-footer {

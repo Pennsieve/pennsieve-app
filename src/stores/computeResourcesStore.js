@@ -37,6 +37,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const allowedProcessorsLoaded = ref({})     // { [nodeId]: boolean }
   const isLoadingAllowedProcessors = ref({})
 
+  // Layers cache - keyed by nodeId
+  const nodeLayers = ref({})                  // { [nodeId]: { layers: [], totalSizeGB, totalEstimatedMonthlyCostUsd } }
+  const layersLoaded = ref({})                // { [nodeId]: boolean }
+  const isLoadingLayers = ref({})
+
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
@@ -82,6 +87,13 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return isLoadingAllowedProcessors.value[nodeId] || false
   })
 
+  const getNodeLayers = computed(() => (nodeId) => {
+    return nodeLayers.value[nodeId] || { layers: [], totalSizeGB: 0, totalEstimatedMonthlyCostUsd: 0 }
+  })
+
+  const isNodeLayersLoading = computed(() => (nodeId) => {
+    return isLoadingLayers.value[nodeId] || false
+  })
 
   const isComputeAccountsCacheValid = computed(() => {
     if (!computeAccountsLastFetched.value) return false
@@ -134,6 +146,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     nodeAllowedProcessors.value = {}
     allowedProcessorsLoaded.value = {}
     isLoadingAllowedProcessors.value = {}
+    nodeLayers.value = {}
+    layersLoaded.value = {}
+    isLoadingLayers.value = {}
   }
 
   const setNodeUpdating = (nodeId, isUpdating) => {
@@ -1285,6 +1300,153 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // Update compute node infrastructure config (GPU, LLM)
+  const updateComputeNodeConfig = async (nodeId, config) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${nodeId}/update-config`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+      })
+      if (response.ok) {
+        return await response.json()
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to update compute node config:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to update config: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to update compute node config:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  // Fetch GPU tiers
+  const gpuTiers = ref([])
+  const gpuTiersLoaded = ref(false)
+
+  const fetchGpuTiers = async (orgId) => {
+    if (gpuTiersLoaded.value) return gpuTiers.value
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        gpuTiers.value = await response.json()
+        gpuTiersLoaded.value = true
+        return gpuTiers.value
+      }
+      return []
+    } catch (error) {
+      console.error('Failed to fetch GPU tiers:', error)
+      return []
+    }
+  }
+
+  // Persistent Layers (uses workflow service base path)
+  const fetchNodeLayers = async (nodeId, forceRefresh = false) => {
+    if (!forceRefresh && layersLoaded.value[nodeId]) {
+      return nodeLayers.value[nodeId]
+    }
+    isLoadingLayers.value[nodeId] = true
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        nodeLayers.value[nodeId] = {
+          layers: data.layers || [],
+          totalSizeGB: data.totalSizeGB || 0,
+          totalEstimatedMonthlyCostUsd: data.totalEstimatedMonthlyCostUsd || 0
+        }
+        layersLoaded.value[nodeId] = true
+        return nodeLayers.value[nodeId]
+      } else if (response.status === 403) {
+        nodeLayers.value[nodeId] = { layers: [], totalSizeGB: 0, totalEstimatedMonthlyCostUsd: 0 }
+        layersLoaded.value[nodeId] = true
+        return nodeLayers.value[nodeId]
+      } else {
+        console.error('Failed to fetch layers:', response.status)
+        return Promise.reject(new Error(`Failed to fetch layers: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to fetch layers:', error)
+      return Promise.reject(error)
+    } finally {
+      isLoadingLayers.value[nodeId] = false
+    }
+  }
+
+  const createNodeLayer = async (nodeId, { layerName, description }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ layerName, description })
+      })
+      if (response.ok) {
+        await fetchNodeLayers(nodeId, true)
+        return true
+      } else if (response.status === 409) {
+        return Promise.reject(new Error('A layer with that name already exists'))
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to create layer:', response.status, errorText)
+        return Promise.reject(new Error(`Failed to create layer: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to create layer:', error)
+      return Promise.reject(error)
+    }
+  }
+
+  const deleteNodeLayer = async (nodeId, layerName) => {
+    try {
+      const token = await useGetToken()
+      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers/${encodeURIComponent(layerName)}`
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        await fetchNodeLayers(nodeId, true)
+        return true
+      } else {
+        console.error('Failed to delete layer:', response.status)
+        return Promise.reject(new Error(`Failed to delete layer: ${response.statusText}`))
+      }
+    } catch (error) {
+      console.error('Failed to delete layer:', error)
+      return Promise.reject(error)
+    }
+  }
+
   return {
     // State - Accounts
     computeAccounts,
@@ -1355,6 +1517,20 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // Actions - Allowed Processors
     fetchAllowedProcessors,
     updateAllowedProcessors,
+
+    // Getters - Layers
+    getNodeLayers,
+    isNodeLayersLoading,
+
+    // Actions - Infrastructure Config
+    updateComputeNodeConfig,
+    gpuTiers,
+    fetchGpuTiers,
+
+    // Actions - Layers
+    fetchNodeLayers,
+    createNodeLayer,
+    deleteNodeLayer,
 
     // Actions - Accounts
     fetchComputeAccounts,

@@ -28,7 +28,8 @@ const showAdvancedSettings = ref(false)
 const steps = [
   { title: 'Basics' },
   { title: 'Infrastructure' },
-  { title: 'AI Access' }
+  { title: 'AI Access' },
+  { title: 'GPU' }
 ]
 
 // Form data
@@ -40,8 +41,15 @@ const computeNode = ref({
   provisionerImageTag: 'latest',
   deploymentMode: 'basic',
   enableLLMAccess: false,
-  llmBaaAcknowledged: false
+  llmBaaAcknowledged: false,
+  enableGpu: false,
+  maxGpuInstances: 2,
+  gpuTier: 'small'
 })
+
+// GPU tiers from API
+const gpuTiers = ref([])
+const isLoadingGpuTiers = ref(false)
 
 // Whether BAA acknowledgement is required (secure or compliant + LLM enabled)
 const requiresBaaAck = computed(() => {
@@ -58,7 +66,7 @@ const llmValid = computed(() => {
 
 // Step navigation computed
 const proceedText = computed(() => {
-  return currentStep.value === 3 ? 'Create Compute Node' : 'Next'
+  return currentStep.value === 4 ? 'Create Compute Node' : 'Next'
 })
 
 const stepBackText = computed(() => {
@@ -121,6 +129,9 @@ const advanceStep = async (direction) => {
       }
     }
     if (currentStep.value === 3) {
+      if (!llmValid.value) return
+    }
+    if (currentStep.value === 4) {
       await handleCreateComputeNode()
       return
     }
@@ -217,6 +228,34 @@ const fetchComputeResourceAccounts = async () => {
   }
 }
 
+// Fetch GPU tiers
+const fetchGpuTiers = async () => {
+  isLoadingGpuTiers.value = true
+  try {
+    const token = await useGetToken()
+    const orgId = currentOrganization.value?.id
+    const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    if (response.ok) {
+      gpuTiers.value = await response.json()
+    } else {
+      console.error('Failed to fetch GPU tiers:', response.status)
+      gpuTiers.value = []
+    }
+  } catch (error) {
+    console.error('Failed to fetch GPU tiers:', error)
+    gpuTiers.value = []
+  } finally {
+    isLoadingGpuTiers.value = false
+  }
+}
+
 // Create compute node
 const createComputeNode = async (nodeData) => {
   const token = await useGetToken()
@@ -260,7 +299,10 @@ const closeDialog = () => {
     provisionerImageTag: 'latest',
     deploymentMode: 'basic',
     enableLLMAccess: false,
-    llmBaaAcknowledged: false
+    llmBaaAcknowledged: false,
+    enableGpu: false,
+    maxGpuInstances: 2,
+    gpuTier: 'small'
   }
   emit('close', false)
   if (computeNodeForm.value) {
@@ -281,7 +323,9 @@ const handleCreateComputeNode = async () => {
       provisionerImageTag: computeNode.value.provisionerImageTag,
       deploymentMode: computeNode.value.deploymentMode,
       enableLLMAccess: computeNode.value.enableLLMAccess,
-      llmBaaAcknowledged: computeNode.value.llmBaaAcknowledged
+      llmBaaAcknowledged: computeNode.value.llmBaaAcknowledged,
+      maxGpuInstances: computeNode.value.enableGpu ? computeNode.value.maxGpuInstances : 0,
+      gpuTier: computeNode.value.enableGpu ? computeNode.value.gpuTier : 'small'
     }
 
     await createComputeNode(formattedComputeNode)
@@ -307,12 +351,14 @@ const handleCreateComputeNode = async () => {
 watch(() => props.dialogVisible, (newValue) => {
   if (newValue) {
     fetchComputeResourceAccounts()
+    fetchGpuTiers()
   }
 })
 
 onMounted(() => {
   if (props.dialogVisible) {
     fetchComputeResourceAccounts()
+    fetchGpuTiers()
   }
 })
 </script>
@@ -565,6 +611,70 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- Step 4: GPU -->
+      <div v-show="currentStep === 4" class="step-panel">
+        <div class="step-header">
+          <h3 class="step-title">GPU Compute</h3>
+          <p class="step-description">Enable GPU instances for workloads that require hardware acceleration (ML inference, training, etc.).</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-field llm-toggle-field">
+            <div class="llm-toggle-row">
+              <div class="llm-toggle-info">
+                <label class="field-label">Enable GPU Support</label>
+                <div class="field-help">
+                  When enabled, an Auto Scaling Group with GPU instances is provisioned in your account. Instances scale to zero when idle to minimize costs.
+                </div>
+              </div>
+              <el-switch v-model="computeNode.enableGpu" :disabled="isLoading" />
+            </div>
+          </div>
+
+          <template v-if="computeNode.enableGpu">
+            <div class="form-field">
+              <label class="field-label">GPU Tier</label>
+              <div v-if="isLoadingGpuTiers" class="field-help">Loading available tiers...</div>
+              <div v-else class="gpu-tier-cards">
+                <div
+                  v-for="tier in gpuTiers"
+                  :key="tier.tier"
+                  class="gpu-tier-card"
+                  :class="{ selected: computeNode.gpuTier === tier.tier }"
+                  @click="computeNode.gpuTier = tier.tier"
+                >
+                  <div class="gpu-tier-header">
+                    <span class="gpu-tier-name">{{ tier.tier }}</span>
+                    <span class="gpu-tier-price">${{ tier.pricePerHour.toFixed(2) }}/hr</span>
+                  </div>
+                  <div class="gpu-tier-specs">
+                    <span>{{ tier.gpu }}</span>
+                    <span>{{ tier.gpuMemoryGB }} GB VRAM</span>
+                    <span>{{ tier.vcpus }} vCPUs</span>
+                    <span>{{ tier.memoryGB }} GB RAM</span>
+                  </div>
+                  <div class="gpu-tier-instance">{{ tier.instanceType }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label class="field-label">Max GPU Instances</label>
+              <el-input-number
+                v-model="computeNode.maxGpuInstances"
+                :min="1"
+                :max="10"
+                :disabled="isLoading"
+                size="default"
+              />
+              <div class="field-help">
+                Maximum number of GPU instances in the Auto Scaling Group. Instances scale to zero when idle.
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
     </dialog-body>
 
     <template #footer>
@@ -579,7 +689,7 @@ onMounted(() => {
         <bf-button
           class="primary"
           @click="advanceStep(1)"
-          :disabled="!hasComputeResources || (currentStep === 3 && !llmValid)"
+          :disabled="!hasComputeResources || (currentStep === 3 && !llmValid) || isLoading"
           :loading="isLoading"
         >
           {{ isLoading ? 'Creating Node...' : proceedText }}
@@ -990,6 +1100,65 @@ onMounted(() => {
 
       .llm-toggle-info {
         flex: 1;
+      }
+    }
+
+    // GPU tier cards
+    .gpu-tier-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .gpu-tier-card {
+      border: 2px solid theme.$gray_2;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: theme.$gray_3;
+      }
+
+      &.selected {
+        border-color: theme.$purple_3;
+        background: rgba(theme.$purple_3, 0.03);
+      }
+
+      .gpu-tier-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+
+        .gpu-tier-name {
+          font-weight: 600;
+          font-size: 14px;
+          color: theme.$gray_6;
+          text-transform: capitalize;
+        }
+
+        .gpu-tier-price {
+          font-size: 13px;
+          font-weight: 600;
+          color: theme.$purple_3;
+        }
+      }
+
+      .gpu-tier-specs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        font-size: 12px;
+        color: theme.$gray_5;
+        margin-bottom: 4px;
+      }
+
+      .gpu-tier-instance {
+        font-size: 11px;
+        color: theme.$gray_4;
+        font-family: 'Monaco', 'Menlo', monospace;
       }
     }
 
