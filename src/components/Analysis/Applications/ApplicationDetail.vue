@@ -40,6 +40,8 @@ const applicationsLoaded = computed(
   () => store.state.analysisModule.applicationsLoaded
 );
 const activeOrganization = computed(() => store.state.activeOrganization);
+const profile = computed(() => store.state.profile);
+const orgMembers = computed(() => store.state.orgMembers || []);
 
 const selectedApplication = computed(() =>
   applications.value.find((a) => a.uuid === props.uuid)
@@ -53,6 +55,34 @@ const hasAdminRights = computed(() => {
   }
   return false;
 });
+
+/*
+  User name resolution
+*/
+const getUserName = (userId) => {
+  if (!userId) return "Unknown";
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
+    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You";
+  }
+  const member = orgMembers.value.find((m) => m.id === userId || m.intId === userId);
+  if (member) {
+    return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
+  }
+  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  try {
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return dateString;
+  }
+};
 
 /*
   Status helpers
@@ -385,19 +415,31 @@ onBeforeUnmount(() => removeGuard());
                   </span>
                 </span>
               </div>
+              <div v-if="selectedApplication.createdAt" class="info-row">
+                <span class="info-label">Created</span>
+                <span class="info-value">{{ formatDate(selectedApplication.createdAt) }}</span>
+              </div>
+              <div v-if="selectedApplication.userId" class="info-row">
+                <span class="info-label">Created By</span>
+                <span class="info-value">{{ getUserName(selectedApplication.userId) }}</span>
+              </div>
             </div>
 
             <!-- Resources -->
-            <template v-if="selectedApplication.resources">
-              <h4 class="sidebar-section-title">Default Resources</h4>
+            <template v-if="selectedApplication.runtimeConfig">
+              <h4 class="sidebar-section-title">Runtime Configuration</h4>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">CPU</span>
-                  <span class="info-value">{{ selectedApplication.resources.cpu || 'N/A' }}</span>
+                  <span class="info-value">{{ selectedApplication.runtimeConfig.cpu || 'N/A' }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Memory</span>
-                  <span class="info-value">{{ selectedApplication.resources.memory || 'N/A' }}</span>
+                  <span class="info-value">{{ selectedApplication.runtimeConfig.memory || 'N/A' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Compute Types</span>
+                  <span class="info-value">{{ (selectedApplication.runtimeConfig.computeTypes || []).join(', ') || 'N/A' }}</span>
                 </div>
               </div>
             </template>
