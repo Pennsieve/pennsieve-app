@@ -179,12 +179,18 @@ export default {
 
       // Filter out workspaces where the user is a guest
       // Show only workspaces where the user has full membership
-      return this.organizations.filter(workspace => {
-        // Check if the workspace has the isGuest flag set to true
-        // If isGuest is true or the workspace is marked as guest, exclude it
-        const isGuest = workspace.isGuest || workspace.organization?.isGuest
-        return !isGuest
-      })
+      return this.organizations
+        .filter(workspace => {
+          // Check if the workspace has the isGuest flag set to true
+          // If isGuest is true or the workspace is marked as guest, exclude it
+          const isGuest = workspace.isGuest || workspace.organization?.isGuest
+          return !isGuest
+        })
+        .sort((a, b) => {
+          const nameA = (a.organization?.name || '').toLowerCase()
+          const nameB = (b.organization?.name || '').toLowerCase()
+          return nameA.localeCompare(nameB)
+        })
     }
   },
 
