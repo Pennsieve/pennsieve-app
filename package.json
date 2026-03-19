@@ -69,7 +69,7 @@
     "moment-range": "^4.0.2",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^4.0.379",
-    "pennsieve-dashboard": "0.2.2",
+    "pennsieve-dashboard": "0.3.71",
     "pinia": "^3.0.3",
     "protobufjs": "^7.2.6",
     "pusher-js": "^8.4.0",
