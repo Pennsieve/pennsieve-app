@@ -1,33 +1,14 @@
 <template>
   <bf-page>
     <template #heading>
-      <bf-rafter title="Publishing" class="primary">
-        <template #description>
-          <p>
-            Here, you can see all your pending and published datasets. Published
-            datasets are publicly available through the Pennsieve platform and
-            associated project portals.
-          </p>
-        </template>
-
-        <template #tabs>
-          <router-tabs :tabs="tabs" />
-
-          <!--          <ul-->
-          <!--            slot="tabs"-->
-          <!--            class="tabs unstyled"-->
-          <!--          >-->
-          <!--            <li-->
-          <!--              v-for="tab in tabs"-->
-          <!--              :key="tab.route.name"-->
-          <!--            >-->
-          <!--              <router-link :to="tab.route">-->
-          <!--                {{ tab.label }} ({{ this.getTotalCount(tab.type) }})-->
-          <!--              </router-link>-->
-          <!--            </li>-->
-          <!--          </ul>-->
+      <bf-rafter class="primary">
+        <template #breadcrumb>
+          <org-breadcrumb page-name="Publishing" :sub-page-name="currentTabName" :page-route="{ name: 'review' }" />
         </template>
       </bf-rafter>
+      <div class="content-tabs">
+        <router-tabs :tabs="tabs" />
+      </div>
     </template>
 
     <template #stage>
@@ -43,6 +24,7 @@ import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../components/shared/bf-button/BfButton.vue";
+import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 
 import EventBus from "../../utils/event-bus";
 import { PublicationStatus, PublicationTabs } from "../../utils/constants.js";
@@ -58,6 +40,7 @@ export default {
     BfPage,
     BfStage,
     BfRafter,
+    OrgBreadcrumb,
   },
 
   mixins: [Request],
@@ -68,6 +51,16 @@ export default {
     ...mapGetters("publishingModule", ["getTotalCount"]),
 
     ...mapState(["config", "activeOrganization", "primaryNavOpen"]),
+
+    currentTabName() {
+      const routeToTab = {
+        'review': 'Review',
+        'rejected': 'Rejected',
+        'published': 'Published',
+        'proposed': 'Proposed',
+      };
+      return routeToTab[this.$route.name] || '';
+    },
 
     ...mapState("publishingModule", ["totalCounts"]),
 
@@ -204,5 +197,12 @@ export default {
 </script>
 
 <style scoped lang="scss">
+@use "../../styles/theme";
 
+.content-tabs {
+  background: white;
+  border-bottom: 1px solid theme.$gray_2;
+  padding: 0 32px;
+  margin-bottom: 8px;
+}
 </style>

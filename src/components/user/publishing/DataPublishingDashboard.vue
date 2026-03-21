@@ -5,7 +5,6 @@
 
     <div v-if="$route.name === 'data-publishing'">
       <div class="info-section">
-        <h2>Data Publishing</h2>
         <p>Submit your datasets to available repositories on the Pennsieve platform. Browse repositories to find the right home for your research data, then create and track proposals for dataset publication. If your proposal is accepted, you will be invited to a dataset for uploading and curation of the data which you can access through <router-link :to="{ name: 'shared-with-me' }" class="info-link">My Data</router-link>.</p>
 
         <div class="info-note">

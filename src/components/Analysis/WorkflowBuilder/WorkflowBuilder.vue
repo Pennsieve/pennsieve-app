@@ -162,6 +162,7 @@ const enterCreateMode = () => {
   isEditingDetails.value = false;
   clearWorkflow();
   accordionActiveNames.value = ["data-and-apps"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const cancelCreate = () => {
@@ -170,6 +171,7 @@ const cancelCreate = () => {
   selectedNode.value = null;
   clearWorkflow();
   accordionActiveNames.value = ["workflows"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const extractRepoName = (gitUrl) => {
@@ -349,6 +351,7 @@ const selectWorkflow = (workflow) => {
   accordionActiveNames.value = ["information", "workflow-metrics"];
   workflowName.value = workflow.name || "";
   workflowDescription.value = workflow.description || "";
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", workflow);
 
   const result = definitionToNodesAndEdges(
     workflow,

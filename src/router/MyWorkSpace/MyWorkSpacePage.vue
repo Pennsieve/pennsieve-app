@@ -1,215 +1,149 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" :title="pageTitle" class="primary" :compact="true">
+    <bf-rafter slot="heading" class="primary">
       <template #breadcrumb>
-        <div class="breadcrumb-nav" v-if="showBreadcrumb">
-          <!-- Root workspace link -->
-          <router-link :to="{ name: 'my-workspace' }" class="breadcrumb-link">
-            My Workspace
-          </router-link>
-          
-          <!-- Dynamic intermediate breadcrumbs -->
-          <template v-for="item in breadcrumbItems" :key="item.name">
-            <span class="breadcrumb-separator">/</span>
-            <router-link :to="{ name: item.name }" class="breadcrumb-link">
-              {{ item.label }}
-            </router-link>
-          </template>
-          
-          <!-- Current page (non-clickable) -->
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">{{ currentPageTitle }}</span>
-        </div>
-      </template>
-      <template #description>
-        <p>{{ pageDescription }}</p>
-      </template>
-      <template v-if="showTabs" #tabs>
-        <router-tabs :tabs="tabs" />
+        <org-breadcrumb
+          :page-name="currentSectionName"
+          :crumbs="breadcrumbCrumbs"
+          :page-route="sectionRoute"
+          workspace-label="My Workspace"
+          :workspace-route="{ name: 'my-workspace' }"
+        />
       </template>
     </bf-rafter>
-    <router-view
-      name="stage"
-    />
+    <div v-if="showTabs" class="content-tabs">
+      <router-tabs :tabs="tabs" />
+    </div>
+    <router-view name="stage" />
   </bf-page>
-
 </template>
 
 <script>
-
-
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
-import { mapActions } from 'vuex';
+import OrgBreadcrumb from "@/components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 
 export default {
-  name: 'MyCollectionsStage',
+  name: 'MyWorkSpacePage',
 
   components: {
     BfRafter,
-    RouterTabs
+    RouterTabs,
+    OrgBreadcrumb
   },
 
-  props: {
-    title: {
-      type: String,
-      default: "My Workspace"
-    },
-    description: {
-      type: String,
-      default: "Manage your personal workspace and user settings."
-    }
-  },
-  
   mounted() {
-    // Clear active organization when in my-workspace routes
     this.$store.commit('UPDATE_ACTIVE_ORGANIZATION', {})
   },
-  
+
   computed: {
-    pageTitle() {
-      return this.title;
+    routeName() {
+      return this.$route.name;
     },
-    pageDescription() {
-      return this.description;
-    },
-    showBreadcrumb() {
-      // Show breadcrumb on all child pages of my-workspace
-      return this.$route.name !== 'my-workspace';
-    },
-    currentPageTitle() {
-      // Get the current page title from the route meta or use the route name
-      const routeMeta = this.$route.meta;
-      const routeName = this.$route.name;
-      
-      // Map route names to display titles
-      const routeTitles = {
-        'user-profile': 'Profile',
-        'user-orcid': 'ORCID Integration',
-        'user-github': 'GitHub Integration',
-        'user-api': 'API Keys',
-        'user-compute-resource': 'Compute Resources',
-        'user-integrations': 'Platform Integrations',
-        'user-security': 'Security Settings',
-        'user-support': 'Support & Help',
-        'my-settings': 'Settings',
-        'data-publishing': 'Data Publishing',
+
+    // Determine which top-level section we're in
+    currentSectionName() {
+      if (this.isSettingsSection) return 'Settings';
+      if (this.isPublishingSection) return 'Data Publishing';
+      if (this.isCollectionsSection) return 'Collections';
+
+      // Top-level pages
+      const topLevel = {
         'shared-with-me': 'My Data',
-        'open-repositories': 'Pennsieve Repositories',
-        'dataset-proposals': 'Dataset Proposals',
-        'my-repositories': 'My Repositories',
+        'my-code': 'My Code',
         'my-analysis': 'My Analysis',
-        'collections-list': 'Collections List',
-        'collection-details': 'Collection Details',
-        'my-collections': 'My Collections'
       };
-      
-      return routeMeta?.title || routeTitles[routeName] || this.title;
+      return topLevel[this.routeName] || 'My Workspace';
     },
-    breadcrumbItems() {
-      const items = [];
-      const routeName = this.$route.name;
-      
-      // Settings section breadcrumbs
-      if (this.isSettingsSubPage) {
-        items.push({ name: 'my-settings', label: 'Settings' });
-        
-        // For integration children (ORCID, GitHub, API Keys), add Platform Integrations as intermediate
-        if (this.isIntegrationChildPage) {
-          items.push({ name: 'user-integrations', label: 'Platform Integrations' });
+
+    sectionRoute() {
+      if (this.isSettingsSection) return { name: 'my-settings' };
+      if (this.isPublishingSection) return { name: 'data-publishing' };
+      if (this.isCollectionsSection) return { name: 'collections-list' };
+      return null;
+    },
+
+    breadcrumbCrumbs() {
+      const routeName = this.routeName;
+
+      // Settings sub-pages
+      if (this.isSettingsSection) {
+        if (routeName === 'my-settings') {
+          return [];
+        }
+
+        // Tab-level pages
+        const settingsPages = {
+          'user-profile': 'Profile',
+          'user-integrations': 'Platform Integrations',
+          'user-security': 'Security',
+          'user-compute-resource': 'Compute Resources',
+          'user-support': 'Support',
+        };
+        if (settingsPages[routeName]) {
+          return [{ name: settingsPages[routeName] }];
+        }
+
+        // Integration child pages
+        const integrationChildren = {
+          'user-orcid': 'ORCID',
+          'user-github': 'GitHub',
+          'user-api': 'API Keys',
+        };
+        if (integrationChildren[routeName]) {
+          return [
+            { name: 'Platform Integrations', route: { name: 'user-integrations' } },
+            { name: integrationChildren[routeName] },
+          ];
         }
       }
-      
-      // Publishing section breadcrumbs
-      else if (this.isPublishingSubPage) {
-        items.push({ name: 'data-publishing', label: 'Data Publishing' });
+
+      // Publishing sub-pages
+      if (this.isPublishingSection) {
+        if (routeName === 'open-repositories') {
+          return [{ name: 'Repositories' }];
+        }
+        if (routeName === 'dataset-proposals') {
+          return [{ name: 'Proposals' }];
+        }
+        return [];
       }
-      
-      // Collections section breadcrumbs
-      else if (routeName === 'collection-details') {
-        // For collection details, show My Collections > Collections List as clickable parents
-        items.push({ name: 'my-collections', label: 'My Collections' });
-        items.push({ name: 'collections-list', label: 'Collections List' });
+
+      // Collections sub-pages
+      if (this.isCollectionsSection) {
+        if (routeName === 'collection-details') {
+          return [{ name: 'Collection Details' }];
+        }
+        return [];
       }
-      else if (routeName === 'collections-list') {
-        // For collections list, just show My Collections as parent
-        items.push({ name: 'my-collections', label: 'My Collections' });
-      }
-      
-      // For all other top-level pages, no intermediate breadcrumbs needed
-      // The current page title will be shown as non-clickable text
-      
-      return items;
+
+      return [];
     },
-    isSettingsSubPage() {
-      // Check if current route is a child of settings
-      const settingsSubPages = [
-        'user-profile', 'user-orcid', 'user-github', 'user-api', 'user-compute-resource',
-        'user-integrations', 'user-security', 'user-support'
+
+    isSettingsSection() {
+      const settingsPages = [
+        'my-settings', 'user-profile', 'user-orcid', 'user-github',
+        'user-api', 'user-compute-resource', 'user-integrations',
+        'user-security', 'user-support'
       ];
-      return settingsSubPages.includes(this.$route.name);
+      return settingsPages.includes(this.routeName);
     },
-    isIntegrationChildPage() {
-      // Check if current route is a child of integrations (needs Platform Integrations in breadcrumb)
-      const integrationChildPages = ['user-orcid', 'user-github', 'user-api'];
-      return integrationChildPages.includes(this.$route.name);
+
+    isPublishingSection() {
+      const publishingPages = ['data-publishing', 'open-repositories', 'dataset-proposals'];
+      return publishingPages.includes(this.routeName);
     },
-    isCollectionsSubPage() {
-      // Check if current route is part of collections
-      const collectionsSubPages = ['collections-list', 'collection-details'];
-      return collectionsSubPages.includes(this.$route.name);
+
+    isCollectionsSection() {
+      const collectionsPages = ['my-collections', 'collections-list', 'collection-details'];
+      return collectionsPages.includes(this.routeName);
     },
-    isPublishingSubPage() {
-      // Check if current route is a child of data-publishing
-      const publishingSubPages = ['open-repositories', 'dataset-proposals'];
-      return publishingSubPages.includes(this.$route.name);
-    },
+
     showTabs() {
-      // Show tabs for publishing sub-pages and settings sub-pages
-      return this.isPublishingSubPage || this.isSettingsSubPage;
+      return false;
     },
+
     tabs() {
-      // Define tabs based on current route section
-      if (this.isPublishingSubPage) {
-        return [
-          {
-            to: 'open-repositories', 
-            name: 'Repositories'
-          },
-          {
-            to: 'dataset-proposals',
-            name: 'Proposals'
-          }
-        ];
-      }
-      
-      // Settings tabs
-      if (this.isSettingsSubPage) {
-        return [
-          {
-            to: 'user-profile',
-            name: 'Profile'
-          },
-          {
-            to: 'user-integrations',
-            name: 'Integrations'
-          },
-          {
-            to: 'user-security',
-            name: 'Security'
-          },
-          {
-            to: 'user-compute-resource',
-            name: 'Compute Resources'
-          },
-          {
-            to: 'user-support',
-            name: 'Support'
-          }
-        ];
-      }
-      
-      // Could add tabs for other sections in the future
       return [];
     }
   }
@@ -219,28 +153,10 @@ export default {
 <style scoped lang="scss">
 @use '../../styles/theme';
 
-.breadcrumb-nav {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  
-  .breadcrumb-link {
-    color: theme.$gray_4;
-    text-decoration: none;
-    
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-  
-  .breadcrumb-separator {
-    margin: 0 8px;
-    color: #71767C;
-  }
-  
-  .breadcrumb-current {
-    color: #000;
-    font-weight: 500;
-  }
+.content-tabs {
+  background: white;
+  border-bottom: 1px solid theme.$gray_2;
+  padding: 0 32px;
+  margin-bottom: 8px;
 }
 </style>

@@ -110,6 +110,9 @@ export const mutations = {
   SET_WORKFLOW_LOGS(state, logs) {
     state.workflowLogs = logs;
   },
+  SET_SELECTED_WORKFLOW(state, workflow) {
+    state.selectedWorkflow = workflow;
+  },
   SET_SELECTED_WORKFLOW_ACTIVITY(state, workflow) {
     state.selectedWorkflowActivity = workflow;
   },
@@ -879,6 +882,7 @@ export const getters = {
   workflowInstancesCursor: (state) => state.workflowInstancesCursor,
   workflowInstance: (state) => state.workflowInstance,
   workflowLogs: (state) => state.workflowLogs,
+  selectedWorkflow: (state) => state.selectedWorkflow,
   selectedWorkflowActivity: (state) => state.selectedWorkflowActivity,
   activityDialogVisible: (state) => state.activityDialogVisible,
   selectedProcessor: (state) => state.selectedProcessor,

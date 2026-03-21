@@ -156,19 +156,6 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        :link="{ name: 'integrations-settings' }"
-        label="Integrations"
-        :condensed="secondaryNavCondensed"
-        :secondary="true"
-        :style-color="getThemeColors[0]"
-        :org-id="orgId"
-      >
-        <template #icon>
-          <IconIntegrations color="currentColor" :height="20" :width="20" />
-        </template>
-      </bf-navigation-item>
-
-      <bf-navigation-item
         :link="{ name: 'publishing-settings' }"
         label="Publishing"
         class="secondary"

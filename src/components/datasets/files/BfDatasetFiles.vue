@@ -609,6 +609,7 @@ export default {
      */
     fetchFiles: function (url) {
       this.filesLoading = true;
+      this.$store.commit('SET_CURRENT_FOLDER', { name: '', ancestors: [] });
 
       useGetToken()
         .then((token) => {
@@ -641,6 +642,12 @@ export default {
               this.sortDirection
             );
             this.ancestors = response.ancestors;
+
+            const isCollection = this.$route.name === 'collection-files';
+            this.$store.commit('SET_CURRENT_FOLDER', {
+              name: isCollection ? (response?.content?.name || '') : '',
+              ancestors: response.ancestors || []
+            });
 
             const pkgId = pathOr("", ["query", "pkgId"], this.$route);
             if (pkgId) {
