@@ -30,13 +30,6 @@
 <!--        icon="analytics"-->
 <!--      />-->
 
-      <workspace-settings-card
-        title="Compute Nodes"
-        description="Manage compute nodes and analysis infrastructure"
-        :route="{ name: 'compute-nodes' }"
-        icon="compute"
-      />
-
 <!--      <workspace-settings-card-->
 <!--        title="Advanced Settings"-->
 <!--        description="Backup, export, and other advanced configuration options"-->

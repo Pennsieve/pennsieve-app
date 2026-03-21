@@ -11,6 +11,8 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
+import IconCopyDocument from "../../icons/IconCopyDocument.vue";
+import IconArrowRight from "../../icons/IconArrowRight.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -101,6 +103,10 @@ const cancellingRun = ref(false);
 // Dataset options for configure summary
 const datasetOptions = ref([]);
 const datasetSearchLoading = ref(false);
+
+// Dataset name for run details (browse mode)
+const runDatasetName = ref("");
+const runDatasetAccessible = ref(false);
 
 /*
   Store computed
@@ -359,6 +365,28 @@ const onProcessorStatusUpdate = (raw) => {
 /*
   Load run (browse mode)
 */
+const fetchRunDatasetName = async (datasetId) => {
+  if (!datasetId) {
+    runDatasetName.value = "";
+    return;
+  }
+  try {
+    const token = await useGetToken();
+    const url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}`;
+    const response = await useSendXhr(url);
+    if (response?.content?.name) {
+      runDatasetName.value = response.content.name;
+      runDatasetAccessible.value = true;
+    } else {
+      runDatasetName.value = "You don't have access to this dataset";
+      runDatasetAccessible.value = false;
+    }
+  } catch {
+    runDatasetName.value = "You don't have access to this dataset";
+    runDatasetAccessible.value = false;
+  }
+};
+
 const loadRun = async (runId) => {
   if (!runId) return;
   isLoading.value = true;
@@ -374,11 +402,25 @@ const loadRun = async (runId) => {
       if (result.needsAutoLayout) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2 }), 50);
     }
+    if (activity?.datasetId) {
+      fetchRunDatasetName(activity.datasetId);
+    }
   } catch (err) {
     console.error("Failed to load run details:", err);
     EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load run details." } });
   } finally {
     isLoading.value = false;
+  }
+};
+
+const copyRunId = async () => {
+  const uuid = selectedWorkflowActivity.value?.uuid;
+  if (!uuid) return;
+  try {
+    await navigator.clipboard.writeText(uuid);
+    EventBus.$emit("toast", { detail: { type: "info", msg: "Run ID copied to clipboard" } });
+  } catch {
+    console.error("Failed to copy Run ID");
   }
 };
 
@@ -793,6 +835,41 @@ const openLogs = async (nodeId, label) => {
 };
 
 /*
+  Download all logs as zip
+*/
+const downloadingLogs = ref(false);
+const downloadAllLogs = async () => {
+  const runId = selectedWorkflowActivity.value?.uuid || props.runId;
+  if (!runId) return;
+  downloadingLogs.value = true;
+  try {
+    const token = await useGetToken();
+    const url = `${config.value.api2Url}/compute/workflows/runs/${runId}/logs?format=zip`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error("Failed to fetch logs download URL");
+    const data = await resp.json();
+    if (data.url) {
+      const a = document.createElement("a");
+      a.href = data.url;
+      a.download = `run-${runId}-logs.zip`;
+      a.click();
+    } else {
+      throw new Error("No download URL returned");
+    }
+  } catch (err) {
+    console.error("Failed to download logs:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: "Failed to download logs." },
+    });
+  } finally {
+    downloadingLogs.value = false;
+  }
+};
+
+/*
   Cancel run
 */
 const cancelRun = async () => {
@@ -859,18 +936,6 @@ const selectedNodeMetrics = computed(() => {
 /*
   Rerun & Export
 */
-const exportRunConfig = () => {
-  const activity = selectedWorkflowActivity.value;
-  if (!activity) return;
-  const json = JSON.stringify(activity, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `run-${activity.uuid}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
 
 const rerunFromRun = async () => {
   const activity = selectedWorkflowActivity.value;
@@ -1500,11 +1565,36 @@ onUnmounted(() => {
               <div class="info-card">
                 <div v-if="runWorkflowName" class="info-row">
                   <span class="info-label">Workflow</span>
-                  <span class="info-value">{{ runWorkflowName }}</span>
+                  <span class="info-value truncate-value">
+                    <router-link
+                      v-if="selectedWorkflowActivity.workflowUuid"
+                      :to="{ name: 'workflow-detail', params: { uuid: selectedWorkflowActivity.workflowUuid } }"
+                      :title="runWorkflowName"
+                      class="truncate-text"
+                    >
+                      {{ runWorkflowName }}
+                    </router-link>
+                    <span v-else class="truncate-text" :title="runWorkflowName">{{ runWorkflowName }}</span>
+                  </span>
+                </div>
+                <div v-if="selectedWorkflowActivity.datasetId" class="info-row">
+                  <span class="info-label">Dataset</span>
+                  <span v-if="!runDatasetName" class="info-value">Loading...</span>
+                  <span v-else-if="runDatasetAccessible" class="info-value">
+                    <router-link :to="{ name: 'dataset-overview', params: { datasetId: selectedWorkflowActivity.datasetId } }">
+                      {{ runDatasetName }}
+                    </router-link>
+                  </span>
+                  <span v-else class="info-value no-access">{{ runDatasetName }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Run ID</span>
-                  <span class="info-value info-url">{{ selectedWorkflowActivity.uuid }}</span>
+                  <span class="info-value info-url run-id-value">
+                    <span class="run-id-text" :title="selectedWorkflowActivity.uuid">{{ selectedWorkflowActivity.uuid }}</span>
+                    <button class="copy-id-btn" @click="copyRunId" title="Copy Run ID">
+                      <IconCopyDocument :width="12" :height="12" />
+                    </button>
+                  </span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Status</span>
@@ -1515,7 +1605,15 @@ onUnmounted(() => {
                 </div>
                 <div v-if="selectedWorkflowActivity.computeNodeUuid" class="info-row">
                   <span class="info-label">Compute Node</span>
-                  <span class="info-value">{{ computeNodeName(selectedWorkflowActivity.computeNodeUuid) }}</span>
+                  <span class="info-value truncate-value">
+                    <router-link
+                      :to="{ name: 'compute-node-management', params: { nodeId: selectedWorkflowActivity.computeNodeUuid } }"
+                      :title="computeNodeName(selectedWorkflowActivity.computeNodeUuid)"
+                      class="truncate-text"
+                    >
+                      {{ computeNodeName(selectedWorkflowActivity.computeNodeUuid) }}
+                    </router-link>
+                  </span>
                 </div>
                 <div v-if="selectedWorkflowActivity.createdBy" class="info-row">
                   <span class="info-label">Invoked By</span>
@@ -1532,10 +1630,6 @@ onUnmounted(() => {
                 <div v-if="selectedWorkflowActivity.startedAt && selectedWorkflowActivity.completedAt" class="info-row">
                   <span class="info-label">Duration</span>
                   <span class="info-value">{{ formatDuration(selectedWorkflowActivity.startedAt, selectedWorkflowActivity.completedAt) }}</span>
-                </div>
-                <div v-if="selectedWorkflowActivity.dag" class="info-row">
-                  <span class="info-label">Processors</span>
-                  <span class="info-value">{{ selectedWorkflowActivity.dag.length }}</span>
                 </div>
               </div>
               <!-- Metrics summary -->
@@ -1562,8 +1656,8 @@ onUnmounted(() => {
                 Rerun with configuration
               </bf-button>
 
-              <bf-button class="secondary export-run-btn" @click="exportRunConfig">
-                Export Run Config
+              <bf-button class="secondary export-run-btn" :disabled="downloadingLogs" @click="downloadAllLogs">
+                {{ downloadingLogs ? 'Downloading...' : 'Download Logs & Configuration' }}
               </bf-button>
             </template>
 
@@ -2483,6 +2577,57 @@ onUnmounted(() => {
 .info-url {
   font-family: monospace;
   font-size: 11px;
+}
+
+.truncate-value {
+  min-width: 0;
+}
+
+.truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+
+.run-id-value {
+  min-width: 0;
+}
+
+.run-id-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.copy-id-btn,
+.nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer !important;
+  padding: 2px;
+  opacity: 0.4;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.2s ease;
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  :deep(svg) {
+    cursor: pointer !important;
+    pointer-events: none;
+  }
+}
+
+.no-access {
+  color: theme.$orange_2;
 }
 
 .info-empty {
