@@ -559,6 +559,24 @@ const saveWorkflow = async () => {
     return;
   }
 
+  const targetWithoutType = nodes.value.find(
+    (n) => n.type === "data-target" && !n.data.targetType
+  );
+  if (targetWithoutType) {
+    // Select the node so the user can see which one needs a target type
+    nodes.value.forEach((n) => (n.selected = false));
+    const target = nodes.value.find((n) => n.id === targetWithoutType.id);
+    if (target) target.selected = true;
+    selectedNode.value = targetWithoutType;
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: "Please select a target type for all data target nodes before saving.",
+      },
+    });
+    return;
+  }
+
   const processors = nodes.value.map((node) => {
     // Build dependsOn from incoming edges (edges whose target is this node)
     const dependsOn = edges.value
@@ -1301,7 +1319,7 @@ const openNodeSettings = (id) => {
                 <div class="data-item-info">
                   <div class="data-item-name">Source</div>
                   <div class="data-item-description">
-                    Select input sources
+                    Select input sookurces
                   </div>
                 </div>
               </div>
@@ -2137,7 +2155,7 @@ const openNodeSettings = (id) => {
 .info-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 6px 0;
 
@@ -2163,6 +2181,11 @@ const openNodeSettings = (id) => {
 
 .info-inline-select {
   width: 130px;
+
+  :deep(.el-select-dropdown__item) {
+    display: flex;
+    align-items: center;
+  }
 }
 
 .runtime-note {

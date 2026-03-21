@@ -110,6 +110,10 @@ export default {
           name: "Applications",
           to: "applications",
         },
+        {
+          name: "Compute Nodes",
+          to: "compute-nodes",
+        },
       ],
     };
   },
