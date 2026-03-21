@@ -1571,6 +1571,22 @@ const router = createRouter({
           props: {
             stage: true
           }
+        },
+        {
+          name: 'compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList
+          },
+          props: true
+        },
+        {
+          name: 'compute-node-management',
+          path: 'compute-nodes/:nodeId',
+          components: {
+            stage: ComputeNodeManagement
+          },
+          props: true
         }
       ]
     },
@@ -1620,22 +1636,6 @@ const router = createRouter({
             stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
           }
         },
-        {
-          name: 'compute-nodes',
-          path: 'compute-nodes',
-          components: {
-            stage: ComputeNodesList
-          },
-          props: true
-        },
-        {
-          name: 'compute-node-management',
-          path: 'compute-nodes/:nodeId',
-          components: {
-            stage: ComputeNodeManagement
-          },
-          props: true
-        }
       ],
       props: true
     },
