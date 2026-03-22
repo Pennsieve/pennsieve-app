@@ -143,10 +143,11 @@ export default {
       .svg-icon {
         color: theme.$purple_1;
       }
-      &.secondary {
-        background: theme.$gray_1;
+      &.secondary, &.secondary:hover, &.secondary:focus {
+        background: theme.$purple_tint;
         border-right: 4px solid var(--color-active, theme.$purple_1);
         color: var(--color-active, theme.$purple_1);
+        font-weight: 600;
 
         .svg-icon {
           color: var(--color-active, theme.$purple_1);
@@ -166,8 +167,13 @@ export default {
         color: inherit;
         transition: color 0.15s ease;
       }
-      &:hover, &:focus, &.active {
+      &:hover, &:focus {
+          background: theme.$gray_1;
           color: var(--color-active, var(--color-hover));
+
+          .svg-icon {
+            color: var(--color-active, var(--color-hover));
+          }
       }
     }
     .primary & {
