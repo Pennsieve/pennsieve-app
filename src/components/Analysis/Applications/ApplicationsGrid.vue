@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { propOr } from "ramda";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
+import StageActions from "../../shared/StageActions/StageActions.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconLink from "../../icons/IconLink.vue";
 import CreateApplicationDialog from "./CreateApplicationDialog.vue";
@@ -140,55 +141,52 @@ const onAddApplicationConfirm = (application) => {
   <div class="applications-grid-page">
     <!-- Header -->
     <div class="builder-header">
-      <span class="header-title">Applications</span>
-      <div class="header-actions">
-        <bf-button
-          :disabled="!hasAdminRights"
-          @click="openCreateApplicationDialog"
-        >
-          + New Application
-        </bf-button>
-      </div>
-    </div>
-
-    <!-- Filter Bar -->
-    <div class="filter-bar-container">
-      <el-input
-        v-model="searchQuery"
-        placeholder="Search applications..."
-        size="small"
-        clearable
-        class="search-input"
-      />
-
-      <div class="sort-buttons">
-        <button
-          class="filter-btn"
-          :class="{ active: sortField === 'name' }"
-          @click="sortField = 'name'"
-        >
-          Name
-        </button>
-        <button
-          class="filter-btn"
-          :class="{ active: sortField === 'status' }"
-          @click="sortField = 'status'"
-        >
-          Status
-        </button>
-      </div>
-
-      <div v-if="availableTags.length > 0" class="tag-chips">
-        <button
-          v-for="tag in availableTags"
-          :key="tag"
-          class="tag-chip"
-          :class="{ selected: selectedTags.includes(tag) }"
-          @click="toggleTag(tag)"
-        >
-          {{ tag }}
-        </button>
-      </div>
+      <stage-actions>
+        <template #left>
+          <el-input
+            v-model="searchQuery"
+            placeholder="Search applications..."
+            size="small"
+            clearable
+            class="search-input"
+          />
+          <div class="sort-buttons">
+            <button
+              class="filter-btn"
+              :class="{ active: sortField === 'name' }"
+              @click="sortField = 'name'"
+            >
+              Name
+            </button>
+            <button
+              class="filter-btn"
+              :class="{ active: sortField === 'status' }"
+              @click="sortField = 'status'"
+            >
+              Status
+            </button>
+          </div>
+          <div v-if="availableTags.length > 0" class="tag-chips">
+            <button
+              v-for="tag in availableTags"
+              :key="tag"
+              class="tag-chip"
+              :class="{ selected: selectedTags.includes(tag) }"
+              @click="toggleTag(tag)"
+            >
+              {{ tag }}
+            </button>
+          </div>
+        </template>
+        <template #right>
+          <bf-button
+            :disabled="!hasAdminRights"
+            @click="openCreateApplicationDialog"
+          >
+            + New Application
+          </bf-button>
+        </template>
+      </stage-actions>
     </div>
 
     <!-- Card Grid -->
@@ -263,10 +261,10 @@ const onAddApplicationConfirm = (application) => {
 .builder-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;
 
   .header-title {
@@ -283,34 +281,28 @@ const onAddApplicationConfirm = (application) => {
   }
 }
 
-.filter-bar-container {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
-  gap: 12px;
-}
-
 .search-input {
   max-width: 300px;
 }
 
 .sort-buttons {
   display: flex;
+  align-items: center;
   gap: 8px;
+  margin-left: 16px;
 }
 
 .filter-btn {
-  padding: 5px 12px;
-  border: 1px solid theme.$gray_3;
+  padding: 4px 16px;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: white;
   color: theme.$gray_5;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  line-height: 1.4;
 
   &:hover {
     border-color: theme.$purple_1;
@@ -326,13 +318,15 @@ const onAddApplicationConfirm = (application) => {
 
 .tag-chips {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+  margin-left: 16px;
 }
 
 .tag-chip {
-  padding: 4px 10px;
-  border: 1px solid theme.$gray_3;
+  padding: 4px 16px;
+  border: 1px solid theme.$gray_2;
   border-radius: 12px;
   background: white;
   color: theme.$gray_5;
@@ -362,7 +356,7 @@ const onAddApplicationConfirm = (application) => {
 
 .app-card {
   background: theme.$white;
-  border: 1px solid theme.$gray_3;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   padding: 20px;
   cursor: pointer;

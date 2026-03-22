@@ -2,6 +2,7 @@
   <div
     class="bf-navigation secondary"
     :class="[secondaryNavCondensed ? 'condensed' : '']"
+    :style="secondaryNavCondensed ? { backgroundImage: condensedBackgroundStyle } : {}"
   >
     <div class="menu-wrap">
       <div
@@ -89,7 +90,7 @@
 <!--        <hr />-->
 <!--      </template>-->
 
-      <hr/>
+      <hr v-if="!secondaryNavCondensed"/>
       <bf-navigation-item
         :link="{ name: 'dataset-overview' }"
         label="Overview"
@@ -152,19 +153,6 @@
       >
         <template #icon>
           <IconActivity color="currentColor" :height="20" :width="20" />
-        </template>
-      </bf-navigation-item>
-
-      <bf-navigation-item
-        :link="{ name: 'integrations-settings' }"
-        label="Integrations"
-        :condensed="secondaryNavCondensed"
-        :secondary="true"
-        :style-color="getThemeColors[0]"
-        :org-id="orgId"
-      >
-        <template #icon>
-          <IconIntegrations color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
 
@@ -298,31 +286,33 @@ export default {
       "config",
     ]),
     getThemeColors: function () {
-      let colorTheme = this.getTheme(this.orgId)
-
-      for (const [key, value] of Object.entries(pathOr({}, ['organization', 'colorTheme'], this.activeOrganization))) {
-          colorTheme = [key, value]
-        }
-
-      return colorTheme
+      // Use getTheme which returns [primary, secondary]
+      return this.getTheme(this.orgId)
     },
     secNavHeaderCollapsedStyle: function () {
-      if (this.secondaryNavCondensed) {
-        const themeColors = this.getThemeColors;
-        const color1 = themeColors[1];
-        return `${color1}`;
-      } else {
-        return "";
+      if (this.secondaryNavCondensed && this.getThemeColors.length >= 2) {
+        // Match the tertiary nav background — darkened secondary color
+        return this.pSBC(-0.25, this.getThemeColors[0]) || '';
       }
+      return '';
     },
     workspaceBackgroundStyle: function () {
       const color1 = this.pSBC(0.8, this.getThemeColors[1]);
       return `${color1}`;
     },
+    condensedBackgroundStyle: function () {
+      if (this.getThemeColors.length >= 2) {
+        const darkened0 = this.pSBC(-0.25, this.getThemeColors[0]) || this.getThemeColors[0];
+        const darkened1 = this.pSBC(-0.25, this.getThemeColors[1]) || this.getThemeColors[1];
+        const color1 = this.pSBC(-0.1, darkened0, darkened1, true);
+        return `linear-gradient(to top, ${darkened1}, ${color1})`;
+      }
+      return '';
+    },
     tertiaryNavColor: function () {
       if (this.secondaryNavCondensed) {
         const themeColors = this.getThemeColors;
-        const color1 = themeColors[0];
+        const color1 = themeColors[1];
         return `${color1}`;
       } else {
         return "";
@@ -511,6 +501,11 @@ export default {
   box-shadow: -1px 0 0 rgba(64, 69, 84, 0.2) inset;
   padding-right: 1px;
   z-index: 99;
+
+  &.condensed {
+    box-shadow: none;
+    padding-right: 0;
+  }
 }
 
 hr {
@@ -539,7 +534,7 @@ hr {
   align-items: baseline;
 
   .condensed & {
-    background: theme.$purple_1;
+    background: theme.$purple_0_7;
     height: 56px;
     padding: 10px;
   }

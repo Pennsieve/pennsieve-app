@@ -43,27 +43,27 @@
           <div class="color-picker-section">
             <div class="color-picker-item">
               <label class="color-label">Primary Color:</label>
-              <el-color-picker 
-                :disabled="!hasAdminRights" 
-                v-model="ruleForm.colorTheme[1]" 
-                size="large"
-                show-alpha
-              />
-              <span class="color-preview" v-if="ruleForm.colorTheme[1]">
-                {{ ruleForm.colorTheme[1] }}
-              </span>
-            </div>
-            
-            <div class="color-picker-item">
-              <label class="color-label">Secondary Color:</label>
-              <el-color-picker  
-                :disabled="!hasAdminRights" 
-                v-model="ruleForm.colorTheme[0]" 
+              <el-color-picker
+                :disabled="!hasAdminRights"
+                v-model="ruleForm.colorTheme[0]"
                 size="large"
                 show-alpha
               />
               <span class="color-preview" v-if="ruleForm.colorTheme[0]">
                 {{ ruleForm.colorTheme[0] }}
+              </span>
+            </div>
+
+            <div class="color-picker-item">
+              <label class="color-label">Secondary Color:</label>
+              <el-color-picker
+                :disabled="!hasAdminRights"
+                v-model="ruleForm.colorTheme[1]"
+                size="large"
+                show-alpha
+              />
+              <span class="color-preview" v-if="ruleForm.colorTheme[1]">
+                {{ ruleForm.colorTheme[1] }}
               </span>
             </div>
           </div>
@@ -172,7 +172,8 @@ export default {
       const colorTheme = pathOr({}, ['organization', 'colorTheme'], org)
       this.ruleForm.colorTheme = [null, null]
       for (const [key, value] of Object.entries(colorTheme)) {
-        this.ruleForm.colorTheme = [key, value]
+        // Store as [primary, secondary] — API object is { secondary: primary }
+        this.ruleForm.colorTheme = [value, key]
       }
     },
 
@@ -198,8 +199,9 @@ export default {
         if (this.ruleForm.colorTheme[0] == null || this.ruleForm.colorTheme[1] == null) {
           colorTheme = null
         } else {
+          // API format: { secondary: primary }
           colorTheme = {}
-          colorTheme[this.ruleForm.colorTheme[0]] = this.ruleForm.colorTheme[1]
+          colorTheme[this.ruleForm.colorTheme[1]] = this.ruleForm.colorTheme[0]
         }
 
         await useSendXhr(url, {
@@ -211,7 +213,7 @@ export default {
         })
 
         this.$store.dispatch('updateWorkspaceColors', {
-          [this.ruleForm.colorTheme[0]]: this.ruleForm.colorTheme[1],
+          [this.ruleForm.colorTheme[1]]: this.ruleForm.colorTheme[0],
         })
 
         EventBus.$emit('toast', {

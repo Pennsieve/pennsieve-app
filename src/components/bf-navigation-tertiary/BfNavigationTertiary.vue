@@ -41,7 +41,7 @@
 
 <!--    </bf-navigation-item>-->
 
-    <user-menu :style="{ backgroundColor: `${bkColor}` }"/>
+    <user-menu :style="{ backgroundColor: darkenedBkColor }"/>
 
 
   </div>
@@ -136,6 +136,11 @@
       isWorkspaceGuest: function() {
         const isGuest = propOr(false, 'isGuest', this.activeOrganization)
         return isGuest
+      },
+
+      darkenedBkColor: function() {
+        // Apply same darkening as the primary nav overlay
+        return this.pSBC(-0.15, this.bkColor) || this.bkColor
       },
     }
   }

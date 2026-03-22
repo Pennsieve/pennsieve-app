@@ -87,16 +87,19 @@ export default {
         // Check if any of the matched routes (including parents of current route)
         // matches --> link is active
         let cl = ''
+        const darkenedColor = this.styleColor ? (this.pSBC(-0.25, this.styleColor) || this.styleColor) : ''
         if (this.$route.matched.map(a => a.name).includes(this.link.name)) {
-          cl = this.styleColor
+          cl = darkenedColor
         }
 
         return this.styleColor? {
           '--color-hover': this.styleColor,
+          '--color-active': darkenedColor,
           'color': cl
 
         } : {
-          '--color-hover': '#4d628c'
+          '--color-hover': '#4d628c',
+          '--color-active': '#3a4a6b'
         }
       },
       itemClass: function() {
@@ -140,10 +143,16 @@ export default {
       .svg-icon {
         color: theme.$purple_1;
       }
-      &.secondary {
-      background: theme.$purple_tint;
-      border-right: 4px solid;
-    }
+      &.secondary, &.secondary:hover, &.secondary:focus {
+        background: theme.$purple_tint;
+        border-right: 4px solid var(--color-active, theme.$purple_1);
+        color: var(--color-active, theme.$purple_1);
+        font-weight: 600;
+
+        .svg-icon {
+          color: var(--color-active, theme.$purple_1);
+        }
+      }
     }
     .svg-icon {
       color: theme.$gray_2;
@@ -152,11 +161,42 @@ export default {
       pointer-events: none;
     }
     &.secondary {
+      transition: background 0.15s ease, color 0.15s ease;
+
       .svg-icon {
         color: inherit;
+        transition: color 0.15s ease;
       }
-      &:hover, &:focus, &.active {
-          color: var(--color-hover);
+      &:hover, &:focus {
+          background: theme.$gray_1;
+          color: var(--color-active, var(--color-hover));
+
+          .svg-icon {
+            color: var(--color-active, var(--color-hover));
+          }
+      }
+
+      .condensed & {
+        color: theme.$white;
+        border-right: none;
+
+        .svg-icon {
+          color: theme.$white;
+        }
+
+        &:hover, &:focus {
+          background: rgba(255, 255, 255, 0.1);
+          color: theme.$white;
+
+          .svg-icon {
+            color: theme.$white;
+          }
+        }
+
+        &.router-link-active {
+          background: rgba(255, 255, 255, 0.15);
+          border-right: none;
+        }
       }
     }
     .primary & {

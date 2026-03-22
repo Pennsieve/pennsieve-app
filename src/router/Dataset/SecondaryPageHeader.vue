@@ -1,108 +1,40 @@
 <script setup>
+import { computed } from "vue";
 import { useRoute } from "vue-router";
-let route = useRoute();
+import { useStore } from "vuex";
+import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
+import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
+
+const route = useRoute();
+const store = useStore();
+
+const dataset = computed(() => store.state.dataset);
+const datasetName = computed(() => dataset.value?.content?.name || 'Dataset');
+const datasetId = computed(() => route.params.datasetId);
+
+const pageName = computed(() => {
+  const routeNames = {
+    'dataset-settings': 'Settings',
+    'publishing-settings': 'Publishing Settings',
+    'integrations-settings': 'Integrations',
+  };
+  return routeNames[route.name] || 'Settings';
+});
 </script>
 
 <template>
-  <locked-banner slot="banner" />
+  <div>
+    <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading" :breadcrumbs="breadcrumbs">
-    <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="$router.go(-1)" class="link-to-files">
-        <IconArrowLeft :height="10" :width="10" />
-        Back to Files
-      </a>
-    </template>
-  </bf-rafter>
+    <bf-rafter slot="heading" class="primary" :hide-dataset-name="true">
+      <template #breadcrumb>
+        <org-breadcrumb
+          :page-name="datasetName"
+          :sub-page-name="pageName"
+          :page-route="{ name: 'dataset-overview', params: { datasetId: datasetId } }"
+        />
+      </template>
+    </bf-rafter>
+  </div>
 </template>
-
-<script>
-import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
-import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
-import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
-import IconGuide from "../../components/icons/IconGuide.vue";
-import IconHelp from "../../components/icons/IconHelp.vue";
-import IconArrowRight from "../../components/icons/IconArrowRight.vue";
-import IconUpload from "../../components/icons/IconUpload.vue";
-
-export default {
-  name: "SecondaryPageHeader",
-
-  components: {
-    BfRafter,
-    IconArrowLeft,
-    LockedBanner,
-    IconGuide,
-    IconHelp,
-    IconArrowRight,
-    IconUpload,
-  },
-  mounted() {
-    const r = useRoute();
-    // this.getReadmeDocument(r.meta.helpSection);
-  },
-
-  computed: {
-    /**
-     * Compute breadcrumbs based on current route
-     * @returns {Array}
-     */
-    breadcrumbs: function() {
-      return this.$route.meta.breadcrumbs || []
-    },
-
-    pageName: function () {
-      const r = useRoute();
-
-      switch (r.name) {
-        case "dataset-settings":
-          return "Dataset Settings";
-        case "dataset-files":
-          return "Files";
-        case "file-record":
-          return "File Details";
-        case "publishing-settings":
-          return "Dataset Publishing";
-        case "dataset-activity":
-          return "Dataset Activity";
-        case "integrations-settings":
-          return "Integrations";
-        case "collection-files":
-          return "Files";
-        case "viewer":
-          return "File Viewer";
-      }
-      return "Unknown";
-    },
-  },
-
-  data() {
-    return {
-      showHelp: false,
-    };
-  },
-
-  methods: {
-    toggleHelp: function () {
-      this.showHelp = !this.showHelp;
-    },
-  },
-};
-</script>
-
-<style scoped lang="scss">
-@use "../../styles/theme";
-
-.flex-heading {
-  background-color: theme.$purple_1;
-}
-
-.el-collapse-item__header {
-  background: theme.$purple_2;
-}
-
-.link-to-files {
-  color: theme.$white;
-  cursor: pointer;
-}
-</style>

@@ -15,16 +15,16 @@ const datasetName = computed(() => dataset.value?.content?.name || 'Dataset');
 const datasetId = computed(() => route.params.datasetId);
 
 const tabs = [
-  { to: 'user-permissions', name: 'User Permissions' },
-  { to: 'embargo-permissions', name: 'Embargo Permissions' },
+  { to: 'dataset-settings-general', name: 'General' },
+  { to: 'integrations-settings', name: 'Integrations' },
 ];
 
 const currentTabName = computed(() => {
   const routeToTab = {
-    'user-permissions': 'User Permissions',
-    'embargo-permissions': 'Embargo Permissions',
+    'dataset-settings-general': 'General',
+    'integrations-settings': 'Integrations',
   };
-  return routeToTab[route.name] || 'Permissions';
+  return routeToTab[route.name] || 'Settings';
 });
 </script>
 
@@ -36,7 +36,7 @@ const currentTabName = computed(() => {
       <template #breadcrumb>
         <org-breadcrumb
           :page-name="datasetName"
-          :crumbs="[{ name: 'Permissions' }, { name: currentTabName }]"
+          :crumbs="[{ name: 'Settings' }, { name: currentTabName }]"
           :page-route="{ name: 'dataset-overview', params: { datasetId: datasetId } }"
         />
       </template>

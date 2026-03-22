@@ -1,63 +1,47 @@
 <script setup>
-import { ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed } from "vue";
+import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
-import IconArrowLeft from "../../components/icons/IconArrowLeft.vue";
+import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 import LockedBanner from "../../components/datasets/LockedBanner/LockedBanner.vue";
-import { getPreviousCollection } from "../index.js"; 
 
 const route = useRoute();
-const router = useRouter();
+const store = useStore();
 
-const breadcrumbs = computed(() => {
-  return route.meta.breadcrumbs || []
-});
+const dataset = computed(() => store.state.dataset);
+const datasetName = computed(() => dataset.value?.content?.name || 'Dataset');
+const datasetId = computed(() => route.params.datasetId);
+const currentFileName = computed(() => store.state.currentFileName);
+const currentFolder = computed(() => store.state.currentFolder);
 
-function backToFiles(){
-    const { datasetId } = route.params;
-  const previousCollection = getPreviousCollection(); // ✅ Get stored collection ID
+const isFileRecord = computed(() => route.name === 'file-record');
+const isTrash = computed(() => currentFolder.value?.isTrash === true);
 
-  if (previousCollection) {
-    router.push({
-      name: "collection-files",
-      params: { datasetId, fileId: previousCollection },
-    });
-  } else {
-    router.push({
-      name: "dataset-files",
-      params: { datasetId },
-    });
+const breadcrumbCrumbs = computed(() => {
+  if (isFileRecord.value) {
+    return [
+      { name: 'Files', route: { name: 'dataset-files', params: { datasetId: datasetId.value } } },
+      { name: currentFileName.value || 'File Details' },
+    ];
   }
-}
-
+  if (isTrash.value) {
+    return [{ name: 'Trash' }];
+  }
+  return [{ name: 'Files' }];
+});
 </script>
 
 <template>
   <locked-banner slot="banner" />
 
-  <bf-rafter slot="heading" :breadcrumbs="breadcrumbs">
-    <template #breadcrumb v-if="route.meta.showBackToFiles">
-      <a @click="backToFiles()" class="link-to-files">
-        <IconArrowLeft :height="10" :width="10" />
-        Back to Files
-      </a>
+  <bf-rafter slot="heading" class="primary" :hide-dataset-name="true">
+    <template #breadcrumb>
+      <org-breadcrumb
+        :page-name="datasetName"
+        :crumbs="breadcrumbCrumbs"
+        :page-route="{ name: 'dataset-overview', params: { datasetId: datasetId } }"
+      />
     </template>
   </bf-rafter>
 </template>
-
-<style scoped lang="scss">
-@use "../../styles/theme";
-
-.flex-heading {
-  background-color: theme.$purple_1;
-}
-
-.el-collapse-item__header {
-  background: theme.$purple_2;
-}
-
-.link-to-files {
-  color: theme.$white;
-  cursor: pointer;
-}
-</style>

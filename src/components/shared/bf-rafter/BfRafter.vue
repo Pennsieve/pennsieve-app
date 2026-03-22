@@ -281,7 +281,7 @@ export default {
     },
     compact: {
       type: Boolean,
-      default: false
+      default: true
     }
   },
 
@@ -370,8 +370,8 @@ export default {
     rafterBackgroundStyle: function() {
       const color1 = this.pSBC(0.8, this.getThemeColors[1])
       return `${color1}`
-
     },
+
 
     isFileRecord: function() {
       return this.$route.name === "file-record";
@@ -941,10 +941,11 @@ export default {
 // Compact Mode Styles
 .bf-rafter.compact {
   padding: 4px 8px 4px 16px; // Reduced padding
-  
+
   &.primary {
-    padding-top: 12px;
-    padding-bottom: 0;
+    padding: 12px 8px 12px 32px;
+    background: white;
+    border-bottom: 1px solid theme.$gray_2;
   }
   
   // Compact header row
@@ -952,7 +953,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 48px; // Fixed height for consistency
+    min-height: 0;
     
     .compact-nav {
       flex-shrink: 0;
@@ -1094,9 +1095,9 @@ export default {
   
   // Compact breadcrumb slot
   .bf-rafter-breadcrumb.compact {
-    margin-bottom: 4px; // Reduced margin
-    font-size: 13px; // Smaller font
-    min-height: 16px; // Reduced height
+    margin-bottom: 0;
+    font-size: 13px;
+    min-height: auto;
   }
   
   // Compact tabs at bottom

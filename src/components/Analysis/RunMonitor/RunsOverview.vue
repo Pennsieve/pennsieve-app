@@ -374,7 +374,6 @@ onBeforeUnmount(() => {
   <div class="runs-overview">
     <!-- Header -->
     <div class="builder-header">
-      <span class="header-title header-title-primary">Runs</span>
       <div class="header-actions">
         <bf-button @click="openWizardDialog">Initiate Workflow</bf-button>
       </div>
@@ -742,10 +741,11 @@ onBeforeUnmount(() => {
 .builder-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
+  border-bottom: 1px solid theme.$gray_2;
   min-height: 48px;
 
   .header-title {
@@ -1007,7 +1007,7 @@ onBeforeUnmount(() => {
 .applications-sidebar {
   width: 350px;
   background-color: theme.$white;
-  border-left: 1px solid theme.$gray_3;
+  border-left: 1px solid theme.$gray_2;
   overflow-y: auto;
   padding: 16px;
   display: flex;

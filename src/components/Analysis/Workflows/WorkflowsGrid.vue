@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import StageActions from "../../shared/StageActions/StageActions.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -125,47 +126,33 @@ onMounted(async () => {
   <div class="workflows-grid-page">
     <!-- Header -->
     <div class="builder-header">
-      <span class="header-title">Workflows</span>
-      <div class="header-actions">
-        <bf-button @click="goToCreate">
-          + New Workflow
-        </bf-button>
-      </div>
-    </div>
-
-    <!-- Filter Bar -->
-    <div class="filter-bar-container">
-      <el-input
-        v-model="searchQuery"
-        placeholder="Search workflows..."
-        size="small"
-        clearable
-        class="search-input"
-      />
-
-      <div class="status-buttons">
-        <button
-          v-for="option in filterOptions"
-          :key="option.value"
-          class="filter-btn"
-          :class="{ active: statusFilter === option.value }"
-          @click="statusFilter = option.value"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-
-      <div class="page-size-selector">
-        <span class="page-size-label">Show</span>
-        <el-select v-model="pageSize" size="small" class="page-size-select">
-          <el-option
-            v-for="size in pageSizeOptions"
-            :key="size"
-            :label="size"
-            :value="size"
+      <stage-actions>
+        <template #left>
+          <el-input
+            v-model="searchQuery"
+            placeholder="Search workflows..."
+            size="small"
+            clearable
+            class="search-input"
           />
-        </el-select>
-      </div>
+          <div class="status-buttons">
+            <button
+              v-for="option in filterOptions"
+              :key="option.value"
+              class="filter-btn"
+              :class="{ active: statusFilter === option.value }"
+              @click="statusFilter = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </template>
+        <template #right>
+          <bf-button @click="goToCreate">
+            + New Workflow
+          </bf-button>
+        </template>
+      </stage-actions>
     </div>
 
     <!-- Card Grid -->
@@ -249,10 +236,10 @@ onMounted(async () => {
 .builder-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;
 
   .header-title {
@@ -269,51 +256,28 @@ onMounted(async () => {
   }
 }
 
-.filter-bar-container {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
-  gap: 12px;
-}
-
 .search-input {
   max-width: 300px;
 }
 
-.page-size-selector {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-
-  .page-size-label {
-    font-size: 12px;
-    color: theme.$gray_4;
-    white-space: nowrap;
-  }
-
-  .page-size-select {
-    width: 72px;
-  }
-}
-
 .status-buttons {
   display: flex;
+  align-items: center;
   gap: 8px;
+  margin-left: 16px;
 }
 
 .filter-btn {
-  padding: 5px 12px;
-  border: 1px solid theme.$gray_3;
+  padding: 4px 16px;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: white;
   color: theme.$gray_5;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  line-height: 1.4;
 
   &:hover {
     border-color: theme.$purple_1;
@@ -339,7 +303,7 @@ onMounted(async () => {
 
 .wf-card {
   background: theme.$white;
-  border: 1px solid theme.$gray_3;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
@@ -447,7 +411,7 @@ onMounted(async () => {
 
 .load-more-btn {
   padding: 8px 24px;
-  border: 1px solid theme.$gray_3;
+  border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: white;
   color: theme.$gray_5;
