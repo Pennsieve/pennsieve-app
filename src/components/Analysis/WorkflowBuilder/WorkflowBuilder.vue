@@ -162,6 +162,7 @@ const enterCreateMode = () => {
   isEditingDetails.value = false;
   clearWorkflow();
   accordionActiveNames.value = ["data-and-apps"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const cancelCreate = () => {
@@ -170,6 +171,7 @@ const cancelCreate = () => {
   selectedNode.value = null;
   clearWorkflow();
   accordionActiveNames.value = ["workflows"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const extractRepoName = (gitUrl) => {
@@ -349,6 +351,7 @@ const selectWorkflow = (workflow) => {
   accordionActiveNames.value = ["information", "workflow-metrics"];
   workflowName.value = workflow.name || "";
   workflowDescription.value = workflow.description || "";
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", workflow);
 
   const result = definitionToNodesAndEdges(
     workflow,
@@ -725,35 +728,22 @@ const openNodeSettings = (id) => {
 
 <template>
   <div class="workflow-builder">
-    <!-- Header -->
-    <div class="builder-header">
-      <span class="header-title">
-        <router-link :to="{ name: 'workflows' }" class="header-back-link">Workflows</router-link>
-        <template v-if="mode === 'create'">
-          <span class="header-breadcrumb-sep">/</span>
-          <span class="header-detail-name">New Workflow</span>
-        </template>
-        <template v-else-if="selectedWorkflow">
-          <span class="header-breadcrumb-sep">/</span>
-          <span class="header-detail-name">{{ selectedWorkflow.name }}</span>
-        </template>
-      </span>
-      <template v-if="mode === 'create'">
-        <el-input
-          v-model="workflowName"
-          placeholder="Workflow name"
-          class="header-name-input"
-        />
-        <el-input
-          v-model="workflowDescription"
-          placeholder="Description (optional)"
-          class="header-desc-input"
-        />
-        <div class="header-actions">
-          <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
-          <bf-button @click="saveWorkflow">Save</bf-button>
-        </div>
-      </template>
+    <!-- Header (create mode only) -->
+    <div class="builder-header" v-if="mode === 'create'">
+      <el-input
+        v-model="workflowName"
+        placeholder="Workflow name"
+        class="header-name-input"
+      />
+      <el-input
+        v-model="workflowDescription"
+        placeholder="Description (optional)"
+        class="header-desc-input"
+      />
+      <div class="header-actions">
+        <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
+        <bf-button @click="saveWorkflow">Save</bf-button>
+      </div>
     </div>
 
     <div class="builder-content">
@@ -1465,7 +1455,7 @@ const openNodeSettings = (id) => {
 @use "../../../styles/theme";
 
 .workflow-builder {
-  height: calc(100vh - 112px);
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1475,7 +1465,7 @@ const openNodeSettings = (id) => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;

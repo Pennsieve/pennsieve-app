@@ -120,8 +120,9 @@
   }
   .bf-stage-content {
     box-sizing: border-box;
-    min-height: calc(100% - 72px);
-    padding: 8px 32px;
+    flex: 1;
+    min-height: 0;
+    padding: 8px 32px 0 32px;
     display: flex;
     flex-direction: column;
     overflow: auto;
@@ -176,6 +177,7 @@
   .buttons {
     display: flex;
     flex-direction: row;
+    align-items: center;
     justify-content: end;
     padding: 16px 32px 16px 16px;
 

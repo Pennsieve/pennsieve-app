@@ -9,25 +9,27 @@
       element-loading-background="transparent"
     >
       <template #actions>
-          <bf-button
-            v-if="hasAdminRights"
-            @click="openDialog"
-          >
-            Send Invitation
-          </bf-button>
+        <stage-actions>
+          <template #left>
+            <el-input
+              v-model="searchQuery"
+              placeholder="Search by name or email..."
+              prefix-icon="el-icon-search"
+              class="search-input"
+              clearable
+              @input="handleSearch"
+            />
+          </template>
+          <template #right>
+            <bf-button
+              v-if="hasAdminRights"
+              @click="openDialog"
+            >
+              Send Invitation
+            </bf-button>
+          </template>
+        </stage-actions>
       </template>
-
-
-      <div class="search-section mb-16">
-        <el-input
-          v-model="searchQuery"
-          placeholder="Search by name or email..."
-          prefix-icon="el-icon-search"
-          class="search-input"
-          clearable
-          @input="handleSearch"
-        />
-      </div>
 
       <div class="pagination-header mb-16" v-if="filteredPeople.length > 0">
         <pagination-page-menu
@@ -160,6 +162,7 @@ import Sorter from '../../../mixins/sorter'
 import UserRoles from '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
 import IconSort from "../../icons/IconSort.vue";
+import StageActions from "../../shared/StageActions/StageActions.vue";
 import {useGetToken} from "@/composables/useGetToken";
 
 export default {
@@ -167,6 +170,7 @@ export default {
 
   components: {
     IconSort,
+    StageActions,
     BfRafter,
     BfButton,
     OrgMember,
@@ -482,12 +486,9 @@ export default {
 .col-spacer {
   height: 17px;
 }
-.search-section {
-  margin-bottom: 20px;
-  
-  .search-input {
-    max-width: 400px;
-  }
+.search-input {
+  max-width: 600px;
+  margin-left: 16px;
 }
 
 .pagination-header {

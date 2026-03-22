@@ -156,19 +156,6 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        :link="{ name: 'integrations-settings' }"
-        label="Integrations"
-        :condensed="secondaryNavCondensed"
-        :secondary="true"
-        :style-color="getThemeColors[0]"
-        :org-id="orgId"
-      >
-        <template #icon>
-          <IconIntegrations color="currentColor" :height="20" :width="20" />
-        </template>
-      </bf-navigation-item>
-
-      <bf-navigation-item
         :link="{ name: 'publishing-settings' }"
         label="Publishing"
         class="secondary"
@@ -298,22 +285,15 @@ export default {
       "config",
     ]),
     getThemeColors: function () {
-      let colorTheme = this.getTheme(this.orgId)
-
-      for (const [key, value] of Object.entries(pathOr({}, ['organization', 'colorTheme'], this.activeOrganization))) {
-          colorTheme = [key, value]
-        }
-
-      return colorTheme
+      // Use getTheme which returns [primary, secondary]
+      return this.getTheme(this.orgId)
     },
     secNavHeaderCollapsedStyle: function () {
-      if (this.secondaryNavCondensed) {
-        const themeColors = this.getThemeColors;
-        const color1 = themeColors[1];
-        return `${color1}`;
-      } else {
-        return "";
+      if (this.secondaryNavCondensed && this.getThemeColors.length >= 2) {
+        // Match the tertiary nav background — darkened secondary color
+        return this.pSBC(-0.25, this.getThemeColors[0]) || '';
       }
+      return '';
     },
     workspaceBackgroundStyle: function () {
       const color1 = this.pSBC(0.8, this.getThemeColors[1]);
@@ -539,7 +519,7 @@ hr {
   align-items: baseline;
 
   .condensed & {
-    background: theme.$purple_1;
+    background: theme.$purple_0_7;
     height: 56px;
     padding: 10px;
   }

@@ -1,51 +1,13 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" title="Analysis" class="primary" :org-id="orgId">
-      <template #description>
-        <div class="description">
-          <p>
-            Pennsieve Analytics enables users to run workflows over data on external compute nodes.
-          </p>
-<!--          <hr />-->
-        </div>
-        <!-- <div slot="description" class="description">
-          <p v-if="this.$route.name === 'applications'">
-            Applications support actions on various entities on the platform
-            such as "Files", "Records", and "Datasets". Registered applications
-            can be triggered from the action-menu associated with the targeted
-            entities.
-            <a
-              href="https://docs.pennsieve.io/docs/introduction-to-integrations"
-              target="_blank"
-            >
-              What's this?
-            </a>
-          </p>
-          <p v-if="this.$route.name === 'webhooks'">
-            Webhooks provide mechanisms to notify external applications of
-            events that happen on the Pennsieve platform, such as "File
-            Uploaded", or "Description updated".
-            <a
-              href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
-              target="_blank"
-            >
-              What's this?
-            </a>
-          </p>
-          <p v-if="this.$route.name === 'compute-nodes'">
-            Compute Nodes are deployed to run analytic pipelines through the
-            Pennsieve platform. You can register compute nodes through the
-            Pennsieve Agent. Each Compute Node is associated with an account,
-            which can be a cloud-provider or a local cluster.
-          </p>
-        </div> -->
-      </template>
-      <template #tabs>
-        <router-tabs
-          :tabs="tabs"
-        />
+    <bf-rafter slot="heading" class="primary" :org-id="orgId">
+      <template #breadcrumb>
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'runs' }" />
       </template>
     </bf-rafter>
+    <div class="content-tabs">
+      <router-tabs :tabs="tabs" />
+    </div>
     <router-view name="stage" :integrations="integrations" />
   </bf-page>
 </template>
@@ -56,6 +18,8 @@ import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
+import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
 
@@ -66,9 +30,70 @@ export default {
     BfPage,
     BfStage,
     BfRafter,
+    OrgBreadcrumb,
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
+    selectedWorkflow() {
+      return this.$store.getters["analysisModule/selectedWorkflow"] || {};
+    },
+    applicationName() {
+      const uuid = this.$route.params.uuid;
+      if (!uuid) return '';
+      const apps = this.$store.getters["analysisModule/applications"] || [];
+      const app = apps.find(a => a.uuid === uuid);
+      return app?.name || '';
+    },
+    computeNodeName() {
+      const nodeId = this.$route.params.nodeId;
+      if (!nodeId) return '';
+      const computeResourcesStore = useComputeResourcesStore();
+      const scope = this.orgId ? `workspace:${this.orgId}` : 'account-owner';
+      const nodes = computeResourcesStore.getScopedComputeNodes(scope) || [];
+      const node = nodes.find(n => n.uuid === nodeId);
+      return node?.name || '';
+    },
+    breadcrumbCrumbs() {
+      const routeName = this.$route.name;
+
+      // Top-level tabs: just one crumb (the tab name, as current)
+      const topLevelTabs = {
+        'runs': 'Runs',
+        'workflows': 'Workflows',
+        'applications': 'Applications',
+        'compute-nodes': 'Compute Nodes',
+      };
+      if (topLevelTabs[routeName]) {
+        return [{ name: topLevelTabs[routeName] }];
+      }
+
+      // Sub-pages: parent tab as link + detail name as current
+      const subPages = {
+        'run-detail': { parent: 'Runs', parentRoute: { name: 'runs' } },
+        'run-configure': { parent: 'Runs', parentRoute: { name: 'runs' } },
+        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'application-detail': { parent: 'Applications', parentRoute: { name: 'applications' } },
+        'compute-node-management': { parent: 'Compute Nodes', parentRoute: { name: 'compute-nodes' } },
+      };
+      const sub = subPages[routeName];
+      if (sub) {
+        const detailNames = {
+          'run-detail': 'Run Details',
+          'run-configure': 'Configure Run',
+          'workflow-detail': this.selectedWorkflow?.name || 'Workflow',
+          'workflow-create': 'New Workflow',
+          'application-detail': this.applicationName || 'Application',
+          'compute-node-management': this.computeNodeName || 'Compute Node',
+        };
+        return [
+          { name: sub.parent, route: sub.parentRoute },
+          { name: detailNames[routeName] },
+        ];
+      }
+
+      return [];
+    },
   },
   // From Router
   props: {
@@ -123,7 +148,9 @@ export default {
 <style scoped lang="scss">
 @use "../../styles/theme";
 
-.description {
-  max-width: 600px;
+.content-tabs {
+  background: white;
+  border-bottom: 1px solid theme.$gray_2;
+  padding: 0 32px;
 }
 </style>

@@ -67,6 +67,8 @@ const initialState = () => ({
   changelogText: "",
   datasetDescriptionEtag: "",
   datasetIgnoreFiles: [],
+  currentFolder: { name: '', ancestors: [] },
+  currentFileName: '',
   datasetFilters: initialFilterState,
   datasetContributors: [],
   isDatasetOwner: false,
@@ -498,6 +500,14 @@ export const mutations = {
 
       SET_DATASET_DESCRIPTION(state, data) {
         state.datasetDescription = data;
+      },
+
+      SET_CURRENT_FOLDER(state, data) {
+        state.currentFolder = data;
+      },
+
+      SET_CURRENT_FILE_NAME(state, name) {
+        state.currentFileName = name;
       },
 
       SET_CHANGELOG_TEXT(state, data) {

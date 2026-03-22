@@ -297,13 +297,11 @@ export default {
     
     workspaceBackgroundStyle: function () {
       if (this.hasCustomTheme) {
-        const color1 = this.pSBC(
-          -0.1,
-          this.getThemeColors[0],
-          this.getThemeColors[1],
-          true
-        );
-        return `linear-gradient(to top, ${color1}, ${this.getThemeColors[1]})`;
+        // Darken theme colors for better white text contrast
+        const darkened0 = this.pSBC(-0.25, this.getThemeColors[0]) || this.getThemeColors[0];
+        const darkened1 = this.pSBC(-0.25, this.getThemeColors[1]) || this.getThemeColors[1];
+        const color1 = this.pSBC(-0.1, darkened0, darkened1, true);
+        return `linear-gradient(to top, ${color1}, ${darkened1})`;
       }
       return "";
     },

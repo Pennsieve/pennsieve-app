@@ -3,27 +3,15 @@
     <template #heading>
       <bf-rafter
         slot="heading"
-        title="Teams"
         class="primary"
         :org-id="orgId"
       >
-        <template #breadcrumb v-if="this.$route.name === 'team-members-list'">
-          <div>
-            <router-link :to="{ name: 'teams-list' }">
-              <IconArrowLeft
-                class="icon"
-                :width="10"
-                :height="10"
-              />
-              All Teams
-            </router-link>
-          </div>
-
-        </template>
-        <template #description>
-          <p>
-            You can create teams to group users. Datasets can be shared with individual users, or teams.
-          </p>
+        <template #breadcrumb>
+          <org-breadcrumb
+            page-name="Teams"
+            :sub-page-name="currentSubPage"
+            :page-route="currentSubPage ? { name: 'teams-list' } : null"
+          />
         </template>
       </bf-rafter>
       <router-view name="stage" />
@@ -34,11 +22,13 @@
 <script>
 
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
+import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 
 export default {
   name: 'BfTeams',
   components: {
-    BfRafter
+    BfRafter,
+    OrgBreadcrumb
   },
   // From Router
   props: {
@@ -53,6 +43,12 @@ export default {
   },
 
   computed: {
+    currentSubPage() {
+      if (this.$route.name === 'team-members-list') {
+        return 'Team Members'
+      }
+      return ''
+    }
   }
 }
 </script>

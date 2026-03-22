@@ -10,6 +10,7 @@ import TemplateGallery from "@/components/datasets/metadata/models/TemplateGalle
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
+import RecordsEmptyState from "@/components/datasets/metadata/records/RecordsEmptyState.vue";
 import DatasetMetadataRecordsView from "@/router/Dataset/DatasetMetadataRecordsView.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
@@ -24,6 +25,8 @@ const DatasetOverview = () => import('../components/datasets/DatasetOverview/Dat
 const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
 const SecondaryPageHeaderFiles = () => import('./Dataset/SecondaryPageHeaderFiles.vue')
 const DatasetActivityHeader = () => import('./Dataset/DatasetActivityHeader.vue')
+const DatasetSettingsHeader = () => import('./Dataset/DatasetSettingsHeader.vue')
+const DatasetSettingsView = () => import('./Dataset/DatasetSettingsView.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
@@ -873,27 +876,42 @@ const router = createRouter({
             stage: BfPublishingSettings
           },
           props: true,
-          meta: {
-            breadcrumbs: [
-              { name: "Publishing Settings", current: true }
-            ]
-          }
         },
         {
           name: 'dataset-settings',
           path: ':datasetId/settings',
           components: {
-            stageHeader: SecondaryPageHeader,
-            stage: BfDatasetSettings,
+            stageHeader: DatasetSettingsHeader,
+            stage: DatasetSettingsView,
+          },
+          redirect: {
+            name: 'dataset-settings-general'
           },
           props: {
             stage: true,
           },
-          meta: {
-            breadcrumbs: [
-              { name: "Settings", current: true }
-            ]
-          }
+          children: [
+            {
+              name: 'dataset-settings-general',
+              path: '',
+              components: {
+                stage: BfDatasetSettings
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'integrations-settings',
+              path: 'integrations',
+              components: {
+                stage: DatasetIntegrationsSettings
+              },
+              props: {
+                stage: true
+              }
+            },
+          ]
         },
         {
           name: 'dataset-permissions',
@@ -979,6 +997,12 @@ const router = createRouter({
                 {
                   path: '',
                   name: 'records-list',
+                  components: {
+                    stage: RecordsEmptyState
+                  },
+                  props: {
+                    stage: true
+                  },
                   beforeEnter: async (to, from, next) => {
                     try {
                       // Import the metadata store
@@ -1005,12 +1029,11 @@ const router = createRouter({
                         }
                       }
                       
-                      // If no models exist, redirect to models list
-                      next({ name: 'models-list' })
+                      // If no models exist, continue to records page
+                      next()
                     } catch (error) {
                       console.error('Error redirecting to records:', error)
-                      // Fallback to models list on error
-                      next({ name: 'models-list' })
+                      next()
                     }
                   }
                 },
@@ -1294,20 +1317,6 @@ const router = createRouter({
               }
             }
           ]
-        },
-        {
-          name: 'integrations-settings',
-          path: ':datasetId/integrations-settings',
-          components: {
-            stageHeader: SecondaryPageHeader,
-            stage: DatasetIntegrationsSettings
-          },
-          props: true,
-          meta: {
-            breadcrumbs: [
-              { name: "Integration Settings", current: true }
-            ]
-          }
         },
         {
           name: 'dataset-activity',

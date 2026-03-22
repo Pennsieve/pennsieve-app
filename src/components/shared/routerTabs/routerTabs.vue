@@ -59,9 +59,10 @@ ul {
   a {
     color: theme.$gray_5;
     display: inline-flex;
-    padding: 0 0 16px;
+    padding: 12px 0;
     position: relative;
     text-decoration: none;
+    font-size: 14px;
     &:hover ,
     &:focus {
       color: theme.$purple_2;
@@ -72,13 +73,14 @@ ul {
       color: theme.$purple_3;
       font-weight: 500;
       &:after {
-        background: theme.$purple_1;
-        bottom: 0;
+        background: theme.$purple_3;
+        bottom: -1px;
         content: '';
         left: 0;
-        height: 6px;
+        height: 2px;
         position: absolute;
         width: 100%;
+        border-radius: 1px;
       }
     }
     &.disabled {
