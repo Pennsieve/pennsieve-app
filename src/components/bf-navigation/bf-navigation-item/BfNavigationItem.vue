@@ -175,6 +175,29 @@ export default {
             color: var(--color-active, var(--color-hover));
           }
       }
+
+      .condensed & {
+        color: theme.$white;
+        border-right: none;
+
+        .svg-icon {
+          color: theme.$white;
+        }
+
+        &:hover, &:focus {
+          background: rgba(255, 255, 255, 0.1);
+          color: theme.$white;
+
+          .svg-icon {
+            color: theme.$white;
+          }
+        }
+
+        &.router-link-active {
+          background: rgba(255, 255, 255, 0.15);
+          border-right: none;
+        }
+      }
     }
     .primary & {
       color: theme.$white;

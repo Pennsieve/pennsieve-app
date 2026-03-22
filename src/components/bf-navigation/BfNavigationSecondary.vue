@@ -2,6 +2,7 @@
   <div
     class="bf-navigation secondary"
     :class="[secondaryNavCondensed ? 'condensed' : '']"
+    :style="secondaryNavCondensed ? { backgroundImage: condensedBackgroundStyle } : {}"
   >
     <div class="menu-wrap">
       <div
@@ -89,7 +90,7 @@
 <!--        <hr />-->
 <!--      </template>-->
 
-      <hr/>
+      <hr v-if="!secondaryNavCondensed"/>
       <bf-navigation-item
         :link="{ name: 'dataset-overview' }"
         label="Overview"
@@ -299,10 +300,19 @@ export default {
       const color1 = this.pSBC(0.8, this.getThemeColors[1]);
       return `${color1}`;
     },
+    condensedBackgroundStyle: function () {
+      if (this.getThemeColors.length >= 2) {
+        const darkened0 = this.pSBC(-0.25, this.getThemeColors[0]) || this.getThemeColors[0];
+        const darkened1 = this.pSBC(-0.25, this.getThemeColors[1]) || this.getThemeColors[1];
+        const color1 = this.pSBC(-0.1, darkened0, darkened1, true);
+        return `linear-gradient(to top, ${darkened1}, ${color1})`;
+      }
+      return '';
+    },
     tertiaryNavColor: function () {
       if (this.secondaryNavCondensed) {
         const themeColors = this.getThemeColors;
-        const color1 = themeColors[0];
+        const color1 = themeColors[1];
         return `${color1}`;
       } else {
         return "";
@@ -491,6 +501,11 @@ export default {
   box-shadow: -1px 0 0 rgba(64, 69, 84, 0.2) inset;
   padding-right: 1px;
   z-index: 99;
+
+  &.condensed {
+    box-shadow: none;
+    padding-right: 0;
+  }
 }
 
 hr {
