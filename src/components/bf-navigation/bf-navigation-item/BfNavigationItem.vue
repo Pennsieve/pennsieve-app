@@ -143,10 +143,11 @@ export default {
       .svg-icon {
         color: theme.$purple_1;
       }
-      &.secondary {
-        background: theme.$gray_1;
+      &.secondary, &.secondary:hover, &.secondary:focus {
+        background: theme.$purple_tint;
         border-right: 4px solid var(--color-active, theme.$purple_1);
         color: var(--color-active, theme.$purple_1);
+        font-weight: 600;
 
         .svg-icon {
           color: var(--color-active, theme.$purple_1);
@@ -166,8 +167,36 @@ export default {
         color: inherit;
         transition: color 0.15s ease;
       }
-      &:hover, &:focus, &.active {
+      &:hover, &:focus {
+          background: theme.$gray_1;
           color: var(--color-active, var(--color-hover));
+
+          .svg-icon {
+            color: var(--color-active, var(--color-hover));
+          }
+      }
+
+      .condensed & {
+        color: theme.$white;
+        border-right: none;
+
+        .svg-icon {
+          color: theme.$white;
+        }
+
+        &:hover, &:focus {
+          background: rgba(255, 255, 255, 0.1);
+          color: theme.$white;
+
+          .svg-icon {
+            color: theme.$white;
+          }
+        }
+
+        &.router-link-active {
+          background: rgba(255, 255, 255, 0.15);
+          border-right: none;
+        }
       }
     }
     .primary & {
