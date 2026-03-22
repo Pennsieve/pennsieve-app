@@ -1459,14 +1459,13 @@ const openNodeSettings = (id) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  margin-top: -8px;
 }
 
 .builder-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;

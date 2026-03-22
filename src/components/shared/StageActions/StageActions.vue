@@ -23,12 +23,14 @@ export default {
   display: flex;
   flex: 1;
   flex-direction: row;
+  align-items: center;
   justify-content: space-between;
 }
 
 .left-actions {
   display: flex;
   flex-direction: row;
+  align-items: center;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -37,7 +39,9 @@ export default {
 .right-actions {
   display: flex;
   flex-direction: row;
+  align-items: center;
   flex-shrink: 0;
+  gap: 8px;
 }
 
 </style>

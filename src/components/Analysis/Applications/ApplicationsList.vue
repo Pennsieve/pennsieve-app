@@ -348,7 +348,6 @@ onBeforeUnmount(() => removeGuard());
   <div class="applications-page">
     <!-- Header -->
     <div class="builder-header">
-      <span class="header-title">Applications</span>
       <div class="header-actions">
         <template v-if="hasUnsavedChanges">
           <bf-button class="secondary" @click="cancelParamEdits">Cancel</bf-button>
@@ -668,8 +667,9 @@ onBeforeUnmount(() => removeGuard());
 .builder-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 16px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;

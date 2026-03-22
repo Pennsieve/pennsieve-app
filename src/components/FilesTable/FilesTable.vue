@@ -1,7 +1,7 @@
 <template>
   <div class="files-table" :class="withinDeleteMenu && 'undelete-modal'">
     <div
-      v-if="selection.length > 0"
+      v-if="selection.length > 0 && withinDeleteMenu"
       class="selection-menu-wrap mb-16"
     >
       <div class="selection-info">
@@ -81,8 +81,9 @@
     <el-table
       ref="table"
       v-loading="withinDeleteMenu ? false : tableLoading"
-      :border="true"
+      :border="false"
       :data="data"
+      class="modern-table"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
       @selection-change="handleTableSelectionChange"
       @sort-change="onSortChange"
@@ -651,10 +652,45 @@ export default {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  border-radius: 4px;
   &.undelete-modal {
     min-height: calc(100vh - 400px);
     border-bottom: none;
+  }
+}
+
+.modern-table {
+  :deep(th) {
+    background: theme.$gray_1 !important;
+    font-size: 12px;
+    font-weight: 600;
+    color: theme.$gray_5;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid theme.$gray_2 !important;
+  }
+
+  :deep(td) {
+    border-bottom: 1px solid theme.$gray_2 !important;
+    font-size: 13px;
+  }
+
+  :deep(tr) {
+    transition: background 0.1s ease;
+
+    &:hover > td {
+      background: theme.$gray_1 !important;
+    }
+  }
+
+  :deep(.el-table__border-left-patch),
+  :deep(.el-table__border-bottom-patch) {
+    display: none;
+  }
+
+  :deep(.el-table--border::after),
+  :deep(.el-table--border::before),
+  :deep(.el-table__inner-wrapper::before) {
+    display: none;
   }
 }
 
@@ -709,7 +745,6 @@ export default {
 }
 .selection-menu-wrap {
   background: #e9edf6;
-  //border: 1px solid theme.$gray_2;
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   display: flex;

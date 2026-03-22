@@ -152,6 +152,5 @@ export default {
   background: white;
   border-bottom: 1px solid theme.$gray_2;
   padding: 0 32px;
-  margin-bottom: 8px;
 }
 </style>

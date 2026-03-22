@@ -370,8 +370,8 @@ export default {
     rafterBackgroundStyle: function() {
       const color1 = this.pSBC(0.8, this.getThemeColors[1])
       return `${color1}`
-
     },
+
 
     isFileRecord: function() {
       return this.$route.name === "file-record";

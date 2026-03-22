@@ -7,7 +7,7 @@
         <div
           class="flex-heading"
         >
-          <div class="dataset-heading">
+          <div class="dataset-heading" :style="headingStyle">
             <dataset-banner
               empty-state-text="Add a banner image."
               @click.native="goToBanner"
@@ -79,18 +79,17 @@
                 </button>
               </div>
               <div class="dataset-heading-cta">
-                <bf-button @click="dashboardDialogVisible=true">Open Dashboard</bf-button>
+                <bf-button :style="dashboardButtonStyle" @click="dashboardDialogVisible=true">Open Dashboard</bf-button>
               </div>
             </div>
           </div>
 
-          <div class="dataset-info-stats">
+          <div class="dataset-info-stats" :style="statsBarStyle">
             <div class="dataset-info-stat">
               <IconFiles
                 class="svg-icon"
                 :height="20"
                 :width="20"
-                color="white"
               />
               <div>
                 <strong>{{ packageTypeCount }}</strong>
@@ -278,6 +277,7 @@
   import BfStorageMetrics from '../../../mixins/bf-storage-metrics/index'
   import FormatDate from '../../../mixins/format-date/index'
   import Request from '../../../mixins/request'
+  import CustomTheme from '../../../mixins/custom-theme'
   import DatasetPublishedData from '../../../mixins/dataset-published-data'
 
   import datasetDescriptionEmptyState from './dataset-description-empty-state'
@@ -329,7 +329,7 @@ export default {
     StaleUpdateDialog
   },
 
-  mixins: [BfStorageMetrics, FormatDate, Request, DatasetPublishedData],
+  mixins: [BfStorageMetrics, FormatDate, Request, DatasetPublishedData, CustomTheme],
 
   props: {
     datasetId: {
@@ -520,6 +520,44 @@ export default {
      */
     datasetName: function() {
       return pathOr('', ['content', 'name'], this.dataset)
+    },
+
+    workspaceColors: function() {
+      const ct = this.activeOrganization?.organization?.colorTheme
+      if (ct && typeof ct === 'object' && !Array.isArray(ct)) {
+        const entries = Object.entries(ct)
+        if (entries.length > 0) {
+          // colorTheme API object: { secondary: primary }
+          return { primary: entries[0][1], secondary: entries[0][0] }
+        }
+      }
+      return null
+    },
+
+    statsBarStyle: function() {
+      if (this.workspaceColors) {
+        // Light tint of primary, slightly darker than the heading background (heading is 0.85)
+        const tint = this.pSBC(0.7, this.workspaceColors.primary) || null
+        if (tint) return { background: tint }
+      }
+      return {}
+    },
+
+    headingStyle: function() {
+      if (this.workspaceColors) {
+        // Very light tint of the primary color (85% lighter)
+        const tint = this.pSBC(0.85, this.workspaceColors.primary) || null
+        if (tint) return { background: tint }
+      }
+      return {}
+    },
+
+    dashboardButtonStyle: function() {
+      if (this.workspaceColors) {
+        const dark = this.pSBC(-0.15, this.workspaceColors.primary) || this.workspaceColors.primary
+        return { backgroundColor: dark, borderColor: dark, color: '#fff' }
+      }
+      return {}
     },
 
     /**
@@ -974,8 +1012,8 @@ h1 {
 }
 
 .dataset-info-stats {
-  background: theme.$purple_1;
-  color: white;
+  background: theme.$purple_tint;
+  color: theme.$gray_6;
   border-bottom: 1px solid theme.$gray_2;
   border-top: 1px solid theme.$gray_2;
   display: flex;
@@ -986,14 +1024,14 @@ h1 {
     text-decoration: underline;
   }
   a {
-    color: white;
+    color: theme.$gray_6;
   }
 }
 .dataset-info-stat {
   align-items: center;
   display: flex;
   .svg-icon {
-    color: theme.$white;
+    color: theme.$gray_4;
     margin-right: 8px;
   }
 }

@@ -506,3 +506,10 @@ export default {
   },
 };
 </script>
+
+<style scoped lang="scss">
+:deep(.bf-stage) {
+  flex: 1;
+  min-height: 0;
+}
+</style>
