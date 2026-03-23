@@ -4,6 +4,7 @@
       <router-link
         :to="{ name: tab.to }"
         :class="{ active: isTabActive(tab) }"
+        active-class=""
       >
         {{ tab.name }}
       </router-link>
@@ -29,8 +30,13 @@ export default {
   methods: {
     isTabActive(tab) {
       try {
-        const resolved = this.$router.resolve({ name: tab.to })
-        return this.$route.path.startsWith(resolved.path)
+        // Check if the current route name matches the tab or is a child of it
+        const currentName = this.$route.name
+        if (currentName === tab.to) return true
+
+        // Check if any matched route in the chain has this name
+        const matched = this.$route.matched
+        return matched.some(r => r.name === tab.to)
       } catch {
         return false
       }
@@ -68,7 +74,6 @@ ul {
       color: theme.$purple_2;
       text-decoration: none;
     }
-    &.router-link-active,
     &.active {
       color: theme.$purple_3;
       font-weight: 500;
@@ -108,7 +113,6 @@ ul {
         color: theme.$gray_2;
         text-decoration: none;
       }
-      &.router-link-active,
       &.active {
         color: white;
         font-weight: 500;

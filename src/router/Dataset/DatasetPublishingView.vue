@@ -1,12 +1,12 @@
 <template>
-  <div class="dataset-settings-view">
+  <div class="dataset-publishing-view">
     <router-view name="stage" />
   </div>
 </template>
 
 <script>
 export default {
-  name: 'DatasetSettingsView',
+  name: 'DatasetPublishingView',
 
   props: {
     orgId: {
@@ -18,7 +18,7 @@ export default {
 </script>
 
 <style scoped>
-.dataset-settings-view {
+.dataset-publishing-view {
   display: flex;
   flex-direction: column;
   flex: 1;

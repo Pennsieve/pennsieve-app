@@ -3,7 +3,6 @@
     id="inputAddContributor"
     class="dataset-settings-contributors"
   >
-    <h3>Contributors</h3>
     <p class="mb-16">
       A list of the people who have helped create this dataset. Contributors will appear in Pennsieve Discover if your dataset is published.
     </p>
