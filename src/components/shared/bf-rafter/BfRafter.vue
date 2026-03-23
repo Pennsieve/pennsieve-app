@@ -312,7 +312,9 @@ export default {
       showHelp: false,
       datasetPageList: [
         'upload-manifests',
-        'publishing-settings',
+        'dataset-publishing',
+        'publication-settings',
+        'publication-status',
         'integrations-settings',
         'embargoed-permissions',
         'relationships',
