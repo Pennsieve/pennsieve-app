@@ -2,8 +2,6 @@
   <div
     class="dataset-settings-banner-image"
   >
-    <hr>
-    <h4>Banner Image</h4>
     <p class="mb-16">
       Image needs to be either jpg, gif, or png.
     </p>

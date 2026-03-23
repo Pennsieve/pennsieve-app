@@ -1,6 +1,5 @@
 <template>
   <div class="dataset-settings-ignore-files">
-    <h3>Ignore Files</h3>
     <p class="mb-16">
       The files listed below will be ignored during publication. Please use the entire source file name and extension. List one filename per line.
       <a

@@ -15,16 +15,16 @@ const datasetName = computed(() => dataset.value?.content?.name || 'Dataset');
 const datasetId = computed(() => route.params.datasetId);
 
 const tabs = [
-  { to: 'dataset-settings-general', name: 'Details' },
-  { to: 'integrations-settings', name: 'Configuration' },
+  { to: 'publication-settings', name: 'Settings' },
+  { to: 'publication-status', name: 'Publishing' },
 ];
 
 const currentTabName = computed(() => {
   const routeToTab = {
-    'dataset-settings-general': 'Details',
-    'integrations-settings': 'Configuration',
+    'publication-settings': 'Settings',
+    'publication-status': 'Publishing',
   };
-  return routeToTab[route.name] || 'Settings';
+  return routeToTab[route.name] || 'Publishing';
 });
 </script>
 
@@ -36,7 +36,7 @@ const currentTabName = computed(() => {
       <template #breadcrumb>
         <org-breadcrumb
           :page-name="datasetName"
-          :crumbs="[{ name: 'Settings' }, { name: currentTabName }]"
+          :crumbs="[{ name: 'Publishing' }, { name: currentTabName }]"
           :page-route="{ name: 'dataset-overview', params: { datasetId: datasetId } }"
         />
       </template>

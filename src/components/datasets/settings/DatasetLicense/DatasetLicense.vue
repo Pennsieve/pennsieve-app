@@ -2,15 +2,15 @@
   <div
     class="dataset-license"
   >
-    <div class="label-flex">
-      License Type
+    <p class="license-help">
+      Select a license to let others know how they can use your data.
       <a
         href="https://docs.pennsieve.io/docs/common-dataset-licenses"
         target="_blank"
       >
-        License Help
+        Learn more
       </a>
-    </div>
+    </p>
     <el-select
       v-if="dataset.content"
       ref="inputLicense"
@@ -76,7 +76,6 @@ import IconLicense from "../../../icons/IconLicense.vue";
 @use '../../../../styles/element/select';
 
 .dataset-license {
-  max-width: 463px;
   .svg-icon {
     margin-top: 10px;
   }
@@ -85,15 +84,14 @@ import IconLicense from "../../../icons/IconLicense.vue";
     width: 100%;
   }
 
-  .label-flex {
-    color: theme.$gray_6;
-    size: 14px;
-    font-weight: 700;
+  .license-help {
+    font-size: 13px;
+    color: theme.$gray_5;
     margin-bottom: 8px;
-  }
 
-  a {
-    font-weight: 500;
+    a {
+      color: theme.$purple_3;
+    }
   }
 }
 
