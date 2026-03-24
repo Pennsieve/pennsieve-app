@@ -8,6 +8,10 @@
           title="Pre-Publication Checklist"
           :padding="false"
         >
+          <p class="checklist-intro">
+            Complete all items below before submitting for review. Click each item to navigate to the relevant setting. You can configure most items in the
+            <router-link :to="{ name: 'publication-settings' }">Settings tab</router-link>.
+          </p>
           <checklist-item
             :route="{
               name: 'dataset-settings-general',
@@ -252,6 +256,20 @@ export default {
 
 .mb-24 {
   margin-bottom: 24px;
+}
+
+.checklist-intro {
+  font-size: 13px;
+  color: theme.$gray_5;
+  line-height: 1.5;
+  padding: 8px 16px 12px;
+  margin: 0;
+
+  a {
+    color: theme.$purple_3;
+    font-weight: 500;
+    text-decoration: underline;
+  }
 }
 
 .pub-section {
