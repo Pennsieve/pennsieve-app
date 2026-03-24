@@ -1,56 +1,78 @@
 <template>
   <bf-stage ref="bfStage" slot="stage">
     <template v-if="hasPermission">
-      <h4 class="integrations-info-title">Integrations</h4>
-      <p class="mb-16">
-        Integrations allow third-parties to receive events and interact with
-        datasets. Activate integrations for this dataset here.
+      <div class="config-container">
+        <div class="config-section">
+          <div class="config-section-header">Integrations</div>
+          <div class="config-section-content">
+            <p class="section-description">
+              Activate integrations for this dataset to allow third-party services to receive events and interact with your data.
+              <a
+                href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
+                target="_blank"
+              >
+                Learn more
+              </a>
+            </p>
 
-        <a
-          href="https://docs.pennsieve.io/docs/preventing-files-from-being-included-during-publishing"
-          target="_blank"
-        >
-          What's this?
-        </a>
-      </p>
+            <div v-if="integrations.length > 0" class="integration-list">
+              <integrations-list-item
+                v-for="integration in integrations"
+                :key="integration.id"
+                :integration="integration"
+                :active-integrations="activeIntegrations"
+                :enable-switch="true"
+                @toggle-integration="toggleIntegration"
+              />
+            </div>
 
-      <div v-if="integrations.length > 0" class="integration-list">
-        <integrations-list-item
-          v-for="integration in integrations"
-          :key="integration.id"
-          :integration="integration"
-          :active-integrations="activeIntegrations"
-          :enable-switch="true"
-          @toggle-integration="toggleIntegration"
-        />
+            <div v-else class="empty-inline">
+              <p v-if="hasAdminRights">
+                No integrations configured.
+                <a href="#" @click.prevent="openAddIntegration">Add a global integration</a>
+                to get started.
+              </p>
+              <p v-else>
+                No integrations available. Contact your administrator to set up integrations.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="config-section-header danger-header">Danger Zone</div>
+          <div class="config-section-content danger-content">
+            <div class="danger-item">
+              <div class="danger-info">
+                <strong>Delete this dataset</strong>
+                <p>Once deleted, this cannot be undone. Published datasets must be unpublished first.</p>
+              </div>
+              <bf-button
+                class="red"
+                :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
+                @click="onDeleteDatasetBtnClick"
+              >
+                Delete Dataset
+              </bf-button>
+            </div>
+            <p
+              v-if="!getPermission('owner')"
+              class="danger-note"
+            >
+              Only owners can delete datasets. Contact
+              <a :href="`mailto:${datasetOwnerEmail}`">{{ datasetOwnerName }}</a>
+              to request deletion.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <bf-empty-page-state v-else class="empty">
-        <img
-          src="/src/assets/images/illustrations/illo-collaboration.svg"
-          height="240"
-          width="247"
-          alt="Teams illustration"
-        />
-        <div v-if="hasAdminRights" class="copy">
-          <h2>There are no integrations yet</h2>
-          <p>
-            Integrations allow external services to be notified when certain
-            events occur on Pennsieve. These integrations are available to all
-            members within the organization and can be managed at the dataset
-            level under settings.
-          </p>
-          <bf-button class="create-team-button" @click="openAddIntegration">
-            Add Global Integration
-          </bf-button>
-        </div>
-        <div v-if="!hasAdminRights" class="copy">
-          <h2>{{ orgName }} doesn't have any integrations yet.</h2>
-          <p>
-            Contact your administrator to get started working with Integrations.
-          </p>
-        </div>
-      </bf-empty-page-state>
+      <delete-dataset
+        ref="deleteDatasetDialog"
+        :dialog-visible="deleteDatasetDialogVisible"
+        @delete-dataset-confirmed="submitDeleteDatasetRequest"
+        @close="onCloseDeleteDialog"
+      />
     </template>
     <template v-else>
       <bf-empty-page-state class="empty">
@@ -73,10 +95,14 @@
 
 <script>
 import Request from "@/mixins/request/index";
+import DeleteDatasetMixin from "@/mixins/DeleteDataset";
 import { mapGetters, mapState, mapActions } from "vuex";
 import { pathOr, propOr } from "ramda";
 import IntegrationsListItem from "../../Integrations/IntegrationsListItem/IntegrationsListItem.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import DeleteDataset from "./window/DeleteDataset.vue";
+import DatasetSettingsIgnoreFiles from "./DatasetSettingsIgnoreFiles/DatasetSettingsIgnoreFiles.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import {
   useHandleXhrError,
@@ -89,14 +115,18 @@ export default {
   components: {
     IntegrationsListItem,
     BfEmptyPageState,
+    BfButton,
+    DeleteDataset,
+    DatasetSettingsIgnoreFiles,
   },
 
-  mixins: [Request],
+  mixins: [Request, DeleteDatasetMixin],
 
   data() {
     return {
       activeIntegrations: [],
       isLoadingIntegrations: false,
+      deleteDatasetDialogVisible: false,
     };
   },
 
@@ -185,6 +215,20 @@ export default {
      */
     hasPermission: function () {
       return this.getPermission("manager");
+    },
+
+    datasetPublished: function () {
+      return this.dataset.publication && !!this.dataset.publication.publishedDataset;
+    },
+
+    datasetOwnerName: function () {
+      const firstName = propOr('', 'firstName', this.datasetOwner);
+      const lastName = propOr('', 'lastName', this.datasetOwner);
+      return `${firstName} ${lastName}`;
+    },
+
+    datasetOwnerEmail: function () {
+      return propOr('', 'email', this.datasetOwner);
     },
 
     /**
@@ -314,6 +358,14 @@ export default {
     ...mapActions(["updateProfile"]),
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
 
+    onDeleteDatasetBtnClick: function () {
+      this.deleteDatasetDialogVisible = true;
+    },
+
+    onCloseDeleteDialog: function () {
+      this.deleteDatasetDialogVisible = false;
+    },
+
     toggleIntegration: function (item) {
       let method = "PUT";
       if (!item.isActive) {
@@ -384,45 +436,136 @@ export default {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 
+.config-container {
+  max-width: 640px;
+}
+
+.config-section {
+  margin-bottom: 24px;
+}
+
+.config-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_5;
+  padding: 8px 0;
+  margin: 0 0 16px;
+  border-bottom: 1px solid theme.$gray_2;
+
+}
+
+.config-section-content {
+  padding-bottom: 0;
+}
+
+.section-description {
+  color: theme.$gray_5;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+
+  a {
+    color: theme.$purple_3;
+  }
+}
+
+.integration-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .empty {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
+  padding: 48px 24px;
+
+  .copy {
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: theme.$gray_6;
+      margin: 16px 0 8px;
+    }
+
+    p {
+      color: theme.$gray_5;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  }
 }
 
-.copy {
-  h2 {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 16px;
-    text-align: center;
-  }
+.empty-inline {
+  padding: 16px;
+  background: theme.$gray_1;
+  border-radius: 4px;
 
   p {
-    color: #71747c;
-    font-size: 14px;
-    line-height: 16px;
-    text-align: center;
-    margin-bottom: 16px;
+    font-size: 13px;
+    color: theme.$gray_5;
+    margin: 0;
+
+    a {
+      color: theme.$purple_3;
+    }
   }
 }
 
-.integration-list {
-  flex-flow: wrap;
+
+.danger-header {
+  color: theme.$red_2;
+}
+
+.danger-content {
+  background: rgba(theme.$red_1, 0.03);
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.danger-item {
   display: flex;
-}
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
 
-.integrations-info-title {
-  margin-top: 0;
-  font-weight: 500;
-}
-.dataset-integrations-settings {
-  background: theme.$white;
+  .danger-info {
+    flex: 1;
 
-  hr {
-    margin: 32px 0 24px;
+    strong {
+      font-size: 14px;
+      color: theme.$gray_6;
+    }
+
+    p {
+      font-size: 13px;
+      color: theme.$gray_5;
+      margin: 4px 0 0;
+      line-height: 1.5;
+    }
   }
+
+  :deep(.bf-button.red) {
+    background: white;
+    color: theme.$red_2;
+    border: 1px solid theme.$red_2;
+    white-space: nowrap;
+
+    &:hover {
+      background: theme.$red_2;
+      color: white;
+    }
+  }
+}
+
+.danger-note {
+  font-size: 13px;
+  color: theme.$gray_4;
+  margin-top: 8px;
 }
 </style>

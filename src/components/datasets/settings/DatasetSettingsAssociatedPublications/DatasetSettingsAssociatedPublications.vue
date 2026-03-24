@@ -1,6 +1,5 @@
 <template>
   <div class="dataset-settings-associated-publications">
-    <h4>References</h4>
     <p class="mb-16">
       List references to other items that are associated with this dataset (e.g
       Publications, Protocols, and Other Datasets).

@@ -26,6 +26,10 @@ const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
 const SecondaryPageHeaderFiles = () => import('./Dataset/SecondaryPageHeaderFiles.vue')
 const DatasetActivityHeader = () => import('./Dataset/DatasetActivityHeader.vue')
 const DatasetSettingsHeader = () => import('./Dataset/DatasetSettingsHeader.vue')
+const DatasetPublishingHeader = () => import('./Dataset/DatasetPublishingHeader.vue')
+const DatasetPublishingView = () => import('./Dataset/DatasetPublishingView.vue')
+const PublicationSettingsPage = () => import('../components/datasets/settings/PublicationSettingsPage.vue')
+const PublicationStatusPage = () => import('../components/datasets/settings/PublicationStatusPage.vue')
 const DatasetSettingsView = () => import('./Dataset/DatasetSettingsView.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
@@ -869,13 +873,40 @@ const router = createRouter({
 
         },
         {
-          name: 'publishing-settings',
-          path: ':datasetId/publishing-settings',
+          name: 'dataset-publishing',
+          path: ':datasetId/publishing',
           components: {
-            stageHeader: SecondaryPageHeader,
-            stage: BfPublishingSettings
+            stageHeader: DatasetPublishingHeader,
+            stage: DatasetPublishingView
           },
-          props: true,
+          redirect: {
+            name: 'publication-settings'
+          },
+          props: {
+            stage: true,
+          },
+          children: [
+            {
+              name: 'publication-settings',
+              path: '',
+              components: {
+                stage: PublicationSettingsPage
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'publication-status',
+              path: 'status',
+              components: {
+                stage: PublicationStatusPage
+              },
+              props: {
+                stage: true
+              }
+            },
+          ]
         },
         {
           name: 'dataset-settings',

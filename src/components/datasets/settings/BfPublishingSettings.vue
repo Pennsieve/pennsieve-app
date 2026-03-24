@@ -1,142 +1,143 @@
 <template>
   <bf-stage ref="bfStage" slot="stage">
     <template v-if="hasPermission">
-      <data-card
-        v-if="isChecklistDimissed === false && hasManagerPermissions"
-        class="mb-32 grey compact"
-        title="Your dataset cannot be published until the following items have been completed:"
-        :padding="false"
-      >
-        <checklist-item
-          :route="{
-            name: 'dataset-settings',
-            query: {
-              focusInput: 'inputDescription',
-            },
-          }"
-          cta="Add a subtitle"
-          :is-complete="hasSubtitle"
+      <div class="publishing-container">
+        <data-card
+          v-if="hasManagerPermissions"
+          class="mb-24 grey compact"
+          title="Pre-Publication Checklist"
+          :padding="false"
         >
-          gives others a brief description of your dataset.
-        </checklist-item>
+          <checklist-item
+            :route="{
+              name: 'dataset-settings-general',
+              query: { focusInput: 'inputDescription' },
+            }"
+            cta="Add a subtitle"
+            :is-complete="hasSubtitle"
+          >
+            gives others a brief description of your dataset.
+          </checklist-item>
 
-        <checklist-item
-          :isComplete="hasTags"
-          :route="{
-            name: 'dataset-settings',
-            query: {
-              focusInput: 'inputTags',
-            },
-          }"
-          cta="Add tags"
-        >
-          make it easier for people to find your dataset in Discover.
-        </checklist-item>
+          <checklist-item
+            :is-complete="hasTags"
+            :route="{
+              name: 'dataset-settings-general',
+              query: { focusInput: 'inputTags' },
+            }"
+            cta="Add tags"
+          >
+            make it easier for people to find your dataset in Discover.
+          </checklist-item>
 
-        <checklist-item
-          :is-complete="hasDescription"
-          cta="Add a description"
-          :route="{
-            name: 'dataset-overview',
-            query: {
-              editDescription: true,
-            },
-          }"
-        >
-          provide a detailed overview of your dataset and outline your findings
-          and analysis for others.
-        </checklist-item>
+          <checklist-item
+            :is-complete="hasDescription"
+            cta="Add a description"
+            :route="{
+              name: 'dataset-overview',
+              query: { editDescription: true },
+            }"
+          >
+            provide a detailed overview of your dataset.
+          </checklist-item>
 
-        <checklist-item
-          :is-complete="hasBanner"
-          cta="Add an image"
-          :route="{
-            name: 'dataset-settings',
-            query: {
-              focusInput: 'bannerImage',
-            },
-          }"
-        >
-          add an image to help your dataset stand out in listings.
-        </checklist-item>
+          <checklist-item
+            :is-complete="hasBanner"
+            cta="Add an image"
+            :route="{
+              name: 'dataset-settings-general',
+              query: { focusInput: 'bannerImage' },
+            }"
+          >
+            help your dataset stand out in listings.
+          </checklist-item>
 
-        <checklist-item
-          :is-complete="hasContributors"
-          cta="Add contributors"
-          :route="{
-            query: {
-              focusInput: 'inputAddContributor',
-            },
-          }"
-        >
-          list all of the people who have contributed to this dataset.
-        </checklist-item>
-        <checklist-item
-          :is-complete="hasDatasetDoi"
-          cta="Reserve a DOI"
-          :route="{
-            query: {
-              focusInput: 'dataciteDoi',
-            },
-          }"
-        >
-          reserve a DataCite DOI for published research.
-        </checklist-item>
+          <checklist-item
+            :is-complete="hasContributors"
+            cta="Add contributors"
+            :route="{
+              query: { focusInput: 'inputAddContributor' },
+            }"
+          >
+            list the people who contributed to this dataset.
+          </checklist-item>
 
-        <checklist-item
-          :is-complete="hasDatasetLicense"
-          cta="Add a license"
-          :route="{
-            name: 'dataset-settings',
-            query: {
-              focusInput: 'inputLicense',
-            },
-          }"
-        >
-          let others know how they can use this data in their own research.
-        </checklist-item>
+          <checklist-item
+            :is-complete="hasDatasetLicense"
+            cta="Add a license"
+            :route="{
+              query: { focusInput: 'inputLicense' },
+            }"
+          >
+            let others know how they can use this data.
+          </checklist-item>
 
-        <checklist-item
-          :is-complete="datasetOwnerHasOrcidId"
-          :externalLinkUrl="getROrcidLink()"
-          externalLinkText="Link ORCID Account"
-          :enableLink="isDatasetOwner"
-        >
-          <template v-if="isDatasetOwner">
-            link your ORCID iD to distinguish yourself from other researchers
-          </template>
-          <template v-else>
-            link the dataset owner's ORCID iD to distinguish themselves from
-            other researchers
-          </template>
-        </checklist-item>
-      </data-card>
+          <checklist-item
+            :is-complete="hasDatasetDoi"
+            cta="Reserve a DOI"
+            :route="{
+              query: { focusInput: 'dataciteDoi' },
+            }"
+          >
+            reserve a DataCite DOI for published research.
+          </checklist-item>
 
-      <hr />
+          <checklist-item
+            :is-complete="datasetOwnerHasOrcidId"
+            :externalLinkUrl="getROrcidLink()"
+            externalLinkText="Link ORCID Account"
+            :enableLink="isDatasetOwner"
+          >
+            <template v-if="isDatasetOwner">
+              link your ORCID iD to distinguish yourself from other researchers.
+            </template>
+            <template v-else>
+              the dataset owner needs to link their ORCID iD.
+            </template>
+          </checklist-item>
+        </data-card>
 
-      <dataset-settings-doi ref="dataciteDoi" />
+        <div class="publishing-section">
+          <div class="publishing-section-header">License</div>
+          <div class="publishing-section-content">
+            <dataset-license
+              id="inputLicense"
+              @change-license="saveLicenseChange"
+            />
+          </div>
+        </div>
 
-      <hr />
+        <div class="publishing-section">
+          <div class="publishing-section-header">Contributors</div>
+          <div class="publishing-section-content">
+            <dataset-settings-contributors ref="inputAddContributor" />
+          </div>
+        </div>
 
-      <dataset-settings-ignore-files />
+        <div class="publishing-section">
+          <div class="publishing-section-header">References</div>
+          <div class="publishing-section-content">
+            <dataset-settings-associated-publications />
+          </div>
+        </div>
 
-      <hr />
+        <div class="publishing-section">
+          <div class="publishing-section-header">DOI Registration</div>
+          <div class="publishing-section-content">
+            <dataset-settings-doi ref="dataciteDoi" />
+          </div>
+        </div>
 
-      <dataset-settings-contributors ref="inputAddContributor" />
-
-      <hr />
-      <!--    <div v-if="isOwner">-->
-      <!--      <hr />-->
-
-      <!--      <owner-orcid ref="orcidId" @open-orcid="openORCID" />-->
-
-      <!--      <hr />-->
-      <!--    </div>-->
-
-      <dataset-settings-publishing
-        :orcid-api-url="getORCIDApiUrl"
-        :orcid-url="getORCIDUrl"
-      />
+        <div class="publishing-section">
+          <div class="publishing-section-header">Submit for Publication</div>
+          <div class="publishing-section-content">
+            <dataset-settings-publishing
+              :orcid-api-url="getORCIDApiUrl"
+              :orcid-url="getORCIDUrl"
+            />
+          </div>
+        </div>
+      </div>
     </template>
     <template v-else>
       <bf-empty-page-state class="empty">
@@ -158,8 +159,9 @@
 </template>
 
 <script>
-import DatasetSettingsIgnoreFiles from "./DatasetSettingsIgnoreFiles/DatasetSettingsIgnoreFiles.vue";
 import DatasetSettingsDoi from "./DatasetSettingsDoi/DatasetSettingsDoi.vue";
+import DatasetSettingsAssociatedPublications from "./DatasetSettingsAssociatedPublications/DatasetSettingsAssociatedPublications.vue";
+import DatasetLicense from "./DatasetLicense/DatasetLicense.vue";
 import OwnerOrcid from "./DatasetSettingsPublishing/OwnerOrcid.vue";
 import DatasetSettingsContributors from "./DatasetSettingsContributors/DatasetSettingsContributors.vue";
 import DatasetSettingsPublishing from "./DatasetSettingsPublishing/DatasetSettingsPublishing.vue";
@@ -185,9 +187,10 @@ export default {
     ChecklistItem,
     LockedBanner,
     BfRafter,
-    DatasetSettingsIgnoreFiles,
     DatasetSettingsDoi,
     DatasetSettingsPublishing,
+    DatasetSettingsAssociatedPublications,
+    DatasetLicense,
     OwnerOrcid,
     DatasetSettingsContributors,
     BfEmptyPageState,
@@ -364,7 +367,26 @@ export default {
   },
 
   methods: {
-    ...mapActions(["updateProfile"]),
+    ...mapActions(["updateProfile", "updateDataset", "setDatasetEtag"]),
+
+    async saveLicenseChange() {
+      try {
+        const token = await useGetToken();
+        const datasetId = pathOr('', ['content', 'id'], this.dataset);
+        const url = `${this.config.apiUrl}/datasets/${datasetId}?api_key=${token}`;
+        const response = await fetch(url, {
+          method: 'PUT',
+          body: JSON.stringify({ license: this.dataset.content.license }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const updated = await response.json();
+          this.updateDataset({ ...this.dataset, ...updated });
+        }
+      } catch (err) {
+        console.error('Failed to save license:', err);
+      }
+    },
 
     /**
      * Retrieves the API URL for adding ORCID
@@ -435,11 +457,31 @@ export default {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
-.bf-publishing-settings {
-  background: theme.$white;
-  hr {
-    margin: 32px 0 24px;
-  }
+.publishing-container {
+  max-width: 640px;
+}
+
+.publishing-section {
+  margin-bottom: 24px;
+}
+
+.publishing-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_5;
+  padding: 8px 0;
+  margin: 0 0 16px;
+  border-bottom: 1px solid theme.$gray_2;
+}
+
+.publishing-section-content {
+  padding-bottom: 0;
+}
+
+.mb-24 {
+  margin-bottom: 24px;
 }
 .copy {
   h2 {

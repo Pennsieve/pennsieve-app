@@ -157,7 +157,7 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        :link="{ name: 'publishing-settings' }"
+        :link="{ name: 'dataset-publishing' }"
         label="Publishing"
         class="secondary"
         :condensed="secondaryNavCondensed"
