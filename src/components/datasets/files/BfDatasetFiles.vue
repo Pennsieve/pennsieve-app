@@ -95,6 +95,15 @@
         <div v-show="selectedFiles.length > 0 && !trashMode" class="selection-bar">
           <span class="selection-count">{{ selectedFiles.length }} selected</span>
           <div class="selection-actions">
+            <button
+              v-if="selectedFiles.length === 1"
+              class="selection-action-btn"
+              :disabled="datasetLocked"
+              @click="startInlineRename"
+            >
+              <IconPencil :height="14" :width="14" />
+              Rename
+            </button>
             <button class="selection-action-btn" :disabled="datasetLocked" @click="showDeleteDialog">
               <IconTrash :height="14" :width="14" />
               Delete
@@ -106,6 +115,14 @@
             <button class="selection-action-btn" @click="downloadSelected">
               <IconUpload :height="14" :width="14" />
               Download
+            </button>
+            <button
+              v-if="selectedFiles.length === 1"
+              class="selection-action-btn"
+              @click="copySelectedFileUrl"
+            >
+              <IconCopyDocument :height="14" :width="14" />
+              Copy Link
             </button>
           </div>
           <button class="selection-action-btn selection-clear" @click="resetSelectedFiles">
@@ -131,6 +148,9 @@
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
           :is-package-attachment-active="isPackageAttachmentActive"
+          :renaming-file-id="renamingFileId"
+          @rename-submit="submitInlineRename"
+          @rename-cancel="cancelInlineRename"
           @move="showMove"
           @delete="showDeleteDialog"
           @process="processFile"
@@ -255,6 +275,8 @@ import IconTrash from "../../icons/IconTrash.vue";
 import IconMoveFile from "../../icons/IconMoveFile.vue";
 import IconArrowDown from "../../icons/IconArrowDown.vue";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import IconPencil from "../../icons/IconPencil.vue";
+import IconCopyDocument from "../../icons/IconCopyDocument.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
@@ -277,6 +299,8 @@ export default {
     IconMoveFile,
     IconArrowDown,
     IconArrowLeft,
+    IconPencil,
+    IconCopyDocument,
     IconPlus,
     BfRafter,
     BfButton,
@@ -338,6 +362,7 @@ export default {
       packageDialogVisible: false,
       deleteDialogVisible: false,
       renameDialogVisible: false,
+      renamingFileId: null,
       moveDialogVisible: false,
       selectedFileForAction: {},
       pusherChannelName: "",
@@ -596,6 +621,63 @@ export default {
       this.selectedFileForAction = this.selectedFiles[0];
       this.renameDialogVisible = true;
     },
+    startInlineRename: function () {
+      if (this.selectedFiles.length === 1) {
+        const file = this.selectedFiles[0];
+        const fileId = file.content?.id || file.content?.nodeId;
+        this.renamingFileId = fileId;
+      }
+    },
+
+    cancelInlineRename: function () {
+      this.renamingFileId = null;
+    },
+
+    submitInlineRename: async function (file, newName) {
+      const currentName = file.content?.name;
+      if (!newName || newName === currentName) {
+        this.renamingFileId = null;
+        return;
+      }
+
+      try {
+        const token = await useGetToken();
+        const id = file.content?.id;
+        const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName }),
+        });
+
+        if (response.ok) {
+          const updated = await response.json();
+          this.onFileRenamed(updated);
+          EventBus.$emit("toast", {
+            detail: { type: "success", msg: "File renamed" },
+          });
+        } else {
+          const data = await response.json();
+          EventBus.$emit("toast", {
+            detail: { type: "error", msg: data.message || "Failed to rename" },
+          });
+        }
+      } catch (err) {
+        console.error("Rename failed:", err);
+        EventBus.$emit("toast", {
+          detail: { type: "error", msg: "Failed to rename file" },
+        });
+      } finally {
+        this.renamingFileId = null;
+      }
+    },
+
+    copySelectedFileUrl: function () {
+      if (this.selectedFiles.length === 1) {
+        this.getPresignedUrl(this.selectedFiles[0]);
+      }
+    },
+
     downloadSelected: function () {
       EventBus.$emit("trigger-download", this.selectedFiles);
     },

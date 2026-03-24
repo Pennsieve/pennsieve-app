@@ -81,7 +81,7 @@
     <el-table
       ref="table"
       v-loading="withinDeleteMenu ? false : tableLoading"
-      :border="false"
+      :border="true"
       :data="data"
       class="modern-table"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
@@ -96,7 +96,6 @@
         label=""
         width="50"
         align="center"
-        fixed
       >
         <template #header>
           <span class="select-column-header">Select</span>
@@ -118,14 +117,12 @@
         type="selection"
         align="center"
         :selectable="withinDeleteMenu ? canSelectRow : null"
-        fixed
         width="50"
       />
 
       <el-table-column
         prop="content.name"
         label="Name"
-        fixed="left"
         min-width="200"
         :resizable="true"
         :sortable="!isSearchResults"
@@ -136,7 +133,10 @@
           <bf-file-label
             :file="scope.row"
             :search-all-data-menu="true"
+            :is-renaming="renamingFileId === (scope.row.content?.id || scope.row.content?.nodeId)"
             @click-name="onFileLabelClick(scope.row)"
+            @rename-submit="(newName) => $emit('rename-submit', scope.row, newName)"
+            @rename-cancel="$emit('rename-cancel')"
           />
         </template>
       </el-table-column>
@@ -144,6 +144,8 @@
         v-if="!withinDeleteMenu"
         prop="subtype"
         label="Kind"
+        width="100"
+        :resizable="false"
         :sortable="!isSearchResults"
         :sort-orders="sortOrders"
       >
@@ -154,6 +156,8 @@
         v-if="!withinDeleteMenu"
         prop="storage"
         label="Size"
+        width="100"
+        :resizable="false"
         :sortable="!isSearchResults"
         :sort-orders="sortOrders"
       >
@@ -166,7 +170,8 @@
         v-if="!withinDeleteMenu"
         prop="content.createdAt"
         label="Date Created"
-        width="180"
+        width="160"
+        :resizable="false"
         :sortable="!isSearchResults"
         :sort-orders="sortOrders"
       >
@@ -251,6 +256,10 @@ export default {
     isPackageAttachmentActive: {
       type: Boolean,
       default: false,
+    },
+    renamingFileId: {
+      type: String,
+      default: null,
     },
   },
 
@@ -667,10 +676,12 @@ export default {
     text-transform: uppercase;
     letter-spacing: 0.3px;
     border-bottom: 1px solid theme.$gray_2 !important;
+    border-right-color: transparent !important;
   }
 
   :deep(td) {
     border-bottom: 1px solid theme.$gray_2 !important;
+    border-right-color: transparent !important;
     font-size: 13px;
   }
 
@@ -691,6 +702,11 @@ export default {
   :deep(.el-table--border::before),
   :deep(.el-table__inner-wrapper::before) {
     display: none;
+  }
+
+  // Hide outer border but keep resize handles
+  :deep(&.el-table--border) {
+    border-color: transparent;
   }
 }
 
