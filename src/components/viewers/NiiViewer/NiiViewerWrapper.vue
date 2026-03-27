@@ -1,102 +1,53 @@
 <template>
-  <div class="app-container">
-    <canvas id="gl" height="480" width="640"/>
+  <div class="nii-container">
+    <NiiViewer
+      v-if="url"
+      :url="url"
+      :zarr-level="zarrLevel"
+    />
+    <p v-else-if="needsConversion" class="nii-message">
+      File too large for direct viewing ({{ fileSizeMB }}MB). Run a conversion workflow first.
+    </p>
+    <p v-else-if="error" class="nii-message nii-error">{{ error }}</p>
+    <div v-else-if="loading" class="nii-message">Loading...</div>
   </div>
 </template>
 
-<script setup lang="ts">
-import {defineProps, onMounted, ref} from 'vue';
-import {pathOr} from "ramda";
-import {useGetToken} from "@/composables/useGetToken";
+<script setup>
+import { NiiViewer, useNiiSource } from '@pennsieve-viz/core'
+import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
-import {Niivue} from '@niivue/niivue'
-
-
 
 const props = defineProps({
   pkg: {
     type: Object,
-    default: {}
-  }
-
-})
-
-const viewAssets = ref([])
-
-onMounted(async () => {
-  try {
-    // get Viewer Assets
-    const nv = new Niivue()
-    await getViewerAssets()
-    let presignedUrl = await getFileUrl(viewAssets.value[0].content.id)
-    console.log(presignedUrl)
-    await nv.attachTo('gl')
-    await nv.loadVolumes([{url: presignedUrl}])
-
-  } catch (err) {
-    console.error(err);
+    default: () => ({})
   }
 })
 
-async function getViewerAssets() {
-  const pkgId = pathOr('', ['content', 'id'], props.pkg)
-  const token = await useGetToken()
-  const url = `${siteConfig.apiUrl}/packages/${pkgId}/view?api_key=${token}`
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      viewAssets.value = await response.json()
-      return
-    }
-
-    if (!response.ok) {
-      return;
-    }
-  } catch (err) {
-    console.error(err)
-    throw err;
-  }
-}
-
-async function getFileUrl(fileId) {
-  const pkgId = pathOr('', ['content', 'id'], props.pkg)
-  const token = await useGetToken()
-  const url = `${siteConfig.apiUrl}/packages/${pkgId}/files/${fileId}?api_key=${token}`
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      const result = await response.json()
-      return result.url;
-    }
-
-    if (!response.ok) {
-      return;
-    }
-
-  } catch (err) {
-    console.error(err)
-    throw err;
-  }
-}
-
+const { url, zarrLevel, needsConversion, fileSizeMB, error, loading } = useNiiSource({
+  pkgId: props.pkg?.content?.id ?? '',
+  apiUrl: siteConfig.apiUrl,
+  getToken: useGetToken,
+})
 </script>
 
-<style>
-.app-container {
+<style scoped>
+.nii-container {
   height: 90vh;
   position: relative;
+}
+
+.nii-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #546085;
+  font-size: 14px;
+}
+
+.nii-error {
+  color: #d32f2f;
 }
 </style>
