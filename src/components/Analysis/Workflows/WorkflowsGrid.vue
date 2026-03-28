@@ -233,7 +233,7 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.bheader {p
+.bheader {
   display: flex;
   align-items: center;
   justify-content: flex-end;
