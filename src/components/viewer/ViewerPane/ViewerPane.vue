@@ -130,12 +130,13 @@ export default {
   watch: {
     pkg: {
       handler: function (pkg) {
-        if (Object.keys(pkg).length > 0) {
+        if (pkg && Object.keys(pkg.content || {}).length > 0) {
           this.loadViewer(pkg);
           this.fetchTimeseriesData();
         }
       },
       immediate: true,
+      deep: true,
     },
   },
 

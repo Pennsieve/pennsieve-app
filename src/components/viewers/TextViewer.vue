@@ -30,6 +30,8 @@ import Request from "../../mixins/request";
 import "highlight.js/styles/github.css";
 
 // import 'highlightjs/styles/color-brewer.css'
+const PLAIN_TEXT_EXTENSIONS = [".lay"];
+
 const escapeHTML = (str) =>
   (str + "").replace(
     /[&<>"'`=\/]/g,
@@ -82,6 +84,11 @@ export default {
     isText: function () {
       return this.subtype === "text";
     },
+
+    isPlainText: function () {
+      const name = (this.pkg?.content?.name || "").toLowerCase();
+      return PLAIN_TEXT_EXTENSIONS.some((ext) => name.endsWith(ext));
+    },
   },
 
   watch: {
@@ -123,13 +130,14 @@ export default {
         .then((response) => response.text())
         .then((data) => {
           this.fileData = data;
-          const codeblock = this.$refs.codeblock;
 
-          hljs.configure();
-
-          this.$nextTick(() => {
-            hljs.highlightBlock(codeblock);
-          });
+          if (!this.isPlainText) {
+            const codeblock = this.$refs.codeblock;
+            hljs.configure();
+            this.$nextTick(() => {
+              hljs.highlightBlock(codeblock);
+            });
+          }
         })
         .catch(this.handleXhrError.bind(this));
     },
