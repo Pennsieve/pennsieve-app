@@ -266,7 +266,8 @@ export default {
   width: 100%;
   height: 100%;
   background: white;
-  padding: 8px 8px 8px 0;
+  padding: 16px;
+  box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   color: theme.$gray_5;
