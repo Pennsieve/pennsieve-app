@@ -137,7 +137,7 @@ export default {
         return useSendXhr(url)
           .then((response) => {
             this.awsURL = response.url;
-            const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${this.awsURL}`;
+            const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(this.awsURL)}`;
             window.open(finalURL, "_blank");
           })
           .catch((err) => useHandleXhrError(err));

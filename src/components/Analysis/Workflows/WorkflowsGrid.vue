@@ -233,7 +233,7 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.builder-header {
+.header {
   display: flex;
   align-items: center;
   justify-content: flex-end;
