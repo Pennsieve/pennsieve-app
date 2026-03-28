@@ -1,26 +1,24 @@
 <template>
   <div>
     <div class="bf-viewer">
-      <bf-rafter class="viewer-rafter">
-        <template #heading>
-          <stage-actions class="stage-actions">
-            <template #left>
-              <div class="file-info">File: {{ packageName }}</div>
-            </template>
-            <template #right>
-              <router-link
-                class="close-action"
-                :to="{
-                  name: 'file-record',
-                  params: {},
-                }"
-              >
-                <div @click="">Close</div>
-              </router-link>
-            </template>
-          </stage-actions>
-        </template>
-      </bf-rafter>
+      <div class="viewer-header">
+        <stage-actions>
+          <template #left>
+            <div class="file-info">{{ packageName }}</div>
+          </template>
+          <template #right>
+            <router-link
+              class="close-action"
+              :to="{
+                name: 'file-record',
+                params: {},
+              }"
+            >
+              <button class="close-btn">Close</button>
+            </router-link>
+          </template>
+        </stage-actions>
+      </div>
 
       <div id="viewer-wrap">
         <viewer-toolbar v-show="!hideToolbars" class="left">
@@ -117,8 +115,6 @@ import IconCompass from "../../icons/IconCompass.vue";
 import IconChannel from "../../icons/IconChannel.vue";
 import IconInfo from "../../icons/IconInfo.vue";
 import IconLink from "@/components/icons/IconLink.vue";
-import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
-import CircleIcon from "../../shared/CircleIcon/CircleIcon.vue";
 import IconMouseCursor from "../../icons/IconMouseCursor.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -130,8 +126,6 @@ import { useViewerInstance } from "@/composables/useViewerInstance";
 export default {
   name: "PsViewer",
   components: {
-    CircleIcon,
-    BfRafter,
     StageActions,
     IconNeural,
     ViewerPane,
@@ -373,20 +367,39 @@ export default {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 
+.viewer-header {
+  background: white;
+  border-bottom: 1px solid theme.$gray_2;
+  padding: 8px 16px;
+}
+
 .close-action {
-  align-self: center;
+  text-decoration: none;
+}
+
+.close-btn {
+  padding: 4px 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: white;
+  color: theme.$gray_5;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  color: theme.$white;
+  transition: all 0.2s;
+  line-height: 1.4;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
 }
 
 .file-info {
   align-self: center;
-  color: theme.$white;
-}
-
-.stage-actions {
-  height: 32px;
-  align-items: center;
+  color: theme.$gray_6;
+  font-size: 14px;
+  font-weight: 600;
 }
 .bf-viewer {
   display: flex;
