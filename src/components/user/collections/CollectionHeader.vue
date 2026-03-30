@@ -105,6 +105,7 @@
           <bf-button
             v-if="showPublishButton"
             class="primary"
+            :disabled="datasetCount === 0"
             @click="publishCollection"
           >
             {{ publishButtonText }}
@@ -268,16 +269,15 @@ export default {
 
     collectionState() {
       const publicationStatus = this.collectionDetails?.publication?.status;
-      if (publicationStatus === "Draft") {
+      if (publicationStatus === "Draft" || publicationStatus === "Failed") {
         return "draft";
       } else if (publicationStatus === "Completed") {
         return "published";
       }
     },
     showPublishButton() {
-      // Show publish button for all collections
       const publicationStatus = this.collectionDetails?.publication?.status;
-      return publicationStatus === "Draft" || publicationStatus === "Completed";
+      return publicationStatus === "Draft" || publicationStatus === "Completed" || publicationStatus === "Failed";
     },
 
     publishButtonText() {
