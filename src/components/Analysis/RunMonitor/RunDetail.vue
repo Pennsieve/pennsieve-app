@@ -805,6 +805,20 @@ const fileCountForNode = (nodeId) => {
   return (dataSourceFiles[nodeId] || []).length;
 };
 
+const nodeUnmetCount = (nodeId, nodeType) => {
+  if (mode.value !== "configure") return 0;
+  if (nodeType === "data-source") {
+    return fileCountForNode(nodeId) === 0 ? 1 : 0;
+  }
+  const cfg = nodeConfigs[nodeId];
+  if (!cfg) return 0;
+  if (nodeType === "data-target") {
+    return (cfg.params || []).filter((p) => p.required && !p.value?.trim()).length;
+  }
+  // processor
+  return (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim()).length;
+};
+
 const removeFileFromNode = (nodeId, index) => {
   if (!dataSourceFiles[nodeId]) return;
   dataSourceFiles[nodeId].splice(index, 1);
@@ -1177,6 +1191,7 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -1213,6 +1228,7 @@ onUnmounted(() => {
             <template #node-data-source="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
                 <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                  <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -1238,6 +1254,7 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.targetType || data.label }}</span>
                   </div>
@@ -2391,7 +2408,26 @@ onUnmounted(() => {
 }
 
 /* Nodes */
+.node-unmet-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: theme.$red_1;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  line-height: 1;
+}
+
 .custom-node {
+  position: relative;
   background: white;
   border: 1px solid theme.$gray_3;
   border-radius: 2px;
