@@ -20,8 +20,11 @@
         <span v-else-if="publicationStatus === PublicationStatus.FAILED" class="status-detail">
           Publication failed
         </span>
+        <span v-else-if="hasBeenPublished" class="status-detail">
+          Previously published on {{ publishedDate }}
+        </span>
         <span v-else class="status-detail">
-          This dataset has not been published
+          Ready to submit for publication
         </span>
       </div>
       <a v-if="isPublished" target="_blank" :href="discoverLink" class="discover-link">
@@ -39,20 +42,20 @@
     </div>
 
     <!-- Readiness message -->
-    <div v-if="!isPublished && !isRequested && datasetOwnerHasOrcidId" class="readiness-message">
+    <div v-if="!isPublished && !isRequested" class="readiness-message">
       <p v-if="canPublish" class="ready">
         Your checklist is complete. This dataset is ready to submit for review.
       </p>
       <p v-else class="not-ready">
-        Some checklist items are incomplete. Please review them above before submitting.
+        {{ incompleteMessage }}
       </p>
     </div>
 
     <!-- Submit Action -->
     <div v-if="!isPublished || isPublished" class="action-row">
       <div class="action-info">
-        <strong>{{ isPublished ? 'Publish a new version' : 'Submit for review' }}</strong>
-        <p>{{ isPublished ? 'Request to publish an updated version to Discover.' : 'While under review, this dataset will be locked until approved or rejected.' }}</p>
+        <strong>{{ (isPublished || hasBeenPublished) ? 'Publish a new version' : 'Submit for review' }}</strong>
+        <p>{{ (isPublished || hasBeenPublished) ? 'Request to publish an updated version to Discover.' : 'While under review, this dataset will be locked until approved or rejected.' }}</p>
       </div>
       <submit-for-publication
         :has-dataset="true"
@@ -206,13 +209,33 @@ export default {
         contributors.length > 0,
         Boolean(datasetDescription),
         Boolean(this.getPermission("owner")),
+        Boolean(this.datasetOwnerHasOrcidId),
       ]);
     },
 
-    /**
-     * Compute if the dataset is published
-     * @returns {Boolean}
-     */
+    incompleteItems: function () {
+      const items = []
+      if (!path(["content", "name"], this.dataset)) items.push("name")
+      if (!path(["content", "description"], this.dataset)) items.push("subtitle")
+      if (!this.datasetBanner) items.push("banner image")
+      if (!path(["content", "license"], this.dataset)) items.push("license")
+      if (!this.datasetTags.length) items.push("tags")
+      if (!this.datasetContributors.length) items.push("contributors")
+      if (!this.datasetDescription) items.push("description")
+      if (!this.getPermission("owner")) items.push("owner permissions")
+      if (!this.datasetOwnerHasOrcidId) items.push("dataset owner's ORCID iD")
+      return items
+    },
+
+    incompleteMessage: function () {
+      const items = this.incompleteItems
+      if (items.length === 0) return ""
+      if (items.length === 1 && items[0] === "owner permissions") {
+        return "Only the dataset owner can submit for publication."
+      }
+      return `The following items are still needed: ${items.join(", ")}.`
+    },
+
     statusLabel: function () {
       if (this.isPublished) return 'Published';
       if (this.publicationStatus === PublicationStatus.REQUESTED) return 'In Review';
@@ -233,10 +256,15 @@ export default {
       return this.publicationStatus === PublicationStatus.REQUESTED;
     },
 
+    hasBeenPublished: function () {
+      const publication = propOr({}, "publication", this.dataset);
+      return publication.hasOwnProperty("publishedDataset");
+    },
+
     isPublished: function () {
       return (
-        this.publishedData &&
-        Object.keys(this.publishedData).length > 0 &&
+        this.hasBeenPublished &&
+        this.publicationStatus === PublicationStatus.COMPLETED &&
         this.publicationType !== PublicationType.REMOVAL
       );
     },
