@@ -1,6 +1,5 @@
 <template>
   <div class="dataset-settings-collections">
-    <h4>Collection</h4>
     <p class="mb-16">
       Assign this dataset to a collection to group similar work
     </p>

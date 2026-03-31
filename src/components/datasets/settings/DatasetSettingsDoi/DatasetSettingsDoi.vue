@@ -1,8 +1,5 @@
 <template>
   <div class="dataset-settings-doi">
-    <h3>
-      Permanent Data Object Identifier (DOI)
-    </h3>
     <p class="mb-16">
       Digital Object Identifiers allow you to reference your data in publications. DOIs make it easy for anyone to find your data.
     </p>

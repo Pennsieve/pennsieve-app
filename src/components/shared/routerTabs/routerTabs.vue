@@ -1,7 +1,11 @@
 <template >
   <ul class="tabs">
     <li v-for="tab in tabs" :key="tab.to">
-      <router-link :to="{ name: tab.to }">
+      <router-link
+        :to="{ name: tab.to }"
+        :class="{ active: isTabActive(tab) }"
+        active-class=""
+      >
         {{ tab.name }}
       </router-link>
     </li>
@@ -23,7 +27,26 @@ export default {
       ]
     },
   },
+  methods: {
+    isTabActive(tab) {
+      try {
+        const currentName = this.$route.name
+        if (currentName === tab.to) return true
 
+        // Check if any matched route in the chain has this name
+        const matched = this.$route.matched
+        if (matched.some(r => r.name === tab.to)) return true
+
+        // Check if current route path starts with the tab's resolved path
+        const tabRoute = this.$router.resolve({ name: tab.to })
+        if (tabRoute && this.$route.path.startsWith(tabRoute.path)) return true
+
+        return false
+      } catch {
+        return false
+      }
+    },
+  },
 }
 </script>
 
@@ -47,26 +70,27 @@ ul {
   a {
     color: theme.$gray_5;
     display: inline-flex;
-    padding: 0 0 16px;
+    padding: 12px 0;
     position: relative;
     text-decoration: none;
+    font-size: 14px;
     &:hover ,
     &:focus {
       color: theme.$purple_2;
       text-decoration: none;
     }
-    &.router-link-active,
     &.active {
       color: theme.$purple_3;
       font-weight: 500;
       &:after {
-        background: theme.$purple_1;
-        bottom: 0;
+        background: theme.$purple_3;
+        bottom: -1px;
         content: '';
         left: 0;
-        height: 6px;
+        height: 2px;
         position: absolute;
         width: 100%;
+        border-radius: 1px;
       }
     }
     &.disabled {
@@ -94,7 +118,6 @@ ul {
         color: theme.$gray_2;
         text-decoration: none;
       }
-      &.router-link-active,
       &.active {
         color: white;
         font-weight: 500;

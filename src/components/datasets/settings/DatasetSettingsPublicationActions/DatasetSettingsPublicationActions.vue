@@ -1,61 +1,53 @@
 <template>
-  <el-row>
-    <h2>Post-Publication Actions</h2>
-    <el-col>
-      <h3>Withdraw Dataset</h3>
-      <p>Withdraw your dataset from the review process.</p>
+  <div class="post-publication-actions">
+    <div class="action-row">
+      <div class="action-info">
+        <strong>Withdraw from review</strong>
+        <p>Cancel the current publication request.</p>
+      </div>
       <bf-button
-        class="primary"
+        class="secondary"
         :disabled="(!isRequested) || !getPermission('owner')"
         @click="onWithdrawDataset"
       >
-        Withdraw Dataset
+        Withdraw
       </bf-button>
-      <h3>Request Revision</h3>
-      <p>
-        Request to publish a revision of your published dataset (only updates information). <a href="https://docs.pennsieve.io/docs/submitting-a-revised-dataset-for-publication">
-          Learn More
-        </a>
-      </p>
-      <p class="publication-blurb">
-        This requires approval by the Publishing team.
-      </p>
+    </div>
+
+    <div class="action-row">
+      <div class="action-info">
+        <strong>Request revision</strong>
+        <p>
+          Publish a revision that updates dataset information.
+          <a href="https://docs.pennsieve.io/docs/submitting-a-revised-dataset-for-publication" target="_blank">
+            Learn more
+          </a>
+        </p>
+      </div>
       <bf-button
-        class="primary"
+        class="secondary"
         :disabled="(isPreviouslyPublished && isPublicationRemoval) || isDraft || isRequested || datasetLocked"
         @click="onRequestRevision"
       >
         Request Revision
       </bf-button>
-      <h3>Request Removal</h3>
-      <p>Request to remove your published dataset from Pennsieve Discover.</p>
-      <p class="publication-blurb">
-        This requires approval by the Publishing team.
-      </p>
-      <bf-button
-        class="red"
-        :disabled="(isPreviouslyPublished && isPublicationRemoval) || datasetLocked || isDraft || !getPermission('owner')"
-        @click="onRequestRemoval"
-      >
-        Request Removal
-      </bf-button>
-    </el-col>
+    </div>
     <withdraw-dataset-dialog
       :dialog-visible="withdrawDatasetDialogVisible"
       @on-withdraw="triggerRequest(PublicationStatus.CANCELLED, publicationType)"
       @on-close="onCloseWithdraw"
     />
-    <request-removal-dialog
+    <!-- <request-removal-dialog
       :dialog-visible="requestRemovalDialogVisible"
       @on-removal="triggerRequest(PublicationStatus.REQUESTED, PublicationType.REMOVAL)"
       @close="onCloseRemoval"
-    />
+    /> -->
     <request-revision-dialog
       :dialog-visible="requestRevisionDialogVisible"
       @on-revision="triggerRequest(PublicationStatus.REQUESTED, PublicationType.REVISION)"
       @close="onCloseRevision"
     />
-  </el-row>
+  </div>
 </template>
 
 <script>
@@ -321,32 +313,41 @@ export default {
 
 <style lang="scss" scoped>
 @use '../../../../styles/theme';
-h1{
-  font-size: 16px;
-  line-height: 16px;
-  font-weight: 700;
-}
-h3 {
-  color: theme.$gray_6;
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 16px;
+.post-publication-actions {
+  margin-top: 8px;
 }
 
-p {
-  margin-bottom: 17px;
-  color: #000;
-}
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid theme.$gray_2;
 
-.bf-button {
-  margin-bottom: 32px;
-  &.secondary {
-    border: solid 1px theme.$gray_2;
+  &:last-child {
+    border-bottom: none;
   }
-}
 
-.publication-blurb {
-  margin-top: -11px;
+  .action-info {
+    flex: 1;
+
+    strong {
+      font-size: 14px;
+      color: theme.$gray_6;
+    }
+
+    p {
+      font-size: 13px;
+      color: theme.$gray_5;
+      margin: 4px 0 0;
+      line-height: 1.5;
+
+      a {
+        color: theme.$purple_3;
+      }
+    }
+  }
 }
 
 </style>

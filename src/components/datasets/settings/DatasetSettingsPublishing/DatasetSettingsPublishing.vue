@@ -1,78 +1,73 @@
 <template>
-  <el-row>
-    <h2>Publishing Your Dataset</h2>
-    <el-col>
-      <dataset-settings-publishing-loader
-        v-if="isLoadingDatasetPublishedData"
-      />
-      <h3 class="heading">Status</h3>
-      <template v-if="publicationStatus === PublicationStatus.FAILED">
-        <status-failed />
-      </template>
-      <template
-        v-else-if="
-          publicationStatus === PublicationStatus.REQUESTED &&
-          publicationType !== PublicationType.REVISION
-        "
-      >
-        <status-requested :publication-type="publicationType" />
-        <h3 class="heading publication">Request to Publish</h3>
-        <sharing-info />
-        <submit-for-publication
-          :has-dataset="true"
-          :can-publish="canPublish"
-          :dataset-id="datasetId"
-          :is-requested="publicationStatus === PublicationStatus.REQUESTED"
-        />
-      </template>
-      <template v-else-if="publicationStatus === PublicationStatus.ACCEPTED">
-        <status-accepted />
-      </template>
-      <template v-else>
-        <template v-if="isPublished">
-          <status-published
-            :can-publish="canPublish"
-            :dataset-id="datasetId"
-            :dataset-owner-name="datasetOwnerName"
-            :dataset-owner-email="datasetOwnerEmail"
-            :discover-link="discoverLink"
-            :has-publishing-permission="getPermission('owner')"
-            :published-date="publishedDate"
-          />
-        </template>
-        <template v-else>
-          <template v-if="getPermission('owner') && !datasetOwnerHasOrcidId">
-            <owner-orcid @open-orcid="openORCID" />
-          </template>
-          <template v-else>
-            <div v-if="canPublish">
-              <p>
-                Your publishing checklist is complete and the dataset is ready
-                to be submitted for review.
-              </p>
-            </div>
-            <div v-else>
-              <p>
-                Your dataset is missing items and cannot be published. Please
-                review the checklist at the top of the page for more
-                information.
-              </p>
-            </div>
-            <h3 class="heading publication">Request to Publish</h3>
-            <sharing-info />
-            <submit-for-publication
-              :has-dataset="true"
-              :can-publish="canPublish"
-              :dataset-id="datasetId"
-            />
-          </template>
-        </template>
-      </template>
+  <div class="publishing-workflow">
+    <dataset-settings-publishing-loader
+      v-if="isLoadingDatasetPublishedData"
+    />
 
-      <hr />
-      <dataset-settings-publication-actions :can-publish="canPublish" />
-    </el-col>
-  </el-row>
+    <!-- Status Card -->
+    <div class="status-card" :class="statusClass">
+      <div class="status-info">
+        <span class="status-badge" :class="statusClass">{{ statusLabel }}</span>
+        <span v-if="isPublished && publishedDate" class="status-detail">
+          Published on {{ publishedDate }}
+        </span>
+        <span v-else-if="publicationStatus === PublicationStatus.REQUESTED" class="status-detail">
+          Awaiting review by the publishing team
+        </span>
+        <span v-else-if="publicationStatus === PublicationStatus.ACCEPTED" class="status-detail">
+          Accepted — publication in progress
+        </span>
+        <span v-else-if="publicationStatus === PublicationStatus.FAILED" class="status-detail">
+          Publication failed
+        </span>
+        <span v-else-if="hasBeenPublished" class="status-detail">
+          Previously published on {{ publishedDate }}
+        </span>
+        <span v-else class="status-detail">
+          Ready to submit for publication
+        </span>
+      </div>
+      <a v-if="isPublished" target="_blank" :href="discoverLink" class="discover-link">
+        View on Discover
+      </a>
+    </div>
+
+    <!-- ORCID Warning -->
+    <div v-if="getPermission('owner') && !datasetOwnerHasOrcidId && !isPublished" class="action-row warning-row">
+      <div class="action-info">
+        <strong>ORCID iD required</strong>
+        <p>Link your ORCID iD before submitting for publication.</p>
+      </div>
+      <owner-orcid @open-orcid="openORCID" />
+    </div>
+
+    <!-- Readiness message -->
+    <div v-if="!isPublished && !isRequested" class="readiness-message">
+      <p v-if="canPublish" class="ready">
+        Your checklist is complete. This dataset is ready to submit for review.
+      </p>
+      <p v-else class="not-ready">
+        {{ incompleteMessage }}
+      </p>
+    </div>
+
+    <!-- Submit Action -->
+    <div v-if="!isPublished || isPublished" class="action-row">
+      <div class="action-info">
+        <strong>{{ (isPublished || hasBeenPublished) ? 'Publish a new version' : 'Submit for review' }}</strong>
+        <p>{{ (isPublished || hasBeenPublished) ? 'Request to publish an updated version to Discover.' : 'While under review, this dataset will be locked until approved or rejected.' }}</p>
+      </div>
+      <submit-for-publication
+        :has-dataset="true"
+        :can-publish="canPublish"
+        :dataset-id="datasetId"
+        :is-requested="publicationStatus === PublicationStatus.REQUESTED"
+      />
+    </div>
+
+    <!-- Post-publication actions -->
+    <dataset-settings-publication-actions :can-publish="canPublish" />
+  </div>
 </template>
 
 <script>
@@ -214,17 +209,62 @@ export default {
         contributors.length > 0,
         Boolean(datasetDescription),
         Boolean(this.getPermission("owner")),
+        Boolean(this.datasetOwnerHasOrcidId),
       ]);
     },
 
-    /**
-     * Compute if the dataset is published
-     * @returns {Boolean}
-     */
+    incompleteItems: function () {
+      const items = []
+      if (!path(["content", "name"], this.dataset)) items.push("name")
+      if (!path(["content", "description"], this.dataset)) items.push("subtitle")
+      if (!this.datasetBanner) items.push("banner image")
+      if (!path(["content", "license"], this.dataset)) items.push("license")
+      if (!this.datasetTags.length) items.push("tags")
+      if (!this.datasetContributors.length) items.push("contributors")
+      if (!this.datasetDescription) items.push("description")
+      if (!this.getPermission("owner")) items.push("owner permissions")
+      if (!this.datasetOwnerHasOrcidId) items.push("dataset owner's ORCID iD")
+      return items
+    },
+
+    incompleteMessage: function () {
+      const items = this.incompleteItems
+      if (items.length === 0) return ""
+      if (items.length === 1 && items[0] === "owner permissions") {
+        return "Only the dataset owner can submit for publication."
+      }
+      return `The following items are still needed: ${items.join(", ")}.`
+    },
+
+    statusLabel: function () {
+      if (this.isPublished) return 'Published';
+      if (this.publicationStatus === PublicationStatus.REQUESTED) return 'In Review';
+      if (this.publicationStatus === PublicationStatus.ACCEPTED) return 'Accepted';
+      if (this.publicationStatus === PublicationStatus.FAILED) return 'Failed';
+      return 'Draft';
+    },
+
+    statusClass: function () {
+      if (this.isPublished) return 'published';
+      if (this.publicationStatus === PublicationStatus.REQUESTED) return 'in-review';
+      if (this.publicationStatus === PublicationStatus.ACCEPTED) return 'accepted';
+      if (this.publicationStatus === PublicationStatus.FAILED) return 'failed';
+      return 'draft';
+    },
+
+    isRequested: function () {
+      return this.publicationStatus === PublicationStatus.REQUESTED;
+    },
+
+    hasBeenPublished: function () {
+      const publication = propOr({}, "publication", this.dataset);
+      return publication.hasOwnProperty("publishedDataset");
+    },
+
     isPublished: function () {
       return (
-        this.publishedData &&
-        Object.keys(this.publishedData).length > 0 &&
+        this.hasBeenPublished &&
+        this.publicationStatus === PublicationStatus.COMPLETED &&
         this.publicationType !== PublicationType.REMOVAL
       );
     },
@@ -364,42 +404,143 @@ export default {
 <style lang="scss" scoped>
 @use "../../../../styles/theme";
 
-.sharing-info {
-  color: #000;
-  margin-bottom: 16px;
+.publishing-workflow {
+  max-width: 640px;
 }
 
-.publishing {
-  margin-top: 3px;
-}
-
-.heading {
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 16px;
-  color: theme.$gray_6;
-  &.publication {
-    margin-top: 33px;
-  }
-}
-
-.sharing-blurb {
-  color: #000;
-  margin-top: 11px;
-  height: 32px;
-  font-size: 14px;
-  margin-bottom: -8px;
-}
-
-.sharing-status {
-  align-items: center;
+.status-card {
   display: flex;
-  .icon-status {
-    margin-right: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+  margin-bottom: 24px;
+
+  &.published {
+    border-color: rgba(theme.$green_1, 0.3);
+    background: rgba(theme.$green_1, 0.05);
   }
+
+  &.in-review {
+    border-color: rgba(theme.$orange_1, 0.3);
+    background: rgba(theme.$orange_1, 0.05);
+  }
+
+  &.failed {
+    border-color: rgba(theme.$red_1, 0.3);
+    background: rgba(theme.$red_1, 0.05);
+  }
+}
+
+.status-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 16px;
+  white-space: nowrap;
+
+  &.published {
+    background: rgba(theme.$green_1, 0.15);
+    color: theme.$green_1;
+  }
+
+  &.in-review {
+    background: rgba(theme.$orange_1, 0.15);
+    color: theme.$orange_2;
+  }
+
+  &.accepted {
+    background: rgba(theme.$green_1, 0.15);
+    color: theme.$green_1;
+  }
+
+  &.failed {
+    background: rgba(theme.$red_1, 0.15);
+    color: theme.$red_1;
+  }
+
+  &.draft {
+    background: theme.$gray_2;
+    color: theme.$gray_5;
+  }
+}
+
+.status-detail {
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+
+.discover-link {
+  font-size: 13px;
+  color: theme.$purple_3;
+  white-space: nowrap;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid theme.$gray_2;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.warning-row {
+    background: rgba(theme.$orange_1, 0.05);
+    border: 1px solid rgba(theme.$orange_1, 0.2);
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .action-info {
+    flex: 1;
+
+    strong {
+      font-size: 14px;
+      color: theme.$gray_6;
+    }
+
+    p {
+      font-size: 13px;
+      color: theme.$gray_5;
+      margin: 4px 0 0;
+      line-height: 1.5;
+    }
+  }
+}
+
+.readiness-message {
+  margin-bottom: 16px;
+
   p {
-    margin-right: 4px;
-    margin-top: 4px;
+    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 0;
+
+    &.ready {
+      background: rgba(theme.$green_1, 0.05);
+      border: 1px solid rgba(theme.$green_1, 0.2);
+      color: theme.$green_1;
+    }
+
+    &.not-ready {
+      background: rgba(theme.$orange_1, 0.05);
+      border: 1px solid rgba(theme.$orange_1, 0.2);
+      color: theme.$orange_2;
+    }
   }
 }
 

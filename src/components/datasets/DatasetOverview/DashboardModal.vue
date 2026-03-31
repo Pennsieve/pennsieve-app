@@ -1,9 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, markRaw, ref, watch } from 'vue'
 import { useStore } from 'vuex'
 import { PublicationStatus } from '../../../utils/constants'
 import { PennsieveDashboard, MarkdownWidget, TextWidget } from 'pennsieve-dashboard'
-import 'element-plus/dist/index.css';
 import 'pennsieve-dashboard/style.css'
 import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
@@ -38,8 +37,8 @@ const collaboratorCounts = computed(() => {
 
 // Component Options
 const availableWidgets = [
-  { name: 'TextWidget', component: TextWidget },
-  { name: 'MarkdownWidget', component: MarkdownWidget },
+  { name: 'TextWidget', component: markRaw(TextWidget) },
+  { name: 'MarkdownWidget', component: markRaw(MarkdownWidget) },
 ]
 
 const defaultLayout = [
@@ -48,7 +47,7 @@ const defaultLayout = [
           x: 0, y: 0, w: 4, h: 7,
           componentKey: 'MarkdownWidget',
           componentName: 'Markdown Widget',
-          component: MarkdownWidget,   
+          component: markRaw(MarkdownWidget),
           Props:{
             markdownText:[
           '# Dataset Overview',
@@ -70,15 +69,15 @@ const defaultLayout = [
           x: 4, y: 0, h: 2, w:1, 
           componentName:"Files",
           componentKey:"TextWidget",
-          component:TextWidget,
-          Props:{bindedKey:"FileCount"} 
+          component: markRaw(TextWidget),
+          Props:{bindedKey:"FileCount"}
         },
         { 
           id: "TextWidget-3", 
           x: 5, y: 0, h: 2, w:2, 
           componentName:"Status",
           componentKey:"TextWidget",
-          component:TextWidget,
+          component: markRaw(TextWidget),
           Props:{bindedKey:"Status"}
         },
         { 
@@ -86,9 +85,10 @@ const defaultLayout = [
           x: 4, y: 2, h: 2, w:2, 
           componentName:"Collaborator Counts",
           componentKey:"TextWidget",
-          component:TextWidget,
+          component: markRaw(TextWidget),
           Props:{bindedKey:"CollaboratorCounts"}}
       ]
+
 
 const dashboardOptions = computed(() => ({
   globalData: {
@@ -111,7 +111,7 @@ function closeDialog () {
 <template>
   <el-dialog
     :modelValue="dialogVisible"
-    class="full-dialog full-dialog-db"
+    class="full-dialog"
     @close="closeDialog"
   >
     <template #header>
@@ -131,16 +131,42 @@ function closeDialog () {
 </template>
 
 
-<style lang="scss" scoped>
-.dashboard-app{
-    --el-color-primary: #243d8e;
-    --el-color-primary-light-3: #fbfdff;
-    --el-color-primary-dark-2: #546085;
-    --el-text-color-primary:white;
-    --color:#243d8e;
-    --dash-secondary: #243d8e;
-     background-color: #f6fcff;
-     border: solid aliceblue;
+<style lang="scss">
+/* Unscoped — el-dialog teleports to <body>, so scoped styles can't reach it */
+.el-overlay .el-dialog.full-dialog {
+  width: 95%;
+  height: 95%;
+  margin: auto;
+  margin-top: 1%;
+  overflow: hidden;
+
+  .el-dialog__body {
+    overflow: auto;
+    height: calc(100% - 80px);
+    padding: 16px 32px;
+  }
 }
-:deep(.grid-stack){height: auto !important;}
+</style>
+
+<style lang="scss" scoped>
+
+.dashboard-app {
+  --el-color-primary: #243d8e !important;
+  --el-color-primary-light-3: #fbfdff !important;
+  --el-color-primary-dark-2: #546085 !important;
+  --el-text-color-primary: white !important;
+  --el-button-text-color: white !important;
+  --el-button-bg-color: #243d8e !important;
+  --el-button-border-color: #546085 !important;
+  --el-button-hover-text-color: #243d8e !important;
+  --el-button-hover-bg-color: #fbfdff !important;
+  --el-button-hover-border-color: #243d8e !important;
+  --dash-secondary: #243d8e;
+  background-color: #f6fcff;
+  border: 1px solid aliceblue;
+  border-radius: 4px;
+  height: 100%;
+}
+
+
 </style>

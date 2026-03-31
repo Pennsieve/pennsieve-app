@@ -1,57 +1,40 @@
 <template>
   <div class="integration-list-item">
-    <el-row type="flex" class="info">
-      <el-col :sm="16">
-        <div class="integration-type">
-          {{ isPrivateStr }}
-        </div>
-      </el-col>
-      <el-col :sm="8" v-if="enableSwitch" class="activeSwitch">
-        <el-switch
-          v-model="isActive"
-          active-color="#5039F7"
-          inactive-color="#CAC5BF"
-          @change="toggleActive"
-        >
-        </el-switch>
-      </el-col>
-      <el-col :sm="8" class="integration-menu" v-else>
-        <el-dropdown
-          class="options-icon"
-          trigger="click"
-          placement="bottom-end"
-          v-if="isAdmin"
-          @command="onIntegrationMenu"
-        >
-          <span class="btn-file-menu el-dropdown-link">
-            <IconMenu :height="20" :width="20" />
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
-              <el-dropdown-item command="openEditDialog">
-                Edit integration
-              </el-dropdown-item>
-              <el-dropdown-item command="openDeleteDialog">
-                Remove integration
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </el-col>
-    </el-row>
-    <el-row>
-      <div class="integration-title">
-        {{ integration.displayName }}
-      </div>
-    </el-row>
-    <el-row>
-      <p class="integration-description">
-        {{ integration.description }}
-      </p>
-    </el-row>
-    <el-row class="userIcon">
-      <avatar class="icon condensed" :user="user" />
-    </el-row>
+    <div class="integration-info">
+      <span class="integration-name">{{ integration.displayName }}</span>
+      <span v-if="integration.isPrivate" class="integration-badge">Private</span>
+      <span v-if="integration.description" class="integration-desc">{{ integration.description }}</span>
+    </div>
+    <div class="integration-actions">
+      <el-switch
+        v-if="enableSwitch"
+        v-model="isActive"
+        active-color="#17bb62"
+        inactive-color="#CAC5BF"
+        @change="toggleActive"
+      />
+      <el-dropdown
+        v-else-if="isAdmin"
+        class="options-icon"
+        trigger="click"
+        placement="bottom-end"
+        @command="onIntegrationMenu"
+      >
+        <button class="menu-btn">
+          <IconMenu :height="16" :width="16" />
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu class="bf-menu" :offset="9">
+            <el-dropdown-item command="openEditDialog">
+              Edit
+            </el-dropdown-item>
+            <el-dropdown-item command="openDeleteDialog">
+              Remove
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
   </div>
 </template>
 
@@ -91,17 +74,11 @@ export default {
     isOwner: function () {
       return this.integration.createdBy == this.profile.intId;
     },
-    isPrivateStr: function () {
-      if (this.integration.isPrivate) {
-        return "PRIVATE";
-      }
-      return "PUBLIC";
+    isAdmin: function () {
+      return this.isOwner;
     },
     user: function () {
       return find(propEq("intId", this.integration.createdBy), this.orgMembers);
-    },
-    created: function () {
-      return this.formatDate(this.integration.createdAt);
     },
     userName: function () {
       if (this.user) {
@@ -114,12 +91,6 @@ export default {
   data: function () {
     return {
       isActive: false,
-      integrationEdit: {
-        type: Object,
-        default: function () {
-          return {};
-        },
-      },
     };
   },
   mounted() {
@@ -167,67 +138,73 @@ export default {
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
-.integration-menu {
-  width: 24px;
-}
-
 .integration-list-item {
-  width: 230px;
-  height: 300px;
-  border: 1px solid theme.$gray_3;
-  //margin: 0 0 16px 0;
-  margin: 0 8px 16px 8px;
-  //padding:  16px 24px 8px 24px;
-  background-color: white;
   display: flex;
-  flex-direction: column;
-}
-.info {
-  background: theme.$purple_tint;
-  padding: 8px 16px;
-  height: 64px;
   align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: white;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: theme.$gray_3;
+  }
 }
 
-.integration-title {
-  font-size: 16px;
-  margin: 16px 4px;
-  color: black;
-  text-align: center;
-}
-
-.integration-type {
-  color: theme.$gray_5;
-  font-weight: 500;
-  font-size: 12px;
-}
-
-.activeSwitch {
-  text-align: end;
-}
-
-.integration-description {
-  font-size: 14px;
-  color: theme.$gray_5;
-  min-height: 3em;
-  max-width: 500px;
-  margin: 0 8px;
-  overflow-wrap: break-word;
-}
-
-.list-item-col-spacer {
-  padding-top: 32px;
-}
-
-.options-icon {
-  float: right;
-}
-
-.userIcon {
-  height: 100%;
-  align-self: self-end;
+.integration-info {
   display: flex;
-  flex-direction: column-reverse;
-  margin: 8px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.integration-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: theme.$gray_6;
+  white-space: nowrap;
+}
+
+.integration-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: theme.$gray_4;
+  background: theme.$gray_1;
+  padding: 2px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.integration-desc {
+  font-size: 13px;
+  color: theme.$gray_4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.integration-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  color: theme.$gray_4;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: theme.$gray_1;
+    color: theme.$gray_6;
+  }
 }
 </style>

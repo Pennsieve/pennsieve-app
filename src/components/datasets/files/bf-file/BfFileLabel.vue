@@ -36,18 +36,31 @@
       alt="package icon"
     >
 
-    <button
-      v-if="isNameLink"
-      class="name"
-      data-cy="moveDialogFileName"
-      :disabled="disabled"
-      @click.stop="onClick('click-name', $event)"
-    >
-      {{ displayName }}
-    </button>
-    <div v-else class="no-link-name">
-      {{ displayName }}
-    </div>
+    <template v-if="isRenaming">
+      <input
+        ref="renameInput"
+        class="rename-input"
+        :value="displayName"
+        @keyup.enter="onRenameSubmit"
+        @keyup.escape="onRenameCancel"
+        @blur="onRenameSubmit"
+        @click.stop
+      />
+    </template>
+    <template v-else>
+      <button
+        v-if="isNameLink"
+        class="name"
+        data-cy="moveDialogFileName"
+        :disabled="disabled"
+        @click.stop="onClick('click-name', $event)"
+      >
+        {{ displayName }}
+      </button>
+      <div v-else class="no-link-name">
+        {{ displayName }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -110,6 +123,31 @@ export default {
     searchAllDataMenu: {
       type: Boolean,
       default: false
+    },
+    isRenaming: {
+      type: Boolean,
+      default: false
+    }
+  },
+
+  watch: {
+    isRenaming(val) {
+      if (val) {
+        this.$nextTick(() => {
+          const input = this.$refs.renameInput;
+          if (input) {
+            input.focus();
+            // Select the name without the extension
+            const name = input.value;
+            const lastDot = name.lastIndexOf('.');
+            if (lastDot > 0) {
+              input.setSelectionRange(0, lastDot);
+            } else {
+              input.select();
+            }
+          }
+        });
+      }
     }
   },
 
@@ -207,6 +245,18 @@ export default {
     ...mapActions('filesModule', [
        'openOffice365File'
     ]),
+
+    onRenameSubmit: function () {
+      const input = this.$refs.renameInput;
+      if (input) {
+        const newName = input.value.trim();
+        this.$emit('rename-submit', newName);
+      }
+    },
+
+    onRenameCancel: function () {
+      this.$emit('rename-cancel');
+    },
 
     isFileUnprocessed: function (file) {
       const fileState = this.getFileState(file)
@@ -321,6 +371,25 @@ export default {
 
 .no-link-name {
   color: theme.$gray_6
+}
+
+.rename-input {
+  flex: 1;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 2px 8px;
+  border: 1px solid theme.$purple_3;
+  border-radius: 3px;
+  outline: none;
+  background: white;
+  color: theme.$gray_6;
+  min-width: 0;
+  height: 24px;
+  box-sizing: border-box;
+
+  &:focus {
+    box-shadow: 0 0 0 2px rgba(theme.$purple_3, 0.2);
+  }
 }
 
 .btn-open-file {

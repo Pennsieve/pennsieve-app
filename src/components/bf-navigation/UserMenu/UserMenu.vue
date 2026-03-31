@@ -415,8 +415,8 @@ export default {
 .user-menu-wrap {
   --el-popover-padding: 0;
   --el-popover-bg-color: white;
-  background: theme.$purple_3;
-  
+  background: transparent;
+
   .secondary & {
     background: theme.$gray_2;
   }

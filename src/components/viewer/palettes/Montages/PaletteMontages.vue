@@ -101,8 +101,13 @@ async function doDeleteMontage(evt) {
   confirmationDialogVisible.value = false
 
   const endpoint = `${store.state.config.api2Url}/timeseries/montages`
+  const organizationId = store.state.activeOrganization?.organization?.id
+  if (!organizationId) {
+    console.error('doDeleteMontage: activeOrganization not available')
+    return
+  }
   const queryParams = toQueryParams({
-    organization_id: store.state.activeOrganization.organization.id,
+    organization_id: organizationId,
     montage_name: evt.resource.name,
   })
 

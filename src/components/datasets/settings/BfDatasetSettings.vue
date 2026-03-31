@@ -2,155 +2,95 @@
   <bf-stage
     ref="bfStage"
   >
-    <!-- update dataset -->
-    <el-row>
-      <el-col>
-        <el-form
-          ref="updateDatasetForm"
-          class="dataset-search-form"
-          label-position="top"
-          :model="form"
-          :rules="rules"
-          @submit.native.prevent
-        >
-          <el-form-item
-            prop="name"
-            class="mb-24"
+    <div class="details-container">
+      <div class="settings-section">
+        <div class="settings-section-header">Basic Information</div>
+        <div class="settings-section-content">
+          <el-form
+            ref="updateDatasetForm"
+            label-position="top"
+            :model="form"
+            :rules="rules"
+            @submit.native.prevent
           >
-            <template #label>
-              Name
-              <span class="label-helper">
-                required
-              </span>
-            </template>
-            <el-input
-              v-model="form.name"
-              :disabled="datasetLocked"
-              :maxlength="255"
-              @input="submitUpdateDatasetRequest"
-            />
-          </el-form-item>
-
-          <el-form-item
-            id="inputDescription"
-            prop="description"
-            class="mb-24"
-          >
-            <template #label>
-              Subtitle
-              <span class="label-helper">
-                required to publish
-              </span>
-            </template>
-            <character-count-input
-              ref="inputDescription"
-              v-model="form.description"
-              :rows="5"
-              placeholder="Add a description to help others understand what's in your dataset"
-              :disabled="datasetLocked"
-              @input="onUpdateDescription"
-            />
-          </el-form-item>
-
-          <el-form-item id="inputTags">
-            <template #label>
-              Tags
-            </template>
-            <el-input
-              ref="inputTags"
-              v-model="inputTag"
-              class="mb-8"
-              placeholder="Add tags"
-              :disabled="datasetLocked"
-              @keyup.enter.native.stop="addTag"
-            >
-              <template #prefix>
-                <IconTag
-                  :height="20"
-                  :width="20"
-                  />
+            <el-form-item prop="name">
+              <template #label>
+                Name
+                <span class="label-required">*</span>
               </template>
-            </el-input>
-
-            <div class="tag-wrap">
-              <bf-tag
-                v-for="tag in form.tags"
-                :key="tag"
-                :label="tag"
-                class="mr-8 mb-8"
-                @remove="removeTag(tag)"
+              <el-input
+                v-model="form.name"
+                :disabled="datasetLocked"
+                :maxlength="255"
+                @input="submitUpdateDatasetRequest"
               />
-            </div>
-          </el-form-item>
-        </el-form>
-      </el-col>
-    </el-row>
+            </el-form-item>
 
-    <hr>
+            <el-form-item
+              id="inputDescription"
+              prop="description"
+            >
+              <template #label>
+                Subtitle
+              </template>
+              <character-count-input
+                ref="inputDescription"
+                v-model="form.description"
+                :rows="4"
+                placeholder="A brief description to help others understand your dataset"
+                :disabled="datasetLocked"
+                @input="onUpdateDescription"
+              />
+            </el-form-item>
 
-    <dataset-license
-      id="inputLicense"
-      @change-license="submitUpdateDatasetRequest"
-    />
+            <el-form-item id="inputTags">
+              <template #label>
+                Tags
+              </template>
+              <el-input
+                ref="inputTags"
+                v-model="inputTag"
+                placeholder="Add tags and press Enter"
+                :disabled="datasetLocked"
+                @keyup.enter.native.stop="addTag"
+              >
+                <template #prefix>
+                  <IconTag :height="16" :width="16" />
+                </template>
+              </el-input>
+              <div v-if="form.tags.length > 0" class="tag-wrap">
+                <bf-tag
+                  v-for="tag in form.tags"
+                  :key="tag"
+                  :label="tag"
+                  @remove="removeTag(tag)"
+                />
+              </div>
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
 
-    <dataset-settings-banner-image
-      id="bannerImage"
-      ref="bannerImage"
-      :dataset = "dataset"
-      :datasetBannerURL = "datasetBanner"
-      :isLoadingBanner="isLoadingDatasetBanner"
-    />
+      <div class="settings-section">
+        <div class="settings-section-header">Banner Image</div>
+        <div class="settings-section-content">
+          <dataset-settings-banner-image
+            id="bannerImage"
+            ref="bannerImage"
+            :dataset="dataset"
+            :datasetBannerURL="datasetBanner"
+            :isLoadingBanner="isLoadingDatasetBanner"
+          />
+        </div>
+      </div>
 
-    <hr>
-
-    <dataset-settings-collections />
-
-    <hr>
-
-    <dataset-settings-associated-publications/>
-
-    <hr>
-
-    <!-- delete dataset -->
-    <el-row>
-      <el-col>
-        <h2 class="delete-title">
-          Delete Dataset
-        </h2>
-        <p>
-          Deleting a dataset removes all data from Pennsieve.
-          <strong>This cannot be undone.</strong>
-        </p>
-        <p class="mb-20">
-          Datasets that are published to Pennsieve Discover must be removed before they can be deleted.
-        </p>
-        <bf-button
-          class="red"
-          :disabled="datasetLocked || !getPermission('owner') || datasetPublished"
-          @click="onDeleteDatasetBtnClick"
-        >
-          Delete
-        </bf-button>
-        <p
-          v-if="!getPermission('owner')"
-          class="sharing-blurb"
-        >
-          Deleting is restricted to owners only. To change the owner of your dataset, please contact
-          <a
-            :href="`mailto:${datasetOwnerEmail}`"
-          >
-            {{ datasetOwnerName }}
-          </a>
-        </p>
-      </el-col>
-    </el-row>
-
-    <delete-dataset
-      ref="deleteDatasetDialog"
-      :dialog-visible="deleteDatasetDialogVisible"
-      @delete-dataset-confirmed="submitDeleteDatasetRequest"
-      @close="onCloseDeleteDialog"
-    />
+      <div class="settings-section">
+        <div class="settings-section-header">Collections</div>
+        <div class="settings-section-content">
+          <dataset-settings-collections />
+        </div>
+      </div>
+    </div>
   </bf-stage>
   <stale-update-dialog
       :dialog-visible = "staleUpdateDialogVisible"
@@ -170,6 +110,7 @@
   import DeleteDataset from './window/DeleteDataset.vue'
   import DatasetSettingsAssociatedPublications from './DatasetSettingsAssociatedPublications/DatasetSettingsAssociatedPublications.vue'
   import DatasetSettingsCollections from './DatasetSettingsCollections/DatasetSettingsCollections.vue'
+  import DatasetSettingsContributors from './DatasetSettingsContributors/DatasetSettingsContributors.vue'
   import DatasetLicense from './DatasetLicense/DatasetLicense.vue'
   import FormatDate from '../../../mixins/format-date'
   import Request from '../../../mixins/request'
@@ -200,6 +141,7 @@ export default {
     LockedBanner,
     DatasetSettingsAssociatedPublications,
     DatasetSettingsCollections,
+    DatasetSettingsContributors,
     BfTag
   },
 
@@ -571,72 +513,58 @@ export default {
 @use '../../../styles/theme';
 @use '../../../styles/element/input';
 
-.settings-wrapper {
-  height:100%;
+.details-container {
+  max-width: 640px;
 }
 
-.flex-heading {
-  color: theme.$white;
-  margin-bottom: 8px;
+.settings-section {
+  margin-bottom: 24px;
 }
 
-.bf-dataset-settings {
-  background: theme.$white;
+.settings-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_5;
+  padding: 8px 0;
+  margin: 0 0 16px;
+  border-bottom: 1px solid theme.$gray_2;
 }
 
-.el-form-item,
-.dataset-settings-collections {
-  max-width: 475px;
+.settings-section-content {
+  padding-bottom: 0;
 }
-.el-form-item__label {
+
+:deep(.el-form-item) {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+:deep(.el-form-item__label) {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$gray_6;
+}
+
+:deep(.el-select) {
   width: 100%;
 }
 
-.el-select {
-  width: 100%;
-}
-
-hr {
-  margin: 32px 0 24px;
-}
-
-.full-width {
-  margin: 32px -32px 24px -32px;
-  height: 2px;
-}
-
-.mb-20 {
-  margin-bottom: 16px;
+.label-required {
+  color: theme.$red_1;
+  margin-left: 2px;
 }
 
 .tag-wrap {
   display: flex;
   flex-wrap: wrap;
-}
-
-.tab-disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.sharing-blurb {
-  color: theme.$gray_4;
-  margin-top: 11px;
-  height: 16px;
-  font-weight: normal;
-  font-size: 14px;
-}
-
-.bf-dataset-settings {
-  .el-checkbox__input.is-checked + .el-checkbox__label {
-    color: theme.$gray_6;
-  }
-}
-
-.delete-title {
-  font-size: 14px;
-  color: theme.$gray_6;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 h4 {

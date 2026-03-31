@@ -55,11 +55,28 @@
   .bf-page {
     display: flex;
     flex-direction: row;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
   }
 
   .stageWrapper {
     display: flex;
     flex-direction: column;
     width: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+
+    :deep(> *) {
+      flex-shrink: 0;
+    }
+
+    :deep(> :last-child) {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
   }
 </style>

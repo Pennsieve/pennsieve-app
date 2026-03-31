@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref, reactive, onMounted } from "vue";
+import { computed, ref, reactive, onMounted, nextTick } from "vue";
 
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 // Vue Flow Imports
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
@@ -14,7 +15,16 @@ import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
+import {
+  FARGATE_CPU_OPTIONS,
+  getMemoryOptionsForCpu,
+  LAMBDA_MEMORY_OPTIONS,
+  getCpuForMemory,
+  formatResourceLabel,
+} from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
+import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+
 
 const {
   onNodeClick,
@@ -23,6 +33,15 @@ const {
   screenToFlowCoordinate,
   fitView,
 } = useVueFlow();
+
+const props = defineProps({
+  uuid: {
+    type: String,
+    default: "",
+  },
+});
+
+const router = useRouter();
 
 /*
 Local State
@@ -38,7 +57,6 @@ const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
 // Mode & workflow list state
 const mode = ref("browse"); // 'browse' | 'create'
 const selectedWorkflow = ref(null);
-const statusFilter = ref("active");
 const accordionActiveNames = ref(["workflows"]);
 
 // Information panel state
@@ -48,6 +66,7 @@ const editDescription = ref("");
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
 const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
+const sidebarRef = ref(null);
 
 // Resolve the original processor definition for the selected node
 const selectedNodeProcessor = computed(() => {
@@ -55,6 +74,100 @@ const selectedNodeProcessor = computed(() => {
   const wfNodes = selectedWorkflow.value.dag || [];
   return wfNodes.find((p) => p.id === selectedNode.value.id) || null;
 });
+
+// Get parameter schema for selected processor node
+const selectedNodeParamSchema = computed(() => {
+  const node = selectedNode.value;
+  if (!node || node.type !== "default") return [];
+  // In browse mode: use paramSchema from the workflow definition DAG node
+  if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
+  // In create mode: use params from the application (flat key-value object)
+  const appParams = node.data?.application?.params;
+  if (appParams && typeof appParams === "object" && !Array.isArray(appParams)) {
+    return Object.entries(appParams).map(([name, defaultValue]) => ({
+      name,
+      defaultValue: defaultValue !== "" ? defaultValue : undefined,
+    }));
+  }
+  if (Array.isArray(appParams)) return appParams;
+  return [];
+});
+
+// Snapshot of original defaultParams when workflow is loaded (for change detection)
+const originalDefaultParams = ref({});
+
+const snapshotDefaultParams = () => {
+  const snapshot = {};
+  for (const node of nodes.value) {
+    if (node.type === "default" && node.data?.defaultParams) {
+      snapshot[node.id] = { ...node.data.defaultParams };
+    }
+  }
+  originalDefaultParams.value = snapshot;
+};
+
+// Track whether any changes have been made in browse mode
+const hasAnyChanges = computed(() => {
+  for (const node of nodes.value) {
+    if (node.type === "default" && node.data?.defaultParams) {
+      const current = JSON.stringify(node.data.defaultParams);
+      const original = JSON.stringify(originalDefaultParams.value[node.id] || {});
+      if (current !== original) return true;
+    }
+  }
+  return false;
+});
+
+// Save all workflow changes via PATCH /definitions/{id}
+const saveWorkflowChanges = async () => {
+  const workflow = selectedWorkflow.value;
+  if (!workflow?.uuid) return;
+
+  const defaultParams = {};
+  for (const node of nodes.value) {
+    if (node.type !== "default") continue;
+    const current = node.data?.defaultParams || {};
+    const original = originalDefaultParams.value[node.id] || {};
+    const params = {};
+    for (const [k, v] of Object.entries(current)) {
+      if (v != null && v !== "") params[k] = v;
+    }
+    // Include node if it has params OR if it originally had params (to clear them)
+    if (Object.keys(params).length > 0 || Object.keys(original).length > 0) {
+      defaultParams[node.id] = params;
+    }
+  }
+
+  try {
+    await store.dispatch("analysisModule/updateWorkflow", {
+      uuid: workflow.uuid,
+      payload: { defaultParams },
+    });
+    EventBus.$emit("toast", {
+      detail: { type: "success", msg: "Workflow changes saved." },
+    });
+    // Refresh definition to get updated resolvedParams
+    const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflow.uuid);
+    store.commit("analysisModule/SET_SELECTED_WORKFLOW", updated);
+    const result = definitionToNodesAndEdges(updated, availableApplications.value);
+    nodes.value = result.nodes;
+    edges.value = result.edges;
+    snapshotDefaultParams();
+  } catch (err) {
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: "Failed to save workflow changes." },
+    });
+  }
+};
+
+// Remove a defaultParam override (reverts to app default)
+const clearDefaultParam = (paramName) => {
+  const node = selectedNode.value;
+  if (!node?.data?.defaultParams) return;
+  const updated = { ...node.data.defaultParams };
+  delete updated[paramName];
+  node.data.defaultParams = updated;
+};
 
 // Resolve dependency labels for the selected node
 const selectedNodeDependencies = computed(() => {
@@ -87,11 +200,37 @@ const availableApplications = computed(
 const targetTypes = computed(
   () => store.getters["analysisModule/targetTypes"] || []
 );
+const profile = computed(() => store.state.profile);
+const orgMembers = computed(() => store.state.orgMembers || []);
+
+const getUserName = (userId) => {
+  if (!userId) return "Unknown";
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
+    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You";
+  }
+  const member = orgMembers.value.find((m) => m.id === userId || m.intId === userId);
+  if (member) {
+    return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
+  }
+  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+};
 
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.computeTypes || [];
+  return tt?.runtimeConfig?.computeTypes || [];
+};
+
+const getTargetTypeParams = (targetType) => {
+  if (!targetType) return [];
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.params || [];
+};
+
+const getTargetTypeLabel = (targetType) => {
+  if (!targetType) return "No target selected";
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.label || targetType;
 };
 
 const onTargetTypeChange = (data) => {
@@ -107,24 +246,9 @@ const toggleTargetEdit = (nodeId) => {
   }
 };
 
-const workflows = computed(
-  () => store.state.analysisModule.workflows || []
-);
-
 /*
 Filtered Workflow List
 */
-const filteredWorkflows = computed(() => {
-  let filtered = workflows.value;
-  if (statusFilter.value === "active") {
-    filtered = filtered.filter((w) => w.isActive);
-  } else if (statusFilter.value === "inactive") {
-    filtered = filtered.filter((w) => !w.isActive);
-  }
-  return [...filtered].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-});
 
 /*
 Mode Management
@@ -138,6 +262,7 @@ const enterCreateMode = () => {
   isEditingDetails.value = false;
   clearWorkflow();
   accordionActiveNames.value = ["data-and-apps"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const cancelCreate = () => {
@@ -146,6 +271,7 @@ const cancelCreate = () => {
   selectedNode.value = null;
   clearWorkflow();
   accordionActiveNames.value = ["workflows"];
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
 const extractRepoName = (gitUrl) => {
@@ -223,8 +349,15 @@ const definitionToNodesAndEdges = (workflow, applications) => {
       data: {
         label,
         targetType: p.targetType || null,
-        computeType: p.computeType || getComputeTypesForTarget(p.targetType)?.[0] || null,
+        computeType: p.computeType || (nodeType === "default"
+          ? (matchedApplication?.runtimeConfig?.computeTypes?.[0] || "standard")
+          : getComputeTypesForTarget(p.targetType)?.[0] || null),
+        cpu: String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
+        memory: String(p.memory || matchedApplication?.runtimeConfig?.memory || "") || "",
         application: matchedApplication,
+        defaultParams: p.defaultParams || {},
+        paramSchema: p.paramSchema || [],
+        resolvedParams: p.resolvedParams || {},
       },
       position: hasSavedPositions && p.position
         ? { x: p.position.x, y: p.position.y }
@@ -318,9 +451,10 @@ const selectWorkflow = (workflow) => {
   selectedWorkflow.value = workflow;
   selectedNode.value = null;
   isEditingDetails.value = false;
-  accordionActiveNames.value = ["workflows", "information"];
+  accordionActiveNames.value = ["information", "workflow-metrics"];
   workflowName.value = workflow.name || "";
   workflowDescription.value = workflow.description || "";
+  store.commit("analysisModule/SET_SELECTED_WORKFLOW", workflow);
 
   const result = definitionToNodesAndEdges(
     workflow,
@@ -328,11 +462,12 @@ const selectWorkflow = (workflow) => {
   );
   nodes.value = result.nodes;
   edges.value = result.edges;
+  snapshotDefaultParams();
 
   if (result.needsAutoLayout) {
     autoLayout();
   } else {
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
 };
 
@@ -344,10 +479,20 @@ const generateNodeId = () => {
   return `node_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
+const dragOffset = ref({ x: 0, y: 0 });
+
 const onDragStart = (item, event, type = "application") => {
   if (isReadOnly.value) return;
   draggedType.value = type;
   draggedApp.value = type === "application" ? item : null;
+
+  // Capture where within the element the user clicked
+  const rect = event.target.getBoundingClientRect();
+  dragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
   }
@@ -359,12 +504,15 @@ const onDrop = (event) => {
 
   if (!draggedType.value) return;
 
-  // Convert the drop position from screen coordinates to flow coordinates
-  // so the node appears exactly where the user dropped it
-  const position = screenToFlowCoordinate({
+  // Convert drop position to flow coordinates, applying the grab offset
+  const flowPos = screenToFlowCoordinate({
     x: event.clientX,
     y: event.clientY,
   });
+  const position = {
+    x: flowPos.x - dragOffset.value.x,
+    y: flowPos.y - dragOffset.value.y,
+  };
 
   const nodeId = generateNodeId();
   let newNode;
@@ -387,8 +535,8 @@ const onDrop = (event) => {
         targetType:
           targetTypes.value.length === 1 ? targetTypes.value[0].targetType : null,
         computeType:
-          targetTypes.value.length === 1 && targetTypes.value[0].computeTypes?.length
-            ? targetTypes.value[0].computeTypes[0] : null,
+          targetTypes.value.length === 1 && targetTypes.value[0].runtimeConfig?.computeTypes?.length
+            ? targetTypes.value[0].runtimeConfig.computeTypes[0] : null,
       },
       position,
     };
@@ -399,6 +547,10 @@ const onDrop = (event) => {
       data: {
         label: draggedApp.value.name,
         application: draggedApp.value,
+        computeType: draggedApp.value.runtimeConfig?.computeTypes?.[0] || "standard",
+        cpu: String(draggedApp.value.runtimeConfig?.cpu || "") || "",
+        memory: String(draggedApp.value.runtimeConfig?.memory || "") || "",
+        defaultParams: {},
       },
       position,
     };
@@ -491,7 +643,7 @@ const autoLayout = () => {
   });
 
   // Fit the view after layout settles
-  setTimeout(() => fitView({ padding: 0.2 }), 50);
+  setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
 const saveWorkflow = async () => {
@@ -510,6 +662,24 @@ const saveWorkflow = async () => {
       detail: {
         type: "error",
         msg: "Please add at least one application to the workflow.",
+      },
+    });
+    return;
+  }
+
+  const targetWithoutType = nodes.value.find(
+    (n) => n.type === "data-target" && !n.data.targetType
+  );
+  if (targetWithoutType) {
+    // Select the node so the user can see which one needs a target type
+    nodes.value.forEach((n) => (n.selected = false));
+    const target = nodes.value.find((n) => n.id === targetWithoutType.id);
+    if (target) target.selected = true;
+    selectedNode.value = targetWithoutType;
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: "Please select a target type for all data target nodes before saving.",
       },
     });
     return;
@@ -544,13 +714,20 @@ const saveWorkflow = async () => {
     }
 
     // Default: processor
-    return {
+    const proc = {
       id: node.id,
       type: "processor",
       sourceUrl: node.data.application?.source?.url,
+      computeType: node.data.computeType || "standard",
       dependsOn: dependsOn,
       position,
     };
+    if (node.data.cpu) proc.cpu = node.data.cpu;
+    if (node.data.memory) proc.memory = node.data.memory;
+    if (node.data.defaultParams && Object.keys(node.data.defaultParams).length > 0) {
+      proc.defaultParams = node.data.defaultParams;
+    }
+    return proc;
   });
 
   const workflowData = {
@@ -593,8 +770,16 @@ onMounted(async () => {
     await Promise.all([
       store.dispatch("analysisModule/fetchApplications"),
       store.dispatch("analysisModule/fetchTargetTypes"),
-      store.dispatch("analysisModule/fetchWorkflows"),
     ]);
+
+    if (props.uuid) {
+      const wf = await store.dispatch("analysisModule/fetchWorkflowDefinition", props.uuid);
+      if (wf) {
+        selectWorkflow(wf);
+      }
+    } else {
+      enterCreateMode();
+    }
   } catch (err) {
     console.error(err);
     EventBus.$emit("toast", {
@@ -619,8 +804,11 @@ onNodeClick(({ node }) => {
   if (target) target.selected = true;
 
   selectedNode.value = node;
-  if (!accordionActiveNames.value.includes("information")) {
-    accordionActiveNames.value = [...accordionActiveNames.value, "information"];
+  const toOpen = ["information", "node-metrics"];
+  const current = accordionActiveNames.value;
+  const missing = toOpen.filter((n) => !current.includes(n));
+  if (missing.length) {
+    accordionActiveNames.value = [...current, ...missing];
   }
 });
 
@@ -628,39 +816,62 @@ onPaneClick(() => {
   nodes.value.forEach((n) => (n.selected = false));
   selectedNode.value = null;
 });
+
+const openNodeSettings = (id) => {
+  nodes.value.forEach((n) => (n.selected = false));
+  const target = nodes.value.find((n) => n.id === id);
+  if (target) target.selected = true;
+  selectedNode.value = target;
+
+  // Ensure information accordion is open
+  if (!accordionActiveNames.value.includes("information")) {
+    accordionActiveNames.value = [...accordionActiveNames.value, "information"];
+  }
+
+  nextTick(() => {
+    sidebarRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+  });
+};
 </script>
 
 <template>
   <div class="workflow-builder">
-    <!-- Header -->
-    <div class="builder-header">
-      <template v-if="mode === 'create'">
-        <el-input
-          v-model="workflowName"
-          placeholder="Workflow name"
-          class="header-name-input"
-        />
-        <el-input
-          v-model="workflowDescription"
-          placeholder="Description (optional)"
-          class="header-desc-input"
-        />
-        <div class="header-actions">
-          <bf-button class="secondary" @click="cancelCreate">Cancel</bf-button>
-          <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
-          <bf-button @click="saveWorkflow">Save</bf-button>
-        </div>
-      </template>
-      <template v-else>
-        <span class="header-title">
-          {{ selectedWorkflow ? selectedWorkflow.name : 'Workflows' }}
-        </span>
-      </template>
+    <!-- Header (create mode) -->
+    <div class="builder-header" v-if="mode === 'create'">
+      <el-input
+        v-model="workflowName"
+        placeholder="Workflow name"
+        class="header-name-input"
+      />
+      <el-input
+        v-model="workflowDescription"
+        placeholder="Description (optional)"
+        class="header-desc-input"
+      />
+      <div class="header-actions">
+        <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
+        <bf-button @click="saveWorkflow">Save</bf-button>
+      </div>
+    </div>
+
+    <!-- Header (browse mode) -->
+    <div class="builder-header" v-if="isReadOnly">
+      <span class="header-title">{{ selectedWorkflow?.name || 'Workflow' }}</span>
+      <div class="header-actions">
+        <bf-button
+          :disabled="!hasAnyChanges"
+          @click="saveWorkflowChanges"
+        >
+          Save Changes
+        </bf-button>
+      </div>
     </div>
 
     <div class="builder-content">
-      <!-- Workflow Canvas -->
-      <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
+      <!-- Left: Main Panel -->
+      <div class="main-panel">
+        <!-- Workflow Canvas -->
+        <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
         <div v-if="nodes.length === 0" class="empty-canvas">
           <template v-if="mode === 'create'">
             <h3>Drag items here to build your workflow</h3>
@@ -670,9 +881,9 @@ onPaneClick(() => {
             </p>
           </template>
           <template v-else>
-            <h3>Select a workflow</h3>
+            <h3>No workflow loaded</h3>
             <p>
-              Choose a workflow from the sidebar to view it, or create a new one
+              Return to the workflows gallery to select a workflow
             </p>
           </template>
         </div>
@@ -710,6 +921,14 @@ onPaneClick(() => {
                   <span class="node-title">{{ data.label }}</span>
                   <button
                     v-if="!isReadOnly"
+                    class="settings-btn"
+                    @click.stop="openNodeSettings(id)"
+                    title="Configure"
+                  >
+                    <IconPencil :width="12" :height="12" />
+                  </button>
+                  <button
+                    v-if="!isReadOnly"
                     class="remove-btn"
                     @click.stop="removeNode(id)"
                   >
@@ -722,12 +941,12 @@ onPaneClick(() => {
                 >
                   {{ data.application.description }}
                 </div>
-                <div
-                  v-if="data.application && data.application.resources"
-                  class="node-resources"
-                >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                <div class="node-resources">
+                  <template v-if="data.computeType !== 'lambda'">
+                    CPU: {{ data.cpu || data.application?.runtimeConfig?.cpu || "N/A" }} |
+                  </template>
+                  Memory: {{ data.memory ? formatResourceLabel(data.memory) : (data.application?.runtimeConfig?.memory || "N/A") }}
+                  <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -754,11 +973,11 @@ onPaneClick(() => {
                   {{ data.application.description }}
                 </div>
                 <div
-                  v-if="data.application && data.application.resources"
+                  v-if="data.application && data.application.runtimeConfig"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
+                  {{ data.application.runtimeConfig.memory || "N/A" }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -785,11 +1004,11 @@ onPaneClick(() => {
                   {{ data.application.description }}
                 </div>
                 <div
-                  v-if="data.application && data.application.resources"
+                  v-if="data.application && data.application.runtimeConfig"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.resources.cpu || "N/A" }} | Memory:
-                  {{ data.application.resources.memory || "N/A" }}
+                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
+                  {{ data.application.runtimeConfig.memory || "N/A" }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -819,12 +1038,12 @@ onPaneClick(() => {
               <div class="custom-node data-target-node">
                 <div class="node-header">
                   <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ data.targetType || 'No target selected' }}</span>
+                  <span class="node-title">{{ getTargetTypeLabel(data.targetType) }}</span>
                   <button
                     v-if="!isReadOnly"
-                    class="edit-target-btn"
-                    :class="{ active: editingTargetNodes.has(id) }"
-                    @click.stop="toggleTargetEdit(id)"
+                    class="settings-btn"
+                    @click.stop="openNodeSettings(id)"
+                    title="Configure"
                   >
                     <IconPencil :width="12" :height="12" />
                   </button>
@@ -838,39 +1057,16 @@ onPaneClick(() => {
                 </div>
                 <div class="node-body">
                   <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
-                  <!-- Edit view: only target type selection -->
-                  <div v-if="editingTargetNodes.has(id)" class="target-edit">
-                    <div class="target-edit-field">
-                      <label class="target-edit-label">Target type</label>
-                      <el-select
-                        v-model="data.targetType"
-                        placeholder="Select target type"
-                        size="small"
-                        @change="onTargetTypeChange(data)"
-                      >
-                        <el-option
-                          v-for="tt in targetTypes"
-                          :key="tt.targetType"
-                          :label="tt.targetType"
-                          :value="tt.targetType"
-                        />
-                      </el-select>
-                    </div>
-                  </div>
                 </div>
               </div>
             </template>
           </VueFlow>
         </div>
       </div>
+      </div>
 
       <!-- Sidebar (Right) -->
-      <div class="applications-sidebar">
-        <!-- New Workflow Button -->
-        <bf-button class="new-workflow-btn" @click="enterCreateMode">
-          + New Workflow
-        </bf-button>
-
+      <div ref="sidebarRef" class="applications-sidebar">
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
           <el-collapse-item title="Information" name="information">
@@ -898,19 +1094,256 @@ onPaneClick(() => {
                     <span class="info-value">{{ selectedNode.data.application.applicationType }}</span>
                   </div>
                 </template>
-                <template v-if="selectedNode.data?.targetType">
+                <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
                     <span class="info-label">Target Type</span>
-                    <span class="info-value">{{ selectedNode.data.targetType }}</span>
+                    <span class="info-value" v-if="isReadOnly">{{ getTargetTypeLabel(selectedNode.data.targetType) }}</span>
+                    <el-select
+                      v-else
+                      v-model="selectedNode.data.targetType"
+                      size="small"
+                      placeholder="Select target type"
+                      class="info-inline-select"
+                      @change="onTargetTypeChange(selectedNode.data)"
+                    >
+                      <el-option
+                        v-for="tt in targetTypes"
+                        :key="tt.targetType"
+                        :label="tt.label || tt.targetType"
+                        :value="tt.targetType"
+                      />
+                    </el-select>
                   </div>
                 </template>
-                <template v-if="selectedNode.data?.computeType">
+                <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
-                    <span class="info-label">Runtime</span>
+                    <span class="info-label">Compute Type</span>
                     <span class="info-value">{{ selectedNode.data.computeType }}</span>
                   </div>
                 </template>
               </div>
+
+              <!-- Data target runtime config (editable in create mode) -->
+              <template v-if="selectedNode.type === 'data-target' && !isReadOnly">
+                <h4 class="sidebar-section-title">Runtime Configuration</h4>
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Compute Type</span>
+                    <el-select
+                      v-model="selectedNode.data.computeType"
+                      size="small"
+                      class="info-inline-select"
+                    >
+                      <el-option
+                        v-for="ct in getComputeTypesForTarget(selectedNode.data.targetType)"
+                        :key="ct"
+                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :value="ct"
+                      />
+                    </el-select>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Data target parameters -->
+              <template v-if="selectedNode.type === 'data-target' && selectedNode.data.targetType">
+                <h4 class="sidebar-section-title">Parameters</h4>
+                <div class="info-card">
+                  <template v-if="getTargetTypeParams(selectedNode.data.targetType).length > 0">
+                    <div
+                      v-for="param in getTargetTypeParams(selectedNode.data.targetType)"
+                      :key="param.name"
+                      class="info-row"
+                    >
+                      <span class="info-label">
+                        {{ param.name }}
+                        <span v-if="!param.defaultValue" class="param-required-badge">required at run</span>
+                      </span>
+                      <span v-if="isReadOnly" class="info-value param-value-truncate">
+                        {{ param.defaultValue || '—' }}
+                      </span>
+                      <span v-else class="info-value">
+                        {{ param.defaultValue || '—' }}
+                      </span>
+                    </div>
+                  </template>
+                  <div v-else class="info-row">
+                    <span class="info-value">No parameters</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Processor settings (editable in create mode) -->
+              <template v-if="selectedNode.type === 'default' && !isReadOnly">
+                <h4 class="sidebar-section-title">Runtime Configuration</h4>
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Compute Type</span>
+                    <el-select
+                      v-model="selectedNode.data.computeType"
+                      size="small"
+                      class="info-inline-select"
+                    >
+                      <el-option
+                        v-for="ct in (selectedNode.data.application?.runtimeConfig?.computeTypes || ['standard'])"
+                        :key="ct"
+                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :value="ct"
+                      />
+                    </el-select>
+                  </div>
+                  <!-- Standard: CPU then dependent Memory -->
+                  <template v-if="selectedNode.data.computeType !== 'lambda'">
+                    <div class="info-row">
+                      <span class="info-label">CPU</span>
+                      <el-select
+                        v-model="selectedNode.data.cpu"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        class="info-inline-select"
+                        @change="() => { selectedNode.data.memory = '' }"
+                      >
+                        <el-option
+                          v-for="cpu in FARGATE_CPU_OPTIONS"
+                          :key="cpu"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :value="cpu"
+                        />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Memory</span>
+                      <el-select
+                        v-model="selectedNode.data.memory"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        :disabled="!selectedNode.data.cpu"
+                        class="info-inline-select"
+                      >
+                        <el-option
+                          v-for="mem in getMemoryOptionsForCpu(selectedNode.data.cpu)"
+                          :key="mem"
+                          :label="formatResourceLabel(mem)"
+                          :value="mem"
+                        />
+                      </el-select>
+                    </div>
+                  </template>
+                  <!-- Lambda: Memory + auto-matched CPU -->
+                  <template v-else>
+                    <div class="info-row">
+                      <span class="info-label">CPU</span>
+                      <el-select
+                        v-model="selectedNode.data.cpu"
+                        size="small"
+                        disabled
+                        class="info-inline-select"
+                      >
+                        <el-option
+                          v-for="cpu in FARGATE_CPU_OPTIONS"
+                          :key="cpu"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :value="cpu"
+                        />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Memory</span>
+                      <el-select
+                        v-model="selectedNode.data.memory"
+                        size="small"
+                        placeholder="Default"
+                        clearable
+                        class="info-inline-select"
+                        @change="(val) => { selectedNode.data.cpu = getCpuForMemory(val) }"
+                      >
+                        <el-option
+                          v-for="mem in LAMBDA_MEMORY_OPTIONS"
+                          :key="mem"
+                          :label="formatResourceLabel(mem)"
+                          :value="mem"
+                        />
+                      </el-select>
+                    </div>
+                    <p class="runtime-note">
+                      Lambda allocates CPU proportionally to memory. CPU and Fargate memory settings are only applied if the run is overridden to execute as a standard processor.
+                    </p>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Parameters for processor nodes -->
+              <template v-if="selectedNode.type === 'default' && selectedNodeParamSchema.length > 0">
+                <h4 class="sidebar-section-title">Parameters</h4>
+                <div class="info-card">
+                  <div
+                    v-for="param in selectedNodeParamSchema"
+                    :key="param.name"
+                    class="info-row"
+                  >
+                    <span class="info-label">
+                      {{ param.name }}
+                      <el-tooltip
+                        v-if="param.defaultValue == null && !selectedNode.data.defaultParams?.[param.name]"
+                        content="No default — must be set here or at run time"
+                        placement="left"
+                      >
+                        <span class="param-required-badge">required at run</span>
+                      </el-tooltip>
+                    </span>
+                    <!-- Has app default: show value with edit toggle -->
+                    <template v-if="param.defaultValue != null">
+                      <template v-if="param.name in selectedNode.data.defaultParams">
+                        <div class="param-edit-row">
+                          <el-input
+                            :model-value="selectedNode.data.defaultParams[param.name]"
+                            size="small"
+                            :placeholder="param.defaultValue"
+                            class="info-inline-select"
+                            @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                          />
+                          <button class="param-revert-btn" title="Revert to app default" @click="clearDefaultParam(param.name)">&times;</button>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <span class="param-default-display" @click="selectedNode.data.defaultParams[param.name] = param.defaultValue">
+                          {{ param.defaultValue }}
+                          <span class="param-edit-icon" title="Override">&#9998;</span>
+                        </span>
+                      </template>
+                    </template>
+                    <!-- No app default: always show input -->
+                    <template v-else>
+                      <el-input
+                        v-if="!param.validValues || param.validValues.length === 0"
+                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        size="small"
+                        placeholder="Set default..."
+                        class="info-inline-select"
+                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                      />
+                      <el-select
+                        v-else
+                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        size="small"
+                        placeholder="Select..."
+                        clearable
+                        class="info-inline-select"
+                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                      >
+                        <el-option
+                          v-for="v in param.validValues"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                      </el-select>
+                    </template>
+                  </div>
+                </div>
+              </template>
 
               <!-- Processor configuration -->
               <template v-if="selectedNodeProcessor">
@@ -938,21 +1371,6 @@ onPaneClick(() => {
                       </template>
                       <template v-else>None</template>
                     </span>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Resources -->
-              <template v-if="selectedNode.data?.application?.resources">
-                <h4 class="sidebar-section-title">Resources</h4>
-                <div class="info-card">
-                  <div class="info-row">
-                    <span class="info-label">CPU</span>
-                    <span class="info-value">{{ selectedNode.data.application.resources.cpu || 'N/A' }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">Memory</span>
-                    <span class="info-value">{{ selectedNode.data.application.resources.memory || 'N/A' }}</span>
                   </div>
                 </div>
               </template>
@@ -1045,6 +1463,10 @@ onPaneClick(() => {
                     <span class="info-label">Created</span>
                     <span class="info-value">{{ new Date(selectedWorkflow.createdAt).toLocaleDateString() }}</span>
                   </div>
+                  <div v-if="selectedWorkflow.createdBy" class="info-row">
+                    <span class="info-label">Created By</span>
+                    <span class="info-value">{{ getUserName(selectedWorkflow.createdBy) }}</span>
+                  </div>
                 </div>
                 <div class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
@@ -1062,49 +1484,38 @@ onPaneClick(() => {
             </div>
           </el-collapse-item>
 
-          <!-- Workflows Section -->
-          <el-collapse-item title="Workflows" name="workflows">
-            <!-- Filter Buttons -->
-            <div class="filter-bar">
-              <button
-                v-for="option in filterOptions"
-                :key="option.value"
-                class="filter-btn"
-                :class="{ active: statusFilter === option.value }"
-                @click="statusFilter = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-
-            <!-- Workflow List -->
-            <div class="workflow-list">
-              <div
-                v-for="wf in filteredWorkflows"
-                :key="wf.uuid"
-                class="workflow-list-item"
-                :class="{ selected: selectedWorkflow && selectedWorkflow.uuid === wf.uuid }"
-                @click="selectWorkflow(wf)"
-              >
-                <IconAnalysis class="wf-item-icon" :width="20" :height="20" />
-                <div class="wf-item-info">
-                  <div class="wf-item-name">{{ wf.name }}</div>
-                  <div class="wf-item-description">
-                    {{ wf.description || "No description" }}
-                  </div>
-                  <div class="wf-item-meta">
-                    {{ (wf.dag || []).length }} nodes
-                  </div>
-                </div>
-              </div>
-              <div v-if="filteredWorkflows.length === 0" class="workflow-list-empty">
-                No workflows found
-              </div>
-            </div>
+          <!-- Workflow Metrics Section -->
+          <el-collapse-item
+            v-if="mode === 'browse' && selectedWorkflow"
+            title="Workflow Metrics"
+            name="workflow-metrics"
+          >
+            <MetricsDashboard
+              :key="selectedWorkflow.uuid"
+              filter-column="workflowUuid"
+              :filter-value="selectedWorkflow.uuid"
+              vertical
+              hide-header
+            />
           </el-collapse-item>
 
-          <!-- Data & Applications Section -->
-          <el-collapse-item title="Data & Applications" name="data-and-apps">
+          <!-- Node Metrics Section -->
+          <el-collapse-item
+            v-if="selectedNode && selectedNodeProcessor?.sourceUrl"
+            title="Node Metrics"
+            name="node-metrics"
+          >
+            <MetricsDashboard
+              :key="selectedNodeProcessor.sourceUrl"
+              filter-column="sourceUrl"
+              :filter-value="selectedNodeProcessor.sourceUrl"
+              vertical
+              hide-header
+            />
+          </el-collapse-item>
+
+          <!-- Data & Applications Section (create mode only) -->
+          <el-collapse-item v-if="mode === 'create'" title="Data & Applications" name="data-and-apps">
             <!-- Data Section -->
             <h4 class="sidebar-section-title">Data</h4>
             <div class="data-items-list">
@@ -1118,7 +1529,7 @@ onPaneClick(() => {
                 <div class="data-item-info">
                   <div class="data-item-name">Source</div>
                   <div class="data-item-description">
-                    Select input packages
+                    Select input sookurces
                   </div>
                 </div>
               </div>
@@ -1136,7 +1547,7 @@ onPaneClick(() => {
                 <div class="data-item-info">
                   <div class="data-item-name">Target</div>
                   <div class="data-item-description">
-                    Select output folder
+                    Select output target
                   </div>
                 </div>
               </div>
@@ -1164,8 +1575,8 @@ onPaneClick(() => {
                     {{ app.description || "No description" }}
                   </div>
                   <div class="app-resources">
-                    CPU: {{ app.resources?.cpu || "N/A" }} | Memory:
-                    {{ app.resources?.memory || "N/A" }}
+                    CPU: {{ app.runtimeConfig?.cpu || "N/A" }} | Memory:
+                    {{ app.runtimeConfig?.memory || "N/A" }}
                   </div>
                 </div>
               </div>
@@ -1264,7 +1675,7 @@ onPaneClick(() => {
 @use "../../../styles/theme";
 
 .workflow-builder {
-  height: calc(100vh - 190px);
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1274,14 +1685,39 @@ onPaneClick(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 8px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;
 
   .header-title {
+    font-weight: 400;
+    font-size: 13px;
+    color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-back-link {
+    color: theme.$purple_3;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .header-breadcrumb-sep {
+    color: theme.$gray_4;
+    font-weight: 400;
+  }
+
+  .header-detail-name {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 14px;
     color: theme.$black;
   }
 
@@ -1305,6 +1741,13 @@ onPaneClick(() => {
 
 .builder-content {
   display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-panel {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
 }
@@ -1699,6 +2142,24 @@ onPaneClick(() => {
     line-height: 1.3;
   }
 
+  .settings-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px;
+    border-radius: 3px;
+    color: theme.$gray_4;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+      color: theme.$purple_1;
+      background: rgba(theme.$purple_1, 0.1);
+    }
+  }
+
   .remove-btn {
     background: theme.$status_red;
     color: white;
@@ -1738,6 +2199,22 @@ onPaneClick(() => {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid theme.$gray_2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .runtime-tag {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: rgba(5, 150, 105, 0.12);
+    color: #047857;
+    white-space: nowrap;
+    margin-left: auto;
   }
 
   .node-badge {
@@ -1810,7 +2287,7 @@ onPaneClick(() => {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: 2px;
       background: rgba(5, 150, 105, 0.12);
       color: #047857;
       white-space: nowrap;
@@ -1888,7 +2365,7 @@ onPaneClick(() => {
 .info-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 6px 0;
 
@@ -1911,6 +2388,24 @@ onPaneClick(() => {
   text-align: right;
   word-break: break-word;
 }
+
+.info-inline-select {
+  width: 130px;
+
+  :deep(.el-select-dropdown__item) {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.runtime-note {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin: 8px 0 0 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
 
 .info-url {
   font-family: monospace;
@@ -1992,5 +2487,71 @@ onPaneClick(() => {
   text-align: center;
   font-size: 13px;
   color: theme.$gray_4;
+}
+
+.header-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.param-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.param-revert-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: theme.$gray_4;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+
+  &:hover {
+    color: theme.$status_red;
+  }
+}
+
+.param-value-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+  cursor: default;
+}
+
+.param-default-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$gray_5;
+    .param-edit-icon {
+      opacity: 1;
+    }
+  }
+}
+
+.param-edit-icon {
+  font-size: 11px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.param-required-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$status_red;
+  text-transform: uppercase;
+  margin-left: 4px;
 }
 </style>

@@ -10,6 +10,7 @@ import TemplateGallery from "@/components/datasets/metadata/models/TemplateGalle
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
+import RecordsEmptyState from "@/components/datasets/metadata/records/RecordsEmptyState.vue";
 import DatasetMetadataRecordsView from "@/router/Dataset/DatasetMetadataRecordsView.vue";
 const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
@@ -24,6 +25,12 @@ const DatasetOverview = () => import('../components/datasets/DatasetOverview/Dat
 const SecondaryPageHeader = () => import('./Dataset/SecondaryPageHeader.vue')
 const SecondaryPageHeaderFiles = () => import('./Dataset/SecondaryPageHeaderFiles.vue')
 const DatasetActivityHeader = () => import('./Dataset/DatasetActivityHeader.vue')
+const DatasetSettingsHeader = () => import('./Dataset/DatasetSettingsHeader.vue')
+const DatasetPublishingHeader = () => import('./Dataset/DatasetPublishingHeader.vue')
+const DatasetPublishingView = () => import('./Dataset/DatasetPublishingView.vue')
+const PublicationSettingsPage = () => import('../components/datasets/settings/PublicationSettingsPage.vue')
+const PublicationStatusPage = () => import('../components/datasets/settings/PublicationStatusPage.vue')
+const DatasetSettingsView = () => import('./Dataset/DatasetSettingsView.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
@@ -122,10 +129,14 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
-const ApplicationsList = () => import ('../components/Analysis/Applications/ApplicationsList.vue')
+const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
+const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
+const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
+const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
+const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
 /**
  * Metadata Components
@@ -862,34 +873,76 @@ const router = createRouter({
 
         },
         {
-          name: 'publishing-settings',
-          path: ':datasetId/publishing-settings',
+          name: 'dataset-publishing',
+          path: ':datasetId/publishing',
           components: {
-            stageHeader: SecondaryPageHeader,
-            stage: BfPublishingSettings
+            stageHeader: DatasetPublishingHeader,
+            stage: DatasetPublishingView
           },
-          props: true,
-          meta: {
-            breadcrumbs: [
-              { name: "Publishing Settings", current: true }
-            ]
-          }
+          redirect: {
+            name: 'publication-settings'
+          },
+          props: {
+            stage: true,
+          },
+          children: [
+            {
+              name: 'publication-settings',
+              path: '',
+              components: {
+                stage: PublicationSettingsPage
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'publication-status',
+              path: 'status',
+              components: {
+                stage: PublicationStatusPage
+              },
+              props: {
+                stage: true
+              }
+            },
+          ]
         },
         {
           name: 'dataset-settings',
           path: ':datasetId/settings',
           components: {
-            stageHeader: SecondaryPageHeader,
-            stage: BfDatasetSettings,
+            stageHeader: DatasetSettingsHeader,
+            stage: DatasetSettingsView,
+          },
+          redirect: {
+            name: 'dataset-settings-general'
           },
           props: {
             stage: true,
           },
-          meta: {
-            breadcrumbs: [
-              { name: "Settings", current: true }
-            ]
-          }
+          children: [
+            {
+              name: 'dataset-settings-general',
+              path: '',
+              components: {
+                stage: BfDatasetSettings
+              },
+              props: {
+                stage: true
+              }
+            },
+            {
+              name: 'integrations-settings',
+              path: 'integrations',
+              components: {
+                stage: DatasetIntegrationsSettings
+              },
+              props: {
+                stage: true
+              }
+            },
+          ]
         },
         {
           name: 'dataset-permissions',
@@ -975,6 +1028,12 @@ const router = createRouter({
                 {
                   path: '',
                   name: 'records-list',
+                  components: {
+                    stage: RecordsEmptyState
+                  },
+                  props: {
+                    stage: true
+                  },
                   beforeEnter: async (to, from, next) => {
                     try {
                       // Import the metadata store
@@ -1001,12 +1060,11 @@ const router = createRouter({
                         }
                       }
                       
-                      // If no models exist, redirect to models list
-                      next({ name: 'models-list' })
+                      // If no models exist, continue to records page
+                      next()
                     } catch (error) {
                       console.error('Error redirecting to records:', error)
-                      // Fallback to models list on error
-                      next({ name: 'models-list' })
+                      next()
                     }
                   }
                 },
@@ -1292,20 +1350,6 @@ const router = createRouter({
           ]
         },
         {
-          name: 'integrations-settings',
-          path: ':datasetId/integrations-settings',
-          components: {
-            stageHeader: SecondaryPageHeader,
-            stage: DatasetIntegrationsSettings
-          },
-          props: true,
-          meta: {
-            breadcrumbs: [
-              { name: "Integration Settings", current: true }
-            ]
-          }
-        },
-        {
           name: 'dataset-activity',
           path: ':datasetId/activity',
           components: {
@@ -1480,18 +1524,52 @@ const router = createRouter({
       },
       props: true,
       children: [
-           {
-          name: 'workflow-builder',
-          path: 'workflow-builder',
+        {
+          name: 'workflows',
+          path: 'workflows',
+          components: {
+            stage: WorkflowsGrid,
+          }
+        },
+        {
+          name: 'workflow-create',
+          path: 'workflows/new',
           components: {
             stage: WorkflowBuilder,
+          }
+        },
+        {
+          name: 'workflow-detail',
+          path: 'workflows/:uuid',
+          components: {
+            stage: WorkflowBuilder,
+          },
+          props: {
+            stage: true
           }
         },
         {
           name: 'runs',
           path: 'runs',
           components: {
-            stage: RunMonitor,
+            stage: RunsOverview,
+          }
+        },
+        {
+          name: 'run-configure',
+          path: 'runs/configure',
+          components: {
+            stage: RunDetail,
+          }
+        },
+        {
+          name: 'run-detail',
+          path: 'runs/:runId',
+          components: {
+            stage: RunDetail,
+          },
+          props: {
+            stage: true
           }
         },
         {
@@ -1521,8 +1599,34 @@ const router = createRouter({
           name: 'applications',
           path: 'applications',
           components: {
-            stage: ApplicationsList,
+            stage: ApplicationsGrid,
           }
+        },
+        {
+          name: 'application-detail',
+          path: 'applications/:uuid',
+          components: {
+            stage: ApplicationDetail,
+          },
+          props: {
+            stage: true
+          }
+        },
+        {
+          name: 'compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList
+          },
+          props: true
+        },
+        {
+          name: 'compute-node-management',
+          path: 'compute-nodes/:nodeId',
+          components: {
+            stage: ComputeNodeManagement
+          },
+          props: true
         }
       ]
     },
@@ -1572,22 +1676,6 @@ const router = createRouter({
             stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
           }
         },
-        {
-          name: 'compute-nodes',
-          path: 'compute-nodes',
-          components: {
-            stage: ComputeNodesList
-          },
-          props: true
-        },
-        {
-          name: 'compute-node-management',
-          path: 'compute-nodes/:nodeId',
-          components: {
-            stage: ComputeNodeManagement
-          },
-          props: true
-        }
       ],
       props: true
     },

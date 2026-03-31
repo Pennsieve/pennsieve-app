@@ -1,25 +1,15 @@
 <template>
   <div class="viewer-pane" v-if="cmpViewer">
     <div class="viewer-btn-wrapper" v-if="availableViewers.length > 1">
-      <div v-for="viewer in availableViewers">
-        <tag-pill
-          :class="[
-            viewer === this.cmpViewer
-              ? 'active viewer-selector'
-              : 'viewer-selector',
-          ]"
-          :indicator-color="viewer === this.cmpViewer ? '#F9A23A' : '#CCCCCC'"
-          :has-indicator="false"
-          :label="viewerNameMapper(viewer)"
-          @click="selectViewer(viewer)"
-        >
-          <template #prefix>
-            <div class="icon-wrapper">
-              <icon-analysis />
-            </div>
-          </template>
-        </tag-pill>
-      </div>
+      <button
+        v-for="viewer in availableViewers"
+        :key="viewer"
+        class="viewer-tab-btn"
+        :class="{ active: viewer === cmpViewer }"
+        @click="selectViewer(viewer)"
+      >
+        {{ viewerNameMapper(viewer) }}
+      </button>
     </div>
     <OmeViewer
       v-if="cmpViewer === 'OmeViewer'"
@@ -50,8 +40,6 @@ import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import TagPill from "@/components/shared/TagPill/TagPill.vue";
-import IconAnalysis from "@/components/icons/IconAnalysis.vue";
 import { TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
 import * as siteConfig from '@/site-config/site.json'
@@ -69,8 +57,6 @@ export default {
   name: "ViewerPane",
 
   components: {
-    IconAnalysis,
-    TagPill,
     BfButton,
     SlideViewer: defineAsyncComponent(() =>
       import("../../viewers/SlideViewer/SlideViewer.vue")
@@ -105,6 +91,9 @@ export default {
     ),
     CSVViewer: defineAsyncComponent(() =>
       import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
+    ),
+    LayViewer: defineAsyncComponent(() =>
+      import("../../viewers/LayViewer.vue")
     ),
     OmeViewer: defineAsyncComponent(()=>
     import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
@@ -141,12 +130,13 @@ export default {
   watch: {
     pkg: {
       handler: function (pkg) {
-        if (Object.keys(pkg).length > 0) {
+        if (pkg && Object.keys(pkg.content || {}).length > 0) {
           this.loadViewer(pkg);
           this.fetchTimeseriesData();
         }
       },
       immediate: true,
+      deep: true,
     },
   },
 
@@ -203,6 +193,10 @@ export default {
           return "Data Explorer";
         case "CSVViewer":
           return "CSV Viewer";
+        case "LayViewer":
+          return ".Lay Viewer";
+        case "TextViewer":
+          return "Raw Text";
         default:
           return viewer;
       }
@@ -226,7 +220,7 @@ export default {
 
       this.availableViewers = this.checkViewerType(activeViewer);
 
-      if (this.isTimeseriesPackageUnprocessed(activeViewer)) {
+      if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
         const viewerToLoad = this.availableViewers[0];
@@ -280,21 +274,6 @@ export default {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 
-.viewer-selector {
-  margin: 4px;
-  padding: 4px;
-  text-align: center;
-  vertical-align: center;
-  font-weight: 500;
-  color: theme.$purple_3;
-  border: 1px solid theme.$gray_4;
-  background: theme.$purple_tint;
-  height: 32px;
-  min-width: 120px;
-  align-content: center;
-  cursor: pointer;
-}
-
 .viewer-pane,
 .viewer-wrap {
   background: theme.$gray_1;
@@ -305,13 +284,33 @@ export default {
 }
 
 .viewer-btn-wrapper {
-  margin: 8px;
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
 }
 
-.icon-wrapper {
-  display: flex;
-  margin-right: 4px;
+.viewer-tab-btn {
+  padding: 4px 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: white;
+  color: theme.$gray_5;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1.4;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+
+  &.active {
+    background: theme.$purple_1;
+    border-color: theme.$purple_1;
+    color: white;
+  }
 }
 </style>

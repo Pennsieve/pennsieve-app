@@ -2299,6 +2299,7 @@ export default {
       
       // Set the proxyRecord to the extracted package data
       this.proxyRecord = packageData;
+      this.$store.commit('SET_CURRENT_FILE_NAME', packageData?.content?.name || '');
 
       // Set Active Viewer
       this.setActiveViewer(this.proxyRecord);

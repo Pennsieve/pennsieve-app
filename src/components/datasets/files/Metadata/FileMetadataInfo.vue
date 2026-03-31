@@ -1,78 +1,71 @@
 <template>
   <div class="file-meta-data-info">
-    <div class="header"><div>Details</div></div>
+    <div class="section-header">Details</div>
     <template v-if="showFileFolderInfo">
       <div class="file-info">
-        <div class="key-value">
-          <div class="label">Name:</div>
-          <div class="value">{{ getFileInfo.Name }}</div>
+        <div class="info-field">
+          <div class="info-label">Name</div>
+          <div class="info-value">{{ getFileInfo.Name }}</div>
         </div>
-        <div class="key-value">
-          <div class="label">Size:</div>
-          <div class="value">{{ getFileInfo.Size }}</div>
+        <div class="info-field">
+          <div class="info-label">Size</div>
+          <div class="info-value">{{ getFileInfo.Size }}</div>
         </div>
-        <div class="key-value">
-          <div class="label">Where:</div>
-          <div class="value">{{ getFileInfo.Where }}</div>
+        <div class="info-field">
+          <div class="info-label">Location</div>
+          <div class="info-value info-path">{{ getFileInfo.Where }}</div>
         </div>
-        <div class="key-value">
-          <div class="label">Kind:</div>
-          <div class="value">{{ getFileInfo.Kind }}</div>
+        <div class="info-field">
+          <div class="info-label">Kind</div>
+          <div class="info-value">{{ getFileInfo.Kind }}</div>
         </div>
-        <div class="key-value">
-          <div class="label">Created:</div>
-          <div class="value">{{ getFileInfo.CreatedAt }}</div>
+        <div class="info-field">
+          <div class="info-label">Created</div>
+          <div class="info-value">{{ getFileInfo.CreatedAt }}</div>
         </div>
-        <div class="key-value">
-          <div class="label">Id:</div>
-          <div class="value">{{ getFileInfo.PackageId }}</div>
-
-          <IconAnnotation
-            class="copy-clipboard"
-            :width="28"
-            :height="28"
-            @click="copyPackageIdToClipboard"
-          />
+        <div v-if="getFileInfo.PackageId" class="info-field">
+          <div class="info-label">ID</div>
+          <div class="info-value info-id">
+            <span>{{ getFileInfo.PackageId }}</span>
+            <button class="copy-btn" @click="copyPackageIdToClipboard" title="Copy ID">
+              <IconCopyDocument :width="12" :height="12" />
+            </button>
+          </div>
         </div>
       </div>
     </template>
 
     <template v-else-if="showDatasetInfo">
-      <div class="key-value">
-        <div class="label">Name:</div>
-        <div class="value">{{ getDatasetInfo.Name }}</div>
-      </div>
-      <div class="key-value">
-        <div class="label">Size:</div>
-        <div class="value">{{ getDatasetInfo.Size }}</div>
-      </div>
-      <div class="key-value">
-        <div class="label">Where:</div>
-        <div class="value">{{ getDatasetInfo.Where }}</div>
-      </div>
-      <div class="key-value">
-        <div class="label">Kind:</div>
-        <div class="value">{{ getDatasetInfo.Kind }}</div>
-      </div>
-      <div class="key-value">
-        <div class="label">Created:</div>
-        <div class="value">{{ getDatasetInfo.CreatedAt }}</div>
-      </div>
-
-      <div class="dataset-info">
-        This is the root folder of the '{{ folder.content.name }}' dataset.
+      <div class="file-info">
+        <div class="info-field">
+          <div class="info-label">Name</div>
+          <div class="info-value">/</div>
+        </div>
+        <div class="info-field">
+          <div class="info-label">Size</div>
+          <div class="info-value">{{ getDatasetInfo.Size }}</div>
+        </div>
+        <div class="info-field">
+          <div class="info-label">Kind</div>
+          <div class="info-value">Folder</div>
+        </div>
+        <div class="info-field">
+          <div class="info-label">Created</div>
+          <div class="info-value">{{ getDatasetInfo.CreatedAt }}</div>
+        </div>
+        <p class="dataset-note">Root folder of the '{{ folder.content.name }}' dataset.</p>
       </div>
     </template>
 
     <template v-else>
       <div class="file-info">
-        <div class="simple-message">{{ noDetailsMessage }}</div>
+        <div class="empty-message">{{ noDetailsMessage }}</div>
       </div>
     </template>
 
     <!-- Connected Records Section -->
     <template v-if="connectedRecords.length > 0">
-      <div class="header"><div>Connected Records</div></div>
+      <div class="section-header">Connected Records</div>
       <div class="connected-records">
         <div 
           class="model-group"
@@ -113,6 +106,7 @@ import FormatDate from "../../../../mixins/format-date";
 import { compose, map, join, prepend, reverse } from "ramda";
 import IconAnnotation from "../../../icons/IconAnnotation.vue";
 import IconInfo from "../../../icons/IconInfo.vue";
+import IconCopyDocument from "../../../icons/IconCopyDocument.vue";
 import { copyText } from "vue3-clipboard";
 import { ref } from "vue";
 import { useMetadataStore } from "../../../../stores/metadataStore";
@@ -121,7 +115,7 @@ import { useRecordKeyProperties } from "../../../../composables/useRecordKeyProp
 export default {
   name: "FileMetadataInfo",
 
-  components: { IconInfo, IconAnnotation },
+  components: { IconInfo, IconAnnotation, IconCopyDocument },
 
   mixins: [BfStorageMetrics, FormatDate],
 
@@ -510,119 +504,141 @@ export default {
 <style scoped lang="scss">
 @use "../../../../styles/theme";
 
-.dataset-info {
-  margin: 8px;
-  font-size: 12px;
-}
-
 .file-meta-data-info {
-  margin-left: 16px;
-  border-radius: 4px;
-  flex: 0 0 260px;
-  max-width: 260px;
+  border-left: 1px solid theme.$gray_2;
+  flex: 0 0 280px;
+  max-width: 280px;
   overflow-wrap: anywhere;
+  overflow-y: auto;
+  height: 100%;
 }
 
-.header {
-  height: 38px;
-  font-size: 16px;
+.section-header {
+  padding: 0 16px;
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: theme.$gray_5;
+  background: theme.$gray_1;
   border-bottom: 1px solid theme.$gray_2;
-  line-height: 38px;
-  padding-left: 16px;
-  color: theme.$purple_3;
 }
 
-.record-info {
-  padding-left: 8px;
-  margin: 0 8px 16px 4px;
+.file-info {
+  padding: 16px;
+}
 
-  .record-header {
-    color: theme.$purple_1;
-    background: none;
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    border-bottom: 1px solid theme.$gray_2;
+.info-field {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 13px;
+  color: theme.$gray_6;
+  line-height: 1.4;
+
+  &.info-path {
+    font-size: 12px;
+    color: theme.$gray_5;
+    word-break: break-all;
   }
 
-  .record-props {
-    font-size: 12px;
-    //margin: 0 16px 16px 16px;
+  &.info-id {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: monospace;
+    font-size: 11px;
+    color: theme.$gray_5;
 
-    .record-prop-item {
-      border-top: 1px solid theme.$gray_1;
-      font-weight: 500;
-
-      .prop-label {
-        font-weight: 300;
-      }
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
     }
   }
 }
 
-.copy-clipboard {
-  align-self: center;
-  color: theme.$purple_1;
-  cursor: pointer;
-}
-.file-info {
-  margin: 4px 8px 24px 4px;
-
-  .simple-message {
-    padding: 8px;
-  }
-}
-.key-value {
+.copy-btn {
+  flex-shrink: 0;
   display: flex;
-  flex-direction: row;
-  margin-left: 8px;
-  margin-top: 4px;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  color: theme.$gray_4;
+  transition: color 0.15s ease, background 0.15s ease;
 
-  .label {
-    font-weight: 300;
-    min-width: 50px;
-    font-size: 12px;
-    color: theme.$gray_5;
+  &:hover {
+    color: theme.$purple_3;
+    background: theme.$gray_1;
   }
+}
 
-  .value {
-    margin-left: 8px;
-    font-size: 12px;
-    color: theme.$gray_5;
-  }
+.dataset-note {
+  font-size: 12px;
+  color: theme.$gray_4;
+  font-style: italic;
+  margin-top: 16px;
+}
+
+.empty-message {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: theme.$gray_4;
 }
 
 .connected-records {
-  margin: 4px 8px 24px 4px;
+  padding: 8px;
 
   .model-group {
     margin-bottom: 8px;
 
     .model-group-header {
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
       color: theme.$purple_2;
       padding: 4px 8px;
-      border-bottom: 1px solid theme.$gray_2;
+      margin-bottom: 4px;
     }
 
     .record-item {
-      padding: 6px 8px;
-      margin: 2px 0;
-      transition: background-color 0.2s ease;
+      padding: 8px;
+      border-radius: 4px;
+      transition: background 0.15s ease;
 
       &.clickable-record {
         cursor: pointer;
-        
+
         &:hover {
-          background-color: theme.$gray_1;
+          background: theme.$gray_1;
         }
       }
 
       .record-content {
         .record-title {
-          font-size: 12px;
-          font-weight: 300;
+          font-size: 13px;
+          font-weight: 500;
           color: theme.$gray_6;
           margin-bottom: 2px;
         }
@@ -630,11 +646,11 @@ export default {
         .record-keys {
           font-size: 12px;
           color: theme.$gray_5;
-          
+
           .key-value-pair {
             display: inline-block;
-            margin-right: 12px;
-            
+            margin-right: 8px;
+
             .key {
               font-weight: 500;
             }

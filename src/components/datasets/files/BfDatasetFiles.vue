@@ -8,7 +8,35 @@
     @dragenter="onDragEnter"
   >
     <template #actions>
-      <stage-actions>
+      <stage-actions v-if="trashMode">
+        <template #left>
+          <button class="trash-back-btn" @click="exitTrashMode">
+            <IconArrowLeft :height="12" :width="12" />
+            Back to Files
+          </button>
+          <breadcrumb-navigation
+            v-if="trashAncestors.length > 0"
+            is-light-background
+            :ancestors="trashAncestors"
+            :file="trashFile"
+            :file-id="trashFile?.content?.id"
+            @navigate-breadcrumb="onTrashBreadcrumbNavigate"
+          />
+        </template>
+        <template #right>
+          <bf-button
+            v-if="selectedTrashFiles.length > 0"
+            class="mr-8"
+            @click="restoreTrashFiles"
+          >
+            Restore {{ selectedTrashFiles.length }} file{{ selectedTrashFiles.length !== 1 ? 's' : '' }}
+          </bf-button>
+          <span class="trash-icon-indicator">
+            <IconTrash :height="18" :width="18" />
+          </span>
+        </template>
+      </stage-actions>
+      <stage-actions v-else>
         <template #left>
           <breadcrumb-navigation
             :ancestors="ancestors"
@@ -18,108 +46,111 @@
           />
         </template>
         <template #right>
-          <template v-if="quickActionsVisible">
-            <bf-button
-              :disabled="!isFeatureFlagEnabled"
-              @click="openRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis
-            </bf-button>
-
-            <!-- <bf-button
-              :disabled="!isFeatureFlagEnabled"
-              @click="openOldRunAnalysisDialog"
-              class="mr-8 flex"
-            >
-              <template #prefix>
-                <IconAnalysis class="mr-8" :height="20" :width="20" />
-              </template>
-              Run Analysis (Choose Processors)
-            </bf-button> -->
-
-            <bf-button
-              v-if="getPermission('editor')"
-              class="flex mr-8"
-              :disabled="datasetLocked"
-              data-cy="createNewFolder"
-              @click="openPackageDialog"
-            >
-              <template #prefix>
-                <IconPlus class="mr-8" :height="20" :width="20" />
-              </template>
-              New Folder
-            </bf-button>
-          </template>
-          <ps-button-dropdown
-            @click="toggleActionDropdown"
-            :menu-open="!quickActionsVisible"
+          <bf-button
+            v-if="getPermission('editor')"
+            class="flex"
+            :disabled="datasetLocked"
+            data-cy="createNewFolder"
+            @click="openPackageDialog"
           >
-            <template #buttons>
-              <bf-button
-                :disabled="!isFeatureFlagEnabled"
-                @click="openRunAnalysisDialog"
-                class="dropdown-button"
-              >
-                <template #prefix>
-                  <IconAnalysis class="mr-8" :height="20" :width="20" />
-                </template>
-                Run Analysis
-              </bf-button>
-
-              <bf-button
-                v-if="getPermission('editor')"
-                class="dropdown-button"
-                :disabled="datasetLocked"
-                data-cy="createNewFolder"
-                @click="openPackageDialog"
-              >
-                <template #prefix>
-                  <IconPlus class="mr-8" :height="20" :width="20" />
-                </template>
-                New Folder
-              </bf-button>
-
-              <bf-button @click="showUpload" class="dropdown-button">
-                <template #prefix>
-                  <IconUpload class="mr-8" :height="20" :width="20" />
-                </template>
-
-                Upload
-              </bf-button>
-
-              <bf-button @click="generateManifest" class="dropdown-button">
-                <template #prefix>
-                  <IconAnnotation class="mr-8" :height="20" :width="20" />
-                </template>
-
-                Generate Manifest
-              </bf-button>
-
-              <bf-button @click="NavToDeleted" class="dropdown-button">
-                <template #prefix>
-                  <IconTrash class="mr-8" :height="20" :width="20" />
-                </template>
-
-                Restore Files
-              </bf-button>
+            <template #prefix>
+              <IconPlus class="mr-8" :height="20" :width="20" />
             </template>
-          </ps-button-dropdown>
+            New Folder
+          </bf-button>
+
+          <bf-button
+            class="flex"
+            @click="showUpload"
+          >
+            <template #prefix>
+              <IconUpload class="mr-8" :height="20" :width="20" />
+            </template>
+            Upload
+          </bf-button>
+
+          <el-dropdown trigger="click" @command="handleActionCommand">
+            <button class="more-btn" title="More actions">
+              <span class="more-dots">···</span>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu class="file-actions-menu">
+                <el-dropdown-item command="manifest">
+                  <IconAnnotation :height="16" :width="16" />
+                  <span>Generate Manifest</span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
+          <button class="trash-icon-btn" @click="enterTrashMode" title="Trash">
+            <IconTrash :height="20" :width="20" />
+          </button>
         </template>
       </stage-actions>
     </template>
 
     <div class="file-meta-wrapper">
-      <div class="table-container" ref="tableContainer" @scroll="handleScroll">
+      <div class="table-column">
+        <div v-show="selectedFiles.length > 0 && !trashMode" class="selection-bar">
+          <span class="selection-count">{{ selectedFiles.length }} selected</span>
+          <div class="selection-actions">
+            <button
+              v-if="selectedFiles.length === 1"
+              class="selection-action-btn"
+              :disabled="datasetLocked"
+              @click="startInlineRename"
+            >
+              <IconPencil :height="14" :width="14" />
+              Rename
+            </button>
+            <button class="selection-action-btn" :disabled="datasetLocked" @click="showDeleteDialog">
+              <IconTrash :height="14" :width="14" />
+              Delete
+            </button>
+            <button class="selection-action-btn" :disabled="datasetLocked" @click="showMove">
+              <IconMoveFile :height="14" :width="14" />
+              Move
+            </button>
+            <button class="selection-action-btn" @click="downloadSelected">
+              <IconUpload :height="14" :width="14" />
+              Download
+            </button>
+            <button
+              v-if="selectedFiles.length === 1"
+              class="selection-action-btn"
+              @click="copySelectedFileUrl"
+            >
+              <IconCopyDocument :height="14" :width="14" />
+              Copy Link
+            </button>
+          </div>
+          <button class="selection-action-btn selection-clear" @click="resetSelectedFiles">
+            Clear
+          </button>
+        </div>
+        <div v-show="selectedTrashFiles.length > 0 && trashMode" class="selection-bar">
+          <span class="selection-count">{{ selectedTrashFiles.length }} selected</span>
+          <div class="selection-actions">
+            <button class="selection-action-btn" @click="restoreTrashFiles">
+              <IconMoveFile :height="14" :width="14" />
+              Restore
+            </button>
+          </div>
+          <button class="selection-action-btn selection-clear" @click="selectedTrashFiles = []">
+            Clear
+          </button>
+        </div>
+        <div class="table-container" ref="tableContainer" @scroll="handleScroll" v-if="!trashMode">
         <files-table
           ref="filesTable"
           :data="files"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
           :is-package-attachment-active="isPackageAttachmentActive"
+          :renaming-file-id="renamingFileId"
+          @rename-submit="submitInlineRename"
+          @rename-cancel="cancelInlineRename"
           @move="showMove"
           @delete="showDeleteDialog"
           @process="processFile"
@@ -132,7 +163,24 @@
           <!-- <el-spinner class="loading-spinner" /> -->
         </div>
       </div>
+        <div class="table-container" v-if="trashMode">
+          <div v-if="trashFiles.length === 0 && !filesLoading" class="trash-empty">
+            <IconTrash :height="32" :width="32" />
+            <p>Trash is empty</p>
+          </div>
+          <files-table
+            v-else
+            ref="trashTable"
+            :data="trashFiles"
+            :multiple-selected="selectedTrashFiles.length > 1"
+            :table-loading="filesLoading"
+            @selection-change="setSelectedTrashFiles"
+            @click-file-label="onTrashFileClick"
+          />
+        </div>
+      </div>
       <file-metadata-info
+        v-if="!trashMode"
         :selectedFiles="selectedFiles"
         :ancestors="ancestors"
         :folder="file"
@@ -180,22 +228,10 @@
       @close="onCloseDeleteDialog"
     />
 
-    <run-analysis-dialog
-      :datasetId="datasetId"
-      :dialog-visible="runAnalysisDialogVisible"
-      @close="onCloseRunAnalysisDialog"
-    />
-
     <bf-drop-info
       v-if="showDropInfo"
       v-model:show-drop-info="showDropInfo"
       :file="file"
-    />
-
-    <old-run-analysis-dialog
-      :datasetId="datasetId"
-      :dialog-visible="oldRunAnalysisDialogVisible"
-      @close="onCloseOldRunAnalysisDialog"
     />
 
     <bf-upload-info v-if="showUploadInfo" />
@@ -219,8 +255,6 @@ import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfPackageDialog from "./bf-package-dialog/BfPackageDialog.vue";
 import BfDeleteDialog from "./bf-delete-dialog/BfDeleteDialog.vue";
-import RunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
-import OldRunAnalysisDialog from "./RunAnalysisDialog/RunAnalysisDialog.vue";
 import BfMoveDialog from "./bf-move-dialog/BfMoveDialog.vue";
 import BreadcrumbNavigation from "./BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
@@ -238,17 +272,16 @@ import LockedBanner from "../LockedBanner/LockedBanner.vue";
 import { useMetadataStore } from "../../../stores/metadataStore.js";
 import IconPlus from "../../icons/IconPlus.vue";
 import IconTrash from "../../icons/IconTrash.vue";
-import IconAnalysis from "../../icons/IconAnalysis.vue";
+import IconMoveFile from "../../icons/IconMoveFile.vue";
+import IconArrowDown from "../../icons/IconArrowDown.vue";
+import IconArrowLeft from "../../icons/IconArrowLeft.vue";
+import IconPencil from "../../icons/IconPencil.vue";
+import IconCopyDocument from "../../icons/IconCopyDocument.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import RenameFileDialog from "./RenameFileDialog.vue";
 import { copyText } from "vue3-clipboard";
 import IconUpload from "../../icons/IconUpload.vue";
 
-import {
-  isEnabledForSpecificOrgs,
-  isEnabledForTestOrgs,
-  isEnabledForAllDevOrgs,
-} from "../../../utils/feature-flags.js";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -259,11 +292,15 @@ export default {
 
   components: {
     IconAnnotation,
-    IconAnalysis,
     IconUpload,
     RenameFileDialog,
     StageActions,
     IconTrash,
+    IconMoveFile,
+    IconArrowDown,
+    IconArrowLeft,
+    IconPencil,
+    IconCopyDocument,
     IconPlus,
     BfRafter,
     BfButton,
@@ -279,8 +316,6 @@ export default {
     LockedBanner,
     DeletedFiles,
     FileMetadataInfo,
-    RunAnalysisDialog,
-    OldRunAnalysisDialog,
     PsButtonDropdown,
   },
 
@@ -314,6 +349,11 @@ export default {
       sortDirection: "asc",
       singleFile: {},
       deletedDialogOpen: false,
+      trashMode: false,
+      trashFiles: [],
+      trashAncestors: [],
+      trashFile: { content: { name: '' } },
+      selectedTrashFiles: [],
       limit: 500,
       offset: 0,
       allowFetch: true,
@@ -322,23 +362,15 @@ export default {
       packageDialogVisible: false,
       deleteDialogVisible: false,
       renameDialogVisible: false,
+      renamingFileId: null,
       moveDialogVisible: false,
       selectedFileForAction: {},
       pusherChannelName: "",
       pusherChannel: {},
-      runAnalysisDialogVisible: false,
-      oldRunAnalysisDialogVisible: false,
     };
   },
 
   computed: {
-    ...mapState("analysisModule", [
-      "computeNodes",
-      "preprocessors",
-      "processors",
-      "postprocessors",
-      "selectedFilesForAnalysis",
-    ]),
     ...mapState(["activeOrganization"]),
     ...mapGetters([
       "config",
@@ -410,15 +442,6 @@ export default {
     isExploreEnabled: function () {
       return this.hasFeature("concepts_feature");
     },
-    isFeatureFlagEnabled: function () {
-      const orgId = pathOr("", ["organization", "id"], this.activeOrganization);
-      return (
-        isEnabledForTestOrgs(orgId) ||
-        isEnabledForSpecificOrgs(orgId) ||
-        isEnabledForAllDevOrgs(this.config.apiUrl)
-      );
-    },
-    
     /**
      * Check if package attachment is active
      * @returns {Boolean}
@@ -598,6 +621,208 @@ export default {
       this.selectedFileForAction = this.selectedFiles[0];
       this.renameDialogVisible = true;
     },
+    startInlineRename: function () {
+      if (this.selectedFiles.length === 1) {
+        const file = this.selectedFiles[0];
+        const fileId = file.content?.id || file.content?.nodeId;
+        this.renamingFileId = fileId;
+      }
+    },
+
+    cancelInlineRename: function () {
+      this.renamingFileId = null;
+    },
+
+    submitInlineRename: async function (file, newName) {
+      const currentName = file.content?.name;
+      if (!newName || newName === currentName) {
+        this.renamingFileId = null;
+        return;
+      }
+
+      try {
+        const token = await useGetToken();
+        const id = file.content?.id;
+        const url = `${this.config.apiUrl}/packages/${id}?api_key=${token}`;
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName }),
+        });
+
+        if (response.ok) {
+          const updated = await response.json();
+          this.onFileRenamed(updated);
+          EventBus.$emit("toast", {
+            detail: { type: "success", msg: "File renamed" },
+          });
+        } else {
+          const data = await response.json();
+          EventBus.$emit("toast", {
+            detail: { type: "error", msg: data.message || "Failed to rename" },
+          });
+        }
+      } catch (err) {
+        console.error("Rename failed:", err);
+        EventBus.$emit("toast", {
+          detail: { type: "error", msg: "Failed to rename file" },
+        });
+      } finally {
+        this.renamingFileId = null;
+      }
+    },
+
+    copySelectedFileUrl: function () {
+      if (this.selectedFiles.length === 1) {
+        this.getPresignedUrl(this.selectedFiles[0]);
+      }
+    },
+
+    downloadSelected: function () {
+      EventBus.$emit("trigger-download", this.selectedFiles);
+    },
+
+    handleActionCommand: function (command) {
+      switch (command) {
+        case 'upload':
+          this.showUpload();
+          break;
+        case 'manifest':
+          this.generateManifest();
+          break;
+      }
+    },
+
+    enterTrashMode: function () {
+      this.trashMode = true;
+      this.$store.commit('SET_CURRENT_FOLDER', { name: 'Trash', ancestors: [], isTrash: true });
+      this.trashFiles = [];
+      this.trashAncestors = [];
+      this.trashFile = { content: { name: '' } };
+      this.selectedTrashFiles = [];
+      this.fetchTrashFiles();
+    },
+
+    exitTrashMode: function () {
+      this.trashMode = false;
+      this.trashFiles = [];
+      this.selectedTrashFiles = [];
+      this.$store.commit('SET_CURRENT_FOLDER', { name: '', ancestors: [], isTrash: false });
+    },
+
+    fetchTrashFiles: function (rootNodeId) {
+      this.filesLoading = true;
+      useGetToken()
+        .then(token => {
+          let url = `${this.config.api2Url}/datasets/trashcan?dataset_id=${this.$route.params.datasetId}&limit=100&offset=0`;
+          if (rootNodeId) {
+            url += `&root_node_id=${rootNodeId}`;
+          }
+          return fetch(url, {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+          })
+            .then(response => {
+              if (response.ok) {
+                return response.json().then(data => {
+                  const packages = data.packages || [];
+                  this.trashFiles = packages.map(file => ({
+                    ...file,
+                    content: {
+                      packageType: file.type,
+                      name: file.name.replace(`__DELETED__${file.node_id}_`, ''),
+                      id: file.node_id,
+                      createdAt: file.created_at,
+                    },
+                    storage: file.size || 0,
+                    subtype: file.type === 'Collection' ? 'Folder' : '',
+                  }));
+                });
+              }
+            });
+        })
+        .catch(err => console.error('Failed to fetch trash:', err))
+        .finally(() => {
+          this.filesLoading = false;
+        });
+    },
+
+    onTrashFileClick: function (file) {
+      const packageType = pathOr('', ['content', 'packageType'], file);
+      if (packageType === 'Collection') {
+        const fileId = file.content?.id || file.node_id;
+        const fileName = file.content?.name || file.name;
+        if (fileId && fileName) {
+          this.trashAncestors.push({
+            content: { id: fileId, name: fileName }
+          });
+        }
+        this.trashFile = file;
+        this.fetchTrashFiles(fileId);
+      }
+    },
+
+    onTrashBreadcrumbNavigate: function (id) {
+      if (id) {
+        const index = this.trashAncestors.findIndex(a => a.content.id === id);
+        if (index >= 0) {
+          this.trashFile = this.trashAncestors[index];
+          this.trashAncestors.splice(index);
+        }
+        this.fetchTrashFiles(id);
+      } else {
+        this.trashAncestors = [];
+        this.trashFile = { content: { name: '' } };
+        this.fetchTrashFiles();
+      }
+    },
+
+    setSelectedTrashFiles: function (selection) {
+      this.selectedTrashFiles = selection;
+    },
+
+    restoreTrashFiles: function () {
+      useGetToken()
+        .then(token => {
+          const nodeIds = this.selectedTrashFiles.map(item => item.node_id);
+          return fetch(
+            `${this.config.api2Url}/packages/restore?dataset_id=${this.$route.params.datasetId}`,
+            {
+              method: 'POST',
+              headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ nodeIds }),
+            }
+          ).then(response => {
+            if (response.ok) {
+              return response.json().then(data => {
+                const successItems = data.success || [];
+                const failureItems = data.failures || [];
+                if (failureItems.length > 0) {
+                  EventBus.$emit('toast', {
+                    detail: { msg: `Failed to restore ${failureItems.length} file(s)`, type: 'error' },
+                  });
+                }
+                if (successItems.length > 0) {
+                  EventBus.$emit('toast', {
+                    detail: { msg: `${successItems.length} file(s) restored successfully`, type: 'success' },
+                  });
+                }
+                this.selectedTrashFiles = [];
+                this.fetchTrashFiles(this.trashFile?.content?.id || undefined);
+              });
+            }
+          });
+        })
+        .catch(err => console.error('Failed to restore:', err));
+    },
+
     showDeleteDialog: function () {
       this.selectedFileForAction = {};
       this.deleteDialogVisible = true;
@@ -607,12 +832,6 @@ export default {
     },
     onClosePackageDialog: function () {
       this.packageDialogVisible = false;
-    },
-    onCloseRunAnalysisDialog: function () {
-      this.runAnalysisDialogVisible = false;
-    },
-    onCloseOldRunAnalysisDialog: function () {
-      this.oldRunAnalysisDialogVisible = false;
     },
     handleScroll: function (event) {
       const { clientHeight, scrollTop, scrollHeight } = event.currentTarget;
@@ -689,6 +908,8 @@ export default {
      */
     fetchFiles: function (url) {
       this.filesLoading = true;
+      this.resetSelectedFiles();
+      this.$store.commit('SET_CURRENT_FOLDER', { name: '', ancestors: [] });
 
       useGetToken()
         .then((token) => {
@@ -721,6 +942,12 @@ export default {
               this.sortDirection
             );
             this.ancestors = response.ancestors;
+
+            const isCollection = this.$route.name === 'collection-files';
+            this.$store.commit('SET_CURRENT_FOLDER', {
+              name: isCollection ? (response?.content?.name || '') : '',
+              ancestors: response.ancestors || []
+            });
 
             const pkgId = pathOr("", ["query", "pkgId"], this.$route);
             if (pkgId) {
@@ -1235,13 +1462,6 @@ export default {
           });
       });
     },
-    openRunAnalysisDialog: function () {
-      this.runAnalysisDialogVisible = true;
-    },
-    openOldRunAnalysisDialog: function () {
-      this.oldRunAnalysisDialogVisible = true;
-    },
-
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
         "dataset-files",
@@ -1285,8 +1505,69 @@ export default {
   flex: 1 1 auto;
   overflow-y: scroll;
   display: block;
-  margin-top: 1px;
-  max-height: calc(100vh - 200px);
+  margin-top: 0;
+}
+
+.table-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: theme.$gray_1;
+  gap: 8px;
+
+  .selection-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: theme.$gray_6;
+    white-space: nowrap;
+    margin-right: 8px;
+  }
+
+  .selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+}
+
+.selection-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: theme.$gray_5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: white;
+    color: theme.$purple_3;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &.selection-clear {
+    margin-left: auto;
+    color: theme.$gray_4;
+    &:hover {
+      color: theme.$gray_6;
+    }
+  }
 }
 
 .actions-container {
@@ -1313,8 +1594,90 @@ export default {
   margin: -10px 0px -8px 6px;
 }
 
-.dropdown-button {
-  margin-top: 8px;
+.trash-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  color: theme.$purple_3;
+  transition: color 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    color: theme.$gray_6;
+    background: theme.$gray_1;
+  }
+}
+
+.trash-icon-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: theme.$gray_4;
+}
+
+.trash-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: theme.$purple_3;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+
+  &:hover {
+    background: theme.$gray_1;
+  }
+}
+
+.trash-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  margin-left: 16px;
+}
+
+.trash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: theme.$gray_4;
+
+  p {
+    margin-top: 16px;
+    font-size: 14px;
+  }
+}
+
+.more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: theme.$purple_3;
+  color: theme.$white;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+
+  .more-dots {
+    font-size: 18px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  &:hover {
+    background: theme.$purple_2;
+  }
 }
 
 .file-meta-wrapper {
@@ -1322,6 +1685,9 @@ export default {
   display: flex;
   flex-direction: row;
   flex: 1;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
 }
 
 .bf-dataset-files {
@@ -1346,6 +1712,23 @@ export default {
       font-size: 14px;
       line-height: 16px;
       text-align: center;
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+.file-actions-menu {
+  .el-dropdown-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+
+    span {
+      flex: 1;
     }
   }
 }

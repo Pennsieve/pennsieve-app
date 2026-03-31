@@ -472,6 +472,7 @@ export default {
         mri: ['NiiViewer'],
         tabular: ['CSVViewer','DataExplorer'],
         omeTiff: ['OmeViewer'],
+        lay: ['LayViewer', 'TextViewer'],
       }
 
       // OME-TIFF check based solely on filename - takes precedence over packageType
@@ -482,6 +483,11 @@ export default {
       // Parquet file check based on filename - for UMAP visualization
       if (this.isParquetFile(pkg)) {
         return vueViewerMap['parquet_umap_viewer']
+      }
+
+      // LAY file check based on filename - display as structured viewer
+      if (this.isLayFile(pkg)) {
+        return vueViewerMap['lay']
       }
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
@@ -525,6 +531,10 @@ export default {
     isParquetFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.parquet')
+    },
+    isLayFile: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.lay')
     }
   }
 

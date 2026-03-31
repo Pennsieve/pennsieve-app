@@ -386,6 +386,8 @@ export const actions = {
                 const parallelUploads3 = new Upload({
                     client: new S3Client({
                         region: 'us-east-1',
+                        requestChecksumCalculation: "WHEN_REQUIRED",
+                        responseChecksumValidation: "WHEN_REQUIRED",
                         credentials: fromCognitoIdentityPool({
                             identityPoolId: config.identityPool.id,
                             clientConfig: {region: config.region},
@@ -399,7 +401,7 @@ export const actions = {
                         Bucket: rootState.config.bucketName,
                         Key: value.config.s3_key,
                         Body: value.file,
-                        Tagging: tags
+                        Tagging: tags,
                     }
                 })
 
@@ -417,6 +419,13 @@ export const actions = {
 
             } catch (e) {
                 console.error(e);
+                commit('SET_FILE_STATUS', {key: key, status: "failed"})
+                EventBus.$emit('toast', {
+                    detail: {
+                        msg: `Failed to upload ${value.file.name}: ${e.message || 'Unknown error'}`,
+                        type: 'error'
+                    }
+                })
             }
         }
         commit('SET_UPLOAD_COMPLETE', true)
