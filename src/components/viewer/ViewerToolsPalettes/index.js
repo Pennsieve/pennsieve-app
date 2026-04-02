@@ -1,4 +1,4 @@
-import { compose, pathOr, indexOf, prop, concat, propOr, reject, propEq, findIndex } from 'ramda'
+import { compose, pathOr, indexOf, prop, concat, propOr, reject, propEq, findIndex, find } from 'ramda'
 import { mapState, mapGetters } from 'vuex'
 import { viewerToolTypes } from '@/utils/constants'
 import IconMouseCursor from "../../icons/IconMouseCursor.vue";
@@ -12,6 +12,22 @@ const checkPackageType = (packageType, item) => compose(
   indexOf(packageType),
   prop('packages')
 )(item)
+
+/**
+ * Check if a Collection package contains timeseries data
+ * @param {Object} viewer
+ * @returns {Boolean}
+ */
+const isTimeseriesCollection = (viewer) => {
+  if (pathOr('', ['content', 'packageType'], viewer) !== 'Collection') {
+    return false
+  }
+  const packageProperties = propOr([], 'properties', viewer)
+  const viewerCategory = find(propEq('category', 'Viewer'), packageProperties)
+  const viewerProps = propOr([], 'properties', viewerCategory)
+  const subtypeProp = find(propEq('key', 'subtype'), viewerProps)
+  return propOr('', 'value', subtypeProp).toLowerCase() === 'pennsieve_timeseries'
+}
 
 export default {
 
@@ -190,6 +206,10 @@ export default {
 
       if (packageState === 'ERROR') {
         type = 'unknown'
+      }
+
+      if (isTimeseriesCollection(viewer)) {
+        type = 'TimeSeries'
       }
       const available = concat(defaultList, list.filter(item => checkPackageType(type, item) > -1))
 
