@@ -197,7 +197,7 @@ const autoLayout = () => {
     const pos = g.node(node.id);
     return { ...node, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
   });
-  setTimeout(() => fitView({ padding: 0.2 }), 50);
+  setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
 /*
@@ -400,7 +400,7 @@ const loadRun = async (runId) => {
       nodes.value = result.nodes;
       edges.value = result.edges;
       if (result.needsAutoLayout) autoLayout();
-      else setTimeout(() => fitView({ padding: 0.2 }), 50);
+      else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
     if (activity?.datasetId) {
       fetchRunDatasetName(activity.datasetId);
@@ -495,7 +495,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           name: pd.name,
           type: pd.type || "string",
           description: pd.description || "",
-          required: !!pd.required,
+          required: pd.defaultValue == null || pd.defaultValue === undefined,
           value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
         }));
         nodeConfigs[d.id] = {
@@ -504,13 +504,32 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           params: targetParams,
         };
       } else if (d.type !== "data-source") {
-        const params = Object.entries(srcParams).map(([key, value]) => ({ key, value: String(value) }));
+        // Build schema-driven params from paramSchema + resolvedParams
+        const schema = d.paramSchema || [];
+        const resolved = d.resolvedParams || {};
+        const schemaParams = schema.map((pd) => ({
+          name: pd.name,
+          type: pd.type || "string",
+          description: pd.description || "",
+          required: pd.defaultValue == null || pd.defaultValue === undefined,
+          validValues: pd.validValues || [],
+          resolvedDefault: resolved[pd.name] != null ? String(resolved[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
+          value: srcParams[pd.name] != null
+            ? String(srcParams[pd.name])
+            : (resolved[pd.name] != null ? String(resolved[pd.name]) : ""),
+        }));
+        const schemaNames = new Set(schema.map((pd) => pd.name));
+        const extraParams = Object.entries(srcParams)
+          .filter(([key]) => !schemaNames.has(key))
+          .map(([key, value]) => ({ key, value: String(value) }));
+
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
           version: srcCfg?.version || "",
           cpu: srcCfg?.cpu || "",
           memory: srcCfg?.memory || "",
-          params,
+          schemaParams,
+          extraParams,
         };
       }
     });
@@ -521,7 +540,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     nodes.value = result.nodes;
     edges.value = result.edges;
     if (result.needsAutoLayout) autoLayout();
-    else setTimeout(() => fitView({ padding: 0.2 }), 50);
+    else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
     mode.value = "configure";
     selectedNode.value = null;
@@ -549,17 +568,46 @@ const cancelConfigure = () => {
 */
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
+
+  // Validate data sources have files selected
+  const missingSources = dataSourceNodes.value.filter(
+    (d) => !dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0
+  );
+  if (missingSources.length > 0) {
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+    });
+    return;
+  }
+
   for (const [nodeId, cfg] of Object.entries(nodeConfigs)) {
     const dagNode = dag.find((n) => n.id === nodeId);
-    if (dagNode?.type !== "data-target") continue;
-    const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
-    if (missing.length > 0) {
-      const nodeLabel = dagNode.targetType || nodeId;
-      const names = missing.map((p) => p.name).join(", ");
-      EventBus.$emit("toast", {
-        detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
-      });
-      return;
+    if (!dagNode) continue;
+
+    // Validate data-target required params
+    if (dagNode.type === "data-target") {
+      const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
+      if (missing.length > 0) {
+        const nodeLabel = dagNode.targetType || nodeId;
+        const names = missing.map((p) => p.name).join(", ");
+        EventBus.$emit("toast", {
+          detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
+        });
+        return;
+      }
+    }
+
+    // Validate processor required params
+    if (dagNode.type === "processor") {
+      const missing = (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim());
+      if (missing.length > 0) {
+        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value) || nodeId;
+        const names = missing.map((p) => p.name).join(", ");
+        EventBus.$emit("toast", {
+          detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
+        });
+        return;
+      }
     }
   }
 
@@ -589,11 +637,16 @@ const executeWorkflow = async () => {
 
     const processorParams = {};
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      if (cfg.params && cfg.params.length > 0) {
-        const obj = {};
-        cfg.params.forEach((p) => { if (p.key) obj[p.key] = p.value; });
-        if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
+      const dagNode = dag.find((n) => n.id === nodeId);
+      if (dagNode?.type === "data-target" || dagNode?.type === "data-source") return;
+      const obj = {};
+      if (cfg.schemaParams) {
+        cfg.schemaParams.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
       }
+      if (cfg.extraParams) {
+        cfg.extraParams.forEach((p) => { if (p.key) obj[p.key] = p.value; });
+      }
+      if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
     });
 
     const dataTargets = {};
@@ -752,6 +805,20 @@ const fileCountForNode = (nodeId) => {
   return (dataSourceFiles[nodeId] || []).length;
 };
 
+const nodeUnmetCount = (nodeId, nodeType) => {
+  if (mode.value !== "configure") return 0;
+  if (nodeType === "data-source") {
+    return fileCountForNode(nodeId) === 0 ? 1 : 0;
+  }
+  const cfg = nodeConfigs[nodeId];
+  if (!cfg) return 0;
+  if (nodeType === "data-target") {
+    return (cfg.params || []).filter((p) => p.required && !p.value?.trim()).length;
+  }
+  // processor
+  return (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim()).length;
+};
+
 const removeFileFromNode = (nodeId, index) => {
   if (!dataSourceFiles[nodeId]) return;
   dataSourceFiles[nodeId].splice(index, 1);
@@ -793,14 +860,10 @@ watch(
 /*
   Node params helpers (configure mode)
 */
-const addParam = (nodeId) => {
+const addExtraParam = (nodeId) => {
   if (!nodeConfigs[nodeId]) return;
-  nodeConfigs[nodeId].params.push({ key: "", value: "" });
-};
-
-const removeParam = (nodeId, index) => {
-  if (!nodeConfigs[nodeId]) return;
-  nodeConfigs[nodeId].params.splice(index, 1);
+  if (!nodeConfigs[nodeId].extraParams) nodeConfigs[nodeId].extraParams = [];
+  nodeConfigs[nodeId].extraParams.push({ key: "", value: "" });
 };
 
 /*
@@ -991,6 +1054,10 @@ onMounted(async () => {
       await store.dispatch("analysisModule/fetchWorkflowInstances");
     }
     await loadRun(props.runId);
+  } else {
+    // No pending config and no runId — nothing to show, redirect to runs
+    router.replace({ name: "runs" });
+    return;
   }
 
   // Subscribe to Pusher
@@ -1054,7 +1121,7 @@ onUnmounted(() => {
         <div class="header-actions">
           <bf-button class="secondary" @click="cancelConfigure">Cancel</bf-button>
           <bf-button
-            :disabled="isExecuting || !allDataSourcesHaveFiles"
+            :disabled="isExecuting"
             @click="executeWorkflow"
           >
             {{ isExecuting ? 'Executing...' : 'Execute Workflow' }}
@@ -1124,6 +1191,7 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -1160,6 +1228,7 @@ onUnmounted(() => {
             <template #node-data-source="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
                 <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                  <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -1185,6 +1254,7 @@ onUnmounted(() => {
               <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                  <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.targetType || data.label }}</span>
                   </div>
@@ -1330,19 +1400,63 @@ onUnmounted(() => {
                   </div>
                 </template>
 
-                <!-- Per-node params -->
-                <div class="config-field">
+                <!-- Schema-driven params -->
+                <div v-if="nodeConfigs[selectedNode.id].schemaParams?.length > 0" class="config-field">
                   <label>Parameters</label>
                   <div
-                    v-for="(param, index) in nodeConfigs[selectedNode.id].params"
+                    v-for="param in nodeConfigs[selectedNode.id].schemaParams"
+                    :key="param.name"
+                    class="target-param"
+                  >
+                    <div class="target-param-header">
+                      <span class="target-param-name">{{ param.name }}</span>
+                      <span v-if="param.required" class="target-param-required">required</span>
+                    </div>
+                    <el-tooltip
+                      v-if="param.description"
+                      :content="param.description"
+                      placement="left"
+                    >
+                      <div class="target-param-description">{{ param.description }}</div>
+                    </el-tooltip>
+                    <el-select
+                      v-if="param.validValues && param.validValues.length > 0"
+                      v-model="param.value"
+                      size="small"
+                      :placeholder="param.resolvedDefault ? `default: ${param.resolvedDefault}` : (param.required ? 'Required' : 'Optional')"
+                      clearable
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="v in param.validValues"
+                        :key="v"
+                        :label="v"
+                        :value="v"
+                      />
+                    </el-select>
+                    <el-input
+                      v-else
+                      v-model="param.value"
+                      size="small"
+                      :placeholder="param.resolvedDefault ? `default: ${param.resolvedDefault}` : (param.required ? 'Required' : 'Optional')"
+                    />
+                  </div>
+                </div>
+
+                <!-- Extra free-form params -->
+                <div class="config-field">
+                  <label v-if="!nodeConfigs[selectedNode.id].schemaParams?.length">Parameters</label>
+                  <label v-else-if="nodeConfigs[selectedNode.id].extraParams?.length > 0">Additional Parameters</label>
+                  <div
+                    v-for="(param, index) in nodeConfigs[selectedNode.id].extraParams"
                     :key="index"
                     class="param-row"
                   >
                     <el-input v-model="param.key" size="small" placeholder="Key" class="param-key" />
                     <el-input v-model="param.value" size="small" placeholder="Value" class="param-value" />
-                    <button class="param-remove-btn" @click="removeParam(selectedNode.id, index)">&times;</button>
+                    <button class="param-remove-btn" @click="nodeConfigs[selectedNode.id].extraParams.splice(index, 1)">&times;</button>
                   </div>
-                  <button class="text-link-btn" @click="addParam(selectedNode.id)">+ Add parameter</button>
+                  <button class="text-link-btn" @click="addExtraParam(selectedNode.id)">+ Add parameter</button>
                 </div>
               </div>
 
@@ -1395,7 +1509,6 @@ onUnmounted(() => {
                     <div class="target-param-header">
                       <span class="target-param-name">{{ param.name }}</span>
                       <span v-if="param.required" class="target-param-required">required</span>
-                      <span v-else class="target-param-optional">optional</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
                     <LayerNameSelector
@@ -2154,7 +2267,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 8px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;
@@ -2295,7 +2408,26 @@ onUnmounted(() => {
 }
 
 /* Nodes */
+.node-unmet-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: theme.$red_1;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  line-height: 1;
+}
+
 .custom-node {
+  position: relative;
   background: white;
   border: 1px solid theme.$gray_3;
   border-radius: 2px;
