@@ -217,7 +217,7 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      const url = `${rootState.config.api2Url}/applications?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/applications/v1?organization_id=${rootState.activeOrganization.organization.id}`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -293,7 +293,7 @@ export const actions = {
     commit("CLEAR_SELECTED_FILES");
   },
   createApplication: async ({ commit, rootState }, newApplication) => {
-    const url = `${rootState.config.api2Url}/applications`;
+    const url = `${rootState.config.api2Url}/applications/v1`;
 
     const userToken = await useGetToken();
 
@@ -449,7 +449,7 @@ export const actions = {
   },
   // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
-    const url = `${rootState.config.api2Url}/applications/deploy`;
+    const url = `${rootState.config.api2Url}/applications/v1/deploy`;
     const userToken = await useGetToken();
 
     try {

@@ -37,9 +37,9 @@ export default {
         const matched = this.$route.matched
         if (matched.some(r => r.name === tab.to)) return true
 
-        // Check if current route path falls under the tab's resolved path
-        const tabResolved = this.$router.resolve({ name: tab.to })
-        if (tabResolved && this.$route.path.startsWith(tabResolved.path + '/')) return true
+        // Check if current route path starts with the tab's resolved path
+        const tabRoute = this.$router.resolve({ name: tab.to })
+        if (tabRoute && this.$route.path.startsWith(tabRoute.path)) return true
 
         return false
       } catch {

@@ -234,6 +234,14 @@ onMounted(async () => {
   padding: 16px 24px;
 }
 
+.builder-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  background-color: theme.$white;
+}
+
 .header {
   display: flex;
   align-items: center;
