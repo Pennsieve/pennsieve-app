@@ -90,6 +90,8 @@ export default {
 
 .user-dashboard {
   max-width: 1200px;
+  overflow: auto;
+  flex: 1;
 }
 
 .dashboard-header {

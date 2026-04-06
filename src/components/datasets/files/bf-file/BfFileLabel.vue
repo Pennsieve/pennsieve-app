@@ -396,8 +396,8 @@ export default {
   display: none;
 }
 
-.hover-row {
-  background: #f5f6f9;
+.hover-row,
+.el-table__row:hover {
   .show-btn-open-file {
     .btn-open-file {
       display: inline-block;

@@ -1,29 +1,27 @@
 <template>
-  <bf-stage 
+  <bf-stage
     slot="stage"
     element-loading-background="transparent"
   >
     <div class="settings-page">
-      <general-settings-form />
+      <storage-nodes-form />
     </div>
   </bf-stage>
 </template>
 
 <script>
-import GeneralSettingsForm from './forms/GeneralSettingsForm.vue'
+import StorageNodesForm from './forms/StorageNodesForm.vue'
 
 export default {
-  name: 'GeneralSettingsPage',
+  name: 'StorageNodesPage',
 
   components: {
-    GeneralSettingsForm
+    StorageNodesForm
   }
 }
 </script>
 
 <style scoped lang="scss">
-@use '../../styles/_theme.scss';
-
 .settings-page {
   padding: 32px 0;
 }

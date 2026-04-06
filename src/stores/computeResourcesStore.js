@@ -582,14 +582,14 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
-  const addWorkspaceAccess = async (accountUuid, organizationId, isPublic) => {
+  const addWorkspaceAccess = async (accountUuid, organizationId, isPublic, enableCompute = true, enableStorage = true) => {
     setNodeUpdating(accountUuid, true)
 
     try {
       const token = await useGetToken()
       const encodedOrgId = encodeURIComponent(organizationId)
       const url = `${siteConfig.api2Url}/compute/resources/accounts/${accountUuid}/workspaces?organization_id=${encodedOrgId}`
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -597,9 +597,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ isPublic })
+        body: JSON.stringify({ isPublic, enableCompute, enableStorage })
       })
-      
+
       if (response.ok) {
         // Add the new workspace to the local state
         const accountIndex = computeAccounts.value.findIndex(account => account.uuid === accountUuid)
@@ -607,6 +607,8 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
           const newWorkspace = {
             organizationId,
             isPublic,
+            enableCompute,
+            enableStorage,
             enabledBy: 'current-user', // This should be set from the user profile
             enabledAt: Math.floor(Date.now() / 1000)
           }
@@ -663,8 +665,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
         
         return true
       } else {
-        console.error('Failed to remove workspace access:', response.status, response.statusText)
-        return Promise.reject(new Error(`Failed to remove workspace access: ${response.statusText}`))
+        const errorBody = await response.text()
+        console.error('Failed to remove workspace access:', response.status, errorBody)
+        return Promise.reject(new Error(errorBody || `Failed to remove workspace access: ${response.statusText}`))
       }
     } catch (error) {
       console.error('Failed to remove workspace access:', error)
