@@ -237,6 +237,19 @@ const router = createRouter({
                 props: true
               },
             {
+                name: 'user-compute-resource-detail',
+                path: 'compute-resources/:accountId',
+                meta: {
+                  title: 'Compute Resource Details',
+                  description: 'Manage compute resource account details.',
+                },
+                components: {
+                  stage: () => import('../components/user/integrations/ComputeResourceDetail.vue'),
+                  navigation: UserNavigation,
+                },
+                props: true
+              },
+            {
               name: 'user-integrations',
               path: 'integrations',
               meta: {
@@ -1674,6 +1687,13 @@ const router = createRouter({
           path: 'usage',
           components: {
             stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
+          }
+        },
+        {
+          name: 'workspace-storage-nodes',
+          path: 'storage-nodes',
+          components: {
+            stage: () => import('../components/OrgSettings/StorageNodesPage.vue')
           }
         },
       ],

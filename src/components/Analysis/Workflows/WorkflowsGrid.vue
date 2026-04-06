@@ -231,6 +231,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 16px 24px;
 }
 
 .header {
@@ -296,7 +297,7 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   grid-auto-rows: max-content;
   gap: 24px;
-  padding: 24px;
+  padding: 24px 0;
   flex: 1;
   overflow-y: auto;
 }

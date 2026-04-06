@@ -84,6 +84,14 @@ export default {
           return [{ name: settingsPages[routeName] }];
         }
 
+        // Compute resource detail page
+        if (routeName === 'user-compute-resource-detail') {
+          return [
+            { name: 'Compute Resources', route: { name: 'user-compute-resource' } },
+            { name: 'Account Details' }
+          ];
+        }
+
         // Integration child pages
         const integrationChildren = {
           'user-orcid': 'ORCID',
@@ -123,8 +131,8 @@ export default {
     isSettingsSection() {
       const settingsPages = [
         'my-settings', 'user-profile', 'user-orcid', 'user-github',
-        'user-api', 'user-compute-resource', 'user-integrations',
-        'user-security', 'user-support'
+        'user-api', 'user-compute-resource', 'user-compute-resource-detail',
+        'user-integrations', 'user-security', 'user-support'
       ];
       return settingsPages.includes(this.routeName);
     },

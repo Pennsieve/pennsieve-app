@@ -35,6 +35,7 @@ export default {
         'workspace-dataset-statuses': 'Dataset Statuses',
         'workspace-data-use-agreements': 'Data Use Agreements',
         'workspace-usage-analytics': 'Usage Analytics',
+        'workspace-storage-nodes': 'Storage Nodes',
       }
       const subPageTitle = routeTitles[this.$route.name]
       if (subPageTitle) {

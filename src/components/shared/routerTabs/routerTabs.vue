@@ -30,13 +30,18 @@ export default {
   methods: {
     isTabActive(tab) {
       try {
-        // Check if the current route name matches the tab or is a child of it
         const currentName = this.$route.name
         if (currentName === tab.to) return true
 
         // Check if any matched route in the chain has this name
         const matched = this.$route.matched
-        return matched.some(r => r.name === tab.to)
+        if (matched.some(r => r.name === tab.to)) return true
+
+        // Check if current route path falls under the tab's resolved path
+        const tabResolved = this.$router.resolve({ name: tab.to })
+        if (tabResolved && this.$route.path.startsWith(tabResolved.path + '/')) return true
+
+        return false
       } catch {
         return false
       }

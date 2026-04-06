@@ -25,6 +25,6 @@ export default {
 @use '../../styles/_theme.scss';
 
 .settings-page {
-  padding: 32px;
+  padding: 32px 0;
 }
 </style>
