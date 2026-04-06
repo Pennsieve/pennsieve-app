@@ -66,7 +66,7 @@
     width: 100%;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow: auto;
 
     :deep(> *) {
       flex-shrink: 0;
