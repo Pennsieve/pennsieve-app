@@ -75,6 +75,100 @@ const selectedNodeProcessor = computed(() => {
   return wfNodes.find((p) => p.id === selectedNode.value.id) || null;
 });
 
+// Get parameter schema for selected processor node
+const selectedNodeParamSchema = computed(() => {
+  const node = selectedNode.value;
+  if (!node || node.type !== "default") return [];
+  // In browse mode: use paramSchema from the workflow definition DAG node
+  if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
+  // In create mode: use params from the application (flat key-value object)
+  const appParams = node.data?.application?.params;
+  if (appParams && typeof appParams === "object" && !Array.isArray(appParams)) {
+    return Object.entries(appParams).map(([name, defaultValue]) => ({
+      name,
+      defaultValue: defaultValue !== "" ? defaultValue : undefined,
+    }));
+  }
+  if (Array.isArray(appParams)) return appParams;
+  return [];
+});
+
+// Snapshot of original defaultParams when workflow is loaded (for change detection)
+const originalDefaultParams = ref({});
+
+const snapshotDefaultParams = () => {
+  const snapshot = {};
+  for (const node of nodes.value) {
+    if (node.type === "default" && node.data?.defaultParams) {
+      snapshot[node.id] = { ...node.data.defaultParams };
+    }
+  }
+  originalDefaultParams.value = snapshot;
+};
+
+// Track whether any changes have been made in browse mode
+const hasAnyChanges = computed(() => {
+  for (const node of nodes.value) {
+    if (node.type === "default" && node.data?.defaultParams) {
+      const current = JSON.stringify(node.data.defaultParams);
+      const original = JSON.stringify(originalDefaultParams.value[node.id] || {});
+      if (current !== original) return true;
+    }
+  }
+  return false;
+});
+
+// Save all workflow changes via PATCH /definitions/{id}
+const saveWorkflowChanges = async () => {
+  const workflow = selectedWorkflow.value;
+  if (!workflow?.uuid) return;
+
+  const defaultParams = {};
+  for (const node of nodes.value) {
+    if (node.type !== "default") continue;
+    const current = node.data?.defaultParams || {};
+    const original = originalDefaultParams.value[node.id] || {};
+    const params = {};
+    for (const [k, v] of Object.entries(current)) {
+      if (v != null && v !== "") params[k] = v;
+    }
+    // Include node if it has params OR if it originally had params (to clear them)
+    if (Object.keys(params).length > 0 || Object.keys(original).length > 0) {
+      defaultParams[node.id] = params;
+    }
+  }
+
+  try {
+    await store.dispatch("analysisModule/updateWorkflow", {
+      uuid: workflow.uuid,
+      payload: { defaultParams },
+    });
+    EventBus.$emit("toast", {
+      detail: { type: "success", msg: "Workflow changes saved." },
+    });
+    // Refresh definition to get updated resolvedParams
+    const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflow.uuid);
+    store.commit("analysisModule/SET_SELECTED_WORKFLOW", updated);
+    const result = definitionToNodesAndEdges(updated, availableApplications.value);
+    nodes.value = result.nodes;
+    edges.value = result.edges;
+    snapshotDefaultParams();
+  } catch (err) {
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: "Failed to save workflow changes." },
+    });
+  }
+};
+
+// Remove a defaultParam override (reverts to app default)
+const clearDefaultParam = (paramName) => {
+  const node = selectedNode.value;
+  if (!node?.data?.defaultParams) return;
+  const updated = { ...node.data.defaultParams };
+  delete updated[paramName];
+  node.data.defaultParams = updated;
+};
+
 // Resolve dependency labels for the selected node
 const selectedNodeDependencies = computed(() => {
   const proc = selectedNodeProcessor.value;
@@ -125,6 +219,12 @@ const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   return tt?.runtimeConfig?.computeTypes || [];
+};
+
+const getTargetTypeParams = (targetType) => {
+  if (!targetType) return [];
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  return tt?.params || [];
 };
 
 const getTargetTypeLabel = (targetType) => {
@@ -255,6 +355,9 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         cpu: String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
         memory: String(p.memory || matchedApplication?.runtimeConfig?.memory || "") || "",
         application: matchedApplication,
+        defaultParams: p.defaultParams || {},
+        paramSchema: p.paramSchema || [],
+        resolvedParams: p.resolvedParams || {},
       },
       position: hasSavedPositions && p.position
         ? { x: p.position.x, y: p.position.y }
@@ -359,11 +462,12 @@ const selectWorkflow = (workflow) => {
   );
   nodes.value = result.nodes;
   edges.value = result.edges;
+  snapshotDefaultParams();
 
   if (result.needsAutoLayout) {
     autoLayout();
   } else {
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
 };
 
@@ -446,6 +550,7 @@ const onDrop = (event) => {
         computeType: draggedApp.value.runtimeConfig?.computeTypes?.[0] || "standard",
         cpu: String(draggedApp.value.runtimeConfig?.cpu || "") || "",
         memory: String(draggedApp.value.runtimeConfig?.memory || "") || "",
+        defaultParams: {},
       },
       position,
     };
@@ -538,7 +643,7 @@ const autoLayout = () => {
   });
 
   // Fit the view after layout settles
-  setTimeout(() => fitView({ padding: 0.2 }), 50);
+  setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
 const saveWorkflow = async () => {
@@ -619,6 +724,9 @@ const saveWorkflow = async () => {
     };
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
+    if (node.data.defaultParams && Object.keys(node.data.defaultParams).length > 0) {
+      proc.defaultParams = node.data.defaultParams;
+    }
     return proc;
   });
 
@@ -728,7 +836,7 @@ const openNodeSettings = (id) => {
 
 <template>
   <div class="workflow-builder">
-    <!-- Header (create mode only) -->
+    <!-- Header (create mode) -->
     <div class="builder-header" v-if="mode === 'create'">
       <el-input
         v-model="workflowName"
@@ -743,6 +851,19 @@ const openNodeSettings = (id) => {
       <div class="header-actions">
         <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
         <bf-button @click="saveWorkflow">Save</bf-button>
+      </div>
+    </div>
+
+    <!-- Header (browse mode) -->
+    <div class="builder-header" v-if="isReadOnly">
+      <span class="header-title">{{ selectedWorkflow?.name || 'Workflow' }}</span>
+      <div class="header-actions">
+        <bf-button
+          :disabled="!hasAnyChanges"
+          @click="saveWorkflowChanges"
+        >
+          Save Changes
+        </bf-button>
       </div>
     </div>
 
@@ -1024,6 +1145,34 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
+              <!-- Data target parameters -->
+              <template v-if="selectedNode.type === 'data-target' && selectedNode.data.targetType">
+                <h4 class="sidebar-section-title">Parameters</h4>
+                <div class="info-card">
+                  <template v-if="getTargetTypeParams(selectedNode.data.targetType).length > 0">
+                    <div
+                      v-for="param in getTargetTypeParams(selectedNode.data.targetType)"
+                      :key="param.name"
+                      class="info-row"
+                    >
+                      <span class="info-label">
+                        {{ param.name }}
+                        <span v-if="!param.defaultValue" class="param-required-badge">required at run</span>
+                      </span>
+                      <span v-if="isReadOnly" class="info-value param-value-truncate">
+                        {{ param.defaultValue || '—' }}
+                      </span>
+                      <span v-else class="info-value">
+                        {{ param.defaultValue || '—' }}
+                      </span>
+                    </div>
+                  </template>
+                  <div v-else class="info-row">
+                    <span class="info-value">No parameters</span>
+                  </div>
+                </div>
+              </template>
+
               <!-- Processor settings (editable in create mode) -->
               <template v-if="selectedNode.type === 'default' && !isReadOnly">
                 <h4 class="sidebar-section-title">Runtime Configuration</h4>
@@ -1122,6 +1271,77 @@ const openNodeSettings = (id) => {
                       Lambda allocates CPU proportionally to memory. CPU and Fargate memory settings are only applied if the run is overridden to execute as a standard processor.
                     </p>
                   </template>
+                </div>
+              </template>
+
+              <!-- Parameters for processor nodes -->
+              <template v-if="selectedNode.type === 'default' && selectedNodeParamSchema.length > 0">
+                <h4 class="sidebar-section-title">Parameters</h4>
+                <div class="info-card">
+                  <div
+                    v-for="param in selectedNodeParamSchema"
+                    :key="param.name"
+                    class="info-row"
+                  >
+                    <span class="info-label">
+                      {{ param.name }}
+                      <el-tooltip
+                        v-if="param.defaultValue == null && !selectedNode.data.defaultParams?.[param.name]"
+                        content="No default — must be set here or at run time"
+                        placement="left"
+                      >
+                        <span class="param-required-badge">required at run</span>
+                      </el-tooltip>
+                    </span>
+                    <!-- Has app default: show value with edit toggle -->
+                    <template v-if="param.defaultValue != null">
+                      <template v-if="param.name in selectedNode.data.defaultParams">
+                        <div class="param-edit-row">
+                          <el-input
+                            :model-value="selectedNode.data.defaultParams[param.name]"
+                            size="small"
+                            :placeholder="param.defaultValue"
+                            class="info-inline-select"
+                            @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                          />
+                          <button class="param-revert-btn" title="Revert to app default" @click="clearDefaultParam(param.name)">&times;</button>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <span class="param-default-display" @click="selectedNode.data.defaultParams[param.name] = param.defaultValue">
+                          {{ param.defaultValue }}
+                          <span class="param-edit-icon" title="Override">&#9998;</span>
+                        </span>
+                      </template>
+                    </template>
+                    <!-- No app default: always show input -->
+                    <template v-else>
+                      <el-input
+                        v-if="!param.validValues || param.validValues.length === 0"
+                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        size="small"
+                        placeholder="Set default..."
+                        class="info-inline-select"
+                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                      />
+                      <el-select
+                        v-else
+                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        size="small"
+                        placeholder="Select..."
+                        clearable
+                        class="info-inline-select"
+                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                      >
+                        <el-option
+                          v-for="v in param.validValues"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                      </el-select>
+                    </template>
+                  </div>
                 </div>
               </template>
 
@@ -1465,7 +1685,7 @@ const openNodeSettings = (id) => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 24px;
+  padding: 8px 24px;
   background-color: theme.$white;
   border-bottom: 1px solid theme.$gray_3;
   min-height: 48px;
@@ -2267,5 +2487,71 @@ const openNodeSettings = (id) => {
   text-align: center;
   font-size: 13px;
   color: theme.$gray_4;
+}
+
+.header-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.param-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.param-revert-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: theme.$gray_4;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+
+  &:hover {
+    color: theme.$status_red;
+  }
+}
+
+.param-value-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+  cursor: default;
+}
+
+.param-default-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$gray_5;
+    .param-edit-icon {
+      opacity: 1;
+    }
+  }
+}
+
+.param-edit-icon {
+  font-size: 11px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.param-required-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$status_red;
+  text-transform: uppercase;
+  margin-left: 4px;
 }
 </style>

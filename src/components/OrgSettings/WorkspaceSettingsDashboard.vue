@@ -23,6 +23,13 @@
         icon="security"
       />
 
+      <workspace-settings-card
+        title="Storage Nodes"
+        description="Manage external storage locations attached to this workspace"
+        :route="{ name: 'workspace-storage-nodes' }"
+        icon="database"
+      />
+
 <!--      <workspace-settings-card-->
 <!--        title="Usage Analytics"-->
 <!--        description="View storage usage and workspace activity metrics"-->

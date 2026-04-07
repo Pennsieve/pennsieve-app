@@ -128,7 +128,6 @@
     overflow: auto;
 
     &.no-actions {
-      padding: 32px;
       min-height: 100%;
     }
 
