@@ -449,7 +449,7 @@ export const actions = {
   },
   // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
-    const url = `${rootState.config.api2Url}/applications/v1/deploy`;
+    const url = `${rootState.config.api2Url}/applications/deploy`;
     const userToken = await useGetToken();
 
     try {
