@@ -473,6 +473,7 @@ export default {
         tabular: ['CSVViewer','DataExplorer'],
         omeTiff: ['OmeViewer'],
         lay: ['LayViewer', 'TextViewer'],
+        neuroglancer: ['NeuroglancerViewer'],
       }
 
       // OME-TIFF check based solely on filename - takes precedence over packageType
@@ -488,6 +489,11 @@ export default {
       // LAY file check based on filename - display as structured viewer
       if (this.isLayFile(pkg)) {
         return vueViewerMap['lay']
+      }
+
+      // Neuroglancer-compatible file check
+      if (this.isNeuroglancerFile(pkg)) {
+        return vueViewerMap['neuroglancer']
       }
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
@@ -535,6 +541,14 @@ export default {
     isLayFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.lay')
+    },
+    isNeuroglancerFile: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.zarr') ||
+        fileName.endsWith('.nii') ||
+        fileName.endsWith('.nii.gz') ||
+        fileName.endsWith('.nrrd') ||
+        fileName.endsWith('.precomputed')
     }
   }
 

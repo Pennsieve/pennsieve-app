@@ -17,6 +17,12 @@
       :source="omeTiffSource"
       source-type="ome-tiff"
     />
+    <NeuroglancerViewer
+      v-else-if="cmpViewer.startsWith('NeuroglancerViewer:')"
+      ref="viewer"
+      :pkg="pkg"
+      :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
+    />
     <component
       v-else
       :is="cmpViewer"
@@ -97,6 +103,9 @@ export default {
     ),
     OmeViewer: defineAsyncComponent(()=>
     import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
+    ),
+    NeuroglancerViewer: defineAsyncComponent(() =>
+      import("../../viewers/NeuroglancerViewer.vue")
     )
   },
 
@@ -121,6 +130,7 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      viewerAssets: [],
       isLoading: false,
       omeTiffSource: "",
       viewerInstanceId: VIEWER_INSTANCE_ID,
@@ -141,7 +151,7 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
 
     /**
      * Called when component is mounted
@@ -188,6 +198,11 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
+      if (viewer.startsWith('NeuroglancerViewer:')) {
+        const idx = parseInt(viewer.split(':')[1])
+        const asset = this.viewerAssets[idx]
+        return asset?.name || `Neuroglancer ${idx + 1}`
+      }
       switch (viewer) {
         case "DataExplorer":
           return "Data Explorer";
@@ -220,6 +235,34 @@ export default {
 
       this.availableViewers = this.checkViewerType(activeViewer);
 
+      // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
+      const pkgId = pathOr('', ['content', 'id'], activeViewer);
+      const datasetId = pathOr('', ['content', 'datasetNodeId'], activeViewer);
+      this.viewerAssets = [];
+      if (pkgId && datasetId) {
+        try {
+          const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+          if (result?.assets?.length > 0) {
+            const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
+            const ngAssets = result.assets.filter(
+              a => neuroglancerTypes.includes(a.asset_type) && a.status === 'ready'
+            )
+            if (ngAssets.length > 0) {
+              this.viewerAssets = ngAssets.map(a => ({
+                ...a,
+                cloudfront: result.cloudfront,
+              }))
+              const ngViewerNames = ngAssets.map((a, i) =>
+                `NeuroglancerViewer:${i}`
+              )
+              this.availableViewers = [...ngViewerNames, ...this.availableViewers]
+            }
+          }
+        } catch (err) {
+          // Viewer assets not available — fall through to default viewer
+        }
+      }
+
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
@@ -229,7 +272,6 @@ export default {
         // use this when migrating instead of a wrapper for every component
         if (viewerToLoad === 'OmeViewer') {
           try {
-            const pkgId = pathOr('', ['content', 'id'], activeViewer);
             const viewerAssets = await this.fetchViewerAssets(pkgId);
 
             if (viewerAssets && viewerAssets.length > 0) {
