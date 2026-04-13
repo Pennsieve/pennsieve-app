@@ -1,25 +1,24 @@
 <template>
   <div class="neuroglancer-viewer">
-    <div v-if="loading" class="neuroglancer-status">
-      Loading viewer assets...
-    </div>
+    <OrthogonalFrame
+      v-if="asset?.asset_url"
+      :source="asset.asset_url"
+      :embed-url="embedUrl"
+      :cloudfront="asset.cloudfront || null"
+      @error="onError"
+    />
     <div v-else-if="error" class="neuroglancer-status neuroglancer-error">
       {{ error }}
     </div>
-    <iframe
-      v-else-if="iframeSrc"
-      :src="iframeSrc"
-      class="neuroglancer-iframe"
-      allow="fullscreen"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
+import { OrthogonalFrame } from '@pennsieve-viz/core'
 import * as siteConfig from '@/site-config/site.json'
 
-const props = defineProps({
+defineProps({
   pkg: {
     type: Object,
     default: () => ({}),
@@ -30,66 +29,12 @@ const props = defineProps({
   },
 })
 
-const iframeSrc = ref('')
-const loading = ref(false)
 const error = ref('')
+const embedUrl = siteConfig.neuroglancerUrl || 'https://orthogonal-viewer.pennsieve.net'
 
-const resolveSource = async (asset) => {
-  if (!asset?.asset_url) {
-    error.value = 'No viewer asset provided.'
-    return
-  }
-
-  loading.value = true
-  error.value = ''
-
-  try {
-    const cf = asset.cloudfront
-    let sourceUrl = asset.asset_url
-    if (siteConfig.environment === 'local') {
-      // Dev: use Vite proxy to append signing params server-side
-      if (cf) {
-        const cfParamStr = `Policy=${cf.policy}&Signature=${cf.signature}&Key-Pair-Id=${cf.key_pair_id}`
-        await fetch('/neuroglancer-cf-params', {
-          method: 'POST',
-          body: cfParamStr,
-        }).catch(() => {})
-      }
-      const assetPath = new URL(asset.asset_url).pathname
-      sourceUrl = `http://localhost:3000/neuroglancer-cf-proxy${assetPath}`
-    } else if (cf?.policy) {
-      // Production: set CloudFront signed cookies on the .pennsieve domain.
-      // Neuroglancer (same origin) forwards these with asset requests.
-      const cookieOpts = `Domain=.${siteConfig.app_domain}; Path=/; Secure; SameSite=None`
-      document.cookie = `CloudFront-Policy=${cf.policy}; ${cookieOpts}`
-      document.cookie = `CloudFront-Signature=${cf.signature}; ${cookieOpts}`
-      document.cookie = `CloudFront-Key-Pair-Id=${cf.key_pair_id}; ${cookieOpts}`
-    }
-
-    const state = JSON.stringify({
-      layers: [
-        {
-          type: 'image',
-          source: `zarr3://${sourceUrl}`,
-          name: asset.name || 'data',
-        },
-      ],
-      layout: 'xy',
-    })
-    iframeSrc.value = `/neuroglancer/index.html#!${state}`
-  } catch (err) {
-    console.error('NeuroglancerViewer:', err)
-    error.value = err.message
-  } finally {
-    loading.value = false
-  }
+function onError(msg) {
+  error.value = msg
 }
-
-watch(() => props.asset, (asset) => {
-  if (asset) {
-    resolveSource(asset)
-  }
-}, { immediate: true })
 </script>
 
 <style scoped>
@@ -97,13 +42,6 @@ watch(() => props.asset, (asset) => {
   display: flex;
   flex: 1;
   min-height: 800px;
-}
-
-.neuroglancer-iframe {
-  width: 100%;
-  height: 100%;
-  min-height: 800px;
-  border: none;
 }
 
 .neuroglancer-status {

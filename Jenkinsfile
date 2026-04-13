@@ -20,8 +20,7 @@ node('executor') {
                     node -v
                     npm -v
                     npm install
-                    npm run build-${buildEnv}
-                    node scripts/build-neuroglancer.mjs"""
+                    npm run build-${buildEnv}"""
 
                 stash includes: "**/dist/**", name: 'dist'
 //                 stash includes: "**/web-components/build/**", name: 'buildComponents'
@@ -50,7 +49,6 @@ node('executor') {
                         sh "aws s3 --region us-east-1 rm --recursive s3://$bucketName/"
                         sh "aws s3 --region us-east-1 cp --recursive dist s3://$bucketName"
                         sh "aws s3 --region us-east-1 cp --cache-control 0 dist/index.html s3://$bucketName/"
-                        sh "aws s3 --region us-east-1 cp --cache-control 0 dist/neuroglancer/index.html s3://$bucketName/neuroglancer/index.html"
                         def distributionId = sh(
                             script: "aws cloudfront list-distributions --query \"DistributionList.Items[?contains(Origins.Items[0].DomainName, '${bucketName}.s3.amazonaws.com')].Id\" --output text",
                             returnStdout: true
