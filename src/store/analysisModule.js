@@ -293,7 +293,7 @@ export const actions = {
     commit("CLEAR_SELECTED_FILES");
   },
   createApplication: async ({ commit, rootState }, newApplication) => {
-    const url = `${rootState.config.api2Url}/applications/v1`;
+    const url = `${rootState.config.api2Url}/applications/store`;
 
     const userToken = await useGetToken();
 
