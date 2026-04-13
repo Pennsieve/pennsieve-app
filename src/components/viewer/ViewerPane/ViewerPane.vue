@@ -45,6 +45,7 @@ import { storeToRefs } from "pinia";
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
+import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import { TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
@@ -64,6 +65,7 @@ export default {
 
   components: {
     BfButton,
+    NeuroglancerViewer,
     SlideViewer: defineAsyncComponent(() =>
       import("../../viewers/SlideViewer/SlideViewer.vue")
     ),
@@ -103,9 +105,6 @@ export default {
     ),
     OmeViewer: defineAsyncComponent(()=>
     import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
-    ),
-    NeuroglancerViewer: defineAsyncComponent(() =>
-      import("../../viewers/NeuroglancerViewer.vue")
     )
   },
 

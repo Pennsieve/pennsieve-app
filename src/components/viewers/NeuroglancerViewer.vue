@@ -45,20 +45,26 @@ const resolveSource = async (asset) => {
 
   try {
     const cf = asset.cloudfront
-    if (cf) {
-      // Send signing params to the dev proxy
-      const cfParamStr = `Policy=${cf.policy}&Signature=${cf.signature}&Key-Pair-Id=${cf.key_pair_id}`
-      await fetch('/neuroglancer-cf-params', {
-        method: 'POST',
-        body: cfParamStr,
-      }).catch(() => {})
+    let sourceUrl = asset.asset_url
+    if (siteConfig.environment === 'local') {
+      // Dev: use Vite proxy to append signing params server-side
+      if (cf) {
+        const cfParamStr = `Policy=${cf.policy}&Signature=${cf.signature}&Key-Pair-Id=${cf.key_pair_id}`
+        await fetch('/neuroglancer-cf-params', {
+          method: 'POST',
+          body: cfParamStr,
+        }).catch(() => {})
+      }
+      const assetPath = new URL(asset.asset_url).pathname
+      sourceUrl = `http://localhost:3000/neuroglancer-cf-proxy${assetPath}`
+    } else if (cf?.policy) {
+      // Production: set CloudFront signed cookies on the .pennsieve domain.
+      // Neuroglancer (same origin) forwards these with asset requests.
+      const cookieOpts = `Domain=.${siteConfig.app_domain}; Path=/; Secure; SameSite=None`
+      document.cookie = `CloudFront-Policy=${cf.policy}; ${cookieOpts}`
+      document.cookie = `CloudFront-Signature=${cf.signature}; ${cookieOpts}`
+      document.cookie = `CloudFront-Key-Pair-Id=${cf.key_pair_id}; ${cookieOpts}`
     }
-
-    // Use the proxy URL for dev, direct URL for production
-    const assetPath = new URL(asset.asset_url).pathname
-    const sourceUrl = siteConfig.environment === 'local'
-      ? `http://localhost:3000/neuroglancer-cf-proxy${assetPath}`
-      : asset.asset_url
 
     const state = JSON.stringify({
       layers: [
@@ -90,14 +96,14 @@ watch(() => props.asset, (asset) => {
 .neuroglancer-viewer {
   display: flex;
   flex: 1;
-  min-height: 0;
+  min-height: 800px;
 }
 
 .neuroglancer-iframe {
   width: 100%;
   height: 100%;
+  min-height: 800px;
   border: none;
-  flex: 1;
 }
 
 .neuroglancer-status {
