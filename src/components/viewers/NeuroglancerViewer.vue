@@ -41,6 +41,7 @@ function onError(msg) {
 .neuroglancer-viewer {
   display: flex;
   flex: 1;
+  height: inherit;
   min-height: 800px;
 }
 
@@ -55,5 +56,9 @@ function onError(msg) {
 
 .neuroglancer-error {
   color: #b91c1c;
+}
+
+:deep(.orthogonal-frame) {
+  height: inherit !important;
 }
 </style>

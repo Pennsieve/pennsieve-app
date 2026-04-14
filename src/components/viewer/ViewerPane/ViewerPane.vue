@@ -232,7 +232,7 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      this.availableViewers = this.checkViewerType(activeViewer);
+      let viewers = this.checkViewerType(activeViewer);
 
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
       const pkgId = pathOr('', ['content', 'id'], activeViewer);
@@ -243,9 +243,13 @@ export default {
           const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
           if (result?.assets?.length > 0) {
             const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
-            const ngAssets = result.assets.filter(
-              a => neuroglancerTypes.includes(a.asset_type) && a.status === 'ready'
-            )
+            const seen = new Set()
+            const ngAssets = result.assets.filter(a => {
+              if (!neuroglancerTypes.includes(a.asset_type) || a.status !== 'ready') return false
+              if (seen.has(a.asset_url)) return false
+              seen.add(a.asset_url)
+              return true
+            })
             if (ngAssets.length > 0) {
               this.viewerAssets = ngAssets.map(a => ({
                 ...a,
@@ -254,13 +258,16 @@ export default {
               const ngViewerNames = ngAssets.map((a, i) =>
                 `NeuroglancerViewer:${i}`
               )
-              this.availableViewers = [...ngViewerNames, ...this.availableViewers]
+              const filtered = viewers.filter(v => v !== 'UnknownViewer')
+              viewers = [...ngViewerNames, ...filtered]
             }
           }
         } catch (err) {
           // Viewer assets not available — fall through to default viewer
         }
       }
+
+      this.availableViewers = viewers;
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
