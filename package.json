@@ -25,7 +25,7 @@
     "@dagrejs/dagre": "^1.1.4",
     "@duckdb/duckdb-wasm": "^1.29.0",
     "@element-plus/icons-vue": "^2.3.1",
-    "@pennsieve-viz/core": "^0.1.7",
+    "@pennsieve-viz/core": "^0.2.1",
     "@pennsieve-viz/micro-ct": "1.0.0",
     "@pennsieve-viz/tsviewer": "^1.1.11",
     "@sigma/node-border": "^3.0.0",

@@ -17,6 +17,12 @@
       :source="omeTiffSource"
       source-type="ome-tiff"
     />
+    <NeuroglancerViewer
+      v-else-if="cmpViewer.startsWith('NeuroglancerViewer:')"
+      ref="viewer"
+      :pkg="pkg"
+      :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
+    />
     <component
       v-else
       :is="cmpViewer"
@@ -39,6 +45,7 @@ import { storeToRefs } from "pinia";
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
+import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import { TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
@@ -58,6 +65,7 @@ export default {
 
   components: {
     BfButton,
+    NeuroglancerViewer,
     SlideViewer: defineAsyncComponent(() =>
       import("../../viewers/SlideViewer/SlideViewer.vue")
     ),
@@ -121,6 +129,7 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      viewerAssets: [],
       isLoading: false,
       omeTiffSource: "",
       viewerInstanceId: VIEWER_INSTANCE_ID,
@@ -141,7 +150,7 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
 
     /**
      * Called when component is mounted
@@ -188,6 +197,11 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
+      if (viewer.startsWith('NeuroglancerViewer:')) {
+        const idx = parseInt(viewer.split(':')[1])
+        const asset = this.viewerAssets[idx]
+        return asset?.name || `Neuroglancer ${idx + 1}`
+      }
       switch (viewer) {
         case "DataExplorer":
           return "Data Explorer";
@@ -218,7 +232,42 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      this.availableViewers = this.checkViewerType(activeViewer);
+      let viewers = this.checkViewerType(activeViewer);
+
+      // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
+      const pkgId = pathOr('', ['content', 'id'], activeViewer);
+      const datasetId = pathOr('', ['content', 'datasetNodeId'], activeViewer);
+      this.viewerAssets = [];
+      if (pkgId && datasetId) {
+        try {
+          const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+          if (result?.assets?.length > 0) {
+            const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
+            const seen = new Set()
+            const ngAssets = result.assets.filter(a => {
+              if (!neuroglancerTypes.includes(a.asset_type) || a.status !== 'ready') return false
+              if (seen.has(a.asset_url)) return false
+              seen.add(a.asset_url)
+              return true
+            })
+            if (ngAssets.length > 0) {
+              this.viewerAssets = ngAssets.map(a => ({
+                ...a,
+                cloudfront: result.cloudfront,
+              }))
+              const ngViewerNames = ngAssets.map((a, i) =>
+                `NeuroglancerViewer:${i}`
+              )
+              const filtered = viewers.filter(v => v !== 'UnknownViewer')
+              viewers = [...ngViewerNames, ...filtered]
+            }
+          }
+        } catch (err) {
+          // Viewer assets not available — fall through to default viewer
+        }
+      }
+
+      this.availableViewers = viewers;
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
@@ -229,7 +278,6 @@ export default {
         // use this when migrating instead of a wrapper for every component
         if (viewerToLoad === 'OmeViewer') {
           try {
-            const pkgId = pathOr('', ['content', 'id'], activeViewer);
             const viewerAssets = await this.fetchViewerAssets(pkgId);
 
             if (viewerAssets && viewerAssets.length > 0) {

@@ -97,16 +97,11 @@
 </template>
 
 <script setup>
-import {
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  getCurrentInstance,
-} from "vue";
+import { computed, ref, onMounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import { useGithubOAuth } from "@/composables/useGithubOAuth";
 import * as siteConfig from "@/site-config/site.json";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import IconRemove from "@/components/icons/IconRemove.vue";
@@ -117,166 +112,21 @@ const instance = getCurrentInstance();
 const profile = computed(() => store.state.profile);
 const loading = ref(false);
 const isDeleteDialogVisible = ref(false);
-const githubProfile = ref({});
-const oauthWindow = ref(null);
 
-const hasGithubProfile = computed(() => {
-  // Check both the local githubProfile and the store's profile
-  return !!(githubProfile.value?.login || profile.value?.githubProfile?.login);
-});
-
-// Get the actual GitHub profile data from either local or store
-const displayGithubProfile = computed(() => {
-  return githubProfile.value?.login
-    ? githubProfile.value
-    : profile.value?.githubProfile || {};
-});
+const displayGithubProfile = computed(() => profile.value?.githubProfile || {});
+const hasGithubProfile = computed(() => !!displayGithubProfile.value.login);
 
 const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
-onMounted(() => {
-  window.addEventListener("message", messageEventListener);
-  initializeGithubData();
+const { openGithubOAuth: openGitHub, fetchGithubProfile } = useGithubOAuth({
+  refreshRepos: true,
 });
 
-onBeforeUnmount(() => {
-  window.removeEventListener("message", messageEventListener);
-});
-
-
-
-async function initializeGithubData() {
+onMounted(async () => {
   loading.value = true;
-
-  // First try to fetch fresh GitHub data from API
   await fetchGithubProfile();
-
-  // If API fetch fails, fall back to store data
-  if (!githubProfile.value?.login && profile.value?.githubProfile) {
-    githubProfile.value = profile.value.githubProfile;
-  }
-
   loading.value = false;
-}
-
-async function fetchGithubProfile() {
-  try {
-    const token = await useGetToken();
-    const response = await fetch(
-      GithubProfileUrl,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "*/*",
-        },
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-
-      if (data && data.login) {
-        githubProfile.value = data;
-
-        // Update store with fresh data - ensure we're updating the githubProfile property
-        const updatedProfile = {
-          ...profile.value,
-          githubProfile: data,
-        };
-
-        store.dispatch("updateProfile", updatedProfile);
-
-        console.log("Updated store with GitHub profile:", data);
-      }
-    } else {
-      console.error(
-        "GitHub API response not ok:",
-        response.status,
-        response.statusText
-      );
-    }
-  } catch (error) {
-    console.error("Failed to fetch GitHub profile:", error);
-    // We'll fall back to store data in initializeGithubData
-  }
-}
-
-function openGitHub() {
-  const redirectUri = `${window.location.origin}/github-redirect`;
-  const url = `${siteConfig.githubAppUrl}?redirect_uri=${redirectUri}`;
-
-  oauthWindow.value = window.open(
-    url,
-    "_blank",
-    "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
-  );
-}
-
-const messageEventListener = async (event) => {
-  if (
-    event.data &&
-    event.data.source &&
-    event.data.source === "github-redirect-response" &&
-    event.data.code
-  ) {
-    const oauthCode = event.data.code;
-    if (oauthCode !== "") {
-      try {
-        const token = await useGetToken();
-
-
-
-        const response = await useSendXhr(
-          `${siteConfig.api2Url}/accounts/github/register`,
-          {
-            method: "POST",
-            header: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: {
-              code: oauthCode,
-              installation_id: event.data.installationId,
-            },
-          }
-        );
-
-        githubProfile.value = response;
-        window.removeEventListener("message", messageEventListener);
-
-        instance.proxy.$message({
-          message: "Your GitHub account has been successfully added!",
-          type: "success",
-          center: true,
-          duration: 3000,
-          showClose: true,
-        });
-
-        // Update store with fresh GitHub data
-        const updatedProfile = {
-          ...profile.value,
-          githubProfile: response,
-        };
-
-        store.dispatch("updateProfile", updatedProfile);
-        console.log(
-          "Updated store with GitHub profile after registration:",
-          response
-        );
-      } catch (error) {
-        console.error("GitHub registration error:", error);
-        instance.proxy.$message({
-          message: "Failed to connect GitHub account. Please try again.",
-          type: "error",
-          center: true,
-          duration: 5000,
-          showClose: true,
-        });
-      }
-    }
-  }
-};
+});
 
 async function confirmDelete() {
   try {
@@ -289,10 +139,8 @@ async function confirmDelete() {
       },
     });
 
-    githubProfile.value = {};
     isDeleteDialogVisible.value = false;
 
-    // Update store
     store.dispatch("updateProfile", {
       ...profile.value,
       githubProfile: null,
