@@ -298,6 +298,25 @@ export const actions = {
   },
 
   /**
+   * Delete a viewer asset
+   * @param {String} datasetId
+   * @param {String} assetId
+   */
+  deleteViewerAsset: async ({rootState}, { datasetId, assetId }) => {
+    const token = await useGetToken()
+    const url = `${rootState.config.api2Url}/packages/assets/${assetId}?dataset_id=${datasetId}`
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!resp.ok) {
+      throw new Error(`Failed to delete viewer asset: ${resp.status}`)
+    }
+  },
+
+  /**
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId
