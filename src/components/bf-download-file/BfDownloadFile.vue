@@ -235,7 +235,7 @@ export default {
      * @param {Array} nodeIds
      * @param {Array} fileIds - when downloading a single package, includes only specified files
      */
-    downloadPackages: function (nodeIds, fileIds) {
+    downloadPackages: async function (nodeIds, fileIds) {
       const fileIdPayload = fileIds ? { fileIds } : {};
       const archiveNamePayload =
         this.archiveName && nodeIds.length > 1
@@ -243,17 +243,25 @@ export default {
           : {};
       const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
 
+      const token = await useGetToken();
+
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = this.zipItUrl;
+      form.action = this.config.zipitUrl;
       form.target = "_blank";
 
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "data";
-      input.value = JSON.stringify(payload);
+      const dataInput = document.createElement("input");
+      dataInput.type = "hidden";
+      dataInput.name = "data";
+      dataInput.value = JSON.stringify(payload);
 
-      form.appendChild(input);
+      const tokenInput = document.createElement("input");
+      tokenInput.type = "hidden";
+      tokenInput.name = "api_key";
+      tokenInput.value = token;
+
+      form.appendChild(dataInput);
+      form.appendChild(tokenInput);
       document.body.appendChild(form);
       form.submit();
       document.body.removeChild(form);
