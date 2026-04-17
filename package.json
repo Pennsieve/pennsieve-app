@@ -71,7 +71,7 @@
     "pennsieve-dashboard": "0.3.71",
     "pinia": "^3.0.3",
     "plotly.js-dist": "^3.4.0",
-    "protobufjs": "^7.2.6",
+    "protobufjs": "^7.5.5",
     "pusher-js": "^8.4.0",
     "qrcode.vue": "^3.6.0",
     "ramda": "^0.28.0",
