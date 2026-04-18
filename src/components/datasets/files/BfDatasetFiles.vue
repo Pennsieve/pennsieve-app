@@ -506,20 +506,18 @@ export default {
                 });
               }
 
-              // Refetch on every upload event. We can't tell from the
-              // payload (which only carries the leaf parent_id) whether an
-              // uploaded file is a descendant of the currently-viewed
-              // folder, and aggregate sizes propagate up the ancestor
-              // chain even for files not directly in this folder.
+              // Silent refetch: same endpoint as a user-driven navigation,
+              // but we don't toggle the loading spinner, reset selections,
+              // or reset the current folder. Combined with el-table's
+              // row-key, this lets sizes tick up in place without the
+              // per-second table flash.
               //
               // The throttling options (leading: true + maxWait) ensure:
-              //   - the first event in a burst fires a refetch immediately
-              //     so the user sees progress,
+              //   - the first event in a burst refreshes immediately,
               //   - subsequent events within the window are coalesced,
-              //   - a sustained burst still produces at most one refetch
-              //     per second (maxWait) rather than being held off until
-              //     events stop.
-              this.debouncedFetchFiles();
+              //   - sustained bursts still produce at most one refresh
+              //     per second rather than being held off until events stop.
+              this.debouncedSilentFetch();
             }.bind(this)
           );
         }
@@ -531,13 +529,14 @@ export default {
   },
 
   created() {
-    // Throttled refetch wrapped around lodash.debounce with leading + maxWait
-    // so that the first event in a burst refetches immediately and sustained
-    // bursts still produce at most one refetch per second. Used by the
-    // upload-event Pusher handler to coalesce the hundreds of events a
-    // large direct-to-storage upload produces.
-    this.debouncedFetchFiles = debounce(
-      () => this.fetchFiles(this.filesUrl),
+    // Throttled silent refetch used by the upload-event Pusher handler to
+    // coalesce the hundreds of events a large direct-to-storage upload
+    // produces. Leading + maxWait mean the first event in a burst refreshes
+    // immediately and sustained bursts still produce at most one refresh
+    // per second, without the spinner / selection reset the full navigation
+    // refetch causes.
+    this.debouncedSilentFetch = debounce(
+      () => this.silentlyFetchFiles(),
       1000,
       { leading: true, trailing: true, maxWait: 1000 }
     );
@@ -922,6 +921,56 @@ export default {
       }
 
       return subtype ? subtype : defaultType;
+    },
+
+    /**
+     * Pusher-driven silent refresh of the file list. Same endpoint as
+     * fetchFiles, but:
+     *   - no `filesLoading` toggle (no spinner overlay flash),
+     *   - no `resetSelectedFiles` (user's checkbox state preserved),
+     *   - no `SET_CURRENT_FOLDER` commit (no breadcrumb churn),
+     *   - no ancestors / route-driven scroll reset.
+     *
+     * el-table's row-key is keyed on content.id, so when we replace
+     * `this.files` the table reuses DOM nodes for unchanged rows and only
+     * repaints the columns whose values actually changed (e.g. `storage`).
+     */
+    silentlyFetchFiles: function () {
+      if (!this.filesUrl) return;
+      // If the user has paginated past the first page, skip the silent
+      // refresh: filesUrl encodes the current offset, and a silent re-merge
+      // at offset>0 would either duplicate the already-loaded tail or miss
+      // the leading pages. Pagination is rare (>500 files in one folder);
+      // the worst case is that live sizes don't tick for those users until
+      // they navigate.
+      if (this.offset > 0) return;
+
+      useGetToken()
+        .then((token) => {
+          const fullUrl = `${this.filesUrl}&api_key=${token}`;
+          return useSendXhr(fullUrl).then((response) => {
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
+              }
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            this.files = newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+          });
+        })
+        .catch((response) => {
+          // Silent refresh failures shouldn't nuke the user's current view.
+          // Log for visibility but don't surface the error toast.
+          console.warn("silentlyFetchFiles failed", response);
+        });
     },
 
     /**
