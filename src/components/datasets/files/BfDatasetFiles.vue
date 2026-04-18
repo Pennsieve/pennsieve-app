@@ -286,6 +286,7 @@ import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDro
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import debounce from "lodash.debounce";
 
 export default {
   name: "BfDatasetFiles",
@@ -498,7 +499,6 @@ export default {
           channel.bind(
             "upload-event",
             function (data) {
-              let curFolderId = this.file.content.intId;
               for (let x in data) {
                 this.updateFileStatus({
                   key: data[x].upload_id.String,
@@ -506,12 +506,20 @@ export default {
                 });
               }
 
-              for (let x in data) {
-                if ((data[x].parent_id.Int64 = curFolderId)) {
-                  this.fetchFiles(this.filesUrl);
-                  break;
-                }
-              }
+              // Refetch on every upload event. We can't tell from the
+              // payload (which only carries the leaf parent_id) whether an
+              // uploaded file is a descendant of the currently-viewed
+              // folder, and aggregate sizes propagate up the ancestor
+              // chain even for files not directly in this folder.
+              //
+              // The throttling options (leading: true + maxWait) ensure:
+              //   - the first event in a burst fires a refetch immediately
+              //     so the user sees progress,
+              //   - subsequent events within the window are coalesced,
+              //   - a sustained burst still produces at most one refetch
+              //     per second (maxWait) rather than being held off until
+              //     events stop.
+              this.debouncedFetchFiles();
             }.bind(this)
           );
         }
@@ -520,6 +528,19 @@ export default {
     },
 
     $route: "handleRouteChange",
+  },
+
+  created() {
+    // Throttled refetch wrapped around lodash.debounce with leading + maxWait
+    // so that the first event in a burst refetches immediately and sustained
+    // bursts still produce at most one refetch per second. Used by the
+    // upload-event Pusher handler to coalesce the hundreds of events a
+    // large direct-to-storage upload produces.
+    this.debouncedFetchFiles = debounce(
+      () => this.fetchFiles(this.filesUrl),
+      1000,
+      { leading: true, trailing: true, maxWait: 1000 }
+    );
   },
 
   mounted: function () {
