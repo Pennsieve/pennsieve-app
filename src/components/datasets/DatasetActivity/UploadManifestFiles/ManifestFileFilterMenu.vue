@@ -58,10 +58,14 @@ export default {
     statusOptions: {
       type: Array,
       default: () => {
+        // Labels are space-stripped by the URL builder in UploadManifestFiles
+        // to form the backend enum value. Keep them matching the manifestFile
+        // status enum: "Failed Orphan" -> "FailedOrphan".
         return [
           "All",
           "In Progress",
           "Failed",
+          "Failed Orphan",
         ]
       }
     }
