@@ -28,7 +28,7 @@
         :sm="5"
         class="member-col col-spacer"
       >
-      {{ item.status}}
+      {{ statusLabel }}
       </el-col>
       <el-col
         :sm="2"
@@ -84,6 +84,16 @@ export default {
 
     fileIconStr: function() {
       return this.toPackageType(this.item.file_type)
+    },
+
+    // Human-friendly display names for the raw manifestFile status enum.
+    // Unknown values fall through to the raw value so we never hide an
+    // actual backend state from the operator.
+    statusLabel: function() {
+      const map = {
+        FailedOrphan: "Failed (Missing)",
+      }
+      return map[this.item.status] || this.item.status
     }
   },
 

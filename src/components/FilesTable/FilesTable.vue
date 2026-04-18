@@ -83,6 +83,7 @@
       v-loading="withinDeleteMenu ? false : tableLoading"
       :border="true"
       :data="data"
+      :row-key="rowKey"
       class="modern-table"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
       @selection-change="handleTableSelectionChange"
@@ -329,6 +330,13 @@ export default {
   },
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
+
+    // row-key lets el-table diff rows across data updates instead of
+    // rebuilding every <tr>. Keyed on the package node id so Pusher-driven
+    // silent merges reuse DOM nodes (no flicker, selections preserved).
+    rowKey(row) {
+      return row?.content?.id;
+    },
 
     handleCloseModal: function () {
       this.$refs.table.clearSelection();
