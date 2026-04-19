@@ -11,8 +11,29 @@ import { useGetToken } from "@/composables/useGetToken";
 // Finalize batching matches the agent (pennsieve-agent/pkg/server/upload.go):
 // server accepts up to 250 files per POST /upload/manifest/files/finalize call
 // and we flush once we hit that bound or the flush interval, whichever first.
+//
+// Flush interval is 1s (vs. the agent's 5s). Measured end-to-end delay from
+// S3 PUT → Pusher "upload-event" is 6–22s in dev; ~5s of that was pure idle
+// in this flush interval for small drops. The server-side SQS batching
+// window (upload-service-v2 terraform/sqs.tf:26, currently 5s) is the other
+// compressible leg. 1s here keeps a little headroom for coalescing when
+// many S3 PUTs finish close together, without dominating the latency.
 const FINALIZE_BATCH_SIZE = 250;
-const FINALIZE_FLUSH_MS = 5000;
+const FINALIZE_FLUSH_MS = 1000;
+
+// How many S3 PUTs run at once. Browser + AWS SDK lib-storage already
+// does 4-way parallelism *within* a file (queueSize: 4) for multipart
+// parts; this is cross-file concurrency on top of that. 4 is a balance
+// between bandwidth saturation on a typical connection and not
+// over-subscribing CPU on the checksum-per-part work.
+const UPLOAD_CONCURRENCY = 4;
+
+// Module-level guard to serialize finalize POSTs. Without this, the
+// batch-size trigger and the timer-based flush can both capture the same
+// pendingFinalize entries and fire duplicate requests — the second POST
+// would arrive with an empty batch (CLEAR_FINALIZE_QUEUE already ran) or,
+// worse, race on the `batch` snapshot. Not reactive — just a mutex.
+let finalizeInFlight = false;
 
 // Refresh storage credentials when the remaining TTL drops below 5 minutes —
 // same headroom the agent uses. STS returns ~1h creds.
@@ -336,9 +357,13 @@ export const actions = {
 
             let targetPackage = await state.currentTargetPackage;
 
+            // `file` is the target folder/dataset package — not a dropped
+            // File — so downstream consumers (placeholder-row getter, etc.)
+            // can match by folder id. Same shape `setUploadDestination`
+            // writes on explicit navigation.
             let uploadDestination = {
                 path: helpers.getFileLocation(targetPackage),
-                file: files[0]
+                file: targetPackage,
             }
 
             commit('SET_UPLOAD_DESTINATION', uploadDestination)
@@ -458,9 +483,19 @@ export const actions = {
             credentials: credentialsProvider,
         })
 
-        // Sequential per-file uploads, matching the existing behaviour.
-        // Concurrency is a follow-up — the agent uses a worker pool here.
-        for (const [key, value] of state.uploadFileMap) {
+        // Time-based finalize flush: drains pendingFinalize every
+        // FINALIZE_FLUSH_MS so the server starts creating packages while
+        // later files are still being PUT, rather than waiting for the
+        // whole batch to finish before finalize fires. Critical for the
+        // small-drop case (<250 files), which otherwise skipped eager
+        // flushing entirely.
+        const flushTimer = setInterval(() => {
+            if (state.pendingFinalize.length > 0) {
+                dispatch('flushFinalizeBatch').catch((e) => console.error(e))
+            }
+        }, FINALIZE_FLUSH_MS)
+
+        const uploadOne = async (key, value) => {
             try {
                 commit('SET_FILE_STATUS', { key, status: "uploading" })
 
@@ -518,6 +553,26 @@ export const actions = {
             }
         }
 
+        // Worker pool — pulls from a shared queue so each worker moves on
+        // to the next file as soon as its current PUT finishes. Cross-file
+        // concurrency is cheap here (lib-storage's queueSize handles
+        // within-file part parallelism).
+        const queue = [...state.uploadFileMap]
+        const workerCount = Math.min(UPLOAD_CONCURRENCY, queue.length)
+        const workers = Array.from({ length: workerCount }, async () => {
+            while (queue.length > 0) {
+                const next = queue.shift()
+                if (!next) return
+                await uploadOne(next[0], next[1])
+            }
+        })
+
+        try {
+            await Promise.all(workers)
+        } finally {
+            clearInterval(flushTimer)
+        }
+
         // Final flush for any remainder below the batch threshold.
         if (state.pendingFinalize.length > 0) {
             await dispatch('flushFinalizeBatch')
@@ -527,12 +582,24 @@ export const actions = {
     },
 
     // POST /upload/manifest/files/finalize with the currently-queued files.
-    // Per-file success -> REMOVE_COMPLETED_FILE (clears the row from the
-    // upload UI); per-file failure -> SET_FILE_STATUS=failed so the user
-    // sees which file didn't make it. Request-level failures mark every
-    // queued file as failed so the UI never silently "forgets" them.
+    // Per-file success -> SET_FILE_STATUS=finalized; the placeholder row
+    // stays visible in the "Importing..." state until the server-side
+    // package record shows up in a silent refresh (Pusher `upload-event`
+    // triggers that), at which point displayFiles dedupes by name and the
+    // placeholder drops out. Removing the map entry here instead would
+    // leave a visual gap of several seconds between finalize and Pusher.
+    // Per-file failure -> SET_FILE_STATUS=failed so the user sees which
+    // file didn't make it. Request-level failures mark every queued file
+    // as failed so the UI never silently "forgets" them.
     flushFinalizeBatch: async ({ rootState, state, commit }) => {
+        // Serialize concurrent callers (timer-based flush + batch-size
+        // trigger + final post-loop flush). The second caller returns
+        // immediately; whatever accumulated while the first POST was
+        // in flight gets picked up by the next timer tick or the final
+        // flush after the worker pool drains.
+        if (finalizeInFlight) return
         if (state.pendingFinalize.length === 0) return
+        finalizeInFlight = true
         const batch = state.pendingFinalize.slice()
         commit('CLEAR_FINALIZE_QUEUE')
 
@@ -568,7 +635,7 @@ export const actions = {
                 const mapKey = byUploadId.get(r.uploadId)
                 if (!mapKey) continue
                 if (r.status === 'finalized') {
-                    commit('REMOVE_COMPLETED_FILE', mapKey)
+                    commit('SET_FILE_STATUS', { key: mapKey, status: 'finalized' })
                 } else {
                     commit('SET_FILE_STATUS', { key: mapKey, status: 'failed' })
                     EventBus.$emit('toast', {
@@ -590,6 +657,8 @@ export const actions = {
                     type: 'error',
                 },
             })
+        } finally {
+            finalizeInFlight = false
         }
     },
 
@@ -616,7 +685,11 @@ export const actions = {
         const apiKey = await useGetToken()
         const queryParams = toQueryParams({ dataset_id: datasetId })
 
-        const uploadMap = new Map()
+        // Merge new-batch entries into any finalized carry-overs from a
+        // previous batch (those still need their placeholder rows until
+        // Pusher confirms them). s3_key is a fresh UUID so the new entries
+        // never collide with existing ones.
+        const uploadMap = new Map(state.uploadFileMap)
         const requestFiles = []
         let total = 0
         for (const mf in state.manifestFiles) {
@@ -646,7 +719,11 @@ export const actions = {
         }
 
         commit("SET_UPLOAD_FILE_MAP", uploadMap)
+        // Progress total is the *current batch only*; finalized carry-over
+        // entries' bytes were already counted in the previous batch's total
+        // and subtracted from loaded/total as they got removed.
         state.uploadProgress.total = total
+        state.uploadProgress.loaded = 0
 
         const requestBody = {
             id: state.manifestNodeId,
@@ -688,6 +765,56 @@ export const actions = {
     // Clear all completed files from the upload map
     clearCompletedFiles: async({ commit }) => {
         commit("CLEAR_COMPLETED_FILES")
+    },
+
+    // Remove finalized entries whose target files are now confirmed in the
+    // server-side file listing. Called from the DatasetFiles silent refresh
+    // so the aggregate pill can stop saying "Importing..." the instant the
+    // real package rows show up.
+    //
+    // Scope: only reconciles when the silent refresh is for the destination
+    // folder the upload was dropped into. When files land in a nested
+    // subfolder, matching the synthetic parent folder's first-segment name
+    // against a Collection child on the server clears every upload sitting
+    // under that segment.
+    reconcileFinalizedFiles: ({ state, commit }, { folderId, serverChildren }) => {
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        const destPath = (dest && dest.path) || ''
+        if (!destId || destId !== folderId) return
+        if (!Array.isArray(serverChildren)) return
+
+        const fileNames = new Set()
+        const collectionNames = new Set()
+        for (const row of serverChildren) {
+            const name = row && row.content && row.content.name
+            if (!name) continue
+            if (row.content.packageType === 'Collection') collectionNames.add(name)
+            else fileNames.add(name)
+        }
+
+        const toRemove = []
+        for (const [key, entry] of state.uploadFileMap) {
+            if (entry.status !== 'finalized') continue
+            const fullTargetPath = (entry.config && entry.config.target_path) || ''
+            let rel = fullTargetPath
+            if (destPath && rel.startsWith(destPath)) {
+                rel = rel.slice(destPath.length).replace(/^\//, '')
+            }
+            const name = (entry.config && entry.config.target_name) || (entry.file && entry.file.name) || ''
+            if (!rel) {
+                // Immediate child of destination — match by filename.
+                if (fileNames.has(name)) toRemove.push(key)
+            } else {
+                // Nested — the server has created the top-level folder, so
+                // at least some files in that subtree have landed. Clearing
+                // optimistically lets the pill settle; the user sees the
+                // real folder row and can navigate in for per-file detail.
+                const firstSeg = rel.split('/')[0]
+                if (collectionNames.has(firstSeg)) toRemove.push(key)
+            }
+        }
+        for (const k of toRemove) commit('REMOVE_COMPLETED_FILE', k)
     }
 
 }
@@ -710,6 +837,132 @@ export const getters = {
     },
     getTotalFilesInBatch: state => () => {
         return state.totalFilesInBatch
+    },
+    getUploadDestination: state => () => {
+        return state.uploadDestination
+    },
+    // Returns synthetic "placeholder" rows for a given folder view so the
+    // DatasetFiles table can show a row for each file that's still
+    // uploading/importing (before the server-side package record exists).
+    //
+    // Scope: placeholders are only surfaced when the user is viewing the
+    // destination folder where files were dropped. Uploads landing in a
+    // nested subfolder below the destination are rolled up into one
+    // synthetic folder row per first-segment. Uploads into a sibling folder
+    // of the current view are not shown here (aggregate pill covers that).
+    //
+    // Placeholder row shape intentionally mirrors a server package row
+    // enough that FilesTable/BfFileLabel can render it:
+    //   { content: { id, name, state, packageType }, storage, _placeholder, _placeholderStatus, _progress }
+    // `_placeholder === true` is the marker every consumer (download
+    // gating, viewer gating, selection handling) should check.
+    getPlaceholdersForFolder: state => (folderId) => {
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        const destPath = (dest && dest.path) || ''
+        if (!destId || destId !== folderId) return []
+
+        const nestedGroups = new Map()
+        const immediate = []
+
+        const addRow = ({ key, relPath, name, size, loaded, total, status }) => {
+            const isImporting = status === 'processing' || status === 'finalized'
+            const phStatus = status === 'failed' ? 'failed'
+                : isImporting ? 'importing' : 'uploading'
+            const phState = status === 'failed' ? 'ERROR'
+                : isImporting ? 'IMPORTING' : 'UPLOADING'
+            if (!relPath) {
+                immediate.push({
+                    storage: size,
+                    _placeholder: true,
+                    _placeholderStatus: phStatus,
+                    _progress: { loaded, total },
+                    content: {
+                        id: key,
+                        name,
+                        state: phState,
+                        packageType: 'Unknown',
+                    },
+                })
+            } else {
+                const firstSeg = relPath.split('/')[0]
+                let g = nestedGroups.get(firstSeg)
+                if (!g) {
+                    g = { count: 0, loaded: 0, total: 0, importingCount: 0, failedCount: 0 }
+                    nestedGroups.set(firstSeg, g)
+                }
+                g.count += 1
+                g.loaded += loaded
+                g.total += total
+                if (isImporting) g.importingCount += 1
+                if (status === 'failed') g.failedCount += 1
+            }
+        }
+
+        // Post-sync phase: uploadFileMap has the authoritative entries with
+        // stable s3_key ids and live progress.
+        if (state.uploadFileMap.size > 0) {
+            for (const [key, entry] of state.uploadFileMap) {
+                const fullTargetPath = (entry.config && entry.config.target_path) || ''
+                let rel = fullTargetPath
+                if (destPath && rel.startsWith(destPath)) {
+                    rel = rel.slice(destPath.length).replace(/^\//, '')
+                }
+                const name = (entry.config && entry.config.target_name) || (entry.file && entry.file.name) || ''
+                const size = (entry.file && entry.file.size) || 0
+                addRow({
+                    key,
+                    relPath: rel,
+                    name: sanitizeFileName(name),
+                    size,
+                    loaded: (entry.progress && entry.progress.loaded) || 0,
+                    total: (entry.progress && entry.progress.total) || size,
+                    status: entry.status || 'waiting',
+                })
+            }
+        } else {
+            // Pre-sync phase: syncManifest hasn't committed uploadFileMap yet.
+            // Surface rows from the raw manifestFiles so the user sees
+            // placeholders the instant they drop, not hundreds of ms later.
+            for (let i = 0; i < state.manifestFiles.length; i += 1) {
+                const f = state.manifestFiles[i]
+                const fullPath = (f && f.path) || (f && f.name) || ''
+                const name = (f && f.name) || ''
+                const rel = fullPath.length > name.length
+                    ? fullPath.slice(0, fullPath.length - name.length).replace(/\/$/, '')
+                    : ''
+                const size = (f && f.size) || 0
+                addRow({
+                    key: `pending:${i}:${fullPath}`,
+                    relPath: rel,
+                    name: sanitizeFileName(name),
+                    size,
+                    loaded: 0,
+                    total: size,
+                    status: 'waiting',
+                })
+            }
+        }
+
+        for (const [firstSeg, g] of nestedGroups) {
+            const allImporting = g.importingCount === g.count
+            const anyFailed = g.failedCount > 0
+            immediate.push({
+                storage: g.total,
+                _placeholder: true,
+                _placeholderStatus: anyFailed ? 'failed' : allImporting ? 'importing' : 'uploading',
+                _placeholderFileCount: g.count,
+                _progress: { loaded: g.loaded, total: g.total },
+                content: {
+                    id: `placeholder:folder:${folderId}:${firstSeg}`,
+                    name: firstSeg,
+                    state: anyFailed ? 'ERROR' : allImporting ? 'IMPORTING' : 'UPLOADING',
+                    packageType: 'Collection',
+                },
+            })
+        }
+
+        return immediate
     }
 }
 

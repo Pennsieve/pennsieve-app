@@ -22,45 +22,98 @@
       </button>
     </div>
 
+    <!--
+      Placeholder rows render an Apple-style ring: determinate fill during
+      upload (clockwise from 12 o'clock), indeterminate spin during the
+      importing window. Failed placeholders fall through to the regular
+      file icon. Real server rows in processing/uploading states keep the
+      legacy pulsing bf-waiting-icon so nothing else in the app changes.
+    -->
     <div
-      v-if="fileState === 'processing' || fileState === 'uploading'"
+      v-if="isPlaceholder && placeholderStatus !== 'failed'"
+      class="upload-ring-wrap mr-16"
+      :class="{ 'upload-ring-wrap--spin': placeholderStatus === 'importing' }"
+      :aria-label="placeholderStatus === 'importing' ? 'Importing' : 'Uploading'"
+    >
+      <svg class="upload-ring" viewBox="0 0 20 20" width="18" height="18">
+        <circle class="ring-track" cx="10" cy="10" r="8" />
+        <circle
+          class="ring-fill"
+          cx="10"
+          cy="10"
+          r="8"
+          :stroke-dasharray="ringCircumference"
+          :stroke-dashoffset="ringDashOffset"
+        />
+      </svg>
+    </div>
+
+    <div
+      v-else-if="!isPlaceholder && (fileState === 'processing' || fileState === 'uploading')"
       class="icon-waiting mr-16"
     >
       <bf-waiting-icon />
     </div>
 
     <img
-      v-if="fileState !== 'processing' && fileState !== 'uploading'"
+      v-else
       class="svg-icon icon-item mr-16"
+      :class="{ 'icon-item--pin-top': isPlaceholder }"
       :src="fileIcon(icon, file.content.packageType)"
       alt="package icon"
     >
 
-    <template v-if="isRenaming">
-      <input
-        ref="renameInput"
-        class="rename-input"
-        :value="displayName"
-        @keyup.enter="onRenameSubmit"
-        @keyup.escape="onRenameCancel"
-        @blur="onRenameSubmit"
-        @click.stop
-      />
-    </template>
-    <template v-else>
-      <button
-        v-if="isNameLink"
-        class="name"
-        data-cy="moveDialogFileName"
-        :disabled="disabled"
-        @click.stop="onClick('click-name', $event)"
+    <div class="name-column">
+      <template v-if="isRenaming">
+        <input
+          ref="renameInput"
+          class="rename-input"
+          :value="displayName"
+          @keyup.enter="onRenameSubmit"
+          @keyup.escape="onRenameCancel"
+          @blur="onRenameSubmit"
+          @click.stop
+        />
+      </template>
+      <template v-else>
+        <button
+          v-if="isNameLink && !isPlaceholder"
+          class="name"
+          data-cy="moveDialogFileName"
+          :disabled="disabled"
+          @click.stop="onClick('click-name', $event)"
+        >
+          {{ displayName }}
+        </button>
+        <div v-else class="no-link-name placeholder-name">
+          {{ displayName }}
+          <span
+            v-if="isPlaceholder && placeholderFileCount > 0"
+            class="placeholder-file-count"
+          >({{ placeholderFileCount }} files)</span>
+        </div>
+      </template>
+
+      <!-- Placeholder meta row: status label + percentage. The ring in the
+           icon slot carries the visual progress; this line is text-only. -->
+      <div
+        v-if="isPlaceholder"
+        class="placeholder-meta"
       >
-        {{ displayName }}
-      </button>
-      <div v-else class="no-link-name">
-        {{ displayName }}
+        <span
+          v-if="placeholderStatus === 'uploading'"
+          class="status-label"
+        >Uploading {{ progressPct }}%</span>
+        <span
+          v-else-if="placeholderStatus === 'importing'"
+          class="status-label importing"
+        >Importing&hellip;</span>
+        <span
+          v-else-if="placeholderStatus === 'failed'"
+          class="status-label failed"
+        >Upload failed</span>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -196,6 +249,40 @@ export default {
     fileState: function() {
       return this.getFileState(this.file)
     },
+
+    // Client-side placeholder flags (see uploadModule
+    // getPlaceholdersForFolder). Real server rows lack the _placeholder
+    // marker, so every computed below collapses to a no-op for them.
+    isPlaceholder: function() {
+      return this.file && this.file._placeholder === true
+    },
+    placeholderStatus: function() {
+      return (this.file && this.file._placeholderStatus) || ''
+    },
+    placeholderFileCount: function() {
+      return (this.file && this.file._placeholderFileCount) || 0
+    },
+    progressPct: function() {
+      const progress = this.file && this.file._progress
+      if (!progress || !progress.total) return 0
+      const pct = Math.floor((progress.loaded / progress.total) * 100)
+      return Math.max(0, Math.min(100, pct))
+    },
+
+    // Ring geometry. Circle r=8 in a 20x20 viewBox; C = 2πr ≈ 50.27. For
+    // the importing (indeterminate) phase we draw a fixed ~25% arc and
+    // let CSS rotate the element, so dashoffset is constant there.
+    ringCircumference: function() {
+      return 50.27
+    },
+    ringDashOffset: function() {
+      if (this.placeholderStatus === 'importing') {
+        // Visible arc length ≈ 25% of circumference.
+        return this.ringCircumference * 0.75
+      }
+      const filled = this.progressPct / 100
+      return this.ringCircumference * (1 - filled)
+    },
     /**
      * Compute package type
      * @returns {String}
@@ -284,7 +371,11 @@ export default {
         'UNAVAILABLE': 'uploading',
         'PENDING': 'processing',
         'ERROR': 'failed',
-        'READY': 'processed'
+        'READY': 'processed',
+        // Client-side placeholder states (see uploadModule
+        // getPlaceholdersForFolder).
+        'UPLOADING': 'uploading',
+        'IMPORTING': 'importing',
       }
       const fileState = path(['content', 'state'], file)
       return states[fileState] ? states[fileState] : ''
@@ -298,7 +389,9 @@ export default {
         'UNAVAILABLE': 'uploading',
         'PENDING': 'processing',
         'ERROR': 'failed',
-        'READY': 'processed'
+        'READY': 'processed',
+        'UPLOADING': 'uploading',
+        'IMPORTING': 'importing',
       }
       const collectionState = path(['content', 'state'], collection)
       return states[collectionState] ? states[collectionState] : ''
@@ -444,6 +537,62 @@ export default {
   width: 24px;
 }
 
+.icon-waiting--pin-top,
+.icon-item--pin-top {
+  align-self: flex-start;
+}
+
+.upload-ring-wrap {
+  align-items: center;
+  align-self: flex-start;
+  display: flex;
+  flex-shrink: 0;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.upload-ring {
+  display: block;
+  // Start the fill at 12 o'clock; SVG default is 3 o'clock.
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+// Importing phase: slow rotation + subtle opacity pulse, muted color.
+// Reads as "background activity" vs. the active primary-color fill of
+// the uploading phase.
+.upload-ring-wrap--spin .upload-ring {
+  animation: upload-ring-spin 2.4s linear infinite;
+}
+.upload-ring-wrap--spin .ring-fill {
+  animation: upload-ring-pulse 1.8s ease-in-out infinite;
+  stroke: theme.$purple_1;
+}
+
+@keyframes upload-ring-spin {
+  from { transform: rotate(-90deg); }
+  to { transform: rotate(270deg); }
+}
+@keyframes upload-ring-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+.ring-track {
+  fill: none;
+  stroke: theme.$gray_2;
+  stroke-width: 2;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: theme.$app-primary-color;
+  stroke-linecap: round;
+  stroke-width: 2;
+  transition: stroke-dashoffset 180ms linear;
+}
+
 .btn-open-file {
   line-height: 1;
   .btn-icon-viewer {
@@ -461,6 +610,41 @@ export default {
     &:hover {
       box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
     }
+  }
+}
+
+.name-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.placeholder-name {
+  color: theme.$gray_5;
+}
+
+.placeholder-file-count {
+  color: theme.$gray_4;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.placeholder-meta {
+  display: flex;
+  font-size: 11px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.status-label {
+  color: theme.$gray_5;
+
+  &.importing {
+    font-style: italic;
+  }
+  &.failed {
+    color: theme.$red_1;
   }
 }
 </style>

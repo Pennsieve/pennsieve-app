@@ -144,7 +144,7 @@
         <div class="table-container" ref="tableContainer" @scroll="handleScroll" v-if="!trashMode">
         <files-table
           ref="filesTable"
-          :data="files"
+          :data="displayFiles"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
           :is-package-attachment-active="isPackageAttachmentActive"
@@ -382,7 +382,13 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete", "getUploadMap"]),
+    ...mapGetters("uploadModule", [
+      "getIsUploading",
+      "getUploadComplete",
+      "getUploadMap",
+      "getPlaceholdersForFolder",
+      "getManifestFiles",
+    ]),
 
     ...mapGetters("datasetModule", [
       "getPusherChannel",
@@ -390,8 +396,13 @@ export default {
     ]),
 
     showUploadInfo: function () {
-      const hasFiles = this.getUploadMap().size > 0;
-      return hasFiles && (this.getUploadComplete() || this.getIsUploading());
+      // Mount the pill any time there's upload activity, including the
+      // pre-sync window where manifestFiles is populated but
+      // uploadFileMap is still empty. The pill itself no-ops internally
+      // once there's nothing to show.
+      return (
+        this.getUploadMap().size > 0 || this.getManifestFiles().length > 0
+      );
     },
 
     /**
@@ -406,6 +417,30 @@ export default {
      */
     hasFiles: function () {
       return this.files.length > 0;
+    },
+
+    /**
+     * Files list as rendered in the table: server-returned children plus
+     * placeholder rows for in-flight uploads targeting this folder. Dialogs
+     * and other consumers keep using `files` so they never see placeholders.
+     *
+     * Reconciliation: when the server row for an upload appears (same
+     * parent folder + same name), its placeholder is dropped so the two
+     * rows don't stack. The uploadModule entry stays in the map until
+     * cleared; only the visible row is deduped here.
+     */
+    displayFiles: function () {
+      const folderId = this.file && this.file.content && this.file.content.id;
+      if (!folderId) return this.files;
+      const placeholders = this.getPlaceholdersForFolder(folderId);
+      if (!placeholders.length) return this.files;
+      const takenNames = new Set(
+        this.files.map((f) => (f.content && f.content.name) || "")
+      );
+      const survivors = placeholders.filter(
+        (p) => !takenNames.has(p.content.name)
+      );
+      return [...survivors, ...this.files];
     },
 
     filesUrl: function () {
@@ -954,6 +989,16 @@ export default {
               this.files,
               this.sortDirection
             );
+            // Sweep any finalized upload entries whose server row now
+            // exists in this folder, so the aggregate pill drops out of
+            // "Importing..." as soon as the refresh lands.
+            const folderId = this.file && this.file.content && this.file.content.id;
+            if (folderId) {
+              this.$store.dispatch("uploadModule/reconcileFinalizedFiles", {
+                folderId,
+                serverChildren: newFiles,
+              });
+            }
           });
         })
         .catch((response) => {
@@ -1035,6 +1080,12 @@ export default {
      * @param {Object} file
      */
     onClickLabel: function (file) {
+      // Placeholder rows have no server-side identity yet — clicking the
+      // name must not trigger navigation (into a non-existent collection
+      // or to the viewer with a bogus id).
+      if (file && file._placeholder) {
+        return;
+      }
       // Normal file navigation logic
       this.files = [];
       this.offset = 0;
