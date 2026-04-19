@@ -1,18 +1,33 @@
-import Cookies from "js-cookie";
 import toQueryParams from '../utils/toQueryParams.js'
-import {compose, defaultTo, find, join, map, prepend, propEq, reverse} from "ramda";
-import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
-import { GetCredentialsForIdentityCommand, CognitoIdentityClient, GetIdCommand } from "@aws-sdk/client-cognito-identity";
+import { compose, find, join, map, prepend, propEq } from "ramda";
 import { Upload } from "@aws-sdk/lib-storage"
-import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
-import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
-
+import { ChecksumAlgorithm, S3Client } from "@aws-sdk/client-s3"
 
 import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
-import {useGetToken} from "@/composables/useGetToken";
-import { fetchAuthSession } from "aws-amplify/auth";
+import { useGetToken } from "@/composables/useGetToken";
+
+// Finalize batching matches the agent (pennsieve-agent/pkg/server/upload.go):
+// server accepts up to 250 files per POST /upload/manifest/files/finalize call
+// and we flush once we hit that bound or the flush interval, whichever first.
+const FINALIZE_BATCH_SIZE = 250;
+const FINALIZE_FLUSH_MS = 5000;
+
+// Refresh storage credentials when the remaining TTL drops below 5 minutes —
+// same headroom the agent uses. STS returns ~1h creds.
+const CREDENTIAL_REFRESH_HEADROOM_MS = 5 * 60 * 1000;
+
+// macOS screenshots insert U+202F (narrow no-break space) between the time
+// and AM/PM, and other Unicode-whitespace variants sneak in from copy/paste.
+// S3 rejects presigned GETs whose response-content-disposition is not
+// ISO-8859-1 with a 400 (InvalidArgument), so names with these characters
+// fail to download. Folding the invisible variants to ASCII space preserves
+// the visible filename while keeping the Content-Disposition header valid.
+// Non-whitespace non-Latin-1 (CJK, emoji) is left alone — that needs the
+// server-side RFC 5987 fix to download correctly.
+const INVISIBLE_UNICODE_WS = /[\u00A0\u2000-\u200F\u202F\u205F\u3000\uFEFF]/g;
+const sanitizeFileName = (name) => name.replace(INVISIBLE_UNICODE_WS, ' ');
 
 class UploadFile {
     constructor(uploadId, s3Key, targetPath, targetName) {
@@ -24,16 +39,25 @@ class UploadFile {
 }
 
 const initialState = () => ({
-    cognitoConfig: {},
     manifestNodeId: "",
-    savedDatasetId:"",
+    savedDatasetId: "",
     manifestFiles: [],
     uploadFileMap: new Map(),
     uploadDestination: {},
-    identityCreds: {},
+    // Storage credentials (STS) fetched from /upload/manifest/storage-credentials.
+    // Scoped to this manifest's key prefix and expire in ~1h; re-fetched when
+    // CREDENTIAL_REFRESH_HEADROOM_MS elapsed before expiry.
+    storageCreds: null,           // {accessKeyId, secretAccessKey, sessionToken}
+    storageCredsExpiresAt: 0,     // ms since epoch
+    storageBucket: "",            // destination bucket (workspace-scoped)
+    storageKeyPrefix: "",         // O{org}/D{ds}/{manifestId}
+    storageRegion: "us-east-1",
+    // Finalize batch — files that finished their S3 PUT and are waiting for
+    // the next flush to /upload/manifest/files/finalize.
+    pendingFinalize: [],
     isUploading: false,
     uploadComplete: false,
-    uploadProgress: {total: 0, loaded:0},
+    uploadProgress: { total: 0, loaded: 0 },
     currentTargetPackage: {},
     totalFilesInBatch: 0
 })
@@ -79,8 +103,24 @@ export const mutations = {
     SET_CURRENT_TARGET_PACKAGE(state, currentTargetPackage) {
         state.currentTargetPackage = currentTargetPackage
     },
-    SET_COGNITO_CONFIG(state, config) {
-        state.cognitoConfig = config
+    SET_STORAGE_CREDS(state, { creds, bucket, keyPrefix, region, expiresAt }) {
+        state.storageCreds = creds
+        state.storageBucket = bucket
+        state.storageKeyPrefix = keyPrefix
+        state.storageRegion = region || state.storageRegion
+        state.storageCredsExpiresAt = expiresAt
+    },
+    CLEAR_STORAGE_CREDS(state) {
+        state.storageCreds = null
+        state.storageCredsExpiresAt = 0
+        state.storageBucket = ""
+        state.storageKeyPrefix = ""
+    },
+    ENQUEUE_FINALIZE(state, entry) {
+        state.pendingFinalize.push(entry)
+    },
+    CLEAR_FINALIZE_QUEUE(state) {
+        state.pendingFinalize = []
     },
     ADD_FILES_TO_MANIFEST(state, files) {
         state.manifestFiles.push(...files)
@@ -134,6 +174,11 @@ export const mutations = {
         state.isUploading = false
         state.uploadComplete = false
         state.totalFilesInBatch = 0
+        state.pendingFinalize = []
+        state.storageCreds = null
+        state.storageCredsExpiresAt = 0
+        state.storageBucket = ""
+        state.storageKeyPrefix = ""
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -238,34 +283,48 @@ export const actions = {
         }
     },
 
-    // Get AWS Credentials to upload data to the upload-bucket
-    getCognitoConfig: async ({rootState, commit, getters}, evt) => {
-
-        // Get existing state of config
-        const curCognitoConfig = getters.getCognitoConfig()
-
-        // Check if existing state is empty
-        const isEmptyConfig = Object.keys(curCognitoConfig).length === 0 &&
-            curCognitoConfig.constructor === Object
-
-        // If empty, use API to get config
-        if (isEmptyConfig) {
-            const endpoint = `${rootState.config.apiUrl}/authentication/cognito-config`
-
-            try {
-                const resp = await fetch(endpoint).then(function (response) {
-                    return response.json();
-                }).then(function (data) {
-                    commit('SET_COGNITO_CONFIG', data)
-                });
-            } catch (e) {
-                throw new Error("Unable to get cognito-config.")
-            }
-
+    // Fetch narrow-scoped STS credentials for the storage bucket. The
+    // response gives us the destination bucket + a keyPrefix of the form
+    // O{org}/D{ds}/{manifestId} and creds valid for ~1h (server-assumed role
+    // with a session policy tied to that prefix). Called before sync so
+    // every file's s3_key can embed the keyPrefix, and re-called transparently
+    // from the AWS-SDK credentials provider when the current set is within
+    // CREDENTIAL_REFRESH_HEADROOM_MS of expiring. Mirror of the agent's
+    // StorageCredentialsProvider (pkg/server/upload.go:194-312).
+    fetchStorageCredentials: async ({ rootState, state, commit }) => {
+        if (!state.manifestNodeId) {
+            throw new Error("fetchStorageCredentials: no manifestNodeId set; call getManifestNodeId first")
         }
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest/storage-credentials`
+        const apiKey = await useGetToken()
+        const url = `${endpoint}?${toQueryParams({ dataset_id: datasetId })}`
 
-        // Return updated config
-        return getters.getCognitoConfig()
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ manifestNodeId: state.manifestNodeId })
+        })
+        if (!resp.ok) {
+            const text = await resp.text()
+            throw new Error(`storage-credentials failed (${resp.status}): ${text}`)
+        }
+        const data = await resp.json()
+        commit('SET_STORAGE_CREDS', {
+            creds: {
+                accessKeyId: data.accessKeyId,
+                secretAccessKey: data.secretAccessKey,
+                sessionToken: data.sessionToken,
+            },
+            bucket: data.bucket,
+            keyPrefix: data.keyPrefix,
+            region: data.region,
+            expiresAt: new Date(data.expiration).getTime(),
+        })
+        return data
     },
 
     // Add files to manifest
@@ -358,140 +417,241 @@ export const actions = {
 
     },
 
-    // Upload files in UploadFilesMap to Pennsieve using AWS SDK
-    UploadFiles: async( {rootState, state, dispatch, commit}, evt) =>{
-
-        // Get or Fetch cognito config
-        const config = await dispatch('getCognitoConfig')
-        // Create logins structure
-        let logins = {}
-    
-        const authSession = await fetchAuthSession();
-        const poolResource = authSession.tokens.accessToken.payload.iss.replace("https://","");
-        logins[poolResource] =authSession.tokens.idToken.toString();
+    // Direct-to-storage upload: PUT every file into the workspace storage
+    // bucket using short-lived STS creds scoped to this manifest's key
+    // prefix, then POST batches to /upload/manifest/files/finalize. No
+    // Cognito identity-pool creds, no legacy upload bucket, no Pusher
+    // dependency for driving this component's state machine.
+    //
+    // State transitions per file:
+    //   waiting -> uploading -> processing (S3 PUT done, awaiting finalize)
+    //           -> complete   (REMOVE_COMPLETED_FILE after finalize 200)
+    //           -> failed     (either the PUT or the finalize failed)
+    UploadFiles: async ({ rootState, state, dispatch, commit }) => {
         commit('SET_IS_UPLOADING', true)
         commit('SET_TOTAL_FILES_IN_BATCH', state.uploadFileMap.size)
 
-        const currentRoute = router.currentRoute.value
-        const datasetId = currentRoute.params.datasetId
+        const datasetId = router.currentRoute.value.params.datasetId
+        const tags = `OrgId=${rootState.activeOrganization.organization.id}&DatasetId=${datasetId}`
 
-        // Iterate over the file-list and upload sequentially
-        // TODO: Add concurrency
-        for (let [key, value] of state.uploadFileMap) {
+        // AWS SDK v3 accepts an async provider that can refresh. The SDK
+        // calls it when it needs creds; when `expiration` is within the
+        // SDK's internal skew window, it re-calls. Our own headroom check
+        // sits in front so a long run of uploads never hands stale creds
+        // to the SDK in the first place.
+        const credentialsProvider = async () => {
+            const now = Date.now()
+            if (!state.storageCreds ||
+                state.storageCredsExpiresAt - now < CREDENTIAL_REFRESH_HEADROOM_MS) {
+                await dispatch('fetchStorageCredentials')
+            }
+            return {
+                accessKeyId: state.storageCreds.accessKeyId,
+                secretAccessKey: state.storageCreds.secretAccessKey,
+                sessionToken: state.storageCreds.sessionToken,
+                expiration: new Date(state.storageCredsExpiresAt),
+            }
+        }
+
+        const s3Client = new S3Client({
+            region: state.storageRegion,
+            credentials: credentialsProvider,
+        })
+
+        // Sequential per-file uploads, matching the existing behaviour.
+        // Concurrency is a follow-up — the agent uses a worker pool here.
+        for (const [key, value] of state.uploadFileMap) {
             try {
-                commit('SET_FILE_STATUS', {key: key, status: "uploading"})
+                commit('SET_FILE_STATUS', { key, status: "uploading" })
 
-                const tags = "OrgId=" + rootState.activeOrganization.organization.id + "&DatasetId=" + datasetId
-
-                const parallelUploads3 = new Upload({
-                    client: new S3Client({
-                        region: 'us-east-1',
-                        requestChecksumCalculation: "WHEN_REQUIRED",
-                        responseChecksumValidation: "WHEN_REQUIRED",
-                        credentials: fromCognitoIdentityPool({
-                            identityPoolId: config.identityPool.id,
-                            clientConfig: {region: config.region},
-                            cache: state.identityCreds,
-                            logins: logins
-                        }),
-                    }),
+                const uploader = new Upload({
+                    client: s3Client,
                     queueSize: 4,
                     leavePartsOnError: false,
                     params: {
-                        Bucket: rootState.config.bucketName,
+                        Bucket: state.storageBucket,
                         Key: value.config.s3_key,
                         Body: value.file,
                         Tagging: tags,
-                    }
+                        // SHA256 is required by the finalize endpoint. The SDK
+                        // computes the multipart checksum-of-checksums during
+                        // upload and returns it on the completion response.
+                        ChecksumAlgorithm: ChecksumAlgorithm.SHA256,
+                    },
                 })
 
-                parallelUploads3.on("httpUploadProgress", (progress) => {
+                uploader.on("httpUploadProgress", (progress) => {
                     commit('UPDATE_UPLOAD_PROGRESS', {
                         key: progress.Key,
                         loaded: progress.loaded,
-                        total: progress.total
+                        total: progress.total,
                     })
-                });
+                })
 
-                await parallelUploads3.done();
+                const result = await uploader.done()
+                const sha256 = result.ChecksumSHA256
+                if (!sha256) {
+                    throw new Error("S3 response missing ChecksumSHA256")
+                }
 
-                commit('SET_FILE_STATUS', {key: key, status: "processing"})
+                commit('SET_FILE_STATUS', { key, status: "processing" })
+                commit('ENQUEUE_FINALIZE', {
+                    uploadId: value.config.upload_id,
+                    size: value.file.size,
+                    sha256,
+                    mapKey: key,
+                })
 
+                // Flush opportunistically once we've accumulated a full batch.
+                if (state.pendingFinalize.length >= FINALIZE_BATCH_SIZE) {
+                    await dispatch('flushFinalizeBatch')
+                }
             } catch (e) {
-                console.error(e);
-                commit('SET_FILE_STATUS', {key: key, status: "failed"})
+                console.error(e)
+                commit('SET_FILE_STATUS', { key, status: "failed" })
                 EventBus.$emit('toast', {
                     detail: {
                         msg: `Failed to upload ${value.file.name}: ${e.message || 'Unknown error'}`,
-                        type: 'error'
-                    }
+                        type: 'error',
+                    },
                 })
             }
         }
+
+        // Final flush for any remainder below the batch threshold.
+        if (state.pendingFinalize.length > 0) {
+            await dispatch('flushFinalizeBatch')
+        }
+
         commit('SET_UPLOAD_COMPLETE', true)
     },
 
-    // Sync Manifest Files with Server
-    syncManifest: async ({rootState,commit, dispatch}, evt) => {
+    // POST /upload/manifest/files/finalize with the currently-queued files.
+    // Per-file success -> REMOVE_COMPLETED_FILE (clears the row from the
+    // upload UI); per-file failure -> SET_FILE_STATUS=failed so the user
+    // sees which file didn't make it. Request-level failures mark every
+    // queued file as failed so the UI never silently "forgets" them.
+    flushFinalizeBatch: async ({ rootState, state, commit }) => {
+        if (state.pendingFinalize.length === 0) return
+        const batch = state.pendingFinalize.slice()
+        commit('CLEAR_FINALIZE_QUEUE')
 
-        // Current assumptions:
-        // 1. Uploads through browser can sync manifest in single call.
-        // 3. All files are uploaded to the folder specified in 'destinationPackageId'
-
-        //
-        const endpoint = `${rootState.config.api2Url}/upload/manifest`
-        const currentRoute = router.currentRoute.value
-        const datasetId = currentRoute.params.datasetId
-
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest/files/finalize`
+        const url = `${endpoint}?${toQueryParams({ dataset_id: datasetId })}`
         const apiKey = await useGetToken()
-        const queryParams = toQueryParams({
-            dataset_id: datasetId,
-        })
 
-        let uploadMap =  new Map()
-        let requestFiles = []
+        const body = {
+            manifestNodeId: state.manifestNodeId,
+            files: batch.map(b => ({
+                uploadId: b.uploadId,
+                size: b.size,
+                sha256: b.sha256,
+            })),
+        }
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify(body),
+            })
+            if (!resp.ok) {
+                throw new Error(`finalize failed (${resp.status}): ${await resp.text()}`)
+            }
+            const data = await resp.json()
+            const byUploadId = new Map(batch.map(b => [b.uploadId, b.mapKey]))
+            for (const r of data.results || []) {
+                const mapKey = byUploadId.get(r.uploadId)
+                if (!mapKey) continue
+                if (r.status === 'finalized') {
+                    commit('REMOVE_COMPLETED_FILE', mapKey)
+                } else {
+                    commit('SET_FILE_STATUS', { key: mapKey, status: 'failed' })
+                    EventBus.$emit('toast', {
+                        detail: {
+                            msg: `Failed to finalize ${mapKey}: ${r.error || 'unknown error'}`,
+                            type: 'error',
+                        },
+                    })
+                }
+            }
+        } catch (e) {
+            console.error(e)
+            for (const b of batch) {
+                commit('SET_FILE_STATUS', { key: b.mapKey, status: 'failed' })
+            }
+            EventBus.$emit('toast', {
+                detail: {
+                    msg: `Failed to finalize batch: ${e.message || 'Unknown error'}`,
+                    type: 'error',
+                },
+            })
+        }
+    },
+
+    // Sync Manifest Files with Server. Fetches fresh storage credentials
+    // first so the per-file s3_key embeds the workspace-scoped keyPrefix
+    // (O{org}/D{ds}/{manifestId}). The server stores the files in
+    // manifest_files with Status=Registered; the finalize call later
+    // promotes them to Finalized.
+    syncManifest: async ({ rootState, state, commit, dispatch }) => {
+        if (!state.manifestNodeId) {
+            throw new Error("syncManifest: no manifestNodeId; call getManifestNodeId first")
+        }
+
+        // Must happen before key assembly — keyPrefix comes from the
+        // credentials response.
+        await dispatch('fetchStorageCredentials')
+        const keyPrefix = state.storageKeyPrefix
+        if (!keyPrefix) {
+            throw new Error("syncManifest: storage-credentials returned no keyPrefix")
+        }
+
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest`
+        const apiKey = await useGetToken()
+        const queryParams = toQueryParams({ dataset_id: datasetId })
+
+        const uploadMap = new Map()
+        const requestFiles = []
         let total = 0
-        for (let mf in state.manifestFiles) {
-
+        for (const mf in state.manifestFiles) {
             const uploadId = uuidv4()
-            const s3Key = state.manifestNodeId + '/' + uploadId
-
+            const s3Key = `${keyPrefix}/${uploadId}`
             const curFile = state.manifestFiles[mf]
 
-            let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length-curFile.name.length)
-            fileLocation = fileLocation.replace(/^\//, '') // remove leading '/' if it exists
-            fileLocation = fileLocation.replace(/\/$/, '') // remove trailing '/' if it exists
+            let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length - curFile.name.length)
+            fileLocation = fileLocation.replace(/^\//, '').replace(/\/$/, '')
 
             const f = new UploadFile(
                 uploadId,
                 s3Key,
                 fileLocation,
-                curFile.name,
-                curFile
+                sanitizeFileName(curFile.name),
             )
 
             uploadMap.set(s3Key, {
                 file: curFile,
                 config: f,
-                progress: {loaded:0, total: curFile.total},
-                status: "waiting"
+                progress: { loaded: 0, total: curFile.total },
+                status: "waiting",
             })
 
             total += curFile.size
-
             requestFiles.push(f)
         }
 
-        // Set the map
         commit("SET_UPLOAD_FILE_MAP", uploadMap)
-
-        // Set the total number of bytes of all files combined
         state.uploadProgress.total = total
 
-        let requestBody = {
+        const requestBody = {
             id: state.manifestNodeId,
-            files: requestFiles
-        };
+            files: requestFiles,
+        }
 
         const url = `${endpoint}?${queryParams}`
         try {
@@ -500,48 +660,19 @@ export const actions = {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json; charset=utf-8',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify(requestBody)
-            }).then(function (resp) {
-            });
+                body: JSON.stringify(requestBody),
+            })
+            if (!resp.ok) {
+                throw new Error(`sync failed (${resp.status}): ${await resp.text()}`)
+            }
         } catch (e) {
             console.error(e)
             throw new Error("Unable to sync manifest.")
         } finally {
-
-            // Set Manifest Files array to empty as this is now in upload file map
             state.manifestFiles = []
         }
-    },
-
-    // Update status of an upload File
-    updateFileStatus: async ({commit, state}, fileInfo) => {
-        let s3_key = state.manifestNodeId + "/" + fileInfo.key
-
-        if (state.uploadFileMap.get(s3_key)) {
-            // If file is complete (appeared in file browser), remove it from the upload list
-            if (fileInfo.status === 'complete') {
-                // Check if this is the last file before removing
-                const isLastFile = state.uploadFileMap.size === 1
-                const totalFiles = state.totalFilesInBatch
-                commit('REMOVE_COMPLETED_FILE', s3_key)
-
-                // Show success toast when all files have been uploaded
-                if (isLastFile && typeof window !== 'undefined') {
-                    const fileWord = totalFiles === 1 ? 'file has' : 'files have'
-                    EventBus.$emit('toast', {
-                        detail: {
-                            msg: `${totalFiles} ${fileWord} been successfully uploaded`,
-                            type: 'success'
-                        }
-                    })
-                }
-            } else {
-                commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
-            }
-        }
-
     },
 
     // Reset upload action
@@ -567,9 +698,6 @@ export const getters = {
     },
     getUploadMap: state => () => {
       return state.uploadFileMap
-    },
-    getCognitoConfig: state => () => {
-        return state.cognitoConfig
     },
     getIsUploading: state => () => {
         return state.isUploading
