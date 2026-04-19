@@ -498,25 +498,16 @@ export default {
         if (!isEmpty(channel)) {
           channel.bind(
             "upload-event",
-            function (data) {
-              for (let x in data) {
-                this.updateFileStatus({
-                  key: data[x].upload_id.String,
-                  status: "complete",
-                });
-              }
-
-              // Silent refetch: same endpoint as a user-driven navigation,
-              // but we don't toggle the loading spinner, reset selections,
-              // or reset the current folder. Combined with el-table's
-              // row-key, this lets sizes tick up in place without the
-              // per-second table flash.
+            function () {
+              // Pusher's job here is purely "a file landed in Postgres,
+              // refresh the dataset table." It fires for uploads from any
+              // source (this browser session, a different session, the
+              // agent). The browser upload flow's own state machine is
+              // driven by the finalize API response (see uploadModule.js)
+              // — nothing on this Pusher event touches it.
               //
-              // The throttling options (leading: true + maxWait) ensure:
-              //   - the first event in a burst refreshes immediately,
-              //   - subsequent events within the window are coalesced,
-              //   - sustained bursts still produce at most one refresh
-              //     per second rather than being held off until events stop.
+              // Silent refetch + leading/maxWait debounce keep the table
+              // current during a burst without the per-second flash.
               this.debouncedSilentFetch();
             }.bind(this)
           );
@@ -600,7 +591,6 @@ export default {
   methods: {
     ...mapActions("uploadModule", [
       "resetUpload",
-      "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
