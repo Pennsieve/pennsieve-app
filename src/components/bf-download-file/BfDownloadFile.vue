@@ -83,6 +83,7 @@ import BfStorageMetrics from "../../mixins/bf-storage-metrics";
 import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import EventBus from "../../utils/event-bus";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -203,6 +204,31 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: async function (packageDTOs, fileDTOs) {
+      // Block optimistic upload rows and packages still being processed
+      // server-side. Selection is already gated (FilesTable.isRowSelectable),
+      // but the toolbar + keyboard paths can still route a placeholder
+      // here, and a package freshly finalized may briefly sit in
+      // UPLOADED/PROCESSING before hitting READY.
+      const notReady = (packageDTOs || []).filter(
+        (p) =>
+          (p && p._placeholder) ||
+          (pathOr("", ["content", "state"], p) &&
+            pathOr("", ["content", "state"], p) !== "READY")
+      );
+      if (notReady.length > 0) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "info",
+            msg:
+              notReady.length === (packageDTOs || []).length
+                ? "Files are still being processed. Download will be available once they're ready."
+                : "Some selected files are still being processed and were skipped.",
+          },
+        });
+        packageDTOs = (packageDTOs || []).filter((p) => !notReady.includes(p));
+        if (packageDTOs.length === 0) return;
+      }
+
       this.packageDTOs = packageDTOs;
       this.fileDTOs = fileDTOs;
       await this.$nextTick();

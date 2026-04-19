@@ -117,7 +117,7 @@
         v-else
         type="selection"
         align="center"
-        :selectable="withinDeleteMenu ? canSelectRow : null"
+        :selectable="isRowSelectable"
         width="50"
       />
 
@@ -358,6 +358,15 @@ export default {
       return row.state === "DELETED";
     },
 
+    // Gate the built-in selection column: placeholder rows (optimistic
+    // upload rows injected by uploadModule) are never selectable, so the
+    // user can't accidentally Delete/Move/Download an in-flight upload.
+    isRowSelectable: function (row) {
+      if (row && row._placeholder) return false;
+      if (this.withinDeleteMenu) return this.canSelectRow(row);
+      return true;
+    },
+
     /**
      * Checkbox display logic
      * @param {Object} store
@@ -519,6 +528,12 @@ export default {
     onRowClick: function (row, column) {
       // Ignore clicks on the checkbox column - onSelect handles those
       if (column?.type === 'selection') {
+        return;
+      }
+
+      // Placeholder rows (optimistic upload rows) are read-only — no
+      // selection, no range-select anchor.
+      if (row && row._placeholder) {
         return;
       }
 

@@ -80,7 +80,7 @@ User archives manifest -> remove activeManifest from memory
 
       <div v-if="isUploading || uploadComplete">
         <div
-          v-for="[key, value] in uploadMap"
+          v-for="[key, value] in activeUploadEntries"
           :key="key"
           class="manifest-file-wrapper"
         >
@@ -142,6 +142,20 @@ const uploadFiles = computed(() =>
   store.getters["uploadModule/getManifestFiles"]()
 );
 const uploadMap = computed(() => store.getters["uploadModule/getUploadMap"]());
+
+// Entries from the *current* upload batch only. Finalized entries from a
+// previous batch stay in uploadFileMap so their placeholder rows can
+// remain in the DatasetFiles table until the Pusher-driven silent
+// refresh confirms them — but they shouldn't appear in this dialog when
+// the user starts a new drop. "finalized" = "user's work done for that
+// file"; the dialog is for work-in-progress.
+const activeUploadEntries = computed(() => {
+  const out = [];
+  for (const entry of uploadMap.value) {
+    if (entry[1].status !== "finalized") out.push(entry);
+  }
+  return out;
+});
 const isUploading = computed(() =>
   store.getters["uploadModule/getIsUploading"]()
 );
@@ -157,7 +171,9 @@ const allFilesComplete = computed(() => {
   const map = uploadMap.value;
   if (map.size === 0) return false;
   for (const [, value] of map) {
-    if (value.status !== "processing") {
+    // See BfUploadInfo.vue allFilesComplete — both "processing" and
+    // "finalized" mean the user's work is done; the server is catching up.
+    if (value.status !== "processing" && value.status !== "finalized") {
       return false;
     }
   }
