@@ -80,7 +80,12 @@ const initialState = () => ({
     uploadComplete: false,
     uploadProgress: { total: 0, loaded: 0 },
     currentTargetPackage: {},
-    totalFilesInBatch: 0
+    totalFilesInBatch: 0,
+    // Name-conflict resolution for this batch. Server accepts keepBoth
+    // (default, auto-rename to " (N)") or replace (soft-delete
+    // predecessor and create new). Reset to keepBoth on every new batch
+    // so "Replace" stays a deliberate choice, not a sticky preference.
+    onConflict: 'keepBoth',
 })
 
 export const state = initialState()
@@ -184,6 +189,16 @@ export const mutations = {
     SET_UPLOAD_COMPLETE(state, value) {
         state.uploadComplete = value
     },
+    SET_ON_CONFLICT(state, value) {
+        // Guard against invalid values at mutation time. Server currently
+        // accepts "keepBoth" (default) or "replace"; anything else is
+        // coerced to the safe default rather than rejected at the API.
+        if (value === 'keepBoth' || value === 'replace') {
+            state.onConflict = value
+        } else {
+            state.onConflict = 'keepBoth'
+        }
+    },
     SET_TOTAL_FILES_IN_BATCH(state, count) {
         state.totalFilesInBatch = count
     },
@@ -200,6 +215,7 @@ export const mutations = {
         state.storageCredsExpiresAt = 0
         state.storageBucket = ""
         state.storageKeyPrefix = ""
+        state.onConflict = 'keepBoth'
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -241,6 +257,10 @@ export const mutations = {
 export const actions = {
     setCurrentTargetPackage: ({commit, rootState}, currentTargetPackage) => {
         commit('SET_CURRENT_TARGET_PACKAGE', currentTargetPackage)
+    },
+
+    setOnConflict: ({commit}, value) => {
+        commit('SET_ON_CONFLICT', value)
     },
 
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
@@ -610,6 +630,10 @@ export const actions = {
 
         const body = {
             manifestNodeId: state.manifestNodeId,
+            // Server accepts "keepBoth" (default), "replace", "fail".
+            // Omitted / empty resolves to keepBoth server-side; sending it
+            // explicitly keeps intent visible in network logs.
+            onConflict: state.onConflict || 'keepBoth',
             files: batch.map(b => ({
                 uploadId: b.uploadId,
                 size: b.size,
@@ -840,6 +864,9 @@ export const getters = {
     },
     getUploadDestination: state => () => {
         return state.uploadDestination
+    },
+    getOnConflict: state => () => {
+        return state.onConflict
     },
     // Returns synthetic "placeholder" rows for a given folder view so the
     // DatasetFiles table can show a row for each file that's still
