@@ -217,7 +217,7 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      const url = `${rootState.config.api2Url}/applications/store?organization_id=${rootState.activeOrganization.organization.id}`;
+      const url = `${rootState.config.api2Url}/applications/store`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -259,6 +259,21 @@ export const actions = {
       commit("UPDATE_APPLICATIONS", []);
       return Promise.reject(err);
     }
+  },
+  fetchApplication: async ({ rootState }, uuid) => {
+    if (!uuid) throw new Error("Missing application uuid");
+    const url = `${rootState.config.api2Url}/applications/store/${uuid}`;
+    const userToken = await useGetToken();
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch application: ${resp.status}`);
+    }
+    return await resp.json();
   },
   fetchComputeResourceAccounts: async ({ commit, rootState }) => {
     try {

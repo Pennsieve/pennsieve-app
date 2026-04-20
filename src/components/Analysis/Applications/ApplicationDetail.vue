@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { marked } from "marked";
@@ -21,11 +21,11 @@ const props = defineProps({
 /*
   Local State
 */
-const accordionActiveNames = ref(["information"]);
+const accordionActiveNames = ref(["information", "versions"]);
+const detail = ref(null);
+const detailLoading = ref(false);
+const detailError = ref("");
 const readmeHtml = ref("");
-const readmeLoading = ref(false);
-const readmeError = ref("");
-const editableParams = ref([]);
 
 /*
   Store computed
@@ -33,19 +33,9 @@ const editableParams = ref([]);
 const store = useStore();
 const router = useRouter();
 
-const applications = computed(
-  () => store.state.analysisModule.applications || []
-);
-const applicationsLoaded = computed(
-  () => store.state.analysisModule.applicationsLoaded
-);
 const activeOrganization = computed(() => store.state.activeOrganization);
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
-
-const selectedApplication = computed(() =>
-  applications.value.find((a) => a.uuid === props.uuid)
-);
 
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
@@ -54,6 +44,39 @@ const hasAdminRights = computed(() => {
     return isAdmin || isOwner;
   }
   return false;
+});
+
+/*
+  Derived helpers
+*/
+const parseGitHubRepo = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+  if (!match) return null;
+  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
+};
+
+const parseGitHubDisplay = (sourceUrl) => {
+  const info = parseGitHubRepo(sourceUrl);
+  return info ? `${info.owner}/${info.repo}` : null;
+};
+
+const repoName = computed(
+  () => parseGitHubDisplay(detail.value?.sourceUrl) || "Unknown repo"
+);
+
+const githubRepoUrl = computed(() => {
+  const info = parseGitHubRepo(detail.value?.sourceUrl);
+  return info ? `https://github.com/${info.owner}/${info.repo}` : null;
+});
+
+const sortedVersions = computed(() => {
+  const versions = detail.value?.versions || [];
+  return [...versions].sort((a, b) => {
+    const aTime = new Date(a.createdAt).getTime() || 0;
+    const bTime = new Date(b.createdAt).getTime() || 0;
+    return bTime - aTime;
+  });
 });
 
 /*
@@ -84,197 +107,92 @@ const formatDate = (dateString) => {
   }
 };
 
+const formatDateTime = (dateString) => {
+  if (!dateString) return "N/A";
+  try {
+    return new Date(dateString).toLocaleString();
+  } catch {
+    return dateString;
+  }
+};
+
 /*
   Status helpers
 */
 const statusBadgeClass = (status) => {
   if (!status) return "badge-gray";
-  if (["deployed", "active"].includes(status)) return "badge-green";
-  if (["registering", "deploying", "re-deploying", "pending"].includes(status))
+  const s = status.toLowerCase();
+  if (["deployed", "active", "running"].includes(s)) return "badge-green";
+  if (["registering", "deploying", "re-deploying", "pending"].includes(s))
     return "badge-blue";
-  if (status.startsWith("error")) return "badge-red";
+  if (s.startsWith("error") || s === "stopped") return "badge-red";
   return "badge-gray";
 };
 
 const statusLabel = (status) => {
   if (!status) return "Unknown";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 };
 
 /*
-  GitHub README
+  README rendering from assets
 */
-const parseGitHubRepo = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
+const getReadmeContent = (assets) => {
+  if (!assets) return "";
+  const key = Object.keys(assets).find((k) => /^readme(\.md)?$/i.test(k));
+  return key ? assets[key] : "";
 };
 
-const githubRepoUrl = computed(() => {
-  if (!selectedApplication.value?.source?.url) return null;
-  const info = parseGitHubRepo(selectedApplication.value.source.url);
-  if (!info) return null;
-  return `https://github.com/${info.owner}/${info.repo}`;
-});
-
-const fetchReadme = async (app) => {
-  readmeHtml.value = "";
-  readmeError.value = "";
-
-  const info = parseGitHubRepo(app?.source?.url);
-  if (!info) {
-    readmeError.value = "No GitHub repository URL available";
+const renderReadme = (markdown) => {
+  if (!markdown) {
+    readmeHtml.value = "";
     return;
   }
-
-  readmeLoading.value = true;
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
-      { headers: { Accept: "application/vnd.github.v3.json" } }
-    );
-
-    if (!resp.ok) {
-      if (resp.status === 404) {
-        readmeError.value = "No README found in this repository";
-      } else if (resp.status === 403) {
-        readmeError.value = "Unable to access README (rate limit or private repository)";
-      } else {
-        readmeError.value = `Failed to fetch README (${resp.status})`;
-      }
-      return;
-    }
-
-    const data = await resp.json();
-    const decoded = new TextDecoder().decode(
-      Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) =>
-        c.charCodeAt(0)
-      )
-    );
-    const html = await marked(decoded);
-    readmeHtml.value = DOMPurify.sanitize(html);
-  } catch (err) {
-    readmeError.value = "Failed to load README";
-  } finally {
-    readmeLoading.value = false;
-  }
+  const html = marked.parse(markdown);
+  readmeHtml.value = DOMPurify.sanitize(html);
 };
 
 /*
-  Inline parameter editing
+  Fetch single application detail
 */
-const formatParamsForUI = (app) => {
-  if (app?.params) {
-    return Object.entries(app.params).map(([key, value]) => ({
-      key,
-      value: String(value),
-    }));
-  }
-  return [];
-};
-
-const formatParamsForPayload = (params) => {
-  if (params.length === 0) return null;
-  return Object.fromEntries(params.map((p) => [p.key, p.value]));
-};
-
-const hasUnsavedChanges = computed(() => {
-  if (!selectedApplication.value) return false;
-  const original = formatParamsForUI(selectedApplication.value);
-  const current = editableParams.value;
-  if (original.length !== current.length) return true;
-  return current.some(
-    (p, i) => p.key !== original[i]?.key || p.value !== original[i]?.value
-  );
-});
-
-const initEditableParams = (app) => {
-  editableParams.value = formatParamsForUI(app);
-};
-
-const addParam = () => {
-  editableParams.value.push({ key: "", value: "" });
-};
-
-const removeParam = (index) => {
-  editableParams.value.splice(index, 1);
-};
-
-const saveParams = async () => {
-  const payload = {
-    ...selectedApplication.value,
-    params: formatParamsForPayload(editableParams.value),
-  };
+const loadDetail = async (uuid) => {
+  detail.value = null;
+  readmeHtml.value = "";
+  detailError.value = "";
+  if (!uuid) return;
+  detailLoading.value = true;
   try {
-    await store.dispatch("analysisModule/editApplication", payload);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Your request has been successfully submitted.",
-      },
-    });
-    initEditableParams(selectedApplication.value);
-  } catch (error) {
-    console.error(error);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "error",
-        msg: "There was a problem submitting your request.",
-      },
-    });
+    const data = await store.dispatch("analysisModule/fetchApplication", uuid);
+    detail.value = data;
+    renderReadme(getReadmeContent(data?.assets));
+  } catch (err) {
+    console.error(err);
+    detailError.value = "Failed to load application";
+  } finally {
+    detailLoading.value = false;
   }
 };
 
-const cancelParamEdits = () => {
-  initEditableParams(selectedApplication.value);
-};
+watch(
+  () => props.uuid,
+  (uuid) => loadDetail(uuid),
+  { immediate: true }
+);
 
-const deployApplication = async (app) => {
+/*
+  Admin actions
+*/
+const deleteApplicationHandler = async () => {
+  if (!detail.value) return;
   try {
-    const formattedUpdateDataset = {
-      uuid: app.uuid,
-      account: {
-        uuid: app.account.uuid,
-        accountId: app.account.accountId,
-        accountType: app.account.accountType,
-      },
-      destination: {
-        type: app.destination.type,
-        url: app.destination.url,
-      },
-      source: {
-        type: app.source.type,
-        url: app.source.url,
-      },
-    };
-    await store.dispatch("analysisModule/updateApplication", formattedUpdateDataset);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Your request has been successfully submitted.",
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "error",
-        msg: "There was a problem submitting your request.",
-      },
-    });
-  }
-};
-
-const deleteApplicationHandler = async (app) => {
-  try {
-    await store.dispatch("analysisModule/deleteApplication", app);
+    await store.dispatch("analysisModule/deleteApplication", detail.value);
     EventBus.$emit("toast", {
       detail: {
         type: "success",
         msg: "Your request was successful. It may take some time to complete.",
       },
     });
+    router.push({ name: "applications" });
   } catch (error) {
     console.error(error);
     EventBus.$emit("toast", {
@@ -285,34 +203,6 @@ const deleteApplicationHandler = async (app) => {
     });
   }
 };
-
-/*
-  Watch: init when selectedApplication becomes available
-*/
-watch(selectedApplication, (app) => {
-  if (app) {
-    initEditableParams(app);
-    fetchReadme(app);
-  } else {
-    editableParams.value = [];
-    readmeHtml.value = "";
-    readmeError.value = "";
-  }
-}, { immediate: true });
-
-/*
-  Route navigation guard — warn on unsaved param changes
-*/
-const removeGuard = router.beforeEach((to, from, next) => {
-  if (hasUnsavedChanges.value) {
-    const leave = window.confirm(
-      "You have unsaved parameter changes. Discard and leave?"
-    );
-    if (!leave) return next(false);
-  }
-  next();
-});
-onBeforeUnmount(() => removeGuard());
 </script>
 
 <template>
@@ -321,27 +211,21 @@ onBeforeUnmount(() => removeGuard());
     <div class="builder-header">
       <span class="header-title">
         <router-link :to="{ name: 'applications' }" class="header-back-link">Applications</router-link>
-        <template v-if="selectedApplication">
+        <template v-if="detail">
           <span class="header-breadcrumb-sep">/</span>
-          <span class="header-detail-name">{{ selectedApplication.name }}</span>
+          <span class="header-detail-name">{{ repoName }}</span>
         </template>
       </span>
-      <div class="header-actions">
-        <template v-if="hasUnsavedChanges">
-          <bf-button class="secondary" @click="cancelParamEdits">Cancel</bf-button>
-          <bf-button @click="saveParams">Update</bf-button>
-        </template>
-      </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="!applicationsLoaded" class="app-loading">
+    <div v-if="detailLoading" class="app-loading">
       Loading...
     </div>
 
-    <!-- Not Found -->
-    <div v-else-if="!selectedApplication" class="app-not-found">
-      <p>Application not found.</p>
+    <!-- Error / Not Found -->
+    <div v-else-if="detailError || !detail" class="app-not-found">
+      <p>{{ detailError || "Application not found." }}</p>
       <router-link :to="{ name: 'applications' }" class="back-link">
         &larr; Back to Applications
       </router-link>
@@ -354,9 +238,9 @@ onBeforeUnmount(() => removeGuard());
         <!-- Metrics -->
         <div class="metrics-section">
           <MetricsDashboard
-            v-if="selectedApplication?.source?.url"
+            v-if="detail.sourceUrl"
             filter-column="sourceUrl"
-            :filter-value="selectedApplication.source.url"
+            :filter-value="detail.sourceUrl"
           />
           <div v-else class="metrics-placeholder">
             <span>No source URL available for metrics</span>
@@ -377,17 +261,10 @@ onBeforeUnmount(() => removeGuard());
               View on GitHub
             </a>
           </div>
-          <div v-if="readmeLoading" class="readme-loading">
-            Loading README...
+          <div v-if="!readmeHtml" class="readme-empty">
+            No README available
           </div>
-          <div v-else-if="readmeError" class="readme-error">
-            {{ readmeError }}
-          </div>
-          <div
-            v-else-if="readmeHtml"
-            class="readme-content"
-            v-html="readmeHtml"
-          />
+          <div v-else class="readme-content" v-html="readmeHtml" />
         </div>
       </div>
 
@@ -397,129 +274,96 @@ onBeforeUnmount(() => removeGuard());
           <el-collapse-item title="Information" name="information">
             <div class="info-card">
               <div class="info-row">
-                <span class="info-label">Name</span>
-                <span class="info-value">{{ selectedApplication.name }}</span>
+                <span class="info-label">Repository</span>
+                <span class="info-value">{{ repoName }}</span>
               </div>
-              <div v-if="selectedApplication.description" class="info-row">
-                <span class="info-label">Description</span>
-                <span class="info-value">{{ selectedApplication.description }}</span>
+              <div v-if="detail.sourceType" class="info-row">
+                <span class="info-label">Source</span>
+                <span class="info-value">{{ detail.sourceType }}</span>
               </div>
-              <div class="info-row">
-                <span class="info-label">Status</span>
-                <span class="info-value">
-                  <span
-                    class="status-badge"
-                    :class="statusBadgeClass(selectedApplication.status)"
-                  >
-                    {{ statusLabel(selectedApplication.status) }}
-                  </span>
-                </span>
+              <div v-if="detail.visibility" class="info-row">
+                <span class="info-label">Visibility</span>
+                <span class="info-value">{{ detail.visibility }}</span>
               </div>
-              <div v-if="selectedApplication.createdAt" class="info-row">
+              <div v-if="detail.createdAt" class="info-row">
                 <span class="info-label">Created</span>
-                <span class="info-value">{{ formatDate(selectedApplication.createdAt) }}</span>
+                <span class="info-value">{{ formatDate(detail.createdAt) }}</span>
               </div>
-              <div v-if="selectedApplication.userId" class="info-row">
-                <span class="info-label">Created By</span>
-                <span class="info-value">{{ getUserName(selectedApplication.userId) }}</span>
+              <div v-if="detail.ownerId" class="info-row">
+                <span class="info-label">Owner</span>
+                <span class="info-value">{{ getUserName(detail.ownerId) }}</span>
+              </div>
+              <div v-if="detail.sourceUrl" class="info-row">
+                <span class="info-label">URL</span>
+                <a
+                  :href="detail.sourceUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="info-value info-url"
+                >
+                  {{ detail.sourceUrl }}
+                </a>
               </div>
             </div>
 
-            <!-- Resources -->
-            <template v-if="selectedApplication.runtimeConfig">
-              <h4 class="sidebar-section-title">Runtime Configuration</h4>
-              <div class="info-card">
-                <div class="info-row">
-                  <span class="info-label">CPU</span>
-                  <span class="info-value">{{ selectedApplication.runtimeConfig.cpu || 'N/A' }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Memory</span>
-                  <span class="info-value">{{ selectedApplication.runtimeConfig.memory || 'N/A' }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Compute Types</span>
-                  <span class="info-value">{{ (selectedApplication.runtimeConfig.computeTypes || []).join(', ') || 'N/A' }}</span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Source -->
-            <template v-if="selectedApplication.source">
-              <h4 class="sidebar-section-title">Source</h4>
-              <div class="info-card">
-                <div v-if="selectedApplication.source.url" class="info-row">
-                  <span class="info-label">Repository</span>
-                  <span class="info-value info-url">{{ selectedApplication.source.url }}</span>
-                </div>
-                <div v-if="selectedApplication.source.branch" class="info-row">
-                  <span class="info-label">Branch</span>
-                  <span class="info-value">{{ selectedApplication.source.branch }}</span>
-                </div>
-                <div v-if="selectedApplication.source.path" class="info-row">
-                  <span class="info-label">Path</span>
-                  <span class="info-value info-url">{{ selectedApplication.source.path }}</span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Parameters -->
-            <template v-if="hasAdminRights">
-              <h4 class="sidebar-section-title">Parameters</h4>
-              <div class="config-field">
-                <div
-                  v-for="(param, index) in editableParams"
-                  :key="index"
-                  class="param-row"
-                >
-                  <el-input
-                    v-model="param.key"
-                    size="small"
-                    placeholder="Key"
-                    class="param-key"
-                  />
-                  <el-input
-                    v-model="param.value"
-                    size="small"
-                    placeholder="Value"
-                    class="param-value"
-                  />
-                  <button class="param-remove-btn" @click="removeParam(index)">&times;</button>
-                </div>
-                <button class="text-link-btn" @click="addParam">+ Add parameter</button>
-              </div>
-            </template>
-            <template v-else-if="selectedApplication.params && Object.keys(selectedApplication.params).length > 0">
-              <h4 class="sidebar-section-title">Parameters</h4>
-              <div class="info-card">
-                <div
-                  v-for="(value, key) in selectedApplication.params"
-                  :key="key"
-                  class="info-row"
-                >
-                  <span class="info-label">{{ key }}</span>
-                  <span class="info-value">{{ value }}</span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Admin Actions -->
             <template v-if="hasAdminRights">
               <div class="info-actions">
                 <button
-                  class="text-link-btn"
-                  @click="deployApplication(selectedApplication)"
-                >
-                  Deploy / Update
-                </button>
-                <button
                   class="text-link-btn archive-btn"
-                  @click="deleteApplicationHandler(selectedApplication)"
+                  @click="deleteApplicationHandler"
                 >
                   Delete application
                 </button>
               </div>
             </template>
+          </el-collapse-item>
+
+          <el-collapse-item
+            :title="`Versions (${sortedVersions.length})`"
+            name="versions"
+          >
+            <div v-if="sortedVersions.length === 0" class="empty-versions">
+              No versions yet
+            </div>
+            <div
+              v-for="version in sortedVersions"
+              :key="version.uuid"
+              class="version-card"
+            >
+              <div class="version-header">
+                <span class="version-tag">{{ version.version }}</span>
+                <span
+                  class="status-badge"
+                  :class="statusBadgeClass(version.status)"
+                >
+                  {{ statusLabel(version.status) }}
+                </span>
+              </div>
+              <div class="version-meta">
+                <span>Released {{ formatDate(version.createdAt) }}</span>
+              </div>
+              <div
+                v-if="(version.deployments || []).length > 0"
+                class="deployments-list"
+              >
+                <div class="deployments-label">Deployments</div>
+                <div
+                  v-for="deployment in version.deployments"
+                  :key="deployment.deploymentId"
+                  class="deployment-row"
+                >
+                  <span
+                    class="status-badge status-badge-sm"
+                    :class="statusBadgeClass(deployment.lastStatus)"
+                  >
+                    {{ statusLabel(deployment.lastStatus) }}
+                  </span>
+                  <span class="deployment-time">
+                    {{ formatDateTime(deployment.initiatedAt) }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </el-collapse-item>
         </el-collapse>
       </div>
@@ -575,13 +419,6 @@ onBeforeUnmount(() => removeGuard());
     font-weight: 600;
     font-size: 14px;
     color: theme.$black;
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
   }
 }
 
@@ -680,17 +517,11 @@ onBeforeUnmount(() => removeGuard());
   }
 }
 
-.readme-empty,
-.readme-loading,
-.readme-error {
+.readme-empty {
   padding: 32px;
   text-align: center;
   color: theme.$gray_4;
   font-size: 14px;
-}
-
-.readme-error {
-  color: theme.$status_red;
 }
 
 .readme-content {
@@ -809,15 +640,6 @@ onBeforeUnmount(() => removeGuard());
   border-top: none;
 }
 
-.sidebar-section-title {
-  margin: 10px 0 6px 0;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: theme.$gray_4;
-}
-
 /* Info panel */
 .info-card {
   background: theme.$gray_1;
@@ -851,11 +673,19 @@ onBeforeUnmount(() => removeGuard());
   color: theme.$black;
   text-align: right;
   word-break: break-word;
+  text-transform: capitalize;
 }
 
 .info-url {
   font-family: monospace;
   font-size: 11px;
+  text-transform: none;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .info-actions {
@@ -893,42 +723,78 @@ onBeforeUnmount(() => removeGuard());
   text-transform: uppercase;
   letter-spacing: 0.5px;
 
+  &.status-badge-sm {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+
   &.badge-gray { background: theme.$gray_2; color: theme.$gray_5; }
   &.badge-blue { background: #dbeafe; color: #1d4ed8; }
   &.badge-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
   &.badge-red { background: #fee2e2; color: #b91c1c; }
 }
 
-/* Inline parameter editing */
-.config-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* Versions */
+.empty-versions {
+  padding: 12px;
+  color: theme.$gray_4;
+  font-size: 12px;
+  text-align: center;
 }
 
-.param-row {
+.version-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.version-header {
   display: flex;
-  gap: 6px;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 4px;
+}
 
-  .param-key { flex: 1; }
-  .param-value { flex: 1; }
+.version-tag {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$black;
+}
 
-  .param-remove-btn {
-    background: theme.$status_red;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1;
-    flex-shrink: 0;
-  }
+.version-meta {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-bottom: 8px;
+}
+
+.deployments-list {
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.deployments-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: theme.$gray_4;
+  margin-bottom: 6px;
+}
+
+.deployment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.deployment-time {
+  color: theme.$gray_5;
 }
 </style>
