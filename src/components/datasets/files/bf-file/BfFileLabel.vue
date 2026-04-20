@@ -23,17 +23,19 @@
     </div>
 
     <!--
-      Placeholder rows render an Apple-style ring: determinate fill during
-      upload (clockwise from 12 o'clock), indeterminate spin during the
-      importing window. Failed placeholders fall through to the regular
-      file icon. Real server rows in processing/uploading states keep the
-      legacy pulsing bf-waiting-icon so nothing else in the app changes.
+      Placeholder rows (optimistic upload rows) and replace-conflict
+      overlays (existing server rows that are being replaced) both
+      render an Apple-style ring: determinate fill during upload
+      (clockwise from 12 o'clock), indeterminate spin during the
+      importing window. Failed falls through to the regular file icon.
+      Real server rows in processing/uploading states keep the legacy
+      pulsing bf-waiting-icon so nothing else in the app changes.
     -->
     <div
-      v-if="isPlaceholder && placeholderStatus !== 'failed'"
+      v-if="showUploadRing"
       class="upload-ring-wrap mr-16"
-      :class="{ 'upload-ring-wrap--spin': placeholderStatus === 'importing' }"
-      :aria-label="placeholderStatus === 'importing' ? 'Importing' : 'Uploading'"
+      :class="{ 'upload-ring-wrap--spin': ringStatus === 'importing' }"
+      :aria-label="ringStatus === 'importing' ? 'Importing' : 'Uploading'"
     >
       <svg class="upload-ring" viewBox="0 0 20 20" width="18" height="18">
         <circle class="ring-track" cx="10" cy="10" r="8" />
@@ -49,7 +51,7 @@
     </div>
 
     <div
-      v-else-if="!isPlaceholder && (fileState === 'processing' || fileState === 'uploading')"
+      v-else-if="!isPlaceholder && !isUploadOverlay && (fileState === 'processing' || fileState === 'uploading')"
       class="icon-waiting mr-16"
     >
       <bf-waiting-icon />
@@ -58,7 +60,7 @@
     <img
       v-else
       class="svg-icon icon-item mr-16"
-      :class="{ 'icon-item--pin-top': isPlaceholder }"
+      :class="{ 'icon-item--pin-top': isPlaceholder || isUploadOverlay }"
       :src="fileIcon(icon, file.content.packageType)"
       alt="package icon"
     >
@@ -76,8 +78,42 @@
         />
       </template>
       <template v-else>
+        <!--
+          Overlay rows (existing server rows being replaced) render the
+          name + status on a single line. el-table caches row heights
+          for rows whose id already existed, so pushing the status to a
+          second line gets clipped. Placeholder rows (new ids) keep the
+          two-line layout where it's cleaner.
+        -->
+        <div
+          v-if="isUploadOverlay"
+          class="name-row-inline"
+        >
+          <button
+            v-if="isNameLink"
+            class="name"
+            :disabled="disabled"
+            @click.stop="onClick('click-name', $event)"
+          >
+            {{ displayName }}
+          </button>
+          <span v-else class="no-link-name">{{ displayName }}</span>
+          <span
+            v-if="ringStatus === 'uploading'"
+            class="inline-status"
+          >Replacing {{ progressPct }}%</span>
+          <span
+            v-else-if="ringStatus === 'importing'"
+            class="inline-status importing"
+          >Replacing&hellip;</span>
+          <span
+            v-else-if="ringStatus === 'failed'"
+            class="inline-status failed"
+          >Replace failed</span>
+        </div>
+
         <button
-          v-if="isNameLink && !isPlaceholder"
+          v-else-if="isNameLink && !isPlaceholder"
           class="name"
           data-cy="moveDialogFileName"
           :disabled="disabled"
@@ -85,7 +121,7 @@
         >
           {{ displayName }}
         </button>
-        <div v-else class="no-link-name placeholder-name">
+        <div v-else-if="!isUploadOverlay" class="no-link-name placeholder-name">
           {{ displayName }}
           <span
             v-if="isPlaceholder && placeholderFileCount > 0"
@@ -94,8 +130,8 @@
         </div>
       </template>
 
-      <!-- Placeholder meta row: status label + percentage. The ring in the
-           icon slot carries the visual progress; this line is text-only. -->
+      <!-- Placeholder meta (new-upload rows only). Overlay rows put
+           their status inline above; they skip this block. -->
       <div
         v-if="isPlaceholder"
         class="placeholder-meta"
@@ -256,14 +292,39 @@ export default {
     isPlaceholder: function() {
       return this.file && this.file._placeholder === true
     },
+    // Set on server rows that are being replaced by a new upload
+    // (see BfDatasetFiles.displayFiles / getReplaceOverlaysForFolder).
+    // We render the same progress ring + status label as a placeholder,
+    // but the row's server-side identity is preserved (clicking opens
+    // the existing file, which is fine — the replacement lands later).
+    isUploadOverlay: function() {
+      return this.file && this.file._uploading === true
+    },
     placeholderStatus: function() {
       return (this.file && this.file._placeholderStatus) || ''
     },
     placeholderFileCount: function() {
       return (this.file && this.file._placeholderFileCount) || 0
     },
+    // Unified status driver: placeholder rows read _placeholderStatus,
+    // overlay rows read _uploadStatus. Both resolve to one of
+    // 'uploading' | 'importing' | 'failed' (or '' when not applicable).
+    ringStatus: function() {
+      if (this.isUploadOverlay) return (this.file && this.file._uploadStatus) || ''
+      if (this.isPlaceholder) return this.placeholderStatus
+      return ''
+    },
+    // Ring should show whenever we're in an uploading/importing state;
+    // failures fall through to the regular icon so the error treatment
+    // on the meta label is clear.
+    showUploadRing: function() {
+      const s = this.ringStatus
+      return (this.isPlaceholder || this.isUploadOverlay) && (s === 'uploading' || s === 'importing')
+    },
     progressPct: function() {
-      const progress = this.file && this.file._progress
+      const progress = this.isUploadOverlay
+        ? (this.file && this.file._uploadProgress)
+        : (this.file && this.file._progress)
       if (!progress || !progress.total) return 0
       const pct = Math.floor((progress.loaded / progress.total) * 100)
       return Math.max(0, Math.min(100, pct))
@@ -276,7 +337,7 @@ export default {
       return 50.27
     },
     ringDashOffset: function() {
-      if (this.placeholderStatus === 'importing') {
+      if (this.ringStatus === 'importing') {
         // Visible arc length ≈ 25% of circumference.
         return this.ringCircumference * 0.75
       }
@@ -635,6 +696,30 @@ export default {
   font-size: 11px;
   line-height: 1;
   margin-top: 2px;
+}
+
+.name-row-inline {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inline-status {
+  color: theme.$gray_5;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-style: italic;
+
+  &.importing {
+    color: theme.$gray_5;
+  }
+  &.failed {
+    color: theme.$red_1;
+    font-style: normal;
+    font-weight: 500;
+  }
 }
 
 .status-label {

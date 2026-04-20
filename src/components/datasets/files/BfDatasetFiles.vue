@@ -388,6 +388,7 @@ export default {
       "getUploadMap",
       "getPlaceholdersForFolder",
       "getManifestFiles",
+      "getReplaceOverlaysForFolder",
     ]),
 
     ...mapGetters("datasetModule", [
@@ -428,19 +429,54 @@ export default {
      * parent folder + same name), its placeholder is dropped so the two
      * rows don't stack. The uploadModule entry stays in the map until
      * cleared; only the visible row is deduped here.
+     *
+     * Replace-conflict overlays: a replace-strategy upload whose target
+     * name collides with an existing server row doesn't emit a separate
+     * placeholder (the placeholder getter skips it). Instead, the
+     * existing row is decorated with _uploading/_uploadStatus/_uploadProgress
+     * so BfFileLabel renders the progress ring in place of the file icon.
+     * When the server-side soft-delete + replacement lands in silent
+     * refresh, the decoration disappears naturally.
      */
     displayFiles: function () {
       const folderId = this.file && this.file.content && this.file.content.id;
       if (!folderId) return this.files;
+      const overlays = this.getReplaceOverlaysForFolder(folderId);
+      const decoratedFiles =
+        overlays.size === 0
+          ? this.files
+          : this.files.map((f) => {
+              const fid = f.content && f.content.id;
+              const hit = fid && overlays.get(fid);
+              if (!hit) return f;
+              const entry = hit.entry;
+              const status = entry.status || "waiting";
+              const uploadStatus =
+                status === "failed"
+                  ? "failed"
+                  : status === "processing" || status === "finalized"
+                  ? "importing"
+                  : "uploading";
+              const size = (entry.file && entry.file.size) || 0;
+              return {
+                ...f,
+                _uploading: true,
+                _uploadStatus: uploadStatus,
+                _uploadProgress: {
+                  loaded: (entry.progress && entry.progress.loaded) || 0,
+                  total: (entry.progress && entry.progress.total) || size,
+                },
+              };
+            });
       const placeholders = this.getPlaceholdersForFolder(folderId);
-      if (!placeholders.length) return this.files;
+      if (!placeholders.length) return decoratedFiles;
       const takenNames = new Set(
-        this.files.map((f) => (f.content && f.content.name) || "")
+        decoratedFiles.map((f) => (f.content && f.content.name) || "")
       );
       const survivors = placeholders.filter(
         (p) => !takenNames.has(p.content.name)
       );
-      return [...survivors, ...this.files];
+      return [...survivors, ...decoratedFiles];
     },
 
     filesUrl: function () {
@@ -988,6 +1024,15 @@ export default {
               "content.name",
               this.files,
               this.sortDirection
+            );
+            // Refresh the store's currentTargetPackage so conflict
+            // detection in syncManifest (getReplaceOverlaysForFolder /
+            // resolveKeepBothName) sees newly-added files right away.
+            // Without this, a second drop of the same filename after an
+            // upload lands misses the conflict until a full page refresh.
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
             );
             // Sweep any finalized upload entries whose server row now
             // exists in this folder, so the aggregate pill drops out of

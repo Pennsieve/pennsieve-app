@@ -50,6 +50,30 @@ const CREDENTIAL_REFRESH_HEADROOM_MS = 5 * 60 * 1000;
 const INVISIBLE_UNICODE_WS = /[\u00A0\u2000-\u200F\u202F\u205F\u3000\uFEFF]/g;
 const sanitizeFileName = (name) => name.replace(INVISIBLE_UNICODE_WS, ' ');
 
+// Mirror the server's keepBoth suffix algorithm (pennsieve-go-core
+// packages.go expandName): greedy-from-left first-dot extension split,
+// then "<base> (<N>).<ext>" or "<base> (<N>)" starting at N=1 until free.
+// For e.g. "archive.tar.gz" this yields "archive (1).tar.gz" — matches
+// the server. Divergence from server would still be safe (server picks
+// its own name, placeholder just lingers until silent refresh catches up).
+const splitNameExt = (name) => {
+    const m = /^([^.]*)\.?(.*)$/.exec(name) || []
+    return [m[1] || '', m[2] || '']
+}
+const resolveKeepBothName = (originalName, takenNames) => {
+    if (!takenNames.has(originalName)) return originalName
+    const [base, ext] = splitNameExt(originalName)
+    let i = 1
+    while (i < 10000) {
+        const candidate = ext ? `${base} (${i}).${ext}` : `${base} (${i})`
+        if (!takenNames.has(candidate)) return candidate
+        i += 1
+    }
+    // Loop bound is a safety net — if someone's folder has 10k collisions,
+    // fall back to a uuid-like suffix rather than hanging.
+    return ext ? `${originalName} (${Date.now()})` : originalName
+}
+
 class UploadFile {
     constructor(uploadId, s3Key, targetPath, targetName) {
         this.upload_id = uploadId;
@@ -716,6 +740,23 @@ export const actions = {
         const uploadMap = new Map(state.uploadFileMap)
         const requestFiles = []
         let total = 0
+
+        // Build the set of names already taken in the destination folder
+        // so we can pre-resolve client-side name conflicts. Only files
+        // landing at the *root* of the destination are checked — we don't
+        // have server-side children for nested subfolders (may or may not
+        // exist), so those fall through to whatever the server decides.
+        // For replace, we also need the existing package's id to overlay
+        // upload progress onto its row in the DatasetFiles table.
+        const existingChildren = (state.currentTargetPackage && state.currentTargetPackage.children) || []
+        const existingByName = new Map()
+        for (const child of existingChildren) {
+            const nm = child && child.content && child.content.name
+            if (nm) existingByName.set(nm, child)
+        }
+        const onConflict = state.onConflict || 'keepBoth'
+        const takenInBatch = new Set()
+
         for (const mf in state.manifestFiles) {
             const uploadId = uuidv4()
             const s3Key = `${keyPrefix}/${uploadId}`
@@ -724,11 +765,31 @@ export const actions = {
             let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length - curFile.name.length)
             fileLocation = fileLocation.replace(/^\//, '').replace(/\/$/, '')
 
+            // Is this file landing at the destination root (no subfolder
+            // from webkitRelativePath), or nested under a dropped folder?
+            // We only pre-resolve conflicts for root-level files.
+            const hasSubfolder = curFile.path && curFile.path !== curFile.name && curFile.path.includes('/')
+
+            let targetName = sanitizeFileName(curFile.name)
+            let replacesPackageId = null
+            if (!hasSubfolder) {
+                if (onConflict === 'keepBoth') {
+                    const taken = new Set([...existingByName.keys(), ...takenInBatch])
+                    targetName = resolveKeepBothName(targetName, taken)
+                } else if (onConflict === 'replace') {
+                    const existing = existingByName.get(targetName)
+                    if (existing && existing.content && existing.content.id) {
+                        replacesPackageId = existing.content.id
+                    }
+                }
+                takenInBatch.add(targetName)
+            }
+
             const f = new UploadFile(
                 uploadId,
                 s3Key,
                 fileLocation,
-                sanitizeFileName(curFile.name),
+                targetName,
             )
 
             uploadMap.set(s3Key, {
@@ -736,6 +797,11 @@ export const actions = {
                 config: f,
                 progress: { loaded: 0, total: curFile.total },
                 status: "waiting",
+                // Set only on replace-conflict root-level entries. The
+                // placeholder getter skips these (no separate row); the
+                // DatasetFiles displayFiles overlays progress onto the
+                // existing server row with this id instead.
+                _replacesPackageId: replacesPackageId,
             })
 
             total += curFile.size
@@ -868,6 +934,21 @@ export const getters = {
     getOnConflict: state => () => {
         return state.onConflict
     },
+    // Returns a Map<existingPackageId, uploadEntry> for replace-conflict
+    // uploads targeting `folderId`. The DatasetFiles displayFiles walks
+    // server rows in that folder and overlays progress onto any row
+    // whose id is a key here. Empty map when not viewing the destination.
+    getReplaceOverlaysForFolder: state => (folderId) => {
+        const out = new Map()
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        if (!destId || destId !== folderId) return out
+        for (const [key, entry] of state.uploadFileMap) {
+            if (!entry._replacesPackageId) continue
+            out.set(entry._replacesPackageId, { key, entry })
+        }
+        return out
+    },
     // Returns synthetic "placeholder" rows for a given folder view so the
     // DatasetFiles table can show a row for each file that's still
     // uploading/importing (before the server-side package record exists).
@@ -930,6 +1011,11 @@ export const getters = {
         // stable s3_key ids and live progress.
         if (state.uploadFileMap.size > 0) {
             for (const [key, entry] of state.uploadFileMap) {
+                // Replace-conflict entries don't get their own placeholder
+                // row — the existing server row (looked up by
+                // _replacesPackageId) gets decorated with upload progress
+                // in BfDatasetFiles displayFiles instead.
+                if (entry._replacesPackageId) continue
                 const fullTargetPath = (entry.config && entry.config.target_path) || ''
                 let rel = fullTargetPath
                 if (destPath && rel.startsWith(destPath)) {
