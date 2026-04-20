@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { propOr } from "ramda";
@@ -7,7 +7,6 @@ import { propOr } from "ramda";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
-import IconLink from "../../icons/IconLink.vue";
 import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 
 
@@ -15,9 +14,14 @@ import CreateApplicationDialog from "./CreateApplicationDialog.vue";
   Local State
 */
 const searchQuery = ref("");
-const sortField = ref("name");
-const selectedTags = ref([]);
+const visibilityFilter = ref("all");
 const addApplicationDialogVisible = ref(false);
+
+const visibilityOptions = [
+  { label: "All", value: "all" },
+  { label: "Public", value: "public" },
+  { label: "Private", value: "private" },
+];
 
 /*
   Store computed
@@ -40,49 +44,110 @@ const hasAdminRights = computed(() => {
 });
 
 /*
-  Tags
+  Derived helpers
 */
-const availableTags = computed(() => {
-  return [...new Set(applications.value.flatMap((a) => a.tags || []))];
-});
+const parseGitHubRepo = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+  if (!match) return null;
+  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
+};
 
-const toggleTag = (tag) => {
-  const idx = selectedTags.value.indexOf(tag);
-  if (idx >= 0) {
-    selectedTags.value.splice(idx, 1);
-  } else {
-    selectedTags.value.push(tag);
+const parseGitHubDisplay = (sourceUrl) => {
+  const info = parseGitHubRepo(sourceUrl);
+  return info ? `${info.owner}/${info.repo}` : null;
+};
+
+const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
+
+const latestVersion = (app) => {
+  const versions = app.versions || [];
+  if (versions.length === 0) return null;
+  return [...versions].sort((a, b) => {
+    const aTime = new Date(a.createdAt).getTime() || 0;
+    const bTime = new Date(b.createdAt).getTime() || 0;
+    return bTime - aTime;
+  })[0];
+};
+
+const totalDeployments = (app) =>
+  (app.versions || []).reduce(
+    (sum, v) => sum + (v.deployments || []).length,
+    0
+  );
+
+/*
+  README previews (fetched lazily per app from GitHub)
+*/
+const readmePreviews = ref({});
+
+const stripMarkdown = (md) =>
+  md
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_`~>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const fetchReadmeFor = async (app) => {
+  if (!app?.uuid || readmePreviews.value[app.uuid] !== undefined) return;
+  const info = parseGitHubRepo(app.sourceUrl);
+  if (!info) {
+    readmePreviews.value[app.uuid] = "";
+    return;
+  }
+  readmePreviews.value[app.uuid] = "";
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
+      { headers: { Accept: "application/vnd.github.v3.json" } }
+    );
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const decoded = new TextDecoder().decode(
+      Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) =>
+        c.charCodeAt(0)
+      )
+    );
+    readmePreviews.value[app.uuid] = stripMarkdown(decoded);
+  } catch {
+    // leave preview empty
   }
 };
 
+watch(
+  applications,
+  (apps) => {
+    (apps || []).forEach((app) => fetchReadmeFor(app));
+  },
+  { immediate: true }
+);
+
 /*
-  Filtered & sorted applications
+  Filtered & sorted applications (newest first, matching workflows)
 */
 const filteredApplications = computed(() => {
   let list = applications.value;
 
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
-    list = list.filter(
-      (app) =>
-        (app.name || "").toLowerCase().includes(q) ||
-        (app.description || "").toLowerCase().includes(q)
+    list = list.filter((app) =>
+      (app.sourceUrl || "").toLowerCase().includes(q)
     );
   }
 
-  if (selectedTags.value.length > 0) {
-    list = list.filter((app) => {
-      const appTags = app.tags || [];
-      return selectedTags.value.every((t) => appTags.includes(t));
-    });
+  if (visibilityFilter.value !== "all") {
+    list = list.filter(
+      (app) => (app.visibility || "").toLowerCase() === visibilityFilter.value
+    );
   }
 
-  const field = sortField.value;
-  return [...list].sort((a, b) => {
-    const aVal = (a[field] || "").toLowerCase();
-    const bVal = (b[field] || "").toLowerCase();
-    return aVal.localeCompare(bVal);
-  });
+  return [...list].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
 });
 
 /*
@@ -90,28 +155,17 @@ const filteredApplications = computed(() => {
 */
 const statusBadgeClass = (status) => {
   if (!status) return "badge-gray";
-  if (["deployed", "active"].includes(status)) return "badge-green";
-  if (["registering", "deploying", "re-deploying", "pending"].includes(status))
+  const s = status.toLowerCase();
+  if (["deployed", "active", "running"].includes(s)) return "badge-green";
+  if (["registering", "deploying", "re-deploying", "pending"].includes(s))
     return "badge-blue";
-  if (status.startsWith("error")) return "badge-red";
+  if (s.startsWith("error") || s === "stopped") return "badge-red";
   return "badge-gray";
 };
 
 const statusLabel = (status) => {
   if (!status) return "Unknown";
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
-
-/*
-  GitHub display
-*/
-const parseGitHubDisplay = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  const owner = match[1];
-  const repo = match[2].replace(/\.git$/, "");
-  return `${owner}/${repo}`;
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 };
 
 /*
@@ -150,31 +204,15 @@ const onAddApplicationConfirm = (application) => {
             clearable
             class="search-input"
           />
-          <div class="sort-buttons">
+          <div class="status-buttons">
             <button
+              v-for="option in visibilityOptions"
+              :key="option.value"
               class="filter-btn"
-              :class="{ active: sortField === 'name' }"
-              @click="sortField = 'name'"
+              :class="{ active: visibilityFilter === option.value }"
+              @click="visibilityFilter = option.value"
             >
-              Name
-            </button>
-            <button
-              class="filter-btn"
-              :class="{ active: sortField === 'status' }"
-              @click="sortField = 'status'"
-            >
-              Status
-            </button>
-          </div>
-          <div v-if="availableTags.length > 0" class="tag-chips">
-            <button
-              v-for="tag in availableTags"
-              :key="tag"
-              class="tag-chip"
-              :class="{ selected: selectedTags.includes(tag) }"
-              @click="toggleTag(tag)"
-            >
-              {{ tag }}
+              {{ option.label }}
             </button>
           </div>
         </template>
@@ -197,35 +235,41 @@ const onAddApplicationConfirm = (application) => {
         class="app-card"
         @click="goToDetail(app)"
       >
-        <div class="card-name">{{ app.name }}</div>
-        <div v-if="app.description" class="card-description">
-          {{ app.description }}
+        <div class="card-body">
+          <div class="card-name">{{ repoName(app) }}</div>
+          <div class="card-description">
+            {{ readmePreviews[app.uuid] || '' }}
+          </div>
+          <div class="card-spacer" />
+          <div class="card-meta">
+            <span
+              class="status-badge"
+              :class="statusBadgeClass(latestVersion(app)?.status)"
+            >
+              {{ statusLabel(latestVersion(app)?.status) }}
+            </span>
+            <span class="meta-text">{{ app.visibility || 'unknown' }}</span>
+            <span class="meta-text">
+              {{ new Date(app.createdAt).toLocaleDateString() }}
+            </span>
+          </div>
         </div>
-        <div class="card-status">
-          <span
-            class="status-badge"
-            :class="statusBadgeClass(app.status)"
-          >
-            {{ statusLabel(app.status) }}
+        <div v-if="(app.versions || []).length > 0" class="card-footer">
+          <span class="metric-item">
+            <span class="metric-value">{{ (app.versions || []).length }}</span>
+            <span class="metric-label">versions</span>
+          </span>
+          <span class="metric-divider" />
+          <span class="metric-item">
+            <span class="metric-value">{{ totalDeployments(app) }}</span>
+            <span class="metric-label">deployments</span>
+          </span>
+          <span class="metric-divider" />
+          <span class="metric-item">
+            <span class="metric-value">{{ latestVersion(app)?.version || '--' }}</span>
+            <span class="metric-label">latest</span>
           </span>
         </div>
-        <div v-if="(app.tags || []).length > 0" class="card-tags">
-          <span v-for="tag in app.tags" :key="tag" class="tag-pill">
-            {{ tag }}
-          </span>
-        </div>
-        <div class="card-spacer" />
-        <a
-          v-if="parseGitHubDisplay(app.source?.url)"
-          :href="app.source.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="card-github-link"
-          @click.stop
-        >
-          <IconLink :width="12" :height="12" />
-          {{ parseGitHubDisplay(app.source.url) }}
-        </a>
       </div>
     </div>
 
@@ -250,42 +294,27 @@ const onAddApplicationConfirm = (application) => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
-
 .applications-grid-page {
   height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 16px 24px;
 }
 
 .builder-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 10px;
   padding: 16px 24px;
   background-color: theme.$white;
-  min-height: 48px;
-
-  .header-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: theme.$black;
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
 }
 
 .search-input {
   max-width: 300px;
 }
 
-.sort-buttons {
+.status-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -316,40 +345,12 @@ const onAddApplicationConfirm = (application) => {
   }
 }
 
-.tag-chips {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-left: 16px;
-}
-
-.tag-chip {
-  padding: 4px 16px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 12px;
-  background: white;
-  color: theme.$gray_5;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: theme.$purple_1;
-  }
-
-  &.selected {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
-}
-
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-auto-rows: max-content;
   gap: 24px;
-  padding: 24px;
+  padding: 24px 0;
   flex: 1;
   overflow-y: auto;
 }
@@ -358,18 +359,24 @@ const onAddApplicationConfirm = (application) => {
   background: theme.$white;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
-  padding: 20px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: 160px;
+  overflow: hidden;
 
   &:hover {
     border-color: theme.$purple_1;
     box-shadow: 0 2px 8px rgba(80, 57, 247, 0.15);
   }
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  flex: 1;
 }
 
 .card-name {
@@ -382,13 +389,21 @@ const onAddApplicationConfirm = (application) => {
   font-size: 13px;
   color: theme.$gray_4;
   line-height: 1.4;
+  min-height: calc(1.4em * 2);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.card-status {
+.card-spacer {
+  flex: 1;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 12px;
 }
 
@@ -407,36 +422,42 @@ const onAddApplicationConfirm = (application) => {
   &.badge-red { background: #fee2e2; color: #b91c1c; }
 }
 
-.card-tags {
+.meta-text {
+  color: theme.$gray_4;
+  text-transform: capitalize;
+}
+
+.card-footer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.tag-pill {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: theme.$gray_2;
-  color: theme.$gray_5;
-}
-
-.card-spacer {
-  flex: 1;
-}
-
-.card-github-link {
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: theme.$purple_3;
-  text-decoration: none;
-  font-weight: 500;
+  gap: 10px;
+  padding: 10px 20px;
+  border-top: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+  border-radius: 0 0 3px 3px;
+}
 
-  &:hover {
-    text-decoration: underline;
-  }
+.metric-item {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: theme.$black;
+}
+
+.metric-label {
+  font-size: 10px;
+  color: theme.$gray_4;
+}
+
+.metric-divider {
+  width: 1px;
+  height: 14px;
+  background: theme.$gray_3;
 }
 
 .empty-state {
