@@ -80,7 +80,15 @@ const initialState = () => ({
     uploadComplete: false,
     uploadProgress: { total: 0, loaded: 0 },
     currentTargetPackage: {},
-    totalFilesInBatch: 0
+    totalFilesInBatch: 0,
+    // Conflict-resolution strategy for the current upload batch. Sent with
+    // each /upload/manifest/files/finalize call as onConflict. Values:
+    // "keepBoth" (default, auto-rename new upload to " (N)" on collision),
+    // "replace" (soft-delete predecessor + provenance link), "fail" (abort
+    // with 409 listing conflicts). "" is treated as keepBoth server-side.
+    // Set by the drop flow from either the user's remembered preference or
+    // the dialog choice; cleared on upload reset.
+    onConflict: "",
 })
 
 export const state = initialState()
@@ -159,6 +167,9 @@ export const mutations = {
     SET_MANIFEST_NODE_ID(state, nodeId) {
         state.manifestNodeId = nodeId
     },
+    SET_ON_CONFLICT(state, strategy) {
+        state.onConflict = strategy || ""
+    },
     SET_UPLOAD_FILE_MAP(state,uploadFileMap) {
         state.uploadFileMap = uploadFileMap
     },
@@ -200,6 +211,7 @@ export const mutations = {
         state.storageCredsExpiresAt = 0
         state.storageBucket = ""
         state.storageKeyPrefix = ""
+        state.onConflict = ""
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -615,6 +627,11 @@ export const actions = {
                 size: b.size,
                 sha256: b.sha256,
             })),
+        }
+        // Omit onConflict when empty so pre-v0.6 upload-service-v2 instances
+        // (should any still exist) see the legacy body byte-for-byte.
+        if (state.onConflict) {
+            body.onConflict = state.onConflict
         }
 
         try {
