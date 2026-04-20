@@ -21,11 +21,14 @@ const props = defineProps({
 /*
   Local State
 */
-const accordionActiveNames = ref(["information", "versions"]);
+const accordionActiveNames = ref(["information", "versions", "permissions"]);
 const detail = ref(null);
 const detailLoading = ref(false);
 const detailError = ref("");
 const readmeHtml = ref("");
+const permissions = ref([]);
+const permissionsLoading = ref(false);
+const permissionsError = ref("");
 
 /*
   Store computed
@@ -153,23 +156,63 @@ const renderReadme = (markdown) => {
 };
 
 /*
-  Fetch single application detail
+  Permission display helpers
+*/
+const permissionLabel = (perm) => {
+  if (perm.userId) return getUserName(perm.userId);
+  if (perm.teamId) return `Team: ${perm.teamName || perm.teamId}`;
+  if (perm.organizationId)
+    return `Org: ${perm.organizationName || perm.organizationId}`;
+  if (perm.granteeId)
+    return perm.granteeType
+      ? `${perm.granteeType}: ${perm.granteeId}`
+      : perm.granteeId;
+  return "Unknown";
+};
+
+const permissionRole = (perm) =>
+  perm.role || perm.permission || perm.accessLevel || "—";
+
+/*
+  Fetch application detail + permissions in parallel
 */
 const loadDetail = async (uuid) => {
   detail.value = null;
+  permissions.value = [];
   readmeHtml.value = "";
   detailError.value = "";
+  permissionsError.value = "";
   if (!uuid) return;
   detailLoading.value = true;
+  permissionsLoading.value = true;
   try {
-    const data = await store.dispatch("analysisModule/fetchApplication", uuid);
-    detail.value = data;
-    renderReadme(getReadmeContent(data?.assets));
-  } catch (err) {
-    console.error(err);
-    detailError.value = "Failed to load application";
+    const [detailResult, permsResult] = await Promise.allSettled([
+      store.dispatch("analysisModule/fetchApplication", uuid),
+      store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
+    ]);
+
+    if (detailResult.status === "fulfilled") {
+      detail.value = detailResult.value;
+      renderReadme(getReadmeContent(detailResult.value?.assets));
+    } else {
+      console.error(detailResult.reason);
+      detailError.value = "Failed to load application";
+    }
+
+    if (permsResult.status === "fulfilled") {
+      const data = permsResult.value;
+      permissions.value = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.permissions)
+          ? data.permissions
+          : [];
+    } else {
+      console.error(permsResult.reason);
+      permissionsError.value = "Failed to load permissions";
+    }
   } finally {
     detailLoading.value = false;
+    permissionsLoading.value = false;
   }
 };
 
@@ -316,6 +359,33 @@ const deleteApplicationHandler = async () => {
                 </button>
               </div>
             </template>
+          </el-collapse-item>
+
+          <el-collapse-item
+            :title="`Permissions (${permissions.length})`"
+            name="permissions"
+          >
+            <div v-if="permissionsLoading" class="empty-versions">
+              Loading...
+            </div>
+            <div v-else-if="permissionsError" class="empty-versions">
+              {{ permissionsError }}
+            </div>
+            <div v-else-if="permissions.length === 0" class="empty-versions">
+              No permissions
+            </div>
+            <div v-else class="info-card">
+              <div
+                v-for="(perm, i) in permissions"
+                :key="perm.uuid || perm.userId || perm.teamId || i"
+                class="info-row"
+              >
+                <span class="info-label">{{ permissionLabel(perm) }}</span>
+                <span class="info-value perm-role">
+                  {{ permissionRole(perm) }}
+                </span>
+              </div>
+            </div>
           </el-collapse-item>
 
           <el-collapse-item
@@ -796,5 +866,9 @@ const deleteApplicationHandler = async () => {
 
 .deployment-time {
   color: theme.$gray_5;
+}
+
+.perm-role {
+  text-transform: capitalize;
 }
 </style>

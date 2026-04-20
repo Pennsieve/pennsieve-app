@@ -275,6 +275,21 @@ export const actions = {
     }
     return await resp.json();
   },
+  fetchApplicationPermissions: async ({ rootState }, uuid) => {
+    if (!uuid) throw new Error("Missing application uuid");
+    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    const userToken = await useGetToken();
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch application permissions: ${resp.status}`);
+    }
+    return await resp.json();
+  },
   fetchComputeResourceAccounts: async ({ commit, rootState }) => {
     try {
       const url = `${rootState.config.api2Url}/accounts?organization_id=${rootState.activeOrganization.organization.id}`;
