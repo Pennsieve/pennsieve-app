@@ -130,6 +130,7 @@ export default {
       cmpViewer: "",
       availableViewers: [],
       viewerAssets: [],
+      timeseriesAsset: null,
       isLoading: false,
       omeTiffSource: "",
       viewerInstanceId: VIEWER_INSTANCE_ID,
@@ -138,9 +139,9 @@ export default {
 
   watch: {
     pkg: {
-      handler: function (pkg) {
+      handler: async function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
-          this.loadViewer(pkg);
+          await this.loadViewer(pkg);
           this.fetchTimeseriesData();
         }
       },
@@ -169,9 +170,10 @@ export default {
       viewerStore.setViewerConfig(viewerConfig)
 
       try {
-        const result = await viewerStore.fetchAndSetActiveViewer({
-          packageId: this.pkg?.content?.id,
-        })
+        const viewerAssetId = this.timeseriesAsset?.id || null
+        const packageId = this.pkg?.content?.id || null
+        if (!viewerAssetId && !packageId) return
+        const result = await viewerStore.fetchAndSetActiveViewer({ viewerAssetId, packageId })
         return result
       } finally {
         this.isLoading = false
@@ -238,10 +240,12 @@ export default {
       const pkgId = pathOr('', ['content', 'id'], activeViewer);
       const datasetId = pathOr('', ['content', 'datasetNodeId'], activeViewer);
       this.viewerAssets = [];
+      this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
           const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
           if (result?.assets?.length > 0) {
+            this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null
             const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
             const seen = new Set()
             const ngAssets = result.assets.filter(a => {
