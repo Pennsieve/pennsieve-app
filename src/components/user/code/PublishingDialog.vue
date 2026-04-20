@@ -33,18 +33,14 @@
               </div>
             </label>
             
-            <label class="option-item disabled">
-              <input 
-                type="checkbox" 
+            <label class="option-item">
+              <input
+                type="checkbox"
                 v-model="localSettings.publishToAppstore"
                 @change="onSettingsChange"
-                disabled
               />
               <div class="option-content">
-                <div class="option-header">
-                  <strong>App Store</strong>
-                  <span class="coming-soon-tag">Coming Soon</span>
-                </div>
+                <strong>App Store</strong>
                 <p>Publish to the Pennsieve App Store for computational tools and applications</p>
               </div>
             </label>
@@ -164,14 +160,14 @@ export default {
         await this.$store.dispatch('codeReposModule/updateRepoPublishingSettings', {
           repoUrl: this.repo.url,
           publish_to_discover: this.localSettings.publishToDiscover,
-          publish_to_appstore: false // App Store is disabled, always save as false
+          publish_to_appstore: this.localSettings.publishToAppstore
         })
 
         this.$emit('save', {
           repo: this.repo,
           settings: {
             publish_to_discover: this.localSettings.publishToDiscover,
-            publish_to_appstore: false // App Store is disabled, always save as false
+            publish_to_appstore: this.localSettings.publishToAppstore
           }
         })
         this.closeDialog()
@@ -362,13 +358,6 @@ export default {
   .option-content {
     flex: 1;
 
-    .option-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-
     strong {
       display: block;
       font-weight: 500;
@@ -381,30 +370,6 @@ export default {
       color: theme.$gray_5;
       margin: 0;
       line-height: 1.4;
-    }
-  }
-
-  &.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-
-    &:hover {
-      border-color: theme.$gray_2;
-      background: transparent;
-    }
-
-    input[type="checkbox"] {
-      cursor: not-allowed;
-    }
-
-    .option-content {
-      strong {
-        color: theme.$gray_4;
-      }
-
-      p {
-        color: theme.$gray_4;
-      }
     }
   }
 }
@@ -434,16 +399,4 @@ export default {
   gap: 12px;
 }
 
-.coming-soon-tag {
-  display: inline-block;
-  padding: 2px 8px;
-  background: #fff3cd;
-  color: #856404;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-radius: 12px;
-  line-height: 1.2;
-}
 </style>

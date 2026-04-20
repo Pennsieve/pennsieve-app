@@ -2,12 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { propOr } from "ramda";
 
-import BfButton from "../../shared/bf-button/BfButton.vue";
 import StageActions from "../../shared/StageActions/StageActions.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
-import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 
 
 /*
@@ -15,7 +12,6 @@ import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 */
 const searchQuery = ref("");
 const visibilityFilter = ref("all");
-const addApplicationDialogVisible = ref(false);
 
 const visibilityOptions = [
   { label: "All", value: "all" },
@@ -32,16 +28,6 @@ const router = useRouter();
 const applications = computed(
   () => store.state.analysisModule.applications || []
 );
-const activeOrganization = computed(() => store.state.activeOrganization);
-
-const hasAdminRights = computed(() => {
-  if (activeOrganization.value) {
-    const isAdmin = propOr(false, "isAdmin", activeOrganization.value);
-    const isOwner = propOr(false, "isOwner", activeOrganization.value);
-    return isAdmin || isOwner;
-  }
-  return false;
-});
 
 /*
   Derived helpers
@@ -174,21 +160,6 @@ const statusLabel = (status) => {
 const goToDetail = (app) => {
   router.push({ name: "application-detail", params: { uuid: app.uuid } });
 };
-
-/*
-  Dialog handlers
-*/
-const openCreateApplicationDialog = () => {
-  addApplicationDialogVisible.value = true;
-};
-
-const onCloseAddDialog = () => {
-  addApplicationDialogVisible.value = false;
-};
-
-const onAddApplicationConfirm = (application) => {
-  store.dispatch("analysisModule/createApplication", application);
-};
 </script>
 
 <template>
@@ -215,14 +186,6 @@ const onAddApplicationConfirm = (application) => {
               {{ option.label }}
             </button>
           </div>
-        </template>
-        <template #right>
-          <bf-button
-            :disabled="!hasAdminRights"
-            @click="openCreateApplicationDialog"
-          >
-            + New Application
-          </bf-button>
         </template>
       </stage-actions>
     </div>
@@ -280,13 +243,6 @@ const onAddApplicationConfirm = (application) => {
       <span v-else>No applications match your filters</span>
     </div>
 
-    <!-- Create Dialog -->
-    <create-application-dialog
-      :dialog-visible="addApplicationDialogVisible"
-      applicationType="Application"
-      @add-application="onAddApplicationConfirm"
-      @close="onCloseAddDialog"
-    />
   </div>
 </template>
 
