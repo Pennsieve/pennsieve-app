@@ -533,7 +533,7 @@ export default {
         if (!isEmpty(channel)) {
           channel.bind(
             "upload-event",
-            function () {
+            function (payload) {
               // Pusher's job here is purely "a file landed in Postgres,
               // refresh the dataset table." It fires for uploads from any
               // source (this browser session, a different session, the
@@ -541,6 +541,26 @@ export default {
               // driven by the finalize API response (see uploadModule.js)
               // — nothing on this Pusher event touches it.
               //
+              // onConflict=replace adds a `replaced_package_id` field on
+              // each UploadMessageItem for the replaced predecessor. Drop
+              // those rows from the table immediately so the user doesn't
+              // see the old (now trashed) and new packages side by side
+              // during the debounce window before the silent refetch.
+              if (Array.isArray(payload)) {
+                const replacedIds = new Set();
+                for (const item of payload) {
+                  if (item && item.replaced_package_id != null) {
+                    replacedIds.add(Number(item.replaced_package_id));
+                  }
+                }
+                if (replacedIds.size > 0 && Array.isArray(this.files)) {
+                  this.files = this.files.filter((f) => {
+                    const id =
+                      f && f.content ? Number(f.content.id) : null;
+                    return id == null || !replacedIds.has(id);
+                  });
+                }
+              }
               // Silent refetch + leading/maxWait debounce keep the table
               // current during a burst without the per-second flash.
               this.debouncedSilentFetch();
