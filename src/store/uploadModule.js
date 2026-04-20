@@ -391,6 +391,84 @@ export const actions = {
         }
     },
 
+    // detectConflicts compares the names of files the user just dropped
+    // against the immediate children of the upload destination, returning
+    // a list of conflict descriptors the caller can feed into the conflict
+    // dialog.
+    //
+    // Scope intentionally limited to the immediate target folder (no
+    // whole-tree recursion) for MVP:
+    //   - covers the common case (drop files into a single folder)
+    //   - the nested "drop a tree into an existing tree" case is handled
+    //     adequately today by the server's auto-rename fallback and the
+    //     folder-replace shortcut (future task)
+    //   - recursive check on a 100k-file tree is expensive on both sides
+    //     and not worth the complexity for v1
+    //
+    // Returns [{ incomingName, existingPackage }] — empty array on no
+    // conflicts or when no target is set. Folder-type children are not
+    // considered conflicts because folders get-or-create by name server-
+    // side; only file-type collisions matter for onConflict.
+    detectConflicts: async ({state, rootState}) => {
+        if (state.manifestFiles.length === 0) return []
+
+        const target = state.uploadDestination && state.uploadDestination.file
+        if (!target) return []
+
+        const currentRoute = router.currentRoute.value
+        const datasetId = currentRoute.params.datasetId
+        const pkgType = target.content && target.content.packageType
+
+        // Dataset root → /datasets/{id}; folder → /packages/{fileId}.
+        // Mirror BfDatasetFiles filesUrl so we hit a cached response if
+        // possible.
+        const baseUrl = pkgType === 'DataSet' ? 'datasets' : 'packages'
+        const idForUrl = pkgType === 'DataSet' ? datasetId : (target.content && target.content.id)
+        if (!idForUrl) return []
+
+        const token = await useGetToken()
+        // limit=1000 is generous for the MVP use case; the conflict-check
+        // only cares about child *names* at one level. Folders with more
+        // than that fall back silently to the server's on-write conflict
+        // resolution (auto-rename or the batch's onConflict choice).
+        const url = `${rootState.config.apiUrl}/${baseUrl}/${idForUrl}?includeAncestors=false&limit=1000&offset=0&api_key=${token}`
+        let children = []
+        try {
+            const resp = await fetch(url)
+            if (!resp.ok) return []
+            const data = await resp.json()
+            children = Array.isArray(data.children) ? data.children : []
+        } catch (err) {
+            // Network or auth blip — don't block the upload. The server
+            // still enforces its own resolution; the user just doesn't get
+            // the pre-flight dialog this time.
+            return []
+        }
+
+        // Only collide against file-type children. Folder (Collection) names
+        // are allowed to coexist with file names at the same level.
+        const existingFileNames = new Map()
+        for (const child of children) {
+            const pt = child && child.content && child.content.packageType
+            const nm = child && child.content && child.content.name
+            if (pt && pt !== 'Collection' && nm) {
+                existingFileNames.set(nm, child)
+            }
+        }
+
+        const conflicts = []
+        for (const incoming of state.manifestFiles) {
+            const nm = incoming.name || (incoming.file && incoming.file.name)
+            if (nm && existingFileNames.has(nm)) {
+                conflicts.push({
+                    incomingName: nm,
+                    existingPackage: existingFileNames.get(nm),
+                })
+            }
+        }
+        return conflicts
+    },
+
     // Define the packageId where files should be uploaded
     // This can be a folder-package-id or a dataset-package-id
     setUploadDestination: async ({rootState, commit}, targetPackage) => {
