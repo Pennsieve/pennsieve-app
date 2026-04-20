@@ -109,6 +109,12 @@ User archives manifest -> remove activeManifest from memory
         </bf-button>
       </template>
     </el-dialog>
+
+    <UploadConflictDialog
+      v-model:dialogVisible="conflictDialogVisible"
+      :conflicts="conflictList"
+      @resolve="onConflictResolved"
+    />
   </div>
 </template>
 
@@ -124,8 +130,18 @@ import IconPDF from "../icons/IconPDF.vue";
 import IconTimeseries from "../icons/IconTimeseries.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import { fileIcon } from "../../mixins/file-icon/file-icon.js";
+import UploadConflictDialog from "./UploadConflictDialog/UploadConflictDialog.vue";
+import {
+  getUploadConflictPref,
+  setUploadConflictPref,
+} from "@/composables/useUploadConflictPref";
 
 const store = useStore();
+
+// Conflict-dialog state. Populated by startUpload when detectConflicts
+// returns any, cleared when the dialog resolves or the upload proceeds.
+const conflictDialogVisible = ref(false);
+const conflictList = ref([]);
 
 defineExpose({
   onDrop,
@@ -201,7 +217,54 @@ function onDrop(acceptedFiles: File[]) {
   store.dispatch("uploadModule/addManifestFiles", acceptedFiles);
 }
 
-function startUpload() {
+async function startUpload() {
+  // Pre-flight conflict check. Collisions are detected at the immediate
+  // upload destination level only (see uploadModule.detectConflicts).
+  // The resolved strategy is committed to uploadModule state so the
+  // finalize batcher sends it to the server in the body.
+  let conflicts = [];
+  try {
+    conflicts = await store.dispatch("uploadModule/detectConflicts");
+  } catch {
+    // Detection is best-effort; server still enforces its own behavior.
+    conflicts = [];
+  }
+
+  if (conflicts.length === 0) {
+    store.commit("uploadModule/SET_ON_CONFLICT", "keepBoth");
+    proceedWithUpload();
+    return;
+  }
+
+  const pref = getUploadConflictPref();
+  if (pref === "replace" || pref === "keepBoth") {
+    store.commit("uploadModule/SET_ON_CONFLICT", pref);
+    proceedWithUpload();
+    return;
+  }
+
+  // pref === 'ask' (default) — surface the dialog and let
+  // onConflictResolved drive the next step.
+  conflictList.value = conflicts;
+  conflictDialogVisible.value = true;
+}
+
+function onConflictResolved({ strategy, remember }) {
+  if (strategy === "cancel") {
+    // User bailed — leave state as-is, keep the upload dialog open so
+    // they can decide to reset or close.
+    conflictList.value = [];
+    return;
+  }
+  if (remember) {
+    setUploadConflictPref(strategy);
+  }
+  store.commit("uploadModule/SET_ON_CONFLICT", strategy);
+  conflictList.value = [];
+  proceedWithUpload();
+}
+
+function proceedWithUpload() {
   store
     .dispatch("uploadModule/getManifestNodeId")
     .then(() => store.dispatch("uploadModule/syncManifest"))
