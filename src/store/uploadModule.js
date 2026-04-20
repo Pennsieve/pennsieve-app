@@ -393,27 +393,38 @@ export const actions = {
 
     // detectConflicts compares the names of files the user just dropped
     // against the immediate children of the upload destination, returning
-    // a list of conflict descriptors the caller can feed into the conflict
-    // dialog.
+    // a descriptor the caller can feed into the conflict dialog.
     //
     // Scope intentionally limited to the immediate target folder (no
     // whole-tree recursion) for MVP:
     //   - covers the common case (drop files into a single folder)
     //   - the nested "drop a tree into an existing tree" case is handled
-    //     adequately today by the server's auto-rename fallback and the
-    //     folder-replace shortcut (future task)
+    //     adequately today by the server's auto-rename fallback
     //   - recursive check on a 100k-file tree is expensive on both sides
     //     and not worth the complexity for v1
     //
-    // Returns [{ incomingName, existingPackage }] — empty array on no
-    // conflicts or when no target is set. Folder-type children are not
-    // considered conflicts because folders get-or-create by name server-
-    // side; only file-type collisions matter for onConflict.
+    // Return shape:
+    //   {
+    //     conflicts: [{ incomingName, existingPackage }],
+    //     target:    { nodeId, id, packageType, existingFileCount, totalIncoming }
+    //   }
+    //
+    // target metadata lets the dialog decide whether to offer the
+    // folder-replace shortcut: when every incoming file conflicts AND
+    // every existing file is being replaced AND the target is a folder
+    // (not the dataset root), deleting the folder and re-uploading is
+    // cheaper than per-file replacement — one DeletePackageJob cascades
+    // to the whole subtree server-side.
+    //
+    // Folder-type children are not considered conflicts because folders
+    // get-or-create by name server-side; only file collisions matter for
+    // onConflict.
     detectConflicts: async ({state, rootState}) => {
-        if (state.manifestFiles.length === 0) return []
+        const empty = { conflicts: [], target: null }
+        if (state.manifestFiles.length === 0) return empty
 
         const target = state.uploadDestination && state.uploadDestination.file
-        if (!target) return []
+        if (!target) return empty
 
         const currentRoute = router.currentRoute.value
         const datasetId = currentRoute.params.datasetId
@@ -424,7 +435,7 @@ export const actions = {
         // possible.
         const baseUrl = pkgType === 'DataSet' ? 'datasets' : 'packages'
         const idForUrl = pkgType === 'DataSet' ? datasetId : (target.content && target.content.id)
-        if (!idForUrl) return []
+        if (!idForUrl) return empty
 
         const token = await useGetToken()
         // limit=1000 is generous for the MVP use case; the conflict-check
@@ -435,14 +446,14 @@ export const actions = {
         let children = []
         try {
             const resp = await fetch(url)
-            if (!resp.ok) return []
+            if (!resp.ok) return empty
             const data = await resp.json()
             children = Array.isArray(data.children) ? data.children : []
         } catch (err) {
             // Network or auth blip — don't block the upload. The server
             // still enforces its own resolution; the user just doesn't get
             // the pre-flight dialog this time.
-            return []
+            return empty
         }
 
         // Only collide against file-type children. Folder (Collection) names
@@ -466,7 +477,17 @@ export const actions = {
                 })
             }
         }
-        return conflicts
+
+        return {
+            conflicts,
+            target: {
+                nodeId: target.content && target.content.nodeId,
+                id: target.content && target.content.id,
+                packageType: pkgType,
+                existingFileCount: existingFileNames.size,
+                totalIncoming: state.manifestFiles.length,
+            },
+        }
     },
 
     // Define the packageId where files should be uploaded

@@ -32,6 +32,12 @@
         </li>
       </ul>
 
+      <p v-if="offerFolderReplace" class="folder-replace-hint" data-cy="folderReplaceHint">
+        Every file in the target folder is being replaced. You can delete
+        the whole folder and upload fresh — cheaper than per-file replace
+        at scale.
+      </p>
+
       <label class="remember-choice">
         <input
           type="checkbox"
@@ -56,6 +62,14 @@
         @click="onChoose('keepBoth')"
       >
         Keep both
+      </bf-button>
+      <bf-button
+        v-if="offerFolderReplace"
+        class="secondary"
+        data-cy="replaceFolderConflict"
+        @click="onChoose('replaceFolder')"
+      >
+        Replace folder
       </bf-button>
       <bf-button
         data-cy="replaceConflict"
@@ -87,6 +101,10 @@ const props = defineProps({
   // Array of { incomingName, existingPackage } — shape produced by
   // uploadModule's detectConflicts action.
   conflicts: { type: Array, default: () => [] },
+  // { nodeId, id, packageType, existingFileCount, totalIncoming } —
+  // from detectConflicts. Used to decide whether to offer the
+  // folder-replace shortcut. null when no target info is available.
+  target: { type: Object, default: null },
 });
 
 const emit = defineEmits(["update:dialogVisible", "resolve"]);
@@ -124,6 +142,22 @@ const hiddenCount = computed(() =>
   Math.max(0, total.value - displayNames.value.length)
 );
 
+// Offer "Replace folder" only when deleting the parent folder would
+// replace exactly the set the user intends to upload. Guard against
+// the dataset-root case (deleting the dataset is a very different
+// operation and not what "replace folder" should mean).
+const offerFolderReplace = computed(() => {
+  const t = props.target;
+  if (!t || t.packageType !== "Collection") return false;
+  if (typeof t.existingFileCount !== "number") return false;
+  if (typeof t.totalIncoming !== "number") return false;
+  return (
+    total.value > 0 &&
+    total.value === t.existingFileCount &&
+    total.value === t.totalIncoming
+  );
+});
+
 function onChoose(strategy) {
   emit("resolve", { strategy, remember: rememberChoice.value });
   emit("update:dialogVisible", false);
@@ -157,6 +191,15 @@ function onCancel() {
   color: var(--text-muted, #6a737d);
   font-style: italic;
   font-size: 13px;
+}
+.folder-replace-hint {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--info-bg, #f1f7fd);
+  border-left: 3px solid var(--info-accent, #4a90e2);
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 .remember-choice {
   display: inline-flex;

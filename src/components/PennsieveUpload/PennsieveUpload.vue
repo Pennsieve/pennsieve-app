@@ -113,6 +113,7 @@ User archives manifest -> remove activeManifest from memory
     <UploadConflictDialog
       v-model:dialogVisible="conflictDialogVisible"
       :conflicts="conflictList"
+      :target="conflictTarget"
       @resolve="onConflictResolved"
     />
   </div>
@@ -135,6 +136,7 @@ import {
   getUploadConflictPref,
   setUploadConflictPref,
 } from "@/composables/useUploadConflictPref";
+import { useGetToken } from "@/composables/useGetToken";
 
 const store = useStore();
 
@@ -142,6 +144,7 @@ const store = useStore();
 // returns any, cleared when the dialog resolves or the upload proceeds.
 const conflictDialogVisible = ref(false);
 const conflictList = ref([]);
+const conflictTarget = ref(null);
 
 defineExpose({
   onDrop,
@@ -222,13 +225,15 @@ async function startUpload() {
   // upload destination level only (see uploadModule.detectConflicts).
   // The resolved strategy is committed to uploadModule state so the
   // finalize batcher sends it to the server in the body.
-  let conflicts = [];
+  let result = { conflicts: [], target: null };
   try {
-    conflicts = await store.dispatch("uploadModule/detectConflicts");
+    result = await store.dispatch("uploadModule/detectConflicts");
   } catch {
     // Detection is best-effort; server still enforces its own behavior.
-    conflicts = [];
+    result = { conflicts: [], target: null };
   }
+
+  const conflicts = (result && result.conflicts) || [];
 
   if (conflicts.length === 0) {
     store.commit("uploadModule/SET_ON_CONFLICT", "keepBoth");
@@ -246,22 +251,67 @@ async function startUpload() {
   // pref === 'ask' (default) — surface the dialog and let
   // onConflictResolved drive the next step.
   conflictList.value = conflicts;
+  conflictTarget.value = result && result.target;
   conflictDialogVisible.value = true;
 }
 
-function onConflictResolved({ strategy, remember }) {
+async function onConflictResolved({ strategy, remember }) {
   if (strategy === "cancel") {
     // User bailed — leave state as-is, keep the upload dialog open so
     // they can decide to reset or close.
     conflictList.value = [];
+    conflictTarget.value = null;
     return;
   }
-  if (remember) {
+  if (remember && strategy !== "replaceFolder") {
+    // Don't persist the folder-replace shortcut as a default — it's a
+    // one-off decision about a specific folder, not a general
+    // conflict-resolution preference.
     setUploadConflictPref(strategy);
   }
+
+  if (strategy === "replaceFolder") {
+    // Whole-folder replacement: delete the target folder via the
+    // existing pennsieve-api endpoint and wait for it to complete before
+    // uploading. Scala's PackageManager.delete cascades state=DELETING
+    // to all descendants and schedules one DeletePackageJob for the
+    // whole subtree — the jobs service handles the async S3 cleanup.
+    const target = conflictTarget.value;
+    conflictList.value = [];
+    conflictTarget.value = null;
+    try {
+      await deleteFolderForReplace(target);
+    } catch (err) {
+      console.error("Replace-folder failed; falling back to per-file replace:", err);
+      store.commit("uploadModule/SET_ON_CONFLICT", "replace");
+      proceedWithUpload();
+      return;
+    }
+    // Folder is in DELETING state now — its children carry the
+    // __DELETED__ prefix, so the new uploads can't collide with them.
+    store.commit("uploadModule/SET_ON_CONFLICT", "keepBoth");
+    proceedWithUpload();
+    return;
+  }
+
   store.commit("uploadModule/SET_ON_CONFLICT", strategy);
   conflictList.value = [];
+  conflictTarget.value = null;
   proceedWithUpload();
+}
+
+async function deleteFolderForReplace(target) {
+  if (!target || !target.nodeId || target.packageType !== "Collection") {
+    throw new Error("deleteFolderForReplace: target is not a folder");
+  }
+  const token = await useGetToken();
+  const apiUrl = store.state.config.apiUrl;
+  const url = `${apiUrl}/packages/${target.nodeId}?api_key=${token}`;
+  const resp = await fetch(url, { method: "DELETE" });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`DELETE /packages/${target.nodeId} failed (${resp.status}): ${text}`);
+  }
 }
 
 function proceedWithUpload() {
