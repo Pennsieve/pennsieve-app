@@ -275,6 +275,48 @@ export const actions = {
   },
 
   /**
+   * Get viewer assets from the packages service (api2)
+   * Returns { assets, cloudfront } with signed CloudFront policy
+   */
+  fetchPackageViewerAssets: async ({rootState}, { datasetId, packageId }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.api2Url}/packages/assets?dataset_id=${datasetId}&package_id=${packageId}`
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (resp.ok) {
+        return await resp.json()
+      }
+      return null
+    } catch (err) {
+      console.warn('Failed to fetch package viewer assets:', err)
+      return null
+    }
+  },
+
+  /**
+   * Delete a viewer asset
+   * @param {String} datasetId
+   * @param {String} assetId
+   */
+  deleteViewerAsset: async ({rootState}, { datasetId, assetId }) => {
+    const token = await useGetToken()
+    const url = `${rootState.config.api2Url}/packages/assets/${assetId}?dataset_id=${datasetId}`
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!resp.ok) {
+      throw new Error(`Failed to delete viewer asset: ${resp.status}`)
+    }
+  },
+
+  /**
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId
