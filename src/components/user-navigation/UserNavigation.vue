@@ -5,26 +5,16 @@
       primaryNavCondensed || secondaryNavOpen ? 'condensed' : '',
     ]"
   >
-    <div class="nav-top">
-      <button
-        type="button"
-        class="workspace-switcher"
-        title="My Workspace"
-      >
-        <span class="workspace-avatar">
-          <icon-pennsieve-mark
-            :width="14"
-            :height="14"
-            color="currentColor"
-          />
-        </span>
-        <span
+    <div class="logo-wrap">
+      <router-link tag="button" :to="{ name: 'home' }">
+        <icon-pennsieve-mark
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="workspace-switcher-name"
-        >
-          My Workspace
-        </span>
-      </button>
+          class="logo"
+          :width="24"
+          :height="24"
+          color="currentColor"
+        />
+      </router-link>
       <button
         v-show="!secondaryNavOpen"
         class="btn-expand-collapse"
@@ -33,15 +23,15 @@
       >
         <IconNavCollapse
           :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 24 : 20"
-          :height="primaryNavCondensed ? 24 : 20"
+          :width="primaryNavCondensed ? 32 : 24"
+          :height="primaryNavCondensed ? 32 : 24"
           color="#fff"
           class="collapse"
         />
         <IconNavExpand
           :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 24 : 20"
-          :height="primaryNavCondensed ? 24 : 20"
+          :width="primaryNavCondensed ? 32 : 24"
+          :height="primaryNavCondensed ? 32 : 24"
           color="#fff"
           class="collapse"
         />
@@ -226,27 +216,25 @@ export default {
     .menu-wrap {
       margin: 0 0 16px -6px;
     }
-
-    .nav-top {
-      padding: 12px 8px;
+    
+    .logo-wrap {
+      padding: 20px 12px;
       justify-content: center;
-      gap: 4px;
-    }
-
-    .workspace-switcher {
-      padding: 4px;
     }
   }
 
-  .nav-top {
-    padding: 14px 12px 14px 16px;
+  .logo-wrap {
+    padding: 20px 16px;
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    .logo {
+      color: #fff;
+    }
 
     .btn-expand-collapse {
-      flex-shrink: 0;
       background: none;
       border: none;
       cursor: pointer;
@@ -254,57 +242,12 @@ export default {
       align-items: center;
       justify-content: center;
       padding: 4px;
-      border-radius: 4px;
-      color: #fff;
-
+      
       &:hover, &:focus {
         opacity: .75;
       }
     }
   }
-
-  .workspace-switcher {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: none;
-    border: none;
-    padding: 4px 8px;
-    border-radius: 6px;
-    color: #fff;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.15s ease;
-
-    &:hover, &:focus {
-      background: rgba(255, 255, 255, 0.08);
-    }
-  }
-
-  .workspace-avatar {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.18);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .workspace-switcher-name {
-    flex: 1;
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.25;
-    color: #fff;
-    word-break: break-word;
-  }
-
 
   .menu-wrap {
     flex: 1;
