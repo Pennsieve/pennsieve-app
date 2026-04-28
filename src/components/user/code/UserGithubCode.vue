@@ -117,7 +117,7 @@
                       <el-input
                         v-if="repositories.length > 0"
                         v-model="reposSearchQuery"
-                        placeholder="Search this page..."
+                        placeholder="Search repositories..."
                         size="default"
                         clearable
                         class="repos-search-input"
