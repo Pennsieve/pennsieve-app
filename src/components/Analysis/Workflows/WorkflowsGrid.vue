@@ -196,6 +196,9 @@ onMounted(async () => {
             <span class="metric-label">avg duration</span>
           </span>
         </div>
+        <div v-else class="card-footer">
+          <span class="empty-footer-text">No runs to report</span>
+        </div>
       </div>
     </div>
 
@@ -386,6 +389,12 @@ onMounted(async () => {
   width: 1px;
   height: 14px;
   background: theme.$gray_3;
+}
+
+.empty-footer-text {
+  font-size: 12px;
+  color: theme.$gray_4;
+  font-style: italic;
 }
 
 .card-meta {
