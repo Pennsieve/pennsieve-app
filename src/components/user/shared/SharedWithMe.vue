@@ -2,119 +2,117 @@
   <bf-stage slot="stage">
 
     <div class="shared-with-me">
-
-      <!-- Workspaces Section -->
-      <div class="section">
-        <div class="section-header">
-          <h2>Shared Workspaces</h2>
-          <p class="section-description">A list of workspaces that you have access to. You can have access to many datasets within a workspace.</p>
-        </div>
-
-        <div v-if="sharedWorkspaces.length === 0" class="empty-state">
-          <div class="empty-state-content">
-            <IconOrganization :width="48" :height="48" color="#71747c" />
-            <h3>No shared workspaces</h3>
-            <p>You haven't been invited to any workspaces yet.</p>
-          </div>
-        </div>
-
-        <div v-else class="workspace-grid">
-          <WorkspaceCard
-            v-for="workspace in sharedWorkspaces"
-            :key="workspace.organization.id"
-            :workspace="workspace"
-          />
-        </div>
-      </div>
-
-      <!-- Datasets Section -->
-      <div class="section">
-        <div class="section-header">
-          <h2>Shared With Me</h2>
-          <p class="section-description">A list of datasets shared with you from workspaces other than those listed above. Although you don't have access to the full workspace, you can still interact with these specific datasets.</p>
-        </div>
-
-        <div v-if="isLoadingDatasets" class="loading-state" v-loading="isLoadingDatasets">
-          <p>Loading datasets...</p>
-        </div>
-
-        <div v-else-if="guestDatasets.length === 0" class="empty-state">
-          <div class="empty-state-content">
-            <IconCompass :width="48" :height="48" color="#71747c" />
-            <h3>No datasets available</h3>
-            <p>You haven't been invited to any datasets outside your workspaces.</p>
-          </div>
-        </div>
-
-        <div v-else class="dataset-list">
-
-          <!-- Pagination Controls -->
-          <div class="dataset-list-controls mb-8">
-            <div class="dataset-list-controls-menus">
-              <pagination-page-menu
-                class="mr-24"
-                pagination-item-label="Datasets"
-                :page-size="pageSize"
-                @update-page-size="updatePageSize"
-              />
+      <el-tabs v-model="activeTab" class="my-data-tabs">
+        <!-- Shared Workspaces Tab -->
+        <el-tab-pane label="Shared Workspaces" name="workspaces">
+          <div class="section">
+            <div class="section-header">
+              <p class="section-description">A list of workspaces that you have access to. You can have access to many datasets within a workspace.</p>
             </div>
 
-            <el-pagination
-              :page-size="pageSize"
-              :pager-count="5"
-              :current-page="currentPage"
-              layout="prev, pager, next"
-              :total="totalCount"
-              @current-change="onPageChange"
-            />
-          </div>
+            <div v-if="sharedWorkspaces.length === 0" class="empty-state">
+              <div class="empty-state-content">
+                <IconOrganization :width="48" :height="48" color="#71747c" />
+                <h3>No shared workspaces</h3>
+                <p>You haven't been invited to any workspaces yet.</p>
+              </div>
+            </div>
 
-          <div class="dataset-grid">
-            <div
-              v-for="dataset in filteredGuestDatasets"
-              :key="dataset.content.id"
-              class="dataset-card"
-              @click="navigateToDataset(dataset)"
-            >
-              <div class="dataset-card-content">
-<!--                TODO: insert banner image-->
-<!--                <div class="dataset-icon">-->
-<!--                  <IconDataset :width="24" :height="24" color="currentColor" />-->
-<!--                </div>-->
-                <div class="dataset-info">
-                  <div class="dataset-header">
-                    <h3 class="dataset-name">{{ dataset.content.name }}</h3>
-                    <span class="dataset-status-tag" :class="`status-${dataset.content.status.toLowerCase().replace('_', '-')}`">
-                      {{ formatDatasetStatus(dataset.content.status) }}
-                    </span>
-                  </div>
-                  <p class="dataset-org">{{ getDatasetOrganization(dataset) }}</p>
-                  <p class="dataset-description" v-if="dataset.content.description">
-                    {{ truncateDescription(dataset.content.description) }}
-                  </p>
-                  <div class="dataset-meta">
-                    <span class="dataset-updated">Updated {{ formatDate(dataset.content.updatedAt) }}</span>
+            <div v-else class="workspace-grid">
+              <WorkspaceCard
+                v-for="workspace in sharedWorkspaces"
+                :key="workspace.organization.id"
+                :workspace="workspace"
+              />
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- Shared With Me Tab -->
+        <el-tab-pane label="Shared With Me" name="datasets">
+          <div class="section">
+            <div class="section-header">
+              <p class="section-description">A list of datasets shared with you from workspaces other than those you're a member of. Although you don't have access to the full workspace, you can still interact with these specific datasets.</p>
+            </div>
+
+            <div v-if="isLoadingDatasets" class="loading-state" v-loading="isLoadingDatasets">
+              <p>Loading datasets...</p>
+            </div>
+
+            <div v-else-if="guestDatasets.length === 0" class="empty-state">
+              <div class="empty-state-content">
+                <IconCompass :width="48" :height="48" color="#71747c" />
+                <h3>No datasets available</h3>
+                <p>You haven't been invited to any datasets outside your workspaces.</p>
+              </div>
+            </div>
+
+            <div v-else class="dataset-list">
+
+              <!-- Pagination Controls -->
+              <div class="dataset-list-controls mb-8">
+                <div class="dataset-list-controls-menus">
+                  <pagination-page-menu
+                    class="mr-24"
+                    pagination-item-label="Datasets"
+                    :page-size="pageSize"
+                    @update-page-size="updatePageSize"
+                  />
+                </div>
+
+                <el-pagination
+                  :page-size="pageSize"
+                  :pager-count="5"
+                  :current-page="currentPage"
+                  layout="prev, pager, next"
+                  :total="totalCount"
+                  @current-change="onPageChange"
+                />
+              </div>
+
+              <div class="dataset-grid">
+                <div
+                  v-for="dataset in filteredGuestDatasets"
+                  :key="dataset.content.id"
+                  class="dataset-card"
+                  @click="navigateToDataset(dataset)"
+                >
+                  <div class="dataset-card-content">
+                    <div class="dataset-info">
+                      <div class="dataset-header">
+                        <h3 class="dataset-name">{{ dataset.content.name }}</h3>
+                        <span class="dataset-status-tag" :class="`status-${dataset.content.status.toLowerCase().replace('_', '-')}`">
+                          {{ formatDatasetStatus(dataset.content.status) }}
+                        </span>
+                      </div>
+                      <p class="dataset-org">{{ getDatasetOrganization(dataset) }}</p>
+                      <p class="dataset-description" v-if="dataset.content.description">
+                        {{ truncateDescription(dataset.content.description) }}
+                      </p>
+                      <div class="dataset-meta">
+                        <span class="dataset-updated">Updated {{ formatDate(dataset.content.updatedAt) }}</span>
+                      </div>
+                    </div>
+                    <div class="dataset-arrow">
+                      <IconArrowRight :width="16" :height="16" color="currentColor" />
+                    </div>
                   </div>
                 </div>
-                <div class="dataset-arrow">
-                  <IconArrowRight :width="16" :height="16" color="currentColor" />
-                </div>
+              </div>
+
+              <div class="pagination-container">
+                <el-pagination
+                  :page-size="pageSize"
+                  :current-page="currentPage"
+                  layout="prev, pager, next"
+                  :total="totalCount"
+                  @current-change="onPageChange"
+                />
               </div>
             </div>
           </div>
-
-          <!-- Pagination for datasets if needed -->
-          <div  class="pagination-container">
-            <el-pagination
-              :page-size="pageSize"
-              :current-page="currentPage"
-              layout="prev, pager, next"
-              :total="totalCount"
-              @current-change="onPageChange"
-            />
-          </div>
-        </div>
-      </div>
+        </el-tab-pane>
+      </el-tabs>
     </div>
   </bf-stage>
 </template>
@@ -157,7 +155,8 @@ export default {
       filteredGuestDatasets: [],
       currentPage: 1,
       pageSize: 20,
-      totalCount: 0
+      totalCount: 0,
+      activeTab: 'workspaces'
     }
   },
 
@@ -343,6 +342,31 @@ export default {
 
 .shared-with-me {
   // Component container
+}
+
+.my-data-tabs {
+  margin-top: 8px;
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 24px;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  :deep(.el-tabs__item.is-active) {
+    color: theme.$purple_2;
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background-color: theme.$purple_2;
+  }
+
+  :deep(.el-tabs__item:hover) {
+    color: theme.$purple_2;
+  }
 }
 
 .page-header {
