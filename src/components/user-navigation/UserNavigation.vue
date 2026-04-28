@@ -38,6 +38,14 @@
       </button>
     </div>
 
+    <div
+      v-show="!primaryNavCondensed || secondaryNavOpen"
+      class="workspace-banner"
+    >
+      <span class="workspace-banner-eyebrow">Workspace</span>
+      <span class="workspace-banner-title">My Workspace</span>
+    </div>
+
     <div class="menu-wrap">
 
       <user-navigation-item
@@ -247,6 +255,30 @@ export default {
         opacity: .75;
       }
     }
+  }
+
+  .workspace-banner {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .workspace-banner-eyebrow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+  }
+
+  .workspace-banner-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.2;
   }
 
   .menu-wrap {
