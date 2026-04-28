@@ -1,9 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
+import IconLink from '@/components/icons/IconLink.vue'
 
 const store = useStore()
+const router = useRouter()
 
 const applications = computed(
   () => store.state.analysisModule.applications || []
@@ -74,6 +77,14 @@ const toggleExpansion = (uuid) => {
   expandedApps.value = next
 }
 
+const goToDetail = (app) => {
+  if (!app?.uuid) return
+  router.push({
+    name: 'my-published-app-detail',
+    params: { uuid: app.uuid },
+  })
+}
+
 const fetchApps = async () => {
   isLoading.value = true
   try {
@@ -100,7 +111,7 @@ onMounted(fetchApps)
         </p>
         <div class="documentation-link">
           <a
-            href="https://docs.pennsieve.io/docs/app-store"
+            href="https://docs.pennsieve.io/docs/introduction-to-pennsieve-analysis"
             target="_blank"
             class="doc-link"
           >
@@ -139,23 +150,17 @@ onMounted(fetchApps)
           <div class="app-header">
             <div class="app-info">
               <h3>
-                <a
-                  v-if="app.sourceUrl"
-                  :href="app.sourceUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
                   class="app-name-link"
+                  @click="goToDetail(app)"
                 >
                   {{ repoName(app) }}
-                </a>
-                <span v-else>{{ repoName(app) }}</span>
+                </button>
               </h3>
               <div class="app-subtitle">Pennsieve App Store</div>
               <div class="app-identifier">
                 <strong>Application UUID:</strong> {{ app.uuid }}
-              </div>
-              <div v-if="app.sourceUrl" class="app-source">
-                <strong>Source:</strong> {{ app.sourceUrl }}
               </div>
               <div class="app-tags">
                 <span
@@ -191,7 +196,7 @@ onMounted(fetchApps)
               </span>
               <button
                 class="expand-toggle"
-                @click="toggleExpansion(app.uuid)"
+                @click.stop="toggleExpansion(app.uuid)"
               >
                 <span class="expand-text">
                   {{
@@ -204,6 +209,27 @@ onMounted(fetchApps)
                 >▼</span>
               </button>
             </div>
+          </div>
+
+          <div class="app-card-actions">
+            <a
+              v-if="app.sourceUrl"
+              :href="app.sourceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="card-action-link"
+            >
+              <IconLink :width="14" :height="14" />
+              <span>View on GitHub</span>
+            </a>
+            <button
+              type="button"
+              class="card-action-link"
+              @click="goToDetail(app)"
+            >
+              <span>View details</span>
+              <span class="arrow">&rarr;</span>
+            </button>
           </div>
 
           <transition name="expand">
@@ -360,7 +386,7 @@ onMounted(fetchApps)
   background: white;
   border: 1px solid theme.$gray_2;
   padding: 20px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease;
 
   &:hover {
     border-color: theme.$gray_3;
@@ -368,6 +394,41 @@ onMounted(fetchApps)
 
   &.expanded {
     border-color: theme.$purple_2;
+  }
+}
+
+.app-card-actions {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid theme.$gray_2;
+}
+
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
   }
 }
 
@@ -393,6 +454,12 @@ onMounted(fetchApps)
     color: theme.$gray_6;
     text-decoration: none;
     transition: color 0.2s ease;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
 
     &:hover {
       color: theme.$purple_2;

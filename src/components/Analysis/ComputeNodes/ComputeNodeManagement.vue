@@ -518,6 +518,12 @@ async function saveGpuConfig() {
 <template>
   <bf-stage element-loading-background="transparent" v-loading="isLoading">
     <div class="compute-node-management" v-if="computeNode">
+      <!-- Back link -->
+      <div class="node-breadcrumb">
+        <router-link :to="{ name: 'compute-nodes' }" class="back-link">
+          &larr; Back to all compute nodes
+        </router-link>
+      </div>
       <!-- Node Header -->
       <div class="node-header-section">
         <div class="node-header-top">
@@ -1100,15 +1106,30 @@ async function saveGpuConfig() {
   padding: 0;
 }
 
+.node-breadcrumb {
+  margin-bottom: 24px;
+
+  .back-link {
+    color: theme.$purple_3;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 .node-header-section {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 
   .node-header-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
 
   h1 {
@@ -1121,7 +1142,7 @@ async function saveGpuConfig() {
   .node-subtitle {
     font-size: 14px;
     color: theme.$gray_5;
-    margin: 0 0 8px 0;
+    margin: 0 0 12px 0;
   }
 
   .node-tags {
@@ -1231,15 +1252,15 @@ async function saveGpuConfig() {
 .management-section {
   background: white;
   border: 1px solid theme.$gray_2;
-  margin-bottom: 24px;
-  padding: 24px;
+  margin-bottom: 32px;
+  padding: 28px 32px;
 
   .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
     border-bottom: 1px solid theme.$gray_2;
 
     h2 {
@@ -1276,8 +1297,9 @@ async function saveGpuConfig() {
 .info-content {
   .info-row {
     display: flex;
-    padding: 12px 0;
+    padding: 14px 0;
     border-bottom: 1px solid theme.$gray_1;
+    gap: 16px;
 
     &:last-child {
       border-bottom: none;

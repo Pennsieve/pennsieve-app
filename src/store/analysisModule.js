@@ -290,6 +290,26 @@ export const actions = {
     }
     return await resp.json();
   },
+  updateApplicationPermissions: async ({ rootState }, { uuid, payload }) => {
+    if (!uuid) throw new Error("Missing application uuid");
+    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    const userToken = await useGetToken();
+    const resp = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const errorDetails = await resp.text();
+      throw new Error(
+        `Failed to update application permissions: ${resp.status} ${errorDetails}`
+      );
+    }
+    return await resp.json();
+  },
   fetchComputeResourceAccounts: async ({ commit, rootState }) => {
     try {
       const url = `${rootState.config.api2Url}/accounts?organization_id=${rootState.activeOrganization.organization.id}`;

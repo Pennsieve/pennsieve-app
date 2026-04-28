@@ -68,75 +68,80 @@
 <!--              </div>-->
 <!--            </div>-->
 
-            <!-- Repositories Section -->
-            <div class="repositories-section">
-              <div class="repos-header">
-                <div class="repos-header-left">
-                  <h3>My Repositories ({{ totalRepoCount }})</h3>
-                  <el-tooltip
-                    ref="refresh-tooltip"
-                    placement="bottom"
-                    content="Refresh list"
-                  >
-                    <button @click="refreshRepositories" class="refresh-icon-button" :disabled="refreshing" :title="refreshing ? 'Refreshing...' : 'Refresh'">
-                      <el-icon :class="{ spinning: refreshing }">
-                        <Refresh />
-                      </el-icon>
-                    </button>
-                  </el-tooltip>
-                </div>
-                <router-link to="/my-workspace/settings/integrations/github" class="manage-link">
-                  Manage GitHub Settings
-                </router-link>
-              </div>
+            <el-tabs v-model="activeTab" class="code-tabs">
+              <el-tab-pane label="My Repositories" name="repositories">
+                <!-- Repositories Section -->
+                <div class="repositories-section">
+                  <div class="repos-header">
+                    <div class="repos-header-left">
+                      <h3>My Repositories ({{ totalRepoCount }})</h3>
+                      <el-tooltip
+                        ref="refresh-tooltip"
+                        placement="bottom"
+                        content="Refresh list"
+                      >
+                        <button @click="refreshRepositories" class="refresh-icon-button" :disabled="refreshing" :title="refreshing ? 'Refreshing...' : 'Refresh'">
+                          <el-icon :class="{ spinning: refreshing }">
+                            <Refresh />
+                          </el-icon>
+                        </button>
+                      </el-tooltip>
+                    </div>
+                    <router-link to="/my-workspace/settings/integrations/github" class="manage-link">
+                      Manage GitHub Settings
+                    </router-link>
+                  </div>
 
-              <el-pagination
-                v-if="totalRepoCount > pageSize && !reposLoading"
-                class="repo-pagination mb-16"
-                :page-size="pageSize"
-                :pager-count="5"
-                :current-page="currentPage"
-                layout="prev, pager, next"
-                :total="totalRepoCount"
-                @current-change="onPaginationPageChange"
-              />
-
-              <div v-if="reposLoading" class="loading-state">
-                <div class="loading-spinner">
-                  <div class="spinner"></div>
-                </div>
-                <p>Loading repositories...</p>
-              </div>
-
-              <div v-else-if="repositories.length === 0" class="empty-repos">
-                <p>No repositories found. Make sure you have repositories in your connected GitHub account.</p>
-              </div>
-
-              <template v-else>
-                <div class="repos-list">
-                  <code-repo-list-item
-                    v-for="repo in repositories"
-                    :key="repo.id"
-                    :repo="repo"
-                    @manage-settings="openPublishingDialog"
+                  <el-pagination
+                    v-if="totalRepoCount > pageSize && !reposLoading"
+                    class="repo-pagination mb-16"
+                    :page-size="pageSize"
+                    :pager-count="5"
+                    :current-page="currentPage"
+                    layout="prev, pager, next"
+                    :total="totalRepoCount"
+                    @current-change="onPaginationPageChange"
                   />
+
+                  <div v-if="reposLoading" class="loading-state">
+                    <div class="loading-spinner">
+                      <div class="spinner"></div>
+                    </div>
+                    <p>Loading repositories...</p>
+                  </div>
+
+                  <div v-else-if="repositories.length === 0" class="empty-repos">
+                    <p>No repositories found. Make sure you have repositories in your connected GitHub account.</p>
+                  </div>
+
+                  <template v-else>
+                    <div class="repos-list">
+                      <code-repo-list-item
+                        v-for="repo in repositories"
+                        :key="repo.id"
+                        :repo="repo"
+                        @manage-settings="openPublishingDialog"
+                      />
+                    </div>
+
+                    <el-pagination
+                      v-if="totalRepoCount > pageSize"
+                      class="repo-pagination mt-16"
+                      :page-size="pageSize"
+                      :pager-count="5"
+                      :current-page="currentPage"
+                      layout="prev, pager, next"
+                      :total="totalRepoCount"
+                      @current-change="onPaginationPageChange"
+                    />
+                  </template>
                 </div>
+              </el-tab-pane>
 
-                <el-pagination
-                  v-if="totalRepoCount > pageSize"
-                  class="repo-pagination mt-16"
-                  :page-size="pageSize"
-                  :pager-count="5"
-                  :current-page="currentPage"
-                  layout="prev, pager, next"
-                  :total="totalRepoCount"
-                  @current-change="onPaginationPageChange"
-                />
-              </template>
-            </div>
-
-            <!-- Published Applications Section -->
-            <published-apps-list class="published-apps-section" />
+              <el-tab-pane label="Published Applications" name="published">
+                <published-apps-list />
+              </el-tab-pane>
+            </el-tabs>
           </div>
         </div>
       </div>
@@ -217,7 +222,8 @@ export default {
       showDisconnectDialog: false,
       disconnecting: false,
       showPublishingDialog: false,
-      selectedRepo: null
+      selectedRepo: null,
+      activeTab: 'repositories'
     }
   },
 
@@ -642,10 +648,29 @@ export default {
   }
 }
 
-.published-apps-section {
-  margin-top: 48px;
-  padding-top: 32px;
-  border-top: 1px solid theme.$gray_2;
+.code-tabs {
+  margin-top: 8px;
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 24px;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  :deep(.el-tabs__item.is-active) {
+    color: theme.$purple_2;
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background-color: theme.$purple_2;
+  }
+
+  :deep(.el-tabs__item:hover) {
+    color: theme.$purple_2;
+  }
 }
 
 .repositories-section {

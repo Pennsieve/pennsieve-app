@@ -1,13 +1,9 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { propOr } from "ramda";
 
-import BfButton from "../../shared/bf-button/BfButton.vue";
-import EventBus from "../../../utils/event-bus";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 
 
@@ -37,20 +33,9 @@ const versionsPage = ref(1);
   Store computed
 */
 const store = useStore();
-const router = useRouter();
 
-const activeOrganization = computed(() => store.state.activeOrganization);
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
-
-const hasAdminRights = computed(() => {
-  if (activeOrganization.value) {
-    const isAdmin = propOr(false, "isAdmin", activeOrganization.value);
-    const isOwner = propOr(false, "isOwner", activeOrganization.value);
-    return isAdmin || isOwner;
-  }
-  return false;
-});
 
 /*
   Derived helpers
@@ -263,31 +248,6 @@ watch(
   (uuid) => loadDetail(uuid),
   { immediate: true }
 );
-
-/*
-  Admin actions
-*/
-const deleteApplicationHandler = async () => {
-  if (!detail.value) return;
-  try {
-    await store.dispatch("analysisModule/deleteApplication", detail.value);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Your request was successful. It may take some time to complete.",
-      },
-    });
-    router.push({ name: "applications" });
-  } catch (error) {
-    console.error(error);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "error",
-        msg: "Something went wrong, please try again later.",
-      },
-    });
-  }
-};
 </script>
 
 <template>
@@ -391,16 +351,6 @@ const deleteApplicationHandler = async () => {
               </div>
             </div>
 
-            <template v-if="hasAdminRights">
-              <div class="info-actions">
-                <button
-                  class="text-link-btn archive-btn"
-                  @click="deleteApplicationHandler"
-                >
-                  Delete application
-                </button>
-              </div>
-            </template>
           </el-collapse-item>
 
           <el-collapse-item
