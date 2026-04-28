@@ -47,16 +47,21 @@ const isSavingPermissions = ref(false)
 const showAddUserDialog = ref(false)
 const showAddTeamDialog = ref(false)
 const selectedAddUserId = ref(null)
-const selectedAddUserRole = ref('viewer')
 const selectedAddTeamId = ref(null)
-const selectedAddTeamRole = ref('viewer')
 
 const teams = computed(() => store.state.teams || [])
 
-const ROLE_OPTIONS = [
-  { label: 'Owner', value: 'owner' },
-  { label: 'Editor', value: 'editor' },
-  { label: 'Viewer', value: 'viewer' },
+const activeOrgId = computed(
+  () =>
+    detail.value?.organizationId ||
+    (permissions.value || []).find((p) => p.organizationId)?.organizationId ||
+    store.state.activeOrganization?.organization?.id ||
+    null
+)
+
+const VISIBILITY_OPTIONS = [
+  { label: 'Public', value: 'public' },
+  { label: 'Private', value: 'private' },
 ]
 
 const appUuid = computed(() => props.uuid || route.params.uuid)
@@ -208,16 +213,16 @@ const splitPermissions = (perms) => {
   for (const p of perms || []) {
     const type = permissionEntityType(p)
     const id = permissionEntityId(p)
-    const role = permissionRole(p)
     if (!id) continue
+    const organizationId = p.organizationId || activeOrgId.value
     if (type === 'user') {
-      users.push({ id, role })
+      users.push({ entityId: id, organizationId })
     } else if (type === 'team') {
-      teams.push({ id, role, teamName: p.teamName })
+      teams.push({ entityId: id, organizationId, teamName: p.teamName })
     } else if (type === 'workspace' || type === 'organization') {
       workspaces.push({
-        id,
-        role,
+        entityId: id,
+        organizationId,
         organizationName: p.organizationName || p.workspaceName,
       })
     }
@@ -251,39 +256,37 @@ const isCurrentUser = (id) =>
 
 const removeEditUser = (idx) => {
   const user = editUsers.value[idx]
-  if (user && isCurrentUser(user.id)) return
+  if (user && isCurrentUser(user.entityId)) return
   editUsers.value.splice(idx, 1)
 }
 const removeEditTeam = (idx) => editTeams.value.splice(idx, 1)
 
 const availableAddableUsers = computed(() => {
-  const taken = new Set(editUsers.value.map((u) => u.id))
+  const taken = new Set(editUsers.value.map((u) => u.entityId))
   return orgMembers.value.filter((m) => m.id && !taken.has(m.id))
 })
 
 const availableAddableTeams = computed(() => {
-  const taken = new Set(editTeams.value.map((t) => t.id))
+  const taken = new Set(editTeams.value.map((t) => t.entityId))
   return teams.value.filter((t) => t.team?.id && !taken.has(t.team.id))
 })
 
 const openAddUserDialog = () => {
   selectedAddUserId.value = null
-  selectedAddUserRole.value = 'viewer'
   showAddUserDialog.value = true
 }
 
 const confirmAddUser = () => {
   if (!selectedAddUserId.value) return
   editUsers.value.push({
-    id: selectedAddUserId.value,
-    role: selectedAddUserRole.value,
+    entityId: selectedAddUserId.value,
+    organizationId: activeOrgId.value,
   })
   showAddUserDialog.value = false
 }
 
 const openAddTeamDialog = () => {
   selectedAddTeamId.value = null
-  selectedAddTeamRole.value = 'viewer'
   showAddTeamDialog.value = true
 }
 
@@ -291,8 +294,8 @@ const confirmAddTeam = () => {
   if (!selectedAddTeamId.value) return
   const team = teams.value.find((t) => t.team?.id === selectedAddTeamId.value)
   editTeams.value.push({
-    id: selectedAddTeamId.value,
-    role: selectedAddTeamRole.value,
+    entityId: selectedAddTeamId.value,
+    organizationId: activeOrgId.value,
     teamName: team?.team?.name,
   })
   showAddTeamDialog.value = false
@@ -302,23 +305,26 @@ const savePermissions = async () => {
   if (!appUuid.value) return
   isSavingPermissions.value = true
   try {
-    // Defense-in-depth: ensure the current user remains an owner.
-    const usersOut = editUsers.value.map((u) =>
-      isCurrentUser(u.id)
-        ? { id: u.id, role: 'owner' }
-        : { id: u.id, role: u.role }
-    )
+    const orgId = activeOrgId.value
+    const usersOut = editUsers.value.map((u) => ({
+      entityId: u.entityId,
+      organizationId: u.organizationId || orgId,
+    }))
+    // Defense-in-depth: ensure the current user is in the users list.
     const meId = profile.value?.id || profile.value?.intId
-    if (meId && !usersOut.some((u) => u.id === meId)) {
-      usersOut.push({ id: meId, role: 'owner' })
+    if (meId && !usersOut.some((u) => u.entityId === meId)) {
+      usersOut.push({ entityId: meId, organizationId: orgId })
     }
     const payload = {
       visibility: editVisibility.value,
       users: usersOut,
-      teams: editTeams.value.map((t) => ({ id: t.id, role: t.role })),
+      teams: editTeams.value.map((t) => ({
+        entityId: t.entityId,
+        organizationId: t.organizationId || orgId,
+      })),
       workspaces: editWorkspaces.value.map((w) => ({
-        id: w.id,
-        role: w.role,
+        entityId: w.entityId,
+        organizationId: w.organizationId || orgId,
       })),
     }
     await store.dispatch('analysisModule/updateApplicationPermissions', {
@@ -640,6 +646,27 @@ const confirmDelete = async () => {
         <!-- Edit mode -->
         <template v-else>
           <div class="permissions-edit">
+            <div class="edit-subsection visibility-subsection">
+              <div class="edit-subsection-header">
+                <h4>Visibility</h4>
+              </div>
+              <el-radio-group v-model="editVisibility" size="default">
+                <el-radio
+                  v-for="opt in VISIBILITY_OPTIONS"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </el-radio>
+              </el-radio-group>
+              <p class="edit-subsection-help">
+                <strong>Public</strong> apps are discoverable by anyone in
+                the workspace.
+                <strong>Private</strong> apps are only available to the
+                users and workspaces granted access below.
+              </p>
+            </div>
+
             <div class="edit-subsection">
               <div class="edit-subsection-header">
                 <h4>Users ({{ editUsers.length }})</h4>
@@ -655,30 +682,17 @@ const confirmDelete = async () => {
               <div
                 v-else
                 v-for="(user, i) in editUsers"
-                :key="user.id"
+                :key="user.entityId"
                 class="edit-permission-row"
               >
                 <span class="edit-permission-label">
-                  {{ getUserName(user.id) }}
-                  <span v-if="isCurrentUser(user.id)" class="self-tag">
+                  {{ getUserName(user.entityId) }}
+                  <span v-if="isCurrentUser(user.entityId)" class="self-tag">
                     you
                   </span>
                 </span>
-                <el-select
-                  v-model="user.role"
-                  size="small"
-                  class="role-select"
-                  :disabled="isCurrentUser(user.id)"
-                >
-                  <el-option
-                    v-for="opt in ROLE_OPTIONS"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
                 <button
-                  v-if="!isCurrentUser(user.id)"
+                  v-if="!isCurrentUser(user.entityId)"
                   class="remove-perm-btn"
                   type="button"
                   @click="removeEditUser(i)"
@@ -707,24 +721,12 @@ const confirmDelete = async () => {
               <div
                 v-else
                 v-for="(team, i) in editTeams"
-                :key="team.id"
+                :key="team.entityId"
                 class="edit-permission-row"
               >
                 <span class="edit-permission-label">
-                  {{ team.teamName || team.id }}
+                  {{ team.teamName || team.entityId }}
                 </span>
-                <el-select
-                  v-model="team.role"
-                  size="small"
-                  class="role-select"
-                >
-                  <el-option
-                    v-for="opt in ROLE_OPTIONS"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
                 <button
                   class="remove-perm-btn"
                   type="button"
@@ -790,18 +792,6 @@ const confirmDelete = async () => {
             </div>
           </el-option>
         </el-select>
-        <el-select
-          v-model="selectedAddUserRole"
-          size="default"
-          class="add-perm-select role"
-        >
-          <el-option
-            v-for="opt in ROLE_OPTIONS"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
       </div>
       <template #footer>
         <div class="dialog-footer">
@@ -836,18 +826,6 @@ const confirmDelete = async () => {
             :key="t.team.id"
             :label="t.team.name"
             :value="t.team.id"
-          />
-        </el-select>
-        <el-select
-          v-model="selectedAddTeamRole"
-          size="default"
-          class="add-perm-select role"
-        >
-          <el-option
-            v-for="opt in ROLE_OPTIONS"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
           />
         </el-select>
       </div>
@@ -1369,6 +1347,18 @@ const confirmDelete = async () => {
       font-weight: 500;
       color: theme.$gray_6;
     }
+  }
+}
+
+.visibility-subsection .edit-subsection-help {
+  font-size: 12px;
+  color: theme.$gray_5;
+  line-height: 1.5;
+  margin: 12px 0 0 0;
+
+  strong {
+    color: theme.$gray_6;
+    font-weight: 600;
   }
 }
 
