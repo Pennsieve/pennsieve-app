@@ -134,6 +134,9 @@
                 />
               </template>
             </div>
+
+            <!-- Published Applications Section -->
+            <published-apps-list class="published-apps-section" />
           </div>
         </div>
       </div>
@@ -182,6 +185,7 @@ import IconGitHub from '@/components/icons/IconGitHub.vue'
 import IconXCircle from '@/components/icons/IconXCircle.vue'
 import CodeRepoListItem from './CodeRepoListItem.vue'
 import PublishingDialog from './PublishingDialog.vue'
+import PublishedAppsList from './PublishedAppsList.vue'
 import { Refresh } from '@element-plus/icons-vue'
 
 export default {
@@ -193,6 +197,7 @@ export default {
     IconXCircle,
     CodeRepoListItem,
     PublishingDialog,
+    PublishedAppsList,
     Refresh
   },
 
@@ -635,6 +640,12 @@ export default {
       }
     }
   }
+}
+
+.published-apps-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid theme.$gray_2;
 }
 
 .repositories-section {

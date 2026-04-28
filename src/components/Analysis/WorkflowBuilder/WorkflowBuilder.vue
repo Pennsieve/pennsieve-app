@@ -290,8 +290,28 @@ const findAppByUrl = (applications, sourceUrl) => {
   if (!sourceUrl) return null;
   const normalized = normalizeUrl(sourceUrl);
   return applications.find(
-    (app) => normalizeUrl(app.source?.url) === normalized
+    (app) => normalizeUrl(app.sourceUrl) === normalized
   ) || null;
+};
+
+const parseGitHubDisplay = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+  if (!match) return null;
+  return `${match[1]}/${match[2].replace(/\.git$/, "")}`;
+};
+
+const repoName = (app) =>
+  parseGitHubDisplay(app?.sourceUrl) || extractRepoName(app?.sourceUrl) || "Unnamed";
+
+const latestVersion = (app) => {
+  const versions = app?.versions || [];
+  if (versions.length === 0) return null;
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0)
+  )[0];
 };
 
 const nodeTypeColor = (type) => {
@@ -335,7 +355,7 @@ const definitionToNodesAndEdges = (workflow, applications) => {
       nodeType = "data-target";
     } else {
       const matchedApp = findAppByUrl(applications, p.sourceUrl);
-      label = matchedApp ? matchedApp.name : extractRepoName(p.sourceUrl);
+      label = matchedApp ? repoName(matchedApp) : extractRepoName(p.sourceUrl);
     }
 
     const matchedApplication =
@@ -545,11 +565,11 @@ const onDrop = (event) => {
       id: nodeId,
       type: "default",
       data: {
-        label: draggedApp.value.name,
+        label: repoName(draggedApp.value),
         application: draggedApp.value,
-        computeType: draggedApp.value.runtimeConfig?.computeTypes?.[0] || "standard",
-        cpu: String(draggedApp.value.runtimeConfig?.cpu || "") || "",
-        memory: String(draggedApp.value.runtimeConfig?.memory || "") || "",
+        computeType: "standard",
+        cpu: "",
+        memory: "",
         defaultParams: {},
       },
       position,
@@ -717,7 +737,7 @@ const saveWorkflow = async () => {
     const proc = {
       id: node.id,
       type: "processor",
-      sourceUrl: node.data.application?.source?.url,
+      sourceUrl: node.data.application?.sourceUrl,
       computeType: node.data.computeType || "standard",
       dependsOn: dependsOn,
       position,
@@ -936,16 +956,18 @@ const openNodeSettings = (id) => {
                   </button>
                 </div>
                 <div
-                  v-if="data.application && data.application.description"
+                  v-if="data.application && latestVersion(data.application)"
                   class="node-description"
                 >
-                  {{ data.application.description }}
+                  {{ (data.application.versions || []).length }}
+                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
+                  &middot; latest {{ latestVersion(data.application).version }}
                 </div>
                 <div class="node-resources">
                   <template v-if="data.computeType !== 'lambda'">
-                    CPU: {{ data.cpu || data.application?.runtimeConfig?.cpu || "N/A" }} |
+                    CPU: {{ data.cpu || "N/A" }} |
                   </template>
-                  Memory: {{ data.memory ? formatResourceLabel(data.memory) : (data.application?.runtimeConfig?.memory || "N/A") }}
+                  Memory: {{ data.memory ? formatResourceLabel(data.memory) : "N/A" }}
                   <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
                 </div>
               </div>
@@ -967,17 +989,18 @@ const openNodeSettings = (id) => {
                 </div>
                 <div class="node-badge">Start</div>
                 <div
-                  v-if="data.application && data.application.description"
+                  v-if="data.application && latestVersion(data.application)"
                   class="node-description"
                 >
-                  {{ data.application.description }}
+                  {{ (data.application.versions || []).length }}
+                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
+                  &middot; latest {{ latestVersion(data.application).version }}
                 </div>
                 <div
-                  v-if="data.application && data.application.runtimeConfig"
+                  v-if="data.application && data.application.visibility"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
-                  {{ data.application.runtimeConfig.memory || "N/A" }}
+                  Visibility: {{ data.application.visibility }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -998,17 +1021,18 @@ const openNodeSettings = (id) => {
                 </div>
                 <div class="node-badge">End</div>
                 <div
-                  v-if="data.application && data.application.description"
+                  v-if="data.application && latestVersion(data.application)"
                   class="node-description"
                 >
-                  {{ data.application.description }}
+                  {{ (data.application.versions || []).length }}
+                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
+                  &middot; latest {{ latestVersion(data.application).version }}
                 </div>
                 <div
-                  v-if="data.application && data.application.runtimeConfig"
+                  v-if="data.application && data.application.visibility"
                   class="node-resources"
                 >
-                  CPU: {{ data.application.runtimeConfig.cpu || "N/A" }} | Memory:
-                  {{ data.application.runtimeConfig.memory || "N/A" }}
+                  Visibility: {{ data.application.visibility }}
                 </div>
               </div>
               <Handle id="source" type="source" :position="Position.Bottom" />
@@ -1569,14 +1593,17 @@ const openNodeSettings = (id) => {
               >
                 <IconAnalysis class="app-icon" :width="20" :height="20" />
                 <div class="app-info">
-                  <div class="app-name">{{ app.name }}</div>
-                  <span class="app-type-badge">{{ app.applicationType }}</span>
+                  <div class="app-name">{{ repoName(app) }}</div>
+                  <span
+                    v-if="app.visibility"
+                    class="app-type-badge"
+                  >{{ app.visibility }}</span>
                   <div class="app-description">
-                    {{ app.description || "No description" }}
-                  </div>
-                  <div class="app-resources">
-                    CPU: {{ app.runtimeConfig?.cpu || "N/A" }} | Memory:
-                    {{ app.runtimeConfig?.memory || "N/A" }}
+                    {{ (app.versions || []).length }}
+                    {{ (app.versions || []).length === 1 ? "version" : "versions" }}
+                    <template v-if="latestVersion(app)">
+                      &middot; latest {{ latestVersion(app).version }}
+                    </template>
                   </div>
                 </div>
               </div>
