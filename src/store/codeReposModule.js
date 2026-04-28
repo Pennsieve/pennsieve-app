@@ -10,7 +10,7 @@ const initialState = () => ({
   myRepos: [],
   myReposPaginationParams: {
     page: 1,
-    size: 25,
+    size: 10,
     currentPage: 1
   },
   myReposCount: 0,

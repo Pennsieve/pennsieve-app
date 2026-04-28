@@ -61,6 +61,11 @@ const ROLE_OPTIONS = [
 
 const appUuid = computed(() => props.uuid || route.params.uuid)
 
+const backToCodeRoute = computed(() => ({
+  name: 'my-code',
+  query: { tab: 'published', app: appUuid.value },
+}))
+
 /* Helpers */
 const parseGitHubRepo = (sourceUrl) => {
   if (!sourceUrl) return null
@@ -233,6 +238,13 @@ const cancelEditingPermissions = () => {
   isEditingPermissions.value = false
 }
 
+const deletingApplications = computed(
+  () => store.state.analysisModule.deletingApplications || []
+)
+const isAppDeleting = computed(() =>
+  deletingApplications.value.includes(appUuid.value)
+)
+
 const isCurrentUser = (id) =>
   !!id &&
   (id === profile.value?.id || id === profile.value?.intId)
@@ -381,6 +393,7 @@ onMounted(() => loadDetail(appUuid.value))
 const confirmDelete = async () => {
   if (!detail.value) return
   isDeleting.value = true
+  showDeleteDialog.value = false
   try {
     await store.dispatch('analysisModule/deleteApplication', detail.value)
     EventBus.$emit('toast', {
@@ -389,8 +402,15 @@ const confirmDelete = async () => {
         msg: 'Your request was successful. It may take some time to complete.',
       },
     })
-    showDeleteDialog.value = false
-    router.push({ name: 'my-code' })
+    // Refresh the applications list so the My Code view either reflects
+    // the deletion or keeps the in-flight marker until the backend finishes.
+    store
+      .dispatch('analysisModule/fetchApplications', { force: true })
+      .catch(() => {})
+    router.push({
+      name: 'my-code',
+      query: { tab: 'published', app: appUuid.value },
+    })
   } catch (error) {
     console.error(error)
     EventBus.$emit('toast', {
@@ -409,16 +429,21 @@ const confirmDelete = async () => {
   <bf-stage element-loading-background="transparent" v-loading="isLoading">
     <div v-if="detailError && !detail" class="app-not-found">
       <p>{{ detailError }}</p>
-      <router-link :to="{ name: 'my-code' }" class="back-link">
+      <router-link :to="backToCodeRoute" class="back-link">
         &larr; Back to My Code
       </router-link>
     </div>
 
-    <div v-else-if="detail" class="application-management">
+    <div
+      v-else-if="detail"
+      class="application-management"
+      :class="{ 'is-deleting': isAppDeleting }"
+      :aria-busy="isAppDeleting"
+    >
       <!-- Back link -->
       <div class="app-breadcrumb">
-        <router-link :to="{ name: 'my-code' }" class="back-link">
-          &larr; Back to My Code
+        <router-link :to="backToCodeRoute" class="back-link">
+          &larr; Back to Published Applications
         </router-link>
       </div>
 
@@ -426,13 +451,18 @@ const confirmDelete = async () => {
       <div class="app-header-section">
         <div class="app-header-top">
           <h1>{{ repoName }}</h1>
-          <span
-            v-if="detail.visibility"
-            class="visibility-pill"
-            :class="(detail.visibility || '').toLowerCase()"
-          >
-            {{ detail.visibility }}
-          </span>
+          <div class="app-header-status">
+            <span v-if="isAppDeleting" class="deleting-pill">
+              Deleting...
+            </span>
+            <span
+              v-if="detail.visibility"
+              class="visibility-pill"
+              :class="(detail.visibility || '').toLowerCase()"
+            >
+              {{ detail.visibility }}
+            </span>
+          </div>
         </div>
         <p class="app-subtitle">Pennsieve App Store</p>
         <div class="app-tags">
@@ -881,6 +911,31 @@ const confirmDelete = async () => {
   max-width: 900px;
   margin: 0;
   padding: 0;
+  transition: opacity 0.2s ease;
+
+  &.is-deleting {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.5);
+  }
+}
+
+.app-header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deleting-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(#F59E0B, 0.12);
+  color: #B45309;
+  border: 1px solid rgba(#F59E0B, 0.25);
 }
 
 .app-breadcrumb {

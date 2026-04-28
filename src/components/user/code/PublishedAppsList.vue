@@ -1,18 +1,27 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useStore } from 'vuex'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconLink from '@/components/icons/IconLink.vue'
 
 const store = useStore()
 const router = useRouter()
+const route = useRoute()
 
 const applications = computed(
   () => store.state.analysisModule.applications || []
 )
+const deletingApplications = computed(
+  () => store.state.analysisModule.deletingApplications || []
+)
+const isAppDeleting = (uuid) => deletingApplications.value.includes(uuid)
 const isLoading = ref(false)
 const expandedApps = ref(new Set())
+const searchQuery = ref('')
+
+const pageSize = 10
+const currentPage = ref(1)
 
 const parseGitHubDisplay = (sourceUrl) => {
   if (!sourceUrl) return null
@@ -23,6 +32,28 @@ const parseGitHubDisplay = (sourceUrl) => {
 
 const repoName = (app) =>
   parseGitHubDisplay(app.sourceUrl) || 'Unknown repo'
+
+const filteredApplications = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return applications.value
+  return applications.value.filter((app) => {
+    return (
+      repoName(app).toLowerCase().includes(q) ||
+      (app.sourceUrl || '').toLowerCase().includes(q)
+    )
+  })
+})
+
+const paginatedApplications = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredApplications.value.slice(start, start + pageSize)
+})
+
+watch(filteredApplications, () => {
+  // Reset to first page whenever the filter result changes so the user
+  // doesn't end up on a now-empty page after typing.
+  currentPage.value = 1
+})
 
 const sortedVersions = (app) => {
   const versions = app.versions || []
@@ -80,9 +111,30 @@ const toggleExpansion = (uuid) => {
 const goToDetail = (app) => {
   if (!app?.uuid) return
   router.push({
-    name: 'my-published-app-detail',
+    name: 'published-app-details',
     params: { uuid: app.uuid },
   })
+}
+
+const scrollToTargetApp = async () => {
+  const targetUuid = route.query.app
+  if (!targetUuid) return
+  const idx = filteredApplications.value.findIndex(
+    (a) => a.uuid === targetUuid
+  )
+  if (idx < 0) return
+  // If the target is on a later page, jump to that page first.
+  const targetPage = Math.floor(idx / pageSize) + 1
+  if (currentPage.value !== targetPage) {
+    currentPage.value = targetPage
+  }
+  await nextTick()
+  const el = document.getElementById(`published-app-${targetUuid}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('flash-highlight')
+    setTimeout(() => el.classList.remove('flash-highlight'), 1500)
+  }
 }
 
 const fetchApps = async () => {
@@ -94,7 +146,13 @@ const fetchApps = async () => {
   } finally {
     isLoading.value = false
   }
+  scrollToTargetApp()
 }
+
+watch(
+  () => route.query.app,
+  () => scrollToTargetApp()
+)
 
 onMounted(fetchApps)
 </script>
@@ -127,7 +185,17 @@ onMounted(fetchApps)
     </div>
 
     <div class="apps-section" v-loading="isLoading">
-      <h3>Published Applications</h3>
+      <div class="apps-section-header">
+        <h3>Published Applications</h3>
+        <el-input
+          v-if="applications.length > 0"
+          v-model="searchQuery"
+          placeholder="Search applications..."
+          size="default"
+          clearable
+          class="apps-search-input"
+        />
+      </div>
 
       <div
         v-if="!isLoading && applications.length === 0"
@@ -140,12 +208,27 @@ onMounted(fetchApps)
         </p>
       </div>
 
+      <div
+        v-else-if="filteredApplications.length === 0"
+        class="empty-state"
+      >
+        <p>
+          No applications match
+          <strong>"{{ searchQuery }}"</strong>.
+        </p>
+      </div>
+
       <div v-else class="apps-grid">
         <div
-          v-for="app in applications"
+          v-for="app in paginatedApplications"
+          :id="`published-app-${app.uuid}`"
           :key="app.uuid"
           class="app-card"
-          :class="{ expanded: isExpanded(app.uuid) }"
+          :class="{
+            expanded: isExpanded(app.uuid),
+            'is-deleting': isAppDeleting(app.uuid),
+          }"
+          :aria-busy="isAppDeleting(app.uuid)"
         >
           <div class="app-header">
             <div class="app-info">
@@ -187,8 +270,11 @@ onMounted(fetchApps)
               </div>
             </div>
             <div class="app-header-actions">
+              <span v-if="isAppDeleting(app.uuid)" class="deleting-pill">
+                Deleting...
+              </span>
               <span
-                v-if="latestVersion(app)"
+                v-else-if="latestVersion(app)"
                 class="app-status-badge"
                 :class="statusKey(latestVersion(app).status)"
               >
@@ -293,6 +379,17 @@ onMounted(fetchApps)
           </transition>
         </div>
       </div>
+
+      <el-pagination
+        v-if="filteredApplications.length > pageSize"
+        class="apps-pagination"
+        :page-size="pageSize"
+        :pager-count="5"
+        :current-page="currentPage"
+        layout="prev, pager, next"
+        :total="filteredApplications.length"
+        @current-change="currentPage = $event"
+      />
     </div>
   </div>
 </template>
@@ -357,8 +454,27 @@ onMounted(fetchApps)
     font-size: 20px;
     font-weight: 500;
     color: theme.$gray_6;
-    margin-bottom: 16px;
+    margin: 0;
   }
+}
+
+.apps-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.apps-search-input {
+  max-width: 320px;
+}
+
+.apps-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  --el-pagination-hover-color: #{theme.$purple_3};
 }
 
 .empty-state {
@@ -386,7 +502,8 @@ onMounted(fetchApps)
   background: white;
   border: 1px solid theme.$gray_2;
   padding: 20px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, opacity 0.2s ease,
+    box-shadow 0.4s ease, background-color 0.4s ease;
 
   &:hover {
     border-color: theme.$gray_3;
@@ -395,6 +512,30 @@ onMounted(fetchApps)
   &.expanded {
     border-color: theme.$purple_2;
   }
+
+  &.is-deleting {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.5);
+  }
+
+  &.flash-highlight {
+    border-color: theme.$purple_2;
+    box-shadow: 0 0 0 4px rgba(80, 57, 247, 0.18);
+    background-color: rgba(80, 57, 247, 0.04);
+  }
+}
+
+.deleting-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(#F59E0B, 0.12);
+  color: #B45309;
+  border: 1px solid rgba(#F59E0B, 0.25);
 }
 
 .app-card-actions {

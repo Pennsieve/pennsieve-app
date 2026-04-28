@@ -17,14 +17,11 @@ const props = defineProps({
 /*
   Local State
 */
-const accordionActiveNames = ref(["information", "versions", "permissions"]);
+const accordionActiveNames = ref(["information", "versions"]);
 const detail = ref(null);
 const detailLoading = ref(false);
 const detailError = ref("");
 const readmeHtml = ref("");
-const permissions = ref([]);
-const permissionsLoading = ref(false);
-const permissionsError = ref("");
 
 const versionsPageSize = 10;
 const versionsPage = ref(1);
@@ -182,38 +179,17 @@ const renderReadme = (markdown) => {
 };
 
 /*
-  Permission display helpers
-*/
-const permissionLabel = (perm) => {
-  if (perm.userId) return getUserName(perm.userId);
-  if (perm.teamId) return `Team: ${perm.teamName || perm.teamId}`;
-  if (perm.organizationId)
-    return `Org: ${perm.organizationName || perm.organizationId}`;
-  if (perm.granteeId)
-    return perm.granteeType
-      ? `${perm.granteeType}: ${perm.granteeId}`
-      : perm.granteeId;
-  return "Unknown";
-};
-
-const permissionRole = (perm) =>
-  perm.role || perm.permission || perm.accessLevel || "—";
-
-/*
-  Fetch application detail + permissions in parallel
+  Fetch application detail
 */
 const loadDetail = async (uuid) => {
   detail.value = null;
-  permissions.value = [];
   readmeHtml.value = "";
   detailError.value = "";
-  permissionsError.value = "";
   versionsPage.value = 1;
   if (!uuid) return;
   detailLoading.value = true;
-  permissionsLoading.value = true;
   try {
-    const [detailResult, permsResult] = await Promise.allSettled([
+    const [detailResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
     ]);
@@ -225,21 +201,8 @@ const loadDetail = async (uuid) => {
       console.error(detailResult.reason);
       detailError.value = "Failed to load application";
     }
-
-    if (permsResult.status === "fulfilled") {
-      const data = permsResult.value;
-      permissions.value = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.permissions)
-          ? data.permissions
-          : [];
-    } else {
-      console.error(permsResult.reason);
-      permissionsError.value = "Failed to load permissions";
-    }
   } finally {
     detailLoading.value = false;
-    permissionsLoading.value = false;
   }
 };
 
@@ -351,33 +314,6 @@ watch(
               </div>
             </div>
 
-          </el-collapse-item>
-
-          <el-collapse-item
-            :title="`Permissions (${permissions.length})`"
-            name="permissions"
-          >
-            <div v-if="permissionsLoading" class="empty-versions">
-              Loading...
-            </div>
-            <div v-else-if="permissionsError" class="empty-versions">
-              {{ permissionsError }}
-            </div>
-            <div v-else-if="permissions.length === 0" class="empty-versions">
-              No permissions
-            </div>
-            <div v-else class="info-card">
-              <div
-                v-for="(perm, i) in permissions"
-                :key="perm.uuid || perm.userId || perm.teamId || i"
-                class="info-row"
-              >
-                <span class="info-label">{{ permissionLabel(perm) }}</span>
-                <span class="info-value perm-role">
-                  {{ permissionRole(perm) }}
-                </span>
-              </div>
-            </div>
           </el-collapse-item>
 
           <el-collapse-item
@@ -869,10 +805,6 @@ watch(
 
 .deployment-time {
   color: theme.$gray_5;
-}
-
-.perm-role {
-  text-transform: capitalize;
 }
 
 .versions-pagination {

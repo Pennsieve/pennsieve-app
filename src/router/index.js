@@ -409,8 +409,8 @@ const router = createRouter({
           }
         },
         {
-          name: 'my-published-app-detail',
-          path: 'code/applications/:uuid',
+          name: 'published-app-details',
+          path: 'published-app-details/:uuid',
           components: {
             stage: PublishedAppDetail,
             navigation: UserNavigation,
@@ -420,7 +420,7 @@ const router = createRouter({
           },
           meta: {
             hideSecondaryNav: true,
-            title: 'Application Detail',
+            title: 'Application Details',
             description: 'Details for an application published to the Pennsieve App Store.',
           },
         },

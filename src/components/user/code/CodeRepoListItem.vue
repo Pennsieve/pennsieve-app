@@ -1,81 +1,113 @@
 <template>
-  <div class="repo-list-item">
-    <div class="repo-content">
-      <!-- Header with title and status -->
-      <div class="repo-header">
-        <div class="repo-title-section">
+  <div class="repo-card">
+    <div class="repo-header">
+      <div class="repo-info">
+        <h3>
           <a
-            :href="repo.url || repo.html_url"
+            :href="repo.html_url || repo.url"
             target="_blank"
+            rel="noopener noreferrer"
             class="repo-name-link"
             :title="`View ${repo.full_name || repo.name} on GitHub`"
           >
-            <IconGitHub/>
-            <h3 class="repo-name">{{ repo.full_name || repo.name }}</h3>
+            {{ repo.full_name || repo.name }}
           </a>
-          <div class="repo-badges">
-            <span v-if="repo.private" class="privacy-badge private">Private</span>
-            <span class="repo-language" v-if="repo.language">{{ repo.language }}</span>
-          </div>
-        </div>
-        <div class="publishing-box">
-          <div class="publishing-box-header">
-            <span class="publishing-box-title">Publishing Settings</span>
-            <button
-              class="settings-button"
-              @click="handleManageSettings"
-              title="Edit publishing settings"
-            >
-              <IconSettings :width="24" :height="24" />
-            </button>
-          </div>
-          <div class="publishing-box-rows">
-            <div class="status-icon-row discover" :class="repo.publishing_to_discover ? 'enabled' : 'disabled'">
-              <span class="status-icon-label">Discover</span>
-              <span class="status-icon-state">{{ repo.publishing_to_discover ? 'On' : 'Off' }}</span>
-            </div>
-            <div class="status-icon-row appstore" :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'">
-              <span class="status-icon-label">App Store</span>
-              <span class="status-icon-state">{{ repo.publishing_to_appstore ? 'On' : 'Off' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Description and stats -->
-      <div class="repo-details">
-        <p class="repo-description" v-if="repo.description">
+        </h3>
+        <div class="repo-subtitle">GitHub Repository</div>
+        <div v-if="repo.description" class="repo-description">
           {{ repo.description }}
-        </p>
-
-        <div class="repo-stats">
-          <span class="stat-item" v-if="repo.stargazers_count !== undefined">
-            ⭐ {{ repo.stargazers_count }}
+        </div>
+        <div class="repo-tags">
+          <span
+            class="tag"
+            :class="repo.private ? 'private' : 'public'"
+          >
+            {{ repo.private ? 'Private' : 'Public' }}
           </span>
-          <span class="stat-item" v-if="repo.forks_count !== undefined">
-            🍴 {{ repo.forks_count }}
-          </span>
-          <span class="stat-item" v-if="repo.updated_at">
-            Updated {{ formatDate(repo.updated_at) }}
+          <span v-if="repo.language" class="tag language">
+            {{ repo.language }}
           </span>
         </div>
       </div>
+
+      <div class="publishing-box">
+        <div class="publishing-box-header">
+          <span class="publishing-box-title">Publishing Settings</span>
+          <button
+            class="settings-button"
+            type="button"
+            title="Edit publishing settings"
+            @click="handleManageSettings"
+          >
+            <IconSettings :width="20" :height="20" color="currentColor" />
+          </button>
+        </div>
+        <div class="publishing-box-rows">
+          <div
+            class="status-icon-row"
+            :class="repo.publishing_to_discover ? 'enabled' : 'disabled'"
+          >
+            <span class="status-icon-label">Discover</span>
+            <span class="status-icon-state">
+              {{ repo.publishing_to_discover ? 'On' : 'Off' }}
+            </span>
+          </div>
+          <div
+            class="status-icon-row"
+            :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'"
+          >
+            <span class="status-icon-label">App Store</span>
+            <span class="status-icon-state">
+              {{ repo.publishing_to_appstore ? 'On' : 'Off' }}
+            </span>
+          </div>
+        </div>
+        <router-link
+          v-if="matchedApp"
+          :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
+          class="app-details-link"
+        >
+          View application details &rarr;
+        </router-link>
+      </div>
+    </div>
+
+    <div class="repo-stats">
+      <span v-if="repo.stargazers_count !== undefined" class="stat-item">
+        ⭐ {{ repo.stargazers_count }}
+      </span>
+      <span v-if="repo.forks_count !== undefined" class="stat-item">
+        🍴 {{ repo.forks_count }}
+      </span>
+      <span v-if="repo.updated_at" class="stat-item">
+        Updated {{ formatDate(repo.updated_at) }}
+      </span>
+    </div>
+
+    <div class="repo-card-actions">
+      <a
+        :href="repo.html_url || repo.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="card-action-link"
+      >
+        <IconGitHub :width="14" :height="14" color="currentColor" />
+        <span>View on GitHub</span>
+      </a>
     </div>
   </div>
 </template>
 
 <script>
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import IconSettings from '@/components/icons/IconSettings.vue'
 import IconGitHub from "@/components/icons/IconGitHub.vue";
+import IconSettings from "@/components/icons/IconSettings.vue";
 
 export default {
   name: 'CodeRepoListItem',
 
   components: {
     IconGitHub,
-    BfButton,
-    IconSettings
+    IconSettings,
   },
 
   props: {
@@ -86,8 +118,24 @@ export default {
   },
 
   computed: {
-    hasPublishingInfo() {
-      return this.repo.publishing_to_discover || this.repo.publishing_to_appstore
+    applications() {
+      return this.$store.state.analysisModule?.applications || []
+    },
+
+    matchedApp() {
+      if (!this.repo.publishing_to_appstore) return null
+      const candidates = [this.repo.html_url, this.repo.url].filter(Boolean)
+      if (candidates.length === 0) return null
+      const normalize = (url) =>
+        (url || '')
+          .replace(/\.git$/, '')
+          .replace(/\/+$/, '')
+          .toLowerCase()
+      const targets = new Set(candidates.map(normalize))
+      return (
+        this.applications.find((app) => targets.has(normalize(app.sourceUrl))) ||
+        null
+      )
     },
   },
 
@@ -122,106 +170,100 @@ export default {
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
-.repo-list-item {
+.repo-card {
   background: white;
   border: 1px solid theme.$gray_2;
-  //border-radius: 4px;
-  //margin-bottom: 8px;
-  transition: all 0.2s ease;
-  overflow: hidden;
-  max-width: 1200px;
+  padding: 20px;
+  transition: border-color 0.2s ease;
 
   &:hover {
     border-color: theme.$gray_3;
-    background: theme.$gray_1;
-    //box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 }
 
-.repo-content {
-  padding: 24px;
-}
-
-// Header section with title, badges, status, and action
 .repo-header {
   display: flex;
+  justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 16px;
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 12px;
-  }
+  gap: 16px;
 }
 
-.repo-title-section {
+.repo-info {
   flex: 1;
   min-width: 0;
-}
 
-.repo-name-link {
-  text-decoration: none;
-  color: inherit;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
+  }
 
-  &:hover {
+  .repo-name-link {
+    color: theme.$gray_6;
     text-decoration: none;
+    transition: color 0.2s ease;
 
-    .repo-name {
+    &:hover {
       color: theme.$purple_2;
+      text-decoration: underline;
     }
   }
 }
 
-.repo-name {
-  font-size: 20px;
+.repo-subtitle {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin-bottom: 6px;
   font-weight: 400;
-  color: theme.$purple_2;
-  margin: 0;
-  line-height: 1.3;
-  transition: color 0.2s ease;
 }
 
-.repo-badges {
+.repo-description {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin: 4px 0 8px 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.repo-tags {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-top: 8px;
   flex-wrap: wrap;
-}
 
-.privacy-badge {
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 
-  &.private {
-    background: lighten(theme.$red_1, 35%);
-    color: theme.$red_1;
+    &.private {
+      background: rgba(#EF4444, 0.1);
+      color: #DC2626;
+    }
+
+    &.public {
+      background: rgba(#10B981, 0.1);
+      color: #059669;
+    }
+
+    &.language {
+      background: theme.$gray_1;
+      color: theme.$gray_5;
+    }
   }
 }
 
-.repo-language {
-  font-size: 12px;
-  color: theme.$gray_5;
-  background: theme.$gray_1;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-}
-
-// Publishing settings box
 .publishing-box {
   flex-shrink: 0;
   border: 1px solid theme.$gray_2;
   border-radius: 6px;
-  padding: 16px 20px;
-  min-width: 240px;
+  padding: 14px 16px;
+  min-width: 220px;
 
   @media (max-width: 768px) {
     width: 100%;
@@ -252,7 +294,6 @@ export default {
 .status-icon-row {
   display: flex;
   align-items: center;
-  gap: 6px;
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 11px;
@@ -271,12 +312,12 @@ export default {
   }
 
   &.enabled {
-    background: lighten(theme.$status_green, 40%);
+    background: rgba(theme.$status_green, 0.12);
     color: theme.$status_green;
   }
 
   &.disabled {
-    background: lighten(theme.$gray_4, 25%);
+    background: theme.$gray_1;
     color: theme.$gray_4;
   }
 }
@@ -285,64 +326,80 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: theme.$gray_4;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 
   &:hover {
-    color: theme.$gray_5;
-    background: theme.$gray_2;
-  }
-
-  &:focus {
-    outline: none;
     color: theme.$purple_2;
+    background: rgba(theme.$purple_2, 0.08);
   }
 }
 
-// Details section
-.repo-details {
-  .repo-description {
-    font-size: 14px;
-    color: theme.$gray_5;
-    line-height: 1.5;
-    margin: 0 0 16px 0;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
+.app-details-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$purple_2;
+  text-decoration: none;
 
-  .repo-stats {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-
-    .stat-item {
-      font-size: 13px;
-      color: theme.$gray_4;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-weight: 500;
-    }
+  &:hover {
+    text-decoration: underline;
   }
 }
 
-// Button overrides
-:deep(.bf-button) {
-  &.small {
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    min-width: auto;
+.repo-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  flex-wrap: wrap;
+
+  .stat-item {
     white-space: nowrap;
+  }
+}
+
+.repo-card-actions {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid theme.$gray_2;
+  flex-wrap: wrap;
+}
+
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
   }
 }
 </style>

@@ -70,71 +70,109 @@
 
             <el-tabs v-model="activeTab" class="code-tabs">
               <el-tab-pane label="My Repositories" name="repositories">
-                <!-- Repositories Section -->
-                <div class="repositories-section">
-                  <div class="repos-header">
-                    <div class="repos-header-left">
-                      <h3>My Repositories ({{ totalRepoCount }})</h3>
-                      <el-tooltip
-                        ref="refresh-tooltip"
-                        placement="bottom"
-                        content="Refresh list"
-                      >
-                        <button @click="refreshRepositories" class="refresh-icon-button" :disabled="refreshing" :title="refreshing ? 'Refreshing...' : 'Refresh'">
-                          <el-icon :class="{ spinning: refreshing }">
-                            <Refresh />
-                          </el-icon>
-                        </button>
-                      </el-tooltip>
+                <div class="repos-container">
+                  <!-- Info Section -->
+                  <div class="info-section">
+                    <div class="info-card">
+                      <h3>Connected GitHub Repositories</h3>
+                      <p>
+                        Manage publishing destinations for the repositories
+                        you've connected through GitHub. Toggle Discover or
+                        App Store publishing per repo, and each tagged
+                        release will fan out to the right place automatically.
+                      </p>
+                      <div class="documentation-link">
+                        <router-link
+                          to="/my-workspace/settings/integrations/github"
+                          class="doc-link"
+                        >
+                          Manage GitHub Settings &rarr;
+                        </router-link>
+                      </div>
                     </div>
-                    <router-link to="/my-workspace/settings/integrations/github" class="manage-link">
-                      Manage GitHub Settings
-                    </router-link>
                   </div>
 
-                  <el-pagination
-                    v-if="totalRepoCount > pageSize && !reposLoading"
-                    class="repo-pagination mb-16"
-                    :page-size="pageSize"
-                    :pager-count="5"
-                    :current-page="currentPage"
-                    layout="prev, pager, next"
-                    :total="totalRepoCount"
-                    @current-change="onPaginationPageChange"
-                  />
-
-                  <div v-if="reposLoading" class="loading-state">
-                    <div class="loading-spinner">
-                      <div class="spinner"></div>
-                    </div>
-                    <p>Loading repositories...</p>
-                  </div>
-
-                  <div v-else-if="repositories.length === 0" class="empty-repos">
-                    <p>No repositories found. Make sure you have repositories in your connected GitHub account.</p>
-                  </div>
-
-                  <template v-else>
-                    <div class="repos-list">
-                      <code-repo-list-item
-                        v-for="repo in repositories"
-                        :key="repo.id"
-                        :repo="repo"
-                        @manage-settings="openPublishingDialog"
+                  <!-- Repos Section -->
+                  <div class="repos-section">
+                    <div class="repos-section-header">
+                      <div class="repos-section-title">
+                        <h3>My Repositories ({{ totalRepoCount }})</h3>
+                        <el-tooltip
+                          ref="refresh-tooltip"
+                          placement="bottom"
+                          content="Refresh list"
+                        >
+                          <button
+                            class="refresh-icon-button"
+                            :disabled="refreshing"
+                            :title="refreshing ? 'Refreshing...' : 'Refresh'"
+                            @click="refreshRepositories"
+                          >
+                            <el-icon :class="{ spinning: refreshing }">
+                              <Refresh />
+                            </el-icon>
+                          </button>
+                        </el-tooltip>
+                      </div>
+                      <el-input
+                        v-if="repositories.length > 0"
+                        v-model="reposSearchQuery"
+                        placeholder="Search this page..."
+                        size="default"
+                        clearable
+                        class="repos-search-input"
                       />
                     </div>
 
-                    <el-pagination
-                      v-if="totalRepoCount > pageSize"
-                      class="repo-pagination mt-16"
-                      :page-size="pageSize"
-                      :pager-count="5"
-                      :current-page="currentPage"
-                      layout="prev, pager, next"
-                      :total="totalRepoCount"
-                      @current-change="onPaginationPageChange"
-                    />
-                  </template>
+                    <div v-if="reposLoading" class="loading-state">
+                      <div class="loading-spinner">
+                        <div class="spinner"></div>
+                      </div>
+                      <p>Loading repositories...</p>
+                    </div>
+
+                    <div
+                      v-else-if="repositories.length === 0"
+                      class="empty-state"
+                    >
+                      <p>
+                        No repositories found. Make sure you have repositories
+                        in your connected GitHub account.
+                      </p>
+                    </div>
+
+                    <div
+                      v-else-if="filteredRepositories.length === 0"
+                      class="empty-state"
+                    >
+                      <p>
+                        No repositories on this page match
+                        <strong>"{{ reposSearchQuery }}"</strong>.
+                      </p>
+                    </div>
+
+                    <template v-else>
+                      <div class="repos-grid">
+                        <code-repo-list-item
+                          v-for="repo in filteredRepositories"
+                          :key="repo.id"
+                          :repo="repo"
+                          @manage-settings="openPublishingDialog"
+                        />
+                      </div>
+
+                      <el-pagination
+                        v-if="totalRepoCount > pageSize"
+                        class="repos-pagination"
+                        :page-size="pageSize"
+                        :pager-count="5"
+                        :current-page="currentPage"
+                        layout="prev, pager, next"
+                        :total="totalRepoCount"
+                        @current-change="onPaginationPageChange"
+                      />
+                    </template>
+                  </div>
                 </div>
               </el-tab-pane>
 
@@ -223,7 +261,8 @@ export default {
       disconnecting: false,
       showPublishingDialog: false,
       selectedRepo: null,
-      activeTab: 'repositories'
+      activeTab: 'repositories',
+      reposSearchQuery: ''
     }
   },
 
@@ -255,14 +294,35 @@ export default {
     
     myReposLoaded() {
       return this.$store.state.codeReposModule.myReposLoaded
-    }
+    },
+
+    filteredRepositories() {
+      const q = this.reposSearchQuery.trim().toLowerCase()
+      if (!q) return this.repositories
+      return this.repositories.filter((repo) => {
+        const name = (repo.full_name || repo.name || '').toLowerCase()
+        const desc = (repo.description || '').toLowerCase()
+        const lang = (repo.language || '').toLowerCase()
+        return name.includes(q) || desc.includes(q) || lang.includes(q)
+      })
+    },
   },
 
   mounted() {
     console.log('Store state keys:', Object.keys(this.$store.state))
     console.log('Store codeRepos state:', this.$store.state.codeRepos)
     console.log('Store modules:', this.$store._modules)
+    if (this.$route.query.tab === 'published') {
+      this.activeTab = 'published'
+    }
     this.fetchGithubProfile()
+  },
+
+  watch: {
+    '$route.query.tab'(val) {
+      if (val === 'published') this.activeTab = 'published'
+      if (val === 'repositories') this.activeTab = 'repositories'
+    },
   },
 
   methods: {
@@ -302,7 +362,7 @@ export default {
     async fetchRepositories() {
       console.log('fetchRepositories called in component')
       this.reposLoading = true
-      
+
       try {
         console.log('About to dispatch fetchMyRepos with:', { page: this.currentPage, size: this.pageSize })
         await this.$store.dispatch('codeReposModule/fetchMyRepos', {
@@ -310,6 +370,13 @@ export default {
           size: this.pageSize
         })
         console.log('fetchMyRepos dispatch completed')
+        // Load published applications so repo cards can deep-link into the
+        // application detail view when publishing_to_appstore is on.
+        this.$store
+          .dispatch('analysisModule/fetchApplications')
+          .catch((err) =>
+            console.error('Failed to fetch applications:', err)
+          )
       } catch (err) {
         console.error('Error fetching repositories:', err)
         // Store handles setting empty state on error
@@ -673,87 +740,142 @@ export default {
   }
 }
 
-.repositories-section {
-  .repos-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    max-width: 1200px;
+.repos-container {
+  max-width: 1000px;
+  margin: 0;
+}
 
-    h3 {
-      font-size: 20px;
-      font-weight: 500;
-      color: theme.$gray_6;
-      margin: 0;
-    }
+.info-section {
+  margin-bottom: 32px;
+}
 
-    .repos-header-left {
-      display: flex;
+.info-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 24px;
+
+  h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 12px 0;
+  }
+
+  p {
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+    margin: 0 0 12px 0;
+  }
+
+  .documentation-link {
+    margin-top: 16px;
+
+    .doc-link {
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-    }
-
-    .manage-link {
-      color: theme.$purple_2;
+      padding: 8px 16px;
+      background: theme.$purple_3;
+      color: white;
       text-decoration: none;
-      font-size: 16px;
-      font-weight: 500;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-
-    .refresh-icon-button {
-      background: none;
-      border: none;
-      color: theme.$purple_2;
-      cursor: pointer;
-      padding: 4px;
       border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      font-size: 14px;
+      font-weight: 500;
       transition: background 0.2s ease;
 
-      &:hover:not(:disabled) {
-        background: rgba(theme.$purple_2, 0.1);
-      }
-
-      &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-
-      .el-icon {
-        font-size: 16px;
-        transition: transform 0.2s ease;
-
-        &.spinning {
-          animation: spin 1s linear infinite;
-        }
+      &:hover {
+        background: theme.$purple_2;
       }
     }
   }
+}
 
-  .empty-repos {
-    text-align: center;
-    padding: 40px 20px;
+.repos-section {
+  margin-bottom: 48px;
+}
+
+.repos-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.repos-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  h3 {
+    font-size: 20px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0;
+  }
+}
+
+.refresh-icon-button {
+  background: none;
+  border: none;
+  color: theme.$purple_2;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(theme.$purple_2, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .el-icon {
+    font-size: 16px;
+    transition: transform 0.2s ease;
+
+    &.spinning {
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+.repos-search-input {
+  max-width: 320px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
     color: theme.$gray_5;
+    line-height: 1.5;
   }
+}
 
-  .repos-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
+.repos-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-  .repo-pagination {
-    justify-content: flex-end;
-    max-width: 1200px;
-    --el-pagination-hover-color: #{theme.$purple_3};
-  }
+.repos-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  --el-pagination-hover-color: #{theme.$purple_3};
 }
 
 .dialog-overlay {
