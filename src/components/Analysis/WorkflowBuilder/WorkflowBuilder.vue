@@ -876,7 +876,13 @@ const openNodeSettings = (id) => {
 
     <!-- Header (browse mode) -->
     <div class="builder-header" v-if="isReadOnly">
-      <span class="header-title">{{ selectedWorkflow?.name || 'Workflow' }}</span>
+      <span class="header-title">
+        <router-link :to="{ name: 'workflows' }" class="header-back-link">
+          &larr; Workflows
+        </router-link>
+        <span class="header-breadcrumb-sep">/</span>
+        <span class="header-detail-name">{{ selectedWorkflow?.name || 'Workflow' }}</span>
+      </span>
       <div class="header-actions">
         <bf-button
           :disabled="!hasAnyChanges"

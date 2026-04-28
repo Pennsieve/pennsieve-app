@@ -30,6 +30,9 @@ const permissions = ref([]);
 const permissionsLoading = ref(false);
 const permissionsError = ref("");
 
+const versionsPageSize = 10;
+const versionsPage = ref(1);
+
 /*
   Store computed
 */
@@ -80,6 +83,15 @@ const sortedVersions = computed(() => {
     const bTime = new Date(b.createdAt).getTime() || 0;
     return bTime - aTime;
   });
+});
+
+const versionsPageCount = computed(() =>
+  Math.max(1, Math.ceil(sortedVersions.value.length / versionsPageSize))
+);
+
+const paginatedVersions = computed(() => {
+  const start = (versionsPage.value - 1) * versionsPageSize;
+  return sortedVersions.value.slice(start, start + versionsPageSize);
 });
 
 /*
@@ -146,13 +158,42 @@ const getReadmeContent = (assets) => {
   return key ? assets[key] : "";
 };
 
+const rawContentBase = (sourceUrl) => {
+  const info = parseGitHubRepo(sourceUrl);
+  if (!info) return null;
+  return `https://raw.githubusercontent.com/${info.owner}/${info.repo}/HEAD/`;
+};
+
+const resolveAssetUrl = (src, sourceUrl) => {
+  if (!src) return src;
+  // GitHub blob URLs → raw URLs (so the image renders inline)
+  const blobMatch = src.match(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/
+  );
+  if (blobMatch) {
+    return `https://raw.githubusercontent.com/${blobMatch[1]}/${blobMatch[2]}/${blobMatch[3]}`;
+  }
+  // Already absolute (http/https/data/blob) — leave alone
+  if (/^(https?:|data:|blob:)/i.test(src)) return src;
+  // Relative — resolve against repo raw content
+  const base = rawContentBase(sourceUrl);
+  if (!base) return src;
+  return base + src.replace(/^\.?\//, "");
+};
+
 const renderReadme = (markdown) => {
   if (!markdown) {
     readmeHtml.value = "";
     return;
   }
-  const html = marked.parse(markdown);
-  readmeHtml.value = DOMPurify.sanitize(html);
+  const rawHtml = marked.parse(markdown);
+  const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+  const sourceUrl = detail.value?.sourceUrl;
+  doc.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (src) img.setAttribute("src", resolveAssetUrl(src, sourceUrl));
+  });
+  readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
 
 /*
@@ -182,6 +223,7 @@ const loadDetail = async (uuid) => {
   readmeHtml.value = "";
   detailError.value = "";
   permissionsError.value = "";
+  versionsPage.value = 1;
   if (!uuid) return;
   detailLoading.value = true;
   permissionsLoading.value = true;
@@ -396,7 +438,7 @@ const deleteApplicationHandler = async () => {
               No versions yet
             </div>
             <div
-              v-for="version in sortedVersions"
+              v-for="version in paginatedVersions"
               :key="version.uuid"
               class="version-card"
             >
@@ -434,6 +476,17 @@ const deleteApplicationHandler = async () => {
                 </div>
               </div>
             </div>
+            <el-pagination
+              v-if="versionsPageCount > 1"
+              class="versions-pagination"
+              :page-size="versionsPageSize"
+              :pager-count="5"
+              :current-page="versionsPage"
+              layout="prev, pager, next"
+              :total="sortedVersions.length"
+              small
+              @current-change="versionsPage = $event"
+            />
           </el-collapse-item>
         </el-collapse>
       </div>
@@ -870,5 +923,12 @@ const deleteApplicationHandler = async () => {
 
 .perm-role {
   text-transform: capitalize;
+}
+
+.versions-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  --el-pagination-hover-color: #{theme.$purple_3};
 }
 </style>
