@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import StageActions from "../../shared/StageActions/StageActions.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 
 
@@ -12,6 +11,9 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 */
 const searchQuery = ref("");
 const visibilityFilter = ref("all");
+
+const pageSize = 10;
+const currentPage = ref(1);
 
 const visibilityOptions = [
   { label: "All", value: "all" },
@@ -136,6 +138,15 @@ const filteredApplications = computed(() => {
   );
 });
 
+const paginatedApplications = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredApplications.value.slice(start, start + pageSize);
+});
+
+watch(filteredApplications, () => {
+  currentPage.value = 1;
+});
+
 /*
   Status helpers
 */
@@ -163,86 +174,148 @@ const goToDetail = (app) => {
 </script>
 
 <template>
-  <div class="applications-grid-page">
-    <!-- Header -->
-    <div class="builder-header">
-      <stage-actions>
-        <template #left>
-          <el-input
-            v-model="searchQuery"
-            placeholder="Search applications..."
-            size="small"
-            clearable
-            class="search-input"
-          />
-          <div class="status-buttons">
-            <button
-              v-for="option in visibilityOptions"
-              :key="option.value"
-              class="filter-btn"
-              :class="{ active: visibilityFilter === option.value }"
-              @click="visibilityFilter = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </template>
-      </stage-actions>
-    </div>
-
-    <!-- Card Grid -->
-    <div v-if="filteredApplications.length > 0" class="card-grid">
-      <div
-        v-for="app in filteredApplications"
-        :key="app.uuid"
-        class="app-card"
-        @click="goToDetail(app)"
-      >
-        <div class="card-body">
-          <div class="card-name">{{ repoName(app) }}</div>
-          <div class="card-description">
-            {{ readmePreviews[app.uuid] || '' }}
-          </div>
-          <div class="card-spacer" />
-          <div class="card-meta">
-            <span
-              class="status-badge"
-              :class="statusBadgeClass(latestVersion(app)?.status)"
-            >
-              {{ statusLabel(latestVersion(app)?.status) }}
-            </span>
-            <span class="meta-text">{{ app.visibility || 'unknown' }}</span>
-            <span class="meta-text">
-              {{ new Date(app.createdAt).toLocaleDateString() }}
-            </span>
-          </div>
-        </div>
-        <div v-if="(app.versions || []).length > 0" class="card-footer">
-          <span class="metric-item">
-            <span class="metric-value">{{ (app.versions || []).length }}</span>
-            <span class="metric-label">versions</span>
-          </span>
-          <span class="metric-divider" />
-          <span class="metric-item">
-            <span class="metric-value">{{ totalDeployments(app) }}</span>
-            <span class="metric-label">deployments</span>
-          </span>
-          <span class="metric-divider" />
-          <span class="metric-item">
-            <span class="metric-value">{{ latestVersion(app)?.version || '--' }}</span>
-            <span class="metric-label">latest</span>
-          </span>
-        </div>
+  <div class="applications-container">
+    <!-- Info Section -->
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Applications</h3>
+        <p>
+          Browse the applications available in this workspace. Each
+          application is sourced from a GitHub repository published to the
+          Pennsieve App Store and can be wired into compute workflows.
+        </p>
+        <p class="info-note">
+          <strong>Want to create a new application?</strong>
+          Open
+          <router-link :to="{ name: 'my-code' }" class="info-link">
+            My Workspace &rsaquo; My Code
+          </router-link>
+          and enable
+          <strong>Publishing &rsaquo; App Store</strong>
+          in the publishing settings for the repository you'd like to
+          publish.
+        </p>
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-else class="empty-state">
-      <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-      <span v-if="applications.length === 0">No applications yet</span>
-      <span v-else>No applications match your filters</span>
-    </div>
+    <!-- Applications Section -->
+    <div class="applications-section">
+      <div class="applications-section-header">
+        <h3>Applications</h3>
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search applications..."
+          size="default"
+          clearable
+          class="applications-search-input"
+        />
+      </div>
 
+      <div class="status-buttons">
+        <button
+          v-for="option in visibilityOptions"
+          :key="option.value"
+          class="filter-btn"
+          :class="{ active: visibilityFilter === option.value }"
+          @click="visibilityFilter = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+
+      <div v-if="filteredApplications.length > 0" class="applications-grid">
+        <div
+          v-for="app in paginatedApplications"
+          :key="app.uuid"
+          class="app-card"
+          @click="goToDetail(app)"
+        >
+          <div class="app-header">
+            <div class="app-info">
+              <h3>
+                <button
+                  type="button"
+                  class="app-name-link"
+                  @click.stop="goToDetail(app)"
+                >
+                  {{ repoName(app) }}
+                </button>
+              </h3>
+              <div class="app-subtitle">Application</div>
+              <div v-if="readmePreviews[app.uuid]" class="app-description">
+                {{ readmePreviews[app.uuid] }}
+              </div>
+              <div class="app-tags">
+                <span
+                  class="status-badge"
+                  :class="statusBadgeClass(latestVersion(app)?.status)"
+                >
+                  {{ statusLabel(latestVersion(app)?.status) }}
+                </span>
+                <span
+                  class="tag visibility"
+                  :class="(app.visibility || 'unknown').toLowerCase()"
+                >
+                  {{ app.visibility || 'Unknown' }}
+                </span>
+                <span class="tag created">
+                  {{ new Date(app.createdAt).toLocaleDateString() }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-card-actions">
+            <div class="app-metrics">
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ (app.versions || []).length }}
+                </span>
+                <span class="metric-label">versions</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">{{ totalDeployments(app) }}</span>
+                <span class="metric-label">deployments</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ latestVersion(app)?.version || '--' }}
+                </span>
+                <span class="metric-label">latest</span>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="card-action-link"
+              @click.stop="goToDetail(app)"
+            >
+              <span>View details</span>
+              <span class="arrow">&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="filteredApplications.length === 0" class="empty-state">
+        <IconAnalysis :width="48" :height="48" color="#9ca3af" />
+        <span v-if="applications.length === 0">No applications yet</span>
+        <span v-else>No applications match your filters</span>
+      </div>
+
+      <el-pagination
+        v-if="filteredApplications.length > 0"
+        class="applications-pagination"
+        :page-size="pageSize"
+        :pager-count="5"
+        :current-page="currentPage"
+        layout="prev, pager, next"
+        :total="filteredApplications.length"
+        @current-change="currentPage = $event"
+      />
+    </div>
   </div>
 </template>
 
@@ -250,31 +323,91 @@ const goToDetail = (app) => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
-.applications-grid-page {
-  height: calc(100vh - 112px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.applications-container {
+  max-width: 1000px;
+  margin: 0;
   padding: 16px 24px;
 }
 
-.builder-header {
+.info-section {
+  margin-bottom: 32px;
+}
+
+.info-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 24px;
+
+  h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 12px 0;
+  }
+
+  p {
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+    margin: 0 0 12px 0;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .info-note {
+    background: rgba(theme.$purple_1, 0.08);
+    border-left: 3px solid theme.$purple_1;
+    padding: 12px 16px;
+    margin: 12px 0 0 0;
+    border-radius: 4px;
+    color: theme.$gray_6;
+
+    strong {
+      color: theme.$gray_6;
+    }
+  }
+
+  .info-link {
+    color: theme.$purple_3;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.applications-section {
+  margin-bottom: 48px;
+}
+
+.applications-section-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 24px;
-  background-color: theme.$white;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h3 {
+    font-size: 20px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0;
+  }
 }
 
-.search-input {
-  max-width: 300px;
+.applications-search-input {
+  max-width: 320px;
 }
 
 .status-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 16px;
+  margin-bottom: 16px;
 }
 
 .filter-btn {
@@ -301,66 +434,113 @@ const goToDetail = (app) => {
   }
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  grid-auto-rows: max-content;
-  gap: 24px;
-  padding: 24px 0;
-  flex: 1;
-  overflow-y: auto;
+.applications-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .app-card {
-  background: theme.$white;
+  background: white;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
+  padding: 20px;
+  transition: border-color 0.2s ease;
   cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 
   &:hover {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(80, 57, 247, 0.15);
+    border-color: theme.$gray_3;
   }
 }
 
-.card-body {
+.app-header {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.app-info {
   flex: 1;
+  min-width: 0;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
+  }
 }
 
-.card-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: theme.$black;
+.app-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$gray_6;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: theme.$purple_2;
+    text-decoration: underline;
+  }
 }
 
-.card-description {
+.app-subtitle {
   font-size: 13px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
+  margin-bottom: 6px;
+  font-weight: 400;
+}
+
+.app-description {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin: 4px 0 8px 0;
   line-height: 1.4;
-  min-height: calc(1.4em * 2);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.card-spacer {
-  flex: 1;
-}
-
-.card-meta {
+.app-tags {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    &.visibility {
+      &.private {
+        background: rgba(#EF4444, 0.1);
+        color: #DC2626;
+      }
+      &.public {
+        background: rgba(#10B981, 0.1);
+        color: #059669;
+      }
+      &.unknown {
+        background: theme.$gray_2;
+        color: theme.$gray_5;
+      }
+    }
+
+    &.created {
+      background: theme.$gray_1;
+      color: theme.$gray_5;
+    }
+  }
 }
 
 .status-badge {
@@ -378,19 +558,21 @@ const goToDetail = (app) => {
   &.badge-red { background: #fee2e2; color: #b91c1c; }
 }
 
-.meta-text {
-  color: theme.$gray_4;
-  text-transform: capitalize;
-}
-
-.card-footer {
+.app-card-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid theme.$gray_2;
-  background: theme.$gray_1;
-  border-radius: 0 0 3px 3px;
+  flex-wrap: wrap;
+}
+
+.app-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .metric-item {
@@ -416,14 +598,51 @@ const goToDetail = (app) => {
   background: theme.$gray_3;
 }
 
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
+  }
+}
+
+.applications-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  --el-pagination-hover-color: #{theme.$purple_3};
+}
+
 .empty-state {
-  flex: 1;
+  text-align: center;
+  padding: 32px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  color: theme.$gray_5;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 12px;
-  color: theme.$gray_4;
-  font-size: 14px;
 }
 </style>

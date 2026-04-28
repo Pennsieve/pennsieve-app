@@ -270,8 +270,8 @@ onMounted(fetchApps)
               </div>
             </div>
             <div class="app-header-actions">
-              <span v-if="isAppDeleting(app.uuid)" class="deleting-pill">
-                Deleting...
+              <span v-if="isAppDeleting(app.uuid)" class="archiving-pill">
+                Archiving...
               </span>
               <span
                 v-else-if="latestVersion(app)"
@@ -381,7 +381,7 @@ onMounted(fetchApps)
       </div>
 
       <el-pagination
-        v-if="filteredApplications.length > pageSize"
+        v-if="filteredApplications.length > 0"
         class="apps-pagination"
         :page-size="pageSize"
         :pager-count="5"
@@ -526,7 +526,7 @@ onMounted(fetchApps)
   }
 }
 
-.deleting-pill {
+.archiving-pill {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 10px;

@@ -314,6 +314,18 @@ watch(
               </div>
             </div>
 
+            <div class="info-actions">
+              <router-link
+                :to="{
+                  name: 'published-app-details',
+                  params: { uuid: detail.uuid },
+                }"
+                class="text-link-btn"
+              >
+                Manage in My Workspace &rarr;
+              </router-link>
+            </div>
+
           </el-collapse-item>
 
           <el-collapse-item

@@ -452,8 +452,8 @@ const confirmDelete = async () => {
         <div class="app-header-top">
           <h1>{{ repoName }}</h1>
           <div class="app-header-status">
-            <span v-if="isAppDeleting" class="deleting-pill">
-              Deleting...
+            <span v-if="isAppDeleting" class="archiving-pill">
+              Archiving...
             </span>
             <span
               v-if="detail.visibility"
@@ -745,18 +745,17 @@ const confirmDelete = async () => {
         <div class="delete-content">
           <div class="delete-info">
             <p>
-              Permanently remove this application from the Pennsieve App Store.
-              Workflows that reference this application will no longer be able
-              to run it.
+              Archive this application to remove it from active workspaces.
+              Workflows that reference this application will no longer be
+              able to run it, but the underlying record is preserved.
             </p>
           </div>
-          <bf-button
-            class="danger-button"
-            :disabled="isDeleting"
-            @click="showDeleteDialog = true"
-          >
-            Delete Application
-          </bf-button>
+          <div class="danger-action">
+            <bf-button class="danger-button" disabled>
+              Archive Application
+            </bf-button>
+            <span class="coming-soon-tag">Coming Soon</span>
+          </div>
         </div>
       </div>
     </div>
@@ -926,7 +925,7 @@ const confirmDelete = async () => {
   gap: 8px;
 }
 
-.deleting-pill {
+.archiving-pill {
   font-size: 11px;
   font-weight: 600;
   padding: 4px 12px;
@@ -1104,6 +1103,32 @@ const confirmDelete = async () => {
     color: theme.$gray_5;
     line-height: 1.5;
   }
+}
+
+.danger-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  .danger-button[disabled],
+  :deep(.bf-button.danger-button:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.coming-soon-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 12px;
+  line-height: 1.2;
 }
 
 .delete-app-dialog {

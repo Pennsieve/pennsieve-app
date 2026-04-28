@@ -162,7 +162,7 @@
                       </div>
 
                       <el-pagination
-                        v-if="totalRepoCount > pageSize"
+                        v-if="totalRepoCount > 0"
                         class="repos-pagination"
                         :page-size="pageSize"
                         :pager-count="5"
