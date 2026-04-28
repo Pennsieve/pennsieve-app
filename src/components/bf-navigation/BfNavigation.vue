@@ -8,32 +8,38 @@
     ]"
     :style="{ backgroundImage: `${workspaceBackgroundStyle}` }"
   >
-    <div class="logo-wrap">
-      <router-link v-if="!pageNotFound && !isWorkspaceGuest" tag="button" :to="logoRoute">
-        <component
-          :is="MarkComponent"
+    <div class="nav-top">
+      <component
+        v-if="!pageNotFound"
+        :is="isWorkspaceGuest ? 'button' : 'router-link'"
+        :to="!isWorkspaceGuest ? logoRoute : null"
+        class="workspace-switcher"
+        :title="activeOrganizationName"
+      >
+        <span class="workspace-avatar">
+          <component
+            :is="MarkComponent"
+            :width="14"
+            :height="14"
+            :class="['logo-mark', logoClass]"
+            color="currentColor"
+          />
+        </span>
+        <span
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
-          color="currentColor"
-        />
-      </router-link>
-      <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
-        <component
-          :is="MarkComponent"
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
-          color="currentColor"
-        />
-      </button>
-      <a v-else :href="logoLink">
-        <pennsieve-mark
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          :width="24"
-          :height="24"
-          color="currentColor"
+          class="workspace-switcher-name"
         >
-        </pennsieve-mark>
+          {{ activeOrganizationName }}
+        </span>
+      </component>
+      <a v-else :href="logoLink" class="workspace-switcher fallback">
+        <span class="workspace-avatar">
+          <pennsieve-mark
+            :width="14"
+            :height="14"
+            color="currentColor"
+          />
+        </span>
       </a>
       <button
         v-show="!secondaryNavOpen && !pageNotFound"
@@ -43,29 +49,21 @@
       >
         <IconNavCollapse
           :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
+          :width="primaryNavCondensed ? 24 : 20"
+          :height="primaryNavCondensed ? 24 : 20"
           color="#fff"
           class="collapse"
         >
         </IconNavCollapse>
         <IconNavExpand
           :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
+          :width="primaryNavCondensed ? 24 : 20"
+          :height="primaryNavCondensed ? 24 : 20"
           color="#fff"
           class="collapse"
         >
         </IconNavExpand>
       </button>
-    </div>
-
-    <div
-      v-show="!pageNotFound && (!primaryNavCondensed || secondaryNavOpen)"
-      class="workspace-banner"
-    >
-      <span class="workspace-banner-eyebrow">Workspace</span>
-      <span class="workspace-banner-title">{{ activeOrganizationName }}</span>
     </div>
 
     <div class="menu-wrap">
@@ -447,19 +445,90 @@ export default {
   }
 }
 
-.logo-wrap {
-  align-items: center;
+.nav-top {
   display: flex;
-  height: 20px;
-  flex-direction: row;
-  padding: 0 20px;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 12px 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
   .condensed & {
+    padding: 12px 8px;
     justify-content: center;
-    padding: 0;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .btn-expand-collapse {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    color: #fff;
+
+    &:hover, &:focus {
+      opacity: .75;
+    }
   }
 }
+
+.workspace-switcher {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.15s ease;
+
+  &:hover, &:focus {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .condensed & {
+    flex: 0 0 auto;
+    padding: 4px;
+  }
+}
+
+.workspace-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .logo-mark {
+    color: #fff;
+  }
+}
+
+.workspace-switcher-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #fff;
+  word-break: break-word;
+}
+
 
 .logo-arrow {
   color: theme.$app-primary-color;
@@ -507,9 +576,6 @@ export default {
     height: auto;
   }
 }
-.logo-wrap {
-  margin: 18px 0;
-}
 .logo-arrow {
   color: theme.$white;
 }
@@ -525,32 +591,4 @@ export default {
   transform: translate3d(-100%, 0, 0);
 }
 
-.workspace-banner {
-  margin-top: 14px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.workspace-banner-eyebrow {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 600;
-}
-
-.workspace-banner-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 </style>

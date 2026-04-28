@@ -5,16 +5,26 @@
       primaryNavCondensed || secondaryNavOpen ? 'condensed' : '',
     ]"
   >
-    <div class="logo-wrap">
-      <router-link tag="button" :to="{ name: 'home' }">
-        <icon-pennsieve-mark
+    <div class="nav-top">
+      <button
+        type="button"
+        class="workspace-switcher"
+        title="My Workspace"
+      >
+        <span class="workspace-avatar">
+          <icon-pennsieve-mark
+            :width="14"
+            :height="14"
+            color="currentColor"
+          />
+        </span>
+        <span
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          :width="24"
-          :height="24"
-          color="currentColor"
-        />
-      </router-link>
+          class="workspace-switcher-name"
+        >
+          My Workspace
+        </span>
+      </button>
       <button
         v-show="!secondaryNavOpen"
         class="btn-expand-collapse"
@@ -23,27 +33,19 @@
       >
         <IconNavCollapse
           :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
+          :width="primaryNavCondensed ? 24 : 20"
+          :height="primaryNavCondensed ? 24 : 20"
           color="#fff"
           class="collapse"
         />
         <IconNavExpand
           :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
+          :width="primaryNavCondensed ? 24 : 20"
+          :height="primaryNavCondensed ? 24 : 20"
           color="#fff"
           class="collapse"
         />
       </button>
-    </div>
-
-    <div
-      v-show="!primaryNavCondensed || secondaryNavOpen"
-      class="workspace-banner"
-    >
-      <span class="workspace-banner-eyebrow">Workspace</span>
-      <span class="workspace-banner-title">My Workspace</span>
     </div>
 
     <div class="menu-wrap">
@@ -224,25 +226,27 @@ export default {
     .menu-wrap {
       margin: 0 0 16px -6px;
     }
-    
-    .logo-wrap {
-      padding: 20px 12px;
+
+    .nav-top {
+      padding: 12px 8px;
       justify-content: center;
+      gap: 4px;
+    }
+
+    .workspace-switcher {
+      padding: 4px;
     }
   }
 
-  .logo-wrap {
-    padding: 20px 16px;
+  .nav-top {
+    padding: 14px 12px 14px 16px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-
-    .logo {
-      color: #fff;
-    }
+    align-items: flex-start;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
     .btn-expand-collapse {
+      flex-shrink: 0;
       background: none;
       border: none;
       cursor: pointer;
@@ -250,36 +254,57 @@ export default {
       align-items: center;
       justify-content: center;
       padding: 4px;
-      
+      border-radius: 4px;
+      color: #fff;
+
       &:hover, &:focus {
         opacity: .75;
       }
     }
   }
 
-  .workspace-banner {
-    padding: 14px 16px;
+  .workspace-switcher {
+    flex: 1;
+    min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.08);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: center;
+    gap: 10px;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+
+    &:hover, &:focus {
+      background: rgba(255, 255, 255, 0.08);
+    }
   }
 
-  .workspace-banner-eyebrow {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: rgba(255, 255, 255, 0.65);
-    font-weight: 600;
+  .workspace-avatar {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .workspace-banner-title {
+  .workspace-switcher-name {
+    flex: 1;
+    min-width: 0;
     font-size: 14px;
     font-weight: 600;
+    line-height: 1.25;
     color: #fff;
-    line-height: 1.2;
+    word-break: break-word;
   }
+
 
   .menu-wrap {
     flex: 1;
