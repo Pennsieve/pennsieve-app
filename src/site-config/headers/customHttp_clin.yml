@@ -36,6 +36,8 @@ customHeaders:
             https://api.pennsieve.org
             https://api2.pennsieve.org
             https://assets.discover.pennsieve.org
+            https://raw.githubusercontent.com
+            https://*.githubusercontent.com
             https://stats.g.doubleclick.net
             https://maps.gstatic.com
             https://www.google-analytics.com
