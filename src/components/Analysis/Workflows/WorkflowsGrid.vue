@@ -9,11 +9,9 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 const store = useStore();
 const router = useRouter();
 
-const searchQuery = ref("");
 const statusFilter = ref("active");
 const pageSize = ref(10);
 const currentPage = ref(1);
-const isSearching = ref(false);
 const isLoadingMore = ref(false);
 
 const workflows = computed(
@@ -165,7 +163,6 @@ const loadMore = async () => {
   isLoadingMore.value = true;
   try {
     await fetchWorkflows({
-      search: searchQuery.value.trim() || undefined,
       cursor: nextCursor.value,
       append: true,
     });
@@ -174,27 +171,13 @@ const loadMore = async () => {
   }
 };
 
-// Debounced server-side search
-let searchTimer = null;
-watch(searchQuery, (val) => {
-  clearTimeout(searchTimer);
-  isSearching.value = true;
-  searchTimer = setTimeout(async () => {
-    try {
-      await fetchWorkflows({ search: val.trim() || undefined });
-    } finally {
-      isSearching.value = false;
-    }
-  }, 300);
-});
-
 // Re-fetch when page size or status filter changes
 watch(pageSize, () => {
-  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
+  fetchWorkflows();
 });
 
 watch(statusFilter, () => {
-  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
+  fetchWorkflows();
 });
 
 onMounted(async () => {
@@ -223,13 +206,6 @@ onMounted(async () => {
     <div class="workflows-section">
       <div class="workflows-section-header">
         <h3>Workflows</h3>
-        <el-input
-          v-model="searchQuery"
-          placeholder="Search workflows..."
-          size="default"
-          clearable
-          class="workflows-search-input"
-        />
       </div>
 
       <div class="status-buttons">
@@ -330,10 +306,7 @@ onMounted(async () => {
 
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-        <span v-if="isSearching">Searching...</span>
-        <span v-else-if="workflows.length === 0 && !searchQuery">
-          No workflows yet
-        </span>
+        <span v-if="workflows.length === 0">No workflows yet</span>
         <span v-else>No workflows match your filters</span>
       </div>
 
@@ -354,7 +327,6 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
-@use "../../../styles/element/input";
 
 .workflows-container {
   max-width: 1000px;
@@ -407,10 +379,6 @@ onMounted(async () => {
     color: theme.$gray_6;
     margin: 0;
   }
-}
-
-.workflows-search-input {
-  max-width: 320px;
 }
 
 .status-buttons {

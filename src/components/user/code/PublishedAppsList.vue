@@ -18,7 +18,6 @@ const deletingApplications = computed(
 const isAppDeleting = (uuid) => deletingApplications.value.includes(uuid)
 const isLoading = ref(false)
 const expandedApps = ref(new Set())
-const searchQuery = ref('')
 
 const pageSize = 10
 const currentPage = ref(1)
@@ -33,16 +32,7 @@ const parseGitHubDisplay = (sourceUrl) => {
 const repoName = (app) =>
   parseGitHubDisplay(app.sourceUrl) || 'Unknown repo'
 
-const filteredApplications = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return applications.value
-  return applications.value.filter((app) => {
-    return (
-      repoName(app).toLowerCase().includes(q) ||
-      (app.sourceUrl || '').toLowerCase().includes(q)
-    )
-  })
-})
+const filteredApplications = computed(() => applications.value)
 
 const paginatedApplications = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -50,8 +40,6 @@ const paginatedApplications = computed(() => {
 })
 
 watch(filteredApplications, () => {
-  // Reset to first page whenever the filter result changes so the user
-  // doesn't end up on a now-empty page after typing.
   currentPage.value = 1
 })
 
@@ -187,14 +175,6 @@ onMounted(fetchApps)
     <div class="apps-section" v-loading="isLoading">
       <div class="apps-section-header">
         <h3>Published Applications</h3>
-        <el-input
-          v-if="applications.length > 0"
-          v-model="searchQuery"
-          placeholder="Search applications..."
-          size="default"
-          clearable
-          class="apps-search-input"
-        />
       </div>
 
       <div
@@ -205,16 +185,6 @@ onMounted(fetchApps)
           No applications published yet. Enable
           <strong>Publish to App Store</strong> in a repository's publishing
           settings above to get started.
-        </p>
-      </div>
-
-      <div
-        v-else-if="filteredApplications.length === 0"
-        class="empty-state"
-      >
-        <p>
-          No applications match
-          <strong>"{{ searchQuery }}"</strong>.
         </p>
       </div>
 
@@ -464,10 +434,6 @@ onMounted(fetchApps)
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
-}
-
-.apps-search-input {
-  max-width: 320px;
 }
 
 .apps-pagination {

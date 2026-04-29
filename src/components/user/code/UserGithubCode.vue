@@ -146,7 +146,7 @@
                       class="empty-state"
                     >
                       <p>
-                        No repositories on this page match
+                        No repositories match
                         <strong>"{{ reposSearchQuery }}"</strong>.
                       </p>
                     </div>
@@ -154,7 +154,7 @@
                     <template v-else>
                       <div class="repos-grid">
                         <code-repo-list-item
-                          v-for="repo in filteredRepositories"
+                          v-for="repo in paginatedRepositories"
                           :key="repo.id"
                           :repo="repo"
                           @manage-settings="openPublishingDialog"
@@ -162,13 +162,13 @@
                       </div>
 
                       <el-pagination
-                        v-if="totalRepoCount > 0"
+                        v-if="filteredRepositories.length > 0"
                         class="repos-pagination"
                         :page-size="pageSize"
                         :pager-count="5"
                         :current-page="currentPage"
                         layout="prev, pager, next"
-                        :total="totalRepoCount"
+                        :total="filteredRepositories.length"
                         @current-change="onPaginationPageChange"
                       />
                     </template>
@@ -306,6 +306,24 @@ export default {
         return name.includes(q) || desc.includes(q) || lang.includes(q)
       })
     },
+
+    paginatedRepositories() {
+      const start = (this.currentPage - 1) * this.pageSize
+      return this.filteredRepositories.slice(start, start + this.pageSize)
+    },
+  },
+
+  watch: {
+    '$route.query.tab'(val) {
+      this.activeTab = val === 'published' ? 'published' : 'repositories'
+    },
+    reposSearchQuery() {
+      // Reset to first page so a query shorter than the current page
+      // doesn't strand the user on an empty page.
+      if (this.currentPage !== 1) {
+        this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', 1)
+      }
+    },
   },
 
   mounted() {
@@ -316,13 +334,6 @@ export default {
       this.activeTab = 'published'
     }
     this.fetchGithubProfile()
-  },
-
-  watch: {
-    '$route.query.tab'(val) {
-      if (val === 'published') this.activeTab = 'published'
-      if (val === 'repositories') this.activeTab = 'repositories'
-    },
   },
 
   methods: {
@@ -360,16 +371,10 @@ export default {
     },
 
     async fetchRepositories() {
-      console.log('fetchRepositories called in component')
       this.reposLoading = true
 
       try {
-        console.log('About to dispatch fetchMyRepos with:', { page: this.currentPage, size: this.pageSize })
-        await this.$store.dispatch('codeReposModule/fetchMyRepos', {
-          page: this.currentPage,
-          size: this.pageSize
-        })
-        console.log('fetchMyRepos dispatch completed')
+        await this.$store.dispatch('codeReposModule/fetchAllMyRepos')
         // Load published applications so repo cards can deep-link into the
         // application detail view when publishing_to_appstore is on.
         this.$store
@@ -379,7 +384,6 @@ export default {
           )
       } catch (err) {
         console.error('Error fetching repositories:', err)
-        // Store handles setting empty state on error
       } finally {
         this.reposLoading = false
         this.refreshing = false
@@ -436,8 +440,8 @@ export default {
     },
 
     onPaginationPageChange(page) {
+      // All repos are already loaded; just update the current page locally.
       this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', page)
-      this.fetchRepositories()
     },
 
     openPublishingDialog(repo) {

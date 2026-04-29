@@ -59,6 +59,54 @@ export const actions = {
     This method fetches github repos that belong to the authenticated user. 
     Use this data to populate the MyRepos view. 
   */
+  /*
+    Fetches every repo for the authenticated user by paging through the
+    /repositories endpoint until the full list is collected. Used by the
+    My Repositories tab so client-side pagination operates over the full
+    set instead of only the current page.
+  */
+  fetchAllMyRepos: async ({ commit, rootState }) => {
+    try {
+      const token = await useGetToken()
+      const baseUrl = `${rootState.config.api2Url}/repositories`
+      const myHeaders = new Headers()
+      myHeaders.append('Authorization', 'Bearer ' + token)
+      myHeaders.append('Accept', 'application/json')
+
+      const fetchSize = 100
+      let page = 1
+      let total = 0
+      const allRepos = []
+      const safetyCap = 50 // hard stop at 5,000 repos
+      while (page <= safetyCap) {
+        const response = await fetch(
+          `${baseUrl}?page=${page}&size=${fetchSize}`,
+          { headers: myHeaders }
+        )
+        if (!response.ok) {
+          throw new Error(response.statusText || `HTTP ${response.status}`)
+        }
+        const json = await response.json()
+        const repos = json.repos || []
+        total = typeof json.total === 'number' ? json.total : total
+        allRepos.push(...repos)
+        if (repos.length === 0 || allRepos.length >= total) break
+        page++
+      }
+
+      commit('SET_MY_REPOS', allRepos)
+      commit('SET_MY_REPOS_CURRENT_PAGE', 1)
+      commit('SET_MY_REPOS_COUNT', allRepos.length)
+      commit('SET_MY_REPOS_LOADED', true)
+    } catch (err) {
+      console.error('Error fetching all my repos:', err)
+      commit('SET_MY_REPOS', [])
+      commit('SET_MY_REPOS_COUNT', 0)
+      commit('SET_MY_REPOS_LOADED', false)
+      throw err
+    }
+  },
+
   fetchMyRepos: async({ commit, rootState }, { page, size }) => {
       // Fetch paginated repos for the MyRepos view.
       try {
