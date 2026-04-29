@@ -25,14 +25,8 @@ import {
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 
-
-const {
-  onNodeClick,
-  onPaneClick,
-  onConnect,
-  screenToFlowCoordinate,
-  fitView,
-} = useVueFlow();
+const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
+  useVueFlow();
 
 const props = defineProps({
   uuid: {
@@ -111,7 +105,9 @@ const hasAnyChanges = computed(() => {
   for (const node of nodes.value) {
     if (node.type === "default" && node.data?.defaultParams) {
       const current = JSON.stringify(node.data.defaultParams);
-      const original = JSON.stringify(originalDefaultParams.value[node.id] || {});
+      const original = JSON.stringify(
+        originalDefaultParams.value[node.id] || {},
+      );
       if (current !== original) return true;
     }
   }
@@ -147,9 +143,15 @@ const saveWorkflowChanges = async () => {
       detail: { type: "success", msg: "Workflow changes saved." },
     });
     // Refresh definition to get updated resolvedParams
-    const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflow.uuid);
+    const updated = await store.dispatch(
+      "analysisModule/fetchWorkflowDefinition",
+      workflow.uuid,
+    );
     store.commit("analysisModule/SET_SELECTED_WORKFLOW", updated);
-    const result = definitionToNodesAndEdges(updated, availableApplications.value);
+    const result = definitionToNodesAndEdges(
+      updated,
+      availableApplications.value,
+    );
     nodes.value = result.nodes;
     edges.value = result.edges;
     snapshotDefaultParams();
@@ -195,24 +197,33 @@ Global State
 */
 const store = useStore();
 const availableApplications = computed(
-  () => store.getters["analysisModule/applications"] || []
+  () => store.getters["analysisModule/applications"] || [],
 );
 const targetTypes = computed(
-  () => store.getters["analysisModule/targetTypes"] || []
+  () => store.getters["analysisModule/targetTypes"] || [],
 );
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
 
 const getUserName = (userId) => {
   if (!userId) return "Unknown";
-  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
-    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You";
+  if (
+    profile.value &&
+    (profile.value.id === userId || profile.value.intId === userId)
+  ) {
+    return (
+      `${profile.value.firstName} ${profile.value.lastName}`.trim() || "You"
+    );
   }
-  const member = orgMembers.value.find((m) => m.id === userId || m.intId === userId);
+  const member = orgMembers.value.find(
+    (m) => m.id === userId || m.intId === userId,
+  );
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
   }
-  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+  return String(userId).includes(":")
+    ? String(userId).split(":").pop()
+    : String(userId);
 };
 
 const getComputeTypesForTarget = (targetType) => {
@@ -289,9 +300,10 @@ const normalizeUrl = (url) => {
 const findAppByUrl = (applications, sourceUrl) => {
   if (!sourceUrl) return null;
   const normalized = normalizeUrl(sourceUrl);
-  return applications.find(
-    (app) => normalizeUrl(app.sourceUrl) === normalized
-  ) || null;
+  return (
+    applications.find((app) => normalizeUrl(app.sourceUrl) === normalized) ||
+    null
+  );
 };
 
 const parseGitHubDisplay = (sourceUrl) => {
@@ -302,7 +314,9 @@ const parseGitHubDisplay = (sourceUrl) => {
 };
 
 const repoName = (app) =>
-  parseGitHubDisplay(app?.sourceUrl) || extractRepoName(app?.sourceUrl) || "Unnamed";
+  parseGitHubDisplay(app?.sourceUrl) ||
+  extractRepoName(app?.sourceUrl) ||
+  "Unnamed";
 
 const latestVersion = (app) => {
   const versions = app?.versions || [];
@@ -310,7 +324,7 @@ const latestVersion = (app) => {
   return [...versions].sort(
     (a, b) =>
       (new Date(b.createdAt).getTime() || 0) -
-      (new Date(a.createdAt).getTime() || 0)
+      (new Date(a.createdAt).getTime() || 0),
   )[0];
 };
 
@@ -339,7 +353,7 @@ const definitionToNodesAndEdges = (workflow, applications) => {
 
   // Check if any node has a saved position
   const hasSavedPositions = processors.some(
-    (p) => p.position && typeof p.position.x === "number"
+    (p) => p.position && typeof p.position.x === "number",
   );
 
   // Build VueFlow nodes
@@ -369,19 +383,25 @@ const definitionToNodesAndEdges = (workflow, applications) => {
       data: {
         label,
         targetType: p.targetType || null,
-        computeType: p.computeType || (nodeType === "default"
-          ? (matchedApplication?.runtimeConfig?.computeTypes?.[0] || "standard")
-          : getComputeTypesForTarget(p.targetType)?.[0] || null),
-        cpu: String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
-        memory: String(p.memory || matchedApplication?.runtimeConfig?.memory || "") || "",
+        computeType:
+          p.computeType ||
+          (nodeType === "default"
+            ? matchedApplication?.runtimeConfig?.computeTypes?.[0] || "standard"
+            : getComputeTypesForTarget(p.targetType)?.[0] || null),
+        cpu:
+          String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
+        memory:
+          String(p.memory || matchedApplication?.runtimeConfig?.memory || "") ||
+          "",
         application: matchedApplication,
         defaultParams: p.defaultParams || {},
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
       },
-      position: hasSavedPositions && p.position
-        ? { x: p.position.x, y: p.position.y }
-        : { x: 0, y: 0 },
+      position:
+        hasSavedPositions && p.position
+          ? { x: p.position.x, y: p.position.y }
+          : { x: 0, y: 0 },
     };
   });
 
@@ -401,7 +421,11 @@ const definitionToNodesAndEdges = (workflow, applications) => {
     }
   }
 
-  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
+  return {
+    nodes: resultNodes,
+    edges: resultEdges,
+    needsAutoLayout: !hasSavedPositions,
+  };
 };
 
 const startEditDetails = () => {
@@ -478,7 +502,7 @@ const selectWorkflow = (workflow) => {
 
   const result = definitionToNodesAndEdges(
     workflow,
-    availableApplications.value
+    availableApplications.value,
   );
   nodes.value = result.nodes;
   edges.value = result.edges;
@@ -553,10 +577,14 @@ const onDrop = (event) => {
       data: {
         label: "Data Target",
         targetType:
-          targetTypes.value.length === 1 ? targetTypes.value[0].targetType : null,
+          targetTypes.value.length === 1
+            ? targetTypes.value[0].targetType
+            : null,
         computeType:
-          targetTypes.value.length === 1 && targetTypes.value[0].runtimeConfig?.computeTypes?.length
-            ? targetTypes.value[0].runtimeConfig.computeTypes[0] : null,
+          targetTypes.value.length === 1 &&
+          targetTypes.value[0].runtimeConfig?.computeTypes?.length
+            ? targetTypes.value[0].runtimeConfig.computeTypes[0]
+            : null,
       },
       position,
     };
@@ -598,7 +626,7 @@ onConnect((params) => {
 
   // Guard against duplicate edges
   const duplicate = edges.value.some(
-    (e) => e.source === params.source && e.target === params.target
+    (e) => e.source === params.source && e.target === params.target,
   );
   if (duplicate) return;
 
@@ -618,7 +646,7 @@ const removeNode = (nodeId) => {
 
   // Remove associated edges
   edges.value = edges.value.filter(
-    (edge) => edge.source !== nodeId && edge.target !== nodeId
+    (edge) => edge.source !== nodeId && edge.target !== nodeId,
   );
 
   // Remove node
@@ -688,7 +716,7 @@ const saveWorkflow = async () => {
   }
 
   const targetWithoutType = nodes.value.find(
-    (n) => n.type === "data-target" && !n.data.targetType
+    (n) => n.type === "data-target" && !n.data.targetType,
   );
   if (targetWithoutType) {
     // Select the node so the user can see which one needs a target type
@@ -744,7 +772,10 @@ const saveWorkflow = async () => {
     };
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
-    if (node.data.defaultParams && Object.keys(node.data.defaultParams).length > 0) {
+    if (
+      node.data.defaultParams &&
+      Object.keys(node.data.defaultParams).length > 0
+    ) {
       proc.defaultParams = node.data.defaultParams;
     }
     return proc;
@@ -793,7 +824,10 @@ onMounted(async () => {
     ]);
 
     if (props.uuid) {
-      const wf = await store.dispatch("analysisModule/fetchWorkflowDefinition", props.uuid);
+      const wf = await store.dispatch(
+        "analysisModule/fetchWorkflowDefinition",
+        props.uuid,
+      );
       if (wf) {
         selectWorkflow(wf);
       }
@@ -881,13 +915,12 @@ const openNodeSettings = (id) => {
           &larr; Workflows
         </router-link>
         <span class="header-breadcrumb-sep">/</span>
-        <span class="header-detail-name">{{ selectedWorkflow?.name || 'Workflow' }}</span>
+        <span class="header-detail-name">{{
+          selectedWorkflow?.name || "Workflow"
+        }}</span>
       </span>
       <div class="header-actions">
-        <bf-button
-          :disabled="!hasAnyChanges"
-          @click="saveWorkflowChanges"
-        >
+        <bf-button :disabled="!hasAnyChanges" @click="saveWorkflowChanges">
           Save Changes
         </bf-button>
       </div>
@@ -898,201 +931,221 @@ const openNodeSettings = (id) => {
       <div class="main-panel">
         <!-- Workflow Canvas -->
         <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
-        <div v-if="nodes.length === 0" class="empty-canvas">
-          <template v-if="mode === 'create'">
-            <h3>Drag items here to build your workflow</h3>
-            <p>
-              Drop data sources, applications, and data targets onto the canvas,
-              then connect them by dragging between handles
-            </p>
-          </template>
-          <template v-else>
-            <h3>No workflow loaded</h3>
-            <p>
-              Return to the workflows gallery to select a workflow
-            </p>
-          </template>
+          <div v-if="nodes.length === 0" class="empty-canvas">
+            <template v-if="mode === 'create'">
+              <h3>Drag items here to build your workflow</h3>
+              <p>
+                Drop data sources, applications, and data targets onto the
+                canvas, then connect them by dragging between handles
+              </p>
+            </template>
+            <template v-else>
+              <h3>No workflow loaded</h3>
+              <p>Return to the workflows gallery to select a workflow</p>
+            </template>
+          </div>
+
+          <div class="workflow-builder-flow">
+            <VueFlow
+              v-model:nodes="nodes"
+              v-model:edges="edges"
+              :default-viewport="{ zoom: 1 }"
+              :min-zoom="0.2"
+              :max-zoom="4"
+              :nodes-draggable="true"
+              :nodes-connectable="!isReadOnly"
+              :elements-selectable="true"
+              :pan-on-drag="true"
+              :zoom-on-scroll="true"
+            >
+              <Background pattern-color="#aaa" :gap="16" />
+              <Controls position="top-left" />
+
+              <div class="canvas-toolbar">
+                <button
+                  v-if="nodes.length > 0"
+                  class="auto-layout-btn"
+                  @click="autoLayout"
+                >
+                  Auto Layout
+                </button>
+              </div>
+
+              <template #node-default="{ data, id }">
+                <Handle id="target" type="target" :position="Position.Top" />
+                <div class="custom-node">
+                  <div class="node-header">
+                    <span class="node-title">{{ data.label }}</span>
+                    <button
+                      v-if="!isReadOnly"
+                      class="settings-btn"
+                      @click.stop="openNodeSettings(id)"
+                      title="Configure"
+                    >
+                      <IconPencil :width="12" :height="12" />
+                    </button>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div
+                    v-if="data.application && latestVersion(data.application)"
+                    class="node-description"
+                  >
+                    {{ (data.application.versions || []).length }}
+                    {{
+                      (data.application.versions || []).length === 1
+                        ? "version"
+                        : "versions"
+                    }}
+                    &middot; latest
+                    {{ latestVersion(data.application).version }}
+                  </div>
+                  <div class="node-resources">
+                    <template v-if="data.computeType !== 'lambda'">
+                      CPU: {{ data.cpu || "N/A" }} |
+                    </template>
+                    Memory:
+                    {{ data.memory ? formatResourceLabel(data.memory) : "N/A" }}
+                    <span v-if="data.computeType" class="runtime-tag">{{
+                      data.computeType
+                    }}</span>
+                  </div>
+                </div>
+                <Handle id="source" type="source" :position="Position.Bottom" />
+              </template>
+
+              <template #node-input="{ data, id }">
+                <Handle id="target" type="target" :position="Position.Top" />
+                <div class="custom-node input-node">
+                  <div class="node-header">
+                    <span class="node-title">{{ data.label }}</span>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div class="node-badge">Start</div>
+                  <div
+                    v-if="data.application && latestVersion(data.application)"
+                    class="node-description"
+                  >
+                    {{ (data.application.versions || []).length }}
+                    {{
+                      (data.application.versions || []).length === 1
+                        ? "version"
+                        : "versions"
+                    }}
+                    &middot; latest
+                    {{ latestVersion(data.application).version }}
+                  </div>
+                  <div
+                    v-if="data.application && data.application.visibility"
+                    class="node-resources"
+                  >
+                    Visibility: {{ data.application.visibility }}
+                  </div>
+                </div>
+                <Handle id="source" type="source" :position="Position.Bottom" />
+              </template>
+
+              <template #node-output="{ data, id }">
+                <Handle id="target" type="target" :position="Position.Top" />
+                <div class="custom-node output-node">
+                  <div class="node-header">
+                    <span class="node-title">{{ data.label }}</span>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div class="node-badge">End</div>
+                  <div
+                    v-if="data.application && latestVersion(data.application)"
+                    class="node-description"
+                  >
+                    {{ (data.application.versions || []).length }}
+                    {{
+                      (data.application.versions || []).length === 1
+                        ? "version"
+                        : "versions"
+                    }}
+                    &middot; latest
+                    {{ latestVersion(data.application).version }}
+                  </div>
+                  <div
+                    v-if="data.application && data.application.visibility"
+                    class="node-resources"
+                  >
+                    Visibility: {{ data.application.visibility }}
+                  </div>
+                </div>
+                <Handle id="source" type="source" :position="Position.Bottom" />
+              </template>
+
+              <!-- Data Source Node: output only (feeds into processors) -->
+              <template #node-data-source="{ data, id }">
+                <div class="custom-node data-source-node">
+                  <div class="node-header">
+                    <span class="node-type-badge source-badge">Source</span>
+                    <span class="node-title">{{ data.label }}</span>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+                <Handle id="source" type="source" :position="Position.Bottom" />
+              </template>
+
+              <!-- Data Target Node: input only (receives from processors) -->
+              <template #node-data-target="{ data, id }">
+                <Handle id="target" type="target" :position="Position.Top" />
+                <div class="custom-node data-target-node">
+                  <div class="node-header">
+                    <span class="node-type-badge target-badge">Target</span>
+                    <span class="node-title">{{
+                      getTargetTypeLabel(data.targetType)
+                    }}</span>
+                    <button
+                      v-if="!isReadOnly"
+                      class="settings-btn"
+                      @click.stop="openNodeSettings(id)"
+                      title="Configure"
+                    >
+                      <IconPencil :width="12" :height="12" />
+                    </button>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div class="node-body">
+                    <span v-if="data.computeType" class="runtime-tag">{{
+                      data.computeType
+                    }}</span>
+                  </div>
+                </div>
+              </template>
+            </VueFlow>
+          </div>
         </div>
-
-        <div class="workflow-builder-flow">
-          <VueFlow
-            v-model:nodes="nodes"
-            v-model:edges="edges"
-            :default-viewport="{ zoom: 1 }"
-            :min-zoom="0.2"
-            :max-zoom="4"
-            :nodes-draggable="true"
-            :nodes-connectable="!isReadOnly"
-            :elements-selectable="true"
-            :pan-on-drag="true"
-            :zoom-on-scroll="true"
-          >
-            <Background pattern-color="#aaa" :gap="16" />
-            <Controls position="top-left" />
-
-            <div class="canvas-toolbar">
-              <button
-                v-if="nodes.length > 0"
-                class="auto-layout-btn"
-                @click="autoLayout"
-              >
-                Auto Layout
-              </button>
-            </div>
-
-            <template #node-default="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node">
-                <div class="node-header">
-                  <span class="node-title">{{ data.label }}</span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="settings-btn"
-                    @click.stop="openNodeSettings(id)"
-                    title="Configure"
-                  >
-                    <IconPencil :width="12" :height="12" />
-                  </button>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
-                <div
-                  v-if="data.application && latestVersion(data.application)"
-                  class="node-description"
-                >
-                  {{ (data.application.versions || []).length }}
-                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
-                  &middot; latest {{ latestVersion(data.application).version }}
-                </div>
-                <div class="node-resources">
-                  <template v-if="data.computeType !== 'lambda'">
-                    CPU: {{ data.cpu || "N/A" }} |
-                  </template>
-                  Memory: {{ data.memory ? formatResourceLabel(data.memory) : "N/A" }}
-                  <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
-                </div>
-              </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
-            </template>
-
-            <template #node-input="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node input-node">
-                <div class="node-header">
-                  <span class="node-title">{{ data.label }}</span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
-                <div class="node-badge">Start</div>
-                <div
-                  v-if="data.application && latestVersion(data.application)"
-                  class="node-description"
-                >
-                  {{ (data.application.versions || []).length }}
-                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
-                  &middot; latest {{ latestVersion(data.application).version }}
-                </div>
-                <div
-                  v-if="data.application && data.application.visibility"
-                  class="node-resources"
-                >
-                  Visibility: {{ data.application.visibility }}
-                </div>
-              </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
-            </template>
-
-            <template #node-output="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node output-node">
-                <div class="node-header">
-                  <span class="node-title">{{ data.label }}</span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
-                <div class="node-badge">End</div>
-                <div
-                  v-if="data.application && latestVersion(data.application)"
-                  class="node-description"
-                >
-                  {{ (data.application.versions || []).length }}
-                  {{ (data.application.versions || []).length === 1 ? "version" : "versions" }}
-                  &middot; latest {{ latestVersion(data.application).version }}
-                </div>
-                <div
-                  v-if="data.application && data.application.visibility"
-                  class="node-resources"
-                >
-                  Visibility: {{ data.application.visibility }}
-                </div>
-              </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
-            </template>
-
-            <!-- Data Source Node: output only (feeds into processors) -->
-            <template #node-data-source="{ data, id }">
-              <div class="custom-node data-source-node">
-                <div class="node-header">
-                  <span class="node-type-badge source-badge">Source</span>
-                  <span class="node-title">{{ data.label }}</span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
-              </div>
-              <Handle id="source" type="source" :position="Position.Bottom" />
-            </template>
-
-            <!-- Data Target Node: input only (receives from processors) -->
-            <template #node-data-target="{ data, id }">
-              <Handle id="target" type="target" :position="Position.Top" />
-              <div class="custom-node data-target-node">
-                <div class="node-header">
-                  <span class="node-type-badge target-badge">Target</span>
-                  <span class="node-title">{{ getTargetTypeLabel(data.targetType) }}</span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="settings-btn"
-                    @click.stop="openNodeSettings(id)"
-                    title="Configure"
-                  >
-                    <IconPencil :width="12" :height="12" />
-                  </button>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
-                <div class="node-body">
-                  <span v-if="data.computeType" class="runtime-tag">{{ data.computeType }}</span>
-                </div>
-              </div>
-            </template>
-          </VueFlow>
-        </div>
-      </div>
       </div>
 
       <!-- Sidebar (Right) -->
@@ -1106,7 +1159,9 @@ const openNodeSettings = (id) => {
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
-                  <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
+                  <span class="info-value">{{
+                    selectedNode.data?.label || "Unnamed"
+                  }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Type</span>
@@ -1115,19 +1170,27 @@ const openNodeSettings = (id) => {
                 <template v-if="selectedNode.data?.application?.description">
                   <div class="info-row">
                     <span class="info-label">Description</span>
-                    <span class="info-value">{{ selectedNode.data.application.description }}</span>
+                    <span class="info-value">{{
+                      selectedNode.data.application.description
+                    }}</span>
                   </div>
                 </template>
-                <template v-if="selectedNode.data?.application?.applicationType">
+                <template
+                  v-if="selectedNode.data?.application?.applicationType"
+                >
                   <div class="info-row">
                     <span class="info-label">App Type</span>
-                    <span class="info-value">{{ selectedNode.data.application.applicationType }}</span>
+                    <span class="info-value">{{
+                      selectedNode.data.application.applicationType
+                    }}</span>
                   </div>
                 </template>
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
                     <span class="info-label">Target Type</span>
-                    <span class="info-value" v-if="isReadOnly">{{ getTargetTypeLabel(selectedNode.data.targetType) }}</span>
+                    <span class="info-value" v-if="isReadOnly">{{
+                      getTargetTypeLabel(selectedNode.data.targetType)
+                    }}</span>
                     <el-select
                       v-else
                       v-model="selectedNode.data.targetType"
@@ -1148,13 +1211,17 @@ const openNodeSettings = (id) => {
                 <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
                     <span class="info-label">Compute Type</span>
-                    <span class="info-value">{{ selectedNode.data.computeType }}</span>
+                    <span class="info-value">{{
+                      selectedNode.data.computeType
+                    }}</span>
                   </div>
                 </template>
               </div>
 
               <!-- Data target runtime config (editable in create mode) -->
-              <template v-if="selectedNode.type === 'data-target' && !isReadOnly">
+              <template
+                v-if="selectedNode.type === 'data-target' && !isReadOnly"
+              >
                 <h4 class="sidebar-section-title">Runtime Configuration</h4>
                 <div class="info-card">
                   <div class="info-row">
@@ -1165,7 +1232,9 @@ const openNodeSettings = (id) => {
                       class="info-inline-select"
                     >
                       <el-option
-                        v-for="ct in getComputeTypesForTarget(selectedNode.data.targetType)"
+                        v-for="ct in getComputeTypesForTarget(
+                          selectedNode.data.targetType,
+                        )"
                         :key="ct"
                         :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
                         :value="ct"
@@ -1176,24 +1245,43 @@ const openNodeSettings = (id) => {
               </template>
 
               <!-- Data target parameters -->
-              <template v-if="selectedNode.type === 'data-target' && selectedNode.data.targetType">
+              <template
+                v-if="
+                  selectedNode.type === 'data-target' &&
+                  selectedNode.data.targetType
+                "
+              >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
-                  <template v-if="getTargetTypeParams(selectedNode.data.targetType).length > 0">
+                  <template
+                    v-if="
+                      getTargetTypeParams(selectedNode.data.targetType).length >
+                      0
+                    "
+                  >
                     <div
-                      v-for="param in getTargetTypeParams(selectedNode.data.targetType)"
+                      v-for="param in getTargetTypeParams(
+                        selectedNode.data.targetType,
+                      )"
                       :key="param.name"
                       class="info-row"
                     >
                       <span class="info-label">
                         {{ param.name }}
-                        <span v-if="!param.defaultValue" class="param-required-badge">required at run</span>
+                        <span
+                          v-if="!param.defaultValue"
+                          class="param-required-badge"
+                          >required at run</span
+                        >
                       </span>
-                      <span v-if="isReadOnly" class="info-value param-value-truncate">
-                        {{ param.defaultValue || '—' }}
+                      <span
+                        v-if="isReadOnly"
+                        class="info-value param-value-truncate"
+                      >
+                        {{ param.defaultValue || "—" }}
                       </span>
                       <span v-else class="info-value">
-                        {{ param.defaultValue || '—' }}
+                        {{ param.defaultValue || "—" }}
                       </span>
                     </div>
                   </template>
@@ -1215,7 +1303,8 @@ const openNodeSettings = (id) => {
                       class="info-inline-select"
                     >
                       <el-option
-                        v-for="ct in (selectedNode.data.application?.runtimeConfig?.computeTypes || ['standard'])"
+                        v-for="ct in selectedNode.data.application
+                          ?.runtimeConfig?.computeTypes || ['standard']"
                         :key="ct"
                         :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
                         :value="ct"
@@ -1232,12 +1321,18 @@ const openNodeSettings = (id) => {
                         placeholder="Default"
                         clearable
                         class="info-inline-select"
-                        @change="() => { selectedNode.data.memory = '' }"
+                        @change="
+                          () => {
+                            selectedNode.data.memory = '';
+                          }
+                        "
                       >
                         <el-option
                           v-for="cpu in FARGATE_CPU_OPTIONS"
                           :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(
+                            cpu >= 1024 ? 0 : 2,
+                          )} vCPU)`"
                           :value="cpu"
                         />
                       </el-select>
@@ -1253,7 +1348,9 @@ const openNodeSettings = (id) => {
                         class="info-inline-select"
                       >
                         <el-option
-                          v-for="mem in getMemoryOptionsForCpu(selectedNode.data.cpu)"
+                          v-for="mem in getMemoryOptionsForCpu(
+                            selectedNode.data.cpu,
+                          )"
                           :key="mem"
                           :label="formatResourceLabel(mem)"
                           :value="mem"
@@ -1274,7 +1371,9 @@ const openNodeSettings = (id) => {
                         <el-option
                           v-for="cpu in FARGATE_CPU_OPTIONS"
                           :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(cpu >= 1024 ? 0 : 2)} vCPU)`"
+                          :label="`${cpu} (${(cpu / 1024).toFixed(
+                            cpu >= 1024 ? 0 : 2,
+                          )} vCPU)`"
                           :value="cpu"
                         />
                       </el-select>
@@ -1287,7 +1386,11 @@ const openNodeSettings = (id) => {
                         placeholder="Default"
                         clearable
                         class="info-inline-select"
-                        @change="(val) => { selectedNode.data.cpu = getCpuForMemory(val) }"
+                        @change="
+                          (val) => {
+                            selectedNode.data.cpu = getCpuForMemory(val);
+                          }
+                        "
                       >
                         <el-option
                           v-for="mem in LAMBDA_MEMORY_OPTIONS"
@@ -1298,14 +1401,21 @@ const openNodeSettings = (id) => {
                       </el-select>
                     </div>
                     <p class="runtime-note">
-                      Lambda allocates CPU proportionally to memory. CPU and Fargate memory settings are only applied if the run is overridden to execute as a standard processor.
+                      Lambda allocates CPU proportionally to memory. CPU and
+                      Fargate memory settings are only applied if the run is
+                      overridden to execute as a standard processor.
                     </p>
                   </template>
                 </div>
               </template>
 
               <!-- Parameters for processor nodes -->
-              <template v-if="selectedNode.type === 'default' && selectedNodeParamSchema.length > 0">
+              <template
+                v-if="
+                  selectedNode.type === 'default' &&
+                  selectedNodeParamSchema.length > 0
+                "
+              >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
                   <div
@@ -1316,52 +1426,94 @@ const openNodeSettings = (id) => {
                     <span class="info-label">
                       {{ param.name }}
                       <el-tooltip
-                        v-if="param.defaultValue == null && !selectedNode.data.defaultParams?.[param.name]"
+                        v-if="
+                          param.defaultValue == null &&
+                          !selectedNode.data.defaultParams?.[param.name]
+                        "
                         content="No default — must be set here or at run time"
                         placement="left"
                       >
-                        <span class="param-required-badge">required at run</span>
+                        <span class="param-required-badge"
+                          >required at run</span
+                        >
                       </el-tooltip>
                     </span>
                     <!-- Has app default: show value with edit toggle -->
                     <template v-if="param.defaultValue != null">
-                      <template v-if="param.name in selectedNode.data.defaultParams">
+                      <template
+                        v-if="param.name in selectedNode.data.defaultParams"
+                      >
                         <div class="param-edit-row">
                           <el-input
-                            :model-value="selectedNode.data.defaultParams[param.name]"
+                            :model-value="
+                              selectedNode.data.defaultParams[param.name]
+                            "
                             size="small"
                             :placeholder="param.defaultValue"
                             class="info-inline-select"
-                            @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                            @update:model-value="
+                              (val) => {
+                                selectedNode.data.defaultParams[param.name] =
+                                  val;
+                              }
+                            "
                           />
-                          <button class="param-revert-btn" title="Revert to app default" @click="clearDefaultParam(param.name)">&times;</button>
+                          <button
+                            class="param-revert-btn"
+                            title="Revert to app default"
+                            @click="clearDefaultParam(param.name)"
+                          >
+                            &times;
+                          </button>
                         </div>
                       </template>
                       <template v-else>
-                        <span class="param-default-display" @click="selectedNode.data.defaultParams[param.name] = param.defaultValue">
+                        <span
+                          class="param-default-display"
+                          @click="
+                            selectedNode.data.defaultParams[param.name] =
+                              param.defaultValue
+                          "
+                        >
                           {{ param.defaultValue }}
-                          <span class="param-edit-icon" title="Override">&#9998;</span>
+                          <span class="param-edit-icon" title="Override"
+                            >&#9998;</span
+                          >
                         </span>
                       </template>
                     </template>
                     <!-- No app default: always show input -->
                     <template v-else>
                       <el-input
-                        v-if="!param.validValues || param.validValues.length === 0"
-                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        v-if="
+                          !param.validValues || param.validValues.length === 0
+                        "
+                        :model-value="
+                          selectedNode.data.defaultParams[param.name] ?? ''
+                        "
                         size="small"
                         placeholder="Set default..."
                         class="info-inline-select"
-                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                        @update:model-value="
+                          (val) => {
+                            selectedNode.data.defaultParams[param.name] = val;
+                          }
+                        "
                       />
                       <el-select
                         v-else
-                        :model-value="selectedNode.data.defaultParams[param.name] ?? ''"
+                        :model-value="
+                          selectedNode.data.defaultParams[param.name] ?? ''
+                        "
                         size="small"
                         placeholder="Select..."
                         clearable
                         class="info-inline-select"
-                        @update:model-value="(val) => { selectedNode.data.defaultParams[param.name] = val }"
+                        @update:model-value="
+                          (val) => {
+                            selectedNode.data.defaultParams[param.name] = val;
+                          }
+                        "
                       >
                         <el-option
                           v-for="v in param.validValues"
@@ -1381,12 +1533,16 @@ const openNodeSettings = (id) => {
                 <div class="info-card">
                   <div class="info-row">
                     <span class="info-label">ID</span>
-                    <span class="info-value info-url">{{ selectedNodeProcessor.id }}</span>
+                    <span class="info-value info-url">{{
+                      selectedNodeProcessor.id
+                    }}</span>
                   </div>
                   <template v-if="selectedNodeProcessor.sourceUrl">
                     <div class="info-row">
                       <span class="info-label">Source URL</span>
-                      <span class="info-value info-url">{{ selectedNodeProcessor.sourceUrl }}</span>
+                      <span class="info-value info-url">{{
+                        selectedNodeProcessor.sourceUrl
+                      }}</span>
                     </div>
                   </template>
                   <div class="info-row">
@@ -1397,7 +1553,8 @@ const openNodeSettings = (id) => {
                           v-for="dep in selectedNodeDependencies"
                           :key="dep.id"
                           class="dep-tag"
-                        >{{ dep.label }}</span>
+                          >{{ dep.label }}</span
+                        >
                       </template>
                       <template v-else>None</template>
                     </span>
@@ -1412,19 +1569,25 @@ const openNodeSettings = (id) => {
                   <template v-if="selectedNode.data.application.source.url">
                     <div class="info-row">
                       <span class="info-label">Repository</span>
-                      <span class="info-value info-url">{{ selectedNode.data.application.source.url }}</span>
+                      <span class="info-value info-url">{{
+                        selectedNode.data.application.source.url
+                      }}</span>
                     </div>
                   </template>
                   <template v-if="selectedNode.data.application.source.branch">
                     <div class="info-row">
                       <span class="info-label">Branch</span>
-                      <span class="info-value">{{ selectedNode.data.application.source.branch }}</span>
+                      <span class="info-value">{{
+                        selectedNode.data.application.source.branch
+                      }}</span>
                     </div>
                   </template>
                   <template v-if="selectedNode.data.application.source.path">
                     <div class="info-row">
                       <span class="info-label">Path</span>
-                      <span class="info-value info-url">{{ selectedNode.data.application.source.path }}</span>
+                      <span class="info-value info-url">{{
+                        selectedNode.data.application.source.path
+                      }}</span>
                     </div>
                   </template>
                 </div>
@@ -1450,17 +1613,14 @@ const openNodeSettings = (id) => {
                     size="small"
                   />
                   <div class="info-edit-actions">
-                    <bf-button
-                      class="secondary"
-                      @click="cancelEditDetails"
-                    >
+                    <bf-button class="secondary" @click="cancelEditDetails">
                       Cancel
                     </bf-button>
                     <bf-button
                       :disabled="isSavingDetails || !editName.trim()"
                       @click="saveDetails"
                     >
-                      {{ isSavingDetails ? 'Saving...' : 'Save' }}
+                      {{ isSavingDetails ? "Saving..." : "Save" }}
                     </bf-button>
                   </div>
                 </div>
@@ -1473,37 +1633,54 @@ const openNodeSettings = (id) => {
                   </div>
                   <div class="info-row">
                     <span class="info-label">Description</span>
-                    <span class="info-value">{{ selectedWorkflow.description || 'No description' }}</span>
+                    <span class="info-value">{{
+                      selectedWorkflow.description || "No description"
+                    }}</span>
                   </div>
                   <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="info-value">
                       <span
                         class="status-dot"
-                        :class="selectedWorkflow.isActive ? 'active' : 'inactive'"
+                        :class="
+                          selectedWorkflow.isActive ? 'active' : 'inactive'
+                        "
                       />
-                      {{ selectedWorkflow.isActive ? 'Active' : 'Inactive' }}
+                      {{ selectedWorkflow.isActive ? "Active" : "Inactive" }}
                     </span>
                   </div>
                   <div class="info-row">
                     <span class="info-label">Nodes</span>
-                    <span class="info-value">{{ (selectedWorkflow.dag || []).length }}</span>
+                    <span class="info-value">{{
+                      (selectedWorkflow.dag || []).length
+                    }}</span>
                   </div>
                   <div class="info-row">
                     <span class="info-label">Created</span>
-                    <span class="info-value">{{ new Date(selectedWorkflow.createdAt).toLocaleDateString() }}</span>
+                    <span class="info-value">{{
+                      new Date(selectedWorkflow.createdAt).toLocaleDateString()
+                    }}</span>
                   </div>
                   <div v-if="selectedWorkflow.createdBy" class="info-row">
                     <span class="info-label">Created By</span>
-                    <span class="info-value">{{ getUserName(selectedWorkflow.createdBy) }}</span>
+                    <span class="info-value">{{
+                      getUserName(selectedWorkflow.createdBy)
+                    }}</span>
                   </div>
                 </div>
                 <div class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
                     Edit name & description
                   </button>
-                  <button class="text-link-btn archive-btn" @click="toggleArchive">
-                    {{ selectedWorkflow.isActive ? 'Archive workflow' : 'Activate workflow' }}
+                  <button
+                    class="text-link-btn archive-btn"
+                    @click="toggleArchive"
+                  >
+                    {{
+                      selectedWorkflow.isActive
+                        ? "Archive workflow"
+                        : "Activate workflow"
+                    }}
                   </button>
                 </div>
               </template>
@@ -1545,7 +1722,11 @@ const openNodeSettings = (id) => {
           </el-collapse-item>
 
           <!-- Data & Applications Section (create mode only) -->
-          <el-collapse-item v-if="mode === 'create'" title="Data & Applications" name="data-and-apps">
+          <el-collapse-item
+            v-if="mode === 'create'"
+            title="Data & Applications"
+            name="data-and-apps"
+          >
             <!-- Data Section -->
             <h4 class="sidebar-section-title">Data</h4>
             <div class="data-items-list">
@@ -1558,9 +1739,7 @@ const openNodeSettings = (id) => {
                 <IconFile class="data-item-icon" :width="20" :height="20" />
                 <div class="data-item-info">
                   <div class="data-item-name">Source</div>
-                  <div class="data-item-description">
-                    Select input sookurces
-                  </div>
+                  <div class="data-item-description">Select input sources</div>
                 </div>
               </div>
               <div
@@ -1576,18 +1755,14 @@ const openNodeSettings = (id) => {
                 />
                 <div class="data-item-info">
                   <div class="data-item-name">Target</div>
-                  <div class="data-item-description">
-                    Select output target
-                  </div>
+                  <div class="data-item-description">Select output target</div>
                 </div>
               </div>
             </div>
 
             <!-- Applications Section -->
             <h4 class="sidebar-section-title">Applications</h4>
-            <div v-if="isLoading" class="loading">
-              Loading applications...
-            </div>
+            <div v-if="isLoading" class="loading">Loading applications...</div>
             <div v-else class="applications-list">
               <div
                 v-for="app in availableApplications"
@@ -1600,13 +1775,14 @@ const openNodeSettings = (id) => {
                 <IconAnalysis class="app-icon" :width="20" :height="20" />
                 <div class="app-info">
                   <div class="app-name">{{ repoName(app) }}</div>
-                  <span
-                    v-if="app.visibility"
-                    class="app-type-badge"
-                  >{{ app.visibility }}</span>
+                  <span v-if="app.visibility" class="app-type-badge">{{
+                    app.visibility
+                  }}</span>
                   <div class="app-description">
                     {{ (app.versions || []).length }}
-                    {{ (app.versions || []).length === 1 ? "version" : "versions" }}
+                    {{
+                      (app.versions || []).length === 1 ? "version" : "versions"
+                    }}
                     <template v-if="latestVersion(app)">
                       &middot; latest {{ latestVersion(app).version }}
                     </template>
@@ -1643,10 +1819,18 @@ const openNodeSettings = (id) => {
   .vue-flow__node {
     --node-border-color: #cccccc;
 
-    &:has(.input-node) { --node-border-color: #17BB62; }
-    &:has(.output-node) { --node-border-color: #17BB62; }
-    &:has(.data-source-node) { --node-border-color: #6366f1; }
-    &:has(.data-target-node) { --node-border-color: #64748b; }
+    &:has(.input-node) {
+      --node-border-color: #17bb62;
+    }
+    &:has(.output-node) {
+      --node-border-color: #17bb62;
+    }
+    &:has(.data-source-node) {
+      --node-border-color: #6366f1;
+    }
+    &:has(.data-target-node) {
+      --node-border-color: #64748b;
+    }
   }
 
   .vue-flow__handle {
@@ -1701,7 +1885,6 @@ const openNodeSettings = (id) => {
     }
   }
 }
-
 </style>
 
 <style lang="scss" scoped>
@@ -2308,7 +2491,8 @@ const openNodeSettings = (id) => {
       align-items: center;
       transition: color 0.15s, background 0.15s;
 
-      &:hover, &.active {
+      &:hover,
+      &.active {
         color: #64748b;
         background: rgba(100, 116, 139, 0.1);
       }
@@ -2438,7 +2622,6 @@ const openNodeSettings = (id) => {
   line-height: 1.4;
   font-style: italic;
 }
-
 
 .info-url {
   font-family: monospace;
