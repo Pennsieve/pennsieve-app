@@ -254,6 +254,8 @@ const isCurrentUser = (id) =>
   !!id &&
   (id === profile.value?.id || id === profile.value?.intId)
 
+const isAppOwner = computed(() => isCurrentUser(detail.value?.ownerId))
+
 const removeEditUser = (idx) => {
   const user = editUsers.value[idx]
   if (user && isCurrentUser(user.entityId)) return
@@ -611,11 +613,24 @@ const confirmDelete = async () => {
                 :loading="isSavingPermissions"
               >Save</bf-button>
             </template>
-            <bf-button
+            <el-tooltip
               v-else
-              class="secondary small"
-              @click="startEditingPermissions"
-            >Edit</bf-button>
+              :content="
+                isAppOwner
+                  ? ''
+                  : 'Only Application Owners Can Update Permissions'
+              "
+              placement="top"
+              :disabled="isAppOwner"
+            >
+              <span class="edit-permissions-wrap">
+                <bf-button
+                  class="secondary small"
+                  :disabled="!isAppOwner"
+                  @click="isAppOwner && startEditingPermissions()"
+                >Edit</bf-button>
+              </span>
+            </el-tooltip>
           </div>
         </div>
 
@@ -753,9 +768,21 @@ const confirmDelete = async () => {
             </p>
           </div>
           <div class="danger-action">
-            <bf-button class="danger-button" disabled>
-              Archive Application
-            </bf-button>
+            <el-tooltip
+              :content="
+                isAppOwner
+                  ? ''
+                  : 'Only Application Owners Can Archive Applications'
+              "
+              placement="top"
+              :disabled="isAppOwner"
+            >
+              <span class="archive-button-wrap">
+                <bf-button class="danger-button" disabled>
+                  Archive Application
+                </bf-button>
+              </span>
+            </el-tooltip>
             <span class="coming-soon-tag">Coming Soon</span>
           </div>
         </div>
@@ -1322,6 +1349,25 @@ const confirmDelete = async () => {
 .section-header .section-actions {
   display: flex;
   gap: 8px;
+}
+
+// Wrappers around disabled buttons so el-tooltip still receives hover
+// events (disabled buttons swallow them in some browsers). Heavily dim
+// the inner button so it reads unmistakably disabled.
+.edit-permissions-wrap,
+.archive-button-wrap {
+  display: inline-flex;
+
+  :deep(button[disabled]),
+  :deep(.bf-button:disabled),
+  :deep(.bf-button.is-disabled) {
+    opacity: 0.4;
+    background-color: theme.$gray_2 !important;
+    border-color: theme.$gray_3 !important;
+    color: theme.$gray_4 !important;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 }
 
 .permissions-edit {
