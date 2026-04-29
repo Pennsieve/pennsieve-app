@@ -1,23 +1,25 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { propOr } from "ramda";
 
-import BfButton from "../../shared/bf-button/BfButton.vue";
-import StageActions from "../../shared/StageActions/StageActions.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
-import IconLink from "../../icons/IconLink.vue";
-import CreateApplicationDialog from "./CreateApplicationDialog.vue";
 
 
 /*
   Local State
 */
 const searchQuery = ref("");
-const sortField = ref("name");
-const selectedTags = ref([]);
-const addApplicationDialogVisible = ref(false);
+const visibilityFilter = ref("all");
+
+const pageSize = 10;
+const currentPage = ref(1);
+
+const visibilityOptions = [
+  { label: "All", value: "all" },
+  { label: "Public", value: "public" },
+  { label: "Private", value: "private" },
+];
 
 /*
   Store computed
@@ -28,61 +30,135 @@ const router = useRouter();
 const applications = computed(
   () => store.state.analysisModule.applications || []
 );
-const activeOrganization = computed(() => store.state.activeOrganization);
-
-const hasAdminRights = computed(() => {
-  if (activeOrganization.value) {
-    const isAdmin = propOr(false, "isAdmin", activeOrganization.value);
-    const isOwner = propOr(false, "isOwner", activeOrganization.value);
-    return isAdmin || isOwner;
-  }
-  return false;
-});
 
 /*
-  Tags
+  Derived helpers
 */
-const availableTags = computed(() => {
-  return [...new Set(applications.value.flatMap((a) => a.tags || []))];
-});
+const parseGitHubRepo = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+  if (!match) return null;
+  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
+};
 
-const toggleTag = (tag) => {
-  const idx = selectedTags.value.indexOf(tag);
-  if (idx >= 0) {
-    selectedTags.value.splice(idx, 1);
-  } else {
-    selectedTags.value.push(tag);
+const parseGitHubDisplay = (sourceUrl) => {
+  const info = parseGitHubRepo(sourceUrl);
+  return info ? `${info.owner}/${info.repo}` : null;
+};
+
+const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
+
+const latestVersion = (app) => {
+  const versions = app.versions || [];
+  if (versions.length === 0) return null;
+  return [...versions].sort((a, b) => {
+    const aTime = new Date(a.createdAt).getTime() || 0;
+    const bTime = new Date(b.createdAt).getTime() || 0;
+    return bTime - aTime;
+  })[0];
+};
+
+const totalDeployments = (app) =>
+  (app.versions || []).reduce(
+    (sum, v) => sum + (v.deployments || []).length,
+    0
+  );
+
+/*
+  README previews (fetched lazily per app from GitHub)
+*/
+const readmePreviews = ref({});
+
+const stripMarkdown = (md) =>
+  md
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_`~>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const fetchReadmeFor = async (app) => {
+  if (!app?.uuid || readmePreviews.value[app.uuid] !== undefined) return;
+  const info = parseGitHubRepo(app.sourceUrl);
+  if (!info) {
+    readmePreviews.value[app.uuid] = "";
+    return;
+  }
+  readmePreviews.value[app.uuid] = "";
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
+      { headers: { Accept: "application/vnd.github.v3.json" } }
+    );
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const decoded = new TextDecoder().decode(
+      Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) =>
+        c.charCodeAt(0)
+      )
+    );
+    readmePreviews.value[app.uuid] = stripMarkdown(decoded);
+  } catch {
+    // leave preview empty
   }
 };
 
+watch(
+  applications,
+  (apps) => {
+    (apps || []).forEach((app) => fetchReadmeFor(app));
+  },
+  { immediate: true }
+);
+
+const visibilityLabel = (app) => {
+  if (typeof app?.isPrivate !== "boolean") return null;
+  return app.isPrivate ? "Private" : "Public";
+};
+
 /*
-  Filtered & sorted applications
+  Filtered & sorted applications (newest first, matching workflows)
 */
 const filteredApplications = computed(() => {
   let list = applications.value;
 
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
-    list = list.filter(
-      (app) =>
-        (app.name || "").toLowerCase().includes(q) ||
-        (app.description || "").toLowerCase().includes(q)
-    );
-  }
-
-  if (selectedTags.value.length > 0) {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
     list = list.filter((app) => {
-      const appTags = app.tags || [];
-      return selectedTags.value.every((t) => appTags.includes(t));
+      const url = (app.sourceUrl || "").toLowerCase();
+      const name = repoName(app).toLowerCase();
+      const visibility = (visibilityLabel(app) || "").toLowerCase();
+      const latest = (latestVersion(app)?.version || "").toLowerCase();
+      return (
+        url.includes(q) ||
+        name.includes(q) ||
+        visibility.includes(q) ||
+        latest.includes(q)
+      );
     });
   }
 
-  const field = sortField.value;
-  return [...list].sort((a, b) => {
-    const aVal = (a[field] || "").toLowerCase();
-    const bVal = (b[field] || "").toLowerCase();
-    return aVal.localeCompare(bVal);
-  });
+  if (visibilityFilter.value !== "all") {
+    list = list.filter(
+      (app) => (visibilityLabel(app) || "").toLowerCase() === visibilityFilter.value
+    );
+  }
+
+  return [...list].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+});
+
+const paginatedApplications = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredApplications.value.slice(start, start + pageSize);
+});
+
+watch(filteredApplications, () => {
+  currentPage.value = 1;
 });
 
 /*
@@ -90,28 +166,17 @@ const filteredApplications = computed(() => {
 */
 const statusBadgeClass = (status) => {
   if (!status) return "badge-gray";
-  if (["deployed", "active"].includes(status)) return "badge-green";
-  if (["registering", "deploying", "re-deploying", "pending"].includes(status))
+  const s = status.toLowerCase();
+  if (["deployed", "active", "running"].includes(s)) return "badge-green";
+  if (["registering", "deploying", "re-deploying", "pending"].includes(s))
     return "badge-blue";
-  if (status.startsWith("error")) return "badge-red";
+  if (s.startsWith("error") || s === "stopped") return "badge-red";
   return "badge-gray";
 };
 
 const statusLabel = (status) => {
   if (!status) return "Unknown";
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
-
-/*
-  GitHub display
-*/
-const parseGitHubDisplay = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  const owner = match[1];
-  const repo = match[2].replace(/\.git$/, "");
-  return `${owner}/${repo}`;
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 };
 
 /*
@@ -120,129 +185,153 @@ const parseGitHubDisplay = (sourceUrl) => {
 const goToDetail = (app) => {
   router.push({ name: "application-detail", params: { uuid: app.uuid } });
 };
-
-/*
-  Dialog handlers
-*/
-const openCreateApplicationDialog = () => {
-  addApplicationDialogVisible.value = true;
-};
-
-const onCloseAddDialog = () => {
-  addApplicationDialogVisible.value = false;
-};
-
-const onAddApplicationConfirm = (application) => {
-  store.dispatch("analysisModule/createApplication", application);
-};
 </script>
 
 <template>
-  <div class="applications-grid-page">
-    <!-- Header -->
-    <div class="builder-header">
-      <stage-actions>
-        <template #left>
-          <el-input
-            v-model="searchQuery"
-            placeholder="Search applications..."
-            size="small"
-            clearable
-            class="search-input"
-          />
-          <div class="sort-buttons">
-            <button
-              class="filter-btn"
-              :class="{ active: sortField === 'name' }"
-              @click="sortField = 'name'"
-            >
-              Name
-            </button>
-            <button
-              class="filter-btn"
-              :class="{ active: sortField === 'status' }"
-              @click="sortField = 'status'"
-            >
-              Status
-            </button>
-          </div>
-          <div v-if="availableTags.length > 0" class="tag-chips">
-            <button
-              v-for="tag in availableTags"
-              :key="tag"
-              class="tag-chip"
-              :class="{ selected: selectedTags.includes(tag) }"
-              @click="toggleTag(tag)"
-            >
-              {{ tag }}
-            </button>
-          </div>
-        </template>
-        <template #right>
-          <bf-button
-            :disabled="!hasAdminRights"
-            @click="openCreateApplicationDialog"
-          >
-            + New Application
-          </bf-button>
-        </template>
-      </stage-actions>
-    </div>
-
-    <!-- Card Grid -->
-    <div v-if="filteredApplications.length > 0" class="card-grid">
-      <div
-        v-for="app in filteredApplications"
-        :key="app.uuid"
-        class="app-card"
-        @click="goToDetail(app)"
-      >
-        <div class="card-name">{{ app.name }}</div>
-        <div v-if="app.description" class="card-description">
-          {{ app.description }}
-        </div>
-        <div class="card-status">
-          <span
-            class="status-badge"
-            :class="statusBadgeClass(app.status)"
-          >
-            {{ statusLabel(app.status) }}
-          </span>
-        </div>
-        <div v-if="(app.tags || []).length > 0" class="card-tags">
-          <span v-for="tag in app.tags" :key="tag" class="tag-pill">
-            {{ tag }}
-          </span>
-        </div>
-        <div class="card-spacer" />
-        <a
-          v-if="parseGitHubDisplay(app.source?.url)"
-          :href="app.source.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="card-github-link"
-          @click.stop
-        >
-          <IconLink :width="12" :height="12" />
-          {{ parseGitHubDisplay(app.source.url) }}
-        </a>
+  <div class="applications-container">
+    <!-- Info Section -->
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Applications</h3>
+        <p>
+          Browse the applications available in this workspace. Each
+          application is sourced from a GitHub repository published to the
+          Pennsieve App Store and can be wired into compute workflows.
+        </p>
+        <p class="info-note">
+          <strong>Want to create a new application?</strong>
+          Open
+          <router-link :to="{ name: 'my-code' }" class="info-link">
+            My Workspace &rsaquo; My Code
+          </router-link>
+          and enable
+          <strong>Publishing &rsaquo; App Store</strong>
+          in the publishing settings for the repository you'd like to
+          publish.
+        </p>
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-else class="empty-state">
-      <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-      <span v-if="applications.length === 0">No applications yet</span>
-      <span v-else>No applications match your filters</span>
-    </div>
+    <!-- Applications Section -->
+    <div class="applications-section">
+      <div class="applications-section-header">
+        <h3>Applications</h3>
+        <el-input
+          v-if="applications.length > 0"
+          v-model="searchQuery"
+          placeholder="Search applications..."
+          size="default"
+          clearable
+          class="applications-search-input"
+        />
+      </div>
 
-    <!-- Create Dialog -->
-    <create-application-dialog
-      :dialog-visible="addApplicationDialogVisible"
-      applicationType="Application"
-      @add-application="onAddApplicationConfirm"
-      @close="onCloseAddDialog"
-    />
+      <div class="status-buttons">
+        <button
+          v-for="option in visibilityOptions"
+          :key="option.value"
+          class="filter-btn"
+          :class="{ active: visibilityFilter === option.value }"
+          @click="visibilityFilter = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+
+      <div v-if="filteredApplications.length > 0" class="applications-grid">
+        <div
+          v-for="app in paginatedApplications"
+          :key="app.uuid"
+          class="app-card"
+          @click="goToDetail(app)"
+        >
+          <div class="app-header">
+            <div class="app-info">
+              <h3>
+                <button
+                  type="button"
+                  class="app-name-link"
+                  @click.stop="goToDetail(app)"
+                >
+                  {{ repoName(app) }}
+                </button>
+              </h3>
+              <div class="app-subtitle">Application</div>
+              <div v-if="readmePreviews[app.uuid]" class="app-description">
+                {{ readmePreviews[app.uuid] }}
+              </div>
+              <div class="app-tags">
+                <span
+                  class="status-badge"
+                  :class="statusBadgeClass(latestVersion(app)?.status)"
+                >
+                  {{ statusLabel(latestVersion(app)?.status) }}
+                </span>
+                <span
+                  v-if="visibilityLabel(app)"
+                  class="tag visibility"
+                  :class="visibilityLabel(app).toLowerCase()"
+                >
+                  {{ visibilityLabel(app) }}
+                </span>
+                <span class="tag created">
+                  {{ new Date(app.createdAt).toLocaleDateString() }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-card-actions">
+            <div class="app-metrics">
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ (app.versions || []).length }}
+                </span>
+                <span class="metric-label">versions</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">{{ totalDeployments(app) }}</span>
+                <span class="metric-label">deployments</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ latestVersion(app)?.version || '--' }}
+                </span>
+                <span class="metric-label">latest</span>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="card-action-link"
+              @click.stop="goToDetail(app)"
+            >
+              <span>View details</span>
+              <span class="arrow">&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="filteredApplications.length === 0" class="empty-state">
+        <IconAnalysis :width="48" :height="48" color="#9ca3af" />
+        <span v-if="applications.length === 0">No applications yet</span>
+        <span v-else>No applications match your filters</span>
+      </div>
+
+      <el-pagination
+        v-if="filteredApplications.length > 0"
+        class="applications-pagination"
+        :page-size="pageSize"
+        :pager-count="5"
+        :current-page="currentPage"
+        layout="prev, pager, next"
+        :total="filteredApplications.length"
+        @current-change="currentPage = $event"
+      />
+    </div>
   </div>
 </template>
 
@@ -250,46 +339,91 @@ const onAddApplicationConfirm = (application) => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
-
-.applications-grid-page {
-  height: calc(100vh - 112px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.applications-container {
+  max-width: 1000px;
+  margin: 0;
+  padding: 16px 24px;
 }
 
-.builder-header {
+.info-section {
+  margin-bottom: 32px;
+}
+
+.info-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 24px;
+
+  h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 12px 0;
+  }
+
+  p {
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+    margin: 0 0 12px 0;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .info-note {
+    background: rgba(theme.$purple_1, 0.08);
+    border-left: 3px solid theme.$purple_1;
+    padding: 12px 16px;
+    margin: 12px 0 0 0;
+    border-radius: 4px;
+    color: theme.$gray_6;
+
+    strong {
+      color: theme.$gray_6;
+    }
+  }
+
+  .info-link {
+    color: theme.$purple_3;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.applications-section {
+  margin-bottom: 48px;
+}
+
+.applications-section-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  background-color: theme.$white;
-  min-height: 48px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
 
-  .header-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: theme.$black;
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
+  h3 {
+    font-size: 20px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0;
   }
 }
 
-.search-input {
-  max-width: 300px;
+.applications-search-input {
+  max-width: 320px;
 }
 
-.sort-buttons {
+.status-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 16px;
+  margin-bottom: 16px;
 }
 
 .filter-btn {
@@ -316,71 +450,71 @@ const onAddApplicationConfirm = (application) => {
   }
 }
 
-.tag-chips {
+.applications-grid {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-left: 16px;
-}
-
-.tag-chip {
-  padding: 4px 16px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 12px;
-  background: white;
-  color: theme.$gray_5;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: theme.$purple_1;
-  }
-
-  &.selected {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
-  padding: 24px;
-  flex: 1;
-  overflow-y: auto;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .app-card {
-  background: theme.$white;
+  background: white;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
   padding: 20px;
+  transition: border-color 0.2s ease;
   cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 160px;
 
   &:hover {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(80, 57, 247, 0.15);
+    border-color: theme.$gray_3;
   }
 }
 
-.card-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: theme.$black;
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.card-description {
+.app-info {
+  flex: 1;
+  min-width: 0;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
+  }
+}
+
+.app-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$gray_6;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: theme.$purple_2;
+    text-decoration: underline;
+  }
+}
+
+.app-subtitle {
   font-size: 13px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
+  margin-bottom: 6px;
+  font-weight: 400;
+}
+
+.app-description {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin: 4px 0 8px 0;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -388,8 +522,41 @@ const onAddApplicationConfirm = (application) => {
   overflow: hidden;
 }
 
-.card-status {
-  font-size: 12px;
+.app-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    &.visibility {
+      &.private {
+        background: rgba(#EF4444, 0.1);
+        color: #DC2626;
+      }
+      &.public {
+        background: rgba(#10B981, 0.1);
+        color: #059669;
+      }
+      &.unknown {
+        background: theme.$gray_2;
+        color: theme.$gray_5;
+      }
+    }
+
+    &.created {
+      background: theme.$gray_1;
+      color: theme.$gray_5;
+    }
+  }
 }
 
 .status-badge {
@@ -407,46 +574,91 @@ const onAddApplicationConfirm = (application) => {
   &.badge-red { background: #fee2e2; color: #b91c1c; }
 }
 
-.card-tags {
+.app-card-actions {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid theme.$gray_2;
   flex-wrap: wrap;
-  gap: 4px;
 }
 
-.tag-pill {
+.app-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.metric-item {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: theme.$black;
+}
+
+.metric-label {
   font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: theme.$gray_2;
-  color: theme.$gray_5;
+  color: theme.$gray_4;
 }
 
-.card-spacer {
-  flex: 1;
+.metric-divider {
+  width: 1px;
+  height: 14px;
+  background: theme.$gray_3;
 }
 
-.card-github-link {
+.card-action-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
   color: theme.$purple_3;
   text-decoration: none;
-  font-weight: 500;
+  cursor: pointer;
 
   &:hover {
     text-decoration: underline;
   }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
+  }
+}
+
+.applications-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  --el-pagination-hover-color: #{theme.$purple_3};
 }
 
 .empty-state {
-  flex: 1;
+  text-align: center;
+  padding: 32px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  color: theme.$gray_5;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 12px;
-  color: theme.$gray_4;
-  font-size: 14px;
 }
 </style>

@@ -121,6 +121,7 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      timeseriesAsset: null,
       isLoading: false,
       omeTiffSource: "",
       viewerInstanceId: VIEWER_INSTANCE_ID,
@@ -129,9 +130,10 @@ export default {
 
   watch: {
     pkg: {
-      handler: function (pkg) {
+      handler: async function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
           this.loadViewer(pkg);
+          await this.loadTimeseriesAsset();
           this.fetchTimeseriesData();
         }
       },
@@ -141,7 +143,26 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl']),
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
+
+    /**
+     * Look up the timeseries viewer asset (if any) for the current package
+     * so fetchTimeseriesData can pass its UUID to the viewer.
+     */
+    loadTimeseriesAsset: async function () {
+      this.timeseriesAsset = null;
+      const pkgId = this.pkg?.content?.id;
+      const datasetId = this.pkg?.content?.datasetNodeId;
+      if (!pkgId || !datasetId) return;
+      try {
+        const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+        if (result?.assets?.length > 0) {
+          this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null;
+        }
+      } catch (err) {
+        // Asset lookup failed — fetchTimeseriesData will fall back to packageId
+      }
+    },
 
     /**
      * Called when component is mounted
@@ -160,9 +181,10 @@ export default {
       viewerStore.setViewerConfig(viewerConfig)
 
       try {
-        const result = await viewerStore.fetchAndSetActiveViewer({
-          packageId: this.pkg?.content?.id,
-        })
+        const viewerAssetId = this.timeseriesAsset?.id || null
+        const packageId = this.pkg?.content?.id || null
+        if (!viewerAssetId && !packageId) return
+        const result = await viewerStore.fetchAndSetActiveViewer({ viewerAssetId, packageId })
         return result
       } finally {
         this.isLoading = false

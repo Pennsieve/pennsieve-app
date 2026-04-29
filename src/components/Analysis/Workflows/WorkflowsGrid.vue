@@ -5,18 +5,15 @@ import { useRouter } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
-import StageActions from "../../shared/StageActions/StageActions.vue";
 
 const store = useStore();
 const router = useRouter();
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const pageSize = ref(20);
-const isSearching = ref(false);
-const isLoadingMore = ref(false);
-
-const pageSizeOptions = [10, 20, 50, 100];
+const pageSize = ref(10);
+const currentPage = ref(1);
+const isLoadingAll = ref(false);
 
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
@@ -32,9 +29,31 @@ const filterOptions = [
 ];
 
 const filteredWorkflows = computed(() => {
-  return [...workflows.value].sort(
+  let list = [...workflows.value];
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
+    list = list.filter((wf) => {
+      const name = (wf.name || "").toLowerCase();
+      const desc = (wf.description || "").toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
+  }
+  return list.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
+});
+
+const paginatedWorkflows = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredWorkflows.value.slice(start, start + pageSize.value);
+});
+
+const onPageChange = (newPage) => {
+  currentPage.value = newPage;
+};
+
+watch(filteredWorkflows, () => {
+  currentPage.value = 1;
 });
 
 const getWorkflowMetrics = (wf) => {
@@ -58,6 +77,59 @@ const formatCost = (v) => {
   return `$${v.toFixed(2)}`;
 };
 
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return null;
+  const then = new Date(dateString).getTime();
+  if (Number.isNaN(then)) return null;
+  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  if (diffDay < 30) return `${Math.floor(diffDay / 7)}w ago`;
+  if (diffDay < 365) return `${Math.floor(diffDay / 30)}mo ago`;
+  return `${Math.floor(diffDay / 365)}y ago`;
+};
+
+const lastRunInfo = (wf) => {
+  const m = wf?.metrics;
+  const ts =
+    wf?.lastRunAt ||
+    m?.lastRunAt ||
+    m?.lastRunCompletedAt ||
+    m?.lastCompletedAt ||
+    null;
+  const status =
+    wf?.lastRunStatus || m?.lastRunStatus || m?.lastStatus || null;
+  const totalRuns = m?.totalRuns ?? 0;
+  if (totalRuns === 0) {
+    return { label: "Never run", statusKey: "gray" };
+  }
+  const rel = formatRelativeTime(ts);
+  return {
+    label: rel ? `Last run · ${rel}` : `${totalRuns} runs`,
+    statusKey: lastRunStatusKey(status, m?.successRate),
+  };
+};
+
+const lastRunStatusKey = (status, successRate) => {
+  if (status) {
+    const s = String(status).toLowerCase();
+    if (["succeeded", "success", "completed"].includes(s)) return "enabled";
+    if (["failed", "error", "errored"].includes(s)) return "failed";
+    if (["running", "pending", "queued"].includes(s)) return "pending";
+  }
+  if (typeof successRate === "number") {
+    if (successRate >= 75) return "enabled";
+    if (successRate < 25) return "failed";
+    return "pending";
+  }
+  return "gray";
+};
+
 const goToCreate = () => {
   router.push({ name: "workflow-create" });
 };
@@ -70,152 +142,192 @@ const getStatusParam = () => {
   return statusFilter.value !== "all" ? statusFilter.value : undefined;
 };
 
-const fetchWorkflows = async ({ search, cursor, append } = {}) => {
-  await store.dispatch("analysisModule/fetchWorkflows", {
-    search: search || undefined,
-    cursor: cursor || undefined,
-    limit: pageSize.value,
-    status: getStatusParam(),
-    append: !!append,
-  });
-};
+const ALL_FETCH_BATCH = 100;
+const ALL_FETCH_CAP = 50; // hard stop at 5,000 workflows
 
-const loadMore = async () => {
-  if (!nextCursor.value || isLoadingMore.value) return;
-  isLoadingMore.value = true;
+const fetchAllWorkflows = async () => {
+  if (isLoadingAll.value) return;
+  isLoadingAll.value = true;
   try {
-    await fetchWorkflows({
-      search: searchQuery.value.trim() || undefined,
-      cursor: nextCursor.value,
-      append: true,
+    // First batch replaces, subsequent batches append.
+    await store.dispatch("analysisModule/fetchWorkflows", {
+      cursor: undefined,
+      limit: ALL_FETCH_BATCH,
+      status: getStatusParam(),
+      append: false,
     });
+    let safety = ALL_FETCH_CAP;
+    while (nextCursor.value && safety-- > 0) {
+      await store.dispatch("analysisModule/fetchWorkflows", {
+        cursor: nextCursor.value,
+        limit: ALL_FETCH_BATCH,
+        status: getStatusParam(),
+        append: true,
+      });
+    }
   } finally {
-    isLoadingMore.value = false;
+    isLoadingAll.value = false;
   }
 };
 
-// Debounced server-side search
-let searchTimer = null;
-watch(searchQuery, (val) => {
-  clearTimeout(searchTimer);
-  isSearching.value = true;
-  searchTimer = setTimeout(async () => {
-    try {
-      await fetchWorkflows({ search: val.trim() || undefined });
-    } finally {
-      isSearching.value = false;
-    }
-  }, 300);
-});
-
-// Re-fetch when page size or status filter changes
-watch(pageSize, () => {
-  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
-});
-
+// Re-fetch all when status filter changes
 watch(statusFilter, () => {
-  fetchWorkflows({ search: searchQuery.value.trim() || undefined });
+  fetchAllWorkflows();
 });
 
 onMounted(async () => {
-  await fetchWorkflows();
+  await fetchAllWorkflows();
 });
 </script>
 
 <template>
-  <div class="workflows-grid-page">
-    <!-- Header -->
-    <div class="builder-header">
-      <stage-actions>
-        <template #left>
-          <el-input
-            v-model="searchQuery"
-            placeholder="Search workflows..."
-            size="small"
-            clearable
-            class="search-input"
-          />
-          <div class="status-buttons">
-            <button
-              v-for="option in filterOptions"
-              :key="option.value"
-              class="filter-btn"
-              :class="{ active: statusFilter === option.value }"
-              @click="statusFilter = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </template>
-        <template #right>
-          <bf-button @click="goToCreate">
-            + New Workflow
-          </bf-button>
-        </template>
-      </stage-actions>
-    </div>
-
-    <!-- Card Grid -->
-    <div v-if="filteredWorkflows.length > 0" class="card-grid">
-      <div
-        v-for="wf in filteredWorkflows"
-        :key="wf.uuid"
-        class="wf-card"
-        @click="goToDetail(wf)"
-      >
-        <div class="card-body">
-          <div class="card-name">{{ wf.name }}</div>
-          <div class="card-description">
-            {{ wf.description || '' }}
-          </div>
-          <div class="card-spacer" />
-          <div class="card-meta">
-            <span
-              class="status-badge"
-              :class="wf.isActive ? 'badge-green' : 'badge-gray'"
-            >
-              {{ wf.isActive ? 'Active' : 'Inactive' }}
-            </span>
-            <span class="meta-text">{{ (wf.dag || []).length }} nodes</span>
-            <span class="meta-text">{{ new Date(wf.createdAt).toLocaleDateString() }}</span>
-          </div>
-        </div>
-        <div v-if="getWorkflowMetrics(wf)" class="card-footer">
-          <span class="metric-item">
-            <span class="metric-value">{{ getWorkflowMetrics(wf).totalRuns }}</span>
-            <span class="metric-label">runs</span>
-          </span>
-          <span class="metric-divider" />
-          <span class="metric-item">
-            <span class="metric-value">{{ Math.round(getWorkflowMetrics(wf).successRate) }}%</span>
-            <span class="metric-label">success</span>
-          </span>
-          <span class="metric-divider" />
-          <span class="metric-item">
-            <span class="metric-value">{{ formatDuration(getWorkflowMetrics(wf).avgDurationSec) }}</span>
-            <span class="metric-label">avg duration</span>
-          </span>
+  <div class="workflows-container">
+    <!-- Info Section -->
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Compute Workflows</h3>
+        <p>
+          Workflows chain processors together into a pipeline that runs on
+          Pennsieve compute nodes. Each workflow can be executed on demand or
+          scheduled, with runtime metrics surfaced per run.
+        </p>
+        <div class="info-card-actions">
+          <bf-button @click="goToCreate">+ New Workflow</bf-button>
         </div>
       </div>
     </div>
 
-    <!-- Load More -->
-    <div v-if="filteredWorkflows.length > 0 && nextCursor" class="load-more-container">
-      <button
-        class="load-more-btn"
-        :disabled="isLoadingMore"
-        @click="loadMore"
-      >
-        {{ isLoadingMore ? 'Loading...' : 'Load More' }}
-      </button>
-    </div>
+    <!-- Workflows Section -->
+    <div class="workflows-section">
+      <div class="workflows-section-header">
+        <h3>Workflows</h3>
+        <el-input
+          v-if="workflows.length > 0"
+          v-model="searchQuery"
+          placeholder="Search workflows..."
+          size="default"
+          clearable
+          class="workflows-search-input"
+        />
+      </div>
 
-    <!-- Empty State -->
-    <div v-else-if="filteredWorkflows.length === 0" class="empty-state">
-      <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-      <span v-if="isSearching">Searching...</span>
-      <span v-else-if="workflows.length === 0 && !searchQuery">No workflows yet</span>
-      <span v-else>No workflows match your filters</span>
+      <div class="status-buttons">
+        <button
+          v-for="option in filterOptions"
+          :key="option.value"
+          class="filter-btn"
+          :class="{ active: statusFilter === option.value }"
+          @click="statusFilter = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+
+      <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
+        <div
+          v-for="wf in paginatedWorkflows"
+          :key="wf.uuid"
+          class="wf-card"
+          @click="goToDetail(wf)"
+        >
+          <div class="wf-header">
+            <div class="wf-info">
+              <h3>
+                <button
+                  type="button"
+                  class="wf-name-link"
+                  @click.stop="goToDetail(wf)"
+                >
+                  {{ wf.name }}
+                </button>
+              </h3>
+              <div class="wf-subtitle">Workflow</div>
+              <div v-if="wf.description" class="wf-description">
+                {{ wf.description }}
+              </div>
+              <div class="wf-tags">
+                <span
+                  class="tag"
+                  :class="wf.isActive ? 'active' : 'inactive'"
+                >
+                  {{ wf.isActive ? 'Active' : 'Inactive' }}
+                </span>
+                <span class="tag nodes">
+                  {{ (wf.dag || []).length }} nodes
+                </span>
+                <span class="tag created">
+                  {{ new Date(wf.createdAt).toLocaleDateString() }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="last-run-pill"
+              :class="lastRunInfo(wf).statusKey"
+            >
+              <span class="last-run-dot" />
+              {{ lastRunInfo(wf).label }}
+            </div>
+          </div>
+
+          <div class="wf-card-actions">
+            <div v-if="getWorkflowMetrics(wf)" class="wf-metrics">
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ getWorkflowMetrics(wf).totalRuns }}
+                </span>
+                <span class="metric-label">runs</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ Math.round(getWorkflowMetrics(wf).successRate) }}%
+                </span>
+                <span class="metric-label">success</span>
+              </span>
+              <span class="metric-divider" />
+              <span class="metric-item">
+                <span class="metric-value">
+                  {{ formatDuration(getWorkflowMetrics(wf).avgDurationSec) }}
+                </span>
+                <span class="metric-label">avg duration</span>
+              </span>
+            </div>
+            <span v-else class="empty-footer-text">No runs to report</span>
+
+            <button
+              type="button"
+              class="card-action-link"
+              @click.stop="goToDetail(wf)"
+            >
+              <span>View details</span>
+              <span class="arrow">&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="empty-state">
+        <IconAnalysis :width="48" :height="48" color="#9ca3af" />
+        <span v-if="isLoadingAll">Loading workflows...</span>
+        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <span v-else-if="searchQuery">
+          No workflows match
+          <strong>"{{ searchQuery }}"</strong>
+        </span>
+        <span v-else>No workflows match your filters</span>
+      </div>
+
+      <el-pagination
+        v-if="filteredWorkflows.length > 0"
+        class="workflows-pagination"
+        :page-size="pageSize"
+        :pager-count="5"
+        :current-page="currentPage"
+        layout="prev, pager, next"
+        :total="filteredWorkflows.length"
+        @current-change="onPageChange"
+      />
     </div>
   </div>
 </template>
@@ -223,57 +335,69 @@ onMounted(async () => {
 <style lang="scss" scoped>
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
-@use "../../../styles/element/select";
 
-
-.workflows-grid-page {
-  height: calc(100vh - 112px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.workflows-container {
+  max-width: 1000px;
+  margin: 0;
   padding: 16px 24px;
 }
 
-.builder-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 24px;
-  background-color: theme.$white;
+.info-section {
+  margin-bottom: 32px;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  background-color: theme.$white;
-  min-height: 48px;
+.info-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 24px;
 
-  .header-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: theme.$black;
+  h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 12px 0;
   }
 
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
+  p {
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+    margin: 0 0 12px 0;
+  }
+
+  .info-card-actions {
+    margin-top: 16px;
   }
 }
 
-.search-input {
-  max-width: 300px;
+.workflows-section {
+  margin-bottom: 48px;
+}
+
+.workflows-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h3 {
+    font-size: 20px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0;
+  }
+}
+
+.workflows-search-input {
+  max-width: 320px;
 }
 
 .status-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 16px;
+  margin-bottom: 16px;
 }
 
 .filter-btn {
@@ -300,69 +424,166 @@ onMounted(async () => {
   }
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  grid-auto-rows: max-content;
-  gap: 24px;
-  padding: 24px 0;
-  flex: 1;
-  overflow-y: auto;
+.workflows-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .wf-card {
-  background: theme.$white;
+  background: white;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
+  padding: 20px;
+  transition: border-color 0.2s ease;
   cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 
   &:hover {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(80, 57, 247, 0.15);
+    border-color: theme.$gray_3;
   }
 }
 
-.card-body {
+.wf-header {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.wf-info {
   flex: 1;
+  min-width: 0;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
+  }
 }
 
-.card-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: theme.$black;
+.wf-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$gray_6;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: theme.$purple_2;
+    text-decoration: underline;
+  }
 }
 
-.card-description {
+.wf-subtitle {
   font-size: 13px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
+  margin-bottom: 6px;
+  font-weight: 400;
+}
+
+.wf-description {
+  font-size: 13px;
+  color: theme.$gray_5;
+  margin: 4px 0 8px 0;
   line-height: 1.4;
-  min-height: calc(1.4em * 2);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  word-break: break-word;
 }
 
-.card-spacer {
-  flex: 1;
+.last-run-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+
+  .last-run-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &.gray {
+    background: theme.$gray_2;
+    color: theme.$gray_5;
+    .last-run-dot { background: theme.$gray_4; }
+  }
+
+  &.enabled {
+    background: rgba(theme.$status_green, 0.12);
+    color: theme.$status_green;
+    .last-run-dot { background: theme.$status_green; }
+  }
+
+  &.pending {
+    background: rgba(#F59E0B, 0.12);
+    color: #B45309;
+    .last-run-dot { background: #F59E0B; }
+  }
+
+  &.failed {
+    background: rgba(#EF4444, 0.12);
+    color: #DC2626;
+    .last-run-dot { background: #DC2626; }
+  }
 }
 
-.card-footer {
+.wf-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    &.active {
+      background: rgba(theme.$status_green, 0.12);
+      color: theme.$status_green;
+    }
+
+    &.inactive {
+      background: theme.$gray_2;
+      color: theme.$gray_5;
+    }
+
+    &.nodes,
+    &.created {
+      background: theme.$gray_1;
+      color: theme.$gray_5;
+    }
+  }
+}
+
+.wf-card-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid theme.$gray_2;
-  background: theme.$gray_1;
-  border-radius: 0 0 3px 3px;
+  flex-wrap: wrap;
+}
+
+.wf-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .metric-item {
@@ -388,66 +609,57 @@ onMounted(async () => {
   background: theme.$gray_3;
 }
 
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.empty-footer-text {
   font-size: 12px;
-}
-
-.status-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-
-  &.badge-gray { background: theme.$gray_2; color: theme.$gray_5; }
-  &.badge-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
-}
-
-.meta-text {
   color: theme.$gray_4;
+  font-style: italic;
 }
 
-.load-more-container {
-  display: flex;
-  justify-content: center;
-  padding: 16px 24px 24px;
-}
-
-.load-more-btn {
-  padding: 8px 24px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  background: white;
-  color: theme.$gray_5;
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
   font-size: 13px;
   font-weight: 500;
+  color: theme.$purple_3;
+  text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s;
 
-  &:hover:not(:disabled) {
-    border-color: theme.$purple_1;
-    color: theme.$purple_1;
+  &:hover {
+    text-decoration: underline;
   }
 
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+  .arrow {
+    transition: transform 0.15s ease;
   }
+
+  &:hover .arrow {
+    transform: translateX(2px);
+  }
+}
+
+.workflows-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  --el-pagination-hover-color: #{theme.$purple_3};
 }
 
 .empty-state {
-  flex: 1;
+  text-align: center;
+  padding: 32px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  color: theme.$gray_5;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 12px;
-  color: theme.$gray_4;
-  font-size: 14px;
 }
 </style>
