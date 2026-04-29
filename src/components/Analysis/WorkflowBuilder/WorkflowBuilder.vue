@@ -313,6 +313,11 @@ const parseGitHubDisplay = (sourceUrl) => {
   return `${match[1]}/${match[2].replace(/\.git$/, "")}`;
 };
 
+const visibilityLabel = (app) => {
+  if (typeof app?.isPrivate !== "boolean") return null;
+  return app.isPrivate ? "Private" : "Public";
+};
+
 const repoName = (app) =>
   parseGitHubDisplay(app?.sourceUrl) ||
   extractRepoName(app?.sourceUrl) ||
@@ -1050,10 +1055,10 @@ const openNodeSettings = (id) => {
                     {{ latestVersion(data.application).version }}
                   </div>
                   <div
-                    v-if="data.application && data.application.visibility"
+                    v-if="data.application && visibilityLabel(data.application)"
                     class="node-resources"
                   >
-                    Visibility: {{ data.application.visibility }}
+                    Visibility: {{ visibilityLabel(data.application) }}
                   </div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -1087,10 +1092,10 @@ const openNodeSettings = (id) => {
                     {{ latestVersion(data.application).version }}
                   </div>
                   <div
-                    v-if="data.application && data.application.visibility"
+                    v-if="data.application && visibilityLabel(data.application)"
                     class="node-resources"
                   >
-                    Visibility: {{ data.application.visibility }}
+                    Visibility: {{ visibilityLabel(data.application) }}
                   </div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -1778,9 +1783,10 @@ const openNodeSettings = (id) => {
                 <IconAnalysis class="app-icon" :width="20" :height="20" />
                 <div class="app-info">
                   <div class="app-name">{{ repoName(app) }}</div>
-                  <span v-if="app.visibility" class="app-type-badge">{{
-                    app.visibility
-                  }}</span>
+                  <span
+                    v-if="visibilityLabel(app)"
+                    class="app-type-badge"
+                  >{{ visibilityLabel(app) }}</span>
                   <div class="app-description">
                     {{ (app.versions || []).length }}
                     {{

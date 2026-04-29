@@ -33,13 +33,18 @@ const parseGitHubDisplay = (sourceUrl) => {
 const repoName = (app) =>
   parseGitHubDisplay(app.sourceUrl) || 'Unknown repo'
 
+const visibilityLabel = (app) => {
+  if (typeof app?.isPrivate !== 'boolean') return null
+  return app.isPrivate ? 'Private' : 'Public'
+}
+
 const filteredApplications = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return applications.value
   return applications.value.filter((app) => {
     const url = (app.sourceUrl || '').toLowerCase()
     const name = repoName(app).toLowerCase()
-    const visibility = (app.visibility || '').toLowerCase()
+    const visibility = (visibilityLabel(app) || '').toLowerCase()
     const latest = (latestVersion(app)?.version || '').toLowerCase()
     return (
       url.includes(q) ||
@@ -251,10 +256,11 @@ onMounted(fetchApps)
               </div>
               <div class="app-tags">
                 <span
+                  v-if="visibilityLabel(app)"
                   class="tag"
-                  :class="(app.visibility || 'unknown').toLowerCase()"
+                  :class="visibilityLabel(app).toLowerCase()"
                 >
-                  {{ app.visibility || 'Unknown' }}
+                  {{ visibilityLabel(app) }}
                 </span>
                 <span class="tag versions">
                   {{ (app.versions || []).length }}

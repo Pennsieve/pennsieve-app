@@ -86,6 +86,7 @@
 
     <div class="repo-card-actions">
       <a
+        v-if="canShowExternalLinks"
         :href="repo.html_url || repo.url"
         target="_blank"
         rel="noopener noreferrer"
@@ -122,7 +123,14 @@ export default {
       return this.$store.state.analysisModule?.applications || []
     },
 
-    matchedApp() {
+    profileId() {
+      const profile = this.$store.state.profile || {}
+      return profile.id || profile.intId || null
+    },
+
+    // Resolved by sourceUrl match — does NOT apply privacy gating, so the
+    // template can decide which links to surface.
+    matchedAppRaw() {
       if (!this.repo.publishing_to_appstore) return null
       const candidates = [this.repo.html_url, this.repo.url].filter(Boolean)
       if (candidates.length === 0) return null
@@ -133,9 +141,31 @@ export default {
           .toLowerCase()
       const targets = new Set(candidates.map(normalize))
       return (
-        this.applications.find((app) => targets.has(normalize(app.sourceUrl))) ||
+        this.applications.find((a) => targets.has(normalize(a.sourceUrl))) ||
         null
       )
+    },
+
+    // True when there's a matched app, it's private, and the viewer is
+    // neither the owner nor someone we can confirm has explicit access.
+    isPrivateUnowned() {
+      const app = this.matchedAppRaw
+      if (!app) return false
+      if (app.isPrivate !== true) return false
+      return !this.profileId || app.ownerId !== this.profileId
+    },
+
+    // Privacy-aware match used by template links so non-owners aren't
+    // routed to an access-denied detail screen.
+    matchedApp() {
+      return this.isPrivateUnowned ? null : this.matchedAppRaw
+    },
+
+    // Hides the View on GitHub link in the same scenarios where the
+    // application detail link is hidden: a private matched app the
+    // viewer doesn't own. Repos without a matched app keep the link.
+    canShowExternalLinks() {
+      return !this.isPrivateUnowned
     },
   },
 

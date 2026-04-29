@@ -114,6 +114,11 @@ watch(
   { immediate: true }
 );
 
+const visibilityLabel = (app) => {
+  if (typeof app?.isPrivate !== "boolean") return null;
+  return app.isPrivate ? "Private" : "Public";
+};
+
 /*
   Filtered & sorted applications (newest first, matching workflows)
 */
@@ -125,7 +130,7 @@ const filteredApplications = computed(() => {
     list = list.filter((app) => {
       const url = (app.sourceUrl || "").toLowerCase();
       const name = repoName(app).toLowerCase();
-      const visibility = (app.visibility || "").toLowerCase();
+      const visibility = (visibilityLabel(app) || "").toLowerCase();
       const latest = (latestVersion(app)?.version || "").toLowerCase();
       return (
         url.includes(q) ||
@@ -138,7 +143,7 @@ const filteredApplications = computed(() => {
 
   if (visibilityFilter.value !== "all") {
     list = list.filter(
-      (app) => (app.visibility || "").toLowerCase() === visibilityFilter.value
+      (app) => (visibilityLabel(app) || "").toLowerCase() === visibilityFilter.value
     );
   }
 
@@ -263,10 +268,11 @@ const goToDetail = (app) => {
                   {{ statusLabel(latestVersion(app)?.status) }}
                 </span>
                 <span
+                  v-if="visibilityLabel(app)"
                   class="tag visibility"
-                  :class="(app.visibility || 'unknown').toLowerCase()"
+                  :class="visibilityLabel(app).toLowerCase()"
                 >
-                  {{ app.visibility || 'Unknown' }}
+                  {{ visibilityLabel(app) }}
                 </span>
                 <span class="tag created">
                   {{ new Date(app.createdAt).toLocaleDateString() }}

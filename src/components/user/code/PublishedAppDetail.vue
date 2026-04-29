@@ -59,11 +59,6 @@ const activeOrgId = computed(
     null
 )
 
-const VISIBILITY_OPTIONS = [
-  { label: 'Public', value: 'public' },
-  { label: 'Private', value: 'private' },
-]
-
 const appUuid = computed(() => props.uuid || route.params.uuid)
 
 const backToCodeRoute = computed(() => ({
@@ -154,6 +149,17 @@ const getUserName = (userId) => {
     : String(userId)
 }
 
+const organizations = computed(() => store.state.organizations || [])
+
+const getWorkspaceName = (workspaceId) => {
+  if (!workspaceId) return null
+  const match = organizations.value.find(
+    (o) => o.organization?.id === workspaceId ||
+           o.organization?.intId === workspaceId
+  )
+  return match?.organization?.name || null
+}
+
 const statusKey = (status) => {
   if (!status) return 'gray'
   const s = status.toLowerCase()
@@ -192,8 +198,14 @@ const permissionLabel = (perm) => {
   const id = permissionEntityId(perm)
   if (type === 'user') return getUserName(id)
   if (type === 'team') return `Team: ${perm.teamName || id}`
-  if (type === 'workspace' || type === 'organization')
-    return `Workspace: ${perm.organizationName || perm.workspaceName || id}`
+  if (type === 'workspace' || type === 'organization') {
+    const name =
+      perm.organizationName ||
+      perm.workspaceName ||
+      getWorkspaceName(id) ||
+      id
+    return `Workspace: ${name}`
+  }
   if (id) return type ? `${type}: ${id}` : id
   return 'Unknown'
 }
@@ -235,7 +247,7 @@ const startEditingPermissions = () => {
   editUsers.value = split.users
   editTeams.value = split.teams
   editWorkspaces.value = split.workspaces
-  editVisibility.value = (detail.value?.visibility || 'private').toLowerCase()
+  editVisibility.value = isAppPublic.value ? 'public' : 'private'
   isEditingPermissions.value = true
 }
 
@@ -255,6 +267,29 @@ const isCurrentUser = (id) =>
   (id === profile.value?.id || id === profile.value?.intId)
 
 const isAppOwner = computed(() => isCurrentUser(detail.value?.ownerId))
+
+// Visibility is sourced from the `isPrivate` flag on the application.
+// `isPrivate === false` ⇒ public; everything else (true / undefined) ⇒ private.
+const isAppPublic = computed(() => detail.value?.isPrivate === false)
+
+const visibilityLabel = computed(() => {
+  if (typeof detail.value?.isPrivate !== 'boolean') return null
+  return detail.value.isPrivate ? 'Private' : 'Public'
+})
+
+const canEditPermissions = computed(
+  () => isAppOwner.value && !isAppPublic.value
+)
+
+const editPermissionsTooltip = computed(() => {
+  if (isAppPublic.value) {
+    return 'Only Private Repos allow Owners to update permissions'
+  }
+  if (!isAppOwner.value) {
+    return 'Only Application Owners Can Update Permissions'
+  }
+  return ''
+})
 
 const removeEditUser = (idx) => {
   const user = editUsers.value[idx]
@@ -379,11 +414,6 @@ const loadDetail = async (uuid) => {
           : Array.isArray(data?.permissions)
             ? data.permissions
             : []
-      // Capture visibility from the permissions endpoint so the PUT round-trip
-      // preserves it even if the application detail call didn't include it.
-      if (data?.visibility) {
-        editVisibility.value = data.visibility
-      }
     } else {
       console.error(permsResult.reason)
       permissionsError.value = 'Failed to load permissions'
@@ -464,11 +494,11 @@ const confirmDelete = async () => {
               Archiving...
             </span>
             <span
-              v-if="detail.visibility"
+              v-if="visibilityLabel"
               class="visibility-pill"
-              :class="(detail.visibility || '').toLowerCase()"
+              :class="visibilityLabel.toLowerCase()"
             >
-              {{ detail.visibility }}
+              {{ visibilityLabel }}
             </span>
           </div>
         </div>
@@ -508,9 +538,9 @@ const confirmDelete = async () => {
             <span class="info-label">Source Type</span>
             <span class="info-value">{{ detail.sourceType }}</span>
           </div>
-          <div v-if="detail.visibility" class="info-row">
+          <div v-if="visibilityLabel" class="info-row">
             <span class="info-label">Visibility</span>
-            <span class="info-value">{{ detail.visibility }}</span>
+            <span class="info-value">{{ visibilityLabel }}</span>
           </div>
           <div class="info-row">
             <span class="info-label">Application UUID</span>
@@ -615,19 +645,15 @@ const confirmDelete = async () => {
             </template>
             <el-tooltip
               v-else
-              :content="
-                isAppOwner
-                  ? ''
-                  : 'Only Application Owners Can Update Permissions'
-              "
+              :content="editPermissionsTooltip"
               placement="top"
-              :disabled="isAppOwner"
+              :disabled="canEditPermissions"
             >
               <span class="edit-permissions-wrap">
                 <bf-button
                   class="secondary small"
-                  :disabled="!isAppOwner"
-                  @click="isAppOwner && startEditingPermissions()"
+                  :disabled="!canEditPermissions"
+                  @click="canEditPermissions && startEditingPermissions()"
                 >Edit</bf-button>
               </span>
             </el-tooltip>
@@ -661,27 +687,6 @@ const confirmDelete = async () => {
         <!-- Edit mode -->
         <template v-else>
           <div class="permissions-edit">
-            <div class="edit-subsection visibility-subsection">
-              <div class="edit-subsection-header">
-                <h4>Visibility</h4>
-              </div>
-              <el-radio-group v-model="editVisibility" size="default">
-                <el-radio
-                  v-for="opt in VISIBILITY_OPTIONS"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ opt.label }}
-                </el-radio>
-              </el-radio-group>
-              <p class="edit-subsection-help">
-                <strong>Public</strong> apps are discoverable by anyone in
-                the workspace.
-                <strong>Private</strong> apps are only available to the
-                users and workspaces granted access below.
-              </p>
-            </div>
-
             <div class="edit-subsection">
               <div class="edit-subsection-header">
                 <h4>Users ({{ editUsers.length }})</h4>
@@ -1393,18 +1398,6 @@ const confirmDelete = async () => {
       font-weight: 500;
       color: theme.$gray_6;
     }
-  }
-}
-
-.visibility-subsection .edit-subsection-help {
-  font-size: 12px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-  margin: 12px 0 0 0;
-
-  strong {
-    color: theme.$gray_6;
-    font-weight: 600;
   }
 }
 

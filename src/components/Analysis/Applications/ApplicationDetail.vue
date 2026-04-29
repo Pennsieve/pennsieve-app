@@ -53,9 +53,21 @@ const repoName = computed(
   () => parseGitHubDisplay(detail.value?.sourceUrl) || "Unknown repo"
 );
 
+const visibilityLabel = computed(() => {
+  if (typeof detail.value?.isPrivate !== "boolean") return null;
+  return detail.value.isPrivate ? "Private" : "Public";
+});
+
 const githubRepoUrl = computed(() => {
   const info = parseGitHubRepo(detail.value?.sourceUrl);
   return info ? `https://github.com/${info.owner}/${info.repo}` : null;
+});
+
+const isAppOwner = computed(() => {
+  const ownerId = detail.value?.ownerId;
+  const id = profile.value?.id;
+  const intId = profile.value?.intId;
+  return !!ownerId && (ownerId === id || ownerId === intId);
 });
 
 const sortedVersions = computed(() => {
@@ -259,15 +271,31 @@ watch(
         <div class="readme-section">
           <div class="readme-header">
             <span class="readme-title">README</span>
-            <a
+            <el-tooltip
               v-if="githubRepoUrl"
-              :href="githubRepoUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="readme-github-link"
+              :content="isAppOwner ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
+              placement="top"
+              :disabled="isAppOwner"
             >
-              View on GitHub
-            </a>
+              <span class="github-link-wrap">
+                <a
+                  v-if="isAppOwner"
+                  :href="githubRepoUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="readme-github-link"
+                >
+                  View on GitHub
+                </a>
+                <span
+                  v-else
+                  class="readme-github-link disabled"
+                  aria-disabled="true"
+                >
+                  View on GitHub
+                </span>
+              </span>
+            </el-tooltip>
           </div>
           <div v-if="!readmeHtml" class="readme-empty">
             No README available
@@ -289,9 +317,9 @@ watch(
                 <span class="info-label">Source</span>
                 <span class="info-value">{{ detail.sourceType }}</span>
               </div>
-              <div v-if="detail.visibility" class="info-row">
+              <div v-if="visibilityLabel" class="info-row">
                 <span class="info-label">Visibility</span>
-                <span class="info-value">{{ detail.visibility }}</span>
+                <span class="info-value">{{ visibilityLabel }}</span>
               </div>
               <div v-if="detail.createdAt" class="info-row">
                 <span class="info-label">Created</span>
@@ -533,9 +561,19 @@ watch(
   text-decoration: none;
   font-weight: 500;
 
-  &:hover {
+  &:hover:not(.disabled) {
     text-decoration: underline;
   }
+
+  &.disabled {
+    color: theme.$gray_4;
+    cursor: not-allowed;
+    user-select: none;
+  }
+}
+
+.github-link-wrap {
+  display: inline-flex;
 }
 
 .readme-empty {
