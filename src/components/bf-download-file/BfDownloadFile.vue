@@ -83,6 +83,7 @@ import BfStorageMetrics from "../../mixins/bf-storage-metrics";
 import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import EventBus from "../../utils/event-bus";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -202,24 +203,115 @@ export default {
      * @param fileDTOs optional - indicates that we are downloading files, NOT packages
      *     represents the parent package of those files
      */
-    triggerDownload: function (packageDTOs, fileDTOs) {
+    triggerDownload: async function (packageDTOs, fileDTOs) {
+      // Block optimistic upload rows and packages still being processed
+      // server-side. Selection is already gated (FilesTable.isRowSelectable),
+      // but the toolbar + keyboard paths can still route a placeholder
+      // here, and a package freshly finalized may briefly sit in
+      // UPLOADED/PROCESSING before hitting READY.
+      const notReady = (packageDTOs || []).filter(
+        (p) =>
+          (p && p._placeholder) ||
+          (pathOr("", ["content", "state"], p) &&
+            pathOr("", ["content", "state"], p) !== "READY")
+      );
+      if (notReady.length > 0) {
+        EventBus.$emit("toast", {
+          detail: {
+            type: "info",
+            msg:
+              notReady.length === (packageDTOs || []).length
+                ? "Files are still being processed. Download will be available once they're ready."
+                : "Some selected files are still being processed and were skipped.",
+          },
+        });
+        packageDTOs = (packageDTOs || []).filter((p) => !notReady.includes(p));
+        if (packageDTOs.length === 0) return;
+      }
+
       this.packageDTOs = packageDTOs;
       this.fileDTOs = fileDTOs;
-      this.$nextTick(() => {
-        if (this.shouldConfirmDownload) {
-          this.showReduceSize = this.disableDownload;
-          this.dialogVisible = true;
-        } else {
-          const nodeIds = this.packageDTOs.map((s) => s.content.nodeId);
-          if (this.fileDTOs) {
-            const fileIds = this.fileDTOs.map((f) => f.id);
-            this.downloadPackages(nodeIds, fileIds);
-          } else {
-            this.downloadPackages(nodeIds);
-          }
-          this.closeDialog();
+      await this.$nextTick();
+      if (this.shouldConfirmDownload) {
+        this.showReduceSize = this.disableDownload;
+        this.dialogVisible = true;
+        return;
+      }
+      // Fast path: a selection that resolves to exactly one file gets a
+      // direct presigned download, no zipit round-trip and no
+      // pennsieve-data.zip wrapper around a single file.
+      if (await this.tryDirectDownload()) {
+        this.closeDialog();
+        return;
+      }
+      const nodeIds = this.packageDTOs.map((s) => s.content.nodeId);
+      if (this.fileDTOs) {
+        const fileIds = this.fileDTOs.map((f) => f.id);
+        this.downloadPackages(nodeIds, fileIds);
+      } else {
+        this.downloadPackages(nodeIds);
+      }
+      this.closeDialog();
+    },
+
+    /**
+     * Attempts to download the selection as a single file via its presigned
+     * URL. Returns true if handled; false to defer to zipit. Any unexpected
+     * error is swallowed and returns false, so the zipit fallback always
+     * runs — a broken fast path never blocks the existing flow.
+     */
+    tryDirectDownload: async function () {
+      if (this.packageDTOs.length !== 1) return false;
+      const pkg = this.packageDTOs[0];
+      if (pathOr("", ["content", "packageType"], pkg) === "Collection") {
+        return false;
+      }
+      const packageId = pathOr("", ["content", "id"], pkg);
+      if (!packageId) return false;
+
+      // A file-level selection short-circuits the sources lookup. Multiple
+      // file selections (e.g. picking 2 sources out of a legacy multi-file
+      // package) defer to zipit.
+      let fileId;
+      if (this.fileDTOs) {
+        if (this.fileDTOs.length !== 1) return false;
+        fileId = this.fileDTOs[0].id;
+      } else {
+        try {
+          const token = await useGetToken();
+          const pkgResp = await this.sendXhr(
+            `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`,
+            { method: "GET", header: { Authorization: `bearer ${token}` } },
+          );
+          const sources = pathOr([], ["objects", "source"], pkgResp);
+          // Legacy multi-file packages need to be zipped so none of the
+          // extra sources get silently dropped.
+          if (sources.length !== 1) return false;
+          fileId = pathOr("", [0, "content", "id"], sources);
+          if (!fileId) return false;
+        } catch (e) {
+          return false;
         }
-      });
+      }
+
+      try {
+        const token = await useGetToken();
+        const presigned = await this.sendXhr(
+          `${this.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`,
+          { method: "GET", header: { Authorization: `bearer ${token}` } },
+        );
+        const url = pathOr("", ["url"], presigned);
+        if (!url) return false;
+        const a = document.createElement("a");
+        a.href = url;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return true;
+      } catch (e) {
+        return false;
+      }
     },
 
     triggerRecordCsvDownload: function (query) {

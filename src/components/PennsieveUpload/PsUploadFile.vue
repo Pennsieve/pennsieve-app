@@ -63,9 +63,9 @@ const statusClass = computed(() => {
 @use '../../styles/theme';
 
 .upload-file {
-  border-left: 1px solid theme.$gray_2;
-  border-right: 1px solid theme.$gray_2;
-  border-bottom:  1px solid theme.$gray_2;
+  // Outer container (PennsieveUpload .file-list-scroll) carries the
+  // L/R/top borders; keep only the bottom here as a row separator.
+  border-bottom: 1px solid theme.$gray_2;
   padding: 16px 16px;
   display: flex;
   flex-direction: row;
