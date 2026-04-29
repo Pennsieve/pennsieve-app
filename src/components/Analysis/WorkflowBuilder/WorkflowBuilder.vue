@@ -539,6 +539,9 @@ const onDragStart = (item, event, type = "application") => {
 
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
+    // Firefox refuses to start a drag unless setData is called inside
+    // dragstart. The payload is unused — drop logic reads from refs.
+    event.dataTransfer.setData("text/plain", type);
   }
 };
 
