@@ -9,6 +9,7 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 /*
   Local State
 */
+const searchQuery = ref("");
 const visibilityFilter = ref("all");
 
 const pageSize = 10;
@@ -119,6 +120,22 @@ watch(
 const filteredApplications = computed(() => {
   let list = applications.value;
 
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
+    list = list.filter((app) => {
+      const url = (app.sourceUrl || "").toLowerCase();
+      const name = repoName(app).toLowerCase();
+      const visibility = (app.visibility || "").toLowerCase();
+      const latest = (latestVersion(app)?.version || "").toLowerCase();
+      return (
+        url.includes(q) ||
+        name.includes(q) ||
+        visibility.includes(q) ||
+        latest.includes(q)
+      );
+    });
+  }
+
   if (visibilityFilter.value !== "all") {
     list = list.filter(
       (app) => (app.visibility || "").toLowerCase() === visibilityFilter.value
@@ -194,6 +211,14 @@ const goToDetail = (app) => {
     <div class="applications-section">
       <div class="applications-section-header">
         <h3>Applications</h3>
+        <el-input
+          v-if="applications.length > 0"
+          v-model="searchQuery"
+          placeholder="Search applications..."
+          size="default"
+          clearable
+          class="applications-search-input"
+        />
       </div>
 
       <div class="status-buttons">
@@ -306,6 +331,7 @@ const goToDetail = (app) => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+@use "../../../styles/element/input";
 
 .applications-container {
   max-width: 1000px;
@@ -381,6 +407,10 @@ const goToDetail = (app) => {
     color: theme.$gray_6;
     margin: 0;
   }
+}
+
+.applications-search-input {
+  max-width: 320px;
 }
 
 .status-buttons {

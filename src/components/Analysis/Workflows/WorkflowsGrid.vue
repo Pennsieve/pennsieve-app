@@ -9,10 +9,11 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 const store = useStore();
 const router = useRouter();
 
+const searchQuery = ref("");
 const statusFilter = ref("active");
 const pageSize = ref(10);
 const currentPage = ref(1);
-const isLoadingMore = ref(false);
+const isLoadingAll = ref(false);
 
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
@@ -28,7 +29,16 @@ const filterOptions = [
 ];
 
 const filteredWorkflows = computed(() => {
-  return [...workflows.value].sort(
+  let list = [...workflows.value];
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
+    list = list.filter((wf) => {
+      const name = (wf.name || "").toLowerCase();
+      const desc = (wf.description || "").toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
+  }
+  return list.sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
 });
@@ -38,24 +48,8 @@ const paginatedWorkflows = computed(() => {
   return filteredWorkflows.value.slice(start, start + pageSize.value);
 });
 
-// Expose one extra page beyond what's loaded whenever the server has
-// more results, so el-pagination shows a "next" button that triggers a
-// cursor-based fetch.
-const paginationTotal = computed(() => {
-  const loaded = filteredWorkflows.value.length;
-  return nextCursor.value ? loaded + pageSize.value : loaded;
-});
-
-const onPageChange = async (newPage) => {
+const onPageChange = (newPage) => {
   currentPage.value = newPage;
-  const required = newPage * pageSize.value;
-  if (
-    required > filteredWorkflows.value.length &&
-    nextCursor.value &&
-    !isLoadingMore.value
-  ) {
-    await loadMore();
-  }
 };
 
 watch(filteredWorkflows, () => {
@@ -148,40 +142,41 @@ const getStatusParam = () => {
   return statusFilter.value !== "all" ? statusFilter.value : undefined;
 };
 
-const fetchWorkflows = async ({ search, cursor, append } = {}) => {
-  await store.dispatch("analysisModule/fetchWorkflows", {
-    search: search || undefined,
-    cursor: cursor || undefined,
-    limit: pageSize.value,
-    status: getStatusParam(),
-    append: !!append,
-  });
-};
+const ALL_FETCH_BATCH = 100;
+const ALL_FETCH_CAP = 50; // hard stop at 5,000 workflows
 
-const loadMore = async () => {
-  if (!nextCursor.value || isLoadingMore.value) return;
-  isLoadingMore.value = true;
+const fetchAllWorkflows = async () => {
+  if (isLoadingAll.value) return;
+  isLoadingAll.value = true;
   try {
-    await fetchWorkflows({
-      cursor: nextCursor.value,
-      append: true,
+    // First batch replaces, subsequent batches append.
+    await store.dispatch("analysisModule/fetchWorkflows", {
+      cursor: undefined,
+      limit: ALL_FETCH_BATCH,
+      status: getStatusParam(),
+      append: false,
     });
+    let safety = ALL_FETCH_CAP;
+    while (nextCursor.value && safety-- > 0) {
+      await store.dispatch("analysisModule/fetchWorkflows", {
+        cursor: nextCursor.value,
+        limit: ALL_FETCH_BATCH,
+        status: getStatusParam(),
+        append: true,
+      });
+    }
   } finally {
-    isLoadingMore.value = false;
+    isLoadingAll.value = false;
   }
 };
 
-// Re-fetch when page size or status filter changes
-watch(pageSize, () => {
-  fetchWorkflows();
-});
-
+// Re-fetch all when status filter changes
 watch(statusFilter, () => {
-  fetchWorkflows();
+  fetchAllWorkflows();
 });
 
 onMounted(async () => {
-  await fetchWorkflows();
+  await fetchAllWorkflows();
 });
 </script>
 
@@ -206,6 +201,14 @@ onMounted(async () => {
     <div class="workflows-section">
       <div class="workflows-section-header">
         <h3>Workflows</h3>
+        <el-input
+          v-if="workflows.length > 0"
+          v-model="searchQuery"
+          placeholder="Search workflows..."
+          size="default"
+          clearable
+          class="workflows-search-input"
+        />
       </div>
 
       <div class="status-buttons">
@@ -306,19 +309,23 @@ onMounted(async () => {
 
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-        <span v-if="workflows.length === 0">No workflows yet</span>
+        <span v-if="isLoadingAll">Loading workflows...</span>
+        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <span v-else-if="searchQuery">
+          No workflows match
+          <strong>"{{ searchQuery }}"</strong>
+        </span>
         <span v-else>No workflows match your filters</span>
       </div>
 
       <el-pagination
-        v-if="paginationTotal > 0"
+        v-if="filteredWorkflows.length > 0"
         class="workflows-pagination"
         :page-size="pageSize"
         :pager-count="5"
         :current-page="currentPage"
         layout="prev, pager, next"
-        :total="paginationTotal"
-        :disabled="isLoadingMore"
+        :total="filteredWorkflows.length"
         @current-change="onPageChange"
       />
     </div>
@@ -327,6 +334,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+@use "../../../styles/element/input";
 
 .workflows-container {
   max-width: 1000px;
@@ -379,6 +387,10 @@ onMounted(async () => {
     color: theme.$gray_6;
     margin: 0;
   }
+}
+
+.workflows-search-input {
+  max-width: 320px;
 }
 
 .status-buttons {
