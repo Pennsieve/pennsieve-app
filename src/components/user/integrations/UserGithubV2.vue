@@ -1,5 +1,11 @@
 <template>
   <div class="github-integration">
+    <!-- Back link -->
+    <router-link :to="{ name: 'my-code' }" class="back-link">
+      <IconArrowLeft :height="10" :width="10" color="currentColor" />
+      My Repositories
+    </router-link>
+
     <!-- Header -->
     <div class="page-header">
       <h1>GitHub Integration</h1>
@@ -178,6 +184,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import * as siteConfig from "@/site-config/site.json";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
+import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
 
 const store = useStore();
 const instance = getCurrentInstance();
@@ -393,6 +400,21 @@ async function confirmDelete() {
   max-width: 900px;
   margin: 0;
   padding: 0;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: theme.$purple_3;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .page-header {
