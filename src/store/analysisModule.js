@@ -203,6 +203,9 @@ export const mutations = {
       node.status = status;
     }
   },
+  CLEAR_STATE(state) {
+    Object.assign(state, initialState());
+  },
 };
 
 export const actions = {
