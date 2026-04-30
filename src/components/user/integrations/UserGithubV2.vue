@@ -90,6 +90,24 @@
         </template>
       </div>
 
+      <!-- Update GitHub App Permissions -->
+      <div v-if="hasGithubProfile" class="management-section">
+        <div class="section-header">
+          <h2>Repository Access</h2>
+        </div>
+        <div class="danger-content">
+          <div class="danger-info">
+            <p>
+              Change which repositories the Pennsieve GitHub App can read,
+              or update the installation's permissions on GitHub.
+            </p>
+          </div>
+          <el-button @click="updateGithubIntegration">
+            Update Integration
+          </el-button>
+        </div>
+      </div>
+
       <!-- What this enables -->
       <div class="management-section">
         <div class="section-header">
@@ -194,6 +212,7 @@ const loading = ref(false);
 const isDeleteDialogVisible = ref(false);
 const githubProfile = ref({});
 const oauthWindow = ref(null);
+const popupPollTimer = ref(null);
 
 const hasGithubProfile = computed(() => {
   // Check both the local githubProfile and the store's profile
@@ -216,7 +235,49 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("message", messageEventListener);
+  clearPopupPoll();
 });
+
+function clearPopupPoll() {
+  if (popupPollTimer.value) {
+    clearInterval(popupPollTimer.value);
+    popupPollTimer.value = null;
+  }
+}
+
+async function onPopupClosed() {
+  clearPopupPoll();
+  try {
+    await fetchGithubProfile();
+    instance.proxy.$message({
+      message: "GitHub integration refreshed.",
+      type: "success",
+      center: true,
+      duration: 3000,
+      showClose: true,
+    });
+  } catch (error) {
+    console.error("Error refreshing GitHub data after popup closed:", error);
+  }
+}
+
+function updateGithubIntegration() {
+  const redirectUri = `${window.location.origin}/github-redirect`;
+  const url = `${siteConfig.githubAppUrl}?redirect_uri=${redirectUri}`;
+
+  oauthWindow.value = window.open(
+    url,
+    "_blank",
+    "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
+  );
+
+  clearPopupPoll();
+  popupPollTimer.value = setInterval(() => {
+    if (oauthWindow.value && oauthWindow.value.closed) {
+      onPopupClosed();
+    }
+  }, 500);
+}
 
 
 
@@ -296,6 +357,7 @@ const messageEventListener = async (event) => {
     event.data.source === "github-redirect-response" &&
     event.data.code
   ) {
+    clearPopupPoll();
     const oauthCode = event.data.code;
     if (oauthCode !== "") {
       try {
