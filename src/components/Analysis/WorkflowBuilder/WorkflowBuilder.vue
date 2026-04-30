@@ -333,6 +333,22 @@ const latestVersion = (app) => {
   )[0];
 };
 
+const sortedVersions = (app) => {
+  const versions = app?.versions || [];
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0),
+  );
+};
+
+const versionOptionLabel = (app, v) => {
+  const latest = latestVersion(app);
+  return latest && v.version === latest.version
+    ? `${v.version} (latest)`
+    : v.version;
+};
+
 const nodeTypeColor = (type) => {
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
@@ -402,6 +418,7 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         defaultParams: p.defaultParams || {},
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
+        tag: p.tag || latestVersion(matchedApplication)?.version || "",
       },
       position:
         hasSavedPositions && p.position
@@ -607,6 +624,7 @@ const onDrop = (event) => {
         cpu: "",
         memory: "",
         defaultParams: {},
+        tag: latestVersion(draggedApp.value)?.version || "",
       },
       position,
     };
@@ -774,6 +792,7 @@ const saveWorkflow = async () => {
       id: node.id,
       type: "processor",
       sourceUrl: node.data.application?.sourceUrl,
+      tag: node.data.tag || latestVersion(node.data.application)?.version || "",
       computeType: node.data.computeType || "standard",
       dependsOn: dependsOn,
       position,
@@ -1001,17 +1020,24 @@ const openNodeSettings = (id) => {
                     </button>
                   </div>
                   <div
-                    v-if="data.application && latestVersion(data.application)"
+                    v-if="data.tag || (data.application && latestVersion(data.application))"
                     class="node-description"
                   >
-                    {{ (data.application.versions || []).length }}
-                    {{
-                      (data.application.versions || []).length === 1
-                        ? "version"
-                        : "versions"
-                    }}
-                    &middot; latest
-                    {{ latestVersion(data.application).version }}
+                    <span class="version-tag">{{
+                      data.tag || latestVersion(data.application)?.version
+                    }}</span>
+                    <span
+                      v-if="
+                        data.tag &&
+                        latestVersion(data.application) &&
+                        data.tag !== latestVersion(data.application).version
+                      "
+                      class="version-outdated-badge"
+                    >
+                      older — latest
+                      {{ latestVersion(data.application).version }}
+                    </span>
+                    <span v-else class="version-latest-badge">latest</span>
                   </div>
                   <div class="node-resources">
                     <template v-if="data.computeType !== 'lambda'">
@@ -1042,17 +1068,24 @@ const openNodeSettings = (id) => {
                   </div>
                   <div class="node-badge">Start</div>
                   <div
-                    v-if="data.application && latestVersion(data.application)"
+                    v-if="data.tag || (data.application && latestVersion(data.application))"
                     class="node-description"
                   >
-                    {{ (data.application.versions || []).length }}
-                    {{
-                      (data.application.versions || []).length === 1
-                        ? "version"
-                        : "versions"
-                    }}
-                    &middot; latest
-                    {{ latestVersion(data.application).version }}
+                    <span class="version-tag">{{
+                      data.tag || latestVersion(data.application)?.version
+                    }}</span>
+                    <span
+                      v-if="
+                        data.tag &&
+                        latestVersion(data.application) &&
+                        data.tag !== latestVersion(data.application).version
+                      "
+                      class="version-outdated-badge"
+                    >
+                      older — latest
+                      {{ latestVersion(data.application).version }}
+                    </span>
+                    <span v-else class="version-latest-badge">latest</span>
                   </div>
                   <div
                     v-if="data.application && visibilityLabel(data.application)"
@@ -1079,17 +1112,24 @@ const openNodeSettings = (id) => {
                   </div>
                   <div class="node-badge">End</div>
                   <div
-                    v-if="data.application && latestVersion(data.application)"
+                    v-if="data.tag || (data.application && latestVersion(data.application))"
                     class="node-description"
                   >
-                    {{ (data.application.versions || []).length }}
-                    {{
-                      (data.application.versions || []).length === 1
-                        ? "version"
-                        : "versions"
-                    }}
-                    &middot; latest
-                    {{ latestVersion(data.application).version }}
+                    <span class="version-tag">{{
+                      data.tag || latestVersion(data.application)?.version
+                    }}</span>
+                    <span
+                      v-if="
+                        data.tag &&
+                        latestVersion(data.application) &&
+                        data.tag !== latestVersion(data.application).version
+                      "
+                      class="version-outdated-badge"
+                    >
+                      older — latest
+                      {{ latestVersion(data.application).version }}
+                    </span>
+                    <span v-else class="version-latest-badge">latest</span>
                   </div>
                   <div
                     v-if="data.application && visibilityLabel(data.application)"
@@ -1295,6 +1335,64 @@ const openNodeSettings = (id) => {
                   </template>
                   <div v-else class="info-row">
                     <span class="info-value">No parameters</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Processor version -->
+              <template
+                v-if="
+                  selectedNode.type === 'default' &&
+                  selectedNode.data.application?.versions?.length
+                "
+              >
+                <h4 class="sidebar-section-title">Application Version</h4>
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Version</span>
+                    <el-select
+                      v-if="!isReadOnly"
+                      v-model="selectedNode.data.tag"
+                      size="small"
+                      class="info-inline-select"
+                    >
+                      <el-option
+                        v-for="v in sortedVersions(
+                          selectedNode.data.application,
+                        )"
+                        :key="v.version"
+                        :label="versionOptionLabel(selectedNode.data.application, v)"
+                        :value="v.version"
+                      />
+                    </el-select>
+                    <span v-else class="info-value">
+                      {{ selectedNode.data.tag || "—" }}
+                      <span
+                        v-if="
+                          selectedNode.data.tag &&
+                          latestVersion(selectedNode.data.application) &&
+                          selectedNode.data.tag !==
+                            latestVersion(selectedNode.data.application).version
+                        "
+                        class="version-outdated-badge"
+                      >
+                        older — latest
+                        {{
+                          latestVersion(selectedNode.data.application).version
+                        }}
+                      </span>
+                      <span
+                        v-else-if="
+                          selectedNode.data.tag &&
+                          latestVersion(selectedNode.data.application) &&
+                          selectedNode.data.tag ===
+                            latestVersion(selectedNode.data.application).version
+                        "
+                        class="version-latest-badge"
+                      >
+                        latest
+                      </span>
+                    </span>
                   </div>
                 </div>
               </template>
@@ -2411,10 +2509,42 @@ const openNodeSettings = (id) => {
     color: theme.$gray_4;
     margin-bottom: 8px;
     line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .version-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: theme.$gray_6;
+    background: theme.$gray_1;
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+
+  .version-latest-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: rgba(5, 150, 105, 0.12);
+    color: #047857;
+    white-space: nowrap;
+  }
+
+  .version-outdated-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: rgba(217, 119, 6, 0.12);
+    color: #b45309;
+    white-space: nowrap;
   }
 
   .node-resources {
@@ -2778,5 +2908,29 @@ const openNodeSettings = (id) => {
   color: theme.$status_red;
   text-transform: uppercase;
   margin-left: 4px;
+}
+
+.version-latest-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(5, 150, 105, 0.12);
+  color: #047857;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.version-outdated-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+  white-space: nowrap;
+  margin-left: 6px;
 }
 </style>
