@@ -276,7 +276,7 @@ export default {
 
         // Handle viewer source - fetch presigned URL
         // use this when migrating instead of a wrapper for every component
-        if (viewerToLoad === 'OmeViewer') {
+        if (viewers.includes('OmeViewer')) {
           try {
             const viewerAssets = await this.fetchViewerAssets(pkgId);
 
