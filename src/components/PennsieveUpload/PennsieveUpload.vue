@@ -157,6 +157,10 @@ User archives manifest -> remove activeManifest from memory
         </label>
       </div>
 
+      <ImageProcessingOptions
+        v-if="!isUploading && !uploadComplete && uploadFiles.length > 0"
+      />
+
       <template #footer>
         <bf-button
           v-if="!isUploading && !uploadComplete"
@@ -188,7 +192,10 @@ import IconPDF from "../icons/IconPDF.vue";
 import IconTimeseries from "../icons/IconTimeseries.vue";
 import IconUpload from "../icons/IconUpload.vue";
 import IconCollection from "../icons/IconCollection.vue";
+import ImageProcessingOptions from "./ImageProcessingOptions.vue";
 import { fileIcon } from "../../mixins/file-icon/file-icon.js";
+import { isImageViewerEligible } from "@/utils/imageViewerFileTypes";
+import { submitBatchProcessForViewer } from "@/utils/mockImageProcessingApi";
 
 const store = useStore();
 
@@ -318,6 +325,21 @@ function onDrop(acceptedFiles: File[]) {
 }
 
 function startUpload() {
+  // If image processing is enabled, fire mock batch processing
+  const imgProc = store.getters["uploadModule/getImageProcessing"]();
+  if (imgProc.enabled) {
+    const eligible = uploadFiles.value.filter(f =>
+      isImageViewerEligible(f.name || "")
+    );
+    if (eligible.length > 0) {
+      submitBatchProcessForViewer(eligible, {
+        downsample: imgProc.downsample,
+        compress: imgProc.compress,
+        processAll: imgProc.processAll,
+      });
+    }
+  }
+
   store
     .dispatch("uploadModule/getManifestNodeId")
     .then(() => store.dispatch("uploadModule/syncManifest"))

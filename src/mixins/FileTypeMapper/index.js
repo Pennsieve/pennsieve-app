@@ -535,6 +535,10 @@ export default {
     isLayFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.lay')
+    },
+    isOMEZarr: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.ome.zarr') || fileName.endsWith('.zarr')
     }
   }
 

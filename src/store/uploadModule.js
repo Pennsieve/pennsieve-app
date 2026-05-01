@@ -4,6 +4,7 @@ import { Upload } from "@aws-sdk/lib-storage"
 import { ChecksumAlgorithm, S3Client } from "@aws-sdk/client-s3"
 
 import { v4 as uuidv4 } from 'uuid';
+import { isImageViewerEligible } from '@/utils/imageViewerFileTypes'
 import router from '@/router'
 import EventBus from '../utils/event-bus'
 import { useGetToken } from "@/composables/useGetToken";
@@ -110,6 +111,12 @@ const initialState = () => ({
     // predecessor and create new). Reset to keepBoth on every new batch
     // so "Replace" stays a deliberate choice, not a sticky preference.
     onConflict: 'keepBoth',
+    imageProcessing: {
+        enabled: false,
+        downsample: true,
+        compress: true,
+        processAll: false,
+    },
 })
 
 export const state = initialState()
@@ -223,6 +230,9 @@ export const mutations = {
             state.onConflict = 'keepBoth'
         }
     },
+    SET_IMAGE_PROCESSING(state, payload) {
+        state.imageProcessing = { ...state.imageProcessing, ...payload }
+    },
     SET_TOTAL_FILES_IN_BATCH(state, count) {
         state.totalFilesInBatch = count
     },
@@ -240,6 +250,7 @@ export const mutations = {
         state.storageBucket = ""
         state.storageKeyPrefix = ""
         state.onConflict = 'keepBoth'
+        state.imageProcessing = { enabled: false, downsample: true, compress: true, processAll: false }
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -285,6 +296,10 @@ export const actions = {
 
     setOnConflict: ({commit}, value) => {
         commit('SET_ON_CONFLICT', value)
+    },
+
+    setImageProcessing: ({commit}, payload) => {
+        commit('SET_IMAGE_PROCESSING', payload)
     },
 
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
@@ -933,6 +948,12 @@ export const getters = {
     },
     getOnConflict: state => () => {
         return state.onConflict
+    },
+    getImageProcessing: state => () => {
+        return state.imageProcessing
+    },
+    getHasImageViewerFiles: state => () => {
+        return state.manifestFiles.some(f => isImageViewerEligible(f.name || ''))
     },
     // Returns a Map<existingPackageId, uploadEntry> for replace-conflict
     // uploads targeting `folderId`. The DatasetFiles displayFiles walks

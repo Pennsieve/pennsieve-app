@@ -23,6 +23,12 @@
       :pkg="pkg"
       :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
     />
+    <NeuroglancerPlaceholder
+      v-else-if="cmpViewer === 'NeuroglancerPlaceholder'"
+      ref="viewer"
+      :pkg="pkg"
+      @assets-ready="onAssetsReady"
+    />
     <component
       v-else
       :is="cmpViewer"
@@ -105,6 +111,9 @@ export default {
     ),
     OmeViewer: defineAsyncComponent(()=>
     import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
+    ),
+    NeuroglancerPlaceholder: defineAsyncComponent(() =>
+      import("../../viewers/NeuroglancerPlaceholder.vue")
     )
   },
 
@@ -211,6 +220,8 @@ export default {
           return ".Lay Viewer";
         case "TextViewer":
           return "Raw Text";
+        case "NeuroglancerPlaceholder":
+          return "Neuroglancer";
         default:
           return viewer;
       }
@@ -218,6 +229,21 @@ export default {
 
     selectViewer: function (evt) {
       this.cmpViewer = evt;
+    },
+
+    onAssetsReady: function (assets) {
+      // Swap placeholder for a mock NeuroglancerViewer entry
+      if (assets && assets.length > 0) {
+        this.viewerAssets = assets.map(a => ({
+          ...a,
+          cloudfront: null,
+        }))
+        const idx = this.availableViewers.indexOf('NeuroglancerPlaceholder')
+        if (idx !== -1) {
+          this.availableViewers.splice(idx, 1, 'NeuroglancerViewer:0')
+        }
+        this.cmpViewer = 'NeuroglancerViewer:0'
+      }
     },
 
     /**
@@ -265,6 +291,13 @@ export default {
         } catch (err) {
           // Viewer assets not available — fall through to default viewer
         }
+      }
+
+      // If file is OME-TIFF or OME-Zarr but no ready neuroglancer assets,
+      // show the placeholder so the user can trigger processing.
+      const hasNgViewer = viewers.some(v => v.startsWith('NeuroglancerViewer:'))
+      if (!hasNgViewer && (this.isOMETiff(activeViewer) || this.isOMEZarr(activeViewer))) {
+        viewers.push('NeuroglancerPlaceholder')
       }
 
       this.availableViewers = viewers;
