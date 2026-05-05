@@ -4,21 +4,23 @@ import {useHandleXhrError, useSendXhr} from "@/mixins/request/request_composable
 import store from "@/store";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import router from "@/router";
+import {useComputeResourcesStore} from "@/stores/computeResourcesStore";
 
 export async function useSwitchWorkspace(org) {
     const orgId = org.organization.id
-    
+
     // Set loading state to true at the beginning
     store.dispatch('setIsSwitchingOrganization', true)
-    
+
     try {
         const token = await useGetToken()
         const switchOrgUrl = `${siteConfig.apiUrl}/session/switch-organization?organization_id=${orgId}&api_key=${token}`
-        
+
         // Perform the organization switch
         await useSendXhr(switchOrgUrl, {method: 'PUT'})
 
         // Clear state and update stores
+        useComputeResourcesStore().clearCache()
         await Promise.all([
             store.dispatch('clearState'),
             store.dispatch('clearDatasetFilters'),

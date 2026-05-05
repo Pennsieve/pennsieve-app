@@ -275,6 +275,7 @@ export const actions = {
   },
 
   /**
+
    * Get source files for a package (the original uploaded files,
    * not processed viewer assets). Used by OmeViewer to get the
    * original .ome.tiff source file.
@@ -347,6 +348,7 @@ export const actions = {
   },
 
   /**
+
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId
