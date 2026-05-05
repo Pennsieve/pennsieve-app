@@ -11,6 +11,9 @@
         {{ viewerNameMapper(viewer) }}
       </button>
     </div>
+    <div v-if="omeTiffSlowWarning && cmpViewer === 'OmeViewer'" class="viewer-warning">
+      This TIFF has interleaved channels and may be very slow to load.
+    </div>
     <OmeViewer
       v-if="cmpViewer === 'OmeViewer'"
       ref="viewer"
@@ -132,6 +135,7 @@ export default {
       viewerAssets: [],
       isLoading: false,
       omeTiffSource: "",
+      omeTiffSlowWarning: false,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
@@ -150,7 +154,7 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets', 'fetchSourceFiles']),
 
     /**
      * Called when component is mounted
@@ -267,6 +271,11 @@ export default {
         }
       }
 
+      // Warn when an OME-TIFF has interleaved channels (processed into
+      // zarr for Neuroglancer) — the raw TIFF will be slow to render.
+      const hasNgViewers = viewers.some(v => v.startsWith('NeuroglancerViewer:'))
+      this.omeTiffSlowWarning = this.isOMETiff(activeViewer) && hasNgViewers
+
       this.availableViewers = viewers;
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
@@ -274,18 +283,18 @@ export default {
       } else {
         const viewerToLoad = this.availableViewers[0];
 
-        // Handle viewer source - fetch presigned URL
-        // use this when migrating instead of a wrapper for every component
+        // Fetch presigned URL for OmeViewer from the original source
+        // files — not /view which returns processed zarr chunks.
         if (viewers.includes('OmeViewer')) {
           try {
-            const viewerAssets = await this.fetchViewerAssets(pkgId);
+            const sourceFiles = await this.fetchSourceFiles(pkgId);
 
-            if (viewerAssets && viewerAssets.length > 0) {
-              const fileId = pathOr('', ['content', 'id'], viewerAssets[0]);
+            if (sourceFiles && sourceFiles.length > 0) {
+              const fileId = pathOr('', ['content', 'id'], sourceFiles[0]);
               this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
             }
           } catch (err) {
-            console.error('Failed to fetch file URL:', err);
+            console.error('Failed to fetch source file URL:', err);
           }
         }
 
@@ -329,6 +338,16 @@ export default {
   flex: 1;
   flex-direction: column;
   position: relative;
+}
+
+.viewer-warning {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 12px;
+  margin: 0 8px;
+  padding: 6px 12px;
 }
 
 .viewer-btn-wrapper {
