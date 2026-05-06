@@ -190,16 +190,11 @@
 </template>
 
 <script setup>
-import {
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  getCurrentInstance,
-} from "vue";
+import { computed, ref, onMounted, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import { useGithubOAuth } from "@/composables/useGithubOAuth";
 import * as siteConfig from "@/site-config/site.json";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
@@ -210,25 +205,22 @@ const instance = getCurrentInstance();
 const profile = computed(() => store.state.profile);
 const loading = ref(false);
 const isDeleteDialogVisible = ref(false);
+
 const githubProfile = ref({});
 const oauthWindow = ref(null);
 const popupPollTimer = ref(null);
 
-const hasGithubProfile = computed(() => {
-  // Check both the local githubProfile and the store's profile
-  return !!(githubProfile.value?.login || profile.value?.githubProfile?.login);
-});
-
-// Get the actual GitHub profile data from either local or store
-const displayGithubProfile = computed(() => {
-  return githubProfile.value?.login
-    ? githubProfile.value
-    : profile.value?.githubProfile || {};
-});
+const displayGithubProfile = computed(() => profile.value?.githubProfile || {});
+const hasGithubProfile = computed(() => !!displayGithubProfile.value.login);
 
 const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
-onMounted(() => {
+
+const { openGithubOAuth: openGitHub, fetchGithubProfile } = useGithubOAuth({
+  refreshRepos: true,
+});
+
+onMounted(async () => {
   window.addEventListener("message", messageEventListener);
   initializeGithubData();
 });
@@ -283,16 +275,9 @@ function updateGithubIntegration() {
 
 async function initializeGithubData() {
   loading.value = true;
-
-  // First try to fetch fresh GitHub data from API
   await fetchGithubProfile();
-
-  // If API fetch fails, fall back to store data
-  if (!githubProfile.value?.login && profile.value?.githubProfile) {
-    githubProfile.value = profile.value.githubProfile;
-  }
-
   loading.value = false;
+
 }
 
 async function fetchGithubProfile() {
@@ -426,10 +411,8 @@ async function confirmDelete() {
       },
     });
 
-    githubProfile.value = {};
     isDeleteDialogVisible.value = false;
 
-    // Update store
     store.dispatch("updateProfile", {
       ...profile.value,
       githubProfile: null,

@@ -1,18 +1,78 @@
-import Cookies from "js-cookie";
 import toQueryParams from '../utils/toQueryParams.js'
-import {compose, defaultTo, find, join, map, prepend, propEq, reverse} from "ramda";
-import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
-import { GetCredentialsForIdentityCommand, CognitoIdentityClient, GetIdCommand } from "@aws-sdk/client-cognito-identity";
+import { compose, find, join, map, prepend, propEq } from "ramda";
 import { Upload } from "@aws-sdk/lib-storage"
-import {ChecksumAlgorithm, S3Client} from "@aws-sdk/client-s3"
-import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers"; // ES6 import
-
+import { ChecksumAlgorithm, S3Client } from "@aws-sdk/client-s3"
 
 import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
-import {useGetToken} from "@/composables/useGetToken";
-import { fetchAuthSession } from "aws-amplify/auth";
+import { useGetToken } from "@/composables/useGetToken";
+
+// Finalize batching matches the agent (pennsieve-agent/pkg/server/upload.go):
+// server accepts up to 250 files per POST /upload/manifest/files/finalize call
+// and we flush once we hit that bound or the flush interval, whichever first.
+//
+// Flush interval is 1s (vs. the agent's 5s). Measured end-to-end delay from
+// S3 PUT → Pusher "upload-event" is 6–22s in dev; ~5s of that was pure idle
+// in this flush interval for small drops. The server-side SQS batching
+// window (upload-service-v2 terraform/sqs.tf:26, currently 5s) is the other
+// compressible leg. 1s here keeps a little headroom for coalescing when
+// many S3 PUTs finish close together, without dominating the latency.
+const FINALIZE_BATCH_SIZE = 250;
+const FINALIZE_FLUSH_MS = 1000;
+
+// How many S3 PUTs run at once. Browser + AWS SDK lib-storage already
+// does 4-way parallelism *within* a file (queueSize: 4) for multipart
+// parts; this is cross-file concurrency on top of that. 4 is a balance
+// between bandwidth saturation on a typical connection and not
+// over-subscribing CPU on the checksum-per-part work.
+const UPLOAD_CONCURRENCY = 4;
+
+// Module-level guard to serialize finalize POSTs. Without this, the
+// batch-size trigger and the timer-based flush can both capture the same
+// pendingFinalize entries and fire duplicate requests — the second POST
+// would arrive with an empty batch (CLEAR_FINALIZE_QUEUE already ran) or,
+// worse, race on the `batch` snapshot. Not reactive — just a mutex.
+let finalizeInFlight = false;
+
+// Refresh storage credentials when the remaining TTL drops below 5 minutes —
+// same headroom the agent uses. STS returns ~1h creds.
+const CREDENTIAL_REFRESH_HEADROOM_MS = 5 * 60 * 1000;
+
+// macOS screenshots insert U+202F (narrow no-break space) between the time
+// and AM/PM, and other Unicode-whitespace variants sneak in from copy/paste.
+// S3 rejects presigned GETs whose response-content-disposition is not
+// ISO-8859-1 with a 400 (InvalidArgument), so names with these characters
+// fail to download. Folding the invisible variants to ASCII space preserves
+// the visible filename while keeping the Content-Disposition header valid.
+// Non-whitespace non-Latin-1 (CJK, emoji) is left alone — that needs the
+// server-side RFC 5987 fix to download correctly.
+const INVISIBLE_UNICODE_WS = /[\u00A0\u2000-\u200F\u202F\u205F\u3000\uFEFF]/g;
+const sanitizeFileName = (name) => name.replace(INVISIBLE_UNICODE_WS, ' ');
+
+// Mirror the server's keepBoth suffix algorithm (pennsieve-go-core
+// packages.go expandName): greedy-from-left first-dot extension split,
+// then "<base> (<N>).<ext>" or "<base> (<N>)" starting at N=1 until free.
+// For e.g. "archive.tar.gz" this yields "archive (1).tar.gz" — matches
+// the server. Divergence from server would still be safe (server picks
+// its own name, placeholder just lingers until silent refresh catches up).
+const splitNameExt = (name) => {
+    const m = /^([^.]*)\.?(.*)$/.exec(name) || []
+    return [m[1] || '', m[2] || '']
+}
+const resolveKeepBothName = (originalName, takenNames) => {
+    if (!takenNames.has(originalName)) return originalName
+    const [base, ext] = splitNameExt(originalName)
+    let i = 1
+    while (i < 10000) {
+        const candidate = ext ? `${base} (${i}).${ext}` : `${base} (${i})`
+        if (!takenNames.has(candidate)) return candidate
+        i += 1
+    }
+    // Loop bound is a safety net — if someone's folder has 10k collisions,
+    // fall back to a uuid-like suffix rather than hanging.
+    return ext ? `${originalName} (${Date.now()})` : originalName
+}
 
 class UploadFile {
     constructor(uploadId, s3Key, targetPath, targetName) {
@@ -24,18 +84,32 @@ class UploadFile {
 }
 
 const initialState = () => ({
-    cognitoConfig: {},
     manifestNodeId: "",
-    savedDatasetId:"",
+    savedDatasetId: "",
     manifestFiles: [],
     uploadFileMap: new Map(),
     uploadDestination: {},
-    identityCreds: {},
+    // Storage credentials (STS) fetched from /upload/manifest/storage-credentials.
+    // Scoped to this manifest's key prefix and expire in ~1h; re-fetched when
+    // CREDENTIAL_REFRESH_HEADROOM_MS elapsed before expiry.
+    storageCreds: null,           // {accessKeyId, secretAccessKey, sessionToken}
+    storageCredsExpiresAt: 0,     // ms since epoch
+    storageBucket: "",            // destination bucket (workspace-scoped)
+    storageKeyPrefix: "",         // O{org}/D{ds}/{manifestId}
+    storageRegion: "us-east-1",
+    // Finalize batch — files that finished their S3 PUT and are waiting for
+    // the next flush to /upload/manifest/files/finalize.
+    pendingFinalize: [],
     isUploading: false,
     uploadComplete: false,
-    uploadProgress: {total: 0, loaded:0},
+    uploadProgress: { total: 0, loaded: 0 },
     currentTargetPackage: {},
-    totalFilesInBatch: 0
+    totalFilesInBatch: 0,
+    // Name-conflict resolution for this batch. Server accepts keepBoth
+    // (default, auto-rename to " (N)") or replace (soft-delete
+    // predecessor and create new). Reset to keepBoth on every new batch
+    // so "Replace" stays a deliberate choice, not a sticky preference.
+    onConflict: 'keepBoth',
 })
 
 export const state = initialState()
@@ -79,8 +153,24 @@ export const mutations = {
     SET_CURRENT_TARGET_PACKAGE(state, currentTargetPackage) {
         state.currentTargetPackage = currentTargetPackage
     },
-    SET_COGNITO_CONFIG(state, config) {
-        state.cognitoConfig = config
+    SET_STORAGE_CREDS(state, { creds, bucket, keyPrefix, region, expiresAt }) {
+        state.storageCreds = creds
+        state.storageBucket = bucket
+        state.storageKeyPrefix = keyPrefix
+        state.storageRegion = region || state.storageRegion
+        state.storageCredsExpiresAt = expiresAt
+    },
+    CLEAR_STORAGE_CREDS(state) {
+        state.storageCreds = null
+        state.storageCredsExpiresAt = 0
+        state.storageBucket = ""
+        state.storageKeyPrefix = ""
+    },
+    ENQUEUE_FINALIZE(state, entry) {
+        state.pendingFinalize.push(entry)
+    },
+    CLEAR_FINALIZE_QUEUE(state) {
+        state.pendingFinalize = []
     },
     ADD_FILES_TO_MANIFEST(state, files) {
         state.manifestFiles.push(...files)
@@ -123,6 +213,16 @@ export const mutations = {
     SET_UPLOAD_COMPLETE(state, value) {
         state.uploadComplete = value
     },
+    SET_ON_CONFLICT(state, value) {
+        // Guard against invalid values at mutation time. Server currently
+        // accepts "keepBoth" (default) or "replace"; anything else is
+        // coerced to the safe default rather than rejected at the API.
+        if (value === 'keepBoth' || value === 'replace') {
+            state.onConflict = value
+        } else {
+            state.onConflict = 'keepBoth'
+        }
+    },
     SET_TOTAL_FILES_IN_BATCH(state, count) {
         state.totalFilesInBatch = count
     },
@@ -134,6 +234,12 @@ export const mutations = {
         state.isUploading = false
         state.uploadComplete = false
         state.totalFilesInBatch = 0
+        state.pendingFinalize = []
+        state.storageCreds = null
+        state.storageCredsExpiresAt = 0
+        state.storageBucket = ""
+        state.storageKeyPrefix = ""
+        state.onConflict = 'keepBoth'
     },
     REMOVE_COMPLETED_FILE(state, key) {
         const fileEntry = state.uploadFileMap.get(key)
@@ -175,6 +281,10 @@ export const mutations = {
 export const actions = {
     setCurrentTargetPackage: ({commit, rootState}, currentTargetPackage) => {
         commit('SET_CURRENT_TARGET_PACKAGE', currentTargetPackage)
+    },
+
+    setOnConflict: ({commit}, value) => {
+        commit('SET_ON_CONFLICT', value)
     },
 
     fetchManifestDownloadUrl: async ({commit, rootState}, manifest_id) => {
@@ -238,34 +348,48 @@ export const actions = {
         }
     },
 
-    // Get AWS Credentials to upload data to the upload-bucket
-    getCognitoConfig: async ({rootState, commit, getters}, evt) => {
-
-        // Get existing state of config
-        const curCognitoConfig = getters.getCognitoConfig()
-
-        // Check if existing state is empty
-        const isEmptyConfig = Object.keys(curCognitoConfig).length === 0 &&
-            curCognitoConfig.constructor === Object
-
-        // If empty, use API to get config
-        if (isEmptyConfig) {
-            const endpoint = `${rootState.config.apiUrl}/authentication/cognito-config`
-
-            try {
-                const resp = await fetch(endpoint).then(function (response) {
-                    return response.json();
-                }).then(function (data) {
-                    commit('SET_COGNITO_CONFIG', data)
-                });
-            } catch (e) {
-                throw new Error("Unable to get cognito-config.")
-            }
-
+    // Fetch narrow-scoped STS credentials for the storage bucket. The
+    // response gives us the destination bucket + a keyPrefix of the form
+    // O{org}/D{ds}/{manifestId} and creds valid for ~1h (server-assumed role
+    // with a session policy tied to that prefix). Called before sync so
+    // every file's s3_key can embed the keyPrefix, and re-called transparently
+    // from the AWS-SDK credentials provider when the current set is within
+    // CREDENTIAL_REFRESH_HEADROOM_MS of expiring. Mirror of the agent's
+    // StorageCredentialsProvider (pkg/server/upload.go:194-312).
+    fetchStorageCredentials: async ({ rootState, state, commit }) => {
+        if (!state.manifestNodeId) {
+            throw new Error("fetchStorageCredentials: no manifestNodeId set; call getManifestNodeId first")
         }
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest/storage-credentials`
+        const apiKey = await useGetToken()
+        const url = `${endpoint}?${toQueryParams({ dataset_id: datasetId })}`
 
-        // Return updated config
-        return getters.getCognitoConfig()
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ manifestNodeId: state.manifestNodeId })
+        })
+        if (!resp.ok) {
+            const text = await resp.text()
+            throw new Error(`storage-credentials failed (${resp.status}): ${text}`)
+        }
+        const data = await resp.json()
+        commit('SET_STORAGE_CREDS', {
+            creds: {
+                accessKeyId: data.accessKeyId,
+                secretAccessKey: data.secretAccessKey,
+                sessionToken: data.sessionToken,
+            },
+            bucket: data.bucket,
+            keyPrefix: data.keyPrefix,
+            region: data.region,
+            expiresAt: new Date(data.expiration).getTime(),
+        })
+        return data
     },
 
     // Add files to manifest
@@ -277,9 +401,13 @@ export const actions = {
 
             let targetPackage = await state.currentTargetPackage;
 
+            // `file` is the target folder/dataset package — not a dropped
+            // File — so downstream consumers (placeholder-row getter, etc.)
+            // can match by folder id. Same shape `setUploadDestination`
+            // writes on explicit navigation.
             let uploadDestination = {
                 path: helpers.getFileLocation(targetPackage),
-                file: files[0]
+                file: targetPackage,
             }
 
             commit('SET_UPLOAD_DESTINATION', uploadDestination)
@@ -358,140 +486,339 @@ export const actions = {
 
     },
 
-    // Upload files in UploadFilesMap to Pennsieve using AWS SDK
-    UploadFiles: async( {rootState, state, dispatch, commit}, evt) =>{
-
-        // Get or Fetch cognito config
-        const config = await dispatch('getCognitoConfig')
-        // Create logins structure
-        let logins = {}
-    
-        const authSession = await fetchAuthSession();
-        const poolResource = authSession.tokens.accessToken.payload.iss.replace("https://","");
-        logins[poolResource] =authSession.tokens.idToken.toString();
+    // Direct-to-storage upload: PUT every file into the workspace storage
+    // bucket using short-lived STS creds scoped to this manifest's key
+    // prefix, then POST batches to /upload/manifest/files/finalize. No
+    // Cognito identity-pool creds, no legacy upload bucket, no Pusher
+    // dependency for driving this component's state machine.
+    //
+    // State transitions per file:
+    //   waiting -> uploading -> processing (S3 PUT done, awaiting finalize)
+    //           -> complete   (REMOVE_COMPLETED_FILE after finalize 200)
+    //           -> failed     (either the PUT or the finalize failed)
+    UploadFiles: async ({ rootState, state, dispatch, commit }) => {
         commit('SET_IS_UPLOADING', true)
         commit('SET_TOTAL_FILES_IN_BATCH', state.uploadFileMap.size)
 
-        const currentRoute = router.currentRoute.value
-        const datasetId = currentRoute.params.datasetId
+        const datasetId = router.currentRoute.value.params.datasetId
+        const tags = `OrgId=${rootState.activeOrganization.organization.id}&DatasetId=${datasetId}`
 
-        // Iterate over the file-list and upload sequentially
-        // TODO: Add concurrency
-        for (let [key, value] of state.uploadFileMap) {
+        // AWS SDK v3 accepts an async provider that can refresh. The SDK
+        // calls it when it needs creds; when `expiration` is within the
+        // SDK's internal skew window, it re-calls. Our own headroom check
+        // sits in front so a long run of uploads never hands stale creds
+        // to the SDK in the first place.
+        const credentialsProvider = async () => {
+            const now = Date.now()
+            if (!state.storageCreds ||
+                state.storageCredsExpiresAt - now < CREDENTIAL_REFRESH_HEADROOM_MS) {
+                await dispatch('fetchStorageCredentials')
+            }
+            return {
+                accessKeyId: state.storageCreds.accessKeyId,
+                secretAccessKey: state.storageCreds.secretAccessKey,
+                sessionToken: state.storageCreds.sessionToken,
+                expiration: new Date(state.storageCredsExpiresAt),
+            }
+        }
+
+        const s3Client = new S3Client({
+            region: state.storageRegion,
+            credentials: credentialsProvider,
+        })
+
+        // Time-based finalize flush: drains pendingFinalize every
+        // FINALIZE_FLUSH_MS so the server starts creating packages while
+        // later files are still being PUT, rather than waiting for the
+        // whole batch to finish before finalize fires. Critical for the
+        // small-drop case (<250 files), which otherwise skipped eager
+        // flushing entirely.
+        const flushTimer = setInterval(() => {
+            if (state.pendingFinalize.length > 0) {
+                dispatch('flushFinalizeBatch').catch((e) => console.error(e))
+            }
+        }, FINALIZE_FLUSH_MS)
+
+        const uploadOne = async (key, value) => {
             try {
-                commit('SET_FILE_STATUS', {key: key, status: "uploading"})
+                commit('SET_FILE_STATUS', { key, status: "uploading" })
 
-                const tags = "OrgId=" + rootState.activeOrganization.organization.id + "&DatasetId=" + datasetId
-
-                const parallelUploads3 = new Upload({
-                    client: new S3Client({
-                        region: 'us-east-1',
-                        requestChecksumCalculation: "WHEN_REQUIRED",
-                        responseChecksumValidation: "WHEN_REQUIRED",
-                        credentials: fromCognitoIdentityPool({
-                            identityPoolId: config.identityPool.id,
-                            clientConfig: {region: config.region},
-                            cache: state.identityCreds,
-                            logins: logins
-                        }),
-                    }),
+                const uploader = new Upload({
+                    client: s3Client,
                     queueSize: 4,
                     leavePartsOnError: false,
                     params: {
-                        Bucket: rootState.config.bucketName,
+                        Bucket: state.storageBucket,
                         Key: value.config.s3_key,
                         Body: value.file,
                         Tagging: tags,
-                    }
+                        // SHA256 is required by the finalize endpoint. The SDK
+                        // computes the multipart checksum-of-checksums during
+                        // upload and returns it on the completion response.
+                        ChecksumAlgorithm: ChecksumAlgorithm.SHA256,
+                    },
                 })
 
-                parallelUploads3.on("httpUploadProgress", (progress) => {
+                uploader.on("httpUploadProgress", (progress) => {
                     commit('UPDATE_UPLOAD_PROGRESS', {
                         key: progress.Key,
                         loaded: progress.loaded,
-                        total: progress.total
+                        total: progress.total,
                     })
-                });
+                })
 
-                await parallelUploads3.done();
+                const result = await uploader.done()
+                const sha256 = result.ChecksumSHA256
+                if (!sha256) {
+                    throw new Error("S3 response missing ChecksumSHA256")
+                }
 
-                commit('SET_FILE_STATUS', {key: key, status: "processing"})
+                commit('SET_FILE_STATUS', { key, status: "processing" })
+                commit('ENQUEUE_FINALIZE', {
+                    uploadId: value.config.upload_id,
+                    size: value.file.size,
+                    sha256,
+                    mapKey: key,
+                })
 
+                // Flush opportunistically once we've accumulated a full batch.
+                if (state.pendingFinalize.length >= FINALIZE_BATCH_SIZE) {
+                    await dispatch('flushFinalizeBatch')
+                }
             } catch (e) {
-                console.error(e);
-                commit('SET_FILE_STATUS', {key: key, status: "failed"})
+                console.error(e)
+                commit('SET_FILE_STATUS', { key, status: "failed" })
                 EventBus.$emit('toast', {
                     detail: {
                         msg: `Failed to upload ${value.file.name}: ${e.message || 'Unknown error'}`,
-                        type: 'error'
-                    }
+                        type: 'error',
+                    },
                 })
             }
         }
+
+        // Worker pool — pulls from a shared queue so each worker moves on
+        // to the next file as soon as its current PUT finishes. Cross-file
+        // concurrency is cheap here (lib-storage's queueSize handles
+        // within-file part parallelism).
+        const queue = [...state.uploadFileMap]
+        const workerCount = Math.min(UPLOAD_CONCURRENCY, queue.length)
+        const workers = Array.from({ length: workerCount }, async () => {
+            while (queue.length > 0) {
+                const next = queue.shift()
+                if (!next) return
+                await uploadOne(next[0], next[1])
+            }
+        })
+
+        try {
+            await Promise.all(workers)
+        } finally {
+            clearInterval(flushTimer)
+        }
+
+        // Final flush for any remainder below the batch threshold.
+        if (state.pendingFinalize.length > 0) {
+            await dispatch('flushFinalizeBatch')
+        }
+
         commit('SET_UPLOAD_COMPLETE', true)
     },
 
-    // Sync Manifest Files with Server
-    syncManifest: async ({rootState,commit, dispatch}, evt) => {
+    // POST /upload/manifest/files/finalize with the currently-queued files.
+    // Per-file success -> SET_FILE_STATUS=finalized; the placeholder row
+    // stays visible in the "Importing..." state until the server-side
+    // package record shows up in a silent refresh (Pusher `upload-event`
+    // triggers that), at which point displayFiles dedupes by name and the
+    // placeholder drops out. Removing the map entry here instead would
+    // leave a visual gap of several seconds between finalize and Pusher.
+    // Per-file failure -> SET_FILE_STATUS=failed so the user sees which
+    // file didn't make it. Request-level failures mark every queued file
+    // as failed so the UI never silently "forgets" them.
+    flushFinalizeBatch: async ({ rootState, state, commit }) => {
+        // Serialize concurrent callers (timer-based flush + batch-size
+        // trigger + final post-loop flush). The second caller returns
+        // immediately; whatever accumulated while the first POST was
+        // in flight gets picked up by the next timer tick or the final
+        // flush after the worker pool drains.
+        if (finalizeInFlight) return
+        if (state.pendingFinalize.length === 0) return
+        finalizeInFlight = true
+        const batch = state.pendingFinalize.slice()
+        commit('CLEAR_FINALIZE_QUEUE')
 
-        // Current assumptions:
-        // 1. Uploads through browser can sync manifest in single call.
-        // 3. All files are uploaded to the folder specified in 'destinationPackageId'
-
-        //
-        const endpoint = `${rootState.config.api2Url}/upload/manifest`
-        const currentRoute = router.currentRoute.value
-        const datasetId = currentRoute.params.datasetId
-
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest/files/finalize`
+        const url = `${endpoint}?${toQueryParams({ dataset_id: datasetId })}`
         const apiKey = await useGetToken()
-        const queryParams = toQueryParams({
-            dataset_id: datasetId,
-        })
 
-        let uploadMap =  new Map()
-        let requestFiles = []
+        const body = {
+            manifestNodeId: state.manifestNodeId,
+            // Server accepts "keepBoth" (default), "replace", "fail".
+            // Omitted / empty resolves to keepBoth server-side; sending it
+            // explicitly keeps intent visible in network logs.
+            onConflict: state.onConflict || 'keepBoth',
+            files: batch.map(b => ({
+                uploadId: b.uploadId,
+                size: b.size,
+                sha256: b.sha256,
+            })),
+        }
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify(body),
+            })
+            if (!resp.ok) {
+                throw new Error(`finalize failed (${resp.status}): ${await resp.text()}`)
+            }
+            const data = await resp.json()
+            const byUploadId = new Map(batch.map(b => [b.uploadId, b.mapKey]))
+            for (const r of data.results || []) {
+                const mapKey = byUploadId.get(r.uploadId)
+                if (!mapKey) continue
+                if (r.status === 'finalized') {
+                    commit('SET_FILE_STATUS', { key: mapKey, status: 'finalized' })
+                } else {
+                    commit('SET_FILE_STATUS', { key: mapKey, status: 'failed' })
+                    EventBus.$emit('toast', {
+                        detail: {
+                            msg: `Failed to finalize ${mapKey}: ${r.error || 'unknown error'}`,
+                            type: 'error',
+                        },
+                    })
+                }
+            }
+        } catch (e) {
+            console.error(e)
+            for (const b of batch) {
+                commit('SET_FILE_STATUS', { key: b.mapKey, status: 'failed' })
+            }
+            EventBus.$emit('toast', {
+                detail: {
+                    msg: `Failed to finalize batch: ${e.message || 'Unknown error'}`,
+                    type: 'error',
+                },
+            })
+        } finally {
+            finalizeInFlight = false
+        }
+    },
+
+    // Sync Manifest Files with Server. Fetches fresh storage credentials
+    // first so the per-file s3_key embeds the workspace-scoped keyPrefix
+    // (O{org}/D{ds}/{manifestId}). The server stores the files in
+    // manifest_files with Status=Registered; the finalize call later
+    // promotes them to Finalized.
+    syncManifest: async ({ rootState, state, commit, dispatch }) => {
+        if (!state.manifestNodeId) {
+            throw new Error("syncManifest: no manifestNodeId; call getManifestNodeId first")
+        }
+
+        // Must happen before key assembly — keyPrefix comes from the
+        // credentials response.
+        await dispatch('fetchStorageCredentials')
+        const keyPrefix = state.storageKeyPrefix
+        if (!keyPrefix) {
+            throw new Error("syncManifest: storage-credentials returned no keyPrefix")
+        }
+
+        const datasetId = router.currentRoute.value.params.datasetId
+        const endpoint = `${rootState.config.api2Url}/upload/manifest`
+        const apiKey = await useGetToken()
+        const queryParams = toQueryParams({ dataset_id: datasetId })
+
+        // Merge new-batch entries into any finalized carry-overs from a
+        // previous batch (those still need their placeholder rows until
+        // Pusher confirms them). s3_key is a fresh UUID so the new entries
+        // never collide with existing ones.
+        const uploadMap = new Map(state.uploadFileMap)
+        const requestFiles = []
         let total = 0
-        for (let mf in state.manifestFiles) {
 
+        // Build the set of names already taken in the destination folder
+        // so we can pre-resolve client-side name conflicts. Only files
+        // landing at the *root* of the destination are checked — we don't
+        // have server-side children for nested subfolders (may or may not
+        // exist), so those fall through to whatever the server decides.
+        // For replace, we also need the existing package's id to overlay
+        // upload progress onto its row in the DatasetFiles table.
+        const existingChildren = (state.currentTargetPackage && state.currentTargetPackage.children) || []
+        const existingByName = new Map()
+        for (const child of existingChildren) {
+            const nm = child && child.content && child.content.name
+            if (nm) existingByName.set(nm, child)
+        }
+        const onConflict = state.onConflict || 'keepBoth'
+        const takenInBatch = new Set()
+
+        for (const mf in state.manifestFiles) {
             const uploadId = uuidv4()
-            const s3Key = state.manifestNodeId + '/' + uploadId
-
+            const s3Key = `${keyPrefix}/${uploadId}`
             const curFile = state.manifestFiles[mf]
 
-            let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length-curFile.name.length)
-            fileLocation = fileLocation.replace(/^\//, '') // remove leading '/' if it exists
-            fileLocation = fileLocation.replace(/\/$/, '') // remove trailing '/' if it exists
+            let fileLocation = state.uploadDestination.path + curFile.path.substring(0, curFile.path.length - curFile.name.length)
+            fileLocation = fileLocation.replace(/^\//, '').replace(/\/$/, '')
+
+            // Is this file landing at the destination root (no subfolder
+            // from webkitRelativePath), or nested under a dropped folder?
+            // We only pre-resolve conflicts for root-level files.
+            const hasSubfolder = curFile.path && curFile.path !== curFile.name && curFile.path.includes('/')
+
+            let targetName = sanitizeFileName(curFile.name)
+            let replacesPackageId = null
+            if (!hasSubfolder) {
+                if (onConflict === 'keepBoth') {
+                    const taken = new Set([...existingByName.keys(), ...takenInBatch])
+                    targetName = resolveKeepBothName(targetName, taken)
+                } else if (onConflict === 'replace') {
+                    const existing = existingByName.get(targetName)
+                    if (existing && existing.content && existing.content.id) {
+                        replacesPackageId = existing.content.id
+                    }
+                }
+                takenInBatch.add(targetName)
+            }
 
             const f = new UploadFile(
                 uploadId,
                 s3Key,
                 fileLocation,
-                curFile.name,
-                curFile
+                targetName,
             )
 
             uploadMap.set(s3Key, {
                 file: curFile,
                 config: f,
-                progress: {loaded:0, total: curFile.total},
-                status: "waiting"
+                progress: { loaded: 0, total: curFile.total },
+                status: "waiting",
+                // Set only on replace-conflict root-level entries. The
+                // placeholder getter skips these (no separate row); the
+                // DatasetFiles displayFiles overlays progress onto the
+                // existing server row with this id instead.
+                _replacesPackageId: replacesPackageId,
             })
 
             total += curFile.size
-
             requestFiles.push(f)
         }
 
-        // Set the map
         commit("SET_UPLOAD_FILE_MAP", uploadMap)
-
-        // Set the total number of bytes of all files combined
+        // Progress total is the *current batch only*; finalized carry-over
+        // entries' bytes were already counted in the previous batch's total
+        // and subtracted from loaded/total as they got removed.
         state.uploadProgress.total = total
+        state.uploadProgress.loaded = 0
 
-        let requestBody = {
+        const requestBody = {
             id: state.manifestNodeId,
-            files: requestFiles
-        };
+            files: requestFiles,
+        }
 
         const url = `${endpoint}?${queryParams}`
         try {
@@ -500,48 +827,19 @@ export const actions = {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json; charset=utf-8',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify(requestBody)
-            }).then(function (resp) {
-            });
+                body: JSON.stringify(requestBody),
+            })
+            if (!resp.ok) {
+                throw new Error(`sync failed (${resp.status}): ${await resp.text()}`)
+            }
         } catch (e) {
             console.error(e)
             throw new Error("Unable to sync manifest.")
         } finally {
-
-            // Set Manifest Files array to empty as this is now in upload file map
             state.manifestFiles = []
         }
-    },
-
-    // Update status of an upload File
-    updateFileStatus: async ({commit, state}, fileInfo) => {
-        let s3_key = state.manifestNodeId + "/" + fileInfo.key
-
-        if (state.uploadFileMap.get(s3_key)) {
-            // If file is complete (appeared in file browser), remove it from the upload list
-            if (fileInfo.status === 'complete') {
-                // Check if this is the last file before removing
-                const isLastFile = state.uploadFileMap.size === 1
-                const totalFiles = state.totalFilesInBatch
-                commit('REMOVE_COMPLETED_FILE', s3_key)
-
-                // Show success toast when all files have been uploaded
-                if (isLastFile && typeof window !== 'undefined') {
-                    const fileWord = totalFiles === 1 ? 'file has' : 'files have'
-                    EventBus.$emit('toast', {
-                        detail: {
-                            msg: `${totalFiles} ${fileWord} been successfully uploaded`,
-                            type: 'success'
-                        }
-                    })
-                }
-            } else {
-                commit('SET_FILE_STATUS', {key: s3_key, status: fileInfo.status})
-            }
-        }
-
     },
 
     // Reset upload action
@@ -557,6 +855,56 @@ export const actions = {
     // Clear all completed files from the upload map
     clearCompletedFiles: async({ commit }) => {
         commit("CLEAR_COMPLETED_FILES")
+    },
+
+    // Remove finalized entries whose target files are now confirmed in the
+    // server-side file listing. Called from the DatasetFiles silent refresh
+    // so the aggregate pill can stop saying "Importing..." the instant the
+    // real package rows show up.
+    //
+    // Scope: only reconciles when the silent refresh is for the destination
+    // folder the upload was dropped into. When files land in a nested
+    // subfolder, matching the synthetic parent folder's first-segment name
+    // against a Collection child on the server clears every upload sitting
+    // under that segment.
+    reconcileFinalizedFiles: ({ state, commit }, { folderId, serverChildren }) => {
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        const destPath = (dest && dest.path) || ''
+        if (!destId || destId !== folderId) return
+        if (!Array.isArray(serverChildren)) return
+
+        const fileNames = new Set()
+        const collectionNames = new Set()
+        for (const row of serverChildren) {
+            const name = row && row.content && row.content.name
+            if (!name) continue
+            if (row.content.packageType === 'Collection') collectionNames.add(name)
+            else fileNames.add(name)
+        }
+
+        const toRemove = []
+        for (const [key, entry] of state.uploadFileMap) {
+            if (entry.status !== 'finalized') continue
+            const fullTargetPath = (entry.config && entry.config.target_path) || ''
+            let rel = fullTargetPath
+            if (destPath && rel.startsWith(destPath)) {
+                rel = rel.slice(destPath.length).replace(/^\//, '')
+            }
+            const name = (entry.config && entry.config.target_name) || (entry.file && entry.file.name) || ''
+            if (!rel) {
+                // Immediate child of destination — match by filename.
+                if (fileNames.has(name)) toRemove.push(key)
+            } else {
+                // Nested — the server has created the top-level folder, so
+                // at least some files in that subtree have landed. Clearing
+                // optimistically lets the pill settle; the user sees the
+                // real folder row and can navigate in for per-file detail.
+                const firstSeg = rel.split('/')[0]
+                if (collectionNames.has(firstSeg)) toRemove.push(key)
+            }
+        }
+        for (const k of toRemove) commit('REMOVE_COMPLETED_FILE', k)
     }
 
 }
@@ -567,9 +915,6 @@ export const getters = {
     },
     getUploadMap: state => () => {
       return state.uploadFileMap
-    },
-    getCognitoConfig: state => () => {
-        return state.cognitoConfig
     },
     getIsUploading: state => () => {
         return state.isUploading
@@ -582,6 +927,155 @@ export const getters = {
     },
     getTotalFilesInBatch: state => () => {
         return state.totalFilesInBatch
+    },
+    getUploadDestination: state => () => {
+        return state.uploadDestination
+    },
+    getOnConflict: state => () => {
+        return state.onConflict
+    },
+    // Returns a Map<existingPackageId, uploadEntry> for replace-conflict
+    // uploads targeting `folderId`. The DatasetFiles displayFiles walks
+    // server rows in that folder and overlays progress onto any row
+    // whose id is a key here. Empty map when not viewing the destination.
+    getReplaceOverlaysForFolder: state => (folderId) => {
+        const out = new Map()
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        if (!destId || destId !== folderId) return out
+        for (const [key, entry] of state.uploadFileMap) {
+            if (!entry._replacesPackageId) continue
+            out.set(entry._replacesPackageId, { key, entry })
+        }
+        return out
+    },
+    // Returns synthetic "placeholder" rows for a given folder view so the
+    // DatasetFiles table can show a row for each file that's still
+    // uploading/importing (before the server-side package record exists).
+    //
+    // Scope: placeholders are only surfaced when the user is viewing the
+    // destination folder where files were dropped. Uploads landing in a
+    // nested subfolder below the destination are rolled up into one
+    // synthetic folder row per first-segment. Uploads into a sibling folder
+    // of the current view are not shown here (aggregate pill covers that).
+    //
+    // Placeholder row shape intentionally mirrors a server package row
+    // enough that FilesTable/BfFileLabel can render it:
+    //   { content: { id, name, state, packageType }, storage, _placeholder, _placeholderStatus, _progress }
+    // `_placeholder === true` is the marker every consumer (download
+    // gating, viewer gating, selection handling) should check.
+    getPlaceholdersForFolder: state => (folderId) => {
+        const dest = state.uploadDestination
+        const destId = dest && dest.file && dest.file.content && dest.file.content.id
+        const destPath = (dest && dest.path) || ''
+        if (!destId || destId !== folderId) return []
+
+        const nestedGroups = new Map()
+        const immediate = []
+
+        const addRow = ({ key, relPath, name, size, loaded, total, status }) => {
+            const isImporting = status === 'processing' || status === 'finalized'
+            const phStatus = status === 'failed' ? 'failed'
+                : isImporting ? 'importing' : 'uploading'
+            const phState = status === 'failed' ? 'ERROR'
+                : isImporting ? 'IMPORTING' : 'UPLOADING'
+            if (!relPath) {
+                immediate.push({
+                    storage: size,
+                    _placeholder: true,
+                    _placeholderStatus: phStatus,
+                    _progress: { loaded, total },
+                    content: {
+                        id: key,
+                        name,
+                        state: phState,
+                        packageType: 'Unknown',
+                    },
+                })
+            } else {
+                const firstSeg = relPath.split('/')[0]
+                let g = nestedGroups.get(firstSeg)
+                if (!g) {
+                    g = { count: 0, loaded: 0, total: 0, importingCount: 0, failedCount: 0 }
+                    nestedGroups.set(firstSeg, g)
+                }
+                g.count += 1
+                g.loaded += loaded
+                g.total += total
+                if (isImporting) g.importingCount += 1
+                if (status === 'failed') g.failedCount += 1
+            }
+        }
+
+        // Post-sync phase: uploadFileMap has the authoritative entries with
+        // stable s3_key ids and live progress.
+        if (state.uploadFileMap.size > 0) {
+            for (const [key, entry] of state.uploadFileMap) {
+                // Replace-conflict entries don't get their own placeholder
+                // row — the existing server row (looked up by
+                // _replacesPackageId) gets decorated with upload progress
+                // in BfDatasetFiles displayFiles instead.
+                if (entry._replacesPackageId) continue
+                const fullTargetPath = (entry.config && entry.config.target_path) || ''
+                let rel = fullTargetPath
+                if (destPath && rel.startsWith(destPath)) {
+                    rel = rel.slice(destPath.length).replace(/^\//, '')
+                }
+                const name = (entry.config && entry.config.target_name) || (entry.file && entry.file.name) || ''
+                const size = (entry.file && entry.file.size) || 0
+                addRow({
+                    key,
+                    relPath: rel,
+                    name: sanitizeFileName(name),
+                    size,
+                    loaded: (entry.progress && entry.progress.loaded) || 0,
+                    total: (entry.progress && entry.progress.total) || size,
+                    status: entry.status || 'waiting',
+                })
+            }
+        } else {
+            // Pre-sync phase: syncManifest hasn't committed uploadFileMap yet.
+            // Surface rows from the raw manifestFiles so the user sees
+            // placeholders the instant they drop, not hundreds of ms later.
+            for (let i = 0; i < state.manifestFiles.length; i += 1) {
+                const f = state.manifestFiles[i]
+                const fullPath = (f && f.path) || (f && f.name) || ''
+                const name = (f && f.name) || ''
+                const rel = fullPath.length > name.length
+                    ? fullPath.slice(0, fullPath.length - name.length).replace(/\/$/, '')
+                    : ''
+                const size = (f && f.size) || 0
+                addRow({
+                    key: `pending:${i}:${fullPath}`,
+                    relPath: rel,
+                    name: sanitizeFileName(name),
+                    size,
+                    loaded: 0,
+                    total: size,
+                    status: 'waiting',
+                })
+            }
+        }
+
+        for (const [firstSeg, g] of nestedGroups) {
+            const allImporting = g.importingCount === g.count
+            const anyFailed = g.failedCount > 0
+            immediate.push({
+                storage: g.total,
+                _placeholder: true,
+                _placeholderStatus: anyFailed ? 'failed' : allImporting ? 'importing' : 'uploading',
+                _placeholderFileCount: g.count,
+                _progress: { loaded: g.loaded, total: g.total },
+                content: {
+                    id: `placeholder:folder:${folderId}:${firstSeg}`,
+                    name: firstSeg,
+                    state: anyFailed ? 'ERROR' : allImporting ? 'IMPORTING' : 'UPLOADING',
+                    packageType: 'Collection',
+                },
+            })
+        }
+
+        return immediate
     }
 }
 

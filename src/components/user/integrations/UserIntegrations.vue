@@ -86,16 +86,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
-import { useGetToken } from '@/composables/useGetToken'
-import * as siteConfig from '@/site-config/site.json'
+import { useGithubOAuth } from '@/composables/useGithubOAuth'
 import IntegrationCard from './IntegrationCard.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import orcidImage from '@/assets/images/orcid_24x24.png'
 
 const store = useStore()
-const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
 const profile = computed(() => store.state.profile)
 
@@ -115,7 +113,11 @@ const githubUsername = computed(() => {
   return profile.value?.githubProfile?.login || ''
 })
 
-const oauthWindow = ref(null)
+const { openGithubOAuth: updateGithubIntegration, fetchGithubProfile } = useGithubOAuth({
+  successMessage: 'Your GitHub integration has been updated!',
+  errorMessage: 'Failed to update GitHub integration. Please try again.',
+  refreshRepos: true,
+})
 
 onMounted(async () => {
   // Only fetch GitHub profile if we don't already have it
@@ -123,54 +125,6 @@ onMounted(async () => {
     await fetchGithubProfile()
   }
 })
-
-function updateGithubIntegration() {
-  // Open the same GitHub OAuth flow as initial connection
-  const redirectUri = `${window.location.origin}/github-redirect`
-  const githubAppUrl = siteConfig.githubAppUrl || 'https://github.com/apps/pennsieve'
-  const url = `${githubAppUrl}?redirect_uri=${redirectUri}`
-  
-  oauthWindow.value = window.open(
-    url,
-    "_blank",
-    "toolbar=no, scrollbars=yes, width=600, height=800, top=200, left=500"
-  )
-}
-
-async function fetchGithubProfile() {
-  try {
-    const token = await useGetToken()
-    const response = await fetch(GithubProfileUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': '*/*'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      
-      if (data && data.login) {
-        // Update store with fresh GitHub data
-        const updatedProfile = {
-          ...profile.value,
-          githubProfile: data
-        }
-        
-        await store.dispatch('updateProfile', updatedProfile)
-        
-        console.log('Updated store with GitHub profile from UserIntegrations:', data)
-      }
-    } else {
-      console.error('GitHub API response not ok:', response.status, response.statusText)
-    }
-  } catch (error) {
-    console.error('Failed to fetch GitHub profile in UserIntegrations:', error)
-    // Silently fail - we'll use existing store data
-  }
-}
 </script>
 
 <style scoped lang="scss">

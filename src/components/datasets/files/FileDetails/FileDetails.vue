@@ -236,6 +236,69 @@
       </div>
     </div>
 
+    <!-- DERIVED DATA SECTION -->
+    <div v-if="viewerAssets.length > 0" class="concept-instance-section viewer-assets-section">
+      <div class="header" @click="showDerivedData = !showDerivedData">
+        <div class="header-left">
+          <span>Derived Data</span>
+          <el-tooltip
+            effect="light"
+            placement="top"
+            raw-content
+            content="Derived data layers are primarily used for web-based visualization.<br>Layers are created by running an analysis pipeline.<br>Use the <strong>data target - viewer assets</strong> component in a workflow to create a derived data layer."
+            @click.stop
+          >
+            <IconInfo class="info-icon" :width="14" :height="14" />
+          </el-tooltip>
+        </div>
+        <div class="header-actions">
+          <el-tag size="small" class="asset-count-tag">
+            {{ viewerAssets.length }} {{ viewerAssets.length === 1 ? 'asset' : 'assets' }}
+          </el-tag>
+          <svg
+            class="collapse-arrow"
+            :class="{ 'is-open': showDerivedData }"
+            viewBox="0 0 12 12"
+            width="12"
+            height="12"
+          >
+            <polyline points="2,4 6,8 10,4" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </div>
+      </div>
+      <div v-if="showDerivedData" class="viewer-assets-list">
+        <div
+          v-for="asset in viewerAssets"
+          :key="asset.id"
+          class="viewer-asset-item"
+        >
+          <div class="asset-info">
+            <span class="asset-name">{{ asset.name }}</span>
+            <el-tag size="small" class="asset-type-tag">{{ asset.asset_type }}</el-tag>
+            <el-tag
+              size="small"
+              :type="isDeletingAsset === asset.id ? 'danger' : asset.status === 'ready' ? 'success' : 'warning'"
+              class="asset-status-tag"
+            >
+              {{ isDeletingAsset === asset.id ? 'deleting...' : asset.status }}
+            </el-tag>
+          </div>
+          <el-button
+            v-if="getPermission('editor')"
+            @click="deleteViewerAsset(asset)"
+            :disabled="datasetLocked || isDeletingAsset === asset.id"
+            :loading="isDeletingAsset === asset.id"
+            link
+            size="small"
+            class="delete-asset-btn"
+            title="Delete asset"
+          >
+            <template v-if="isDeletingAsset !== asset.id">&#10005;</template>
+          </el-button>
+        </div>
+      </div>
+    </div>
+
     <div class="viewer-pane-wrap">
       <div class="header">
         <div>Preview</div>
@@ -314,6 +377,7 @@ import {
 } from "@/mixins/request/request_composable";
 import { useMetadataStore } from '@/stores/metadataStore';
 import IconArrowRight from '@/components/icons/IconArrowRight.vue';
+import IconInfo from '@/components/icons/IconInfo.vue';
 import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
 import { useViewerInstance } from '@/composables/useViewerInstance';
 
@@ -326,6 +390,7 @@ export default {
     StageActions,
     IconMenu,
     IconArrowRight,
+    IconInfo,
     BfButton,
     ConceptInstanceStaticProperty,
     LinkRecordMenu,
@@ -417,6 +482,9 @@ export default {
       renameDialogVisible: false,
       moveDialogVisible: false,
       connectedRecords: [],
+      viewerAssets: [],
+      isDeletingAsset: null,
+      showDerivedData: false,
       metadataStore: useMetadataStore()
     };
   },
@@ -1120,6 +1188,7 @@ export default {
         if (val) {
           this.getInstanceDetails();
           this.fetchConnectedRecords();
+          this.fetchViewerAssets();
         }
       },
       immediate: true,
@@ -1271,7 +1340,7 @@ export default {
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
-    ...mapActions("viewerModule", ["setActiveViewer"]),
+    ...mapActions("viewerModule", ["setActiveViewer", "fetchPackageViewerAssets"]),
 
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
@@ -2798,6 +2867,61 @@ export default {
     },
 
     /**
+     * Fetch viewer assets for the current package
+     */
+    async fetchViewerAssets() {
+      if (!this.fileId || !this.datasetId) {
+        this.viewerAssets = []
+        return
+      }
+
+      try {
+        const result = await this.fetchPackageViewerAssets({
+          datasetId: this.datasetId,
+          packageId: this.fileId,
+        })
+        this.viewerAssets = result?.assets || []
+      } catch (err) {
+        console.warn('Failed to fetch viewer assets:', err)
+        this.viewerAssets = []
+      }
+    },
+
+    /**
+     * Delete a viewer asset after confirmation
+     */
+    async deleteViewerAsset(asset) {
+      try {
+        await this.$confirm(
+          `Are you sure you want to delete "${asset.name}"? This action cannot be undone.`,
+          'Delete Asset',
+          {
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+            type: 'warning',
+          }
+        )
+      } catch {
+        return
+      }
+
+      this.isDeletingAsset = asset.id
+      try {
+        await this.$store.dispatch('viewerModule/deleteViewerAsset', {
+          datasetId: this.datasetId,
+          assetId: asset.id,
+        })
+        this.viewerAssets = this.viewerAssets.filter(a => a.id !== asset.id)
+        this.$message.success('Asset deleted')
+      } catch (err) {
+        console.error('Error deleting viewer asset:', err)
+        this.$message.error('Failed to delete asset')
+      } finally {
+        this.isDeletingAsset = null
+      }
+    },
+
+    /**
      * Start record attachment flow - placeholder for future implementation
      */
     startRecordAttachment() {
@@ -3273,6 +3397,134 @@ export default {
             transition: color 0.2s ease;
             flex-shrink: 0;
           }
+        }
+      }
+    }
+  }
+}
+
+// Viewer Assets Section
+.viewer-assets-section {
+  background: white;
+  padding: 8px;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid theme.$gray_2;
+    cursor: pointer;
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: theme.$gray_6;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .asset-count-tag {
+      background-color: theme.$purple_tint !important;
+      border-color: theme.$purple_1 !important;
+      color: theme.$purple_2 !important;
+      font-weight: 500;
+    }
+
+    .info-icon {
+      color: theme.$gray_4;
+      cursor: help;
+
+      &:hover {
+        color: theme.$purple_1;
+      }
+    }
+
+    .collapse-arrow {
+      color: theme.$gray_4;
+      transition: transform 0.2s ease;
+
+      &.is-open {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  .viewer-assets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .viewer-asset-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      border: 1px solid theme.$gray_2;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: theme.$purple_1;
+        background-color: theme.$gray_1;
+
+        .delete-asset-btn {
+          opacity: 1;
+        }
+      }
+
+      .asset-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+
+        .asset-name {
+          font-size: 13px;
+          color: theme.$gray_6;
+          font-weight: 400;
+        }
+
+        .asset-type-tag {
+          font-size: 10px;
+          font-weight: 500;
+          padding: 2px 6px;
+          white-space: nowrap;
+          background: theme.$gray_1 !important;
+          border-color: theme.$gray_3 !important;
+          color: theme.$gray_5 !important;
+        }
+
+        .asset-status-tag {
+          font-size: 10px;
+          font-weight: 500;
+          padding: 2px 6px;
+          white-space: nowrap;
+        }
+      }
+
+      .delete-asset-btn {
+        opacity: 0;
+        transition: all 0.2s ease;
+        padding: 2px 4px !important;
+        min-height: unset !important;
+        height: 18px !important;
+        width: 18px !important;
+        font-size: 12px;
+        color: theme.$gray_4;
+        flex-shrink: 0;
+
+        &:hover {
+          color: theme.$red_2 !important;
+          background-color: theme.$red_tint !important;
         }
       }
     }

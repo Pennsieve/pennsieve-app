@@ -11,11 +11,20 @@
         {{ viewerNameMapper(viewer) }}
       </button>
     </div>
+    <div v-if="omeTiffSlowWarning && cmpViewer === 'OmeViewer'" class="viewer-warning">
+      This TIFF has interleaved channels and may be very slow to load.
+    </div>
     <OmeViewer
       v-if="cmpViewer === 'OmeViewer'"
       ref="viewer"
       :source="omeTiffSource"
       source-type="ome-tiff"
+    />
+    <NeuroglancerViewer
+      v-else-if="cmpViewer.startsWith('NeuroglancerViewer:')"
+      ref="viewer"
+      :pkg="pkg"
+      :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
     />
     <component
       v-else
@@ -39,6 +48,7 @@ import { storeToRefs } from "pinia";
 import ImportHref from "../../../mixins/import-href";
 import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
+import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import { TSViewer } from '@pennsieve-viz/tsviewer'
 import '@pennsieve-viz/tsviewer/style.css'
@@ -58,6 +68,7 @@ export default {
 
   components: {
     BfButton,
+    NeuroglancerViewer,
     SlideViewer: defineAsyncComponent(() =>
       import("../../viewers/SlideViewer/SlideViewer.vue")
     ),
@@ -121,9 +132,11 @@ export default {
     return {
       cmpViewer: "",
       availableViewers: [],
+      viewerAssets: [],
       timeseriesAsset: null,
       isLoading: false,
       omeTiffSource: "",
+      omeTiffSlowWarning: false,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
@@ -143,7 +156,9 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
+
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets', 'fetchSourceFiles']),
+
 
     /**
      * Look up the timeseries viewer asset (if any) for the current package
@@ -163,6 +178,7 @@ export default {
         // Asset lookup failed — fetchTimeseriesData will fall back to packageId
       }
     },
+
 
     /**
      * Called when component is mounted
@@ -210,6 +226,11 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
+      if (viewer.startsWith('NeuroglancerViewer:')) {
+        const idx = parseInt(viewer.split(':')[1])
+        const asset = this.viewerAssets[idx]
+        return asset?.name || `Neuroglancer ${idx + 1}`
+      }
       switch (viewer) {
         case "DataExplorer":
           return "Data Explorer";
@@ -240,26 +261,65 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      this.availableViewers = this.checkViewerType(activeViewer);
+      let viewers = this.checkViewerType(activeViewer);
+
+      // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
+      const pkgId = pathOr('', ['content', 'id'], activeViewer);
+      const datasetId = pathOr('', ['content', 'datasetNodeId'], activeViewer);
+      this.viewerAssets = [];
+      if (pkgId && datasetId) {
+        try {
+          const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+          if (result?.assets?.length > 0) {
+            const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
+            const seen = new Set()
+            const ngAssets = result.assets.filter(a => {
+              if (!neuroglancerTypes.includes(a.asset_type) || a.status !== 'ready') return false
+              if (seen.has(a.asset_url)) return false
+              seen.add(a.asset_url)
+              return true
+            })
+            if (ngAssets.length > 0) {
+              this.viewerAssets = ngAssets.map(a => ({
+                ...a,
+                cloudfront: result.cloudfront,
+              }))
+              const ngViewerNames = ngAssets.map((a, i) =>
+                `NeuroglancerViewer:${i}`
+              )
+              const filtered = viewers.filter(v => v !== 'UnknownViewer')
+              viewers = [...ngViewerNames, ...filtered]
+            }
+          }
+        } catch (err) {
+          // Viewer assets not available — fall through to default viewer
+        }
+      }
+
+      // Warn when an OME-TIFF has interleaved channels (processed into
+      // zarr for Neuroglancer) — the raw TIFF will be slow to render.
+      const hasNgViewers = viewers.some(v => v.startsWith('NeuroglancerViewer:'))
+      this.omeTiffSlowWarning = this.isOMETiff(activeViewer) && hasNgViewers
+
+      this.availableViewers = viewers;
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
         this.loadVueViewer("UnknownViewer");
       } else {
         const viewerToLoad = this.availableViewers[0];
 
-        // Handle viewer source - fetch presigned URL
-        // use this when migrating instead of a wrapper for every component
-        if (viewerToLoad === 'OmeViewer') {
+        // Fetch presigned URL for OmeViewer from the original source
+        // files — not /view which returns processed zarr chunks.
+        if (viewers.includes('OmeViewer')) {
           try {
-            const pkgId = pathOr('', ['content', 'id'], activeViewer);
-            const viewerAssets = await this.fetchViewerAssets(pkgId);
+            const sourceFiles = await this.fetchSourceFiles(pkgId);
 
-            if (viewerAssets && viewerAssets.length > 0) {
-              const fileId = pathOr('', ['content', 'id'], viewerAssets[0]);
+            if (sourceFiles && sourceFiles.length > 0) {
+              const fileId = pathOr('', ['content', 'id'], sourceFiles[0]);
               this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
             }
           } catch (err) {
-            console.error('Failed to fetch file URL:', err);
+            console.error('Failed to fetch source file URL:', err);
           }
         }
 
@@ -303,6 +363,16 @@ export default {
   flex: 1;
   flex-direction: column;
   position: relative;
+}
+
+.viewer-warning {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 12px;
+  margin: 0 8px;
+  padding: 6px 12px;
 }
 
 .viewer-btn-wrapper {
