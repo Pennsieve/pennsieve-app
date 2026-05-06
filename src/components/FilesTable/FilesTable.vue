@@ -83,7 +83,6 @@
       v-loading="withinDeleteMenu ? false : tableLoading"
       :border="true"
       :data="data"
-      :row-key="rowKey"
       class="modern-table"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
       @selection-change="handleTableSelectionChange"
@@ -117,7 +116,7 @@
         v-else
         type="selection"
         align="center"
-        :selectable="isRowSelectable"
+        :selectable="withinDeleteMenu ? canSelectRow : null"
         width="50"
       />
 
@@ -331,13 +330,6 @@ export default {
   methods: {
     ...mapActions("filesModule", ["openOffice365File"]),
 
-    // row-key lets el-table diff rows across data updates instead of
-    // rebuilding every <tr>. Keyed on the package node id so Pusher-driven
-    // silent merges reuse DOM nodes (no flicker, selections preserved).
-    rowKey(row) {
-      return row?.content?.id;
-    },
-
     handleCloseModal: function () {
       this.$refs.table.clearSelection();
     },
@@ -356,15 +348,6 @@ export default {
 
     canSelectRow: (row) => {
       return row.state === "DELETED";
-    },
-
-    // Gate the built-in selection column: placeholder rows (optimistic
-    // upload rows injected by uploadModule) are never selectable, so the
-    // user can't accidentally Delete/Move/Download an in-flight upload.
-    isRowSelectable: function (row) {
-      if (row && row._placeholder) return false;
-      if (this.withinDeleteMenu) return this.canSelectRow(row);
-      return true;
     },
 
     /**
@@ -528,12 +511,6 @@ export default {
     onRowClick: function (row, column) {
       // Ignore clicks on the checkbox column - onSelect handles those
       if (column?.type === 'selection') {
-        return;
-      }
-
-      // Placeholder rows (optimistic upload rows) are read-only — no
-      // selection, no range-select anchor.
-      if (row && row._placeholder) {
         return;
       }
 
