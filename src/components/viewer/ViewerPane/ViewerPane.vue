@@ -23,6 +23,13 @@
       :pkg="pkg"
       :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
     />
+    <CSVViewer
+      v-else-if="cmpViewer === 'CSVViewer'"
+      ref="viewer"
+      :pkg="pkg"
+      :api-url="apiUrl"
+      :file-type="pkg.content?.packageType"
+    />
     <component
       v-else
       :is="cmpViewer"
@@ -98,7 +105,7 @@ export default {
       import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
     ),
     CSVViewer: defineAsyncComponent(() =>
-      import("../../viewers/CSVViewer/CSVViewerWrapper.vue")
+      import("@pennsieve-viz/core").then(m => m.CSVViewer)
     ),
     LayViewer: defineAsyncComponent(() =>
       import("../../viewers/LayViewer.vue")
@@ -132,6 +139,7 @@ export default {
       viewerAssets: [],
       isLoading: false,
       omeTiffSource: "",
+      apiUrl: siteConfig.apiUrl,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
@@ -141,7 +149,9 @@ export default {
       handler: function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
           this.loadViewer(pkg);
-          this.fetchTimeseriesData();
+          if (pathOr('', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries') {
+            this.fetchTimeseriesData();
+          }
         }
       },
       immediate: true,
