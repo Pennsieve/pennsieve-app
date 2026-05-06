@@ -11,6 +11,9 @@
         {{ viewerNameMapper(viewer) }}
       </button>
     </div>
+    <div v-if="omeTiffSlowWarning && cmpViewer === 'OmeViewer'" class="viewer-warning">
+      This TIFF has interleaved channels and may be very slow to load.
+    </div>
     <OmeViewer
       v-if="cmpViewer === 'OmeViewer'"
       ref="viewer"
@@ -137,20 +140,23 @@ export default {
       cmpViewer: "",
       availableViewers: [],
       viewerAssets: [],
+      timeseriesAsset: null,
       isLoading: false,
       omeTiffSource: "",
       apiUrl: siteConfig.apiUrl,
+      omeTiffSlowWarning: false,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
 
   watch: {
     pkg: {
-      handler: function (pkg) {
+      handler: async function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
           this.loadViewer(pkg);
           if (pathOr('', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries') {
-            this.fetchTimeseriesData();
+             await this.loadTimeseriesAsset();
+             this.fetchTimeseriesData();
           }
         }
       },
@@ -160,7 +166,29 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets']),
+
+    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets', 'fetchSourceFiles']),
+
+
+    /**
+     * Look up the timeseries viewer asset (if any) for the current package
+     * so fetchTimeseriesData can pass its UUID to the viewer.
+     */
+    loadTimeseriesAsset: async function () {
+      this.timeseriesAsset = null;
+      const pkgId = this.pkg?.content?.id;
+      const datasetId = this.pkg?.content?.datasetNodeId;
+      if (!pkgId || !datasetId) return;
+      try {
+        const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+        if (result?.assets?.length > 0) {
+          this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null;
+        }
+      } catch (err) {
+        // Asset lookup failed — fetchTimeseriesData will fall back to packageId
+      }
+    },
+
 
     /**
      * Called when component is mounted
@@ -179,9 +207,10 @@ export default {
       viewerStore.setViewerConfig(viewerConfig)
 
       try {
-        const result = await viewerStore.fetchAndSetActiveViewer({
-          packageId: this.pkg?.content?.id,
-        })
+        const viewerAssetId = this.timeseriesAsset?.id || null
+        const packageId = this.pkg?.content?.id || null
+        if (!viewerAssetId && !packageId) return
+        const result = await viewerStore.fetchAndSetActiveViewer({ viewerAssetId, packageId })
         return result
       } finally {
         this.isLoading = false
@@ -277,6 +306,11 @@ export default {
         }
       }
 
+      // Warn when an OME-TIFF has interleaved channels (processed into
+      // zarr for Neuroglancer) — the raw TIFF will be slow to render.
+      const hasNgViewers = viewers.some(v => v.startsWith('NeuroglancerViewer:'))
+      this.omeTiffSlowWarning = this.isOMETiff(activeViewer) && hasNgViewers
+
       this.availableViewers = viewers;
 
       if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
@@ -284,18 +318,18 @@ export default {
       } else {
         const viewerToLoad = this.availableViewers[0];
 
-        // Handle viewer source - fetch presigned URL
-        // use this when migrating instead of a wrapper for every component
-        if (viewerToLoad === 'OmeViewer') {
+        // Fetch presigned URL for OmeViewer from the original source
+        // files — not /view which returns processed zarr chunks.
+        if (viewers.includes('OmeViewer')) {
           try {
-            const viewerAssets = await this.fetchViewerAssets(pkgId);
+            const sourceFiles = await this.fetchSourceFiles(pkgId);
 
-            if (viewerAssets && viewerAssets.length > 0) {
-              const fileId = pathOr('', ['content', 'id'], viewerAssets[0]);
+            if (sourceFiles && sourceFiles.length > 0) {
+              const fileId = pathOr('', ['content', 'id'], sourceFiles[0]);
               this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
             }
           } catch (err) {
-            console.error('Failed to fetch file URL:', err);
+            console.error('Failed to fetch source file URL:', err);
           }
         }
 
@@ -339,6 +373,16 @@ export default {
   flex: 1;
   flex-direction: column;
   position: relative;
+}
+
+.viewer-warning {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 12px;
+  margin: 0 8px;
+  padding: 6px 12px;
 }
 
 .viewer-btn-wrapper {

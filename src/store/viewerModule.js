@@ -275,6 +275,37 @@ export const actions = {
   },
 
   /**
+
+   * Get source files for a package (the original uploaded files,
+   * not processed viewer assets). Used by OmeViewer to get the
+   * original .ome.tiff source file.
+   * @param {String} packageId
+   * @returns {Promise<Array>} Array of source file objects
+   */
+  fetchSourceFiles: async ({rootState}, packageId) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.apiUrl}/packages/${packageId}/sources-paged?api_key=${token}`
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (resp.ok) {
+        const result = await resp.json()
+        return result.results || result
+      } else {
+        return Promise.reject(resp)
+      }
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  },
+
+  /**
    * Get viewer assets from the packages service (api2)
    * Returns { assets, cloudfront } with signed CloudFront policy
    */
@@ -317,6 +348,7 @@ export const actions = {
   },
 
   /**
+
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId

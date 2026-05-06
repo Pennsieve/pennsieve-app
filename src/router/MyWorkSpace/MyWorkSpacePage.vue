@@ -46,6 +46,7 @@ export default {
       if (this.isSettingsSection) return 'Settings';
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
+      if (this.isCodeSection) return 'My Code';
 
       // Top-level pages
       const topLevel = {
@@ -60,6 +61,7 @@ export default {
       if (this.isSettingsSection) return { name: 'my-settings' };
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
+      if (this.isCodeSection) return { name: 'my-code' };
       return null;
     },
 
@@ -125,7 +127,19 @@ export default {
         return [];
       }
 
+      // My Code sub-pages
+      if (this.isCodeSection) {
+        if (routeName === 'published-app-details') {
+          return [{ name: 'Application Details' }];
+        }
+        return [];
+      }
+
       return [];
+    },
+
+    isCodeSection() {
+      return this.routeName === 'published-app-details';
     },
 
     isSettingsSection() {

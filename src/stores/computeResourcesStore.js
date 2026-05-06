@@ -134,11 +134,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     scopedComputeNodes.value.clear()
     scopedNodesLastFetched.value.clear()
     scopedNodesLoading.value.clear()
-    
+
     computeAccounts.value = []
     computeAccountsLoaded.value = false
     computeAccountsLastFetched.value = null
-    
+
     nodePermissions.value = {}
     permissionsLoaded.value = {}
     isLoadingPermissions.value = {}
@@ -149,6 +149,16 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     nodeLayers.value = {}
     layersLoaded.value = {}
     isLoadingLayers.value = {}
+
+    nodeSecrets.value = {}
+    nodeSharedSecrets.value = {}
+    secretsLoaded.value = {}
+    sharedSecretsLoaded.value = {}
+    isLoadingSecrets.value = {}
+    isLoadingSharedSecrets.value = {}
+
+    gpuTiers.value = []
+    gpuTiersLoaded.value = false
   }
 
   const setNodeUpdating = (nodeId, isUpdating) => {
