@@ -139,14 +139,8 @@ router.beforeEach(async (to, from, next) => {
     // ==== CHECK FOR TOKEN ====
     // Get token from Amplify -- don't use useGetToken as there are cases
     // where we want to not re-direct even if no token is available
-    let token = null
-    try {
-        const session = await fetchAuthSession();
-        token = session?.tokens?.accessToken?.toString();
-    } catch (err) {
-        // Expired refresh token or other auth error — treat as unauthenticated
-        console.warn('Session check failed:', err.message)
-    }
+    const session = await fetchAuthSession();
+    const token = session?.tokens?.accessToken.toString();
 
     // If there is no token and route is not on the un-authenticated list --> redirect to discover app
     if (!token && !(allowList.indexOf(to.name) >= 0)) {
