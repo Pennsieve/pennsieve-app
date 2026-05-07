@@ -94,9 +94,6 @@ export default {
     UMAPViewer: defineAsyncComponent(() =>
       import("../../viewers/UmapViewer/wrapper.vue")
     ),
-    NiiViewer: defineAsyncComponent(() =>
-      import("../../viewers/NiiViewer/NiiViewerWrapper.vue")
-    ),
     DataExplorer: defineAsyncComponent(() =>
       import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
     ),
