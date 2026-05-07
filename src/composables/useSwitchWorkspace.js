@@ -28,15 +28,23 @@ export async function useSwitchWorkspace(org) {
             store.dispatch('updateFilesProxyId', null)
         ])
 
+        // Update the active organization before refetching org-scoped data
+        await store.dispatch('updateActiveOrganization', org)
+
+        // Force-refresh applications so the new org's apps are ready when the
+        // user lands on any analysis tab (avoids stale list from the previous org)
+        try {
+            await store.dispatch('analysisModule/fetchApplications', { force: true })
+        } catch (err) {
+            console.warn('Failed to refresh applications on org switch:', err)
+        }
+
         // Navigate to the appropriate route
         if (!checkIsSubscribed) {
             await router.replace(`/${orgId}/welcome/terms-of-service`)
         } else {
             await router.replace(`/${orgId}/datasets`)
         }
-
-        // Update the active organization
-        await store.dispatch('updateActiveOrganization', org)
         
         // Clear loading state only after everything is complete
         store.dispatch('setIsSwitchingOrganization', false)

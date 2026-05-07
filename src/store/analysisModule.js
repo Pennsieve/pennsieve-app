@@ -239,7 +239,10 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      const url = `${rootState.config.api2Url}/applications/store`;
+      const orgId = rootState.activeOrganization?.organization?.id;
+      const url = orgId
+        ? `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`
+        : `${rootState.config.api2Url}/applications/store`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {

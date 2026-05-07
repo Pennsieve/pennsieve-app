@@ -224,13 +224,15 @@ router.beforeEach(async (to, from, next) => {
             // Only check/switch org if the route has an orgId and it's different from current
             if (routeOrgId && routeOrgId !== currentActiveOrgId) {
                 // Use the same clearing logic as useSwitchWorkspace
+                const { useComputeResourcesStore } = await import('@/stores/computeResourcesStore')
+                useComputeResourcesStore().clearCache()
                 await Promise.all([
                     store.dispatch('clearState'),
                     store.dispatch('clearDatasetFilters'),
                     store.dispatch('datasetModule/clearSearchState'),
                     store.dispatch('updateFilesProxyId', null)
                 ])
-                
+
                 // Switch the backend session to match the URL FIRST
                 let sessionSwitched = false
                 try {
@@ -243,12 +245,12 @@ router.beforeEach(async (to, from, next) => {
                     console.warn('Failed to switch organization session:', err)
                     EventBus.$emit('toast', {
                         detail: {
-                            type: 'warning', 
+                            type: 'warning',
                             msg: 'Unable to switch workspace session. Some features may be unavailable.'
                         }
                     })
                 }
-                
+
                 // Only proceed with data loading if session switch succeeded
                 await checkActiveOrg(to)
                 if (sessionSwitched) {
@@ -261,6 +263,10 @@ router.beforeEach(async (to, from, next) => {
                             }
                         })
                     })
+
+                    // Force-refresh applications for the new org
+                    store.dispatch('analysisModule/fetchApplications', { force: true })
+                        .catch(err => console.warn('Failed to refresh applications on org switch:', err))
                 }
             }
         }
