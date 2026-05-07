@@ -118,7 +118,8 @@ const hasGithubProfile = computed(() => !!displayGithubProfile.value.login);
 
 const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
-const { openGithubOAuth: openGitHub, fetchGithubProfile } = useGithubOAuth({
+
+const { openGithubOAuth } = useGithubOAuth({
   refreshRepos: true,
 });
 
