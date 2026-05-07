@@ -3229,6 +3229,7 @@ export default {
   font-weight: 300;
   line-height: 1;
   margin: 40px 0px 0 0px;
+  padding-bottom: 30px;
 
   .header {
     font-size: 18px;
