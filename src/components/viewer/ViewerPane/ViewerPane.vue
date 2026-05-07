@@ -339,6 +339,8 @@ export default {
   flex: 1;
   flex-direction: column;
   position: relative;
+  min-width: 0;
+  overflow: auto;
 }
 
 .viewer-btn-wrapper {
