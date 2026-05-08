@@ -144,7 +144,7 @@
         <div class="table-container" ref="tableContainer" @scroll="handleScroll" v-if="!trashMode">
         <files-table
           ref="filesTable"
-          :data="files"
+          :data="displayFiles"
           :multiple-selected="multipleSelected"
           :table-loading="filesLoading"
           :is-package-attachment-active="isPackageAttachmentActive"
@@ -286,6 +286,7 @@ import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDro
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import debounce from "lodash.debounce";
 
 export default {
   name: "BfDatasetFiles",
@@ -381,7 +382,14 @@ export default {
       "getPermission",
       "datasetLocked",
     ]),
-    ...mapGetters("uploadModule", ["getIsUploading", "getUploadComplete", "getUploadMap"]),
+    ...mapGetters("uploadModule", [
+      "getIsUploading",
+      "getUploadComplete",
+      "getUploadMap",
+      "getPlaceholdersForFolder",
+      "getManifestFiles",
+      "getReplaceOverlaysForFolder",
+    ]),
 
     ...mapGetters("datasetModule", [
       "getPusherChannel",
@@ -389,8 +397,13 @@ export default {
     ]),
 
     showUploadInfo: function () {
-      const hasFiles = this.getUploadMap().size > 0;
-      return hasFiles && (this.getUploadComplete() || this.getIsUploading());
+      // Mount the pill any time there's upload activity, including the
+      // pre-sync window where manifestFiles is populated but
+      // uploadFileMap is still empty. The pill itself no-ops internally
+      // once there's nothing to show.
+      return (
+        this.getUploadMap().size > 0 || this.getManifestFiles().length > 0
+      );
     },
 
     /**
@@ -405,6 +418,65 @@ export default {
      */
     hasFiles: function () {
       return this.files.length > 0;
+    },
+
+    /**
+     * Files list as rendered in the table: server-returned children plus
+     * placeholder rows for in-flight uploads targeting this folder. Dialogs
+     * and other consumers keep using `files` so they never see placeholders.
+     *
+     * Reconciliation: when the server row for an upload appears (same
+     * parent folder + same name), its placeholder is dropped so the two
+     * rows don't stack. The uploadModule entry stays in the map until
+     * cleared; only the visible row is deduped here.
+     *
+     * Replace-conflict overlays: a replace-strategy upload whose target
+     * name collides with an existing server row doesn't emit a separate
+     * placeholder (the placeholder getter skips it). Instead, the
+     * existing row is decorated with _uploading/_uploadStatus/_uploadProgress
+     * so BfFileLabel renders the progress ring in place of the file icon.
+     * When the server-side soft-delete + replacement lands in silent
+     * refresh, the decoration disappears naturally.
+     */
+    displayFiles: function () {
+      const folderId = this.file && this.file.content && this.file.content.id;
+      if (!folderId) return this.files;
+      const overlays = this.getReplaceOverlaysForFolder(folderId);
+      const decoratedFiles =
+        overlays.size === 0
+          ? this.files
+          : this.files.map((f) => {
+              const fid = f.content && f.content.id;
+              const hit = fid && overlays.get(fid);
+              if (!hit) return f;
+              const entry = hit.entry;
+              const status = entry.status || "waiting";
+              const uploadStatus =
+                status === "failed"
+                  ? "failed"
+                  : status === "processing" || status === "finalized"
+                  ? "importing"
+                  : "uploading";
+              const size = (entry.file && entry.file.size) || 0;
+              return {
+                ...f,
+                _uploading: true,
+                _uploadStatus: uploadStatus,
+                _uploadProgress: {
+                  loaded: (entry.progress && entry.progress.loaded) || 0,
+                  total: (entry.progress && entry.progress.total) || size,
+                },
+              };
+            });
+      const placeholders = this.getPlaceholdersForFolder(folderId);
+      if (!placeholders.length) return decoratedFiles;
+      const takenNames = new Set(
+        decoratedFiles.map((f) => (f.content && f.content.name) || "")
+      );
+      const survivors = placeholders.filter(
+        (p) => !takenNames.has(p.content.name)
+      );
+      return [...survivors, ...decoratedFiles];
     },
 
     filesUrl: function () {
@@ -497,21 +569,17 @@ export default {
         if (!isEmpty(channel)) {
           channel.bind(
             "upload-event",
-            function (data) {
-              let curFolderId = this.file.content.intId;
-              for (let x in data) {
-                this.updateFileStatus({
-                  key: data[x].upload_id.String,
-                  status: "complete",
-                });
-              }
-
-              for (let x in data) {
-                if ((data[x].parent_id.Int64 = curFolderId)) {
-                  this.fetchFiles(this.filesUrl);
-                  break;
-                }
-              }
+            function () {
+              // Pusher's job here is purely "a file landed in Postgres,
+              // refresh the dataset table." It fires for uploads from any
+              // source (this browser session, a different session, the
+              // agent). The browser upload flow's own state machine is
+              // driven by the finalize API response (see uploadModule.js)
+              // — nothing on this Pusher event touches it.
+              //
+              // Silent refetch + leading/maxWait debounce keep the table
+              // current during a burst without the per-second flash.
+              this.debouncedSilentFetch();
             }.bind(this)
           );
         }
@@ -520,6 +588,20 @@ export default {
     },
 
     $route: "handleRouteChange",
+  },
+
+  created() {
+    // Throttled silent refetch used by the upload-event Pusher handler to
+    // coalesce the hundreds of events a large direct-to-storage upload
+    // produces. Leading + maxWait mean the first event in a burst refreshes
+    // immediately and sustained bursts still produce at most one refresh
+    // per second, without the spinner / selection reset the full navigation
+    // refetch causes.
+    this.debouncedSilentFetch = debounce(
+      () => this.silentlyFetchFiles(),
+      1000,
+      { leading: true, trailing: true, maxWait: 1000 }
+    );
   },
 
   mounted: function () {
@@ -580,7 +662,6 @@ export default {
   methods: {
     ...mapActions("uploadModule", [
       "resetUpload",
-      "updateFileStatus",
       "setCurrentTargetPackage",
     ]),
     ...mapActions("datasetsModule", ["createDatasetManifest"]),
@@ -904,6 +985,75 @@ export default {
     },
 
     /**
+     * Pusher-driven silent refresh of the file list. Same endpoint as
+     * fetchFiles, but:
+     *   - no `filesLoading` toggle (no spinner overlay flash),
+     *   - no `resetSelectedFiles` (user's checkbox state preserved),
+     *   - no `SET_CURRENT_FOLDER` commit (no breadcrumb churn),
+     *   - no ancestors / route-driven scroll reset.
+     *
+     * el-table's row-key is keyed on content.id, so when we replace
+     * `this.files` the table reuses DOM nodes for unchanged rows and only
+     * repaints the columns whose values actually changed (e.g. `storage`).
+     */
+    silentlyFetchFiles: function () {
+      if (!this.filesUrl) return;
+      // If the user has paginated past the first page, skip the silent
+      // refresh: filesUrl encodes the current offset, and a silent re-merge
+      // at offset>0 would either duplicate the already-loaded tail or miss
+      // the leading pages. Pagination is rare (>500 files in one folder);
+      // the worst case is that live sizes don't tick for those users until
+      // they navigate.
+      if (this.offset > 0) return;
+
+      useGetToken()
+        .then((token) => {
+          const fullUrl = `${this.filesUrl}&api_key=${token}`;
+          return useSendXhr(fullUrl).then((response) => {
+            const newFiles = response.children.map((file) => {
+              if (!file.storage) {
+                file.storage = 0;
+              }
+              file.icon =
+                file.icon || this.getFilePropertyVal(file.properties, "icon");
+              file.subtype = this.getSubType(file);
+              return file;
+            });
+            this.files = newFiles;
+            this.sortedFiles = this.returnSort(
+              "content.name",
+              this.files,
+              this.sortDirection
+            );
+            // Refresh the store's currentTargetPackage so conflict
+            // detection in syncManifest (getReplaceOverlaysForFolder /
+            // resolveKeepBothName) sees newly-added files right away.
+            // Without this, a second drop of the same filename after an
+            // upload lands misses the conflict until a full page refresh.
+            this.$store.dispatch(
+              "uploadModule/setCurrentTargetPackage",
+              response
+            );
+            // Sweep any finalized upload entries whose server row now
+            // exists in this folder, so the aggregate pill drops out of
+            // "Importing..." as soon as the refresh lands.
+            const folderId = this.file && this.file.content && this.file.content.id;
+            if (folderId) {
+              this.$store.dispatch("uploadModule/reconcileFinalizedFiles", {
+                folderId,
+                serverChildren: newFiles,
+              });
+            }
+          });
+        })
+        .catch((response) => {
+          // Silent refresh failures shouldn't nuke the user's current view.
+          // Log for visibility but don't surface the error toast.
+          console.warn("silentlyFetchFiles failed", response);
+        });
+    },
+
+    /**
      * Send API request to get files for item
      */
     fetchFiles: function (url) {
@@ -975,6 +1125,12 @@ export default {
      * @param {Object} file
      */
     onClickLabel: function (file) {
+      // Placeholder rows have no server-side identity yet — clicking the
+      // name must not trigger navigation (into a non-existent collection
+      // or to the viewer with a bogus id).
+      if (file && file._placeholder) {
+        return;
+      }
       // Normal file navigation logic
       this.files = [];
       this.offset = 0;

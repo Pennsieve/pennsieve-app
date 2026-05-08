@@ -469,7 +469,6 @@ export default {
         csv: ['CSVViewer', 'DataExplorer'],
         xls: ['XLSViewer'],
         parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
-        mri: ['NiiViewer'],
         tabular: ['CSVViewer','DataExplorer'],
         omeTiff: ['OmeViewer'],
         lay: ['LayViewer', 'TextViewer'],
