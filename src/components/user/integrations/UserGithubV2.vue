@@ -209,9 +209,13 @@ const hasGithubProfile = computed(() => !!displayGithubProfile.value.login);
 
 const GithubProfileUrl = `${siteConfig.api2Url}/accounts/github/user`;
 
-const { openGithubOAuth } = useGithubOAuth({
+const {
+  openGithubOAuth: updateGithubIntegration,
+  fetchGithubProfile,
+} = useGithubOAuth({
   refreshRepos: true,
 });
+const openGitHub = updateGithubIntegration;
 
 onMounted(async () => {
   loading.value = true;
