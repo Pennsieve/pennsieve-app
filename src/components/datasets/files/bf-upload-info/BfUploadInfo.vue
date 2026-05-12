@@ -1,115 +1,146 @@
+<!--
+  Compact upload status pill. Per-row placeholder progress in the
+  DatasetFiles table (see uploadModule getPlaceholdersForFolder) is the
+  primary feedback; this pill exists only to give an aggregate for large
+  batches and keep the upload visible when the user has navigated away
+  from the destination folder. Clicking the pill jumps back to the
+  destination.
+-->
 <template>
-  <transition name="dialog-fade">
-    <div class="bf-upload-info">
-      <button class="dismiss-btn" @click="onDismiss" title="Dismiss">
-        <IconRemove />
+  <transition name="pill-fade">
+    <div
+      v-if="hasActivity"
+      class="upload-pill"
+      :class="pillVariantClass"
+      role="status"
+      @click="jumpToDestination"
+    >
+      <bf-waiting-icon v-if="!allDone" class="pill-icon" />
+      <span class="pill-label">{{ pillLabel }}</span>
+      <button
+        class="pill-dismiss"
+        :title="allDone ? 'Dismiss' : 'Cancel'"
+        @click.stop="onDismiss"
+      >
+        <icon-remove :height="14" :width="14" />
       </button>
-      <div v-if="getIsUploading" class="copy">
-        <strong> {{ uploadCopy }}</strong>
-
-        <bf-progress-bar
-          :loaded="getUploadProgress().loaded"
-          :total="getUploadProgress().total"
-          :complete="allFilesComplete"
-        />
-      </div>
-      <div v-else class="copy">
-        {{ uploadCopy }}
-      </div>
-      <div class="upload-details">
-        <button class="show-details" @click="showUpload">Show details</button>
-        <div v-if="getIsUploading && !allFilesComplete">
-          <strong>{{ loadedStr }}</strong>
-          of {{ totalStr }}
-        </div>
-        <div v-else-if="allFilesComplete" class="complete-text">
-          Uploading...
-        </div>
-      </div>
     </div>
   </transition>
 </template>
 
 <script>
-import { mapGetters, mapState } from "vuex";
-import { propOr } from "ramda";
-import BfProgressBar from "../../../shared/bf-progress-bar/bf-progress-bar.vue";
-import BfStorageMetrics from "../../../../mixins/bf-storage-metrics";
-import EventBus from "../../../../utils/event-bus";
+import { mapGetters } from "vuex";
+import BfWaitingIcon from "../../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 import IconRemove from "../../../icons/IconRemove.vue";
 
 export default {
   name: "BfUploadInfo",
 
   components: {
-    BfProgressBar,
+    BfWaitingIcon,
     IconRemove,
-  },
-
-  mixins: [BfStorageMetrics],
-
-  data() {
-    return {};
   },
 
   computed: {
     ...mapGetters("uploadModule", [
-      "getUploadProgress",
-      "getIsUploading",
       "getUploadMap",
+      "getIsUploading",
       "getUploadComplete",
       "getTotalFilesInBatch",
+      "getUploadDestination",
+      "getManifestFiles",
     ]),
 
-    /**
-     * Compute copy based on how many files are being uploaded
-     * @returns {String}
-     */
-    uploadCopy: function () {
-      if (this.getUploadComplete()) {
-        return "";
-      }
-      const totalFiles = this.getTotalFilesInBatch();
-      const file = totalFiles > 1 ? "files" : "file";
-      return `Uploading ${totalFiles} ${file}`;
+    hasActivity() {
+      const mapSize = this.getUploadMap().size;
+      const manifestSize = this.getManifestFiles().length;
+      return mapSize > 0 || manifestSize > 0;
     },
 
-    loadedStr: function () {
-      return this.formatMetric(this.getUploadProgress().loaded);
-    },
-    totalStr: function () {
-      return this.formatMetric(this.getUploadProgress().total);
+    counts() {
+      const c = { total: 0, uploading: 0, importing: 0, failed: 0 };
+      const map = this.getUploadMap();
+      if (map.size === 0) {
+        // Pre-sync phase — every manifest file is waiting to upload.
+        const pre = this.getManifestFiles().length;
+        c.total = pre;
+        c.uploading = pre;
+        return c;
+      }
+      for (const [, v] of map) {
+        c.total += 1;
+        if (v.status === "failed") c.failed += 1;
+        else if (v.status === "processing" || v.status === "finalized")
+          c.importing += 1;
+        else c.uploading += 1;
+      }
+      return c;
     },
 
-    /**
-     * Check if all files have completed uploading (in processing state)
-     * @returns {Boolean}
-     */
-    allFilesComplete: function () {
-      const uploadMap = this.getUploadMap();
-      if (uploadMap.size === 0) return false;
-      for (const [, value] of uploadMap) {
-        if (value.status !== "processing") {
-          return false;
-        }
+    allDone() {
+      const c = this.counts;
+      return c.total > 0 && c.uploading === 0 && c.failed === 0;
+    },
+
+    pillVariantClass() {
+      if (this.counts.failed > 0) return "upload-pill--failed";
+      if (this.allDone) return "upload-pill--done";
+      return "";
+    },
+
+    pillLabel() {
+      const c = this.counts;
+      if (c.failed > 0) {
+        const word = c.failed === 1 ? "upload failed" : "uploads failed";
+        return `${c.failed} ${word}`;
       }
-      return true;
+      if (c.uploading > 0) {
+        const done = c.total - c.uploading;
+        return `Uploading ${done} of ${c.total}\u2026`;
+      }
+      if (c.importing > 0) {
+        return `Importing ${c.importing} of ${c.total}\u2026`;
+      }
+      const word = c.total === 1 ? "file" : "files";
+      return `${c.total} ${word} uploaded`;
+    },
+
+    destinationFolder() {
+      const dest = this.getUploadDestination();
+      return (dest && dest.file) || null;
     },
   },
 
   methods: {
-    /**
-     * Show uploader
-     * @returns {String}
-     */
-    showUpload: function () {
-      EventBus.$emit("open-uploader", false);
+    jumpToDestination() {
+      const folder = this.destinationFolder;
+      if (!folder || !folder.content) return;
+      const packageType = folder.content.packageType;
+      const id = folder.content.id;
+      if (!id) return;
+      if (packageType === "Collection") {
+        this.$router.push({
+          name: "dataset-files",
+          params: {
+            ...this.$route.params,
+            fileId: id,
+          },
+        });
+      } else if (packageType === "DataSet") {
+        this.$router.push({
+          name: "dataset-files",
+          params: {
+            ...this.$route.params,
+            fileId: undefined,
+          },
+        });
+      }
     },
 
-    /**
-     * Dismiss status bar and clear uploaded files in bf-upload
-     */
-    onDismiss: function () {
+    onDismiss() {
+      // resetUpload clears uploadFileMap + manifestFiles + progress totals.
+      // In-flight S3 PUTs continue (they hold their own references), but
+      // the UI stops tracking them.
       this.$store.dispatch("uploadModule/resetUpload");
     },
   },
@@ -119,64 +150,78 @@ export default {
 <style scoped lang="scss">
 @use "../../../../styles/theme";
 
-.bf-upload-info {
+.upload-pill {
+  align-items: center;
   background: theme.$gray_1;
-  border-radius: 4px;
-  box-shadow: 0 0 1px 0 rgba(0, 0, 0, 0.21), 0 0 5px 0 rgba(0, 0, 0, 0.18);
+  border: 1px solid theme.$gray_2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
-  font-size: 13px;
-  margin-left: -240px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 8px;
   left: 50%;
-  padding: 8px 16px;
-  padding-right: 40px;
+  max-width: 320px;
+  padding: 6px 8px 6px 12px;
   position: absolute;
   top: 8px;
-  width: 480px;
+  transform: translateX(-50%);
   z-index: 10;
 
-  .bf-progress-bar {
-    display: block !important;
-    margin: 4px 0;
-    width: 100% !important;
+  &:hover {
+    background: theme.$gray_0;
   }
 }
-button {
-  color: theme.$app-primary-color;
-  text-decoration: underline;
+
+.upload-pill--failed {
+  border-color: theme.$red_tint;
+  .pill-label {
+    color: theme.$red_1;
+  }
 }
-.dismiss-btn {
-  position: absolute;
-  right: 8px;
-  top: 8px;
+
+.upload-pill--done {
+  border-color: theme.$gray_2;
+}
+
+.pill-icon {
+  flex-shrink: 0;
+}
+
+.pill-label {
+  color: theme.$gray_6;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pill-dismiss {
+  align-items: center;
   background: none;
   border: none;
-  cursor: pointer;
-  padding: 4px;
-  text-decoration: none;
   color: theme.$gray_4;
+  cursor: pointer;
   display: flex;
-  align-items: center;
+  flex-shrink: 0;
+  height: 20px;
   justify-content: center;
+  padding: 0;
+  width: 20px;
 
   &:hover {
     color: theme.$gray_6;
   }
+}
 
-  .svg-icon {
-    width: 16px;
-    height: 16px;
-  }
+.pill-fade-enter-active,
+.pill-fade-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
 }
-.upload-details {
-  display: flex;
-  margin-top: 4px;
-}
-.show-details {
-  flex: 1;
-  text-align: left;
-}
-.complete-text {
-  color: theme.$green_1;
-  font-weight: 500;
+.pill-fade-enter-from,
+.pill-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -6px);
 }
 </style>
