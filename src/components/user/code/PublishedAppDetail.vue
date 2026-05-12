@@ -7,6 +7,8 @@ import { ElMessage } from 'element-plus'
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import EventBus from '@/utils/event-bus'
+import { useGetToken } from '@/composables/useGetToken'
+import { useSendXhr } from '@/mixins/request/request_composable'
 
 const props = defineProps({
   uuid: {
@@ -46,8 +48,10 @@ const editWorkspaces = ref([])
 const isSavingPermissions = ref(false)
 const showAddUserDialog = ref(false)
 const showAddTeamDialog = ref(false)
+const showAddWorkspaceDialog = ref(false)
 const selectedAddUserId = ref(null)
 const selectedAddTeamId = ref(null)
+const selectedAddWorkspaceId = ref(null)
 
 const teams = computed(() => store.state.teams || [])
 
@@ -308,6 +312,15 @@ const availableAddableTeams = computed(() => {
   return teams.value.filter((t) => t.team?.id && !taken.has(t.team.id))
 })
 
+const availableAddableWorkspaces = computed(() => {
+  const taken = new Set(editWorkspaces.value.map((w) => w.entityId))
+  return organizations.value.filter(
+    (o) => o.organization?.id &&
+      !taken.has(o.organization.id) &&
+      o.organization.name?.toLowerCase() !== 'welcome'
+  )
+})
+
 const openAddUserDialog = () => {
   selectedAddUserId.value = null
   showAddUserDialog.value = true
@@ -337,6 +350,26 @@ const confirmAddTeam = () => {
   })
   showAddTeamDialog.value = false
 }
+
+const openAddWorkspaceDialog = () => {
+  selectedAddWorkspaceId.value = null
+  showAddWorkspaceDialog.value = true
+}
+
+const confirmAddWorkspace = () => {
+  if (!selectedAddWorkspaceId.value) return
+  const org = organizations.value.find(
+    (o) => o.organization?.id === selectedAddWorkspaceId.value
+  )
+  editWorkspaces.value.push({
+    entityId: selectedAddWorkspaceId.value,
+    organizationId: selectedAddWorkspaceId.value,
+    organizationName: org?.organization?.name,
+  })
+  showAddWorkspaceDialog.value = false
+}
+
+const removeEditWorkspace = (idx) => editWorkspaces.value.splice(idx, 1)
 
 const savePermissions = async () => {
   if (!appUuid.value) return
@@ -391,9 +424,32 @@ const loadDetail = async (uuid) => {
   isLoading.value = true
   permissionsLoading.value = true
   try {
+    // Ensure org members and teams are loaded — getPrimaryData() in main.js
+    // may not have run if the user navigated here via a userRoute (e.g. my-workspace).
+    // Fall back to preferredOrganization / first org when activeOrganization is not set.
+    const orgId = store.state.activeOrganization?.organization?.id
+      || store.state.profile?.preferredOrganization
+      || store.state.organizations?.[0]?.organization?.id
+    const needsMembers = orgId && !store.state.orgMembers?.length
+    const needsTeams = orgId && !store.state.teams?.length
+    const orgDataPromise = (needsMembers || needsTeams)
+      ? useGetToken().then((token) => {
+          const base = `${store.state.config.apiUrl}/organizations/${orgId}`
+          return Promise.all([
+            needsMembers
+              ? useSendXhr(`${base}/members?api_key=${token}`).then((r) => store.dispatch('updateOrgMembers', r))
+              : Promise.resolve(),
+            needsTeams
+              ? useSendXhr(`${base}/teams?api_key=${token}`).then((r) => store.dispatch('updateTeams', r))
+              : Promise.resolve(),
+          ])
+        }).catch((err) => console.warn('Failed to load org data:', err))
+      : Promise.resolve()
+
     const [detailResult, permsResult] = await Promise.allSettled([
       store.dispatch('analysisModule/fetchApplication', uuid),
       store.dispatch('analysisModule/fetchApplicationPermissions', uuid),
+      orgDataPromise,
     ])
 
     if (detailResult.status === 'fulfilled' && detailResult.value) {
@@ -755,6 +811,36 @@ const confirmDelete = async () => {
                 >&times;</button>
               </div>
             </div>
+
+            <div class="edit-subsection">
+              <div class="edit-subsection-header">
+                <h4>Workspaces ({{ editWorkspaces.length }})</h4>
+                <bf-button
+                  class="secondary small"
+                  @click="openAddWorkspaceDialog"
+                  :disabled="availableAddableWorkspaces.length === 0"
+                >+ Add Workspace</bf-button>
+              </div>
+              <div v-if="editWorkspaces.length === 0" class="edit-empty">
+                No workspaces
+              </div>
+              <div
+                v-else
+                v-for="(ws, i) in editWorkspaces"
+                :key="ws.entityId"
+                class="edit-permission-row"
+              >
+                <span class="edit-permission-label">
+                  {{ ws.organizationName || ws.entityId }}
+                </span>
+                <button
+                  class="remove-perm-btn"
+                  type="button"
+                  @click="removeEditWorkspace(i)"
+                  title="Remove"
+                >&times;</button>
+              </div>
+            </div>
           </div>
         </template>
       </div>
@@ -868,6 +954,42 @@ const confirmDelete = async () => {
             type="primary"
             :disabled="!selectedAddTeamId"
             @click="confirmAddTeam"
+          >Add</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Add Workspace Permission Dialog -->
+    <el-dialog
+      v-model="showAddWorkspaceDialog"
+      title="Add Workspace"
+      width="480px"
+      :close-on-click-modal="true"
+    >
+      <div class="add-perm-dialog">
+        <p>Grant a workspace access to this application:</p>
+        <el-select
+          v-model="selectedAddWorkspaceId"
+          placeholder="Select a workspace"
+          size="default"
+          filterable
+          class="add-perm-select"
+        >
+          <el-option
+            v-for="o in availableAddableWorkspaces"
+            :key="o.organization.id"
+            :label="o.organization.name"
+            :value="o.organization.id"
+          />
+        </el-select>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showAddWorkspaceDialog = false">Cancel</el-button>
+          <el-button
+            type="primary"
+            :disabled="!selectedAddWorkspaceId"
+            @click="confirmAddWorkspace"
           >Add</el-button>
         </div>
       </template>
