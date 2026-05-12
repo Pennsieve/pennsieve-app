@@ -28,6 +28,13 @@
             {{ repo.language }}
           </span>
         </div>
+        <router-link
+          v-if="matchedApp"
+          :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
+          class="app-details-link"
+        >
+          View application details &rarr;
+        </router-link>
       </div>
 
       <div class="publishing-box">
@@ -62,13 +69,6 @@
             </span>
           </div>
         </div>
-        <router-link
-          v-if="matchedApp"
-          :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
-          class="app-details-link"
-        >
-          View application details &rarr;
-        </router-link>
       </div>
     </div>
 
@@ -373,8 +373,8 @@ export default {
 
 .app-details-link {
   display: inline-block;
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 10px;
+  font-size: 13px;
   font-weight: 500;
   color: theme.$purple_2;
   text-decoration: none;

@@ -157,7 +157,7 @@ router.beforeEach(async (to, from, next) => {
     
     // Check if this is a user-specific route (no organization context needed)
     const isUserRoute = userRoutes.indexOf(to.name) >= 0
-    
+
     if (to.name === 'home' && token && savedOrgId) {
         // Special case for 'home' page; if previously logged in, and session stored, then
         // forward to dataset listing page for the organization.
@@ -226,8 +226,7 @@ router.beforeEach(async (to, from, next) => {
             // Profile exists - just check if org context needs updating
             const routeOrgId = to.params.orgId
             const currentActiveOrgId = store.getters.activeOrganization?.organization?.id
-            
-            // Only check/switch org if the route has an orgId and it's different from current
+
             if (routeOrgId && routeOrgId !== currentActiveOrgId) {
                 // Use the same clearing logic as useSwitchWorkspace
                 const { useComputeResourcesStore } = await import('@/stores/computeResourcesStore')
