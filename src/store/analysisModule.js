@@ -239,10 +239,14 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      const orgId = rootState.activeOrganization?.organization?.id;
-      const url = orgId
-        ? `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`
-        : `${rootState.config.api2Url}/applications/store`;
+      // /applications/store requires organization_id. On user routes (My Workspace)
+      // there is no activeOrganization, so fall back to preferredOrganization
+      // or the first org so we can still populate app data for repo cards.
+      const orgId = rootState.activeOrganization?.organization?.id
+        || rootState.profile?.preferredOrganization
+        || rootState.organizations?.[0]?.organization?.id;
+      if (!orgId) return;
+      const url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {

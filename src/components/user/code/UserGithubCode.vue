@@ -176,7 +176,7 @@
                 </div>
               </el-tab-pane>
 
-              <el-tab-pane label="Published Applications" name="published">
+              <el-tab-pane v-if="hasOrgContext" label="Published Applications" name="published">
                 <published-apps-list />
               </el-tab-pane>
             </el-tabs>
@@ -270,6 +270,10 @@ export default {
     hasGithubProfile() {
       return this.githubProfile && this.githubProfile.login
     },
+
+    hasOrgContext() {
+      return !!this.$store.state.activeOrganization?.organization?.id
+    },
     
     // Use store state for repositories
     repositories() {
@@ -298,12 +302,20 @@ export default {
 
     filteredRepositories() {
       const q = this.reposSearchQuery.trim().toLowerCase()
-      if (!q) return this.repositories
-      return this.repositories.filter((repo) => {
-        const name = (repo.full_name || repo.name || '').toLowerCase()
-        const desc = (repo.description || '').toLowerCase()
-        const lang = (repo.language || '').toLowerCase()
-        return name.includes(q) || desc.includes(q) || lang.includes(q)
+      let repos = this.repositories
+      if (q) {
+        repos = repos.filter((repo) => {
+          const name = (repo.full_name || repo.name || '').toLowerCase()
+          const desc = (repo.description || '').toLowerCase()
+          const lang = (repo.language || '').toLowerCase()
+          return name.includes(q) || desc.includes(q) || lang.includes(q)
+        })
+      }
+      // Sort published repos to the top
+      return repos.slice().sort((a, b) => {
+        const aPublished = a.publishing_to_appstore ? 1 : 0
+        const bPublished = b.publishing_to_appstore ? 1 : 0
+        return bPublished - aPublished
       })
     },
 
@@ -327,9 +339,6 @@ export default {
   },
 
   mounted() {
-    console.log('Store state keys:', Object.keys(this.$store.state))
-    console.log('Store codeRepos state:', this.$store.state.codeRepos)
-    console.log('Store modules:', this.$store._modules)
     if (this.$route.query.tab === 'published') {
       this.activeTab = 'published'
     }
