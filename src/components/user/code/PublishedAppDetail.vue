@@ -67,7 +67,6 @@ const appUuid = computed(() => props.uuid || route.params.uuid)
 
 const backToCodeRoute = computed(() => ({
   name: 'my-code',
-  query: { tab: 'published', app: appUuid.value },
 }))
 
 /* Helpers */
@@ -537,7 +536,7 @@ const confirmDelete = async () => {
       <!-- Back link -->
       <div class="app-breadcrumb">
         <router-link :to="backToCodeRoute" class="back-link">
-          &larr; Back to Published Applications
+          &larr; Back to My Repos
         </router-link>
       </div>
 
