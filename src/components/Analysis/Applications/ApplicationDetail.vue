@@ -380,6 +380,8 @@ watch(
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
               </div>
+              <!-- Deployments hidden for now -->
+              <!--
               <div
                 v-if="(version.deployments || []).length > 0"
                 class="deployments-list"
@@ -401,6 +403,7 @@ watch(
                   </span>
                 </div>
               </div>
+              -->
             </div>
             <el-pagination
               v-if="versionsPageCount > 1"
