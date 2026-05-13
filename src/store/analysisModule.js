@@ -263,7 +263,7 @@ export const actions = {
             runtimeConfig: {
               cpu: rc.cpu || null,
               memory: rc.memory || null,
-              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard", "lambda"])
                 .map((t) => (t === "ecs" ? "standard" : t)),
             },
           };
@@ -898,7 +898,7 @@ export const actions = {
             runtimeConfig: {
               cpu: rc.cpu || null,
               memory: rc.memory || null,
-              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard", "lambda"])
                 .map((t) => (t === "ecs" ? "standard" : t)),
             },
           };
