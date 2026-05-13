@@ -163,6 +163,14 @@ const getWorkspaceName = (workspaceId) => {
   return match?.organization?.name || null
 }
 
+const getTeamName = (teamId) => {
+  if (!teamId) return null
+  const match = teams.value.find(
+    (t) => t.team?.id === teamId || t.team?.intId === teamId
+  )
+  return match?.team?.name || null
+}
+
 const statusKey = (status) => {
   if (!status) return 'gray'
   const s = status.toLowerCase()
@@ -200,13 +208,12 @@ const permissionLabel = (perm) => {
   const type = permissionEntityType(perm)
   const id = permissionEntityId(perm)
   if (type === 'user') return getUserName(id)
-  if (type === 'team') return `Team: ${perm.teamName || id}`
+  if (type === 'team') {
+    const name = perm.teamName || getTeamName(id) || id
+    return `Team: ${name}`
+  }
   if (type === 'workspace' || type === 'organization') {
-    const name =
-      perm.organizationName ||
-      perm.workspaceName ||
-      getWorkspaceName(id) ||
-      id
+    const name = perm.organizationName || perm.workspaceName || getWorkspaceName(id) || id
     return `Workspace: ${name}`
   }
   if (id) return type ? `${type}: ${id}` : id
@@ -800,7 +807,7 @@ const confirmDelete = async () => {
                 class="edit-permission-row"
               >
                 <span class="edit-permission-label">
-                  {{ team.teamName || team.entityId }}
+                  {{ team.teamName || getTeamName(team.entityId) || team.entityId }}
                 </span>
                 <button
                   class="remove-perm-btn"
@@ -830,7 +837,7 @@ const confirmDelete = async () => {
                 class="edit-permission-row"
               >
                 <span class="edit-permission-label">
-                  {{ ws.organizationName || ws.entityId }}
+                  {{ ws.organizationName || getWorkspaceName(ws.entityId) || ws.entityId }}
                 </span>
                 <button
                   class="remove-perm-btn"

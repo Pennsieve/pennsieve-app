@@ -324,6 +324,7 @@ const runToNodesAndEdges = (run) => {
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
+        version: d.tag || null,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
         ...extra,
@@ -1692,6 +1693,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
+                </div>
+                <div v-if="selectedNode.data?.version" class="info-row">
+                  <span class="info-label">Version</span>
+                  <span class="info-value">{{ selectedNode.data.version }}</span>
                 </div>
               </div>
 

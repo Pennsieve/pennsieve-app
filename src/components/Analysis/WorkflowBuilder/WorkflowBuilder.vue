@@ -227,9 +227,12 @@ const getUserName = (userId) => {
 };
 
 const getComputeTypesForTarget = (targetType) => {
-  if (!targetType) return [];
+  if (!targetType) return ["standard", "lambda"];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.runtimeConfig?.computeTypes || [];
+  // TODO: use API-driven computeTypes once target types return them reliably
+  // return tt?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+  const types = tt?.runtimeConfig?.computeTypes;
+  return types && types.length ? types : ["standard", "lambda"];
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -1273,7 +1276,15 @@ const openNodeSettings = (id) => {
                 <h4 class="sidebar-section-title">Runtime Configuration</h4>
                 <div class="info-card">
                   <div class="info-row">
-                    <span class="info-label">Compute Type</span>
+                    <span class="info-label">
+                      Compute Type
+                      <el-tooltip
+                        content="Application must be set up for Lambda, if selected"
+                        placement="top"
+                      >
+                        <IconInfoSmall :width="20" :height="20" class="compute-type-info-icon" />
+                      </el-tooltip>
+                    </span>
                     <el-select
                       v-model="selectedNode.data.computeType"
                       size="small"
@@ -1402,15 +1413,26 @@ const openNodeSettings = (id) => {
                 <h4 class="sidebar-section-title">Runtime Configuration</h4>
                 <div class="info-card">
                   <div class="info-row">
-                    <span class="info-label">Compute Type</span>
+                    <span class="info-label">
+                      Compute Type
+                      <el-tooltip
+                        content="Application must be set up for Lambda, if selected"
+                        placement="top"
+                      >
+                        <IconInfoSmall :width="20" :height="20" class="compute-type-info-icon" />
+                      </el-tooltip>
+                    </span>
                     <el-select
                       v-model="selectedNode.data.computeType"
                       size="small"
                       class="info-inline-select"
                     >
+                      <!-- TODO: use API-driven computeTypes once applications return them reliably -->
                       <el-option
-                        v-for="ct in selectedNode.data.application
-                          ?.runtimeConfig?.computeTypes || ['standard']"
+                        v-for="ct in (selectedNode.data.application
+                          ?.runtimeConfig?.computeTypes?.length
+                          ? selectedNode.data.application.runtimeConfig.computeTypes
+                          : ['standard', 'lambda'])"
                         :key="ct"
                         :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
                         :value="ct"
@@ -2736,6 +2758,12 @@ const openNodeSettings = (id) => {
   color: theme.$gray_5;
   flex-shrink: 0;
   min-width: 80px;
+
+  .compute-type-info-icon {
+    vertical-align: top;
+    margin-left: 2px;
+    opacity: 0.6;
+  }
 }
 
 .info-value {

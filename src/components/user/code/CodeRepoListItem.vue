@@ -19,10 +19,11 @@
         </div>
         <div class="repo-tags">
           <span
+            v-if="matchedAppRaw && typeof matchedAppRaw.isPrivate === 'boolean'"
             class="tag"
-            :class="repo.private ? 'private' : 'public'"
+            :class="matchedAppRaw.isPrivate ? 'private' : 'public'"
           >
-            {{ repo.private ? 'Private' : 'Public' }}
+            {{ matchedAppRaw.isPrivate ? 'Private' : 'Public' }}
           </span>
           <span v-if="repo.language" class="tag language">
             {{ repo.language }}
