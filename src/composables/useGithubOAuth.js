@@ -30,6 +30,10 @@ const GITHUB_REGISTER_URL = `${siteConfig.api2Url}/accounts/github/register`
  *   the repo list reflects GitHub-side changes
  * @param {(profile: Object) => void} [options.onSuccess]
  */
+// Tracks which composable instance opened the OAuth popup so only that
+// instance's message-listener processes the redirect callback.
+let activeOAuthInstance = null
+
 export function useGithubOAuth(options = {}) {
   const {
     successMessage = 'Your GitHub account has been successfully added!',
@@ -43,7 +47,11 @@ export function useGithubOAuth(options = {}) {
   const oauthWindow = ref(null)
   const profile = computed(() => store.state.profile)
 
+  // Unique token for this composable instance
+  const instanceId = Symbol('useGithubOAuth')
+
   function openGithubOAuth() {
+    activeOAuthInstance = instanceId
     const redirectUri = `${window.location.origin}/github-redirect`
     const url = `${siteConfig.githubAppUrl}?redirect_uri=${redirectUri}`
     oauthWindow.value = window.open(
@@ -112,6 +120,14 @@ export function useGithubOAuth(options = {}) {
     if (!event.data.code && !event.data.installationId) {
       return
     }
+
+    // Only the instance that opened the popup should handle the callback.
+    // This prevents duplicate API calls when multiple components use this
+    // composable simultaneously (e.g. parent + child route).
+    if (activeOAuthInstance !== instanceId) {
+      return
+    }
+    activeOAuthInstance = null
 
     try {
       let githubProfile
