@@ -652,10 +652,10 @@ const confirmDelete = async () => {
                 Released {{ formatDate(version.createdAt) }}
               </span>
             </div>
-            <div
+            <!-- <div
               v-if="(version.deployments || []).length > 0"
               class="deployments-list"
-            >
+              >
               <div class="deployments-label">
                 Deployments ({{ version.deployments.length }})
               </div>
@@ -672,7 +672,7 @@ const confirmDelete = async () => {
                   {{ formatDateTime(deployment.initiatedAt) }}
                 </span>
               </div>
-            </div>
+            </div> -->
           </div>
           <el-pagination
             v-if="versionsPageCount > 1"
