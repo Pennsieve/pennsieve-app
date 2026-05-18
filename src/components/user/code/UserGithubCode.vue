@@ -367,8 +367,8 @@ export default {
           await this.fetchRepositories()
         }
       } catch (err) {
-        if (err.response && err.response.status === 404) {
-          // No GitHub account connected - this is normal
+        if (err && err.status === 404) {
+          // No GitHub account connected — show the "Not Connected" state
           this.githubProfile = null
         } else {
           this.error = 'Failed to load GitHub profile. Please try again.'
