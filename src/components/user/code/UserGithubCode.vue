@@ -300,6 +300,17 @@ export default {
       return this.$store.state.codeReposModule.myReposLoaded
     },
 
+    applications() {
+      return this.$store.state.analysisModule?.applications || []
+    },
+
+    // Set of normalized application sourceUrls for fast lookup
+    appSourceUrls() {
+      const normalize = (url) =>
+        (url || '').replace(/\.git$/, '').replace(/\/+$/, '').toLowerCase()
+      return new Set(this.applications.map((a) => normalize(a.sourceUrl)))
+    },
+
     filteredRepositories() {
       const q = this.reposSearchQuery.trim().toLowerCase()
       let repos = this.repositories
@@ -311,11 +322,17 @@ export default {
           return name.includes(q) || desc.includes(q) || lang.includes(q)
         })
       }
-      // Sort published repos to the top
+      const normalize = (url) =>
+        (url || '').replace(/\.git$/, '').replace(/\/+$/, '').toLowerCase()
+      const appUrls = this.appSourceUrls
+      // Sort repos with a matched application first, then alphabetical
       return repos.slice().sort((a, b) => {
-        const aPublished = a.publishing_to_appstore ? 1 : 0
-        const bPublished = b.publishing_to_appstore ? 1 : 0
-        return bPublished - aPublished
+        const aMatch = [a.html_url, a.url].some((u) => appUrls.has(normalize(u))) ? 1 : 0
+        const bMatch = [b.html_url, b.url].some((u) => appUrls.has(normalize(u))) ? 1 : 0
+        if (bMatch !== aMatch) return bMatch - aMatch
+        const aName = (a.full_name || a.name || '').toLowerCase()
+        const bName = (b.full_name || b.name || '').toLowerCase()
+        return aName.localeCompare(bName)
       })
     },
 
@@ -367,8 +384,8 @@ export default {
           await this.fetchRepositories()
         }
       } catch (err) {
-        if (err.response && err.response.status === 404) {
-          // No GitHub account connected - this is normal
+        if (err && err.status === 404) {
+          // No GitHub account connected — show the "Not Connected" state
           this.githubProfile = null
         } else {
           this.error = 'Failed to load GitHub profile. Please try again.'

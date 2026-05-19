@@ -413,10 +413,13 @@ const definitionToNodesAndEdges = (workflow, applications) => {
             ? matchedApplication?.runtimeConfig?.computeTypes?.[0] || "standard"
             : getComputeTypesForTarget(p.targetType)?.[0] || null),
         cpu:
-          String(p.cpu || matchedApplication?.runtimeConfig?.cpu || "") || "",
+          (p.runtimeConfig?.cpu ? String(p.runtimeConfig.cpu) : "") ||
+          (p.cpu ? String(p.cpu) : "") ||
+          (matchedApplication?.runtimeConfig?.cpu ? String(matchedApplication.runtimeConfig.cpu) : ""),
         memory:
-          String(p.memory || matchedApplication?.runtimeConfig?.memory || "") ||
-          "",
+          (p.runtimeConfig?.memory ? String(p.runtimeConfig.memory) : "") ||
+          (p.memory ? String(p.memory) : "") ||
+          (matchedApplication?.runtimeConfig?.memory ? String(matchedApplication.runtimeConfig.memory) : ""),
         application: matchedApplication,
         defaultParams: p.defaultParams || {},
         paramSchema: p.paramSchema || [],
