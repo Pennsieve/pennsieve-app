@@ -147,6 +147,50 @@ const getComputeTypesForProcessor = (sourceUrl) => {
   return app?.runtimeConfig?.computeTypes || ["standard", "lambda"];
 };
 
+/* Version helpers — match WorkflowBuilder */
+const normalizeUrl = (url) => {
+  if (!url) return "";
+  return url.replace(/\.git$/, "").replace(/\/$/, "");
+};
+
+const latestVersion = (app) => {
+  const versions = app?.versions || [];
+  if (versions.length === 0) return null;
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0),
+  )[0];
+};
+
+const sortedVersions = (app) => {
+  const versions = app?.versions || [];
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0),
+  );
+};
+
+const versionOptionLabel = (app, v) => {
+  const latest = latestVersion(app);
+  return latest && v.version === latest.version
+    ? `${v.version} (latest)`
+    : v.version;
+};
+
+const findMatchedApp = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const normalized = normalizeUrl(sourceUrl);
+  return (
+    availableApplications.value.find(
+      (app) =>
+        normalizeUrl(app.sourceUrl) === normalized ||
+        normalizeUrl(app.source?.url) === normalized
+    ) || null
+  );
+};
+
 const getTargetTypeDefinition = (targetType) => {
   if (!targetType) return null;
   return targetTypes.value.find((t) => t.targetType === targetType) || null;
@@ -280,6 +324,7 @@ const runToNodesAndEdges = (run) => {
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
+        version: d.tag || null,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
         ...extra,
@@ -523,11 +568,12 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           .filter(([key]) => !schemaNames.has(key))
           .map(([key, value]) => ({ key, value: String(value) }));
 
+        const matchedApp = findMatchedApp(d.sourceUrl);
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
-          version: srcCfg?.version || "",
-          cpu: srcCfg?.cpu || "",
-          memory: srcCfg?.memory || "",
+          version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
+          cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
+          memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
           schemaParams,
           extraParams,
         };
@@ -1041,6 +1087,7 @@ onMounted(async () => {
   await Promise.all([
     store.dispatch("analysisModule/fetchComputeNodes"),
     store.dispatch("analysisModule/fetchTargetTypes"),
+    store.dispatch("analysisModule/fetchApplications", { force: true }),
   ]);
 
   // Check for pending configure mode
@@ -1338,11 +1385,24 @@ onUnmounted(() => {
                 </div>
                 <div class="config-field">
                   <label>Version</label>
-                  <el-input
+                  <el-select
                     v-model="nodeConfigs[selectedNode.id].version"
                     size="small"
+                    style="width: 100%"
                     placeholder="latest"
-                  />
+                    :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
+                  >
+                    <el-option
+                      v-for="v in sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl))"
+                      :key="v.version"
+                      :label="versionOptionLabel(findMatchedApp(selectedNode.data?.sourceUrl), v)"
+                      :value="v.version"
+                    />
+                  </el-select>
+                  <span
+                    v-if="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
+                    class="version-hint"
+                  >No other versions available</span>
                 </div>
 
                 <!-- CPU / Memory (Standard only) -->
@@ -1633,6 +1693,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
+                </div>
+                <div v-if="selectedNode.data?.version" class="info-row">
+                  <span class="info-label">Version</span>
+                  <span class="info-value">{{ selectedNode.data.version }}</span>
                 </div>
               </div>
 
@@ -2820,6 +2884,12 @@ onUnmounted(() => {
     font-weight: 600;
     color: theme.$gray_5;
   }
+}
+
+.version-hint {
+  font-size: 11px;
+  color: theme.$gray_4;
+  font-style: italic;
 }
 
 .param-row {
