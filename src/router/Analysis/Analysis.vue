@@ -109,10 +109,22 @@ export default {
 
   async mounted() {
     const p1 = this.fetchIntegrations();
-    const p2 = this.fetchComputeNodes();
-    const p3 = this.fetchApplications();
+    const p2 = this.fetchComputeNodes({ force: true });
+    const p3 = this.fetchApplications({ force: true });
 
     return Promise.all([p1, p2, p3]);
+  },
+
+  watch: {
+    // When the active org changes while Analysis is mounted (e.g. user
+    // switches orgs from a menu without leaving the page), force-refresh
+    // org-scoped data so we never display the previous org's applications.
+    "$store.state.activeOrganization.organization.id"(newId, oldId) {
+      if (newId && newId !== oldId) {
+        this.fetchApplications({ force: true });
+        this.fetchComputeNodes({ force: true });
+      }
+    },
   },
 
   methods: {
