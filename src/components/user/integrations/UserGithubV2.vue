@@ -172,9 +172,6 @@
           GitHub releases will no longer result in Pennsieve GitHub
           Publications.
         </li>
-        <li>
-          You can no longer create Applications and Workflows on Pennsieve.
-        </li>
       </ul>
 
       <template #footer>
