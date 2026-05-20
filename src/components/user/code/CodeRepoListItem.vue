@@ -2,17 +2,7 @@
   <div class="repo-card">
     <div class="repo-header">
       <div class="repo-info">
-        <h3>
-          <a
-            :href="repo.html_url || repo.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="repo-name-link"
-            :title="`View ${repo.full_name || repo.name} on GitHub`"
-          >
-            {{ repo.full_name || repo.name }}
-          </a>
-        </h3>
+        <h3>{{ repo.full_name || repo.name }}</h3>
         <div class="repo-subtitle">GitHub Repository</div>
         <div v-if="repo.description" class="repo-description">
           {{ repo.description }}
@@ -29,47 +19,39 @@
             {{ repo.language }}
           </span>
         </div>
-        <router-link
-          v-if="matchedApp"
-          :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
-          class="app-details-link"
-        >
-          View application details &rarr;
-        </router-link>
       </div>
 
-      <div class="publishing-box">
-        <div class="publishing-box-header">
-          <span class="publishing-box-title">Publishing Settings</span>
-          <button
-            class="settings-button"
-            type="button"
-            title="Edit publishing settings"
-            @click="handleManageSettings"
-          >
-            <IconSettings :width="20" :height="20" color="currentColor" />
-          </button>
-        </div>
-        <div class="publishing-box-rows">
-          <div
-            class="status-icon-row"
-            :class="repo.publishing_to_discover ? 'enabled' : 'disabled'"
-          >
-            <span class="status-icon-label">Discover</span>
-            <span class="status-icon-state">
-              {{ repo.publishing_to_discover ? 'On' : 'Off' }}
-            </span>
-          </div>
-          <div
-            class="status-icon-row"
-            :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'"
-          >
-            <span class="status-icon-label">App Store</span>
-            <span class="status-icon-state">
-              {{ repo.publishing_to_appstore ? 'On' : 'Off' }}
-            </span>
+      <div class="header-right">
+        <div class="tracking-box">
+          <div class="tracking-statuses">
+            <div
+              class="status-icon-row"
+              :class="repo.publishing_to_discover ? 'enabled' : 'disabled'"
+            >
+              <span class="status-icon-label">Discover</span>
+              <span class="status-icon-state">
+                {{ repo.publishing_to_discover ? 'On' : 'Off' }}
+              </span>
+            </div>
+            <div
+              class="status-icon-row"
+              :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'"
+            >
+              <span class="status-icon-label">App Store</span>
+              <span class="status-icon-state">
+                {{ repo.publishing_to_appstore ? 'On' : 'Off' }}
+              </span>
+            </div>
           </div>
         </div>
+        <button
+          class="settings-button"
+          type="button"
+          title="Edit tracking settings"
+          @click="handleManageSettings"
+        >
+          <IconSettings :width="20" :height="20" color="currentColor" />
+        </button>
       </div>
     </div>
 
@@ -96,6 +78,19 @@
         <IconGitHub :width="14" :height="14" color="currentColor" />
         <span>View on GitHub</span>
       </a>
+      <router-link
+        v-if="matchedApp"
+        :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
+        class="card-action-link app-details-link"
+      >
+        View application details &rarr;
+      </router-link>
+      <span
+        v-else-if="repo.publishing_to_appstore && !matchedApp"
+        class="card-action-hint"
+      >
+        Create Github release to add to app store
+      </span>
     </div>
   </div>
 </template>
@@ -132,7 +127,6 @@ export default {
     // Resolved by sourceUrl match — does NOT apply privacy gating, so the
     // template can decide which links to surface.
     matchedAppRaw() {
-      if (!this.repo.publishing_to_appstore) return null
       const candidates = [this.repo.html_url, this.repo.url].filter(Boolean)
       if (candidates.length === 0) return null
       const normalize = (url) =>
@@ -141,10 +135,7 @@ export default {
           .replace(/\/+$/, '')
           .toLowerCase()
       const targets = new Set(candidates.map(normalize))
-      return (
-        this.applications.find((a) => targets.has(normalize(a.sourceUrl))) ||
-        null
-      )
+      return this.applications.find((a) => targets.has(normalize(a.sourceUrl))) || null
     },
 
     // True when there's a matched app, it's private, and the viewer is
@@ -289,74 +280,18 @@ export default {
   }
 }
 
-.publishing-box {
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  padding: 14px 16px;
-  min-width: 220px;
-
-  @media (max-width: 768px) {
-    width: 100%;
-  }
-}
-
-.publishing-box-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.publishing-box-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.publishing-box-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.status-icon-row {
-  display: flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-
-  .status-icon-label {
-    font-weight: 600;
-  }
-
-  .status-icon-state {
-    font-weight: 600;
-    margin-left: auto;
-  }
-
-  &.enabled {
-    background: rgba(theme.$status_green, 0.12);
-    color: theme.$status_green;
-  }
-
-  &.disabled {
-    background: theme.$gray_1;
-    color: theme.$gray_4;
-  }
 }
 
 .settings-button {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
   border: none;
@@ -372,17 +307,59 @@ export default {
   }
 }
 
-.app-details-link {
-  display: inline-block;
-  margin-top: 10px;
+.tracking-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tracking-box-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.tracking-statuses {
+  display: flex;
+  gap: 6px;
+}
+
+.status-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+
+  &.enabled {
+    background: rgba(theme.$status_green, 0.12);
+    color: theme.$status_green;
+  }
+
+  &.disabled {
+    background: theme.$gray_1;
+    color: theme.$gray_4;
+  }
+}
+
+.app-details-link,
+.card-action-hint {
+  margin-left: auto;
+}
+
+.card-action-hint {
   font-size: 13px;
   font-weight: 500;
-  color: theme.$purple_2;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  color: theme.$gray_4;
+  font-style: italic;
 }
 
 .repo-stats {

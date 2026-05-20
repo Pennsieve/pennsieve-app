@@ -572,8 +572,8 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
           version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
-          cpu: srcCfg?.cpu || "",
-          memory: srcCfg?.memory || "",
+          cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
+          memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
           schemaParams,
           extraParams,
         };
