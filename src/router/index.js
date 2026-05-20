@@ -80,6 +80,8 @@ const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
 
+const WorkspaceOverviewView = () => import('./WorkspaceOverview/WorkspaceOverviewView.vue')
+
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 const Settings = () => import('./OrgSettings/Settings.vue')
@@ -762,6 +764,28 @@ const router = createRouter({
       redirect: {
         name: 'datasets-list',
       }
+    },
+    /**
+     * Workspace Insights — chat-centric dashboard
+     */
+    {
+      path: '/:orgId/insights',
+      name: 'workspace-insights',
+      components: {
+        page: WorkspaceOverviewView,
+        navigation: BfNavigation,
+        navigationSecondary: BfNavigationSecondary,
+      },
+      props: {
+        page: true,
+        navigation: true,
+        navigationSecondary: true,
+      },
+      meta: {
+        hideSecondaryNav: true,
+        title: 'Insights',
+        description: 'Workspace metrics and AI assistant.',
+      },
     },
     /**
      * Datasets routes
