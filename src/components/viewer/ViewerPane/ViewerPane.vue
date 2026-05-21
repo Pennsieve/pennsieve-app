@@ -258,7 +258,7 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      let viewers = this.checkViewerType(activeViewer);
+      let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
 
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
       const pkgId = pathOr("", ["content", "id"], activeViewer);
