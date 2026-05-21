@@ -103,6 +103,15 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       case 'message': {
+        // A new assistant message arriving "resolves" any pending
+        // background-task indicators on prior messages in this
+        // conversation — the next frame is, by definition, the
+        // completion the user was waiting for. Clear them now so the
+        // "in flight" pill disappears as the figure (or follow-up text)
+        // renders.
+        for (const m of convo.messages) {
+          if (m.pendingTasks?.length) m.pendingTasks = []
+        }
         convo.messages.push({
           role: 'assistant',
           content: frame.content || '',
@@ -120,6 +129,12 @@ export const useChatStore = defineStore('chat', () => {
           // → figure.png inline). See compute-node-chat docs:
           //   docs/developer/inline-image-frames.md
           blocks: Array.isArray(frame.blocks) ? frame.blocks : null,
+          // Background-workflow indicators. Non-empty when this assistant
+          // turn fired off one or more async-mode MCP tools (plot_file
+          // etc.) whose results arrive in a later completion frame.
+          // Rendered as persistent "running…" pills below the message
+          // until the next assistant frame arrives (see clear loop above).
+          pendingTasks: Array.isArray(frame.pendingTasks) ? frame.pendingTasks : [],
         })
         convo.pending = false
         convo.activeTools = []
