@@ -1,8 +1,33 @@
 <template>
   <div class="chat-message" :class="roleClass">
     <div class="bubble">
-      <MarkdownContent v-if="message.role === 'assistant'" :source="message.content" />
-      <span v-else class="user-text">{{ message.content }}</span>
+      <!-- User turns: plain text only. No markdown, no blocks. -->
+      <span v-if="message.role !== 'assistant'" class="user-text">{{ message.content }}</span>
+
+      <!-- Assistant turns with structured blocks. Render in order;
+           unknown block types are skipped (forward-compat). Used today
+           for inline figure rendering on workflow-completion frames. -->
+      <template v-else-if="hasBlocks">
+        <template v-for="(block, idx) in message.blocks" :key="idx">
+          <MarkdownContent
+            v-if="block.type === 'text'"
+            :source="block.text || ''"
+          />
+          <ChatImageBlock
+            v-else-if="block.type === 'image'"
+            :block="block"
+          />
+          <!-- else: unknown block type — render nothing (forward-compat) -->
+        </template>
+      </template>
+
+      <!-- Default assistant render path: plain markdown content. This is
+           what every sync chat turn uses; only the workflow-completion
+           webhooks have started emitting `blocks` so far. -->
+      <MarkdownContent
+        v-else
+        :source="message.content"
+      />
     </div>
   </div>
 </template>
@@ -10,12 +35,20 @@
 <script setup>
 import { computed } from 'vue'
 import MarkdownContent from './MarkdownContent.vue'
+import ChatImageBlock from './ChatImageBlock.vue'
 
 const props = defineProps({
   message: { type: Object, required: true },
 })
 
 const roleClass = computed(() => `role-${props.message.role}${props.message.blocked ? ' blocked' : ''}`)
+
+// Structured-content rendering kicks in when the backend supplied a
+// non-empty `blocks` array. Older backends (and most sync chat turns)
+// don't set this field; we fall back to plain markdown of `content`.
+const hasBlocks = computed(
+  () => Array.isArray(props.message.blocks) && props.message.blocks.length > 0,
+)
 </script>
 
 <style scoped lang="scss">

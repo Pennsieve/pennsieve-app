@@ -113,6 +113,13 @@ export const useChatStore = defineStore('chat', () => {
           referencedDatasets: Array.isArray(frame.referencedDatasets)
             ? frame.referencedDatasets
             : [],
+          // Optional structured-content render path. When the backend
+          // supplies `blocks`, newer clients render those in order;
+          // otherwise fall back to `content`. Used today for inline
+          // figure rendering on workflow-completion frames (plot_file
+          // → figure.png inline). See compute-node-chat docs:
+          //   docs/developer/inline-image-frames.md
+          blocks: Array.isArray(frame.blocks) ? frame.blocks : null,
         })
         convo.pending = false
         convo.activeTools = []
