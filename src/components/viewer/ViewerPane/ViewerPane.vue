@@ -1,5 +1,15 @@
 <template>
   <div class="viewer-pane" v-if="cmpViewer">
+    <div
+      v-if="showConversionHint"
+      class="viewer-info"
+    >
+      Find out more about processing an image for previewing
+      <a
+        href="https://docs.pennsieve.io/page/running-a-file-conversion-workflow-in-pennsieve"
+        target="_blank"
+      >here</a>.
+    </div>
     <div class="viewer-btn-wrapper" v-if="availableViewers.length > 1">
       <button
         v-for="viewer in availableViewers"
@@ -146,6 +156,12 @@ export default {
       apiUrl: siteConfig.apiUrl,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
+  },
+
+  computed: {
+    showConversionHint() {
+      return this.isNifti(this.pkg) || this.isOMETiff(this.pkg)
+    },
   },
 
   watch: {
@@ -377,6 +393,22 @@ export default {
   position: relative;
   min-width: 0;
   overflow: auto;
+}
+
+.viewer-info {
+  background: #e8f4fd;
+  border: 1px solid #b8daff;
+  border-radius: 4px;
+  color: #004085;
+  font-size: 13px;
+  margin: 8px 8px 0;
+  padding: 8px 12px;
+
+  a {
+    color: #004085;
+    font-weight: 500;
+    text-decoration: underline;
+  }
 }
 
 .viewer-warning {
