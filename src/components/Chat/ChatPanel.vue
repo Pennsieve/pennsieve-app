@@ -1,10 +1,11 @@
 <template>
   <div class="chat-panel">
-    <!-- Sub-bar: chat context + compute node + new-chat affordance. The
-         "Ask Pennsieve" title lives in the dashboard widget header (via
-         the layout item's componentName) — not duplicated here. The
-         context label is optional (e.g., the dataset overview already
-         shows the dataset name in the page heading). -->
+    <!-- Sub-bar: chat context + compute node + per-user quota meter +
+         new-chat affordance. The "Ask Pennsieve" title lives in the
+         dashboard widget header (via the layout item's componentName) —
+         not duplicated here. The context label is optional (e.g., the
+         dataset overview already shows the dataset name in the page
+         heading). -->
     <div class="chat-context">
       <div class="context-info">
         <span v-if="contextLabel" class="context-label">{{ contextLabel }}</span>
@@ -32,6 +33,17 @@
             <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" />
           </svg>
         </button>
+        <!-- Per-user LLM cost quota meter — inline-compact next to the
+             compute-pill. Expanded panel pops out below the chat-context
+             row via absolute positioning (see ChatQuotaHeader.vue). -->
+        <ChatQuotaHeader
+          v-if="selectedNodeId"
+          inline
+          :quota="chatQuota"
+          :loading="chatQuotaLoading"
+          :error="chatQuotaError"
+          :manage-href="manageQuotasHref"
+        />
       </div>
       <div class="header-actions">
         <!-- Quick-compose trigger. The Spotlight modal is also bound to
@@ -57,18 +69,6 @@
         >New chat</button>
       </div>
     </div>
-
-    <!-- Per-user LLM cost quota meter for the active compute node.
-         Collapsed by default — auto-expands once when the user hits the
-         "over" warning level. Hidden until the node id resolves or a
-         fetch starts. -->
-    <ChatQuotaHeader
-      v-if="selectedNodeId"
-      :quota="chatQuota"
-      :loading="chatQuotaLoading"
-      :error="chatQuotaError"
-      :manage-href="manageQuotasHref"
-    />
 
     <!-- Recently-discussed datasets — datasets the assistant invoked
          tools against this conversation. Source: backend's
@@ -422,6 +422,11 @@ watch(nodes, (list) => {
   padding: 8px 16px;
   font-size: 12px;
   color: #666;
+  // Anchor for the quota meter's absolutely-positioned expanded panel.
+  // The collapsed trigger sits inline next to the compute pill; opening
+  // it drops the breakdown popover down below this row without pushing
+  // the message list.
+  position: relative;
 }
 
 .context-info {
@@ -438,7 +443,7 @@ watch(nodes, (list) => {
   gap: 4px;
   background: #fff;
   border: 1px solid #d1d5db;
-  border-radius: 16px;
+  border-radius: 4px;
   padding: 1px 8px;
   font-size: 12px;
   color: #1c1c1c;
