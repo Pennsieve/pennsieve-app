@@ -16,7 +16,7 @@
 //
 // The store dedupes in-flight requests, so overlapping triggers are safe.
 
-import { watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useChatQuotaStore } from '@/stores/chatQuotaStore'
 
 // 60 seconds. Quota tables update on every chat turn (sub-second after the
@@ -61,10 +61,15 @@ export function useChatQuota(nodeIdRef, pendingRef) {
     if (intervalId !== null) window.clearInterval(intervalId)
   })
 
+  // Wrap each accessor in computed so consumers receive reactive refs.
+  // Destructuring `quotaStore.activeQuota` directly would capture the value
+  // at call time and silently break reactivity — Pinia setup-style stores
+  // auto-unwrap computeds on member access, so the consumer would never see
+  // store updates and the UI would stay blank after the fetch completes.
   return {
-    quota: quotaStore.activeQuota,
-    loading: quotaStore.activeLoading,
-    error: quotaStore.activeError,
+    quota: computed(() => quotaStore.activeQuota),
+    loading: computed(() => quotaStore.activeLoading),
+    error: computed(() => quotaStore.activeError),
     refresh: () => nodeIdRef.value && quotaStore.fetch(nodeIdRef.value),
   }
 }
