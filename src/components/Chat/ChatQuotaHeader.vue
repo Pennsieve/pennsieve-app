@@ -2,7 +2,7 @@
   <div
     v-if="show"
     class="quota-header"
-    :class="[`level-${level}`, { expanded }]"
+    :class="[`level-${level}`, { expanded, inline }]"
   >
     <!-- Collapsed row — always visible. -->
     <button
@@ -21,7 +21,7 @@
         <template v-else>
           <strong>${{ fmt(quota.dailySpentUsd) }}</strong>
           <span class="sep">/</span>
-          ${{ fmt(quota.dailyCostUsd) }} today
+          ${{ fmt(quota.dailyCostUsd) }}<span class="suffix"> today</span>
         </template>
       </span>
       <span v-if="level === 'over'" class="pill pill-over">Limit reached</span>
@@ -106,6 +106,11 @@ const props = defineProps({
   // Optional deep-link target shown only to compute-node owners (parent
   // gates visibility based on the user's ownership of the active node).
   manageHref: { type: String, default: '' },
+  // When true, render the collapsed trigger as a compact inline pill
+  // (sized to match the compute-node selector next to it) and pop the
+  // expanded panel out as an absolutely-positioned dropdown below. When
+  // false (default), the header is a full-width banner block.
+  inline: { type: Boolean, default: false },
 })
 
 const expanded = ref(false)
@@ -208,6 +213,25 @@ const ariaLabel = computed(() => {
   &.level-over {
     background: color.mix(#fde0e0, #fafbfc, 55%);
   }
+
+  // Inline mode: the trigger sits next to the compute-pill (compact pill
+  // styling, no banner background or bottom border). The expanded panel
+  // pops out as an absolutely-positioned dropdown anchored to the parent
+  // .chat-context row (which sets `position: relative` — we deliberately
+  // do NOT add it here, so the absolute child escapes up to that row).
+  &.inline {
+    border-bottom: 0;
+    background: transparent;
+
+    &.level-near .collapsed-row {
+      border-color: #d99416;
+      color: #8a5a0c;
+    }
+    &.level-over .collapsed-row {
+      border-color: #c64545;
+      color: #8a2222;
+    }
+  }
 }
 
 .collapsed-row {
@@ -229,6 +253,38 @@ const ariaLabel = computed(() => {
     outline: 2px solid theme.$purple_3;
     outline-offset: -2px;
   }
+
+  // Compact inline form — matches compute-pill geometry (1px 8px,
+  // border-radius 4px, 1px border). Meter shrinks and the caption
+  // becomes "X / Y" without the trailing "today" word so the whole
+  // thing stays one short pill.
+  .inline & {
+    width: auto;
+    gap: 6px;
+    padding: 1px 8px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    color: #1c1c1c;
+
+    &:hover {
+      background: #fff;
+      border-color: theme.$purple_3;
+      color: theme.$purple_3;
+    }
+  }
+}
+
+// Compact meter inside the inline trigger.
+.inline .collapsed-row .meter {
+  width: 60px;
+  height: 5px;
+}
+
+// "today" suffix is dropped in inline mode — the caption shows just
+// "$X / $Y" so the pill stays small. See the v-if in the template.
+.inline .caption .suffix {
+  display: none;
 }
 
 .caption {
@@ -311,6 +367,23 @@ const ariaLabel = computed(() => {
   flex-direction: column;
   gap: 10px;
   border-top: 1px solid #eee;
+}
+
+// Inline mode: float the expanded panel as a dropdown below the
+// chat-context row. Anchored to .chat-context (which sets
+// position: relative). Width matches the parent row so the meters
+// have room to breathe.
+.inline .expanded {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 16px;
+  right: 16px;
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  border-top: 1px solid #e6e8eb;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  z-index: 10;
 }
 
 .axis {
