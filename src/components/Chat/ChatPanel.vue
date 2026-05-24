@@ -58,6 +58,41 @@
       </div>
     </div>
 
+    <!-- Per-user LLM cost quota meter for the active compute node.
+         Collapsed by default — auto-expands once when the user hits the
+         "over" warning level. Hidden until the node id resolves or a
+         fetch starts. -->
+    <ChatQuotaHeader
+      v-if="selectedNodeId"
+      :quota="chatQuota"
+      :loading="chatQuotaLoading"
+      :error="chatQuotaError"
+      :manage-href="manageQuotasHref"
+    />
+
+    <!-- Recently-discussed datasets — datasets the assistant invoked
+         tools against this conversation. Source: backend's
+         `referencedDatasets` field on each `message` frame
+         (chat-integration.md §3.2.2). -->
+    <div v-if="referencedDatasets.length" class="discussed-row">
+      <span class="discussed-label">Discussed:</span>
+      <template v-for="ds in referencedDatasets" :key="ds.id">
+        <a
+          v-if="ds.resolved"
+          class="discussed-chip"
+          :href="datasetUrl(ds)"
+          target="_blank"
+          rel="noopener noreferrer"
+          :title="`Open ${ds.name}`"
+        >{{ ds.name }}</a>
+        <span
+          v-else
+          class="discussed-chip unresolved"
+          :title="ds.id"
+        >{{ ds.name }}</span>
+      </template>
+    </div>
+
     <div v-if="lastError" class="error-banner">
       <span>{{ errorLabel }}</span>
       <button type="button" class="dismiss" @click="dismissError" aria-label="Dismiss">×</button>
@@ -138,6 +173,8 @@ import ChatStarterPrompts from './ChatStarterPrompts.vue'
 import ComputeNodePicker from './ComputeNodePicker.vue'
 import EventBus from '@/utils/event-bus'
 import { cmdKLabel } from '@/utils/platform'
+import ChatQuotaHeader from './ChatQuotaHeader.vue'
+import { useChatQuota } from '@/composables/useChatQuota'
 
 const props = defineProps({
   mode: { type: String, required: true }, // 'workspace' | 'dataset'
@@ -261,6 +298,33 @@ const pending = computed(() => convo.value?.pending || false)
 const activeTools = computed(() => convo.value?.activeTools || [])
 const connectionState = computed(() => convo.value?.connectionState || 'idle')
 const lastError = computed(() => convo.value?.lastError || null)
+
+// Per-(user, compute-node) LLM cost quota meter. Fetches on mount, on node
+// change, and after each assistant turn (pending: true → false). See
+// useChatQuota for the orchestration; the data comes from account-service's
+// /effective endpoint.
+const {
+  quota: chatQuota,
+  loading: chatQuotaLoading,
+  error: chatQuotaError,
+} = useChatQuota(selectedNodeId, pending)
+
+// "Manage quotas" deep-link visibility. Only compute-node owners see it —
+// for non-owners the link would 403 on click. We treat node.ownerId being
+// the current user as the proxy; admins-with-manage-access can still get
+// in through the same page if they navigate there directly.
+const currentUserNodeId = computed(() => vuexStore.state?.profile?.id || '')
+const isSelectedNodeOwner = computed(() => {
+  if (!selectedNode.value || !currentUserNodeId.value) return false
+  return selectedNode.value.ownerId === currentUserNodeId.value
+})
+const manageQuotasHref = computed(() => {
+  if (!isSelectedNodeOwner.value || !selectedNode.value) return ''
+  // Settings page lives outside this PR — link target is the planned URL.
+  // Until the page ships the link is hidden anyway (isSelectedNodeOwner is
+  // gated AND the href is empty for non-owners).
+  return `/${props.orgId}/settings/compute/${selectedNode.value.uuid}#quotas`
+})
 
 const canSend = computed(() => !pending.value && !!selectedNodeId.value)
 
