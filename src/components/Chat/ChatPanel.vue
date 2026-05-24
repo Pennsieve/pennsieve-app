@@ -508,17 +508,27 @@ watch(nodes, (list) => {
 .dot-sep { color: #c5cbd6; }
 
 .compute-pill {
+  // Reset native button defaults first; the explicit font-size +
+  // line-height + height below are what actually decides the pill's
+  // geometry. `font: inherit` is a shorthand that resets font-size and
+  // line-height, so it must come BEFORE those overrides.
+  font: inherit;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  padding: 1px 8px;
+  // Padding intentionally 0 vertical — height is set explicitly so the
+  // compute-pill and the inline quota-meter pill match pixel-for-pixel.
+  // Height must agree with .inline .collapsed-row in ChatQuotaHeader.vue.
+  padding: 0 8px;
+  height: 24px;
+  box-sizing: border-box;
   font-size: 12px;
+  line-height: 1;
   color: #1c1c1c;
   cursor: pointer;
-  font: inherit;
 
   &:hover { border-color: theme.$purple_3; color: theme.$purple_3; }
 
