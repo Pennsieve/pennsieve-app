@@ -19,9 +19,15 @@
         <template v-if="loading && !quota">Checking your LLM quota…</template>
         <template v-else-if="!quota">Quota unavailable</template>
         <template v-else>
-          <strong>${{ fmt(quota.dailySpentUsd) }}</strong>
-          <span class="sep">/</span>
-          ${{ fmt(quota.dailyCostUsd) }}<span class="suffix"> today</span>
+          <!--
+            Tokens, not dollars, in the collapsed pill — less in-your-face
+            than money on every chat. The progress bar still reflects
+            dollar-utilization (the actual enforcement axis), so the bar
+            growth matches reality; the caption is a softer "usage stat"
+            instead of a bill running in front of the user. Full dollar
+            breakdown is one click away in the expanded panel.
+          -->
+          <strong>{{ fmtTokens(quota.dailyTokens) }}</strong><span class="suffix"> tokens today</span>
         </template>
       </span>
       <span v-if="level === 'over'" class="pill pill-over">Limit reached</span>
@@ -45,6 +51,7 @@
           <span class="axis-label">Daily</span>
           <span class="axis-numbers">
             <strong>${{ fmt(quota.dailySpentUsd) }}</strong> / ${{ fmt(quota.dailyCostUsd) }}
+            <span class="axis-tokens">({{ fmtTokens(quota.dailyTokens) }} tokens)</span>
           </span>
         </div>
         <span class="meter" aria-hidden="true">
@@ -58,6 +65,7 @@
           <span class="axis-label">Monthly</span>
           <span class="axis-numbers">
             <strong>${{ fmt(quota.monthlySpentUsd) }}</strong> / ${{ fmt(quota.monthlyCostUsd) }}
+            <span class="axis-tokens">({{ fmtTokens(quota.monthlyTokens) }} tokens)</span>
           </span>
         </div>
         <span class="meter" aria-hidden="true">
@@ -127,6 +135,22 @@ const fmt = (n) => {
   // wide on micro-amounts.
   if (n >= 1) return n.toFixed(2)
   return n.toFixed(Math.min(4, Math.max(2, Math.ceil(-Math.log10(Math.max(n, 1e-6))) + 2)))
+}
+
+// fmtTokens compacts a raw token count for the collapsed caption.
+// We want a short, glanceable number that doesn't dominate the pill
+// — "1,234" feels precise but cluttered next to a small bar; "1.2k"
+// or "1.23M" reads better. Thresholds:
+//   <1000      → "823"
+//   <10000     → "1.2k"
+//   <1000000   → "47k"   (no decimals once we're past 5 digits)
+//   ≥1000000   → "1.4M"
+const fmtTokens = (n) => {
+  if (typeof n !== 'number' || n < 0) return '0'
+  if (n < 1000) return String(Math.floor(n))
+  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  if (n < 1_000_000) return Math.round(n / 1000) + 'k'
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M'
 }
 
 const NEAR = 0.8
@@ -421,6 +445,15 @@ const ariaLabel = computed(() => {
     color: #222;
     font-weight: 600;
   }
+}
+
+// Secondary metric: raw token count next to the dollar figure. Quieter
+// than the cost (which is the actual enforcement axis) — small,
+// neutral gray, sits in parens.
+.axis-tokens {
+  color: #999;
+  font-size: 11px;
+  margin-left: 4px;
 }
 
 .axis-source {
