@@ -254,14 +254,17 @@ const ariaLabel = computed(() => {
     outline-offset: -2px;
   }
 
-  // Compact inline form — matches compute-pill geometry (1px 8px,
-  // border-radius 4px, 1px border). Meter shrinks and the caption
-  // becomes "X / Y" without the trailing "today" word so the whole
-  // thing stays one short pill.
+  // Compact inline form — must match the compute-pill geometry in
+  // ChatPanel.vue pixel-for-pixel so the two sit on the same baseline.
+  // Padding is 0 vertical with an explicit height; line-height: 1 to
+  // keep the text from inflating the row.
   .inline & {
     width: auto;
     gap: 6px;
-    padding: 1px 8px;
+    padding: 0 8px;
+    height: 24px;
+    box-sizing: border-box;
+    line-height: 1;
     background: #fff;
     border: 1px solid #d1d5db;
     border-radius: 4px;
