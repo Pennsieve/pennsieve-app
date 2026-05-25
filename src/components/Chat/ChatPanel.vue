@@ -71,7 +71,16 @@
     </div>
 
     <div v-if="lastError" class="error-banner">
-      <span>{{ errorLabel }}</span>
+      <span>
+        {{ errorLabel }}
+        <a
+          v-if="isQuotaError"
+          href="https://docs.pennsieve.io/docs/registering-a-compute-resource"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="error-cta"
+        >Set up your own compute node →</a>
+      </span>
       <button type="button" class="dismiss" @click="dismissError" aria-label="Dismiss">×</button>
     </div>
 
@@ -297,10 +306,7 @@ const isSelectedNodeOwner = computed(() => {
 })
 const manageQuotasHref = computed(() => {
   if (!isSelectedNodeOwner.value || !selectedNode.value) return ''
-  // Settings page lives outside this PR — link target is the planned URL.
-  // Until the page ships the link is hidden anyway (isSelectedNodeOwner is
-  // gated AND the href is empty for non-owners).
-  return `/${props.orgId}/settings/compute/${selectedNode.value.uuid}#quotas`
+  return `/${props.orgId}/analysis/compute-nodes/${selectedNode.value.uuid}#quotas`
 })
 
 const canSend = computed(() => !pending.value && !!selectedNodeId.value)
@@ -312,9 +318,14 @@ const inputPlaceholder = computed(() => {
   return props.mode === 'dataset' ? 'Ask about this dataset…' : 'Ask about your workspace…'
 })
 
+const isQuotaError = computed(() => lastError.value?.code === 'QUOTA_EXCEEDED')
+
 const errorLabel = computed(() => {
   if (!lastError.value) return ''
   const code = lastError.value.code || ''
+  if (code === 'QUOTA_EXCEEDED') {
+    return lastError.value.message || "You've reached your LLM cost limit on this compute node."
+  }
   if (code === 'WS_CLOSE_1006') {
     return "Couldn't reach the chat service. Please try again in a moment, or contact your workspace admin if this persists."
   }
@@ -511,6 +522,15 @@ watch(nodes, (list) => {
   line-height: 1;
   cursor: pointer;
   padding: 0 4px;
+}
+
+.error-cta {
+  display: inline-block;
+  margin-left: 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  &:hover { opacity: 0.85; }
 }
 
 .empty-state {

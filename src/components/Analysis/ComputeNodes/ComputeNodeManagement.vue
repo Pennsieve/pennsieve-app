@@ -12,6 +12,7 @@ import IconRemove from '@/components/icons/IconRemove.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
+import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -788,6 +789,15 @@ async function saveGpuConfig() {
             </div>
           </template>
         </div>
+      </div>
+
+      <!-- LLM Cost Quotas Section. Anchor `#quotas` is what the chat
+           panel's "Manage quotas" link targets. -->
+      <div id="quotas" class="management-section" v-if="canManagePermissions">
+        <div class="section-header">
+          <h2>LLM Cost Quotas</h2>
+        </div>
+        <ComputeNodeQuotas :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
       <!-- Access & Permissions Section -->

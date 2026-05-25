@@ -82,6 +82,17 @@
         <span class="axis-source">{{ sourceLabel(quota.perWorkflowSource) }}</span>
       </div>
 
+      <div v-if="level === 'over'" class="own-node-cta">
+        Reached your limit on this compute node? You can register your own
+        compute resource to keep working.
+        <a
+          href="https://docs.pennsieve.io/docs/registering-a-compute-resource"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="own-node-link"
+        >Set up your own compute node →</a>
+      </div>
+
       <div class="footnote">
         Daily resets at 00:00 UTC.
         <a v-if="manageHref" :href="manageHref" class="manage-link">Manage quotas →</a>
@@ -480,5 +491,25 @@ const ariaLabel = computed(() => {
 .error-note {
   color: #8a2222;
   font-size: 11px;
+}
+
+.own-node-cta {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(theme.$red_2, 0.06);
+  border: 1px solid rgba(theme.$red_2, 0.2);
+  color: theme.$gray_6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.own-node-link {
+  display: inline-block;
+  margin-top: 4px;
+  color: theme.$purple_3;
+  text-decoration: none;
+  font-weight: 500;
+  &:hover { text-decoration: underline; }
 }
 </style>
