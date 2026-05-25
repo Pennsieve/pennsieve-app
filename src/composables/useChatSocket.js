@@ -90,7 +90,7 @@ export function useChatSocket() {
     return ws
   }
 
-  const sendUserMessage = async ({ mode, orgId, datasetId, computeNodeId, content }) => {
+  const sendUserMessage = async ({ mode, orgId, datasetId, computeNodeId, content, attachments }) => {
     const key = contextKey({ mode, orgId, datasetId })
     const trimmed = (content || '').trim()
     if (!trimmed) return
@@ -99,8 +99,14 @@ export function useChatSocket() {
     // appendUserMessage no-ops on the first send (the convo doesn't
     // exist until connect() runs below), and we end up sending an
     // empty messages array (server rejects with EMPTY_REQUEST).
+    //
+    // `attachments` (optional, from Spotlight's current-page auto-attach)
+    // is stored on the message as structured metadata so the UI can
+    // render chips. The LLM-visible prefix is re-derived when we build
+    // the wire payload below — keeping the rendered + serialized forms
+    // separate.
     store.ensureConversation({ mode, orgId, datasetId, computeNodeId })
-    store.appendUserMessage(key, trimmed)
+    store.appendUserMessage(key, trimmed, attachments)
 
     let ws = sockets.get(key)
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -134,7 +140,17 @@ export function useChatSocket() {
     }
 
     const convo = store.getConversation(key)
-    const messages = (convo?.messages || []).map((m) => ({ role: m.role, content: m.content }))
+    // Walk the conversation and serialize each turn for the wire.
+    // For user messages that carry structured attachments (Spotlight
+    // auto-attach today; @-mentions etc. later), prepend the
+    // `[Attached file: …]` / `[Attached dataset: …]` prefix so the
+    // model has the structured node IDs to work with. The store keeps
+    // the chip + body separate; this is the only place the two forms
+    // merge.
+    const messages = (convo?.messages || []).map((m) => ({
+      role: m.role,
+      content: m.role === 'user' ? serializeUserContent(m) : m.content,
+    }))
     // Defensive: never send an empty messages array. The server rejects
     // it with EMPTY_REQUEST and that error has historically leaked into
     // the next turn in confusing ways.
@@ -143,6 +159,34 @@ export function useChatSocket() {
       return
     }
     ws.send(JSON.stringify({ action: 'chat', messages }))
+  }
+
+  // serializeUserContent — fold structured attachments into the LLM-
+  // visible content string. Kept here (vs. inside the store) so the
+  // store's user messages stay clean and rendering doesn't have to
+  // worry about parsing back out.
+  const serializeUserContent = (m) => {
+    const attachments = m.attachments || []
+    if (!attachments.length) return m.content
+    const prefix = attachments
+      .map((a) => formatAttachment(a))
+      .filter(Boolean)
+      .join(' ')
+    if (!prefix) return m.content
+    return `${prefix}\n\n${m.content}`
+  }
+
+  const formatAttachment = (a) => {
+    if (a.type === 'file') {
+      const name = a.name ? `${a.name} ` : ''
+      const ds = a.datasetId ? ` in dataset ${a.datasetId}` : ''
+      return `[Attached file: ${name}(${a.packageId})${ds}]`
+    }
+    if (a.type === 'dataset') {
+      const name = a.name ? `${a.name} ` : ''
+      return `[Attached dataset: ${name}(${a.datasetId})]`
+    }
+    return ''
   }
 
   const disconnect = ({ mode, orgId, datasetId }) => {

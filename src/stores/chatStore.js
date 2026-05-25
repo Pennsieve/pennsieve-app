@@ -71,10 +71,26 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
-  const appendUserMessage = (key, content) => {
+  // Append a user turn to the named conversation.
+  //
+  // `attachments` (optional) is the structured form of context the user
+  // attached when composing — currently only via the Spotlight modal's
+  // current-page auto-attach. Stored on the message so the chat UI can
+  // render them as chips ABOVE the prompt body (vs. inlining them as
+  // raw `[Attached file: …(N:package:…)…]` text the way v1 did). The
+  // wire-level prefix that the LLM needs gets re-derived when the
+  // socket serializes the message — see useChatSocket.sendUserMessage.
+  //
+  // Shape: [{ type: 'file' | 'dataset', packageId?, datasetId, name? }]
+  // Absent / empty array on plain typed turns.
+  const appendUserMessage = (key, content, attachments) => {
     const convo = conversations.value.get(key)
     if (!convo) return
-    convo.messages.push({ role: 'user', content })
+    convo.messages.push({
+      role: 'user',
+      content,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
+    })
     convo.pending = true
     convo.activeTools = []
     convo.lastError = null
