@@ -70,29 +70,6 @@
       </div>
     </div>
 
-    <!-- Recently-discussed datasets — datasets the assistant invoked
-         tools against this conversation. Source: backend's
-         `referencedDatasets` field on each `message` frame
-         (chat-integration.md §3.2.2). -->
-    <div v-if="referencedDatasets.length" class="discussed-row">
-      <span class="discussed-label">Discussed:</span>
-      <template v-for="ds in referencedDatasets" :key="ds.id">
-        <a
-          v-if="ds.resolved"
-          class="discussed-chip"
-          :href="datasetUrl(ds)"
-          target="_blank"
-          rel="noopener noreferrer"
-          :title="`Open ${ds.name}`"
-        >{{ ds.name }}</a>
-        <span
-          v-else
-          class="discussed-chip unresolved"
-          :title="ds.id"
-        >{{ ds.name }}</span>
-      </template>
-    </div>
-
     <div v-if="lastError" class="error-banner">
       <span>{{ errorLabel }}</span>
       <button type="button" class="dismiss" @click="dismissError" aria-label="Dismiss">×</button>
