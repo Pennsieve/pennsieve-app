@@ -102,7 +102,7 @@ const onImgError = () => {
 }
 
 onMounted(async () => {
-  const { packageNodeId, datasetNodeId, assetName, assetType } = source.value
+  const { packageNodeId, datasetNodeId, assetName, assetType, fileName, sourceFileId } = source.value
 
   if (!packageNodeId || !datasetNodeId) {
     loading.value = false
@@ -110,13 +110,25 @@ onMounted(async () => {
   }
 
   try {
+    // Source-file path: when the package itself is a PNG, there's no
+    // viewer-asset to look up. Fetch a presigned URL for the file directly.
+    // Used by show_figure for "this package IS a .png" cases.
+    if (sourceFileId) {
+      const url = await store.dispatch('viewerModule/fetchFileUrl', {
+        packageId: packageNodeId,
+        fileId: sourceFileId,
+      })
+      if (url) resolvedUrl.value = url
+      return
+    }
+
+    // Viewer-asset path (the original / default).
     const result = await store.dispatch('viewerModule/fetchPackageViewerAssets', {
       datasetId: datasetNodeId,
       packageId: packageNodeId,
     })
 
     if (!result?.assets?.length) {
-      loading.value = false
       return
     }
 
@@ -134,18 +146,22 @@ onMounted(async () => {
 
     const asset = candidates[0]
     if (!asset || !asset.asset_url) {
-      loading.value = false
       return
     }
 
     // Build the signed image URL. asset.asset_url ends with the asset's
-    // S3-prefix slash; the figure-asset data-target writes `figure.png`
-    // there. Sign with CloudFront query-string params from the API
-    // response.
+    // S3-prefix slash; the figure-asset data-target writes one of:
+    //
+    //   - the explicit fileName the block supplied (preferred — newer
+    //     show_figure path, captures workflows that name files by asset
+    //     name like `value-type-distribution.png`)
+    //   - the asset's own filename surfaced by the API (when present)
+    //   - the legacy `figure.png` (quick-plot's data-target convention)
+    //
+    // Sign with CloudFront query-string params from the API response.
     const cf = result.cloudfront
     if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) {
       // Asset exists but signing failed server-side — fall back.
-      loading.value = false
       return
     }
     const qs = new URLSearchParams({
@@ -153,7 +169,8 @@ onMounted(async () => {
       Signature: cf.signature,
       'Key-Pair-Id': cf.key_pair_id,
     })
-    resolvedUrl.value = `${asset.asset_url}figure.png?${qs.toString()}`
+    const key = fileName || asset.file_name || 'figure.png'
+    resolvedUrl.value = `${asset.asset_url}${key}?${qs.toString()}`
   } catch (err) {
     // Permission denied / network / shape change — log and degrade.
     // eslint-disable-next-line no-console
