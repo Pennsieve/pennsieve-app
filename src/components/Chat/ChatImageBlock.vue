@@ -77,16 +77,21 @@ const resolvedUrl = ref('')
 const alt = computed(() => props.block.alt || 'Inline figure')
 const source = computed(() => props.block.source || {})
 
-// Open-in-viewer fallback link. Matches the package-viewer route used
-// elsewhere in the app — keep this aligned if/when that route changes.
+// Open-in-viewer fallback link. Matches the `file-record` route registered
+// in router/index.js (`:orgId/datasets/:datasetId/files/:fileId/details`).
+// Two pieces routinely missed when this was first built:
+//   - the org slug at the start (a /datasets/... URL with no org 404s)
+//   - the /details suffix (the route is FileDetails, not the dataset-files
+//     index)
+// Read the org from Vuex's activeOrganization rather than a route param —
+// the chat panel can be hosted in widgets (e.g. Spotlight) where the
+// current route isn't org-scoped, but activeOrganization is set globally.
 const packageHref = computed(() => {
   const { packageNodeId, datasetNodeId } = source.value
   if (!packageNodeId || !datasetNodeId) return '#'
-  // Active workspace org slug lives in the route; route name matches the
-  // existing FileDetails entry point. router-link would be cleaner here
-  // but we want an external anchor so users can mouse-middle-click into a
-  // new tab without disrupting the chat session.
-  return `/datasets/${datasetNodeId}/files/${packageNodeId}`
+  const orgId = store.state?.activeOrganization?.organization?.id
+  if (!orgId) return '#'
+  return `/${orgId}/datasets/${datasetNodeId}/files/${packageNodeId}/details`
 })
 
 const onImgError = () => {
