@@ -10,6 +10,14 @@ import { useChatStore, contextKey } from '@/stores/chatStore'
 
 const sockets = new Map() // contextKey -> WebSocket
 
+// Treat the cached socket as stale (despite readyState===OPEN) when no
+// frame has been received from AWS for this long. AWS API Gateway closes
+// idle WebSockets after 10 minutes; the browser-side readyState often
+// stays OPEN well past that, silently swallowing sends. Five minutes is
+// well under that bound while still being long enough to span normal
+// "user is thinking" gaps without forcing unnecessary reconnects.
+const STALE_SOCKET_MS = 5 * 60 * 1000
+
 const buildUrl = ({ token, orgId, computeNodeId, datasetId, sessionId }) => {
   const params = new URLSearchParams()
   params.set('token', token)
@@ -27,10 +35,21 @@ export function useChatSocket() {
     const key = contextKey({ mode, orgId, datasetId })
     const convo = store.ensureConversation({ mode, orgId, datasetId, computeNodeId })
 
-    // Already open or connecting — reuse.
+    // Already open or connecting — reuse, but only if the connection
+    // looks genuinely live. A browser-side OPEN socket whose server side
+    // has been closed for >STALE_SOCKET_MS produces silent send drops
+    // (no error, no AWS log line, no chat response). Force-close stale
+    // ones so the next branch builds a fresh socket.
     const existing = sockets.get(key)
     if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
-      return existing
+      const lastFrameAt = convo?.lastFrameAt || 0
+      const idleMs = lastFrameAt ? Date.now() - lastFrameAt : 0
+      if (existing.readyState === WebSocket.CONNECTING || lastFrameAt === 0 || idleMs < STALE_SOCKET_MS) {
+        return existing
+      }
+      // Stale — bin it and fall through to reconnect.
+      try { existing.close(4000, 'stale-reconnect') } catch (_) {}
+      sockets.delete(key)
     }
 
     store.setConnectionState(key, 'connecting')
@@ -61,6 +80,12 @@ export function useChatSocket() {
 
     ws.onopen = () => {
       store.setConnectionState(key, 'open')
+      // A successful handshake counts as evidence the socket is alive,
+      // even before the first inbound frame. Without this, a socket that
+      // opens and then sits idle past the staleness window would be
+      // treated as stale on the next send purely because no frame had
+      // ever arrived.
+      store.markSocketAlive(key)
     }
     ws.onmessage = (event) => {
       try {
@@ -74,7 +99,13 @@ export function useChatSocket() {
       // Don't surface raw error events — onclose runs next with diagnostic info.
     }
     ws.onclose = (event) => {
-      sockets.delete(key)
+      // If a new socket has already taken our place in the map (e.g. the
+      // stale-socket force-reconnect flow closed us *after* binding a
+      // replacement), don't touch global state — the old close arriving
+      // late would otherwise stomp the new socket's 'open' state with an
+      // 'error'.
+      if (sockets.get(key) === ws) sockets.delete(key)
+      else return
       // 1000 / 1001 are clean closes; anything else suggests a problem.
       const wasClean = event.code === 1000 || event.code === 1001
       if (!wasClean) {
@@ -108,30 +139,32 @@ export function useChatSocket() {
     store.ensureConversation({ mode, orgId, datasetId, computeNodeId })
     store.appendUserMessage(key, trimmed, attachments)
 
-    let ws = sockets.get(key)
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      try {
-        ws = await connect({ mode, orgId, datasetId, computeNodeId })
-      } catch (e) {
-        store.markFailedTurn(key, 'Could not connect to chat service')
-        return
-      }
-      if (ws.readyState !== WebSocket.OPEN) {
-        await new Promise((resolve, reject) => {
-          const onOpen = () => {
-            ws.removeEventListener('open', onOpen)
-            ws.removeEventListener('close', onClose)
-            resolve()
-          }
-          const onClose = () => {
-            ws.removeEventListener('open', onOpen)
-            ws.removeEventListener('close', onClose)
-            reject(new Error('socket closed before open'))
-          }
-          ws.addEventListener('open', onOpen)
-          ws.addEventListener('close', onClose)
-        }).catch(() => {})
-      }
+    // Always route through connect() so its stale-socket check fires —
+    // doing the readyState check inline here would skip that and reuse a
+    // half-dead socket. connect() is a no-op fast-path when the cached
+    // socket is genuinely live (CONNECTING, or OPEN with a recent frame).
+    let ws
+    try {
+      ws = await connect({ mode, orgId, datasetId, computeNodeId })
+    } catch (e) {
+      store.markFailedTurn(key, 'Could not connect to chat service')
+      return
+    }
+    if (ws.readyState !== WebSocket.OPEN) {
+      await new Promise((resolve, reject) => {
+        const onOpen = () => {
+          ws.removeEventListener('open', onOpen)
+          ws.removeEventListener('close', onClose)
+          resolve()
+        }
+        const onClose = () => {
+          ws.removeEventListener('open', onOpen)
+          ws.removeEventListener('close', onClose)
+          reject(new Error('socket closed before open'))
+        }
+        ws.addEventListener('open', onOpen)
+        ws.addEventListener('close', onClose)
+      }).catch(() => {})
     }
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {

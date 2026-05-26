@@ -32,6 +32,12 @@ const newConversation = ({ mode, orgId, datasetId, computeNodeId }) => ({
   activeTools: [],
   connectionState: 'idle', // 'idle' | 'connecting' | 'open' | 'reconnecting' | 'error'
   lastError: null,
+  // Wall-clock ms of the last frame received on this conversation's
+  // WebSocket. Used by useChatSocket to detect "browser thinks the socket
+  // is OPEN but AWS hung up minutes ago" — when the gap exceeds the
+  // staleness threshold, the socket is force-closed and reconnected
+  // before the next send. Set on every frame in handleIncomingFrame.
+  lastFrameAt: 0,
 })
 
 export const contextKey = ({ mode, orgId, datasetId }) => {
@@ -100,6 +106,11 @@ export const useChatStore = defineStore('chat', () => {
   const handleIncomingFrame = (key, frame) => {
     const convo = conversations.value.get(key)
     if (!convo) return
+
+    // Mark liveness: any frame we receive proves the socket is genuinely
+    // connected to AWS, not just OPEN in the browser's local view.
+    // useChatSocket reads this before reusing a cached socket to send.
+    convo.lastFrameAt = Date.now()
 
     switch (frame.type) {
       case 'tool_progress': {
@@ -185,6 +196,15 @@ export const useChatStore = defineStore('chat', () => {
     if (error) convo.lastError = error
   }
 
+  // markSocketAlive — bumps lastFrameAt without applying a frame. Called
+  // by useChatSocket's onopen so a freshly handshaken socket isn't
+  // immediately treated as stale just because no frame has yet arrived.
+  const markSocketAlive = (key) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.lastFrameAt = Date.now()
+  }
+
   const clearError = (key) => {
     const convo = conversations.value.get(key)
     if (!convo) return
@@ -211,6 +231,7 @@ export const useChatStore = defineStore('chat', () => {
     appendUserMessage,
     handleIncomingFrame,
     setConnectionState,
+    markSocketAlive,
     clearError,
     markFailedTurn,
   }
