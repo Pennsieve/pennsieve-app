@@ -1,10 +1,11 @@
 <template>
   <div class="chat-panel">
-    <!-- Sub-bar: chat context + compute node + new-chat affordance. The
-         "Ask Pennsieve" title lives in the dashboard widget header (via
-         the layout item's componentName) — not duplicated here. The
-         context label is optional (e.g., the dataset overview already
-         shows the dataset name in the page heading). -->
+    <!-- Sub-bar: chat context + compute node + per-user quota meter +
+         new-chat affordance. The "Ask Pennsieve" title lives in the
+         dashboard widget header (via the layout item's componentName) —
+         not duplicated here. The context label is optional (e.g., the
+         dataset overview already shows the dataset name in the page
+         heading). -->
     <div class="chat-context">
       <div class="context-info">
         <span v-if="contextLabel" class="context-label">{{ contextLabel }}</span>
@@ -32,42 +33,54 @@
             <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" />
           </svg>
         </button>
+        <!-- Per-user LLM cost quota meter — inline-compact next to the
+             compute-pill. Expanded panel pops out below the chat-context
+             row via absolute positioning (see ChatQuotaHeader.vue). -->
+        <ChatQuotaHeader
+          v-if="selectedNodeId"
+          inline
+          :quota="chatQuota"
+          :loading="chatQuotaLoading"
+          :error="chatQuotaError"
+          :manage-href="manageQuotasHref"
+        />
       </div>
-      <button
-        v-if="messageCount"
-        type="button"
-        class="header-btn"
-        @click="onResetConversation"
-        aria-label="Start a new conversation"
-        title="New conversation"
-      >New chat</button>
-    </div>
-
-    <!-- Recently-discussed datasets — datasets the assistant invoked
-         tools against this conversation. Source: backend's
-         `referencedDatasets` field on each `message` frame
-         (chat-integration.md §3.2.2). -->
-    <div v-if="referencedDatasets.length" class="discussed-row">
-      <span class="discussed-label">Discussed:</span>
-      <template v-for="ds in referencedDatasets" :key="ds.id">
-        <a
-          v-if="ds.resolved"
-          class="discussed-chip"
-          :href="datasetUrl(ds)"
-          target="_blank"
-          rel="noopener noreferrer"
-          :title="`Open ${ds.name}`"
-        >{{ ds.name }}</a>
-        <span
-          v-else
-          class="discussed-chip unresolved"
-          :title="ds.id"
-        >{{ ds.name }}</span>
-      </template>
+      <div class="header-actions">
+        <!-- Quick-compose trigger. The Spotlight modal is also bound to
+             Cmd+K (Ctrl+K on non-Mac); this button is the discoverable
+             affordance for users who don't reach for keyboard shortcuts.
+             EventBus hook is registered in App.vue. -->
+        <button
+          type="button"
+          class="header-btn quick-compose"
+          @click="openSpotlight"
+          :aria-label="`Quick compose (${cmdKLabel})`"
+          :title="`Quick compose from any page (${cmdKLabel})`"
+        >
+          <span class="kbd-inline" aria-hidden="true">{{ cmdKLabel }}</span>
+        </button>
+        <button
+          v-if="messageCount"
+          type="button"
+          class="header-btn"
+          @click="onResetConversation"
+          aria-label="Start a new conversation"
+          title="New conversation"
+        >New chat</button>
+      </div>
     </div>
 
     <div v-if="lastError" class="error-banner">
-      <span>{{ errorLabel }}</span>
+      <span>
+        {{ errorLabel }}
+        <a
+          v-if="isQuotaError"
+          href="https://docs.pennsieve.io/docs/registering-a-compute-resource"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="error-cta"
+        >Set up your own compute node →</a>
+      </span>
       <button type="button" class="dismiss" @click="dismissError" aria-label="Dismiss">×</button>
     </div>
 
@@ -105,7 +118,9 @@
           <p class="empty-title">{{ emptyTitle }}</p>
           <ChatStarterPrompts :prompts="starterPrompts" :disabled="!canSend" @pick="onPickPrompt" />
           <p v-if="mode === 'workspace'" class="empty-hint">
-            Tip: type <kbd>@</kbd> in your message to mention a specific dataset.
+            Tip: type <kbd>@</kbd> to mention a specific dataset, or press
+            <kbd>{{ cmdKLabel }}</kbd> from any page to compose with the
+            current file or dataset attached.
           </p>
         </div>
       </template>
@@ -142,6 +157,10 @@ import ChatMessageList from './ChatMessageList.vue'
 import ChatInput from './ChatInput.vue'
 import ChatStarterPrompts from './ChatStarterPrompts.vue'
 import ComputeNodePicker from './ComputeNodePicker.vue'
+import EventBus from '@/utils/event-bus'
+import { cmdKLabel } from '@/utils/platform'
+import ChatQuotaHeader from './ChatQuotaHeader.vue'
+import { useChatQuota } from '@/composables/useChatQuota'
 
 const props = defineProps({
   mode: { type: String, required: true }, // 'workspace' | 'dataset'
@@ -239,56 +258,14 @@ const convo = computed(() => chatStore.getConversation(key.value))
 const messages = computed(() => convo.value?.messages || [])
 const messageCount = computed(() => messages.value.length)
 
-// Backend supplies `referencedDatasets` on each `message` frame
-// (chat-integration.md §3.2.2) — dataset node IDs the assistant
-// actually invoked tools against. Union across all assistant turns
-// to get the conversation-wide set, then resolve names from the
-// workspace dataset list.
+// Workspace dataset list — sourced from Vuex (loaded once per org
+// when the user lands in the workspace). Used by the @-mention
+// autocomplete in ChatInput; the per-conversation `referencedDatasets`
+// field on each `message` frame is still recorded on the message in
+// the chat store for forward-compat, but we no longer render a
+// separate "Discussed:" pill row — attachments and references read
+// inline in the thread now, mirroring how other chat UIs work.
 const workspaceDatasets = computed(() => vuexStore.state?.datasets || [])
-
-const datasetById = computed(() => {
-  const map = new Map()
-  for (const ds of workspaceDatasets.value) {
-    const id = ds?.content?.id
-    if (id) map.set(id, ds.content)
-  }
-  return map
-})
-
-const referencedDatasets = computed(() => {
-  // Show chips only in workspace mode — in dataset mode the page
-  // already names the focused dataset in its heading.
-  if (props.mode !== 'workspace') return []
-  if (!messages.value.length) return []
-
-  // Walk newest → oldest so most-recently-referenced sits first.
-  const seen = new Set()
-  const out = []
-  for (let i = messages.value.length - 1; i >= 0 && out.length < 5; i--) {
-    const refs = messages.value[i]?.referencedDatasets || []
-    for (const nodeId of refs) {
-      if (seen.has(nodeId)) continue
-      seen.add(nodeId)
-      const meta = datasetById.value.get(nodeId)
-      out.push({
-        id: nodeId,
-        intId: meta?.intId,
-        // Fall back to the node ID's UUID suffix when the dataset
-        // isn't in the loaded page (e.g. beyond paginated limit) —
-        // still recognizable, link won't work, chip is greyed out.
-        name: meta?.name || nodeId.split(':').pop().slice(0, 8) + '…',
-        resolved: !!meta,
-      })
-      if (out.length >= 5) break
-    }
-  }
-  return out
-})
-
-const datasetUrl = (ds) => {
-  if (!ds?.intId) return '#'
-  return `/${props.orgId}/datasets/${ds.intId}/overview`
-}
 
 // Datasets surfaced in the @-mention autocomplete in ChatInput.
 // Only meaningful in workspace mode — in dataset mode the chat is
@@ -308,6 +285,30 @@ const activeTools = computed(() => convo.value?.activeTools || [])
 const connectionState = computed(() => convo.value?.connectionState || 'idle')
 const lastError = computed(() => convo.value?.lastError || null)
 
+// Per-(user, compute-node) LLM cost quota meter. Fetches on mount, on node
+// change, and after each assistant turn (pending: true → false). See
+// useChatQuota for the orchestration; the data comes from account-service's
+// /effective endpoint.
+const {
+  quota: chatQuota,
+  loading: chatQuotaLoading,
+  error: chatQuotaError,
+} = useChatQuota(selectedNodeId, pending)
+
+// "Manage quotas" deep-link visibility. Only compute-node owners see it —
+// for non-owners the link would 403 on click. We treat node.ownerId being
+// the current user as the proxy; admins-with-manage-access can still get
+// in through the same page if they navigate there directly.
+const currentUserNodeId = computed(() => vuexStore.state?.profile?.id || '')
+const isSelectedNodeOwner = computed(() => {
+  if (!selectedNode.value || !currentUserNodeId.value) return false
+  return selectedNode.value.ownerId === currentUserNodeId.value
+})
+const manageQuotasHref = computed(() => {
+  if (!isSelectedNodeOwner.value || !selectedNode.value) return ''
+  return `/${props.orgId}/analysis/compute-nodes/${selectedNode.value.uuid}#quotas`
+})
+
 const canSend = computed(() => !pending.value && !!selectedNodeId.value)
 
 const inputPlaceholder = computed(() => {
@@ -317,9 +318,14 @@ const inputPlaceholder = computed(() => {
   return props.mode === 'dataset' ? 'Ask about this dataset…' : 'Ask about your workspace…'
 })
 
+const isQuotaError = computed(() => lastError.value?.code === 'QUOTA_EXCEEDED')
+
 const errorLabel = computed(() => {
   if (!lastError.value) return ''
   const code = lastError.value.code || ''
+  if (code === 'QUOTA_EXCEEDED') {
+    return lastError.value.message || "You've reached your LLM cost limit on this compute node."
+  }
   if (code === 'WS_CLOSE_1006') {
     return "Couldn't reach the chat service. Please try again in a moment, or contact your workspace admin if this persists."
   }
@@ -361,6 +367,12 @@ const onPickPrompt = (prompt) => onSubmit(prompt)
 
 const onResetConversation = () => chatStore.resetConversation(key.value)
 
+// Open the global Spotlight compose modal (the same one bound to
+// Cmd+K). Available from inside the chat panel too as a discoverable
+// trigger for users who don't reach for keyboard shortcuts. App.vue
+// owns the modal's visibility state; we just emit the open signal.
+const openSpotlight = () => EventBus.$emit('open-chat-spotlight')
+
 onMounted(() => {
   // Just load the node list; don't auto-open the picker. Users hit the
   // picker when they pick a node from the empty state, click the
@@ -398,59 +410,11 @@ watch(nodes, (list) => {
   padding: 8px 16px;
   font-size: 12px;
   color: #666;
-}
-
-.discussed-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 0 16px 8px;
-  font-size: 12px;
-}
-
-.discussed-label {
-  color: #888;
-  font-weight: 500;
-  margin-right: 2px;
-}
-
-.discussed-chip {
-  display: inline-flex;
-  align-items: center;
-  background: #f1f3f5;
-  color: theme.$purple_3;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background 0.15s ease, border-color 0.15s ease;
-
-  &:hover {
-    background: #e8edf5;
-    border-color: theme.$purple_3;
-    text-decoration: none;
-  }
-
-  // Datasets whose names we couldn't resolve from the loaded
-  // dataset list (e.g., beyond the paginated page) get a muted,
-  // non-link treatment.
-  &.unresolved {
-    color: #888;
-    font-style: italic;
-    cursor: default;
-
-    &:hover {
-      background: #f1f3f5;
-      border-color: transparent;
-    }
-  }
+  // Anchor for the quota meter's absolutely-positioned expanded panel.
+  // The collapsed trigger sits inline next to the compute pill; opening
+  // it drops the breakdown popover down below this row without pushing
+  // the message list.
+  position: relative;
 }
 
 .context-info {
@@ -462,17 +426,27 @@ watch(nodes, (list) => {
 .dot-sep { color: #c5cbd6; }
 
 .compute-pill {
+  // Reset native button defaults first; the explicit font-size +
+  // line-height + height below are what actually decides the pill's
+  // geometry. `font: inherit` is a shorthand that resets font-size and
+  // line-height, so it must come BEFORE those overrides.
+  font: inherit;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   background: #fff;
   border: 1px solid #d1d5db;
-  border-radius: 16px;
-  padding: 1px 8px;
+  border-radius: 4px;
+  // Padding intentionally 0 vertical — height is set explicitly so the
+  // compute-pill and the inline quota-meter pill match pixel-for-pixel.
+  // Height must agree with .inline .collapsed-row in ChatQuotaHeader.vue.
+  padding: 0 8px;
+  height: 24px;
+  box-sizing: border-box;
   font-size: 12px;
+  line-height: 1;
   color: #1c1c1c;
   cursor: pointer;
-  font: inherit;
 
   &:hover { border-color: theme.$purple_3; color: theme.$purple_3; }
 
@@ -504,6 +478,31 @@ watch(nodes, (list) => {
   &:hover { background: #f0f2f5; }
 }
 
+// Quick-compose button is a tighter, icon-style trigger. The label
+// ("⌘K" / "Ctrl+K") doubles as both the affordance and the keyboard-
+// shortcut hint, so there's no need for a separate label.
+.quick-compose {
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+
+  .kbd-inline {
+    font-size: 11px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.4;
+  }
+
+  &:hover .kbd-inline {
+    background: #e5e7eb;
+    color: #1f2937;
+  }
+}
+
 .error-banner {
   display: flex;
   align-items: center;
@@ -523,6 +522,15 @@ watch(nodes, (list) => {
   line-height: 1;
   cursor: pointer;
   padding: 0 4px;
+}
+
+.error-cta {
+  display: inline-block;
+  margin-left: 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  &:hover { opacity: 0.85; }
 }
 
 .empty-state {

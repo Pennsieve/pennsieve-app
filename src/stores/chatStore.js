@@ -71,10 +71,26 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
-  const appendUserMessage = (key, content) => {
+  // Append a user turn to the named conversation.
+  //
+  // `attachments` (optional) is the structured form of context the user
+  // attached when composing — currently only via the Spotlight modal's
+  // current-page auto-attach. Stored on the message so the chat UI can
+  // render them as chips ABOVE the prompt body (vs. inlining them as
+  // raw `[Attached file: …(N:package:…)…]` text the way v1 did). The
+  // wire-level prefix that the LLM needs gets re-derived when the
+  // socket serializes the message — see useChatSocket.sendUserMessage.
+  //
+  // Shape: [{ type: 'file' | 'dataset', packageId?, datasetId, name? }]
+  // Absent / empty array on plain typed turns.
+  const appendUserMessage = (key, content, attachments) => {
     const convo = conversations.value.get(key)
     if (!convo) return
-    convo.messages.push({ role: 'user', content })
+    convo.messages.push({
+      role: 'user',
+      content,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
+    })
     convo.pending = true
     convo.activeTools = []
     convo.lastError = null
@@ -103,6 +119,15 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       case 'message': {
+        // A new assistant message arriving "resolves" any pending
+        // background-task indicators on prior messages in this
+        // conversation — the next frame is, by definition, the
+        // completion the user was waiting for. Clear them now so the
+        // "in flight" pill disappears as the figure (or follow-up text)
+        // renders.
+        for (const m of convo.messages) {
+          if (m.pendingTasks?.length) m.pendingTasks = []
+        }
         convo.messages.push({
           role: 'assistant',
           content: frame.content || '',
@@ -113,6 +138,19 @@ export const useChatStore = defineStore('chat', () => {
           referencedDatasets: Array.isArray(frame.referencedDatasets)
             ? frame.referencedDatasets
             : [],
+          // Optional structured-content render path. When the backend
+          // supplies `blocks`, newer clients render those in order;
+          // otherwise fall back to `content`. Used today for inline
+          // figure rendering on workflow-completion frames (plot_file
+          // → figure.png inline). See compute-node-chat docs:
+          //   docs/developer/inline-image-frames.md
+          blocks: Array.isArray(frame.blocks) ? frame.blocks : null,
+          // Background-workflow indicators. Non-empty when this assistant
+          // turn fired off one or more async-mode MCP tools (plot_file
+          // etc.) whose results arrive in a later completion frame.
+          // Rendered as persistent "running…" pills below the message
+          // until the next assistant frame arrives (see clear loop above).
+          pendingTasks: Array.isArray(frame.pendingTasks) ? frame.pendingTasks : [],
         })
         convo.pending = false
         convo.activeTools = []
