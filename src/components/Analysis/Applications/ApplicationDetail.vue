@@ -5,6 +5,8 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import AppPermissions from "../../user/code/AppPermissions.vue";
+import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 
 
 const props = defineProps({
@@ -69,6 +71,17 @@ const isAppOwner = computed(() => {
   const intId = profile.value?.intId;
   return !!ownerId && (ownerId === id || ownerId === intId);
 });
+
+// Permissions only apply to private applications.
+const isPublic = computed(() => detail.value?.isPrivate === false);
+
+// Keep the local detail in sync when the archive toggle changes status.
+const onArchiveChange = (status) => {
+  if (detail.value) detail.value = { ...detail.value, status };
+};
+
+// Visibility may change via the permissions editor — reload to reflect it.
+const reloadAfterPermissions = () => loadDetail(props.uuid);
 
 const sortedVersions = computed(() => {
   const versions = detail.value?.versions || [];
@@ -342,16 +355,15 @@ watch(
               </div>
             </div>
 
-            <div class="info-actions">
-              <router-link
-                :to="{
-                  name: 'published-app-details',
-                  params: { uuid: detail.uuid },
-                }"
-                class="text-link-btn"
-              >
-                Manage in My Workspace &rarr;
-              </router-link>
+            <div class="info-actions archive-actions">
+              <span class="info-label">Status</span>
+              <app-archive-toggle
+                :uuid="detail.uuid"
+                :owner-id="detail.ownerId"
+                :source-url="detail.sourceUrl"
+                :status="detail.status"
+                @change="onArchiveChange"
+              />
             </div>
 
           </el-collapse-item>
@@ -418,6 +430,16 @@ watch(
             />
           </el-collapse-item>
         </el-collapse>
+
+        <div class="sidebar-permissions">
+          <app-permissions
+            :uuid="detail.uuid"
+            :owner-id="detail.ownerId"
+            :is-public="isPublic"
+            :organization-id="detail.organizationId"
+            @updated="reloadAfterPermissions"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -754,6 +776,20 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.archive-actions {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.sidebar-permissions {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 16px;
+  margin-top: 12px;
 }
 
 .text-link-btn {

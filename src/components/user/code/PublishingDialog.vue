@@ -56,8 +56,21 @@
             </ul>
           </div>
         </div>
+
+        <div v-if="canManagePermissions" class="permissions-section">
+          <h5>Permissions</h5>
+          <p class="options-description">
+            Manage who can access this private application.
+          </p>
+          <app-permissions
+            :uuid="matchedApp.uuid"
+            :owner-id="matchedApp.ownerId"
+            :is-public="false"
+            :organization-id="matchedApp.organizationId"
+          />
+        </div>
       </div>
-      
+
       <div class="dialog-actions">
         <bf-button class="secondary" @click="closeDialog">Cancel</bf-button>
         <bf-button
@@ -75,13 +88,15 @@
 <script>
 import IconXCircle from '../../icons/IconXCircle.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import AppPermissions from './AppPermissions.vue'
 
 export default {
   name: 'PublishingDialog',
 
   components: {
     BfButton,
-    IconXCircle
+    IconXCircle,
+    AppPermissions
   },
 
   props: {
@@ -118,6 +133,38 @@ export default {
 
     hasAnyPublishing() {
       return this.localSettings.publishToDiscover || this.localSettings.publishToAppstore
+    },
+
+    applications() {
+      return this.$store.state.analysisModule?.applications || []
+    },
+
+    // The published application for this repo, matched by source URL.
+    matchedApp() {
+      const candidates = [this.repo?.html_url, this.repo?.url].filter(Boolean)
+      if (candidates.length === 0) return null
+      const normalize = (url) =>
+        (url || '').replace(/\.git$/, '').replace(/\/+$/, '').toLowerCase()
+      const targets = new Set(candidates.map(normalize))
+      return (
+        this.applications.find((a) => targets.has(normalize(a.sourceUrl))) ||
+        null
+      )
+    },
+
+    isMatchedAppOwner() {
+      const ownerId = this.matchedApp?.ownerId
+      const profile = this.$store.state.profile || {}
+      return !!ownerId && (ownerId === profile.id || ownerId === profile.intId)
+    },
+
+    // Permissions are only manageable for a private application you own.
+    canManagePermissions() {
+      return (
+        !!this.matchedApp &&
+        this.matchedApp.isPrivate === true &&
+        this.isMatchedAppOwner
+      )
     }
   },
 
@@ -302,6 +349,26 @@ export default {
     font-size: 14px;
     color: theme.$gray_5;
     margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.permissions-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid theme.$gray_2;
+
+  h5 {
+    font-size: 16px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
+  }
+
+  .options-description {
+    font-size: 14px;
+    color: theme.$gray_5;
+    margin: 0 0 16px 0;
     line-height: 1.5;
   }
 }

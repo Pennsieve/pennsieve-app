@@ -16,7 +16,6 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import {
-  FARGATE_CPU_OPTIONS,
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
   LAMBDA_MEMORY_OPTIONS,
@@ -1492,21 +1491,9 @@ const openNodeSettings = (id) => {
                   <template v-else>
                     <div class="info-row">
                       <span class="info-label">CPU</span>
-                      <el-select
-                        v-model="selectedNode.data.cpu"
-                        size="small"
-                        disabled
-                        class="info-inline-select"
-                      >
-                        <el-option
-                          v-for="cpu in FARGATE_CPU_OPTIONS"
-                          :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(
-                            cpu >= 1024 ? 0 : 2,
-                          )} vCPU)`"
-                          :value="cpu"
-                        />
-                      </el-select>
+                      <span class="info-auto-value">
+                        Set automatically
+                      </span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">Memory</span>
@@ -1531,8 +1518,9 @@ const openNodeSettings = (id) => {
                       </el-select>
                     </div>
                     <p class="runtime-note">
-                      Lambda allocates CPU proportionally to memory. CPU and
-                      Fargate memory settings are only applied if the run is
+                      Lambda sizes CPU automatically in proportion to the
+                      memory you choose — there's no CPU to set here. The
+                      Fargate CPU/memory values only apply if the run is
                       overridden to execute as a standard processor.
                     </p>
                   </template>
@@ -2782,6 +2770,14 @@ const openNodeSettings = (id) => {
     display: flex;
     align-items: center;
   }
+}
+
+.info-auto-value {
+  width: 130px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  font-style: italic;
+  text-align: right;
 }
 
 .runtime-note {

@@ -11,7 +11,7 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 */
 const searchQuery = ref("");
 const visibilityFilter = ref("all");
-const showArchived = ref(false);
+const statusFilter = ref("active");
 
 const pageSize = 10;
 const currentPage = ref(1);
@@ -20,6 +20,12 @@ const visibilityOptions = [
   { label: "All", value: "all" },
   { label: "Public", value: "public" },
   { label: "Private", value: "private" },
+];
+
+const statusOptions = [
+  { label: "All", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Archived", value: "archived" },
 ];
 
 /*
@@ -126,9 +132,11 @@ const visibilityLabel = (app) => {
 const filteredApplications = computed(() => {
   let list = applications.value;
 
-  // Archived applications are hidden unless the user opts to show them.
-  if (!showArchived.value) {
+  // Filter by lifecycle status. "Active" (the default) hides archived apps.
+  if (statusFilter.value === "active") {
     list = list.filter((app) => app.status !== "archived");
+  } else if (statusFilter.value === "archived") {
+    list = list.filter((app) => app.status === "archived");
   }
 
   const q = searchQuery.value.trim().toLowerCase();
@@ -167,13 +175,13 @@ watch(filteredApplications, () => {
   currentPage.value = 1;
 });
 
-// Archived applications are excluded from the default list response, so
-// toggling visibility requires refetching with the includeArchived flag.
-watch(showArchived, (show) => {
+// Archived applications are excluded from the default list response, so any
+// view that includes them must refetch with the includeArchived flag.
+watch(statusFilter, (val) => {
   store
     .dispatch("analysisModule/fetchApplications", {
       force: true,
-      includeArchived: show,
+      includeArchived: val !== "active",
     })
     .catch(() => {});
 });
@@ -243,23 +251,38 @@ const goToDetail = (app) => {
         />
       </div>
 
-      <div class="status-buttons">
-        <button
-          v-for="option in visibilityOptions"
-          :key="option.value"
-          class="filter-btn"
-          :class="{ active: visibilityFilter === option.value }"
-          @click="visibilityFilter = option.value"
-        >
-          {{ option.label }}
-        </button>
-        <el-checkbox
-          v-model="showArchived"
-          size="small"
-          class="show-archived-toggle"
-        >
-          Show archived
-        </el-checkbox>
+      <div class="filter-bar">
+        <label class="filter-field">
+          <span class="filter-field-label">Visibility</span>
+          <el-select
+            v-model="visibilityFilter"
+            size="default"
+            class="filter-select"
+          >
+            <el-option
+              v-for="option in visibilityOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-field-label">Status</span>
+          <el-select
+            v-model="statusFilter"
+            size="default"
+            class="filter-select"
+          >
+            <el-option
+              v-for="option in statusOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </label>
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
@@ -446,39 +469,28 @@ const goToDetail = (app) => {
   max-width: 320px;
 }
 
-.status-buttons {
+.filter-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 20px;
   margin-bottom: 16px;
 }
 
-.show-archived-toggle {
-  margin-left: auto;
+.filter-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.filter-btn {
-  padding: 4px 16px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  background: white;
-  color: theme.$gray_5;
+.filter-field-label {
   font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  line-height: 1.4;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
 
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_1;
-  }
-
-  &.active {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
+.filter-select {
+  width: 150px;
 }
 
 .applications-grid {

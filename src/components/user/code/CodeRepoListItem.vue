@@ -86,7 +86,7 @@
         View application details &rarr;
       </router-link>
       <span
-        v-else-if="repo.publishing_to_appstore && !matchedApp"
+        v-else-if="repo.publishing_to_appstore && !matchedApp && !hasReleases"
         class="card-action-hint"
       >
         Create Github release to add to app store
@@ -158,6 +158,13 @@ export default {
     // viewer doesn't own. Repos without a matched app keep the link.
     canShowExternalLinks() {
       return !this.isPrivateUnowned
+    },
+
+    // True when the repo already has at least one GitHub release. A repo that
+    // has been released doesn't need another release to reach the App Store,
+    // so the "create a release" hint should not be shown in that case.
+    hasReleases() {
+      return (this.repo?.content?.releases?.length || 0) > 0
     },
   },
 

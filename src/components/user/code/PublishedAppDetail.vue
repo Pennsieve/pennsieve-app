@@ -2,13 +2,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import EventBus from '@/utils/event-bus'
 import { useGetToken } from '@/composables/useGetToken'
 import { useSendXhr } from '@/mixins/request/request_composable'
+import AppPermissions from './AppPermissions.vue'
+import AppArchiveToggle from './AppArchiveToggle.vue'
 
 const props = defineProps({
   uuid: {
@@ -27,9 +28,6 @@ const orgMembers = computed(() => store.state.orgMembers || [])
 const detail = ref(null)
 const isLoading = ref(false)
 const detailError = ref('')
-const permissions = ref([])
-const permissionsLoading = ref(false)
-const permissionsError = ref('')
 
 const versionsPageSize = 5
 const versionsPage = ref(1)
@@ -38,30 +36,6 @@ const showDeleteDialog = ref(false)
 const isDeleting = ref(false)
 
 const versionsExpanded = ref(true)
-
-// Permissions edit state
-const isEditingPermissions = ref(false)
-const editVisibility = ref('private')
-const editUsers = ref([])
-const editTeams = ref([])
-const editWorkspaces = ref([])
-const isSavingPermissions = ref(false)
-const showAddUserDialog = ref(false)
-const showAddTeamDialog = ref(false)
-const showAddWorkspaceDialog = ref(false)
-const selectedAddUserId = ref(null)
-const selectedAddTeamId = ref(null)
-const selectedAddWorkspaceId = ref(null)
-
-const teams = computed(() => store.state.teams || [])
-
-const activeOrgId = computed(
-  () =>
-    detail.value?.organizationId ||
-    (permissions.value || []).find((p) => p.organizationId)?.organizationId ||
-    store.state.activeOrganization?.organization?.id ||
-    null
-)
 
 const appUuid = computed(() => props.uuid || route.params.uuid)
 
@@ -152,25 +126,6 @@ const getUserName = (userId) => {
     : String(userId)
 }
 
-const organizations = computed(() => store.state.organizations || [])
-
-const getWorkspaceName = (workspaceId) => {
-  if (!workspaceId) return null
-  const match = organizations.value.find(
-    (o) => o.organization?.id === workspaceId ||
-           o.organization?.intId === workspaceId
-  )
-  return match?.organization?.name || null
-}
-
-const getTeamName = (teamId) => {
-  if (!teamId) return null
-  const match = teams.value.find(
-    (t) => t.team?.id === teamId || t.team?.intId === teamId
-  )
-  return match?.team?.name || null
-}
-
 const statusKey = (status) => {
   if (!status) return 'gray'
   const s = status.toLowerCase()
@@ -186,97 +141,12 @@ const statusLabel = (status) => {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
 
-const permissionEntityType = (perm) =>
-  perm.entityType || perm.granteeType || (perm.userId
-    ? 'user'
-    : perm.teamId
-      ? 'team'
-      : perm.organizationId || perm.workspaceId
-        ? 'workspace'
-        : null)
-
-const permissionEntityId = (perm) =>
-  perm.entityRawId ||
-  perm.userId ||
-  perm.teamId ||
-  perm.organizationId ||
-  perm.workspaceId ||
-  perm.granteeId ||
-  null
-
-const permissionLabel = (perm) => {
-  const type = permissionEntityType(perm)
-  const id = permissionEntityId(perm)
-  if (type === 'user') return getUserName(id)
-  if (type === 'team') {
-    const name = perm.teamName || getTeamName(id) || id
-    return `Team: ${name}`
-  }
-  if (type === 'workspace' || type === 'organization') {
-    const name = perm.organizationName || perm.workspaceName || getWorkspaceName(id) || id
-    return `Workspace: ${name}`
-  }
-  if (id) return type ? `${type}: ${id}` : id
-  return 'Unknown'
-}
-
-const permissionRole = (perm) =>
-  perm.accessType ||
-  perm.role ||
-  perm.permission ||
-  perm.accessLevel ||
-  '—'
-
-/* Permissions edit helpers */
-const splitPermissions = (perms) => {
-  const users = []
-  const teams = []
-  const workspaces = []
-  for (const p of perms || []) {
-    const type = permissionEntityType(p)
-    const id = permissionEntityId(p)
-    if (!id) continue
-    const organizationId = p.organizationId || activeOrgId.value
-    if (type === 'user') {
-      users.push({ entityId: id, organizationId })
-    } else if (type === 'team') {
-      teams.push({ entityId: id, organizationId, teamName: p.teamName })
-    } else if (type === 'workspace' || type === 'organization') {
-      workspaces.push({
-        entityId: id,
-        organizationId,
-        organizationName: p.organizationName || p.workspaceName,
-      })
-    }
-  }
-  return { users, teams, workspaces }
-}
-
-const startEditingPermissions = () => {
-  const split = splitPermissions(permissions.value)
-  editUsers.value = split.users
-  editTeams.value = split.teams
-  editWorkspaces.value = split.workspaces
-  editVisibility.value = isAppPublic.value ? 'public' : 'private'
-  isEditingPermissions.value = true
-}
-
-const cancelEditingPermissions = () => {
-  isEditingPermissions.value = false
-}
-
 const deletingApplications = computed(
   () => store.state.analysisModule.deletingApplications || []
 )
 const isAppDeleting = computed(() =>
   deletingApplications.value.includes(appUuid.value)
 )
-
-const isCurrentUser = (id) =>
-  !!id &&
-  (id === profile.value?.id || id === profile.value?.intId)
-
-const isAppOwner = computed(() => isCurrentUser(detail.value?.ownerId))
 
 // Visibility is sourced from the `isPrivate` flag on the application.
 // `isPrivate === false` ⇒ public; everything else (true / undefined) ⇒ private.
@@ -287,152 +157,18 @@ const visibilityLabel = computed(() => {
   return detail.value.isPrivate ? 'Private' : 'Public'
 })
 
-const canEditPermissions = computed(
-  () => isAppOwner.value && !isAppPublic.value
-)
-
-const editPermissionsTooltip = computed(() => {
-  if (isAppPublic.value) {
-    return 'Only Private Repos allow Owners to update permissions'
-  }
-  if (!isAppOwner.value) {
-    return 'Only Application Owners Can Update Permissions'
-  }
-  return ''
-})
-
-const removeEditUser = (idx) => {
-  const user = editUsers.value[idx]
-  if (user && isCurrentUser(user.entityId)) return
-  editUsers.value.splice(idx, 1)
-}
-const removeEditTeam = (idx) => editTeams.value.splice(idx, 1)
-
-const availableAddableUsers = computed(() => {
-  const taken = new Set(editUsers.value.map((u) => u.entityId))
-  return orgMembers.value.filter((m) => m.id && !taken.has(m.id))
-})
-
-const availableAddableTeams = computed(() => {
-  const taken = new Set(editTeams.value.map((t) => t.entityId))
-  return teams.value.filter((t) => t.team?.id && !taken.has(t.team.id))
-})
-
-const availableAddableWorkspaces = computed(() => {
-  const taken = new Set(editWorkspaces.value.map((w) => w.entityId))
-  return organizations.value.filter(
-    (o) => o.organization?.id &&
-      !taken.has(o.organization.id) &&
-      o.organization.name?.toLowerCase() !== 'welcome'
-  )
-})
-
-const openAddUserDialog = () => {
-  selectedAddUserId.value = null
-  showAddUserDialog.value = true
-}
-
-const confirmAddUser = () => {
-  if (!selectedAddUserId.value) return
-  editUsers.value.push({
-    entityId: selectedAddUserId.value,
-    organizationId: activeOrgId.value,
-  })
-  showAddUserDialog.value = false
-}
-
-const openAddTeamDialog = () => {
-  selectedAddTeamId.value = null
-  showAddTeamDialog.value = true
-}
-
-const confirmAddTeam = () => {
-  if (!selectedAddTeamId.value) return
-  const team = teams.value.find((t) => t.team?.id === selectedAddTeamId.value)
-  editTeams.value.push({
-    entityId: selectedAddTeamId.value,
-    organizationId: activeOrgId.value,
-    teamName: team?.team?.name,
-  })
-  showAddTeamDialog.value = false
-}
-
-const openAddWorkspaceDialog = () => {
-  selectedAddWorkspaceId.value = null
-  showAddWorkspaceDialog.value = true
-}
-
-const confirmAddWorkspace = () => {
-  if (!selectedAddWorkspaceId.value) return
-  const org = organizations.value.find(
-    (o) => o.organization?.id === selectedAddWorkspaceId.value
-  )
-  editWorkspaces.value.push({
-    entityId: selectedAddWorkspaceId.value,
-    organizationId: selectedAddWorkspaceId.value,
-    organizationName: org?.organization?.name,
-  })
-  showAddWorkspaceDialog.value = false
-}
-
-const removeEditWorkspace = (idx) => editWorkspaces.value.splice(idx, 1)
-
-const savePermissions = async () => {
-  if (!appUuid.value) return
-  isSavingPermissions.value = true
-  try {
-    const orgId = activeOrgId.value
-    const usersOut = editUsers.value.map((u) => ({
-      entityId: u.entityId,
-      organizationId: u.organizationId || orgId,
-    }))
-    // Defense-in-depth: ensure the current user is in the users list.
-    const meId = profile.value?.id || profile.value?.intId
-    if (meId && !usersOut.some((u) => u.entityId === meId)) {
-      usersOut.push({ entityId: meId, organizationId: orgId })
-    }
-    const payload = {
-      visibility: editVisibility.value,
-      users: usersOut,
-      teams: editTeams.value.map((t) => ({
-        entityId: t.entityId,
-        organizationId: t.organizationId || orgId,
-      })),
-      workspaces: editWorkspaces.value.map((w) => ({
-        entityId: w.entityId,
-        organizationId: w.organizationId || orgId,
-      })),
-    }
-    await store.dispatch('analysisModule/updateApplicationPermissions', {
-      uuid: appUuid.value,
-      payload,
-    })
-    ElMessage.success('Permissions updated')
-    isEditingPermissions.value = false
-    // Refresh permissions and detail (visibility may have changed)
-    await loadDetail(appUuid.value)
-  } catch (err) {
-    console.error(err)
-    ElMessage.error('Failed to update permissions')
-  } finally {
-    isSavingPermissions.value = false
-  }
-}
-
 /* Fetch */
 const loadDetail = async (uuid) => {
   detail.value = null
-  permissions.value = []
   detailError.value = ''
-  permissionsError.value = ''
   versionsPage.value = 1
   if (!uuid) return
   isLoading.value = true
-  permissionsLoading.value = true
   try {
     // Ensure org members and teams are loaded — getPrimaryData() in main.js
     // may not have run if the user navigated here via a userRoute (e.g. my-workspace).
-    // Fall back to preferredOrganization / first org when activeOrganization is not set.
+    // The permissions editor relies on this data. Fall back to
+    // preferredOrganization / first org when activeOrganization is not set.
     const orgId = store.state.activeOrganization?.organization?.id
       || store.state.profile?.preferredOrganization
       || store.state.organizations?.[0]?.organization?.id
@@ -452,9 +188,8 @@ const loadDetail = async (uuid) => {
         }).catch((err) => console.warn('Failed to load org data:', err))
       : Promise.resolve()
 
-    const [detailResult, permsResult] = await Promise.allSettled([
+    const [detailResult] = await Promise.allSettled([
       store.dispatch('analysisModule/fetchApplication', uuid),
-      store.dispatch('analysisModule/fetchApplicationPermissions', uuid),
       orgDataPromise,
     ])
 
@@ -466,23 +201,8 @@ const loadDetail = async (uuid) => {
         'This repository is not published to the App Store yet.'
       ElMessage.error('Failed to load application details')
     }
-
-    if (permsResult.status === 'fulfilled') {
-      const data = permsResult.value
-      permissions.value = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.access)
-          ? data.access
-          : Array.isArray(data?.permissions)
-            ? data.permissions
-            : []
-    } else {
-      console.error(permsResult.reason)
-      permissionsError.value = 'Failed to load permissions'
-    }
   } finally {
     isLoading.value = false
-    permissionsLoading.value = false
   }
 }
 
@@ -524,48 +244,12 @@ const confirmDelete = async () => {
   }
 }
 
-/* Archive / restore
-   PATCH /applications/store/{uuid} with { status: "active" | "archived" } */
-const isArchiving = ref(false)
+/* Archive / restore — handled by the shared AppArchiveToggle component. */
 const isArchived = computed(() => detail.value?.status === 'archived')
 
-const toggleArchiveStatus = async () => {
-  if (!detail.value || !isAppOwner.value || isArchiving.value) return
-  const nextStatus = isArchived.value ? 'active' : 'archived'
-
-  if (nextStatus === 'archived') {
-    try {
-      await ElMessageBox.confirm(
-        'Archive this application? It will be removed from active workspaces and workflows that reference it will no longer be able to run it. The underlying record is preserved and you can restore it later.',
-        'Archive Application',
-        { confirmButtonText: 'Archive', cancelButtonText: 'Cancel', type: 'warning' }
-      )
-    } catch {
-      return // user cancelled
-    }
-  }
-
-  isArchiving.value = true
-  try {
-    const updated = await store.dispatch('analysisModule/setApplicationStatus', {
-      uuid: detail.value.uuid || appUuid.value,
-      status: nextStatus,
-    })
-    // Reflect the change locally (the response is the updated application).
-    detail.value = { ...detail.value, ...(updated || {}), status: nextStatus }
-    // Refresh the shared applications list so other views reflect the change.
-    store
-      .dispatch('analysisModule/fetchApplications', { force: true })
-      .catch(() => {})
-    ElMessage.success(
-      nextStatus === 'archived' ? 'Application archived' : 'Application restored'
-    )
-  } catch (error) {
-    console.error(error)
-    ElMessage.error('Failed to update application status. Please try again.')
-  } finally {
-    isArchiving.value = false
-  }
+// Keep the local detail in sync when the archive toggle changes status.
+const onArchiveChange = (status) => {
+  if (detail.value) detail.value = { ...detail.value, status }
 }
 </script>
 
@@ -734,165 +418,13 @@ const toggleArchiveStatus = async () => {
 
       <!-- Permissions -->
       <div class="management-section">
-        <div class="section-header">
-          <h2>Permissions ({{ permissions.length }})</h2>
-          <div class="section-actions">
-            <template v-if="isEditingPermissions">
-              <bf-button
-                class="secondary small"
-                @click="cancelEditingPermissions"
-                :disabled="isSavingPermissions"
-              >Cancel</bf-button>
-              <bf-button
-                class="primary small"
-                @click="savePermissions"
-                :loading="isSavingPermissions"
-              >Save</bf-button>
-            </template>
-            <el-tooltip
-              v-else
-              :content="editPermissionsTooltip"
-              placement="top"
-              :disabled="canEditPermissions"
-            >
-              <span class="edit-permissions-wrap">
-                <bf-button
-                  class="secondary small"
-                  :disabled="!canEditPermissions"
-                  @click="canEditPermissions && startEditingPermissions()"
-                >Edit</bf-button>
-              </span>
-            </el-tooltip>
-          </div>
-        </div>
-
-        <div v-if="permissionsLoading" class="empty-state">Loading...</div>
-        <div v-else-if="permissionsError" class="empty-state">
-          {{ permissionsError }}
-        </div>
-
-        <!-- Read mode -->
-        <template v-else-if="!isEditingPermissions">
-          <div v-if="permissions.length === 0" class="empty-state">
-            No permissions configured
-          </div>
-          <div v-else class="info-content">
-            <div
-              v-for="(perm, i) in permissions"
-              :key="perm.uuid || perm.userId || perm.teamId || i"
-              class="info-row"
-            >
-              <span class="info-label">{{ permissionLabel(perm) }}</span>
-              <span class="info-value perm-role">
-                {{ permissionRole(perm) }}
-              </span>
-            </div>
-          </div>
-        </template>
-
-        <!-- Edit mode -->
-        <template v-else>
-          <div class="permissions-edit">
-            <div class="edit-subsection">
-              <div class="edit-subsection-header">
-                <h4>Users ({{ editUsers.length }})</h4>
-                <bf-button
-                  class="secondary small"
-                  @click="openAddUserDialog"
-                  :disabled="availableAddableUsers.length === 0"
-                >+ Add User</bf-button>
-              </div>
-              <div v-if="editUsers.length === 0" class="edit-empty">
-                No users
-              </div>
-              <div
-                v-else
-                v-for="(user, i) in editUsers"
-                :key="user.entityId"
-                class="edit-permission-row"
-              >
-                <span class="edit-permission-label">
-                  {{ getUserName(user.entityId) }}
-                  <span v-if="isCurrentUser(user.entityId)" class="self-tag">
-                    you
-                  </span>
-                </span>
-                <button
-                  v-if="!isCurrentUser(user.entityId)"
-                  class="remove-perm-btn"
-                  type="button"
-                  @click="removeEditUser(i)"
-                  title="Remove"
-                >&times;</button>
-                <span
-                  v-else
-                  class="remove-perm-btn-placeholder"
-                  aria-hidden="true"
-                ></span>
-              </div>
-            </div>
-
-            <div class="edit-subsection">
-              <div class="edit-subsection-header">
-                <h4>Teams ({{ editTeams.length }})</h4>
-                <bf-button
-                  class="secondary small"
-                  @click="openAddTeamDialog"
-                  :disabled="availableAddableTeams.length === 0"
-                >+ Add Team</bf-button>
-              </div>
-              <div v-if="editTeams.length === 0" class="edit-empty">
-                No teams
-              </div>
-              <div
-                v-else
-                v-for="(team, i) in editTeams"
-                :key="team.entityId"
-                class="edit-permission-row"
-              >
-                <span class="edit-permission-label">
-                  {{ team.teamName || getTeamName(team.entityId) || team.entityId }}
-                </span>
-                <button
-                  class="remove-perm-btn"
-                  type="button"
-                  @click="removeEditTeam(i)"
-                  title="Remove"
-                >&times;</button>
-              </div>
-            </div>
-
-            <div class="edit-subsection">
-              <div class="edit-subsection-header">
-                <h4>Workspaces ({{ editWorkspaces.length }})</h4>
-                <bf-button
-                  class="secondary small"
-                  @click="openAddWorkspaceDialog"
-                  :disabled="availableAddableWorkspaces.length === 0"
-                >+ Add Workspace</bf-button>
-              </div>
-              <div v-if="editWorkspaces.length === 0" class="edit-empty">
-                No workspaces
-              </div>
-              <div
-                v-else
-                v-for="(ws, i) in editWorkspaces"
-                :key="ws.entityId"
-                class="edit-permission-row"
-              >
-                <span class="edit-permission-label">
-                  {{ ws.organizationName || getWorkspaceName(ws.entityId) || ws.entityId }}
-                </span>
-                <button
-                  class="remove-perm-btn"
-                  type="button"
-                  @click="removeEditWorkspace(i)"
-                  title="Remove"
-                >&times;</button>
-              </div>
-            </div>
-          </div>
-        </template>
+        <app-permissions
+          :uuid="detail.uuid"
+          :owner-id="detail.ownerId"
+          :is-public="isAppPublic"
+          :organization-id="detail.organizationId"
+          @updated="loadDetail(appUuid)"
+        />
       </div>
 
       <!-- Danger Zone -->
@@ -914,148 +446,17 @@ const toggleArchiveStatus = async () => {
             </p>
           </div>
           <div class="danger-action">
-            <el-tooltip
-              :content="
-                isAppOwner
-                  ? ''
-                  : 'Only Application Owners Can Archive Applications'
-              "
-              placement="top"
-              :disabled="isAppOwner"
-            >
-              <span class="archive-button-wrap">
-                <bf-button
-                  class="danger-button"
-                  :disabled="!isAppOwner || isArchiving"
-                  @click="toggleArchiveStatus"
-                >
-                  {{
-                    isArchiving
-                      ? (isArchived ? "Restoring..." : "Archiving...")
-                      : (isArchived ? "Restore Application" : "Archive Application")
-                  }}
-                </bf-button>
-              </span>
-            </el-tooltip>
+            <app-archive-toggle
+              :uuid="detail.uuid"
+              :owner-id="detail.ownerId"
+              :source-url="detail.sourceUrl"
+              :status="detail.status"
+              @change="onArchiveChange"
+            />
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Add User Permission Dialog -->
-    <el-dialog
-      v-model="showAddUserDialog"
-      title="Add User"
-      width="480px"
-      :close-on-click-modal="true"
-    >
-      <div class="add-perm-dialog">
-        <p>Grant a user access to this application:</p>
-        <el-select
-          v-model="selectedAddUserId"
-          placeholder="Select a user"
-          size="default"
-          filterable
-          class="add-perm-select"
-        >
-          <el-option
-            v-for="user in availableAddableUsers"
-            :key="user.id"
-            :label="`${user.firstName} ${user.lastName}`"
-            :value="user.id"
-          >
-            <div class="user-option">
-              <span class="user-name">
-                {{ user.firstName }} {{ user.lastName }}
-              </span>
-              <span class="user-email">{{ user.email }}</span>
-            </div>
-          </el-option>
-        </el-select>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showAddUserDialog = false">Cancel</el-button>
-          <el-button
-            type="primary"
-            :disabled="!selectedAddUserId"
-            @click="confirmAddUser"
-          >Add</el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- Add Team Permission Dialog -->
-    <el-dialog
-      v-model="showAddTeamDialog"
-      title="Add Team"
-      width="480px"
-      :close-on-click-modal="true"
-    >
-      <div class="add-perm-dialog">
-        <p>Grant a team access to this application:</p>
-        <el-select
-          v-model="selectedAddTeamId"
-          placeholder="Select a team"
-          size="default"
-          filterable
-          class="add-perm-select"
-        >
-          <el-option
-            v-for="t in availableAddableTeams"
-            :key="t.team.id"
-            :label="t.team.name"
-            :value="t.team.id"
-          />
-        </el-select>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showAddTeamDialog = false">Cancel</el-button>
-          <el-button
-            type="primary"
-            :disabled="!selectedAddTeamId"
-            @click="confirmAddTeam"
-          >Add</el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- Add Workspace Permission Dialog -->
-    <el-dialog
-      v-model="showAddWorkspaceDialog"
-      title="Add Workspace"
-      width="480px"
-      :close-on-click-modal="true"
-    >
-      <div class="add-perm-dialog">
-        <p>Grant a workspace access to this application:</p>
-        <el-select
-          v-model="selectedAddWorkspaceId"
-          placeholder="Select a workspace"
-          size="default"
-          filterable
-          class="add-perm-select"
-        >
-          <el-option
-            v-for="o in availableAddableWorkspaces"
-            :key="o.organization.id"
-            :label="o.organization.name"
-            :value="o.organization.id"
-          />
-        </el-select>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showAddWorkspaceDialog = false">Cancel</el-button>
-          <el-button
-            type="primary"
-            :disabled="!selectedAddWorkspaceId"
-            @click="confirmAddWorkspace"
-          >Add</el-button>
-        </div>
-      </template>
-    </el-dialog>
 
     <!-- Delete Confirmation Dialog -->
     <el-dialog
@@ -1304,25 +705,6 @@ const toggleArchiveStatus = async () => {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-
-  .danger-button[disabled],
-  :deep(.bf-button.danger-button:disabled) {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
-.coming-soon-tag {
-  display: inline-block;
-  padding: 2px 8px;
-  background: #fff3cd;
-  color: #856404;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-radius: 12px;
-  line-height: 1.2;
 }
 
 .delete-app-dialog {
@@ -1543,8 +925,7 @@ const toggleArchiveStatus = async () => {
 // Wrappers around disabled buttons so el-tooltip still receives hover
 // events (disabled buttons swallow them in some browsers). Heavily dim
 // the inner button so it reads unmistakably disabled.
-.edit-permissions-wrap,
-.archive-button-wrap {
+.edit-permissions-wrap {
   display: inline-flex;
 
   :deep(button[disabled]),
@@ -1557,6 +938,11 @@ const toggleArchiveStatus = async () => {
     cursor: not-allowed;
     box-shadow: none;
   }
+}
+
+.archive-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .permissions-edit {
