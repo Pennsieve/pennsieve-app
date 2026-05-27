@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
@@ -523,6 +523,50 @@ const confirmDelete = async () => {
     isDeleting.value = false
   }
 }
+
+/* Archive / restore
+   PATCH /applications/store/{uuid} with { status: "active" | "archived" } */
+const isArchiving = ref(false)
+const isArchived = computed(() => detail.value?.status === 'archived')
+
+const toggleArchiveStatus = async () => {
+  if (!detail.value || !isAppOwner.value || isArchiving.value) return
+  const nextStatus = isArchived.value ? 'active' : 'archived'
+
+  if (nextStatus === 'archived') {
+    try {
+      await ElMessageBox.confirm(
+        'Archive this application? It will be removed from active workspaces and workflows that reference it will no longer be able to run it. The underlying record is preserved and you can restore it later.',
+        'Archive Application',
+        { confirmButtonText: 'Archive', cancelButtonText: 'Cancel', type: 'warning' }
+      )
+    } catch {
+      return // user cancelled
+    }
+  }
+
+  isArchiving.value = true
+  try {
+    const updated = await store.dispatch('analysisModule/setApplicationStatus', {
+      uuid: detail.value.uuid || appUuid.value,
+      status: nextStatus,
+    })
+    // Reflect the change locally (the response is the updated application).
+    detail.value = { ...detail.value, ...(updated || {}), status: nextStatus }
+    // Refresh the shared applications list so other views reflect the change.
+    store
+      .dispatch('analysisModule/fetchApplications', { force: true })
+      .catch(() => {})
+    ElMessage.success(
+      nextStatus === 'archived' ? 'Application archived' : 'Application restored'
+    )
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('Failed to update application status. Please try again.')
+  } finally {
+    isArchiving.value = false
+  }
+}
 </script>
 
 <template>
@@ -858,10 +902,15 @@ const confirmDelete = async () => {
         </div>
         <div class="delete-content">
           <div class="delete-info">
-            <p>
+            <p v-if="isArchived">
+              This application is archived and hidden from active workspaces.
+              Restore it to make it available to workflows again.
+            </p>
+            <p v-else>
               Archive this application to remove it from active workspaces.
               Workflows that reference this application will no longer be
-              able to run it, but the underlying record is preserved.
+              able to run it, but the underlying record is preserved and can
+              be restored later.
             </p>
           </div>
           <div class="danger-action">
@@ -875,12 +924,19 @@ const confirmDelete = async () => {
               :disabled="isAppOwner"
             >
               <span class="archive-button-wrap">
-                <bf-button class="danger-button" disabled>
-                  Archive Application
+                <bf-button
+                  class="danger-button"
+                  :disabled="!isAppOwner || isArchiving"
+                  @click="toggleArchiveStatus"
+                >
+                  {{
+                    isArchiving
+                      ? (isArchived ? "Restoring..." : "Archiving...")
+                      : (isArchived ? "Restore Application" : "Archive Application")
+                  }}
                 </bf-button>
               </span>
             </el-tooltip>
-            <span class="coming-soon-tag">Coming Soon</span>
           </div>
         </div>
       </div>

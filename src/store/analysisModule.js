@@ -63,6 +63,13 @@ export const mutations = {
       (u) => u !== uuid
     );
   },
+  UPDATE_APPLICATION_STATUS(state, { uuid, status }) {
+    // Applications are referenced by both the master list and the
+    // categorized (pre/processor/post) lists, so mutating the object's
+    // status keeps every view in sync.
+    const application = state.applications.find((a) => a.uuid === uuid);
+    if (application) application.status = status;
+  },
   UPDATE_PREPROCESSORS(state, preprocessors) {
     state.preprocessors = preprocessors;
   },
@@ -234,7 +241,10 @@ export const actions = {
         return Promise.reject();
       });
   },
-  fetchApplications: async ({ state, commit, rootState }, { force } = {}) => {
+  fetchApplications: async (
+    { state, commit, rootState },
+    { force, includeArchived } = {}
+  ) => {
     if (!force && state.applicationsLoaded) return;
     try {
       const userToken = await useGetToken();
@@ -246,7 +256,9 @@ export const actions = {
         || rootState.profile?.preferredOrganization
         || rootState.organizations?.[0]?.organization?.id;
       if (!orgId) return;
-      const url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
+      // Archived applications are excluded by default; opt in with includeArchived.
+      let url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
+      if (includeArchived) url += `&includeArchived=true`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -775,6 +787,38 @@ export const actions = {
       return result;
     } catch (err) {
       console.error("Failed to update application:", err.message);
+      throw err;
+    }
+  },
+  // Partially update an app store application's lifecycle status.
+  // status is one of "active" | "archived".
+  // PATCH /applications/store/{uuid}
+  setApplicationStatus: async ({ commit, rootState }, { uuid, status }) => {
+    if (!uuid) throw new Error("Missing application uuid");
+    const url = `${rootState.config.api2Url}/applications/store/${uuid}`;
+    const userToken = await useGetToken();
+
+    try {
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        throw new Error(
+          `Error ${response.status}: ${response.statusText} - ${errorDetails}`
+        );
+      }
+
+      commit("UPDATE_APPLICATION_STATUS", { uuid, status });
+      return await response.json();
+    } catch (err) {
+      console.error("Failed to update application status:", err.message);
       throw err;
     }
   },

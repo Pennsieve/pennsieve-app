@@ -221,6 +221,44 @@ export const getCpuForMemory = (memory) => {
   return FARGATE_CPU_OPTIONS[FARGATE_CPU_OPTIONS.length - 1];
 };
 
+// Standard (Fargate) CPU/memory selection for workflow processors.
+// Mirrors the original Create Application form exactly: CPU is offered in whole
+// CPU units (1024 = 1 CPU) and the available memory depends on the chosen CPU.
+export const STANDARD_CPU_OPTIONS = [
+  { value: "1024", label: "1 CPU" },
+  { value: "2048", label: "2 CPU" },
+  { value: "4096", label: "4 CPU" },
+  { value: "8192", label: "8 CPU" },
+];
+
+// Memory range (in GB) selectable for each CPU value: start..end stepping by `i`.
+// Extra CPU keys are kept unsurfaced for parity with the original form.
+const STANDARD_MEMORY_MAP = {
+  "256": { start: 1, end: 2, i: 1 },
+  "512": { start: 1, end: 4, i: 1 },
+  "1024": { start: 2, end: 8, i: 1 },
+  "2048": { start: 4, end: 16, i: 1 },
+  "4096": { start: 8, end: 30, i: 1 },
+  "8192": { start: 16, end: 60, i: 4 },
+  "16384": { start: 32, end: 120, i: 8 },
+};
+
+// Memory options for a given CPU value, matching the original Create Application
+// form. Values are returned in MiB (GB * 1024) with GB labels.
+export const getStandardMemoryOptions = (cpu) => {
+  const memVars = STANDARD_MEMORY_MAP[String(cpu)];
+  if (!memVars) return [];
+  const { start, end, i } = memVars;
+  const options = [];
+  if (String(cpu) === "256") {
+    options.push({ value: "512", label: "512 MiB" });
+  }
+  for (let gb = start; gb <= end; gb += i) {
+    options.push({ value: String(gb * 1024), label: `${gb} GB` });
+  }
+  return options;
+};
+
 export const formatResourceLabel = (val) => {
   const n = parseInt(val, 10);
   if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;

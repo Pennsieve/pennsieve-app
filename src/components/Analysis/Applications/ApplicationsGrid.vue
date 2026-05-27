@@ -11,6 +11,7 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 */
 const searchQuery = ref("");
 const visibilityFilter = ref("all");
+const showArchived = ref(false);
 
 const pageSize = 10;
 const currentPage = ref(1);
@@ -125,6 +126,11 @@ const visibilityLabel = (app) => {
 const filteredApplications = computed(() => {
   let list = applications.value;
 
+  // Archived applications are hidden unless the user opts to show them.
+  if (!showArchived.value) {
+    list = list.filter((app) => app.status !== "archived");
+  }
+
   const q = searchQuery.value.trim().toLowerCase();
   if (q) {
     list = list.filter((app) => {
@@ -159,6 +165,17 @@ const paginatedApplications = computed(() => {
 
 watch(filteredApplications, () => {
   currentPage.value = 1;
+});
+
+// Archived applications are excluded from the default list response, so
+// toggling visibility requires refetching with the includeArchived flag.
+watch(showArchived, (show) => {
+  store
+    .dispatch("analysisModule/fetchApplications", {
+      force: true,
+      includeArchived: show,
+    })
+    .catch(() => {});
 });
 
 /*
@@ -236,6 +253,13 @@ const goToDetail = (app) => {
         >
           {{ option.label }}
         </button>
+        <el-checkbox
+          v-model="showArchived"
+          size="small"
+          class="show-archived-toggle"
+        >
+          Show archived
+        </el-checkbox>
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
@@ -276,6 +300,9 @@ const goToDetail = (app) => {
                 </span>
                 <span class="tag created">
                   {{ new Date(app.createdAt).toLocaleDateString() }}
+                </span>
+                <span v-if="app.status === 'archived'" class="tag archived">
+                  Archived
                 </span>
               </div>
             </div>
@@ -426,6 +453,10 @@ const goToDetail = (app) => {
   margin-bottom: 16px;
 }
 
+.show-archived-toggle {
+  margin-left: auto;
+}
+
 .filter-btn {
   padding: 4px 16px;
   border: 1px solid theme.$gray_2;
@@ -554,6 +585,11 @@ const goToDetail = (app) => {
 
     &.created {
       background: theme.$gray_1;
+      color: theme.$gray_5;
+    }
+
+    &.archived {
+      background: theme.$gray_2;
       color: theme.$gray_5;
     }
   }

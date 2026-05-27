@@ -17,7 +17,8 @@ import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
 import {
   FARGATE_CPU_OPTIONS,
-  getMemoryOptionsForCpu,
+  STANDARD_CPU_OPTIONS,
+  getStandardMemoryOptions,
   LAMBDA_MEMORY_OPTIONS,
   getCpuForMemory,
   formatResourceLabel,
@@ -1459,12 +1460,10 @@ const openNodeSettings = (id) => {
                         "
                       >
                         <el-option
-                          v-for="cpu in FARGATE_CPU_OPTIONS"
-                          :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(
-                            cpu >= 1024 ? 0 : 2,
-                          )} vCPU)`"
-                          :value="cpu"
+                          v-for="opt in STANDARD_CPU_OPTIONS"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
@@ -1473,18 +1472,18 @@ const openNodeSettings = (id) => {
                       <el-select
                         v-model="selectedNode.data.memory"
                         size="small"
-                        placeholder="Default"
+                        placeholder="Select CPU before Memory"
                         clearable
                         :disabled="!selectedNode.data.cpu"
                         class="info-inline-select"
                       >
                         <el-option
-                          v-for="mem in getMemoryOptionsForCpu(
+                          v-for="opt in getStandardMemoryOptions(
                             selectedNode.data.cpu,
                           )"
-                          :key="mem"
-                          :label="formatResourceLabel(mem)"
-                          :value="mem"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
