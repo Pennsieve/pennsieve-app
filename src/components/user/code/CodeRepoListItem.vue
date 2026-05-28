@@ -78,15 +78,8 @@
         <IconGitHub :width="14" :height="14" color="currentColor" />
         <span>View on GitHub</span>
       </a>
-      <router-link
-        v-if="matchedApp"
-        :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
-        class="card-action-link app-details-link"
-      >
-        View application details &rarr;
-      </router-link>
       <span
-        v-else-if="repo.publishing_to_appstore && !matchedApp && !hasReleases"
+        v-if="repo.publishing_to_appstore && !matchedAppRaw && !hasReleases"
         class="card-action-hint"
       >
         Create Github release to add to app store
@@ -357,12 +350,8 @@ export default {
   }
 }
 
-.app-details-link,
 .card-action-hint {
   margin-left: auto;
-}
-
-.card-action-hint {
   font-size: 13px;
   font-weight: 500;
   color: theme.$gray_4;
