@@ -12,6 +12,8 @@ import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import { useGetToken } from '@/composables/useGetToken'
+import { useSendXhr } from '@/mixins/request/request_composable'
 
 const props = defineProps({
   // Application uuid whose permissions we manage.
@@ -282,6 +284,40 @@ const confirmAddWorkspace = () => {
   showAddWorkspaceDialog.value = false
 }
 
+// Members and teams power friendly-name resolution for permission entries
+// and the owner badge. They are not always preloaded — when the user opens
+// the Publishing dialog from the My Code page, getPrimaryData() in main.js
+// may not have run for the current org yet. Fall back to loading them here.
+const ensureOrgData = async () => {
+  const orgId =
+    props.organizationId ||
+    store.state.activeOrganization?.organization?.id ||
+    store.state.profile?.preferredOrganization ||
+    store.state.organizations?.[0]?.organization?.id
+  if (!orgId) return
+  const needsMembers = !store.state.orgMembers?.length
+  const needsTeams = !store.state.teams?.length
+  if (!needsMembers && !needsTeams) return
+  try {
+    const token = await useGetToken()
+    const base = `${store.state.config.apiUrl}/organizations/${orgId}`
+    await Promise.all([
+      needsMembers
+        ? useSendXhr(`${base}/members?api_key=${token}`).then((r) =>
+            store.dispatch('updateOrgMembers', r)
+          )
+        : Promise.resolve(),
+      needsTeams
+        ? useSendXhr(`${base}/teams?api_key=${token}`).then((r) =>
+            store.dispatch('updateTeams', r)
+          )
+        : Promise.resolve(),
+    ])
+  } catch (err) {
+    console.warn('Failed to load org data for permissions:', err)
+  }
+}
+
 /* Fetch + save */
 const loadPermissions = async (uuid) => {
   permissions.value = []
@@ -290,10 +326,10 @@ const loadPermissions = async (uuid) => {
   if (!uuid) return
   permissionsLoading.value = true
   try {
-    const data = await store.dispatch(
-      'analysisModule/fetchApplicationPermissions',
-      uuid
-    )
+    const [data] = await Promise.all([
+      store.dispatch('analysisModule/fetchApplicationPermissions', uuid),
+      ensureOrgData(),
+    ])
     permissions.value = Array.isArray(data)
       ? data
       : Array.isArray(data?.access)

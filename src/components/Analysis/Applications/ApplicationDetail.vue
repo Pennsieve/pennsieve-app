@@ -7,6 +7,8 @@ import DOMPurify from "dompurify";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 
 const props = defineProps({
@@ -203,6 +205,38 @@ const renderReadme = (markdown) => {
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
 
+// Members and teams power friendly-name resolution for the owner badge.
+// They are not always preloaded when navigating directly to this page;
+// fall back to fetching them here.
+const ensureOrgData = async () => {
+  const orgId =
+    store.state.activeOrganization?.organization?.id ||
+    store.state.profile?.preferredOrganization ||
+    store.state.organizations?.[0]?.organization?.id;
+  if (!orgId) return;
+  const needsMembers = !store.state.orgMembers?.length;
+  const needsTeams = !store.state.teams?.length;
+  if (!needsMembers && !needsTeams) return;
+  try {
+    const token = await useGetToken();
+    const base = `${store.state.config.apiUrl}/organizations/${orgId}`;
+    await Promise.all([
+      needsMembers
+        ? useSendXhr(`${base}/members?api_key=${token}`).then((r) =>
+            store.dispatch("updateOrgMembers", r)
+          )
+        : Promise.resolve(),
+      needsTeams
+        ? useSendXhr(`${base}/teams?api_key=${token}`).then((r) =>
+            store.dispatch("updateTeams", r)
+          )
+        : Promise.resolve(),
+    ]);
+  } catch (err) {
+    console.warn("Failed to load org data for application detail:", err);
+  }
+};
+
 /*
   Fetch application detail
 */
@@ -217,6 +251,7 @@ const loadDetail = async (uuid) => {
     const [detailResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
+      ensureOrgData(),
     ]);
 
     if (detailResult.status === "fulfilled") {
