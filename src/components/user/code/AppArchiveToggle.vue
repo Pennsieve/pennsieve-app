@@ -3,10 +3,9 @@
   Shared archive/restore toggle for an App Store application.
 
   Renders an Active/Archived switch and owns the lifecycle change:
-  PATCH /applications/store/{uuid} with { status }. Archiving also turns off
-  App Store publishing for the source repository (restoring does not turn it
-  back on). The switch only flips after the backend confirms the change.
-  Emits `change` with the new status so the parent can update its local copy.
+  PATCH /applications/store/{uuid} with { status }. The switch only flips
+  after the backend confirms the change. Emits `change` with the new status
+  so the parent can update its local copy.
 */
 import { computed, ref } from 'vue'
 import { useStore } from 'vuex'
@@ -20,11 +19,6 @@ const props = defineProps({
   ownerId: {
     type: [String, Number],
     default: null,
-  },
-  // Application's source repo URL — used to turn off publishing on archive.
-  sourceUrl: {
-    type: String,
-    default: '',
   },
   // Current lifecycle status: 'active' | 'archived'.
   status: {
@@ -49,37 +43,6 @@ const isArchived = computed(() => props.status === 'archived')
 const ownerTooltip = computed(() =>
   isAppOwner.value ? '' : 'Only Application Owners Can Archive Applications'
 )
-
-const normalizeRepoUrl = (url) =>
-  (url || '').replace(/\.git$/, '').replace(/\/+$/, '').toLowerCase()
-
-// Turn off App Store publishing for the source repository. The /repositories
-// update is a full write, so we preserve the current publish_to_discover flag
-// and only clear publish_to_appstore.
-const disableAppStorePublishing = async () => {
-  if (!props.sourceUrl) return
-
-  if (!store.state.codeReposModule.myReposLoaded) {
-    await store.dispatch('codeReposModule/fetchAllMyRepos')
-  }
-
-  const target = normalizeRepoUrl(props.sourceUrl)
-  const repos = store.state.codeReposModule.myRepos || []
-  const repo = repos.find((r) =>
-    [r.html_url, r.url].some((u) => u && normalizeRepoUrl(u) === target)
-  )
-
-  if (!repo) {
-    throw new Error(`Could not find a repository matching ${props.sourceUrl}`)
-  }
-  if (!repo.publishing_to_appstore) return // already off — nothing to do
-
-  await store.dispatch('codeReposModule/updateRepoPublishingSettings', {
-    repoUrl: repo.url,
-    publish_to_discover: Boolean(repo.publishing_to_discover),
-    publish_to_appstore: false,
-  })
-}
 
 // el-switch :before-change handler. Resolve true to let the toggle flip,
 // reject (or resolve false) to keep it where it was.
@@ -106,21 +69,6 @@ const handleArchiveToggle = async () => {
     store
       .dispatch('analysisModule/fetchApplications', { force: true })
       .catch(() => {})
-
-    // Archiving must also turn off App Store publishing. Restoring does not
-    // re-enable it.
-    if (nextStatus === 'archived') {
-      try {
-        await disableAppStorePublishing()
-      } catch (pubErr) {
-        console.error('Failed to disable App Store publishing:', pubErr)
-        ElMessage.warning(
-          'Application archived, but App Store publishing could not be turned off automatically. Please disable it in the repository’s publishing settings.'
-        )
-        emit('change', nextStatus)
-        return true // archive succeeded; keep the toggle archived
-      }
-    }
 
     emit('change', nextStatus)
     ElMessage.success(

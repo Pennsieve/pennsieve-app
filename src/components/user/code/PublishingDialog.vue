@@ -13,67 +13,78 @@
           <h4>{{ repo.name }}</h4>
           <p v-if="repo.description" class="repo-description">{{ repo.description }}</p>
         </div>
-        
-        <div class="publishing-options">
-          <h5>Publishing Destinations</h5>
-          <p class="options-description">
-            Choose where you want to publish this repository when releases are created.
-          </p>
-          
-          <div class="option-group">
-            <label class="option-item">
-              <input 
-                type="checkbox" 
-                v-model="localSettings.publishToDiscover"
-                @change="onSettingsChange"
-              />
-              <div class="option-content">
-                <strong>Pennsieve Discover</strong>
-                <p>Publish to the Pennsieve Discover platform for scientific research datasets</p>
-              </div>
-            </label>
-            
-            <label class="option-item">
-              <input
-                type="checkbox"
-                v-model="localSettings.publishToAppstore"
-                @change="onSettingsChange"
-              />
-              <div class="option-content">
-                <strong>App Store</strong>
-                <p>Publish to the Pennsieve App Store for computational tools and applications</p>
-              </div>
-            </label>
-          </div>
-          
-          <div v-if="hasAnyPublishing" class="publishing-info">
-            <h6>What happens when you publish?</h6>
-            <ul>
-              <li>A DOI (Digital Object Identifier) will be generated for each release</li>
-              <li>Your repository will be archived and made citable</li>
-              <li>Metadata will be extracted and indexed for discoverability</li>
-              <li>A landing page will be created with publication details</li>
-            </ul>
-          </div>
-        </div>
 
-        <div v-if="canManagePermissions" class="permissions-section">
-          <h5>Permissions</h5>
-          <p class="options-description">
-            Manage who can access this private application.
-          </p>
-          <app-permissions
-            :uuid="matchedApp.uuid"
-            :owner-id="matchedApp.ownerId"
-            :is-public="false"
-            :organization-id="matchedApp.organizationId"
-          />
-        </div>
+        <el-tabs v-model="activeTab" class="publishing-tabs">
+          <el-tab-pane label="Destinations" name="destinations">
+            <div class="publishing-options">
+              <p class="options-description">
+                Choose where you want to publish this repository when releases are created.
+              </p>
+
+              <div class="option-group">
+                <label class="option-item">
+                  <input
+                    type="checkbox"
+                    v-model="localSettings.publishToDiscover"
+                    @change="onSettingsChange"
+                  />
+                  <div class="option-content">
+                    <strong>Pennsieve Discover</strong>
+                    <p>Publish to the Pennsieve Discover platform for scientific research datasets</p>
+                  </div>
+                </label>
+
+                <label class="option-item">
+                  <input
+                    type="checkbox"
+                    v-model="localSettings.publishToAppstore"
+                    @change="onSettingsChange"
+                  />
+                  <div class="option-content">
+                    <strong>App Store</strong>
+                    <p>Publish to the Pennsieve App Store for computational tools and applications</p>
+                  </div>
+                </label>
+              </div>
+
+              <div v-if="hasAnyPublishing" class="publishing-info">
+                <h6>What happens when you publish?</h6>
+                <ul>
+                  <li>A DOI (Digital Object Identifier) will be generated for each release</li>
+                  <li>Your repository will be archived and made citable</li>
+                  <li>Metadata will be extracted and indexed for discoverability</li>
+                  <li>A landing page will be created with publication details</li>
+                </ul>
+              </div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane
+            v-if="matchedApp"
+            label="Permissions"
+            name="permissions"
+          >
+            <div class="permissions-section">
+              <p class="options-description">
+                {{ permissionsDescription }}
+              </p>
+              <app-permissions
+                :uuid="matchedApp.uuid"
+                :owner-id="matchedApp.ownerId"
+                :is-public="matchedApp.isPrivate === false"
+                :organization-id="matchedApp.organizationId"
+              />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </div>
 
       <div class="dialog-actions">
-        <bf-button class="secondary" @click="closeDialog">Cancel</bf-button>
+        <bf-button class="secondary" @click="closeDialog">
+          {{ activeTab === 'permissions' ? 'Close' : 'Cancel' }}
+        </bf-button>
         <bf-button
+          v-if="activeTab === 'destinations'"
           class="primary"
           @click="saveSettings"
           :disabled="saving"
@@ -113,6 +124,7 @@ export default {
   data() {
     return {
       saving: false,
+      activeTab: 'destinations',
       localSettings: {
         publishToDiscover: false,
         publishToAppstore: false
@@ -158,19 +170,21 @@ export default {
       return !!ownerId && (ownerId === profile.id || ownerId === profile.intId)
     },
 
-    // Permissions are only manageable for a private application you own.
-    canManagePermissions() {
-      return (
-        !!this.matchedApp &&
-        this.matchedApp.isPrivate === true &&
-        this.isMatchedAppOwner
-      )
+    // AppPermissions itself disables editing for non-owners and public apps,
+    // so the section is shown view-only in those cases. The description below
+    // matches the editability so it doesn't promise an edit you can't perform.
+    permissionsDescription() {
+      if (this.matchedApp?.isPrivate === true && this.isMatchedAppOwner) {
+        return 'Manage who can access this private application.'
+      }
+      return 'View who has access to this application.'
     }
   },
 
   watch: {
     dialogVisible(newVal) {
       if (newVal) {
+        this.activeTab = 'destinations'
         this.initializeSettings()
       }
     },
@@ -353,18 +367,35 @@ export default {
   }
 }
 
-.permissions-section {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid theme.$gray_2;
+.publishing-tabs {
+  margin-top: 8px;
 
-  h5 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
+  :deep(.el-tabs__header) {
+    margin-bottom: 20px;
   }
 
+  :deep(.el-tabs__item) {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  :deep(.el-tabs__item.is-active),
+  :deep(.el-tabs__item:hover) {
+    color: theme.$purple_2;
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background-color: theme.$purple_2;
+  }
+
+  // Keep the modal a stable height across tabs so switching to Permissions
+  // doesn't make the dialog shrink or grow.
+  :deep(.el-tabs__content) {
+    min-height: 460px;
+  }
+}
+
+.permissions-section {
   .options-description {
     font-size: 14px;
     color: theme.$gray_5;
@@ -374,13 +405,6 @@ export default {
 }
 
 .publishing-options {
-  h5 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-
   .options-description {
     font-size: 14px;
     color: theme.$gray_5;

@@ -449,7 +449,6 @@ const onArchiveChange = (status) => {
             <app-archive-toggle
               :uuid="detail.uuid"
               :owner-id="detail.ownerId"
-              :source-url="detail.sourceUrl"
               :status="detail.status"
               @change="onArchiveChange"
             />

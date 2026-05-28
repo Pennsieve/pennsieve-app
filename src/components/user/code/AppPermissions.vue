@@ -663,16 +663,17 @@ defineExpose({ reload: () => loadPermissions(props.uuid) })
 .info-content {
   .info-row {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     padding: 12px 0;
     border-bottom: 1px solid theme.$gray_1;
-    gap: 16px;
+    gap: 8px 10px;
 
     &:last-child {
       border-bottom: none;
     }
 
     .info-label {
-      flex: 1;
       color: theme.$gray_6;
       font-weight: 500;
       font-size: 14px;
@@ -685,6 +686,12 @@ defineExpose({ reload: () => loadPermissions(props.uuid) })
 
       &.perm-role {
         text-transform: capitalize;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: theme.$gray_1;
+        color: theme.$gray_6;
+        font-size: 12px;
+        font-weight: 500;
       }
     }
   }
