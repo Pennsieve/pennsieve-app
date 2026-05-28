@@ -842,6 +842,75 @@ export const actions = {
         }
     },
 
+    // Replace an existing file's content with edited text coming from a
+    // viewer (TextViewer "Replace" button). Reuses the direct-to-storage
+    // pipeline with onConflict='replace': we build an in-memory File from
+    // the edited string, point the upload destination at the file's own
+    // folder, and let the server soft-delete the predecessor and create the
+    // new package (matched server-side by folder path + filename).
+    //
+    // `pkg` is the file package being viewed (pkg.content.id is the package
+    // to replace, pkg.content.name its filename). The viewer loads packages
+    // without ancestors, so we re-fetch with includeAncestors=true here to
+    // resolve the containing folder path authoritatively. Returns once the
+    // S3 PUT + finalize have been kicked off (UploadFiles awaits both).
+    replaceFileWithText: async ({ rootState, state, commit, dispatch }, { pkg, content }) => {
+        if (state.isUploading) {
+            throw new Error("Cannot replace while an upload is in progress.")
+        }
+        const packageId = pkg?.content?.id
+        const fileName = pkg?.content?.name
+        if (!packageId || !fileName) {
+            throw new Error("replaceFileWithText: missing package id or name")
+        }
+
+        // Resolve the containing folder path from the package's ancestors.
+        const apiKey = await useGetToken()
+        const detailUrl = `${rootState.config.apiUrl}/packages/${packageId}?api_key=${apiKey}&includeAncestors=true`
+        const detailResp = await fetch(detailUrl, { headers: { Accept: 'application/json' } })
+        if (!detailResp.ok) {
+            throw new Error(`replaceFileWithText: failed to load package (${detailResp.status})`)
+        }
+        const detail = await detailResp.json()
+        const ancestors = Array.isArray(detail.ancestors) ? detail.ancestors : []
+        // Mirror the upload target_path convention: collection names from
+        // the dataset root down to the immediate parent, '' when at root.
+        const folderPath = ancestors
+            .map(a => a?.content?.name || '')
+            .filter(Boolean)
+            .join('/')
+
+        // In-memory File carrying the edited bytes. Same name as the package
+        // being replaced so the server matches and overlays it. `path` is the
+        // file-selector contract syncManifest reads (== name, no subfolder).
+        const blob = new Blob([content], { type: 'text/plain' })
+        const file = new File([blob], fileName, { type: 'text/plain' })
+        file.path = fileName
+
+        // currentTargetPackage.children seeds syncManifest's existingByName
+        // lookup so replacesPackageId resolves to this package — the existing
+        // row gets a progress overlay instead of a duplicate placeholder.
+        commit('SET_CURRENT_TARGET_PACKAGE', {
+            content: { id: packageId, name: fileName, packageType: 'Collection' },
+            children: [{ content: { id: packageId, name: fileName } }],
+        })
+        commit('SET_UPLOAD_DESTINATION', {
+            path: folderPath,
+            file: { content: { id: packageId, name: fileName } },
+        })
+        commit('SET_ON_CONFLICT', 'replace')
+        commit('SET_UPLOAD_COMPLETE', false)
+        commit('ADD_FILES_TO_MANIFEST', [file])
+
+        await dispatch('getManifestNodeId')
+        await dispatch('syncManifest')
+        await dispatch('UploadFiles')
+
+        // Immediate parent collection id (null when the file lives at the
+        // dataset root) so the caller can route back to the right listing.
+        return { parentId: detail?.parent?.content?.id || null }
+    },
+
     // Reset upload action
     resetUpload: async({ commit}) => {
         commit("RESET_UPLOADER")

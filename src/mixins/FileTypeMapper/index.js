@@ -466,10 +466,10 @@ export default {
         video: ['VideoViewer'],
         slide: ['SlideViewer'],
         timeseries: ['TimeseriesViewer'],
-        csv: ['CSVViewer', 'DataExplorer'],
+        csv: ['CSVViewer', 'DataExplorer', 'TextViewer'],
         xls: ['XLSViewer'],
         parquet_umap_viewer: ['DataExplorer', 'UMAPViewer' ],
-        tabular: ['CSVViewer','DataExplorer'],
+        tabular: ['CSVViewer','DataExplorer', 'TextViewer'],
         omeTiff: ['OmeViewer'],
         lay: ['LayViewer', 'TextViewer'],
       }
