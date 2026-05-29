@@ -75,7 +75,7 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest && hasFeature('compute_node_chat')"
         :link="{ name: 'workspace-insights', params: { orgId: orgId } }"
         label="Insights"
         :condensed="primaryNavCondensed"
