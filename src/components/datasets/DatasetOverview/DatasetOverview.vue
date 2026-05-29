@@ -78,9 +78,6 @@
                   <IconCopyDocument/>
                 </button>
               </div>
-              <div class="dataset-heading-cta">
-                <bf-button :style="dashboardButtonStyle" @click="dashboardDialogVisible=true">Open Dashboard</bf-button>
-              </div>
             </div>
           </div>
 
@@ -148,116 +145,18 @@
     </bf-rafter>
 
     <bf-stage>
-
-      <data-card
-        ref="descriptionDataCard"
-        class="grey compact"
-        title="Description"
-        :is-expandable="true"
-        :padding="false"
-      >
-        <template #title-aux>
-          <button
-            v-if="isEditingMarkdownDescription
-"
-            class="linked mr-8"
-            @click="isEditingMarkdownDescription
- = false"
-          >
-            Cancel
-          </button>
-          <button
-            v-if="isEditingMarkdownDescription
-"
-            class="linked"
-            :disabled="datasetLocked"
-            @click="isSavingMarkdownDescription = true"
-          >
-            Save
-          </button>
-
-          <button
-            v-else
-            slot="title-aux"
-            class="linked-9"
-            :disabled="datasetLocked"
-            @click="isEditingMarkdownDescription
- = true"
-          >
-            Update
-          </button>
-        </template>
-
-        <markdown-editor
-          ref="markdownEditor"
-          :value="datasetDescription"
-          :is-editing="isEditingMarkdownDescription
-"
-          :is-saving="isSavingMarkdownDescription"
-          :empty-state="datasetDescriptionEmptyState"
-          :is-loading="isLoadingDatasetDescription"
-          @save="onReadmeSave"
-        />
-      </data-card>
-      <br>
-      <data-card
-        ref="changelogDataCard"
-        class="grey compact"
-        title="Changelog"
-        :is-expandable="true"
-        :padding="false"
-      >
-        <template #title-aux>
-          <button
-            v-if="isEditingMarkdownChangelog
-"
-            class="linked mr-8"
-            @click="isEditingMarkdownChangelog
- = false"
-          >
-            Cancel
-          </button>
-          <button
-            v-if="isEditingMarkdownChangelog
-"
-            class="linked"
-            @click="isSavingMarkdownChangelog = true"
-          >
-            Save
-          </button>
-          <button
-            v-else
-            slot="title-aux"
-            class="linked-9"
-            :disabled="datasetLocked"
-            @click="isEditingMarkdownChangelog
- = true"
-          >
-            Update
-          </button>
-        </template>
-        <markdown-editor
-          ref="markdownEditor"
-          :value="changelogText"
-          :is-editing="isEditingMarkdownChangelog
-"
-          :is-saving="isSavingMarkdownChangelog"
-          :empty-state="changelogDescriptionEmptyState"
-          @save="onChangelogSave"
-
-        />
-      </data-card>
-
+      <StaticDashboard
+        v-if="dataset"
+        :key="datasetId"
+        class="dataset-overview-dashboard"
+        :options="dashboardOptions"
+      />
     </bf-stage>
 
     <stale-update-dialog
       ref="staleUpdateDialog"
       :dialog-visible = "staleUpdateDialogVisible"
       @close="staleUpdateDialogClose"
-    />
-    <DashboardModal
-      :dialog-visible="dashboardDialogVisible"
-      @close-dialog="handleCloseDashDialog"
     />
   </div>
 
@@ -269,10 +168,14 @@
   import Cookie from 'js-cookie'
   import {compose, defaultTo, head, last, pathOr, propOr, split, sum, values} from 'ramda'
 
+  import { markRaw } from 'vue'
+  import { StaticDashboard } from 'pennsieve-dashboard'
+  import 'pennsieve-dashboard/style.css'
   import DataCard from '../../shared/DataCard/DataCard.vue'
   import ChecklistItem from '../../shared/ChecklistItem/ChecklistItem.vue'
   import MarkdownEditor from '../../shared/MarkdownEditor/MarkdownEditor.vue'
-  import DashboardModal from './DashboardModal.vue'
+  import MarkdownPanelWidget from './widgets/MarkdownPanelWidget.vue'
+  import DatasetMetricsWidget from './widgets/DatasetMetricsWidget.vue'
 
   import BfStorageMetrics from '../../../mixins/bf-storage-metrics/index'
   import FormatDate from '../../../mixins/format-date/index'
@@ -326,7 +229,8 @@ export default {
     ContributorItem,
     BfRafter,
     BfButton,
-    StaleUpdateDialog
+    StaleUpdateDialog,
+    StaticDashboard,
   },
 
   mixins: [BfStorageMetrics, FormatDate, Request, DatasetPublishedData, CustomTheme],
@@ -345,17 +249,11 @@ export default {
   data() {
     return {
       isChecklistDimissed: false,
-      isEditingMarkdownDescription: false,
-      isEditingMarkdownChangelog: false,
-      isSavingMarkdownDescription: false,
-      isSavingMarkdownChangelog: false,
       datasetDescriptionEmptyState,
       changelogDescriptionEmptyState,
       packageTypeCount: 0,
       isDialogVisible: false,
       staleUpdateDialogVisible: false,
-      staleUpdateDialogVisible: false,
-      dashboardDialogVisible:false,
     }
   },
 
@@ -657,6 +555,74 @@ export default {
 
       return nodeId
     },
+
+    /**
+     * Dashboard layout for the dataset overview body. Configurable by
+     * the user via gridstack's "Edit Grid" affordance; layout persists
+     * to localStorage per browser. Widgets read live values from the
+     * Vuex store via `valueStoreKey`, so changes propagate after save.
+     */
+    dashboardOptions: function() {
+      // Three-column static dashboard: description on the left, then
+      // changelog, then metrics. All fillHeight so the cards stretch
+      // to match heights — long content scrolls inside the card.
+      const widgets = [
+        { name: 'MarkdownPanelWidget', component: markRaw(MarkdownPanelWidget) },
+        { name: 'DatasetMetricsWidget', component: markRaw(DatasetMetricsWidget) },
+      ]
+      // Two columns: description (w:8) on the left, a stack of metrics
+      // (top, sized to content) + changelog (below, fills remaining
+      // height) on the right (w:4). Metrics and changelog share the
+      // same column key (x:8 w:4) so the StaticDashboard groups them
+      // into a single vertical stack.
+      const layout = [
+        {
+          id: 'description-widget',
+          x: 0, y: 0, w: 8,
+          fillHeight: true,
+          componentKey: 'MarkdownPanelWidget',
+          componentName: 'Description',
+          component: markRaw(MarkdownPanelWidget),
+          Props: {
+            widgetName: 'Description',
+            valueStoreKey: 'datasetDescription',
+            isLoadingStoreKey: 'isLoadingDatasetDescription',
+            emptyState: this.datasetDescriptionEmptyState,
+            locked: this.datasetLocked,
+            onSave: this.onReadmeSave,
+          },
+        },
+        {
+          id: 'dataset-metrics',
+          x: 8, y: 0, w: 4,
+          sizeToContent: true,
+          componentKey: 'DatasetMetricsWidget',
+          componentName: 'At a glance',
+          component: markRaw(DatasetMetricsWidget),
+          Props: { widgetName: 'At a glance' },
+        },
+        {
+          id: 'changelog-widget',
+          x: 8, y: 1, w: 4,
+          fillHeight: true,
+          componentKey: 'MarkdownPanelWidget',
+          componentName: 'Changelog',
+          component: markRaw(MarkdownPanelWidget),
+          Props: {
+            widgetName: 'Changelog',
+            valueStoreKey: 'changelogText',
+            emptyState: this.changelogDescriptionEmptyState,
+            locked: this.datasetLocked,
+            onSave: this.onChangelogSave,
+          },
+        },
+      ]
+      return {
+        globalData: {},
+        availableWidgets: widgets,
+        defaultLayout: layout,
+      }
+    },
   },
 
   watch: {
@@ -711,9 +677,6 @@ export default {
     staleUpdateDialogClose: function() {
       this.staleUpdateDialogVisible = false
     },
-    handleCloseDashDialog: function(){
-      this.dashboardDialogVisible = false;
-    },
     /**
      * Check if the dataset checklist
      * has been dismissed
@@ -745,15 +708,14 @@ export default {
     },
 
     /**
-     * Set edit description and scroll to description
+     * Deep-link "edit description" hook. With the dashboard refactor the
+     * description now lives inside MarkdownPanelWidget which owns its own
+     * edit state; toggling it from the parent isn't wired up yet. Left
+     * as a no-op so existing callers (?editDescription=true route query)
+     * don't error. Re-enable by adding a ref to the widget instance.
      */
     setEditDescription: function() {
-      this.isEditingMarkdownDescription
- = true
-      this.$nextTick(() => {
-        this.$refs.descriptionDataCard.$el.scrollIntoView()
-        this.$refs.markdownEditor.focus()
-      })
+      // no-op for now
     },
 
     /**
@@ -783,14 +745,11 @@ export default {
      * @params {String} markdown
      */
     onReadmeSave: function(markdown) {
-      console.log('saving readme')
-      useGetToken()
+      return useGetToken()
         .then(token => {
           const url = `${this.config.apiUrl}/datasets/${this.datasetId}/readme?api_key=${token}`
           return useSendXhr(url, {
-            body: {
-              readme: markdown
-            },
+            body: { readme: markdown },
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -799,13 +758,11 @@ export default {
           })
             .then(response => {
               this.setDatasetDescriptionEtag(response.headers.get('etag'))
-              this.setDatasetDescription(markdown).finally(() => {
-                this.isSavingMarkdownDescription = false
-                this.isEditingMarkdownDescription
-                  = false
-              })
-            }).catch((errResponse) => {
-              // TODO: backend not returning 412 for stale updates
+              return this.setDatasetDescription(markdown)
+            })
+            .catch((errResponse) => {
+              // Surface user-facing errors then re-throw so the calling
+              // widget keeps the editor open for retry.
               if (errResponse.status === 412) {
                 EventBus.$emit("ajaxError", {
                   detail: {
@@ -815,26 +772,22 @@ export default {
                     duration: 10000
                   },
                 });
-                this.isSavingMarkdownDescription = false
                 this.staleUpdateDialogVisible = true
               } else if (errResponse.status === 403) {
-                this.isSavingMarkdownDescription = false
                 EventBus.$emit("ajaxError", {
                   detail: {
                     msg: "You do not have permission to edit this dataset. Please contact the dataset owner or an administrator.",
-                    type: "error", 
+                    type: "error",
                     showClose: true,
                     duration: 10000
                   },
                 });
+              } else {
+                useHandleXhrError(errResponse)
               }
-              else {
-                throw errResponse
-              }
+              throw errResponse
             })
         })
-        .catch(useHandleXhrError)
-
     },
 
 
@@ -847,31 +800,26 @@ export default {
      */
 
     onChangelogSave: function(markdown) {
-      this.datasetChangelogUrl
-        .then(url => {
-          fetch(url, {
-            body: JSON.stringify({
-              changelog: markdown
-            }),
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          })
-            .then(response => {
-              if (response.ok) {
-                this.setChangelogText(markdown).finally(() => {
-                  this.isSavingMarkdownChangelog = false
-                  this.isEditingMarkdownChangelog = false
-                })
-              } else if (response.status === 412) {
-                this.isSavingMarkdownChangelog = false
-                this.$refs.staleUpdateDialog.dialogVisible = true
-              } else {
-                throw response
-              }
-            })
-            .catch(this.handleXhrError.bind(this))
+      return this.datasetChangelogUrl
+        .then(url => fetch(url, {
+          body: JSON.stringify({ changelog: markdown }),
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' }
+        }))
+        .then(response => {
+          if (response.ok) {
+            return this.setChangelogText(markdown)
+          }
+          if (response.status === 412) {
+            this.staleUpdateDialogVisible = true
+          }
+          throw response
+        })
+        .catch((err) => {
+          if (err && typeof err.status === 'number' && err.status !== 412) {
+            this.handleXhrError(err)
+          }
+          throw err
         })
 
     },
@@ -942,6 +890,14 @@ export default {
 
 <style scoped lang="scss">
 @use '../../../styles/theme';
+
+// Tint the dashboard accent (edit-mode toolbar icon, etc.) with the
+// Pennsieve brand color, and give the dashboard area a slightly
+// off-white background so the white widget cards stand out.
+.dataset-overview-dashboard {
+  --dash-secondary: #{theme.$purple_3};
+  --dash-app-background: #fefefe;
+}
 
 .flex-heading {
   display: flex;

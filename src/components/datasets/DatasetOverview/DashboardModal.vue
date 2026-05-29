@@ -149,24 +149,11 @@ function closeDialog () {
 </style>
 
 <style lang="scss" scoped>
-
+// Let the lib's default tokens drive the look. The lib now ships modern
+// border/radius/shadow + transparent container; widget chrome lives on
+// the cards themselves. If we ever need to re-tint Element Plus controls
+// in this surface, override --el-color-primary here.
 .dashboard-app {
-  --el-color-primary: #243d8e !important;
-  --el-color-primary-light-3: #fbfdff !important;
-  --el-color-primary-dark-2: #546085 !important;
-  --el-text-color-primary: white !important;
-  --el-button-text-color: white !important;
-  --el-button-bg-color: #243d8e !important;
-  --el-button-border-color: #546085 !important;
-  --el-button-hover-text-color: #243d8e !important;
-  --el-button-hover-bg-color: #fbfdff !important;
-  --el-button-hover-border-color: #243d8e !important;
-  --dash-secondary: #243d8e;
-  background-color: #f6fcff;
-  border: 1px solid aliceblue;
-  border-radius: 4px;
   height: 100%;
 }
-
-
 </style>

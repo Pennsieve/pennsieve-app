@@ -75,6 +75,18 @@
       </bf-navigation-item>
 
       <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest && hasFeature('compute_node_chat')"
+        :link="{ name: 'workspace-insights', params: { orgId: orgId } }"
+        label="Insights"
+        :condensed="primaryNavCondensed"
+        :styleColor="navStyleColor"
+      >
+        <template v-slot:icon>
+          <IconResearch :width="20" :height="20" color="currentColor" />
+        </template>
+      </bf-navigation-item>
+
+      <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
         id="nav-integrations"
         :link="{
@@ -180,6 +192,8 @@ import PennsieveMark from "../icons/IconPennsieveMark.vue";
 import IconNavCollapse from "../icons/IconNavCollapse.vue";
 import IconNavExpand from "../icons/IconNavExpand.vue";
 import IconDatasets from "../icons/IconDatasets.vue";
+import IconOverview from "../icons/IconOverview.vue";
+import IconResearch from "../icons/IconResearch.vue";
 import IconPerson from "../icons/IconPerson.vue";
 import IconTeam from "../icons/IconTeam.vue";
 import IconSettings from "../icons/IconSettings.vue";
@@ -220,6 +234,8 @@ export default {
     BfNavigationItem,
     BfNavigationTertiary,
     IconDatasets,
+    IconOverview,
+    IconResearch,
     IconTeam,
     IconIntegrations,
     IconHealInitiative,
