@@ -275,6 +275,8 @@ export const actions = {
   },
 
   /**
+<<<<<<< HEAD
+=======
    * Get source files for a package (the original uploaded files,
    * not processed viewer assets). Used by OmeViewer to get the
    * original .ome.tiff source file.
@@ -305,6 +307,7 @@ export const actions = {
   },
 
   /**
+>>>>>>> main
    * Get viewer assets from the packages service (api2)
    * Returns { assets, cloudfront } with signed CloudFront policy
    */
@@ -328,6 +331,8 @@ export const actions = {
   },
 
   /**
+<<<<<<< HEAD
+=======
    * Delete a viewer asset
    * @param {String} datasetId
    * @param {String} assetId
@@ -347,6 +352,7 @@ export const actions = {
   },
 
   /**
+>>>>>>> main
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId

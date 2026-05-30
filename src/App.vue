@@ -49,6 +49,22 @@ let route = useRoute();
   <bf-download-file ref="downloadFile" />
 
   <office-365-dialog />
+
+  <!-- Spotlight compose modal — global capture surface for the org-level
+       chat. Cmd+K (or Ctrl+K) anywhere in the app opens it; user types a
+       prompt, optionally with the current page's entity auto-attached,
+       and the message is enqueued into the same conversation the
+       Insights page renders. See chat-frontend-handoff notes /
+       Spotlight.vue for the full rationale.
+
+       Gated behind the `compute_node_chat` org feature flag — orgs that
+       haven't enabled it never see the modal, never bind the Cmd+K
+       handler, and never wire the event-bus listener (see mounted()
+       below). -->
+  <chat-spotlight
+    v-if="hasFeature('compute_node_chat')"
+    v-model:visible="spotlightOpen"
+  />
 </template>
 
 <script>
@@ -65,6 +81,7 @@ import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
+import ChatSpotlight from "@/components/Chat/Spotlight.vue";
 import { useGetToken } from "@/composables/useGetToken";
 
 export default {
@@ -75,6 +92,7 @@ export default {
     PsAnalytics,
     BfDownloadFile,
     Office365Dialog,
+    ChatSpotlight,
   },
   mixins: [globalMessageHandler, request],
 
@@ -88,6 +106,14 @@ export default {
       showSessionTimerThreshold: 120,
       sessionLogoutThreshold: 5,
       loadingTimeout: 30000, // 30 seconds
+
+      // Spotlight (global chat compose modal) visibility. Toggled by
+      // Cmd+K / Ctrl+K anywhere in the app + by the header button.
+      // Component: ChatSpotlight (Spotlight.vue).
+      spotlightOpen: false,
+
+      // Bound handler reference so we can removeEventListener on unmount.
+      _spotlightKeyHandler: null,
     };
   },
   mounted() {
@@ -95,6 +121,46 @@ export default {
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
+
+    // Global Cmd+K / Ctrl+K shortcut to open Spotlight. Captures on the
+    // document so it fires regardless of focused element. We don't try
+    // to filter when an input is focused — letting the user trigger
+    // Spotlight from inside a text field is desirable (e.g. quick
+    // "ask about this" from a comment box).
+    //
+    // Note: this overrides browser-level Cmd+K (address bar focus on
+    // Chrome). Intentional — matches the in-app shortcut pattern other
+    // workspace apps use (Linear, Notion, Slack).
+    this._spotlightKeyHandler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        // Only intercept when the user has an active workspace. On the
+        // sign-in page we let the browser default fire. Also skip when
+        // the org hasn't enabled the compute_node_chat feature — we don't
+        // want to steal Cmd+K from the browser for users who can't use
+        // Spotlight anyway.
+        if (!this.activeOrganization?.organization?.id) return;
+        if (!this.hasFeature("compute_node_chat")) return;
+        e.preventDefault();
+        this.spotlightOpen = !this.spotlightOpen;
+      }
+    };
+    document.addEventListener("keydown", this._spotlightKeyHandler);
+
+    // Also expose an event-bus listener so other components (e.g. a
+    // header button) can open Spotlight without importing App.vue's
+    // state directly. Same feature-flag gate as the Cmd+K path.
+    EventBus.$on("open-chat-spotlight", () => {
+      if (!this.activeOrganization?.organization?.id) return;
+      if (!this.hasFeature("compute_node_chat")) return;
+      this.spotlightOpen = true;
+    });
+  },
+
+  beforeUnmount() {
+    if (this._spotlightKeyHandler) {
+      document.removeEventListener("keydown", this._spotlightKeyHandler);
+    }
+    EventBus.$off("open-chat-spotlight");
   },
 
   computed: {
