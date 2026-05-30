@@ -4,22 +4,38 @@
       <span class="loading-text">Loading figure…</span>
     </div>
 
-    <a
-      v-else-if="resolvedUrl"
-      :href="packageHref"
-      target="_blank"
-      rel="noopener"
-      class="image-link"
-      :aria-label="alt + ' — open package'"
-    >
-      <img
-        :src="resolvedUrl"
-        :alt="alt"
-        loading="lazy"
-        class="figure"
-        @error="onImgError"
-      />
-    </a>
+    <div v-else-if="resolvedUrl" class="figure-wrap">
+      <a
+        :href="packageHref"
+        target="_blank"
+        rel="noopener"
+        class="image-link"
+        :aria-label="alt + ' — open package'"
+      >
+        <img
+          :src="resolvedUrl"
+          :alt="alt"
+          loading="lazy"
+          class="figure"
+          @error="onImgError"
+        />
+      </a>
+      <!-- Download to the browser's downloads folder. Revealed on hover so
+           it doesn't clutter the figure at rest. -->
+      <button
+        type="button"
+        class="download-btn"
+        :title="`Download ${downloadName}`"
+        :aria-label="`Download ${downloadName}`"
+        :disabled="downloading"
+        @click="downloadImage"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 1.5v7.4m0 0L4.8 5.7M8 8.9l3.2-3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M2.5 11v2a1 1 0 001 1h9a1 1 0 001-1v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
 
     <a
       v-else
@@ -73,9 +89,48 @@ const store = useStore()
 
 const loading = ref(true)
 const resolvedUrl = ref('')
+const downloading = ref(false)
 
 const alt = computed(() => props.block.alt || 'Inline figure')
 const source = computed(() => props.block.source || {})
+
+// Filename for the downloaded file. Prefer the asset's own name; fall back
+// to the figure-asset convention (figure.png). Ensure a .png extension so
+// the OS treats it as an image.
+const downloadName = computed(() => {
+  const name = (source.value.assetName || '').trim()
+  if (!name) return 'figure.png'
+  return /\.[a-z0-9]+$/i.test(name) ? name : `${name}.png`
+})
+
+// Download the figure to the browser's downloads folder. The signed
+// CloudFront URL is cross-origin, so a plain <a download> would be ignored
+// (the browser would navigate instead). Fetch the bytes and save via an
+// object URL. If the fetch is blocked (e.g. CORS), fall back to opening the
+// image in a new tab so the user can still save it manually.
+const downloadImage = async () => {
+  if (!resolvedUrl.value || downloading.value) return
+  downloading.value = true
+  try {
+    const resp = await fetch(resolvedUrl.value)
+    if (!resp.ok) throw new Error(`status ${resp.status}`)
+    const blob = await resp.blob()
+    const objUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objUrl
+    a.download = downloadName.value
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(objUrl)
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[chat] ChatImageBlock: download failed, opening in new tab', err)
+    window.open(resolvedUrl.value, '_blank', 'noopener')
+  } finally {
+    downloading.value = false
+  }
+}
 
 // Open-in-viewer fallback link. Matches the `file-record` route registered
 // in router/index.js (`:orgId/datasets/:datasetId/files/:fileId/details`).
@@ -185,10 +240,45 @@ onMounted(async () => {
   }
 }
 
+// Positioning context for the hover download button, sized to the image
+// (inline-block) so the button hugs the figure's top-right, not the bubble.
+.figure-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
 .image-link {
   display: inline-block;
   line-height: 0; // collapse the anchor's text-baseline gap below the img
 }
+
+.download-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(28, 28, 28, 0.6);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+
+  svg { width: 16px; height: 16px; display: block; }
+
+  &:hover { background: rgba(28, 28, 28, 0.8); }
+  &:disabled { cursor: default; opacity: 0.5; }
+}
+
+.figure-wrap:hover .download-btn,
+.download-btn:focus-visible { opacity: 1; }
 
 .figure {
   display: block;
