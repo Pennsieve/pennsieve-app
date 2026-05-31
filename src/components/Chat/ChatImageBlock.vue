@@ -4,6 +4,12 @@
       <span class="loading-text">Loading figure…</span>
     </div>
 
+    <!-- Terminal state after the user removes the figure. The viewer-asset
+         (and its S3 bytes) are gone; we don't try to re-resolve. -->
+    <div v-else-if="removed" class="figure-removed">
+      <span>Figure removed.</span>
+    </div>
+
     <div v-else-if="resolvedUrl" class="figure-wrap">
       <a
         :href="packageHref"
@@ -20,21 +26,84 @@
           @error="onImgError"
         />
       </a>
-      <!-- Download to the browser's downloads folder. Revealed on hover so
-           it doesn't clutter the figure at rest. -->
-      <button
-        type="button"
-        class="download-btn"
-        :title="`Download ${downloadName}`"
-        :aria-label="`Download ${downloadName}`"
-        :disabled="downloading"
-        @click="downloadImage"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M8 1.5v7.4m0 0L4.8 5.7M8 8.9l3.2-3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M2.5 11v2a1 1 0 001 1h9a1 1 0 001-1v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </button>
+
+      <!-- Hover-revealed actions. Sits top-right so it doesn't clutter the
+           figure at rest. -->
+      <div v-if="!confirmingRemove" class="actions">
+        <button
+          type="button"
+          class="action-btn"
+          :title="`Download ${downloadName}`"
+          :aria-label="`Download ${downloadName}`"
+          :disabled="downloading"
+          @click="downloadImage"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 1.5v7.4m0 0L4.8 5.7M8 8.9l3.2-3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M2.5 11v2a1 1 0 001 1h9a1 1 0 001-1v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+
+        <!-- Promote: detach from the chat session so the figure becomes a
+             normal dataset asset. Only offered when we resolved by asset id
+             (we have something to act on) and it hasn't been promoted yet. -->
+        <button
+          v-if="assetId && !promoted"
+          type="button"
+          class="action-btn"
+          title="Save to dataset assets"
+          aria-label="Save figure to dataset assets"
+          :disabled="busy"
+          @click="promote"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 2.5h6.8L13 5.2V13a.5.5 0 01-.5.5h-9A.5.5 0 013 13V3a.5.5 0 01.5-.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+            <path d="M5.5 2.5v3h4v-3M5.5 13.5v-4h5v4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+          </svg>
+        </button>
+
+        <!-- Remove: delete just this viewer-asset by id. Never touches the
+             underlying package or dataset. Two-step (click → confirm). -->
+        <button
+          v-if="assetId"
+          type="button"
+          class="action-btn action-btn--danger"
+          title="Remove figure"
+          aria-label="Remove figure"
+          :disabled="busy"
+          @click="confirmingRemove = true"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3 4.5h10M6.2 4.5V3.2a.7.7 0 01.7-.7h2.2a.7.7 0 01.7.7v1.3M4.3 4.5l.6 8a.8.8 0 00.8.7h4.6a.8.8 0 00.8-.7l.6-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Inline confirm overlay for the destructive remove. -->
+      <div v-else class="confirm-overlay">
+        <span class="confirm-text">Remove this figure?</span>
+        <div class="confirm-buttons">
+          <button
+            type="button"
+            class="confirm-btn confirm-btn--danger"
+            :disabled="busy"
+            @click="removeFigure"
+          >
+            {{ busy ? 'Removing…' : 'Remove' }}
+          </button>
+          <button
+            type="button"
+            class="confirm-btn"
+            :disabled="busy"
+            @click="confirmingRemove = false"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <p v-if="promoted" class="status-note">Saved to dataset assets.</p>
+      <p v-if="actionError" class="status-note status-note--error">{{ actionError }}</p>
     </div>
 
     <a
@@ -51,37 +120,42 @@
 
 <script setup>
 // ChatImageBlock — renders one inline figure produced by an MCP-triggered
-// workflow (currently just plot_file). The frame carries no URL —
-// (packageNodeId, datasetNodeId, assetName, assetType) coordinates only.
-// This component resolves to a signed CloudFront URL by:
+// workflow (currently just plot_file). The frame carries no URL — only
+// viewer-asset coordinates on `source`.
 //
-//   1. Calling the existing `fetchPackageViewerAssets` Vuex action against
-//      packages-service `/packages/assets?dataset_id=…&package_id=…`.
-//      Same call the package viewer uses for ome-zarr / neuroglancer
-//      rendering — see ViewerPane.vue.
-//   2. Picking the asset matching {name, asset_type}. When `assetName` is
-//      empty, pick the most recently created asset of the requested type.
-//   3. Building a query-string-signed URL:
-//      `${asset.asset_url}figure.png?Policy=…&Signature=…&Key-Pair-Id=…`.
-//      Query-string signing (vs. relying on the Set-Cookie machinery the
-//      assets endpoint emits) works regardless of cross-domain cookie
-//      attribute issues.
+// Resolution, in priority order:
+//
+//   1. By asset id (preferred). When the producing workflow reported the
+//      viewer-asset UUID back as a run output, the frame carries
+//      `source.assetId`. We resolve it directly via packages-service
+//      `GET /packages/assets/{id}?dataset_id=…`, which returns the asset +
+//      a signed CloudFront policy. This is the ONLY reliable path for
+//      chat-scoped figures: those are excluded from the package/dataset
+//      asset listing, so the list-and-match path (below) can't see them.
+//
+//   2. By coordinates (fallback). For older frames without `assetId`, list
+//      the package's assets via `fetchPackageViewerAssets` and match on
+//      {name, asset_type}, newest first. Works for plain (non-chat-scoped)
+//      figures only.
+//
+// Either way we build a query-string-signed URL:
+//   `${asset.asset_url}${fileName}?Policy=…&Signature=…&Key-Pair-Id=…`
+// (fileName defaults to the figure-asset convention `figure.png`).
+//
+// Actions (when resolved by id): download, promote (detach from the chat
+// session → becomes a plain dataset asset), and remove (delete just this
+// viewer-asset by id — never the package or dataset).
 //
 // On any error — API failure, no matching asset, image-load failure — the
-// component falls back to a plain text-link pointing at the package
-// viewer. Same UX older clients get from the plain-text `content` field.
-//
-// Filename convention: the `figure-asset` data-target writes `figure.png`
-// at the asset's S3 prefix root. If a future workflow ships a different
-// filename, the assets API would need to surface it; tracked as an open
-// question in compute-node-chat/docs/developer/inline-image-frames.md.
+// component falls back to a plain text-link pointing at the package viewer.
 
 import { computed, onMounted, ref } from 'vue'
 import { useStore } from 'vuex'
 
 const props = defineProps({
-  // The image block from AssistantMessage.blocks[]. Required fields on
-  // `source`: packageNodeId, datasetNodeId. Optional: assetName, assetType.
+  // The image block from AssistantMessage.blocks[]. Required on `source`:
+  // datasetNodeId, plus EITHER assetId OR packageNodeId. Optional: assetName,
+  // assetType, fileName.
   block: { type: Object, required: true },
 })
 
@@ -91,8 +165,18 @@ const loading = ref(true)
 const resolvedUrl = ref('')
 const downloading = ref(false)
 
+// Action state.
+const busy = ref(false)
+const confirmingRemove = ref(false)
+const removed = ref(false)
+const promoted = ref(false)
+const actionError = ref('')
+
 const alt = computed(() => props.block.alt || 'Inline figure')
 const source = computed(() => props.block.source || {})
+const assetId = computed(() => source.value.assetId || '')
+const datasetNodeId = computed(() => source.value.datasetNodeId || '')
+const fileName = computed(() => source.value.fileName || 'figure.png')
 
 // Filename for the downloaded file. Prefer the asset's own name; fall back
 // to the figure-asset convention (figure.png). Ensure a .png extension so
@@ -132,21 +216,61 @@ const downloadImage = async () => {
   }
 }
 
+// Promote: detach the chat session so the figure shows in the dataset's
+// asset listing. Metadata-only — the bytes don't move.
+const promote = async () => {
+  if (!assetId.value || !datasetNodeId.value || busy.value) return
+  busy.value = true
+  actionError.value = ''
+  try {
+    await store.dispatch('viewerModule/promoteViewerAsset', {
+      datasetId: datasetNodeId.value,
+      assetId: assetId.value,
+    })
+    promoted.value = true
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[chat] ChatImageBlock: promote failed', err)
+    actionError.value = 'Could not save to dataset assets.'
+  } finally {
+    busy.value = false
+  }
+}
+
+// Remove: delete just this viewer-asset by id. The package and dataset are
+// untouched. After success we show the removed state instead of re-resolving.
+const removeFigure = async () => {
+  if (!assetId.value || !datasetNodeId.value || busy.value) return
+  busy.value = true
+  actionError.value = ''
+  try {
+    await store.dispatch('viewerModule/deleteViewerAsset', {
+      datasetId: datasetNodeId.value,
+      assetId: assetId.value,
+    })
+    removed.value = true
+    confirmingRemove.value = false
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[chat] ChatImageBlock: remove failed', err)
+    actionError.value = 'Could not remove the figure.'
+    confirmingRemove.value = false
+  } finally {
+    busy.value = false
+  }
+}
+
 // Open-in-viewer fallback link. Matches the `file-record` route registered
 // in router/index.js (`:orgId/datasets/:datasetId/files/:fileId/details`).
-// Two pieces routinely missed when this was first built:
-//   - the org slug at the start (a /datasets/... URL with no org 404s)
-//   - the /details suffix (the route is FileDetails, not the dataset-files
-//     index)
 // Read the org from Vuex's activeOrganization rather than a route param —
-// the chat panel can be hosted in widgets (e.g. Spotlight) where the
-// current route isn't org-scoped, but activeOrganization is set globally.
+// the chat panel can be hosted in widgets (e.g. Spotlight) where the current
+// route isn't org-scoped, but activeOrganization is set globally.
 const packageHref = computed(() => {
-  const { packageNodeId, datasetNodeId } = source.value
-  if (!packageNodeId || !datasetNodeId) return '#'
+  const { packageNodeId, datasetNodeId: ds } = source.value
+  if (!packageNodeId || !ds) return '#'
   const orgId = store.state?.activeOrganization?.organization?.id
   if (!orgId) return '#'
-  return `/${orgId}/datasets/${datasetNodeId}/files/${packageNodeId}/details`
+  return `/${orgId}/datasets/${ds}/files/${packageNodeId}/details`
 })
 
 const onImgError = () => {
@@ -156,59 +280,75 @@ const onImgError = () => {
   resolvedUrl.value = ''
 }
 
-onMounted(async () => {
-  const { packageNodeId, datasetNodeId, assetName, assetType } = source.value
+// Build a query-string-signed image URL from an { asset, cloudfront }
+// response. Returns true on success.
+const buildSignedUrl = (result) => {
+  const asset = result?.asset
+  if (!asset?.asset_url) return false
+  const cf = result.cloudfront
+  if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) return false
+  const qs = new URLSearchParams({
+    Policy: cf.policy,
+    Signature: cf.signature,
+    'Key-Pair-Id': cf.key_pair_id,
+  })
+  resolvedUrl.value = `${asset.asset_url}${fileName.value}?${qs.toString()}`
+  return true
+}
 
-  if (!packageNodeId || !datasetNodeId) {
+// Preferred path: resolve directly by asset id. Works for chat-scoped
+// figures, which the listing endpoint deliberately excludes.
+const resolveByAssetId = async () => {
+  const result = await store.dispatch('viewerModule/fetchViewerAssetById', {
+    datasetId: datasetNodeId.value,
+    assetId: assetId.value,
+  })
+  return buildSignedUrl(result)
+}
+
+// Fallback path: list the package's assets and match on {name, asset_type},
+// newest first. Only finds plain (non-chat-scoped) figures.
+const resolveByListing = async () => {
+  const { packageNodeId, assetName, assetType } = source.value
+  if (!packageNodeId) return false
+
+  const result = await store.dispatch('viewerModule/fetchPackageViewerAssets', {
+    datasetId: datasetNodeId.value,
+    packageId: packageNodeId,
+  })
+  if (!result?.assets?.length) return false
+
+  const typeFilter = assetType || 'PNG'
+  const candidates = result.assets
+    .filter((a) => a.status === 'ready')
+    .filter((a) => a.asset_type === typeFilter)
+    .filter((a) => !assetName || a.name === assetName)
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+
+  const asset = candidates[0]
+  if (!asset) return false
+  return buildSignedUrl({ asset, cloudfront: result.cloudfront })
+}
+
+onMounted(async () => {
+  // datasetNodeId is required for both paths.
+  if (!datasetNodeId.value) {
+    loading.value = false
+    return
+  }
+  // Need at least one resolution key.
+  if (!assetId.value && !source.value.packageNodeId) {
     loading.value = false
     return
   }
 
   try {
-    const result = await store.dispatch('viewerModule/fetchPackageViewerAssets', {
-      datasetId: datasetNodeId,
-      packageId: packageNodeId,
-    })
-
-    if (!result?.assets?.length) {
-      loading.value = false
-      return
+    if (assetId.value) {
+      if (await resolveByAssetId()) return
     }
-
-    // Pick the right asset. Match on name + asset_type when both are
-    // specified; fall back to asset_type only if name is empty; fall back
-    // to "any ready asset" as a last resort. Sort by created_at desc so
-    // the most recent run wins when a user plotted the same package
-    // multiple times.
-    const typeFilter = assetType || 'PNG'
-    const candidates = result.assets
-      .filter((a) => a.status === 'ready')
-      .filter((a) => a.asset_type === typeFilter)
-      .filter((a) => !assetName || a.name === assetName)
-      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-
-    const asset = candidates[0]
-    if (!asset || !asset.asset_url) {
-      loading.value = false
-      return
-    }
-
-    // Build the signed image URL. asset.asset_url ends with the asset's
-    // S3-prefix slash; the figure-asset data-target writes `figure.png`
-    // there. Sign with CloudFront query-string params from the API
-    // response.
-    const cf = result.cloudfront
-    if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) {
-      // Asset exists but signing failed server-side — fall back.
-      loading.value = false
-      return
-    }
-    const qs = new URLSearchParams({
-      Policy: cf.policy,
-      Signature: cf.signature,
-      'Key-Pair-Id': cf.key_pair_id,
-    })
-    resolvedUrl.value = `${asset.asset_url}figure.png?${qs.toString()}`
+    // Fall back to the coordinate listing path (older frames / no assetId,
+    // or an asset-id lookup that returned nothing).
+    await resolveByListing()
   } catch (err) {
     // Permission denied / network / shape change — log and degrade.
     // eslint-disable-next-line no-console
@@ -240,8 +380,19 @@ onMounted(async () => {
   }
 }
 
-// Positioning context for the hover download button, sized to the image
-// (inline-block) so the button hugs the figure's top-right, not the bubble.
+.figure-removed {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px dashed #d0d3d8;
+  border-radius: 8px;
+  color: #6b6b6b;
+  font-size: 13px;
+  font-style: italic;
+}
+
+// Positioning context for the hover actions, sized to the image
+// (inline-block) so the buttons hug the figure's top-right, not the bubble.
 .figure-wrap {
   position: relative;
   display: inline-block;
@@ -253,10 +404,17 @@ onMounted(async () => {
   line-height: 0; // collapse the anchor's text-baseline gap below the img
 }
 
-.download-btn {
+.actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -268,17 +426,61 @@ onMounted(async () => {
   background: rgba(28, 28, 28, 0.6);
   color: #fff;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease;
+  transition: background 0.12s ease;
 
   svg { width: 16px; height: 16px; display: block; }
 
   &:hover { background: rgba(28, 28, 28, 0.8); }
   &:disabled { cursor: default; opacity: 0.5; }
+
+  &--danger:hover { background: rgba(197, 48, 48, 0.9); }
 }
 
-.figure-wrap:hover .download-btn,
-.download-btn:focus-visible { opacity: 1; }
+.figure-wrap:hover .actions,
+.actions:focus-within { opacity: 1; }
+
+.confirm-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(28, 28, 28, 0.85);
+  line-height: normal;
+}
+
+.confirm-text {
+  color: #fff;
+  font-size: 12px;
+}
+
+.confirm-buttons {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.confirm-btn {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 5px;
+  background: #e8eaed;
+  color: #1c1c1c;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover { background: #fff; }
+  &:disabled { cursor: default; opacity: 0.6; }
+
+  &--danger {
+    background: #c53030;
+    color: #fff;
+
+    &:hover { background: #b02525; }
+  }
+}
 
 .figure {
   display: block;
@@ -287,6 +489,15 @@ onMounted(async () => {
   height: auto;
   border-radius: 8px;
   border: 1px solid #e0e2e6;
+}
+
+.status-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b6b6b;
+  line-height: normal;
+
+  &--error { color: #c53030; }
 }
 
 .fallback-link {
