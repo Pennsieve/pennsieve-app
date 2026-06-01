@@ -381,6 +381,8 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
+@use '../../styles/theme';
+
 .chat-image-block {
   margin: 4px 0;
 }
@@ -392,11 +394,11 @@ onMounted(async () => {
   width: 100%;
   max-width: 480px;
   aspect-ratio: 4 / 3;
-  background: #e8eaed;
+  background: theme.$gray_2;
   border-radius: 8px;
 
   .loading-text {
-    color: #6b6b6b;
+    color: theme.$gray_5;
     font-size: 13px;
   }
 }
@@ -405,9 +407,9 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   padding: 10px 14px;
-  border: 1px dashed #d0d3d8;
+  border: 1px dashed theme.$gray_3;
   border-radius: 8px;
-  color: #6b6b6b;
+  color: theme.$gray_5;
   font-size: 13px;
   font-style: italic;
 }
@@ -439,17 +441,17 @@ onMounted(async () => {
   padding: 0;
   border: none;
   border-radius: 6px;
-  background: rgba(28, 28, 28, 0.6);
-  color: #fff;
+  background: rgba(theme.$black, 0.6);
+  color: theme.$white;
   cursor: pointer;
   transition: background 0.12s ease;
 
   svg { width: 16px; height: 16px; display: block; }
 
-  &:hover { background: rgba(28, 28, 28, 0.8); }
+  &:hover { background: rgba(theme.$black, 0.8); }
   &:disabled { cursor: default; opacity: 0.5; }
 
-  &--danger:hover { background: rgba(197, 48, 48, 0.9); }
+  &--danger:hover { background: rgba(theme.$red_1, 0.9); }
 }
 
 .figure-wrap:hover .actions,
@@ -464,12 +466,12 @@ onMounted(async () => {
   gap: 6px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(28, 28, 28, 0.85);
+  background: rgba(theme.$black, 0.85);
   line-height: normal;
 }
 
 .confirm-text {
-  color: #fff;
+  color: theme.$white;
   font-size: 12px;
 }
 
@@ -482,19 +484,19 @@ onMounted(async () => {
   padding: 3px 10px;
   border: none;
   border-radius: 5px;
-  background: #e8eaed;
-  color: #1c1c1c;
+  background: theme.$gray_2;
+  color: theme.$gray_6;
   font-size: 12px;
   cursor: pointer;
 
-  &:hover { background: #fff; }
+  &:hover { background: theme.$white; }
   &:disabled { cursor: default; opacity: 0.6; }
 
   &--danger {
-    background: #c53030;
-    color: #fff;
+    background: theme.$red_1;
+    color: theme.$white;
 
-    &:hover { background: #b02525; }
+    &:hover { background: theme.$red_2; }
   }
 }
 
@@ -504,16 +506,16 @@ onMounted(async () => {
   width: 100%;
   height: auto;
   border-radius: 8px;
-  border: 1px solid #e0e2e6;
+  border: 1px solid theme.$gray_2;
 }
 
 .status-note {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #6b6b6b;
+  color: theme.$gray_5;
   line-height: normal;
 
-  &--error { color: #c53030; }
+  &--error { color: theme.$red_2; }
 }
 
 // Source-package link beneath the figure. line-height reset because the
@@ -524,7 +526,7 @@ onMounted(async () => {
 }
 
 .source-link {
-  color: #5039f5;
+  color: theme.$purple_3;
   font-size: 12px;
   text-decoration: none;
 
@@ -533,7 +535,7 @@ onMounted(async () => {
 
 .fallback-link {
   display: inline-block;
-  color: #5039f5;
+  color: theme.$purple_3;
   font-size: 13px;
   text-decoration: underline;
 }
