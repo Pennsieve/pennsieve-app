@@ -45,14 +45,16 @@
         </button>
 
         <!-- Promote: detach from the chat session so the figure becomes a
-             normal dataset asset. Only offered when we resolved by asset id
-             (we have something to act on) and it hasn't been promoted yet. -->
+             normal asset. It lands wherever its package link points: a
+             package-scoped asset when the figure came from a package
+             (plot_file always does), else a plain dataset asset. Only offered
+             when we resolved by asset id and it hasn't been promoted yet. -->
         <button
           v-if="assetId && !promoted"
           type="button"
           class="action-btn"
-          title="Save to dataset assets"
-          aria-label="Save figure to dataset assets"
+          :title="promoteTitle"
+          :aria-label="promoteTitle"
           :disabled="busy"
           @click="promote"
         >
@@ -102,7 +104,7 @@
         </div>
       </div>
 
-      <p v-if="promoted" class="status-note">Saved to dataset assets.</p>
+      <p v-if="promoted" class="status-note">{{ promotedNote }}</p>
       <p v-if="actionError" class="status-note status-note--error">{{ actionError }}</p>
     </div>
 
@@ -177,6 +179,18 @@ const source = computed(() => props.block.source || {})
 const assetId = computed(() => source.value.assetId || '')
 const datasetNodeId = computed(() => source.value.datasetNodeId || '')
 const fileName = computed(() => source.value.fileName || 'figure.png')
+
+// A chat figure carries its package link through promote (clear_chat_session
+// only nulls the chat scope), so it lands as a package-scoped asset whenever
+// it came from a package — which plot_file figures always do. Word the promote
+// affordance to match where the figure actually ends up.
+const hasPackage = computed(() => !!source.value.packageNodeId)
+const promoteTitle = computed(() =>
+  hasPackage.value ? 'Save to package' : 'Save to dataset assets'
+)
+const promotedNote = computed(() =>
+  hasPackage.value ? 'Saved to package.' : 'Saved to dataset assets.'
+)
 
 // Filename for the downloaded file. Prefer the asset's own name; fall back
 // to the figure-asset convention (figure.png). Ensure a .png extension so
