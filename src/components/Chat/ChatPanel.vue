@@ -59,6 +59,23 @@
         >
           <span class="kbd-inline" aria-hidden="true">{{ cmdKLabel }}</span>
         </button>
+        <!-- History dropdown: resume a saved server-side session. Anchored
+             relative to this wrapper so the popover drops below the button. -->
+        <div class="history-wrap">
+          <button
+            type="button"
+            class="header-btn"
+            :class="{ active: historyOpen }"
+            @click="toggleHistory"
+            aria-label="Chat history"
+            title="Chat history"
+          >History</button>
+          <ChatSessionMenu
+            v-model:visible="historyOpen"
+            :active-id="convo?.sessionId || null"
+            @resume="resumeSession"
+          />
+        </div>
         <button
           v-if="messageCount"
           type="button"
@@ -157,10 +174,12 @@ import ChatMessageList from './ChatMessageList.vue'
 import ChatInput from './ChatInput.vue'
 import ChatStarterPrompts from './ChatStarterPrompts.vue'
 import ComputeNodePicker from './ComputeNodePicker.vue'
+import ChatSessionMenu from './ChatSessionMenu.vue'
 import EventBus from '@/utils/event-bus'
 import { cmdKLabel } from '@/utils/platform'
 import ChatQuotaHeader from './ChatQuotaHeader.vue'
 import { useChatQuota } from '@/composables/useChatQuota'
+import { useChatSessions } from '@/composables/useChatSessions'
 
 const props = defineProps({
   mode: { type: String, required: true }, // 'workspace' | 'dataset'
@@ -175,6 +194,7 @@ const chatStore = useChatStore()
 const computeStore = useComputeResourcesStore()
 const vuexStore = useStore()
 const { sendUserMessage, disconnect } = useChatSocket()
+const { listMessages } = useChatSessions()
 
 const hasAdminRights = computed(() => {
   const org = vuexStore.state?.activeOrganization
@@ -367,6 +387,56 @@ const onPickPrompt = (prompt) => onSubmit(prompt)
 
 const onResetConversation = () => chatStore.resetConversation(key.value)
 
+const historyOpen = ref(false)
+const toggleHistory = () => { historyOpen.value = !historyOpen.value }
+
+// Resume a persisted server-side session: fetch its history (oldest-first),
+// hydrate the conversation so the panel renders the prior turns, and close
+// the current socket so the next send reconnects on the resumed sessionId
+// (the URL carries `sessionId`, so the server continues that session).
+const resumeSession = async (session) => {
+  historyOpen.value = false
+  const id = session?.id
+  if (!id) return
+
+  // Fetch history FIRST, before mutating any store state. This avoids an
+  // intermediate render where the conversation exists but is empty (which
+  // would flash the empty state and force an extra 0→N list transition).
+  let messages = []
+  try {
+    // No cursor/direction → server returns the first page oldest-first
+    // (ascending), which is the order the panel renders top-to-bottom.
+    const res = await listMessages(id)
+    messages = res?.messages || []
+  } catch (e) {
+    console.error('chat: failed to resume session', e)
+    return
+  }
+
+  // Continue the session on the node it ran on, when that node is still
+  // available here and LLM-capable. Otherwise keep the current selection.
+  const sessionNode = nodes.value.find(
+    (n) => n.uuid === session.computeNodeId && n.enableLLMAccess
+  )
+  if (sessionNode) {
+    selectedNodeId.value = sessionNode.uuid
+    rememberComputeNode(props.orgId, sessionNode.uuid)
+  }
+
+  // Create-if-missing then hydrate, both synchronous so Vue batches them
+  // into a single update (existing messages → resumed messages) with no
+  // empty render in between. ensureConversation also guards the case where
+  // the user resumes before ever sending a message in this panel.
+  chatStore.ensureConversation({
+    mode: props.mode,
+    orgId: props.orgId,
+    datasetId: props.datasetId,
+    computeNodeId: selectedNodeId.value,
+  })
+  chatStore.hydrateConversation(key.value, { sessionId: id, messages })
+  disconnect({ mode: props.mode, orgId: props.orgId, datasetId: props.datasetId })
+}
+
 // Open the global Spotlight compose modal (the same one bound to
 // Cmd+K). Available from inside the chat panel too as a discoverable
 // trigger for users who don't reach for keyboard shortcuts. App.vue
@@ -476,7 +546,12 @@ watch(nodes, (list) => {
   cursor: pointer;
 
   &:hover { background: #f0f2f5; }
+  &.active { background: #f0f2f5; border-color: theme.$purple_3; }
 }
+
+// Anchor for the History popover. The ChatSessionMenu positions itself
+// absolutely against this wrapper so it drops below the History button.
+.history-wrap { position: relative; }
 
 // Quick-compose button is a tighter, icon-style trigger. The label
 // ("⌘K" / "Ctrl+K") doubles as both the affordance and the keyboard-

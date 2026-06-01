@@ -1,7 +1,15 @@
 <template>
   <div ref="scrollEl" class="chat-message-list">
-    <slot name="empty" v-if="!messages.length && !pending" />
-    <ChatMessage v-for="(msg, idx) in messages" :key="idx" :message="msg" />
+    <!-- Empty state and the message list are mutually exclusive branches.
+         Putting v-if on a wrapper element (rather than directly on <slot>)
+         avoids a Vue fragment/anchor patch bug that crashed on the
+         empty→populated transition when resuming a session. -->
+    <div v-if="!messages.length && !pending" class="empty-slot">
+      <slot name="empty" />
+    </div>
+    <template v-else>
+      <ChatMessage v-for="(msg, idx) in messages" :key="msg.id ?? idx" :message="msg" />
+    </template>
     <ChatToolProgress v-if="activeTools.length" :tools="activeTools" />
     <div v-if="pending && !hasRunningTool" class="thinking">
       <span class="dot" />
@@ -45,6 +53,15 @@ watch(() => props.pending, scrollToBottom)
   padding: 16px;
   display: flex;
   flex-direction: column;
+}
+
+// Wrapper around the #empty slot. Forwards the flex sizing so the slotted
+// empty-state (which uses flex:1 to center itself) still fills the list.
+.empty-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .thinking {

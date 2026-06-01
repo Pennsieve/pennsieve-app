@@ -77,6 +77,42 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
+  // Resume a persisted server-side session into the named conversation.
+  //
+  // Adopts the persisted `sessionId` and replaces the in-memory message
+  // list with the history fetched from the chat-sessions REST API. The
+  // existing socket is closed by the caller (useChatSocket.disconnect) so
+  // the next send reconnects on this sessionId, continuing that server
+  // session.
+  //
+  // `messages` are REST `ChatMessageRecord`s (oldest-first) and get mapped
+  // into the same shape handleIncomingFrame produces, so the panel renders
+  // resumed turns identically to live ones.
+  const hydrateConversation = (key, { sessionId, messages = [] }) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    if (sessionId) convo.sessionId = sessionId
+    convo.messages = (Array.isArray(messages) ? messages : []).map((m) => {
+      if (m.role === 'user') {
+        return { id: m.id, role: 'user', content: m.content || '' }
+      }
+      return {
+        id: m.id,
+        role: 'assistant',
+        content: m.content || '',
+        usage: m.usage || undefined,
+        referencedDatasets: Array.isArray(m.referencedDatasets)
+          ? m.referencedDatasets
+          : [],
+        blocks: Array.isArray(m.blocks) ? m.blocks : null,
+        pendingTasks: [],
+      }
+    })
+    convo.pending = false
+    convo.activeTools = []
+    convo.lastError = null
+  }
+
   // Append a user turn to the named conversation.
   //
   // `attachments` (optional) is the structured form of context the user
@@ -228,6 +264,7 @@ export const useChatStore = defineStore('chat', () => {
     getConversation,
     ensureConversation,
     resetConversation,
+    hydrateConversation,
     appendUserMessage,
     handleIncomingFrame,
     setConnectionState,
