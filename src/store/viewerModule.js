@@ -275,8 +275,6 @@ export const actions = {
   },
 
   /**
-<<<<<<< HEAD
-=======
    * Get source files for a package (the original uploaded files,
    * not processed viewer assets). Used by OmeViewer to get the
    * original .ome.tiff source file.
@@ -307,7 +305,6 @@ export const actions = {
   },
 
   /**
->>>>>>> main
    * Get viewer assets from the packages service (api2)
    * Returns { assets, cloudfront } with signed CloudFront policy
    */
@@ -331,8 +328,62 @@ export const actions = {
   },
 
   /**
-<<<<<<< HEAD
-=======
+   * Get a single viewer asset by its UUID from the packages service (api2).
+   * Returns { asset, cloudfront } with a signed CloudFront policy. Unlike
+   * fetchPackageViewerAssets (which lists a package's assets and is subject
+   * to the chat-scoped exclusion filter), this resolves by id directly — the
+   * only reliable way to reach a chat-scoped figure, which is omitted from
+   * the dataset/package listing. Returns null on any failure (caller degrades
+   * to a fallback link).
+   * @param {String} datasetId
+   * @param {String} assetId
+   */
+  fetchViewerAssetById: async ({rootState}, { datasetId, assetId }) => {
+    try {
+      const token = await useGetToken()
+      const url = `${rootState.config.api2Url}/packages/assets/${assetId}?dataset_id=${datasetId}`
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (resp.ok) {
+        return await resp.json()
+      }
+      return null
+    } catch (err) {
+      console.warn('Failed to fetch viewer asset by id:', err)
+      return null
+    }
+  },
+
+  /**
+   * Promote a chat-scoped viewer asset to a plain dataset asset by detaching
+   * its chat session (PATCH clear_chat_session). Metadata-only: the asset's
+   * bytes never move (dataset_id is unchanged), it simply starts appearing in
+   * the dataset's asset listing and is no longer reclaimed when the chat
+   * session is deleted. Idempotent — a no-op on an already-unscoped asset.
+   * @param {String} datasetId
+   * @param {String} assetId
+   */
+  promoteViewerAsset: async ({rootState}, { datasetId, assetId }) => {
+    const token = await useGetToken()
+    const url = `${rootState.config.api2Url}/packages/assets/${assetId}?dataset_id=${datasetId}`
+    const resp = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ clear_chat_session: true }),
+    })
+    if (!resp.ok) {
+      throw new Error(`Failed to promote viewer asset: ${resp.status}`)
+    }
+    return await resp.json()
+  },
+
+  /**
    * Delete a viewer asset
    * @param {String} datasetId
    * @param {String} assetId
@@ -352,7 +403,6 @@ export const actions = {
   },
 
   /**
->>>>>>> main
    * Get presigned URL for a file
    * @param {String} packageId
    * @param {String} fileId
