@@ -12,6 +12,8 @@ import IconRemove from '@/components/icons/IconRemove.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
+import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
+import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -796,6 +798,32 @@ async function saveGpuConfig() {
         </div>
       </div>
 
+      <!-- Node-wide LLM budget. The SSM-backed cap the governor enforces
+           on every invocation — chat *and* workflow applications. This is
+           the only enforcement layer that catches non-chat callers, so
+           it's shown first. Per-user quotas (below) are an additional
+           cap on chat only. -->
+      <div id="llm-budget" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
+        <div class="section-header">
+          <h2>Node LLM Budget</h2>
+        </div>
+        <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
+      </div>
+
+      <!-- Per-user chat LLM quotas. Anchor `#quotas` is what the chat
+           panel's "Manage quotas" link targets. -->
+      <div id="quotas" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
+        <div class="section-header">
+          <h2>Per-user LLM Quotas</h2>
+        </div>
+        <p class="section-blurb">
+          Optional per-user caps applied <em>in addition to</em> the node
+          budget above. These only gate chat — workflow applications are
+          governed solely by the node budget.
+        </p>
+        <ComputeNodeQuotas :node-id="nodeUuid" :is-owner="isNodeOwner" />
+      </div>
+
       <!-- Access & Permissions Section -->
       <div class="management-section" v-loading="isLoadingPermissions">
         <div class="section-header">
@@ -1254,6 +1282,15 @@ async function saveGpuConfig() {
   border: 1px solid theme.$gray_2;
   margin-bottom: 32px;
   padding: 28px 32px;
+
+  .section-blurb {
+    margin: -8px 0 16px 0;
+    font-size: 13px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+
+    em { font-style: italic; }
+  }
 
   .section-header {
     display: flex;
