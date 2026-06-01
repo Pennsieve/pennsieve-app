@@ -914,6 +914,10 @@ export const actions = {
       throw new Error(message);
     }
     const newRun = await resp.json();
+    // Preserve the user-supplied name on the optimistic add in case the API response omits it.
+    if (payload?.name && newRun && !newRun.name) {
+      newRun.name = payload.name;
+    }
     commit("PREPEND_WORKFLOW_INSTANCE", newRun);
     return newRun;
   },

@@ -105,6 +105,41 @@ export const labelForDagNode = (d, applications, targetTypes = []) => {
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
 };
 
+// Run name validation and display.
+// Pattern follows common cloud-resource conventions (AWS Step Functions / Kubernetes-friendly):
+//  - 3-64 characters
+//  - Letters, numbers, spaces, hyphens, underscores, periods
+//  - Must start with a letter or number
+export const RUN_NAME_MAX_LENGTH = 64;
+export const RUN_NAME_MIN_LENGTH = 3;
+const RUN_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _.\-]*$/;
+
+export const validateRunName = (raw) => {
+  const name = (raw == null ? "" : String(raw)).trim();
+  if (!name) return { valid: true, error: null, value: "" };
+  if (name.length < RUN_NAME_MIN_LENGTH) {
+    return { valid: false, error: `Must be at least ${RUN_NAME_MIN_LENGTH} characters`, value: name };
+  }
+  if (name.length > RUN_NAME_MAX_LENGTH) {
+    return { valid: false, error: `Must be ${RUN_NAME_MAX_LENGTH} characters or fewer`, value: name };
+  }
+  if (!RUN_NAME_PATTERN.test(name)) {
+    return {
+      valid: false,
+      error: "Use letters, numbers, spaces, hyphens, underscores, or periods (must start with a letter or number)",
+      value: name,
+    };
+  }
+  return { valid: true, error: null, value: name };
+};
+
+export const runDisplayName = (run) => {
+  if (!run) return "";
+  const name = typeof run.name === "string" ? run.name.trim() : "";
+  if (name) return name;
+  return run.workflowName || "";
+};
+
 // Time formatting
 export const formatTime = (dateStr) => {
   if (!dateStr) return "N/A";

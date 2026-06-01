@@ -17,6 +17,7 @@ import {
   computeNodeName as computeNodeNameFn,
   getUserName as getUserNameFn,
   runStatusOptions,
+  runDisplayName,
 } from "./runHelpers";
 
 const store = useStore();
@@ -395,7 +396,8 @@ onBeforeUnmount(() => {
               class="active-run-card"
               @click="selectRun(run)"
             >
-              <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
+              <div class="active-run-name">{{ runDisplayName(run) || 'Unnamed run' }}</div>
+              <div v-if="run.name && run.workflowName" class="active-run-subtitle">{{ run.workflowName }}</div>
               <div class="active-run-meta">
                 <span class="run-status-dot" :class="statusDotClass(run.status)" />
                 <span>{{ statusLabel(run.status) }}</span>
@@ -463,7 +465,7 @@ onBeforeUnmount(() => {
               @click="selectRun(run)"
             >
               <span class="run-status-dot" :class="statusDotClass(run.status)" />
-              <span class="recent-run-name">{{ run.workflowName || 'Unnamed' }}</span>
+              <span class="recent-run-name">{{ runDisplayName(run) || 'Unnamed' }}</span>
               <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
               <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
             </div>
@@ -535,8 +537,9 @@ onBeforeUnmount(() => {
               >
                 <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
                 <div class="wf-item-info">
-                  <div class="wf-item-name">{{ formatTime(run.startedAt) }}</div>
-                  <div class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                  <div class="wf-item-name">{{ runDisplayName(run) || formatTime(run.startedAt) }}</div>
+                  <div v-if="run.name" class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                  <div class="wf-item-meta">{{ formatTime(run.startedAt) }}</div>
                   <div class="wf-item-meta">{{ computeNodeName(run.computeNodeUuid) }}</div>
                   <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
                 </div>
@@ -894,6 +897,13 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
   color: theme.$black;
+  margin-bottom: 6px;
+}
+
+.active-run-subtitle {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-top: -4px;
   margin-bottom: 6px;
 }
 

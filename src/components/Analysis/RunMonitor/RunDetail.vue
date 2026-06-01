@@ -43,6 +43,9 @@ import {
   getMemoryOptionsForCpu,
   NODE_WIDTH,
   NODE_HEIGHT,
+  validateRunName,
+  runDisplayName,
+  RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
 
 const props = defineProps({
@@ -69,7 +72,8 @@ let analyticsChannel = null;
 let analyticsChannelName = null;
 
 // Configure mode state
-const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
+const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", name: "" });
+const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
 const nodeConfigs = reactive({});
@@ -209,6 +213,12 @@ const runTimeLabel = computed(() => {
 const runWorkflowName = computed(() => {
   const activity = selectedWorkflowActivity.value;
   return activity?.workflowName || "";
+});
+
+const runName = computed(() => {
+  const activity = selectedWorkflowActivity.value;
+  const raw = activity?.name || "";
+  return typeof raw === "string" ? raw.trim() : "";
 });
 
 /*
@@ -514,7 +524,8 @@ onPaneClick(() => {
 */
 const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
-  initiateForm.value = { workflowId, computeNodeId, datasetId };
+  initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
+  runNameError.value = "";
 
   try {
     const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
@@ -615,6 +626,15 @@ const cancelConfigure = () => {
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
 
+  const nameResult = validateRunName(initiateForm.value.name);
+  runNameError.value = nameResult.error || "";
+  if (!nameResult.valid) {
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: nameResult.error },
+    });
+    return;
+  }
+
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
     (d) => !dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0
@@ -705,6 +725,7 @@ const executeWorkflow = async () => {
       }
     });
 
+    const trimmedName = nameResult.value;
     const payload = {
       workflowInstanceConfiguration: {
         workflowId: initiateForm.value.workflowId,
@@ -713,6 +734,7 @@ const executeWorkflow = async () => {
       },
       datasetId: initiateForm.value.datasetId,
       dataSources,
+      ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
@@ -1179,7 +1201,8 @@ onUnmounted(() => {
         <span class="header-title">
           <a class="header-back-link" @click="goBack">Runs</a>
           <span class="header-breadcrumb-sep">/</span>
-          {{ runTimeLabel }}
+          {{ runName || runTimeLabel }}
+          <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
       </template>
@@ -1625,6 +1648,24 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure'">
               <h4 class="sidebar-section-title">Configuration Summary</h4>
               <div class="info-card">
+                <div class="info-row info-row-stacked">
+                  <label class="info-label" for="run-name-input">Run Name <span class="info-label-hint">(optional)</span></label>
+                  <input
+                    id="run-name-input"
+                    v-model="initiateForm.name"
+                    class="run-name-input"
+                    :class="{ 'has-error': !!runNameError }"
+                    type="text"
+                    :maxlength="RUN_NAME_MAX_LENGTH"
+                    placeholder="e.g. Sleep-stage-batch-01"
+                    @input="runNameError = ''"
+                    @blur="runNameError = validateRunName(initiateForm.name).error || ''"
+                  />
+                  <span v-if="runNameError" class="run-name-error">{{ runNameError }}</span>
+                  <span v-else class="run-name-hint">
+                    Up to {{ RUN_NAME_MAX_LENGTH }} characters — letters, numbers, spaces, hyphens, underscores, periods.
+                  </span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
@@ -1740,6 +1781,12 @@ onUnmounted(() => {
             <template v-else-if="mode === 'browse' && selectedWorkflowActivity?.uuid">
               <h4 class="sidebar-section-title">Run Details</h4>
               <div class="info-card">
+                <div v-if="runName" class="info-row">
+                  <span class="info-label">Name</span>
+                  <span class="info-value truncate-value">
+                    <span class="truncate-text" :title="runName">{{ runName }}</span>
+                  </span>
+                </div>
                 <div v-if="runWorkflowName" class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value truncate-value">
@@ -1930,7 +1977,7 @@ onUnmounted(() => {
     >
       <div v-if="runMetrics" class="metrics-receipt">
         <div class="receipt-header">
-          <div class="receipt-title">{{ runWorkflowName || 'Workflow Run' }}</div>
+          <div class="receipt-title">{{ runName || runWorkflowName || 'Workflow Run' }}</div>
           <div class="receipt-date">{{ formatTime(selectedWorkflowActivity?.startedAt) }}</div>
         </div>
 
@@ -2128,7 +2175,7 @@ onUnmounted(() => {
     >
       <div v-if="runMetrics" class="metrics-receipt">
         <div class="receipt-header">
-          <div class="receipt-title">{{ selectedWorkflowActivity?.workflowName || 'Workflow' }}</div>
+          <div class="receipt-title">{{ runName || selectedWorkflowActivity?.workflowName || 'Workflow' }}</div>
           <div class="receipt-date">Total: {{ formatDurationSec(runMetrics.executionTimeSec) }}</div>
         </div>
 
@@ -2851,6 +2898,53 @@ onUnmounted(() => {
   color: theme.$gray_4;
   line-height: 1.5;
   margin-top: 8px;
+}
+
+.info-row-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.info-label-hint {
+  font-weight: 400;
+  color: theme.$gray_4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.run-name-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$black;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: theme.$purple_3;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+
+  &.has-error {
+    border-color: #e02d2d;
+    box-shadow: 0 0 0 2px rgba(224, 45, 45, 0.12);
+  }
+}
+
+.run-name-hint {
+  font-size: 11px;
+  color: theme.$gray_4;
+  line-height: 1.4;
+}
+
+.run-name-error {
+  font-size: 11px;
+  color: #e02d2d;
+  line-height: 1.4;
 }
 
 .runtime-tag {
