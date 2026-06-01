@@ -177,6 +177,11 @@ const removed = ref(false)
 const promoted = ref(false)
 const actionError = ref('')
 
+// Resolved-asset state, populated from the by-id lookup. `resolvedPackageIds`
+// is null until we've resolved (so hasPackage can fall back to the frame's
+// packageNodeId for the listing path / older frames).
+const resolvedPackageIds = ref(null)
+
 const alt = computed(() => props.block.alt || 'Inline figure')
 const source = computed(() => props.block.source || {})
 const assetId = computed(() => source.value.assetId || '')
@@ -186,13 +191,21 @@ const fileName = computed(() => source.value.fileName || 'figure.png')
 // A chat figure carries its package link through promote (clear_chat_session
 // only nulls the chat scope), so it lands as a package-scoped asset whenever
 // it came from a package — which plot_file figures always do. Word the promote
-// affordance to match where the figure actually ends up.
-const hasPackage = computed(() => !!source.value.packageNodeId)
+// affordance to match where the figure actually ends up. Prefer the resolved
+// asset's real package links; fall back to the frame's packageNodeId before
+// resolution completes (and for the listing path, where we don't fetch by id).
+const hasPackage = computed(() => {
+  if (resolvedPackageIds.value !== null) return resolvedPackageIds.value.length > 0
+  return !!source.value.packageNodeId
+})
 const promoteTitle = computed(() =>
   hasPackage.value ? 'Save to package' : 'Save to dataset assets'
 )
 const promotedNote = computed(() =>
   hasPackage.value ? 'Saved to package.' : 'Saved to dataset assets.'
+)
+const promoteFailNote = computed(() =>
+  hasPackage.value ? 'Could not save to package.' : 'Could not save to dataset assets.'
 )
 
 // Filename for the downloaded file. Prefer the asset's own name; fall back
@@ -248,7 +261,7 @@ const promote = async () => {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('[chat] ChatImageBlock: promote failed', err)
-    actionError.value = 'Could not save to dataset assets.'
+    actionError.value = promoteFailNote.value
   } finally {
     busy.value = false
   }
@@ -308,6 +321,14 @@ const buildSignedUrl = (result) => {
   if (!asset?.asset_url) return false
   const cf = result.cloudfront
   if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) return false
+
+  // Capture the asset's real state so the actions reflect it: package links
+  // decide the promote wording/target, and the presence of chat_session_id
+  // tells us whether it's still a chat figure (offer promote) or already
+  // promoted (don't — re-promoting would 404 once the chat link is gone).
+  resolvedPackageIds.value = Array.isArray(asset.package_ids) ? asset.package_ids : []
+  if (!asset.chat_session_id) promoted.value = true
+
   const qs = new URLSearchParams({
     Policy: cf.policy,
     Signature: cf.signature,
