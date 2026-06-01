@@ -11,21 +11,17 @@
     </div>
 
     <div v-else-if="resolvedUrl" class="figure-wrap">
-      <a
-        :href="packageHref"
-        target="_blank"
-        rel="noopener"
-        class="image-link"
-        :aria-label="alt + ' — open package'"
-      >
-        <img
-          :src="resolvedUrl"
-          :alt="alt"
-          loading="lazy"
-          class="figure"
-          @error="onImgError"
-        />
-      </a>
+      <!-- The figure renders inline here. We don't link the image to the
+           package: the figure is chat-scoped until promoted, so it isn't
+           viewable in the package viewer yet. The source-package router-link
+           below points at where the data came from. -->
+      <img
+        :src="resolvedUrl"
+        :alt="alt"
+        loading="lazy"
+        class="figure"
+        @error="onImgError"
+      />
 
       <!-- Hover-revealed actions. Sits top-right so it doesn't clutter the
            figure at rest. -->
@@ -106,17 +102,24 @@
 
       <p v-if="promoted" class="status-note">{{ promotedNote }}</p>
       <p v-if="actionError" class="status-note status-note--error">{{ actionError }}</p>
+
+      <!-- Link to the source package (where the plotted data lives) as an
+           in-app router navigation. Not "where the figure is" — the figure
+           shows inline above and isn't in the package until promoted. -->
+      <p v-if="packageRoute" class="source-note">
+        <router-link :to="packageRoute" class="source-link">Open source package →</router-link>
+      </p>
     </div>
 
-    <a
-      v-else
-      :href="packageHref"
-      target="_blank"
-      rel="noopener"
+    <!-- Figure couldn't be resolved/rendered. Fall back to a router-link to
+         the source package so the user can still get there. -->
+    <router-link
+      v-else-if="packageRoute"
+      :to="packageRoute"
       class="fallback-link"
     >
-      View plot in package →
-    </a>
+      Open source package →
+    </router-link>
   </div>
 </template>
 
@@ -274,17 +277,21 @@ const removeFigure = async () => {
   }
 }
 
-// Open-in-viewer fallback link. Matches the `file-record` route registered
-// in router/index.js (`:orgId/datasets/:datasetId/files/:fileId/details`).
-// Read the org from Vuex's activeOrganization rather than a route param —
-// the chat panel can be hosted in widgets (e.g. Spotlight) where the current
-// route isn't org-scoped, but activeOrganization is set globally.
-const packageHref = computed(() => {
+// vue-router target for the source package (the `file-record` route, same one
+// ChatMessage's attachment chips use). Returns null when we can't build it —
+// the template degrades by hiding the link rather than rendering a dead one.
+// Read the org from Vuex's activeOrganization rather than a route param: the
+// chat panel can be hosted in widgets (e.g. Spotlight) where the current route
+// isn't org-scoped, but activeOrganization is set globally.
+const packageRoute = computed(() => {
   const { packageNodeId, datasetNodeId: ds } = source.value
-  if (!packageNodeId || !ds) return '#'
+  if (!packageNodeId || !ds) return null
   const orgId = store.state?.activeOrganization?.organization?.id
-  if (!orgId) return '#'
-  return `/${orgId}/datasets/${ds}/files/${packageNodeId}/details`
+  if (!orgId) return null
+  return {
+    name: 'file-record',
+    params: { orgId, datasetId: ds, fileId: packageNodeId },
+  }
 })
 
 const onImgError = () => {
@@ -413,11 +420,6 @@ onMounted(async () => {
   line-height: 0;
 }
 
-.image-link {
-  display: inline-block;
-  line-height: 0; // collapse the anchor's text-baseline gap below the img
-}
-
 .actions {
   position: absolute;
   top: 8px;
@@ -512,6 +514,21 @@ onMounted(async () => {
   line-height: normal;
 
   &--error { color: #c53030; }
+}
+
+// Source-package link beneath the figure. line-height reset because the
+// .figure-wrap container collapses it to 0 to hug the image.
+.source-note {
+  margin: 4px 0 0;
+  line-height: normal;
+}
+
+.source-link {
+  color: #5039f5;
+  font-size: 12px;
+  text-decoration: none;
+
+  &:hover { text-decoration: underline; }
 }
 
 .fallback-link {
