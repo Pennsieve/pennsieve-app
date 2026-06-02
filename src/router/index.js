@@ -80,6 +80,8 @@ const TermsOfService = () => import('./TermsOfService/TermsOfService.vue')
 const CreateAccount = () => import('./CreateAccount/CreateAccount.vue')
 const MyWorkSpacePage = () => import('./MyWorkSpace/MyWorkSpacePage.vue')
 
+const WorkspaceOverviewView = () => import('./WorkspaceOverview/WorkspaceOverviewView.vue')
+
 const Viewer = () => import('../components/viewer/PsViewer/PsViewer.vue')
 
 const Settings = () => import('./OrgSettings/Settings.vue')
@@ -109,6 +111,7 @@ const UserDashboard = () => import('../components/user/dashboard/UserDashboard.v
 const UserIntegrations = () => import('../components/user/integrations/UserIntegrations.vue')
 const UserOrcid = () => import('../components/user/integrations/UserOrcid.vue')
 const UserGithubCode = () => import('../components/user/code/UserGithubCode.vue')
+const PublishedAppDetail = () => import('../components/user/code/PublishedAppDetail.vue')
 const UserGithubIntegrations = () => import('../components/user/integrations/UserGithubV2.vue')
 const DataPublishingDashboard = () => import('../components/user/publishing/DataPublishingDashboard.vue')
 const SharedWithMe = () => import('../components/user/shared/SharedWithMe.vue')
@@ -406,6 +409,22 @@ const router = createRouter({
             title: 'My Code',
             description: 'Connect your GitHub account to track and publish your repositories with DOIs.'
           }
+        },
+        {
+          name: 'published-app-details',
+          path: 'published-app-details/:uuid',
+          components: {
+            stage: PublishedAppDetail,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Application Details',
+            description: 'Details for an application published to the Pennsieve App Store.',
+          },
         },
         {
           name: 'my-analysis',
@@ -762,6 +781,28 @@ const router = createRouter({
       redirect: {
         name: 'datasets-list',
       }
+    },
+    /**
+     * Workspace Insights — chat-centric dashboard
+     */
+    {
+      path: '/:orgId/insights',
+      name: 'workspace-insights',
+      components: {
+        page: WorkspaceOverviewView,
+        navigation: BfNavigation,
+        navigationSecondary: BfNavigationSecondary,
+      },
+      props: {
+        page: true,
+        navigation: true,
+        navigationSecondary: true,
+      },
+      meta: {
+        hideSecondaryNav: true,
+        title: 'Insights',
+        description: 'Workspace metrics and AI assistant.',
+      },
     },
     /**
      * Datasets routes

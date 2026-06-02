@@ -1,0 +1,303 @@
+// @/stores/chatStore.js
+//
+// Pinia store for chat conversations. The store owns a `conversations` Map
+// keyed by a context string ("workspace:<orgId>" or "dataset:<datasetId>"),
+// so the same store backs the workspace-overview chat and the per-dataset
+// chat without state collisions.
+//
+// The WebSocket instance itself does NOT live in the store — see
+// useChatSocket.js. Pinia reactive proxies of a WebSocket would be wasted
+// overhead and cause noise about un-proxyable types.
+
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+const newSessionId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  // RFC4122 v4 fallback
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
+const newConversation = ({ mode, orgId, datasetId, computeNodeId }) => ({
+  mode,
+  orgId,
+  datasetId: datasetId || null,
+  computeNodeId,
+  sessionId: newSessionId(),
+  messages: [],
+  pending: false,
+  activeTools: [],
+  connectionState: 'idle', // 'idle' | 'connecting' | 'open' | 'reconnecting' | 'error'
+  lastError: null,
+  // Wall-clock ms of the last frame received on this conversation's
+  // WebSocket. Used by useChatSocket to detect "browser thinks the socket
+  // is OPEN but AWS hung up minutes ago" — when the gap exceeds the
+  // staleness threshold, the socket is force-closed and reconnected
+  // before the next send. Set on every frame in handleIncomingFrame.
+  lastFrameAt: 0,
+})
+
+export const contextKey = ({ mode, orgId, datasetId }) => {
+  if (mode === 'dataset') return `dataset:${datasetId}`
+  return `workspace:${orgId}`
+}
+
+export const useChatStore = defineStore('chat', () => {
+  // Map<contextKey, Conversation>
+  const conversations = ref(new Map())
+
+  const getConversation = computed(() => (key) => conversations.value.get(key) || null)
+
+  const ensureConversation = ({ mode, orgId, datasetId, computeNodeId }) => {
+    const key = contextKey({ mode, orgId, datasetId })
+    let convo = conversations.value.get(key)
+    if (!convo) {
+      convo = newConversation({ mode, orgId, datasetId, computeNodeId })
+      conversations.value.set(key, convo)
+    } else if (computeNodeId && convo.computeNodeId !== computeNodeId) {
+      // User changed compute node — reset the conversation so the next
+      // turn goes to the new node with a clean slate.
+      convo = newConversation({ mode, orgId, datasetId, computeNodeId })
+      conversations.value.set(key, convo)
+    }
+    return convo
+  }
+
+  const resetConversation = (key) => {
+    const existing = conversations.value.get(key)
+    if (!existing) return
+    conversations.value.set(key, newConversation({
+      mode: existing.mode,
+      orgId: existing.orgId,
+      datasetId: existing.datasetId,
+      computeNodeId: existing.computeNodeId,
+    }))
+  }
+
+  // Resume a persisted server-side session into the named conversation.
+  //
+  // Adopts the persisted `sessionId` and replaces the in-memory message
+  // list with the history fetched from the chat-sessions REST API. The
+  // existing socket is closed by the caller (useChatSocket.disconnect) so
+  // the next send reconnects on this sessionId, continuing that server
+  // session.
+  //
+  // `messages` are REST `ChatMessageRecord`s (oldest-first) and get mapped
+  // into the same shape handleIncomingFrame produces, so the panel renders
+  // resumed turns identically to live ones.
+  const hydrateConversation = (key, { sessionId, messages = [] }) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    if (sessionId) convo.sessionId = sessionId
+    convo.messages = (Array.isArray(messages) ? messages : []).map((m) => {
+      if (m.role === 'user') {
+        return { id: m.id, role: 'user', content: m.content || '' }
+      }
+      return {
+        id: m.id,
+        role: 'assistant',
+        content: m.content || '',
+        usage: m.usage || undefined,
+        referencedDatasets: Array.isArray(m.referencedDatasets)
+          ? m.referencedDatasets
+          : [],
+        blocks: Array.isArray(m.blocks) ? m.blocks : null,
+        pendingTasks: [],
+      }
+    })
+    convo.pending = false
+    convo.activeTools = []
+    convo.lastError = null
+  }
+
+  // Append a user turn to the named conversation.
+  //
+  // `attachments` (optional) is the structured form of context the user
+  // attached when composing — currently only via the Spotlight modal's
+  // current-page auto-attach. Stored on the message so the chat UI can
+  // render them as chips ABOVE the prompt body (vs. inlining them as
+  // raw `[Attached file: …(N:package:…)…]` text the way v1 did). The
+  // wire-level prefix that the LLM needs gets re-derived when the
+  // socket serializes the message — see useChatSocket.sendUserMessage.
+  //
+  // Shape: [{ type: 'file' | 'dataset', packageId?, datasetId, name? }]
+  // Absent / empty array on plain typed turns.
+  const appendUserMessage = (key, content, attachments) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.messages.push({
+      role: 'user',
+      content,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
+    })
+    convo.pending = true
+    convo.activeTools = []
+    convo.lastError = null
+  }
+
+  // Apply a single inbound frame from the WebSocket.
+  const handleIncomingFrame = (key, frame) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+
+    // Mark liveness: any frame we receive proves the socket is genuinely
+    // connected to AWS, not just OPEN in the browser's local view.
+    // useChatSocket reads this before reusing a cached socket to send.
+    convo.lastFrameAt = Date.now()
+
+    switch (frame.type) {
+      case 'tool_progress': {
+        const idx = convo.activeTools.findIndex((t) => t.name === frame.name && t.status === 'running')
+        if (frame.status === 'running') {
+          if (idx === -1) {
+            convo.activeTools.push({ name: frame.name, status: 'running' })
+          }
+        } else if (frame.status === 'done') {
+          if (idx !== -1) convo.activeTools[idx] = { ...convo.activeTools[idx], status: 'done' }
+          else convo.activeTools.push({ name: frame.name, status: 'done' })
+        } else if (frame.status === 'error') {
+          const tool = { name: frame.name, status: 'error', message: frame.message }
+          if (idx !== -1) convo.activeTools[idx] = tool
+          else convo.activeTools.push(tool)
+        }
+        return
+      }
+      case 'message': {
+        // A new assistant message arriving "resolves" any pending
+        // background-task indicators on prior messages in this
+        // conversation — the next frame is, by definition, the
+        // completion the user was waiting for. Clear them now so the
+        // "in flight" pill disappears as the figure (or follow-up text)
+        // renders.
+        for (const m of convo.messages) {
+          if (m.pendingTasks?.length) m.pendingTasks = []
+        }
+        convo.messages.push({
+          role: 'assistant',
+          content: frame.content || '',
+          usage: frame.usage,
+          // Backend-supplied list of dataset node IDs the assistant
+          // acted on during this turn (per chat-integration.md §3.2.2).
+          // Used to render "currently discussing" pills in the panel.
+          referencedDatasets: Array.isArray(frame.referencedDatasets)
+            ? frame.referencedDatasets
+            : [],
+          // Optional structured-content render path. When the backend
+          // supplies `blocks`, newer clients render those in order;
+          // otherwise fall back to `content`. Used today for inline
+          // figure rendering on workflow-completion frames (plot_file
+          // → figure.png inline). See compute-node-chat docs:
+          //   docs/developer/inline-image-frames.md
+          blocks: Array.isArray(frame.blocks) ? frame.blocks : null,
+          // Background-workflow indicators. Non-empty when this assistant
+          // turn fired off one or more async-mode MCP tools (plot_file
+          // etc.) whose results arrive in a later completion frame.
+          // Rendered as persistent "running…" pills below the message
+          // until the next assistant frame arrives (see clear loop above).
+          pendingTasks: Array.isArray(frame.pendingTasks) ? frame.pendingTasks : [],
+        })
+        convo.pending = false
+        convo.activeTools = []
+        return
+      }
+      case 'blocked': {
+        convo.messages.push({
+          role: 'assistant',
+          content: frame.message || "I can't help with that request.",
+          blocked: true,
+        })
+        convo.pending = false
+        convo.activeTools = []
+        return
+      }
+      case 'error': {
+        console.warn('[chat] backend error frame', frame)
+        convo.lastError = { code: frame.code || 'INTERNAL', message: frame.message || 'Something went wrong' }
+        convo.pending = false
+        return
+      }
+      default:
+        // Forward-compatible: ignore unknown frame types (spec §13).
+        return
+    }
+  }
+
+  const setConnectionState = (key, state, error = null) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.connectionState = state
+    if (error) convo.lastError = error
+  }
+
+  // markSocketAlive — bumps lastFrameAt without applying a frame. Called
+  // by useChatSocket's onopen so a freshly handshaken socket isn't
+  // immediately treated as stale just because no frame has yet arrived.
+  const markSocketAlive = (key) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.lastFrameAt = Date.now()
+  }
+
+  const clearError = (key) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.lastError = null
+  }
+
+  const markFailedTurn = (key, message) => {
+    const convo = conversations.value.get(key)
+    if (!convo) return
+    convo.pending = false
+    convo.activeTools = []
+    // Don't overwrite a more specific error (e.g. WS close code) that
+    // already landed from the socket's onclose/onerror handlers.
+    if (!convo.lastError) {
+      convo.lastError = { code: 'CLIENT', message }
+    }
+  }
+
+  return {
+    conversations,
+    getConversation,
+    ensureConversation,
+    resetConversation,
+    hydrateConversation,
+    appendUserMessage,
+    handleIncomingFrame,
+    setConnectionState,
+    markSocketAlive,
+    clearError,
+    markFailedTurn,
+  }
+})
+
+// Persisted compute-node choice per workspace (orgId).
+// Lives in localStorage so it survives page reloads but stays per-browser.
+const COMPUTE_NODE_KEY = (orgId) => `pennsieve.chat.computeNode.${orgId}`
+
+export const getRememberedComputeNode = (orgId) => {
+  try {
+    return window.localStorage.getItem(COMPUTE_NODE_KEY(orgId)) || null
+  } catch {
+    return null
+  }
+}
+
+export const rememberComputeNode = (orgId, nodeId) => {
+  try {
+    window.localStorage.setItem(COMPUTE_NODE_KEY(orgId), nodeId)
+  } catch {
+    // ignore (private mode, full disk, etc.)
+  }
+}
+
+export const forgetComputeNode = (orgId) => {
+  try {
+    window.localStorage.removeItem(COMPUTE_NODE_KEY(orgId))
+  } catch {
+    // ignore
+  }
+}

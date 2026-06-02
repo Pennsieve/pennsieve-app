@@ -18,6 +18,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -57,7 +58,9 @@ const initiateForm = ref({
   workflowId: "",
   computeNodeId: "",
   datasetId: "",
+  name: "",
 });
+const runNameError = ref("");
 const wizardVisible = ref(false);
 const wizardStep = ref(0); // 0=workflow, 1=compute, 2=dataset, 3=confirm
 const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
@@ -136,6 +139,45 @@ const getComputeTypesForProcessor = (sourceUrl) => {
   return app?.runtimeConfig?.computeTypes || ["standard", "lambda"];
 };
 
+/* Version helpers — match WorkflowBuilder */
+const latestVersion = (app) => {
+  const versions = app?.versions || [];
+  if (versions.length === 0) return null;
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0),
+  )[0];
+};
+
+const sortedVersions = (app) => {
+  const versions = app?.versions || [];
+  return [...versions].sort(
+    (a, b) =>
+      (new Date(b.createdAt).getTime() || 0) -
+      (new Date(a.createdAt).getTime() || 0),
+  );
+};
+
+const versionOptionLabel = (app, v) => {
+  const latest = latestVersion(app);
+  return latest && v.version === latest.version
+    ? `${v.version} (latest)`
+    : v.version;
+};
+
+const findMatchedApp = (sourceUrl) => {
+  if (!sourceUrl) return null;
+  const normalized = normalizeUrl(sourceUrl);
+  return (
+    availableApplications.value.find(
+      (app) =>
+        normalizeUrl(app.sourceUrl) === normalized ||
+        normalizeUrl(app.source?.url) === normalized
+    ) || null
+  );
+};
+
 const getTargetTypeDefinition = (targetType) => {
   if (!targetType) return null;
   return targetTypes.value.find((t) => t.targetType === targetType) || null;
@@ -181,6 +223,14 @@ const runWorkflowName = computed(() => {
   if (!run) return '';
   const activity = selectedWorkflowActivity.value;
   return activity?.workflowName || run.workflowName || '';
+});
+
+const runName = computed(() => {
+  const run = selectedRun.value;
+  if (!run) return '';
+  const activity = selectedWorkflowActivity.value;
+  const raw = activity?.name || run.name || '';
+  return typeof raw === 'string' ? raw.trim() : '';
 });
 
 /*
@@ -871,8 +921,10 @@ const wizardBack = () => {
 };
 
 const wizardConfirm = () => {
-  // Copy wizard selections into initiateForm and trigger the existing flow
-  initiateForm.value = { ...wizardForm.value };
+  // Copy wizard selections into initiateForm and trigger the existing flow.
+  // Name is collected later in the Configuration Summary panel — start blank.
+  initiateForm.value = { ...wizardForm.value, name: "" };
+  runNameError.value = "";
   wizardVisible.value = false;
   initiateWorkflow();
 };
@@ -951,11 +1003,12 @@ const initiateWorkflow = async () => {
           .filter(([key]) => !schemaNames.has(key))
           .map(([key, value]) => ({ key, value: String(value) }));
 
+        const matchedApp = findMatchedApp(d.sourceUrl);
         nodeConfigs[d.id] = {
           executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
-          version: srcCfg?.version || "",
-          cpu: srcCfg?.cpu || "",
-          memory: srcCfg?.memory || "",
+          version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
+          cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
+          memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
           schemaParams,
           extraParams,
         };
@@ -997,6 +1050,8 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
+  initiateForm.value.name = "";
+  runNameError.value = "";
   accordionActiveNames.value = ["runs"];
 };
 
@@ -1006,6 +1061,16 @@ const cancelConfigure = () => {
 const executeWorkflow = async () => {
   // Validate required inputs before executing
   const dag = configDefinition.value?.dag || [];
+
+  // Validate the optional run name first so the user can fix it before any other check.
+  const nameResult = validateRunName(initiateForm.value.name);
+  runNameError.value = nameResult.error || "";
+  if (!nameResult.valid) {
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: nameResult.error },
+    });
+    return;
+  }
 
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
@@ -1112,6 +1177,7 @@ const executeWorkflow = async () => {
       }
     });
 
+    const trimmedName = nameResult.value;
     const payload = {
       workflowInstanceConfiguration: {
         workflowId: initiateForm.value.workflowId,
@@ -1120,6 +1186,7 @@ const executeWorkflow = async () => {
       },
       datasetId: initiateForm.value.datasetId,
       dataSources,
+      ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
@@ -1137,6 +1204,8 @@ const executeWorkflow = async () => {
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
     selectedNode.value = null;
+    initiateForm.value.name = "";
+    runNameError.value = "";
 
     // Set a temporary placeholder so the canvas doesn't show the dashboard
     const runId = newRun?.uuid || newRun?.id || newRun?.runId;
@@ -1542,6 +1611,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       store.dispatch("analysisModule/fetchTargetTypes"),
+      store.dispatch("analysisModule/fetchApplications", { force: true }),
       fetchOrgCounters(),
     ]);
   } catch (err) {
@@ -1611,7 +1681,8 @@ onUnmounted(() => {
           <template v-if="selectedRun">
             <a class="header-back-link" @click="clearRunSelection">Runs</a>
             <span class="header-breadcrumb-sep">/</span>
-            {{ runTimeLabel }}
+            {{ runName || runTimeLabel }}
+            <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
             <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
           </template>
           <template v-else>
@@ -1638,7 +1709,8 @@ onUnmounted(() => {
                 class="active-run-card"
                 @click="selectRun(run)"
               >
-                <div class="active-run-name">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                <div class="active-run-name">{{ runDisplayName(run) || 'Unnamed run' }}</div>
+                <div v-if="run.name && run.workflowName" class="active-run-subtitle">{{ run.workflowName }}</div>
                 <div class="active-run-meta">
                   <span class="run-status-dot" :class="statusDotClass(run.status)" />
                   <span>{{ statusLabel(run.status) }}</span>
@@ -1706,7 +1778,7 @@ onUnmounted(() => {
                 @click="selectRun(run)"
               >
                 <span class="run-status-dot" :class="statusDotClass(run.status)" />
-                <span class="recent-run-name">{{ run.workflowName || 'Unnamed' }}</span>
+                <span class="recent-run-name">{{ runDisplayName(run) || 'Unnamed' }}</span>
                 <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
                 <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
               </div>
@@ -1907,11 +1979,24 @@ onUnmounted(() => {
                 </div>
                 <div class="config-field">
                   <label>Version</label>
-                  <el-input
+                  <el-select
                     v-model="nodeConfigs[selectedNode.id].version"
                     size="small"
+                    style="width: 100%"
                     placeholder="latest"
-                  />
+                    :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
+                  >
+                    <el-option
+                      v-for="v in sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl))"
+                      :key="v.version"
+                      :label="versionOptionLabel(findMatchedApp(selectedNode.data?.sourceUrl), v)"
+                      :value="v.version"
+                    />
+                  </el-select>
+                  <span
+                    v-if="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
+                    class="version-hint"
+                  >No other versions available</span>
                 </div>
 
                 <!-- CPU / Memory (Standard only) -->
@@ -2144,6 +2229,24 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure'">
               <h4 class="sidebar-section-title">Configuration Summary</h4>
               <div class="info-card">
+                <div class="info-row info-row-stacked">
+                  <label class="info-label" for="run-name-input">Run Name <span class="info-label-hint">(optional)</span></label>
+                  <input
+                    id="run-name-input"
+                    v-model="initiateForm.name"
+                    class="run-name-input"
+                    :class="{ 'has-error': !!runNameError }"
+                    type="text"
+                    :maxlength="RUN_NAME_MAX_LENGTH"
+                    placeholder="e.g. Sleep-stage-batch-01"
+                    @input="runNameError = ''"
+                    @blur="runNameError = validateRunName(initiateForm.name).error || ''"
+                  />
+                  <span v-if="runNameError" class="run-name-error">{{ runNameError }}</span>
+                  <span v-else class="run-name-hint">
+                    Up to {{ RUN_NAME_MAX_LENGTH }} characters — letters, numbers, spaces, hyphens, underscores, periods.
+                  </span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
@@ -2257,6 +2360,10 @@ onUnmounted(() => {
             <template v-else-if="mode === 'browse' && selectedRun && selectedWorkflowActivity?.uuid">
               <h4 class="sidebar-section-title">Run Details</h4>
               <div class="info-card">
+                <div v-if="runName" class="info-row">
+                  <span class="info-label">Name</span>
+                  <span class="info-value">{{ runName }}</span>
+                </div>
                 <div v-if="runWorkflowName" class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ runWorkflowName }}</span>
@@ -2392,10 +2499,10 @@ onUnmounted(() => {
               >
                 <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
                 <div class="wf-item-info">
-                  <div class="wf-item-name">{{ formatTime(run.startedAt) }} </div>
-                  <div class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                  <div class="wf-item-name">{{ runDisplayName(run) || formatTime(run.startedAt) }}</div>
+                  <div v-if="run.name" class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
+                  <div class="wf-item-meta">{{ formatTime(run.startedAt) }}</div>
                   <div class="wf-item-meta">
-
                     {{ computeNodeName(run.computeNodeUuid) }}
                   </div>
                   <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
@@ -2670,7 +2777,7 @@ onUnmounted(() => {
       <div v-if="runMetrics" class="metrics-receipt">
         <!-- Header -->
         <div class="receipt-header">
-          <div class="receipt-title">{{ runWorkflowName || 'Workflow Run' }}</div>
+          <div class="receipt-title">{{ runName || runWorkflowName || 'Workflow Run' }}</div>
           <div class="receipt-date">{{ formatTime(selectedWorkflowActivity?.startedAt) }}</div>
         </div>
 
@@ -2872,7 +2979,7 @@ onUnmounted(() => {
     >
       <div v-if="runMetrics" class="metrics-receipt">
         <div class="receipt-header">
-          <div class="receipt-title">{{ selectedWorkflowActivity?.workflowName || 'Workflow' }}</div>
+          <div class="receipt-title">{{ runName || selectedWorkflowActivity?.workflowName || 'Workflow' }}</div>
           <div class="receipt-date">Total: {{ formatDurationSec(runMetrics.executionTimeSec) }}</div>
         </div>
 
@@ -3229,6 +3336,13 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: theme.$black;
+  margin-bottom: 6px;
+}
+
+.active-run-subtitle {
+  font-size: 11px;
+  color: theme.$gray_4;
+  margin-top: -4px;
   margin-bottom: 6px;
 }
 
@@ -3847,6 +3961,53 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
+.info-row-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.info-label-hint {
+  font-weight: 400;
+  color: theme.$gray_4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.run-name-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$black;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: theme.$purple_3;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+
+  &.has-error {
+    border-color: #e02d2d;
+    box-shadow: 0 0 0 2px rgba(224, 45, 45, 0.12);
+  }
+}
+
+.run-name-hint {
+  font-size: 11px;
+  color: theme.$gray_4;
+  line-height: 1.4;
+}
+
+.run-name-error {
+  font-size: 11px;
+  color: #e02d2d;
+  line-height: 1.4;
+}
+
 .runtime-tag {
   font-size: 10px;
   font-weight: 600;
@@ -3878,6 +4039,12 @@ onUnmounted(() => {
     font-weight: 600;
     color: theme.$gray_5;
   }
+}
+
+.version-hint {
+  font-size: 11px;
+  color: theme.$gray_4;
+  font-style: italic;
 }
 
 .param-row {

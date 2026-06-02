@@ -67,7 +67,6 @@ async function sendRequest() {
       <li>
         GitHub releases will no longer result in Pennsieve GitHub Publications.
       </li>
-      <li>You can no longer create Applications and Workflows on Pennsieve.</li>
     </template>
 
     <template #footer>

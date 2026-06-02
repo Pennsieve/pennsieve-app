@@ -11,7 +11,10 @@
         {{ viewerNameMapper(viewer) }}
       </button>
     </div>
-    <div v-if="omeTiffSlowWarning && cmpViewer === 'OmeViewer'" class="viewer-warning">
+    <div
+      v-if="omeTiffSlowWarning && cmpViewer === 'OmeViewer'"
+      class="viewer-warning"
+    >
       This TIFF has interleaved channels and may be very slow to load.
     </div>
     <OmeViewer
@@ -57,15 +60,15 @@ import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
 import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import { TSViewer } from '@pennsieve-viz/tsviewer'
-import '@pennsieve-viz/tsviewer/style.css'
-import * as siteConfig from '@/site-config/site.json'
+import { TSViewer } from "@pennsieve-viz/tsviewer";
+import "@pennsieve-viz/tsviewer/style.css";
+import * as siteConfig from "@/site-config/site.json";
 import {
   VIEWER_INSTANCE_ID,
   initViewerStore,
   cleanupViewerStore,
-  useViewerInstance
-} from '@/composables/useViewerInstance'
+  useViewerInstance,
+} from "@/composables/useViewerInstance";
 
 import "@pennsieve-viz/micro-ct/style.css";
 import "@pennsieve-viz/core/style.css";
@@ -77,42 +80,42 @@ export default {
     BfButton,
     NeuroglancerViewer,
     SlideViewer: defineAsyncComponent(() =>
-      import("../../viewers/SlideViewer/SlideViewer.vue")
+      import("../../viewers/SlideViewer/SlideViewer.vue"),
     ),
     ImageViewer: defineAsyncComponent(() =>
-      import("../../viewers/ImageViewer.vue")
+      import("../../viewers/ImageViewer.vue"),
     ),
     PDFViewer: defineAsyncComponent(() =>
-      import("../../viewers/PDFViewer.vue")
+      import("../../viewers/PDFViewer.vue"),
     ),
     TextViewer: defineAsyncComponent(() =>
-      import("../../viewers/TextViewer.vue")
+      import("../../viewers/TextViewer.vue"),
     ),
     UnknownViewer: defineAsyncComponent(() =>
-      import("../../viewers/UnknownViewer.vue")
+      import("../../viewers/UnknownViewer.vue"),
     ),
     VideoViewer: defineAsyncComponent(() =>
-      import("../../viewers/VideoViewer.vue")
+      import("../../viewers/VideoViewer.vue"),
     ),
     TimeseriesViewer: TSViewer,
     XLSViewer: defineAsyncComponent(() =>
-      import("../../viewers/XLSViewer.vue")
+      import("../../viewers/XLSViewer.vue"),
     ),
     UMAPViewer: defineAsyncComponent(() =>
-      import("../../viewers/UmapViewer/wrapper.vue")
+      import("../../viewers/UmapViewer/wrapper.vue"),
     ),
     DataExplorer: defineAsyncComponent(() =>
-      import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue")
+      import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue"),
     ),
     CSVViewer: defineAsyncComponent(() =>
-      import("@pennsieve-viz/core").then(m => m.CSVViewer)
+      import("@pennsieve-viz/core").then((m) => m.CSVViewer),
     ),
     LayViewer: defineAsyncComponent(() =>
-      import("../../viewers/LayViewer.vue")
+      import("../../viewers/LayViewer.vue"),
     ),
-    OmeViewer: defineAsyncComponent(()=>
-    import("@pennsieve-viz/micro-ct").then(m => m.OmeViewer)
-    )
+    OmeViewer: defineAsyncComponent(() =>
+      import("@pennsieve-viz/micro-ct").then((m) => m.OmeViewer),
+    ),
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -150,8 +153,11 @@ export default {
     pkg: {
       handler: async function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
-          await this.loadViewer(pkg);
-          if (pathOr('', ['content', 'packageType'], pkg).toLowerCase() === 'timeseries') {
+          this.loadViewer(pkg);
+          if (
+            pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
+            "timeseries"
+          ) {
             this.fetchTimeseriesData();
           }
         }
@@ -162,7 +168,12 @@ export default {
   },
 
   methods: {
-    ...mapActions('viewerModule', ['fetchViewerAssets', 'fetchFileUrl', 'fetchPackageViewerAssets', 'fetchSourceFiles']),
+    ...mapActions("viewerModule", [
+      "fetchViewerAssets",
+      "fetchFileUrl",
+      "fetchPackageViewerAssets",
+      "fetchSourceFiles",
+    ]),
 
     /**
      * Called when component is mounted
@@ -170,24 +181,27 @@ export default {
     fetchTimeseriesData: async function () {
       this.isLoading = true;
       // Initialize the viewer store with the shared instance ID
-      const viewerStore = initViewerStore(this.viewerInstanceId)
-      const viewerControls = useViewerInstance(this.viewerInstanceId)
+      const viewerStore = initViewerStore(this.viewerInstanceId);
+      const viewerControls = useViewerInstance(this.viewerInstanceId);
 
       const viewerConfig = {
         timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
         apiUrl: siteConfig.apiUrl,
         timeSeriesApi: siteConfig.timeSeriesApi,
       };
-      viewerStore.setViewerConfig(viewerConfig)
+      viewerStore.setViewerConfig(viewerConfig);
 
       try {
-        const viewerAssetId = this.timeseriesAsset?.id || null
-        const packageId = this.pkg?.content?.id || null
-        if (!viewerAssetId && !packageId) return
-        const result = await viewerStore.fetchAndSetActiveViewer({ viewerAssetId, packageId })
-        return result
+        const viewerAssetId = this.timeseriesAsset?.id || null;
+        const packageId = this.pkg?.content?.id || null;
+        if (!viewerAssetId && !packageId) return;
+        const result = await viewerStore.fetchAndSetActiveViewer({
+          viewerAssetId,
+          packageId,
+        });
+        return result;
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
@@ -210,10 +224,10 @@ export default {
     },
 
     viewerNameMapper: function (viewer) {
-      if (viewer.startsWith('NeuroglancerViewer:')) {
-        const idx = parseInt(viewer.split(':')[1])
-        const asset = this.viewerAssets[idx]
-        return asset?.name || `Neuroglancer ${idx + 1}`
+      if (viewer.startsWith("NeuroglancerViewer:")) {
+        const idx = parseInt(viewer.split(":")[1]);
+        const asset = this.viewerAssets[idx];
+        return asset?.name || `Neuroglancer ${idx + 1}`;
       }
       switch (viewer) {
         case "DataExplorer":
@@ -245,36 +259,42 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      let viewers = this.checkViewerType(activeViewer);
+      let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
 
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
-      const pkgId = pathOr('', ['content', 'id'], activeViewer);
-      const datasetId = pathOr('', ['content', 'datasetNodeId'], activeViewer);
+      const pkgId = pathOr("", ["content", "id"], activeViewer);
+      const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
       this.viewerAssets = [];
       this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
-          const result = await this.fetchPackageViewerAssets({ datasetId, packageId: pkgId });
+          const result = await this.fetchPackageViewerAssets({
+            datasetId,
+            packageId: pkgId,
+          });
           if (result?.assets?.length > 0) {
-            this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null
-            const neuroglancerTypes = ['ome-zarr', 'neuroglancer-precomputed']
-            const seen = new Set()
-            const ngAssets = result.assets.filter(a => {
-              if (!neuroglancerTypes.includes(a.asset_type) || a.status !== 'ready') return false
-              if (seen.has(a.asset_url)) return false
-              seen.add(a.asset_url)
-              return true
-            })
+            const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
+            const seen = new Set();
+            const ngAssets = result.assets.filter((a) => {
+              if (
+                !neuroglancerTypes.includes(a.asset_type) ||
+                a.status !== "ready"
+              )
+                return false;
+              if (seen.has(a.asset_url)) return false;
+              seen.add(a.asset_url);
+              return true;
+            });
             if (ngAssets.length > 0) {
-              this.viewerAssets = ngAssets.map(a => ({
+              this.viewerAssets = ngAssets.map((a) => ({
                 ...a,
                 cloudfront: result.cloudfront,
-              }))
-              const ngViewerNames = ngAssets.map((a, i) =>
-                `NeuroglancerViewer:${i}`
-              )
-              const filtered = viewers.filter(v => v !== 'UnknownViewer')
-              viewers = [...ngViewerNames, ...filtered]
+              }));
+              const ngViewerNames = ngAssets.map(
+                (a, i) => `NeuroglancerViewer:${i}`,
+              );
+              const filtered = viewers.filter((v) => v !== "UnknownViewer");
+              viewers = [...ngViewerNames, ...filtered];
             }
           }
         } catch (err) {
@@ -284,28 +304,36 @@ export default {
 
       // Warn when an OME-TIFF has interleaved channels (processed into
       // zarr for Neuroglancer) — the raw TIFF will be slow to render.
-      const hasNgViewers = viewers.some(v => v.startsWith('NeuroglancerViewer:'))
-      this.omeTiffSlowWarning = this.isOMETiff(activeViewer) && hasNgViewers
+      const hasNgViewers = viewers.some((v) =>
+        v.startsWith("NeuroglancerViewer:"),
+      );
+      this.omeTiffSlowWarning = this.isOMETiff(activeViewer) && hasNgViewers;
 
       this.availableViewers = viewers;
 
-      if (this.isTimeseriesPackageUnprocessed(activeViewer) && !this.isLayFile(activeViewer)) {
+      if (
+        this.isTimeseriesPackageUnprocessed(activeViewer) &&
+        !this.isLayFile(activeViewer)
+      ) {
         this.loadVueViewer("UnknownViewer");
       } else {
         const viewerToLoad = this.availableViewers[0];
 
         // Fetch presigned URL for OmeViewer from the original source
         // files — not /view which returns processed zarr chunks.
-        if (viewers.includes('OmeViewer')) {
+        if (viewers.includes("OmeViewer")) {
           try {
             const sourceFiles = await this.fetchSourceFiles(pkgId);
 
             if (sourceFiles && sourceFiles.length > 0) {
-              const fileId = pathOr('', ['content', 'id'], sourceFiles[0]);
-              this.omeTiffSource = await this.fetchFileUrl({ packageId: pkgId, fileId });
+              const fileId = pathOr("", ["content", "id"], sourceFiles[0]);
+              this.omeTiffSource = await this.fetchFileUrl({
+                packageId: pkgId,
+                fileId,
+              });
             }
           } catch (err) {
-            console.error('Failed to fetch source file URL:', err);
+            console.error("Failed to fetch source file URL:", err);
           }
         }
 

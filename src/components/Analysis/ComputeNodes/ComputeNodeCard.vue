@@ -64,6 +64,16 @@
         </div>
       </div>
     </div>
+
+    <div class="node-card-actions">
+      <router-link
+        :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
+        class="card-action-link"
+      >
+        <span>View details</span>
+        <span class="arrow">&rarr;</span>
+      </router-link>
+    </div>
   </div>
 </template>
 
@@ -394,6 +404,44 @@ async function updateStatus(newStatus) {
     :deep(.el-select__caret) {
       color: #D97706;
     }
+  }
+}
+
+.node-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid theme.$gray_2;
+  flex-wrap: wrap;
+}
+
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
   }
 }
 </style>
