@@ -58,8 +58,9 @@ const repoName = computed(
 );
 
 const visibilityLabel = computed(() => {
-  if (typeof detail.value?.isPrivate !== "boolean") return null;
-  return detail.value.isPrivate ? "Private" : "Public";
+  const visibility = detail.value?.visibility;
+  if (visibility !== "public" && visibility !== "private") return null;
+  return visibility === "private" ? "Private" : "Public";
 });
 
 const githubRepoUrl = computed(() => {

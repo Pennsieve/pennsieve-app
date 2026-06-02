@@ -9,12 +9,14 @@ import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import dagre from "@dagrejs/dagre";
+import { ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import {
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
@@ -514,6 +516,79 @@ const toggleArchive = async () => {
   } catch {
     EventBus.$emit("toast", {
       detail: { type: "error", msg: "Failed to update workflow status." },
+    });
+  }
+};
+
+/*
+Visibility (public / private)
+*/
+const isSuperAdmin = computed(() => store.getters.isSuperAdmin === true);
+
+const isWorkflowCreator = computed(() => {
+  const wf = selectedWorkflow.value;
+  if (!wf || !profile.value) return false;
+  return (
+    profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
+  );
+});
+
+const isPublicWorkflow = computed(
+  () => selectedWorkflow.value?.visibility === "public",
+);
+
+// Only the creator may publish. The creator or a super-admin (moderation) may
+// unpublish — mirrors the workflow-service authorization rules.
+const canPublish = computed(
+  () => !isPublicWorkflow.value && isWorkflowCreator.value,
+);
+const canUnpublish = computed(
+  () => isPublicWorkflow.value && (isWorkflowCreator.value || isSuperAdmin.value),
+);
+
+const togglePublish = async () => {
+  if (!selectedWorkflow.value) return;
+  const wf = selectedWorkflow.value;
+  const goingPublic = !isPublicWorkflow.value;
+
+  try {
+    await ElMessageBox.confirm(
+      goingPublic
+        ? `Publishing "${wf.name}" makes it discoverable and runnable by anyone across all organizations. Every processor must itself be a public application.`
+        : `Unpublishing "${wf.name}" reverts it to private. It will no longer be discoverable by other users and any "Official" badge will be removed.`,
+      goingPublic ? "Publish workflow" : "Unpublish workflow",
+      {
+        confirmButtonText: goingPublic ? "Publish" : "Unpublish",
+        cancelButtonText: "Cancel",
+        type: "warning",
+      },
+    );
+  } catch {
+    return; // user cancelled
+  }
+
+  try {
+    const action = goingPublic ? "publishWorkflow" : "unpublishWorkflow";
+    const updated = await store.dispatch(`analysisModule/${action}`, {
+      uuid: wf.uuid,
+    });
+    selectedWorkflow.value = {
+      ...wf,
+      visibility: updated?.visibility ?? (goingPublic ? "public" : ""),
+      official: updated?.official ?? false,
+    };
+    EventBus.$emit("toast", {
+      detail: {
+        type: "success",
+        msg: goingPublic ? "Workflow published." : "Workflow unpublished.",
+      },
+    });
+  } catch (err) {
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: err?.message || "Failed to update workflow visibility.",
+      },
     });
   }
 };
@@ -1768,6 +1843,30 @@ const openNodeSettings = (id) => {
                     </span>
                   </div>
                   <div class="info-row">
+                    <span class="info-label">Visibility</span>
+                    <span class="info-value">
+                      <span
+                        class="visibility-badge"
+                        :class="isPublicWorkflow ? 'public' : 'private'"
+                      >
+                        {{ isPublicWorkflow ? "Public" : "Private" }}
+                      </span>
+                      <el-tooltip
+                        v-if="selectedWorkflow.official"
+                        content="This workflow has been reviewed and validated by Pennsieve."
+                        placement="top"
+                      >
+                        <span class="official-mark">
+                          <IconPennsieveMark
+                            :width="15"
+                            :height="15"
+                            color="currentColor"
+                          />
+                        </span>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                  <div class="info-row">
                     <span class="info-label">Nodes</span>
                     <span class="info-value">{{
                       (selectedWorkflow.dag || []).length
@@ -1789,16 +1888,6 @@ const openNodeSettings = (id) => {
                 <div class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
                     Edit name & description
-                  </button>
-                  <button
-                    class="text-link-btn archive-btn"
-                    @click="toggleArchive"
-                  >
-                    {{
-                      selectedWorkflow.isActive
-                        ? "Archive workflow"
-                        : "Activate workflow"
-                    }}
                   </button>
                 </div>
               </template>
@@ -1907,6 +1996,61 @@ const openNodeSettings = (id) => {
                     </template>
                   </div>
                 </div>
+              </div>
+            </div>
+          </el-collapse-item>
+
+          <!-- Danger Zone (always last) -->
+          <el-collapse-item
+            v-if="mode === 'browse' && selectedWorkflow"
+            title="Danger Zone"
+            name="danger-zone"
+            class="danger-collapse-item"
+          >
+            <div class="danger-zone">
+              <div class="danger-row">
+                <div class="danger-info">
+                  <div class="danger-row-title">
+                    {{
+                      selectedWorkflow.isActive
+                        ? "Archive workflow"
+                        : "Activate workflow"
+                    }}
+                  </div>
+                  <p class="danger-row-desc">
+                    {{
+                      selectedWorkflow.isActive
+                        ? "Archiving hides this workflow from the active list. You can reactivate it at any time."
+                        : "Reactivate this workflow so it appears in the active list and can be run."
+                    }}
+                  </p>
+                </div>
+                <bf-button class="danger-button" @click="toggleArchive">
+                  {{ selectedWorkflow.isActive ? "Archive" : "Activate" }}
+                </bf-button>
+              </div>
+
+              <div v-if="canPublish || canUnpublish" class="danger-row">
+                <div class="danger-info">
+                  <div class="danger-row-title">
+                    {{ isPublicWorkflow ? "Make private" : "Make public" }}
+                  </div>
+                  <p class="danger-row-desc">
+                    <template v-if="isPublicWorkflow">
+                      This workflow is public — discoverable and runnable by
+                      anyone across all organizations. Making it private also
+                      removes any "Official" badge.
+                    </template>
+                    <template v-else>
+                      Publishing makes this workflow discoverable and runnable by
+                      anyone across all organizations. Every processor must
+                      itself be public.
+                    </template>
+                  </p>
+                </div>
+                <bf-button class="danger-button" @click="togglePublish">
+                  {{ isPublicWorkflow ? "Make private" : "Make public" }}
+                </bf-button>
               </div>
             </div>
           </el-collapse-item>
@@ -2829,9 +2973,94 @@ const openNodeSettings = (id) => {
   &:hover {
     text-decoration: underline;
   }
+}
 
-  &.archive-btn {
-    color: theme.$status_red;
+.visibility-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+
+  &.private {
+    background-color: theme.$gray_2;
+    color: theme.$gray_5;
+  }
+
+  &.public {
+    background-color: theme.$green_tint;
+    color: theme.$status_green;
+  }
+}
+
+.official-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  color: theme.$purple_3;
+  vertical-align: middle;
+}
+
+.danger-collapse-item {
+  :deep(.el-collapse-item__header) {
+    color: theme.$red_2;
+    font-weight: 600;
+  }
+}
+
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  &:not(:last-child) {
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(theme.$red_2, 0.2);
+  }
+}
+
+.danger-info {
+  flex: 1;
+}
+
+.danger-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  margin-bottom: 4px;
+}
+
+.danger-row-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.danger-button {
+  flex-shrink: 0;
+  background: theme.$white;
+  color: theme.$red_2;
+  border: 1px solid theme.$red_2;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: theme.$red_1;
+    color: theme.$white;
   }
 }
 
