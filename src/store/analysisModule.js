@@ -1,5 +1,17 @@
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
 
+// extractErrorMessage pulls the workflow-service `{ "message": "..." }` body off a
+// failed response, falling back to the HTTP status when none is present.
+const extractErrorMessage = async (response) => {
+  try {
+    const body = await response.json();
+    if (body?.message) return body.message;
+  } catch {
+    /* non-JSON body */
+  }
+  return `Error ${response.status}: ${response.statusText}`;
+};
+
 const initialState = () => ({
   computeNodes: [],
   computeNodesLoaded: false,
@@ -173,6 +185,17 @@ export const mutations = {
     if (workflow) {
       if (name !== undefined) workflow.name = name;
       if (description !== undefined) workflow.description = description;
+    }
+  },
+  UPDATE_WORKFLOW_VISIBILITY(state, { uuid, visibility, official }) {
+    const apply = (w) => {
+      if (!w) return;
+      w.visibility = visibility;
+      if (official !== undefined) w.official = official;
+    };
+    apply(state.workflows.find((w) => w.uuid === uuid));
+    if (state.selectedWorkflow?.uuid === uuid) {
+      apply(state.selectedWorkflow);
     }
   },
   SET_ANALYTICS_CHANNEL(state, channel) {
@@ -525,6 +548,59 @@ export const actions = {
       console.error("Failed to update workflow:", err.message);
       throw err;
     }
+  },
+  // Publish makes a workflow public (discoverable/runnable across organizations).
+  // Backend enforces creator-only and that every processor references an App
+  // Store application; surfaces those rejections via the response message.
+  publishWorkflow: async ({ commit, rootState }, { uuid }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}/publish`;
+    const userToken = await useGetToken();
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    const result = await response.json();
+    commit("UPDATE_WORKFLOW_VISIBILITY", {
+      uuid,
+      visibility: result.visibility || "public",
+      official: result.official ?? false,
+    });
+    return result;
+  },
+  // Unpublish reverts a workflow to private and clears any Official badge.
+  // Backend allows the creator or a super-admin (moderation).
+  unpublishWorkflow: async ({ commit, rootState }, { uuid }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}/unpublish`;
+    const userToken = await useGetToken();
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    const result = await response.json();
+    commit("UPDATE_WORKFLOW_VISIBILITY", {
+      uuid,
+      visibility: result.visibility || "",
+      official: result.official ?? false,
+    });
+    return result;
   },
   // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
@@ -929,12 +1005,18 @@ export const actions = {
       throw new Error(`Failed to fetch workflow definition: ${resp.status}`);
     }
   },
-  fetchWorkflows: async ({ commit, rootState }, { search, cursor, limit, status, append } = {}) => {
+  fetchWorkflows: async ({ commit, rootState }, { search, cursor, limit, status, append, visibility, official } = {}) => {
     try {
       const userToken = await useGetToken();
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-      });
+      // Public discovery lists the cross-organization catalog, so it must NOT be
+      // scoped to the active workspace. Otherwise list the active workspace.
+      const params = new URLSearchParams();
+      if (visibility === "public") {
+        params.set("visibility", "public");
+        if (official) params.set("official", "true");
+      } else {
+        params.set("organization_id", rootState.activeOrganization.organization.id);
+      }
       if (limit) params.set("limit", limit);
       if (search) params.set("search", search);
       if (cursor) params.set("cursor", cursor);

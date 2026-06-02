@@ -115,8 +115,9 @@ watch(
 );
 
 const visibilityLabel = (app) => {
-  if (typeof app?.isPrivate !== "boolean") return null;
-  return app.isPrivate ? "Private" : "Public";
+  const visibility = app?.visibility;
+  if (visibility !== "public" && visibility !== "private") return null;
+  return visibility === "private" ? "Private" : "Public";
 };
 
 /*
