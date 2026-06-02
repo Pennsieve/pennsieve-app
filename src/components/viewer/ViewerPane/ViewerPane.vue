@@ -152,7 +152,7 @@ export default {
     pkg: {
       handler: async function (pkg) {
         if (pkg && Object.keys(pkg.content || {}).length > 0) {
-          this.loadViewer(pkg);
+          await this.loadViewer(pkg);
           if (
             pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
             "timeseries"
@@ -264,6 +264,7 @@ export default {
       const pkgId = pathOr("", ["content", "id"], activeViewer);
       const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
       this.viewerAssets = [];
+      this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
           const result = await this.fetchPackageViewerAssets({
@@ -271,6 +272,7 @@ export default {
             packageId: pkgId,
           });
           if (result?.assets?.length > 0) {
+            this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null
             const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
             const seen = new Set();
             const ngAssets = result.assets.filter((a) => {
