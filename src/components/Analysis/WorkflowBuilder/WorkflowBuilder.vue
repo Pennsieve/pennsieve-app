@@ -16,6 +16,7 @@ import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import {
   FARGATE_CPU_OPTIONS,
   getMemoryOptionsForCpu,
@@ -1863,12 +1864,19 @@ const openNodeSettings = (id) => {
                       >
                         {{ isPublicWorkflow ? "Public" : "Private" }}
                       </span>
-                      <span
+                      <el-tooltip
                         v-if="selectedWorkflow.official"
-                        class="visibility-badge official"
+                        content="This workflow has been reviewed and validated by Pennsieve."
+                        placement="top"
                       >
-                        Official
-                      </span>
+                        <span class="official-mark">
+                          <IconPennsieveMark
+                            :width="15"
+                            :height="15"
+                            color="currentColor"
+                          />
+                        </span>
+                      </el-tooltip>
                     </span>
                   </div>
                   <div class="info-row">
@@ -2989,12 +2997,14 @@ const openNodeSettings = (id) => {
     background-color: theme.$green_tint;
     color: theme.$status_green;
   }
+}
 
-  &.official {
-    margin-left: 6px;
-    background-color: theme.$purple_tint;
-    color: theme.$purple_3;
-  }
+.official-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  color: theme.$purple_3;
+  vertical-align: middle;
 }
 
 .danger-collapse-item {

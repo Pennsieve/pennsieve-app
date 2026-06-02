@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -292,9 +293,15 @@ onMounted(async () => {
                 <span v-if="wf.visibility === 'public'" class="tag public">
                   Public
                 </span>
-                <span v-if="wf.official" class="tag official">
-                  Official
-                </span>
+                <el-tooltip
+                  v-if="wf.official"
+                  content="This workflow has been reviewed and validated by Pennsieve."
+                  placement="top"
+                >
+                  <span class="official-mark" @click.stop>
+                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
+                  </span>
+                </el-tooltip>
               </div>
             </div>
 
@@ -627,12 +634,13 @@ onMounted(async () => {
       background: theme.$green_tint;
       color: theme.$status_green;
     }
-
-    &.official {
-      background: theme.$purple_tint;
-      color: theme.$purple_3;
-    }
   }
+}
+
+.official-mark {
+  display: inline-flex;
+  align-items: center;
+  color: theme.$purple_3;
 }
 
 .wf-card-actions {
