@@ -380,6 +380,7 @@ import IconArrowRight from '@/components/icons/IconArrowRight.vue';
 import IconInfo from '@/components/icons/IconInfo.vue';
 import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
 import { useViewerInstance } from '@/composables/useViewerInstance';
+import { useViewerAssets } from '@/composables/useViewerAssets';
 
 export default {
   name: "FileDetails",
@@ -417,9 +418,12 @@ export default {
 
   setup() {
     const { formatRecordKeyValues } = useRecordKeyProperties();
-    
+    const { viewerAssets, removeViewerAsset } = useViewerAssets();
+
     return {
-      formatRecordKeyValues
+      formatRecordKeyValues,
+      viewerAssets,
+      removeViewerAsset,
     };
   },
 
@@ -482,7 +486,6 @@ export default {
       renameDialogVisible: false,
       moveDialogVisible: false,
       connectedRecords: [],
-      viewerAssets: [],
       isDeletingAsset: null,
       showDerivedData: false,
       metadataStore: useMetadataStore()
@@ -1184,20 +1187,10 @@ export default {
 
   watch: {
     fileId: {
-      handler: function (val, oldVal) {
-        if (val) {
-          this.getInstanceDetails();
-          this.fetchConnectedRecords();
-          this.fetchViewerAssets();
-        }
-      },
-      immediate: true,
-    },
-
-    packageDetailsUrl: {
       handler: function (val) {
         if (val) {
           this.getInstanceDetails();
+          this.fetchConnectedRecords();
         }
       },
       immediate: true,
@@ -1340,7 +1333,7 @@ export default {
 
     ...mapActions("filesModule", ["openOffice365File"]),
 
-    ...mapActions("viewerModule", ["setActiveViewer", "fetchPackageViewerAssets"]),
+    ...mapActions("viewerModule", ["setActiveViewer"]),
 
     /**
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
@@ -2867,27 +2860,6 @@ export default {
     },
 
     /**
-     * Fetch viewer assets for the current package
-     */
-    async fetchViewerAssets() {
-      if (!this.fileId || !this.datasetId) {
-        this.viewerAssets = []
-        return
-      }
-
-      try {
-        const result = await this.fetchPackageViewerAssets({
-          datasetId: this.datasetId,
-          packageId: this.fileId,
-        })
-        this.viewerAssets = result?.assets || []
-      } catch (err) {
-        console.warn('Failed to fetch viewer assets:', err)
-        this.viewerAssets = []
-      }
-    },
-
-    /**
      * Delete a viewer asset after confirmation
      */
     async deleteViewerAsset(asset) {
@@ -2911,7 +2883,7 @@ export default {
           datasetId: this.datasetId,
           assetId: asset.id,
         })
-        this.viewerAssets = this.viewerAssets.filter(a => a.id !== asset.id)
+        this.removeViewerAsset(asset.id)
         this.$message.success('Asset deleted')
       } catch (err) {
         console.error('Error deleting viewer asset:', err)

@@ -69,6 +69,7 @@ import {
   cleanupViewerStore,
   useViewerInstance,
 } from "@/composables/useViewerInstance";
+import { useViewerAssets } from "@/composables/useViewerAssets";
 
 import "@pennsieve-viz/micro-ct/style.css";
 import "@pennsieve-viz/core/style.css";
@@ -120,6 +121,11 @@ export default {
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
 
+  setup() {
+    const { fetchViewerAssets: fetchPackageViewerAssets } = useViewerAssets();
+    return { fetchPackageViewerAssets };
+  },
+
   props: {
     isPreview: {
       type: Boolean,
@@ -170,7 +176,6 @@ export default {
     ...mapActions("viewerModule", [
       "fetchViewerAssets",
       "fetchFileUrl",
-      "fetchPackageViewerAssets",
       "fetchSourceFiles",
     ]),
 
@@ -267,10 +272,10 @@ export default {
       this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
-          const result = await this.fetchPackageViewerAssets({
+          const result = await this.fetchPackageViewerAssets(
             datasetId,
-            packageId: pkgId,
-          });
+            pkgId
+          );
           if (result?.assets?.length > 0) {
             this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null
             const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
