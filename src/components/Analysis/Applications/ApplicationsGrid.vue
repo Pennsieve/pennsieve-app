@@ -211,6 +211,10 @@ const statusLabel = (status) => {
 const goToDetail = (app) => {
   router.push({ name: "application-detail", params: { uuid: app.uuid } });
 };
+
+const goToManifestBuilder = () => {
+  router.push({ name: "application-manifest-builder" });
+};
 </script>
 
 <template>
@@ -235,6 +239,25 @@ const goToDetail = (app) => {
           in the publishing settings for the repository you'd like to
           publish.
         </p>
+        <p class="info-note">
+          <strong>Configure your application's defaults.</strong>
+          Generate an <code>app.json</code> manifest with the
+          <router-link
+            :to="{ name: 'application-manifest-builder' }"
+            class="info-link"
+          >
+            manifest builder
+          </router-link>
+          to declare your application's runtime, resources, parameters, and
+          inputs/outputs, then add it to your repository. See the
+          <router-link
+            :to="{ name: 'application-manifest-guide' }"
+            class="info-link"
+          >
+            manifest guide
+          </router-link>
+          for the full specification.
+        </p>
       </div>
     </div>
 
@@ -242,14 +265,19 @@ const goToDetail = (app) => {
     <div class="applications-section">
       <div class="applications-section-header">
         <h3>Applications</h3>
-        <el-input
-          v-if="applications.length > 0"
-          v-model="searchQuery"
-          placeholder="Search applications..."
-          size="default"
-          clearable
-          class="applications-search-input"
-        />
+        <div class="applications-section-actions">
+          <el-input
+            v-if="applications.length > 0"
+            v-model="searchQuery"
+            placeholder="Search applications..."
+            size="default"
+            clearable
+            class="applications-search-input"
+          />
+          <el-button type="primary" @click="goToManifestBuilder">
+            Create app.json
+          </el-button>
+        </div>
       </div>
 
       <div class="filter-bar">
@@ -464,6 +492,12 @@ const goToDetail = (app) => {
     color: theme.$gray_6;
     margin: 0;
   }
+}
+
+.applications-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .applications-search-input {

@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://app.pennsieve.io/static/schemas/app.v1.json",
+  "title": "Pennsieve Application Manifest",
+  "description": "Declarative manifest (app.json) committed to an application's source repository. Pennsieve reads this file when the repository is published to the App Store to seed the application's runtime configuration, parameters, inputs/outputs, and classification.",
+  "type": "object",
+  "required": ["schemaVersion", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional pointer to this schema for editor autocomplete and validation."
+    },
+    "schemaVersion": {
+      "const": "1.0",
+      "description": "Manifest schema version. Must be \"1.0\"."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable application name."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of what the application does."
+    },
+    "applicationType": {
+      "enum": ["processor", "preprocessor", "postprocessor"],
+      "description": "Role the application plays within a workflow."
+    },
+    "categories": {
+      "type": "array",
+      "description": "Curated categories used to group and discover applications.",
+      "items": {
+        "enum": [
+          "Preprocessing",
+          "Segmentation",
+          "Registration",
+          "Quantification",
+          "Visualization",
+          "Machine Learning",
+          "Statistics",
+          "Format Conversion",
+          "Quality Control",
+          "Utility"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "tags": {
+      "type": "array",
+      "description": "Free-form labels for search and filtering.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "runtime": {
+      "type": "object",
+      "description": "Where and how the application executes.",
+      "additionalProperties": false,
+      "properties": {
+        "computeTypes": {
+          "type": "array",
+          "description": "Compute environments the application supports.",
+          "items": { "enum": ["standard", "lambda"] },
+          "uniqueItems": true,
+          "default": ["standard"]
+        },
+        "gpu": {
+          "type": "object",
+          "description": "GPU requirements. Omit or set enabled=false for CPU-only applications.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of GPUs to allocate."
+            },
+            "type": {
+              "type": "string",
+              "description": "GPU model identifier (e.g. nvidia-t4)."
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Default CPU and memory reservation. These are defaults; workspace runs may override within allowed limits.",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "enum": [256, 512, 1024, 2048, 4096, 8192, 16384],
+          "description": "CPU units (1024 = 1 vCPU)."
+        },
+        "memory": {
+          "enum": [512, 1024, 2048, 4096, 8192, 16384, 30720, 61440, 122880],
+          "description": "Memory reservation in MB."
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "description": "Run-time parameters exposed to users. The default of each parameter pre-populates the workflow run form.",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Typed input ports. Used to validate connections when the application is placed in a workflow.",
+      "items": { "$ref": "#/$defs/port" }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Typed output ports. Used to validate connections to downstream applications.",
+      "items": { "$ref": "#/$defs/port" }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Machine name passed to the application. Must be unique within the manifest."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label shown in the run form."
+        },
+        "description": {
+          "type": "string",
+          "description": "Help text shown beneath the field."
+        },
+        "type": {
+          "enum": ["string", "number", "boolean", "enum"],
+          "description": "Parameter data type. Determines the control rendered in the UI."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether a value must be supplied before the run can start."
+        },
+        "default": {
+          "description": "Default value used to pre-populate the run form. Must match the parameter type."
+        },
+        "allowedValues": {
+          "type": "array",
+          "description": "Permitted values. Required when type is \"enum\".",
+          "minItems": 1
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (numeric parameters only)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (numeric parameters only)."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } } },
+          "then": { "required": ["allowedValues"] }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "required": ["name", "dataType"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Port name. Must be unique among the application's inputs (or outputs)."
+        },
+        "description": {
+          "type": "string",
+          "description": "What flows through this port."
+        },
+        "dataType": {
+          "enum": [
+            "any",
+            "file",
+            "directory",
+            "package",
+            "dataset",
+            "tabular",
+            "image",
+            "timeseries"
+          ],
+          "description": "Data type carried by the port. Used to validate workflow connections."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the port must be connected for the application to run (inputs only)."
+        }
+      }
+    }
+  }
+}
