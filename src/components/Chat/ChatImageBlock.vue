@@ -25,7 +25,7 @@
 
       <!-- Hover-revealed actions. Sits top-right so it doesn't clutter the
            figure at rest. -->
-      <div v-if="!confirmingRemove" class="actions">
+      <div v-if="!confirmingRemove && !choosingSave" class="actions">
         <button
           type="button"
           class="action-btn"
@@ -40,19 +40,19 @@
           </svg>
         </button>
 
-        <!-- Promote: detach from the chat session so the figure becomes a
-             normal asset. It lands wherever its package link points: a
-             package-scoped asset when the figure came from a package
-             (plot_file always does), else a plain dataset asset. Only offered
-             when we resolved by asset id and it hasn't been promoted yet. -->
+        <!-- Save: detach from the chat session so the figure becomes a normal
+             asset. When it came from a package, clicking opens a choice
+             (package vs dataset); otherwise it promotes straight to a dataset
+             asset. Only offered when we resolved by asset id and it hasn't been
+             saved yet. -->
         <button
           v-if="assetId && !promoted"
           type="button"
           class="action-btn"
-          :title="promoteTitle"
-          :aria-label="promoteTitle"
+          :title="saveTitle"
+          :aria-label="saveTitle"
           :disabled="busy"
-          @click="promote"
+          @click="onSaveClick"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M3.5 2.5h6.8L13 5.2V13a.5.5 0 01-.5.5h-9A.5.5 0 013 13V3a.5.5 0 01.5-.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
@@ -75,6 +75,39 @@
             <path d="M3 4.5h10M6.2 4.5V3.2a.7.7 0 01.7-.7h2.2a.7.7 0 01.7.7v1.3M4.3 4.5l.6 8a.8.8 0 00.8.7h4.6a.8.8 0 00.8-.7l.6-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
+      </div>
+
+      <!-- Save-target choice overlay. Shown only for figures derived from a
+           package: "Package" links it to the source package (primary), "Dataset"
+           leaves it as a plain dataset asset. -->
+      <div v-else-if="choosingSave" class="confirm-overlay">
+        <span class="confirm-text">Save figure to…</span>
+        <div class="confirm-buttons">
+          <button
+            type="button"
+            class="confirm-btn confirm-btn--primary"
+            :disabled="busy"
+            @click="promote('package')"
+          >
+            {{ busy ? 'Saving…' : 'Package' }}
+          </button>
+          <button
+            type="button"
+            class="confirm-btn"
+            :disabled="busy"
+            @click="promote('dataset')"
+          >
+            Dataset
+          </button>
+          <button
+            type="button"
+            class="confirm-btn"
+            :disabled="busy"
+            @click="choosingSave = false"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
 
       <!-- Inline confirm overlay for the destructive remove. -->
@@ -173,14 +206,13 @@ const downloading = ref(false)
 // Action state.
 const busy = ref(false)
 const confirmingRemove = ref(false)
+const choosingSave = ref(false)
 const removed = ref(false)
 const promoted = ref(false)
+// Where the figure was saved, once promoted: 'package' | 'dataset'. Drives the
+// confirmation note so it matches what the user actually chose.
+const promotedTo = ref('')
 const actionError = ref('')
-
-// Resolved-asset state, populated from the by-id lookup. `resolvedPackageIds`
-// is null until we've resolved (so hasPackage can fall back to the frame's
-// packageNodeId for the listing path / older frames).
-const resolvedPackageIds = ref(null)
 
 const alt = computed(() => props.block.alt || 'Inline figure')
 const source = computed(() => props.block.source || {})
@@ -194,18 +226,17 @@ const fileName = computed(() => source.value.fileName || 'figure.png')
 // affordance to match where the figure actually ends up. Prefer the resolved
 // asset's real package links; fall back to the frame's packageNodeId before
 // resolution completes (and for the listing path, where we don't fetch by id).
-const hasPackage = computed(() => {
-  if (resolvedPackageIds.value !== null) return resolvedPackageIds.value.length > 0
-  return !!source.value.packageNodeId
-})
-const promoteTitle = computed(() =>
-  hasPackage.value ? 'Save to package' : 'Save to dataset assets'
+// Whether the figure was derived from a source package (plot_file figures
+// always are). When true we offer "Save to package" as the primary action and
+// "Save to dataset" as a secondary option; when false there's nothing to link
+// to, so saving just promotes to a dataset asset.
+const fromPackage = computed(() => !!source.value.packageNodeId)
+
+const saveTitle = computed(() =>
+  fromPackage.value ? 'Save figure' : 'Save to dataset assets'
 )
 const promotedNote = computed(() =>
-  hasPackage.value ? 'Saved to package.' : 'Saved to dataset assets.'
-)
-const promoteFailNote = computed(() =>
-  hasPackage.value ? 'Could not save to package.' : 'Could not save to dataset assets.'
+  promotedTo.value === 'package' ? 'Saved to package.' : 'Saved to dataset assets.'
 )
 
 // Filename for the downloaded file. Prefer the asset's own name; fall back
@@ -246,22 +277,47 @@ const downloadImage = async () => {
   }
 }
 
-// Promote: detach the chat session so the figure shows in the dataset's
-// asset listing. Metadata-only — the bytes don't move.
-const promote = async () => {
+// Save-button click. When the figure came from a package, open the choice
+// overlay (package vs dataset). Otherwise there's nothing to link to — promote
+// straight to a dataset asset.
+const onSaveClick = () => {
+  if (busy.value) return
+  if (fromPackage.value) {
+    choosingSave.value = true
+  } else {
+    promote('dataset')
+  }
+}
+
+// Promote: detach the chat session so the figure stops being chat-scoped.
+// target='package' links it to the source package (becomes a package asset);
+// target='dataset' leaves it unlinked (becomes a plain dataset asset).
+// Metadata-only — the bytes don't move.
+const promote = async (target) => {
   if (!assetId.value || !datasetNodeId.value || busy.value) return
   busy.value = true
   actionError.value = ''
   try {
+    const packageIds =
+      target === 'package' && source.value.packageNodeId
+        ? [source.value.packageNodeId]
+        : []
     await store.dispatch('viewerModule/promoteViewerAsset', {
       datasetId: datasetNodeId.value,
       assetId: assetId.value,
+      packageIds,
     })
     promoted.value = true
+    promotedTo.value = target
+    choosingSave.value = false
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('[chat] ChatImageBlock: promote failed', err)
-    actionError.value = promoteFailNote.value
+    actionError.value =
+      target === 'package'
+        ? 'Could not save to package.'
+        : 'Could not save to dataset assets.'
+    choosingSave.value = false
   } finally {
     busy.value = false
   }
@@ -322,11 +378,9 @@ const buildSignedUrl = (result) => {
   const cf = result.cloudfront
   if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) return false
 
-  // Capture the asset's real state so the actions reflect it: package links
-  // decide the promote wording/target, and the presence of chat_session_id
-  // tells us whether it's still a chat figure (offer promote) or already
-  // promoted (don't — re-promoting would 404 once the chat link is gone).
-  resolvedPackageIds.value = Array.isArray(asset.package_ids) ? asset.package_ids : []
+  // The presence of chat_session_id tells us whether it's still a chat figure
+  // (offer save) or already promoted (don't — re-promoting would 404 once the
+  // chat link is gone).
   if (!asset.chat_session_id) promoted.value = true
 
   const qs = new URLSearchParams({
@@ -512,6 +566,13 @@ onMounted(async () => {
 
   &:hover { background: theme.$white; }
   &:disabled { cursor: default; opacity: 0.6; }
+
+  &--primary {
+    background: theme.$purple_2;
+    color: theme.$white;
+
+    &:hover { background: theme.$purple_3; }
+  }
 
   &--danger {
     background: theme.$red_1;
