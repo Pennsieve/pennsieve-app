@@ -1109,7 +1109,7 @@ onMounted(async () => {
   await Promise.all([
     store.dispatch("analysisModule/fetchComputeNodes"),
     store.dispatch("analysisModule/fetchTargetTypes"),
-    store.dispatch("analysisModule/fetchApplications", { force: true }),
+    store.dispatch("analysisModule/fetchApplications"),
   ]);
 
   // Check for pending configure mode
