@@ -86,8 +86,8 @@ export async function useGetPrimaryData() {
             .then(datasetStatuses => store.dispatch('updateOrgDatasetStatuses', datasetStatuses))
             .catch(err => console.warn('Failed to load dataset statuses:', err))
 
-        const applicationsPromise = store.dispatch('analysisModule/fetchApplications', { force: true })
-            .catch(err => console.warn('Failed to load applications:', err))
+        // Applications are loaded lazily by Analysis.vue on mount and refetched
+        // by its watcher when activeOrganization changes — no pre-warm needed here.
 
         return Promise.all([
             teamAndPublishersPromise,
@@ -95,7 +95,6 @@ export async function useGetPrimaryData() {
             orgContributorsPromise,
             dataUseAgreementsPromise,
             datasetStatusesPromise,
-            applicationsPromise,
         ])
     })
 }
