@@ -5,6 +5,7 @@ import store from "@/store";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import router from "@/router";
 import {useComputeResourcesStore} from "@/stores/computeResourcesStore";
+import {useGetPrimaryData} from "@/composables/useGetPrimaryData";
 
 export async function useSwitchWorkspace(org) {
     const orgId = org.organization.id
@@ -31,12 +32,14 @@ export async function useSwitchWorkspace(org) {
         // Update the active organization before refetching org-scoped data
         await store.dispatch('updateActiveOrganization', org)
 
-        // Force-refresh applications so the new org's apps are ready when the
-        // user lands on any analysis tab (avoids stale list from the previous org)
+        // Refetch org-scoped data (members, teams, publishers, contributors,
+        // data use agreements, dataset statuses, applications) so pages like
+        // /:orgId/people don't render with stale or empty state from the
+        // previous workspace.
         try {
-            await store.dispatch('analysisModule/fetchApplications', { force: true })
+            await useGetPrimaryData()
         } catch (err) {
-            console.warn('Failed to refresh applications on org switch:', err)
+            console.warn('Failed to refresh primary data on org switch:', err)
         }
 
         // Navigate to the appropriate route
