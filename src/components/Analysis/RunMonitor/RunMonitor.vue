@@ -1611,7 +1611,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       store.dispatch("analysisModule/fetchTargetTypes"),
-      store.dispatch("analysisModule/fetchApplications", { force: true }),
+      store.dispatch("analysisModule/fetchApplications"),
       fetchOrgCounters(),
     ]);
   } catch (err) {
