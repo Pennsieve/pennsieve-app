@@ -222,6 +222,33 @@ const runName = computed(() => {
 });
 
 /*
+  Interactive (Jupyter) session entry point. A run is offered a notebook when its
+  DAG contains an interactive processor and the run is still active (the step
+  pauses the workflow while the user works). The connect endpoint is the source
+  of truth — the notebook page handles "still starting" / "no session" itself.
+*/
+const interactiveProcessor = computed(() => {
+  const dag = selectedWorkflowActivity.value?.dag || [];
+  return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
+});
+
+const interactiveSessionAvailable = computed(() => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || !interactiveProcessor.value) return false;
+  return !isTerminalStatus(activity.status);
+});
+
+const openNotebook = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid) return;
+  const href = router.resolve({
+    name: "notebook-session",
+    params: { orgId: route.params.orgId, runId: activity.uuid },
+  }).href;
+  window.open(href, "_blank", "noopener");
+};
+
+/*
   In configure mode, check which data-source nodes still need files
 */
 const dataSourceNodes = computed(() => {
@@ -1205,6 +1232,9 @@ onUnmounted(() => {
           <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
+        <div v-if="interactiveSessionAvailable" class="header-actions">
+          <bf-button class="primary" @click="openNotebook">Open Notebook</bf-button>
+        </div>
       </template>
     </div>
 

@@ -138,6 +138,7 @@ const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityM
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
+const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
@@ -179,6 +180,16 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
+    },
+    {
+      // Dedicated full-screen interactive notebook for a workflow run (opened in
+      // its own tab from the run detail view). No app navigation chrome.
+      name: "notebook-session",
+      path: "/:orgId/analysis/runs/:runId/notebook",
+      components: {
+        page: NotebookSession,
+      },
+      props: { page: true },
     },
     {
       name: 'my-workspace',
