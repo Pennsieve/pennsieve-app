@@ -458,17 +458,17 @@ async function confirmDestroyNode() {
   }
 }
 
-// GPU Configuration editing
+// Node capability config editing (LLM, GPU, interactive — one edit group)
 const currentGpuTierInfo = computed(() => {
   const tier = computeNode.value?.gpuTier
   if (!tier || !availableGpuTiers.value.length) return null
   return availableGpuTiers.value.find(t => t.tier === tier)
 })
 
-const isEditingGpu = ref(false)
-const isUpdatingGpu = ref(false)
+const isEditingConfig = ref(false)
+const isUpdatingConfig = ref(false)
 const availableGpuTiers = ref([])
-const gpuForm = ref({
+const configForm = ref({
   enableLLMAccess: false,
   enableGpu: false,
   gpuTier: 'small',
@@ -477,8 +477,8 @@ const gpuForm = ref({
   maxInteractiveSessions: 2
 })
 
-async function startEditingGpu() {
-  gpuForm.value = {
+async function startEditingConfig() {
+  configForm.value = {
     enableLLMAccess: !!computeNode.value?.enableLLMAccess,
     enableGpu: (computeNode.value?.maxGpuInstances || 0) > 0,
     gpuTier: computeNode.value?.gpuTier || 'small',
@@ -486,7 +486,7 @@ async function startEditingGpu() {
     enableInteractive: (computeNode.value?.maxInteractiveSessions || 0) > 0,
     maxInteractiveSessions: computeNode.value?.maxInteractiveSessions || 2
   }
-  isEditingGpu.value = true
+  isEditingConfig.value = true
   try {
     const tiers = await computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id)
     availableGpuTiers.value = tiers || []
@@ -495,28 +495,28 @@ async function startEditingGpu() {
   }
 }
 
-function cancelEditingGpu() {
-  isEditingGpu.value = false
-  gpuForm.value = { enableLLMAccess: false, enableGpu: false, gpuTier: 'small', maxGpuInstances: 2, enableInteractive: false, maxInteractiveSessions: 2 }
+function cancelEditingConfig() {
+  isEditingConfig.value = false
+  configForm.value = { enableLLMAccess: false, enableGpu: false, gpuTier: 'small', maxGpuInstances: 2, enableInteractive: false, maxInteractiveSessions: 2 }
 }
 
-async function saveGpuConfig() {
-  isUpdatingGpu.value = true
+async function saveConfig() {
+  isUpdatingConfig.value = true
   try {
     await computeResourcesStore.updateComputeNodeConfig(nodeUuid.value, {
-      enableLLMAccess: gpuForm.value.enableLLMAccess,
-      maxGpuInstances: gpuForm.value.enableGpu ? gpuForm.value.maxGpuInstances : 0,
-      gpuTier: gpuForm.value.enableGpu ? gpuForm.value.gpuTier : 'small',
-      maxInteractiveSessions: gpuForm.value.enableInteractive ? gpuForm.value.maxInteractiveSessions : 0
+      enableLLMAccess: configForm.value.enableLLMAccess,
+      maxGpuInstances: configForm.value.enableGpu ? configForm.value.maxGpuInstances : 0,
+      gpuTier: configForm.value.enableGpu ? configForm.value.gpuTier : 'small',
+      maxInteractiveSessions: configForm.value.enableInteractive ? configForm.value.maxInteractiveSessions : 0
     })
     await fetchComputeNode()
-    ElMessage.success('GPU configuration updated')
-    isEditingGpu.value = false
+    ElMessage.success('Configuration updated')
+    isEditingConfig.value = false
   } catch (error) {
-    console.error('Failed to update GPU config:', error)
-    ElMessage.error('Failed to update GPU configuration')
+    console.error('Failed to update node config:', error)
+    ElMessage.error('Failed to update configuration')
   } finally {
-    isUpdatingGpu.value = false
+    isUpdatingConfig.value = false
   }
 }
 
@@ -707,19 +707,19 @@ async function saveGpuConfig() {
         </div>
       </div>
 
-      <!-- Accelerators Section -->
+      <!-- Capabilities Section (LLM, GPU, interactive) -->
       <div class="management-section" v-if="canManagePermissions">
         <div class="section-header">
-          <h2>Accelerators</h2>
+          <h2>Capabilities</h2>
           <div class="section-actions">
-            <template v-if="!isEditingGpu">
-              <button class="processor-edit-button" @click="startEditingGpu">Update</button>
+            <template v-if="!isEditingConfig">
+              <button class="processor-edit-button" @click="startEditingConfig">Update</button>
             </template>
             <template v-else>
-              <button class="processor-edit-button" :disabled="isUpdatingGpu" @click="saveGpuConfig">
-                {{ isUpdatingGpu ? 'Updating...' : 'Update' }}
+              <button class="processor-edit-button" :disabled="isUpdatingConfig" @click="saveConfig">
+                {{ isUpdatingConfig ? 'Updating...' : 'Update' }}
               </button>
-              <button class="processor-cancel-button" @click="cancelEditingGpu">Cancel</button>
+              <button class="processor-cancel-button" @click="cancelEditingConfig">Cancel</button>
             </template>
           </div>
         </div>
@@ -727,7 +727,7 @@ async function saveGpuConfig() {
           <div class="info-row">
             <span class="info-label">LLM Access:</span>
             <span class="info-value">
-              <template v-if="!isEditingGpu">
+              <template v-if="!isEditingConfig">
                 <span class="deployment-mode-detail">
                   <span class="mode-header">
                     <span v-if="computeNode.enableLLMAccess" class="tag llm">Enabled</span>
@@ -741,13 +741,13 @@ async function saveGpuConfig() {
                   </span>
                 </span>
               </template>
-              <el-switch v-else v-model="gpuForm.enableLLMAccess" />
+              <el-switch v-else v-model="configForm.enableLLMAccess" />
             </span>
           </div>
           <div class="info-row">
             <span class="info-label">GPU Support:</span>
             <span class="info-value">
-              <template v-if="!isEditingGpu">
+              <template v-if="!isEditingConfig">
                 <span class="deployment-mode-detail">
                   <span class="mode-header">
                     <span v-if="computeNode.maxGpuInstances > 0" class="tag gpu">Enabled</span>
@@ -761,10 +761,10 @@ async function saveGpuConfig() {
                   </span>
                 </span>
               </template>
-              <el-switch v-else v-model="gpuForm.enableGpu" />
+              <el-switch v-else v-model="configForm.enableGpu" />
             </span>
           </div>
-          <template v-if="!isEditingGpu && computeNode.maxGpuInstances > 0">
+          <template v-if="!isEditingConfig && computeNode.maxGpuInstances > 0">
             <div class="info-row">
               <span class="info-label">GPU Tier:</span>
               <span class="info-value">
@@ -779,11 +779,11 @@ async function saveGpuConfig() {
               <span class="info-value">{{ computeNode.maxGpuInstances }}</span>
             </div>
           </template>
-          <template v-if="isEditingGpu && gpuForm.enableGpu">
+          <template v-if="isEditingConfig && configForm.enableGpu">
             <div class="info-row">
               <span class="info-label">GPU Tier:</span>
               <span class="info-value">
-                <el-select v-model="gpuForm.gpuTier" size="default" style="width: 200px">
+                <el-select v-model="configForm.gpuTier" size="default" style="width: 200px">
                   <el-option
                     v-for="tier in availableGpuTiers"
                     :key="tier.tier"
@@ -796,14 +796,14 @@ async function saveGpuConfig() {
             <div class="info-row">
               <span class="info-label">Max Instances:</span>
               <span class="info-value">
-                <el-input-number v-model="gpuForm.maxGpuInstances" :min="1" :max="10" size="default" />
+                <el-input-number v-model="configForm.maxGpuInstances" :min="1" :max="10" size="default" />
               </span>
             </div>
           </template>
           <div class="info-row">
             <span class="info-label">Interactive Notebooks:</span>
             <span class="info-value">
-              <template v-if="!isEditingGpu">
+              <template v-if="!isEditingConfig">
                 <span class="deployment-mode-detail">
                   <span class="mode-header">
                     <span v-if="computeNode.maxInteractiveSessions > 0" class="tag gpu">Enabled</span>
@@ -817,20 +817,20 @@ async function saveGpuConfig() {
                   </span>
                 </span>
               </template>
-              <el-switch v-else v-model="gpuForm.enableInteractive" />
+              <el-switch v-else v-model="configForm.enableInteractive" />
             </span>
           </div>
-          <template v-if="!isEditingGpu && computeNode.maxInteractiveSessions > 0">
+          <template v-if="!isEditingConfig && computeNode.maxInteractiveSessions > 0">
             <div class="info-row">
               <span class="info-label">Max Sessions:</span>
               <span class="info-value">{{ computeNode.maxInteractiveSessions }}</span>
             </div>
           </template>
-          <template v-if="isEditingGpu && gpuForm.enableInteractive">
+          <template v-if="isEditingConfig && configForm.enableInteractive">
             <div class="info-row">
               <span class="info-label">Max Sessions:</span>
               <span class="info-value">
-                <el-input-number v-model="gpuForm.maxInteractiveSessions" :min="1" :max="50" size="default" />
+                <el-input-number v-model="configForm.maxInteractiveSessions" :min="1" :max="50" size="default" />
               </span>
             </div>
           </template>

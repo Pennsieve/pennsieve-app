@@ -29,7 +29,7 @@ const steps = [
   { title: 'Basics' },
   { title: 'Infrastructure' },
   { title: 'AI Access' },
-  { title: 'GPU' }
+  { title: 'Capabilities' }
 ]
 
 // Form data
@@ -617,11 +617,11 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Step 4: GPU -->
+      <!-- Step 4: Compute Capabilities (GPU + interactive) -->
       <div v-show="currentStep === 4" class="step-panel">
         <div class="step-header">
-          <h3 class="step-title">GPU Compute</h3>
-          <p class="step-description">Enable GPU instances for workloads that require hardware acceleration (ML inference, training, etc.).</p>
+          <h3 class="step-title">Compute Capabilities</h3>
+          <p class="step-description">Optional add-ons for this node: GPU instances for hardware-accelerated workloads, and interactive Jupyter notebook sessions in workflows.</p>
         </div>
 
         <div class="form-section">
