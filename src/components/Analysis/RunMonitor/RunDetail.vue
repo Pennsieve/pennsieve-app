@@ -612,6 +612,20 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
           memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
+          // Interactive (Jupyter) override. Seeded from the run/definition/app if
+          // already declared (forward-compatible once the app registry +
+          // workflow-service carry it); otherwise off, and the user can toggle it
+          // here so the run launches an interactive session.
+          interactive:
+            srcCfg?.interactive ??
+            d.runtimeConfig?.interactive ??
+            matchedApp?.runtimeConfig?.interactive ??
+            false,
+          sessionType:
+            srcCfg?.sessionType ||
+            d.runtimeConfig?.sessionType ||
+            matchedApp?.runtimeConfig?.sessionType ||
+            "jupyter",
           schemaParams,
           extraParams,
         };
@@ -724,6 +738,12 @@ const executeWorkflow = async () => {
         if (cfg.version) entry.version = cfg.version;
         if (cfg.cpu) entry.cpu = cfg.cpu;
         if (cfg.memory) entry.memory = cfg.memory;
+        // Interactive (Jupyter) override → workflow-service applies it to the run
+        // DAG node's runtimeConfig (interactive waitForTaskToken step).
+        if (cfg.interactive) {
+          entry.interactive = true;
+          entry.sessionType = cfg.sessionType || "jupyter";
+        }
         processorConfigs.push(entry);
       }
     });
@@ -1435,6 +1455,13 @@ onUnmounted(() => {
                       :value="ct"
                     />
                   </el-select>
+                </div>
+                <div class="config-field">
+                  <label>Interactive Notebook</label>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <el-switch v-model="nodeConfigs[selectedNode.id].interactive" />
+                    <span class="version-hint">Run this step as a live Jupyter notebook — the workflow pauses until you close the session.</span>
+                  </div>
                 </div>
                 <div class="config-field">
                   <label>Version</label>
