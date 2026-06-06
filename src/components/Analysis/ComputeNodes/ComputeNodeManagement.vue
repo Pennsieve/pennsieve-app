@@ -472,7 +472,9 @@ const gpuForm = ref({
   enableLLMAccess: false,
   enableGpu: false,
   gpuTier: 'small',
-  maxGpuInstances: 2
+  maxGpuInstances: 2,
+  enableInteractive: false,
+  maxInteractiveSessions: 2
 })
 
 async function startEditingGpu() {
@@ -480,7 +482,9 @@ async function startEditingGpu() {
     enableLLMAccess: !!computeNode.value?.enableLLMAccess,
     enableGpu: (computeNode.value?.maxGpuInstances || 0) > 0,
     gpuTier: computeNode.value?.gpuTier || 'small',
-    maxGpuInstances: computeNode.value?.maxGpuInstances || 2
+    maxGpuInstances: computeNode.value?.maxGpuInstances || 2,
+    enableInteractive: (computeNode.value?.maxInteractiveSessions || 0) > 0,
+    maxInteractiveSessions: computeNode.value?.maxInteractiveSessions || 2
   }
   isEditingGpu.value = true
   try {
@@ -493,7 +497,7 @@ async function startEditingGpu() {
 
 function cancelEditingGpu() {
   isEditingGpu.value = false
-  gpuForm.value = { enableLLMAccess: false, enableGpu: false, gpuTier: 'small', maxGpuInstances: 2 }
+  gpuForm.value = { enableLLMAccess: false, enableGpu: false, gpuTier: 'small', maxGpuInstances: 2, enableInteractive: false, maxInteractiveSessions: 2 }
 }
 
 async function saveGpuConfig() {
@@ -502,7 +506,8 @@ async function saveGpuConfig() {
     await computeResourcesStore.updateComputeNodeConfig(nodeUuid.value, {
       enableLLMAccess: gpuForm.value.enableLLMAccess,
       maxGpuInstances: gpuForm.value.enableGpu ? gpuForm.value.maxGpuInstances : 0,
-      gpuTier: gpuForm.value.enableGpu ? gpuForm.value.gpuTier : 'small'
+      gpuTier: gpuForm.value.enableGpu ? gpuForm.value.gpuTier : 'small',
+      maxInteractiveSessions: gpuForm.value.enableInteractive ? gpuForm.value.maxInteractiveSessions : 0
     })
     await fetchComputeNode()
     ElMessage.success('GPU configuration updated')
@@ -792,6 +797,40 @@ async function saveGpuConfig() {
               <span class="info-label">Max Instances:</span>
               <span class="info-value">
                 <el-input-number v-model="gpuForm.maxGpuInstances" :min="1" :max="10" size="default" />
+              </span>
+            </div>
+          </template>
+          <div class="info-row">
+            <span class="info-label">Interactive Notebooks:</span>
+            <span class="info-value">
+              <template v-if="!isEditingGpu">
+                <span class="deployment-mode-detail">
+                  <span class="mode-header">
+                    <span v-if="computeNode.maxInteractiveSessions > 0" class="tag gpu">Enabled</span>
+                    <span v-else class="tag disabled">Disabled</span>
+                  </span>
+                  <span class="mode-explanation" v-if="computeNode.maxInteractiveSessions > 0">
+                    Workflows on this node can include interactive Jupyter notebook steps.
+                  </span>
+                  <span class="mode-explanation" v-else>
+                    Interactive notebook sessions are not enabled on this node.
+                  </span>
+                </span>
+              </template>
+              <el-switch v-else v-model="gpuForm.enableInteractive" />
+            </span>
+          </div>
+          <template v-if="!isEditingGpu && computeNode.maxInteractiveSessions > 0">
+            <div class="info-row">
+              <span class="info-label">Max Sessions:</span>
+              <span class="info-value">{{ computeNode.maxInteractiveSessions }}</span>
+            </div>
+          </template>
+          <template v-if="isEditingGpu && gpuForm.enableInteractive">
+            <div class="info-row">
+              <span class="info-label">Max Sessions:</span>
+              <span class="info-value">
+                <el-input-number v-model="gpuForm.maxInteractiveSessions" :min="1" :max="50" size="default" />
               </span>
             </div>
           </template>
