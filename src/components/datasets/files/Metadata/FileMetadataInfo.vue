@@ -387,21 +387,6 @@ export default {
 
 
     /**
-     * Group connected records by model
-     * @returns {Object} Records grouped by model_id
-     */
-    groupedRecords() {
-      const grouped = {};
-      this.connectedRecords.forEach(record => {
-        if (!grouped[record.model_id]) {
-          grouped[record.model_id] = [];
-        }
-        grouped[record.model_id].push(record);
-      });
-      return grouped;
-    },
-
-    /**
      * Get display name for a model
      * @param {String} modelId - The model ID
      * @returns {String} Model display name
