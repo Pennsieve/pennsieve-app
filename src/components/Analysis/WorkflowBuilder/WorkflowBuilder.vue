@@ -9,15 +9,17 @@ import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import dagre from "@dagrejs/dagre";
+import { ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconPencil from "../../icons/IconPencil.vue";
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import {
-  FARGATE_CPU_OPTIONS,
-  getMemoryOptionsForCpu,
+  STANDARD_CPU_OPTIONS,
+  getStandardMemoryOptions,
   LAMBDA_MEMORY_OPTIONS,
   getCpuForMemory,
   formatResourceLabel,
@@ -226,13 +228,31 @@ const getUserName = (userId) => {
     : String(userId);
 };
 
+const DEFAULT_COMPUTE_TYPES = ["standard", "lambda", "gpu"];
+
+// Display label for a compute type; "gpu" should read as "GPU", others Title-cased.
+const formatComputeTypeLabel = (ct) => {
+  if (!ct) return "";
+  if (ct === "gpu") return "GPU";
+  return ct.charAt(0).toUpperCase() + ct.slice(1);
+};
+
+// Ensure "gpu" is always selectable, even when the API-supplied list omits it.
+const withGpu = (types) =>
+  types.includes("gpu") ? types : [...types, "gpu"];
+
 const getComputeTypesForTarget = (targetType) => {
-  if (!targetType) return ["standard", "lambda"];
+  if (!targetType) return DEFAULT_COMPUTE_TYPES;
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   // TODO: use API-driven computeTypes once target types return them reliably
-  // return tt?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+  // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? types : ["standard", "lambda"];
+  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+};
+
+const getComputeTypesForApplication = (application) => {
+  const types = application?.runtimeConfig?.computeTypes;
+  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -514,6 +534,79 @@ const toggleArchive = async () => {
   } catch {
     EventBus.$emit("toast", {
       detail: { type: "error", msg: "Failed to update workflow status." },
+    });
+  }
+};
+
+/*
+Visibility (public / private)
+*/
+const isSuperAdmin = computed(() => store.getters.isSuperAdmin === true);
+
+const isWorkflowCreator = computed(() => {
+  const wf = selectedWorkflow.value;
+  if (!wf || !profile.value) return false;
+  return (
+    profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
+  );
+});
+
+const isPublicWorkflow = computed(
+  () => selectedWorkflow.value?.visibility === "public",
+);
+
+// Only the creator may publish. The creator or a super-admin (moderation) may
+// unpublish — mirrors the workflow-service authorization rules.
+const canPublish = computed(
+  () => !isPublicWorkflow.value && isWorkflowCreator.value,
+);
+const canUnpublish = computed(
+  () => isPublicWorkflow.value && (isWorkflowCreator.value || isSuperAdmin.value),
+);
+
+const togglePublish = async () => {
+  if (!selectedWorkflow.value) return;
+  const wf = selectedWorkflow.value;
+  const goingPublic = !isPublicWorkflow.value;
+
+  try {
+    await ElMessageBox.confirm(
+      goingPublic
+        ? `Publishing "${wf.name}" makes it discoverable and runnable by anyone across all organizations. Every processor must itself be a public application.`
+        : `Unpublishing "${wf.name}" reverts it to private. It will no longer be discoverable by other users and any "Official" badge will be removed.`,
+      goingPublic ? "Publish workflow" : "Unpublish workflow",
+      {
+        confirmButtonText: goingPublic ? "Publish" : "Unpublish",
+        cancelButtonText: "Cancel",
+        type: "warning",
+      },
+    );
+  } catch {
+    return; // user cancelled
+  }
+
+  try {
+    const action = goingPublic ? "publishWorkflow" : "unpublishWorkflow";
+    const updated = await store.dispatch(`analysisModule/${action}`, {
+      uuid: wf.uuid,
+    });
+    selectedWorkflow.value = {
+      ...wf,
+      visibility: updated?.visibility ?? (goingPublic ? "public" : ""),
+      official: updated?.official ?? false,
+    };
+    EventBus.$emit("toast", {
+      detail: {
+        type: "success",
+        msg: goingPublic ? "Workflow published." : "Workflow unpublished.",
+      },
+    });
+  } catch (err) {
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: err?.message || "Failed to update workflow visibility.",
+      },
     });
   }
 };
@@ -1298,7 +1391,7 @@ const openNodeSettings = (id) => {
                           selectedNode.data.targetType,
                         )"
                         :key="ct"
-                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :label="formatComputeTypeLabel(ct)"
                         :value="ct"
                       />
                     </el-select>
@@ -1432,12 +1525,11 @@ const openNodeSettings = (id) => {
                     >
                       <!-- TODO: use API-driven computeTypes once applications return them reliably -->
                       <el-option
-                        v-for="ct in (selectedNode.data.application
-                          ?.runtimeConfig?.computeTypes?.length
-                          ? selectedNode.data.application.runtimeConfig.computeTypes
-                          : ['standard', 'lambda'])"
+                        v-for="ct in getComputeTypesForApplication(
+                          selectedNode.data.application,
+                        )"
                         :key="ct"
-                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :label="formatComputeTypeLabel(ct)"
                         :value="ct"
                       />
                     </el-select>
@@ -1459,12 +1551,10 @@ const openNodeSettings = (id) => {
                         "
                       >
                         <el-option
-                          v-for="cpu in FARGATE_CPU_OPTIONS"
-                          :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(
-                            cpu >= 1024 ? 0 : 2,
-                          )} vCPU)`"
-                          :value="cpu"
+                          v-for="opt in STANDARD_CPU_OPTIONS"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
@@ -1473,18 +1563,18 @@ const openNodeSettings = (id) => {
                       <el-select
                         v-model="selectedNode.data.memory"
                         size="small"
-                        placeholder="Default"
+                        placeholder="Select CPU before Memory"
                         clearable
                         :disabled="!selectedNode.data.cpu"
                         class="info-inline-select"
                       >
                         <el-option
-                          v-for="mem in getMemoryOptionsForCpu(
+                          v-for="opt in getStandardMemoryOptions(
                             selectedNode.data.cpu,
                           )"
-                          :key="mem"
-                          :label="formatResourceLabel(mem)"
-                          :value="mem"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
                         />
                       </el-select>
                     </div>
@@ -1493,21 +1583,9 @@ const openNodeSettings = (id) => {
                   <template v-else>
                     <div class="info-row">
                       <span class="info-label">CPU</span>
-                      <el-select
-                        v-model="selectedNode.data.cpu"
-                        size="small"
-                        disabled
-                        class="info-inline-select"
-                      >
-                        <el-option
-                          v-for="cpu in FARGATE_CPU_OPTIONS"
-                          :key="cpu"
-                          :label="`${cpu} (${(cpu / 1024).toFixed(
-                            cpu >= 1024 ? 0 : 2,
-                          )} vCPU)`"
-                          :value="cpu"
-                        />
-                      </el-select>
+                      <span class="info-auto-value">
+                        Set automatically
+                      </span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">Memory</span>
@@ -1532,8 +1610,9 @@ const openNodeSettings = (id) => {
                       </el-select>
                     </div>
                     <p class="runtime-note">
-                      Lambda allocates CPU proportionally to memory. CPU and
-                      Fargate memory settings are only applied if the run is
+                      Lambda sizes CPU automatically in proportion to the
+                      memory you choose — there's no CPU to set here. The
+                      Fargate CPU/memory values only apply if the run is
                       overridden to execute as a standard processor.
                     </p>
                   </template>
@@ -1781,6 +1860,30 @@ const openNodeSettings = (id) => {
                     </span>
                   </div>
                   <div class="info-row">
+                    <span class="info-label">Visibility</span>
+                    <span class="info-value">
+                      <span
+                        class="visibility-badge"
+                        :class="isPublicWorkflow ? 'public' : 'private'"
+                      >
+                        {{ isPublicWorkflow ? "Public" : "Private" }}
+                      </span>
+                      <el-tooltip
+                        v-if="selectedWorkflow.official"
+                        content="This workflow has been reviewed and validated by Pennsieve."
+                        placement="top"
+                      >
+                        <span class="official-mark">
+                          <IconPennsieveMark
+                            :width="15"
+                            :height="15"
+                            color="currentColor"
+                          />
+                        </span>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                  <div class="info-row">
                     <span class="info-label">Nodes</span>
                     <span class="info-value">{{
                       (selectedWorkflow.dag || []).length
@@ -1802,16 +1905,6 @@ const openNodeSettings = (id) => {
                 <div class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
                     Edit name & description
-                  </button>
-                  <button
-                    class="text-link-btn archive-btn"
-                    @click="toggleArchive"
-                  >
-                    {{
-                      selectedWorkflow.isActive
-                        ? "Archive workflow"
-                        : "Activate workflow"
-                    }}
                   </button>
                 </div>
               </template>
@@ -1920,6 +2013,61 @@ const openNodeSettings = (id) => {
                     </template>
                   </div>
                 </div>
+              </div>
+            </div>
+          </el-collapse-item>
+
+          <!-- Danger Zone (always last) -->
+          <el-collapse-item
+            v-if="mode === 'browse' && selectedWorkflow"
+            title="Danger Zone"
+            name="danger-zone"
+            class="danger-collapse-item"
+          >
+            <div class="danger-zone">
+              <div class="danger-row">
+                <div class="danger-info">
+                  <div class="danger-row-title">
+                    {{
+                      selectedWorkflow.isActive
+                        ? "Archive workflow"
+                        : "Activate workflow"
+                    }}
+                  </div>
+                  <p class="danger-row-desc">
+                    {{
+                      selectedWorkflow.isActive
+                        ? "Archiving hides this workflow from the active list. You can reactivate it at any time."
+                        : "Reactivate this workflow so it appears in the active list and can be run."
+                    }}
+                  </p>
+                </div>
+                <bf-button class="danger-button" @click="toggleArchive">
+                  {{ selectedWorkflow.isActive ? "Archive" : "Activate" }}
+                </bf-button>
+              </div>
+
+              <div v-if="canPublish || canUnpublish" class="danger-row">
+                <div class="danger-info">
+                  <div class="danger-row-title">
+                    {{ isPublicWorkflow ? "Make private" : "Make public" }}
+                  </div>
+                  <p class="danger-row-desc">
+                    <template v-if="isPublicWorkflow">
+                      This workflow is public — discoverable and runnable by
+                      anyone across all organizations. Making it private also
+                      removes any "Official" badge.
+                    </template>
+                    <template v-else>
+                      Publishing makes this workflow discoverable and runnable by
+                      anyone across all organizations. Every processor must
+                      itself be public.
+                    </template>
+                  </p>
+                </div>
+                <bf-button class="danger-button" @click="togglePublish">
+                  {{ isPublicWorkflow ? "Make private" : "Make public" }}
+                </bf-button>
               </div>
             </div>
           </el-collapse-item>
@@ -2785,6 +2933,14 @@ const openNodeSettings = (id) => {
   }
 }
 
+.info-auto-value {
+  width: 130px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  font-style: italic;
+  text-align: right;
+}
+
 .runtime-note {
   font-size: 11px;
   color: theme.$gray_4;
@@ -2834,9 +2990,94 @@ const openNodeSettings = (id) => {
   &:hover {
     text-decoration: underline;
   }
+}
 
-  &.archive-btn {
-    color: theme.$status_red;
+.visibility-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+
+  &.private {
+    background-color: theme.$gray_2;
+    color: theme.$gray_5;
+  }
+
+  &.public {
+    background-color: theme.$green_tint;
+    color: theme.$status_green;
+  }
+}
+
+.official-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  color: theme.$purple_3;
+  vertical-align: middle;
+}
+
+.danger-collapse-item {
+  :deep(.el-collapse-item__header) {
+    color: theme.$red_2;
+    font-weight: 600;
+  }
+}
+
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  &:not(:last-child) {
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(theme.$red_2, 0.2);
+  }
+}
+
+.danger-info {
+  flex: 1;
+}
+
+.danger-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  margin-bottom: 4px;
+}
+
+.danger-row-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.danger-button {
+  flex-shrink: 0;
+  background: theme.$white;
+  color: theme.$red_2;
+  border: 1px solid theme.$red_2;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: theme.$red_1;
+    color: theme.$white;
   }
 }
 

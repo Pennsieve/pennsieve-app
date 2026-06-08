@@ -5,6 +5,10 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import AppPermissions from "../../user/code/AppPermissions.vue";
+import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
 
 
 const props = defineProps({
@@ -54,8 +58,9 @@ const repoName = computed(
 );
 
 const visibilityLabel = computed(() => {
-  if (typeof detail.value?.isPrivate !== "boolean") return null;
-  return detail.value.isPrivate ? "Private" : "Public";
+  const visibility = detail.value?.visibility;
+  if (visibility !== "public" && visibility !== "private") return null;
+  return visibility === "private" ? "Private" : "Public";
 });
 
 const githubRepoUrl = computed(() => {
@@ -69,6 +74,17 @@ const isAppOwner = computed(() => {
   const intId = profile.value?.intId;
   return !!ownerId && (ownerId === id || ownerId === intId);
 });
+
+// Permissions only apply to private applications.
+const isPublic = computed(() => detail.value?.isPrivate === false);
+
+// Keep the local detail in sync when the archive toggle changes status.
+const onArchiveChange = (status) => {
+  if (detail.value) detail.value = { ...detail.value, status };
+};
+
+// Visibility may change via the permissions editor — reload to reflect it.
+const reloadAfterPermissions = () => loadDetail(props.uuid);
 
 const sortedVersions = computed(() => {
   const versions = detail.value?.versions || [];
@@ -190,6 +206,38 @@ const renderReadme = (markdown) => {
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
 
+// Members and teams power friendly-name resolution for the owner badge.
+// They are not always preloaded when navigating directly to this page;
+// fall back to fetching them here.
+const ensureOrgData = async () => {
+  const orgId =
+    store.state.activeOrganization?.organization?.id ||
+    store.state.profile?.preferredOrganization ||
+    store.state.organizations?.[0]?.organization?.id;
+  if (!orgId) return;
+  const needsMembers = !store.state.orgMembers?.length;
+  const needsTeams = !store.state.teams?.length;
+  if (!needsMembers && !needsTeams) return;
+  try {
+    const token = await useGetToken();
+    const base = `${store.state.config.apiUrl}/organizations/${orgId}`;
+    await Promise.all([
+      needsMembers
+        ? useSendXhr(`${base}/members?api_key=${token}`).then((r) =>
+            store.dispatch("updateOrgMembers", r)
+          )
+        : Promise.resolve(),
+      needsTeams
+        ? useSendXhr(`${base}/teams?api_key=${token}`).then((r) =>
+            store.dispatch("updateTeams", r)
+          )
+        : Promise.resolve(),
+    ]);
+  } catch (err) {
+    console.warn("Failed to load org data for application detail:", err);
+  }
+};
+
 /*
   Fetch application detail
 */
@@ -204,6 +252,7 @@ const loadDetail = async (uuid) => {
     const [detailResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
+      ensureOrgData(),
     ]);
 
     if (detailResult.status === "fulfilled") {
@@ -342,16 +391,14 @@ watch(
               </div>
             </div>
 
-            <div class="info-actions">
-              <router-link
-                :to="{
-                  name: 'published-app-details',
-                  params: { uuid: detail.uuid },
-                }"
-                class="text-link-btn"
-              >
-                Manage in My Workspace &rarr;
-              </router-link>
+            <div class="info-actions archive-actions">
+              <span class="info-label">Status</span>
+              <app-archive-toggle
+                :uuid="detail.uuid"
+                :owner-id="detail.ownerId"
+                :status="detail.status"
+                @change="onArchiveChange"
+              />
             </div>
 
           </el-collapse-item>
@@ -418,6 +465,16 @@ watch(
             />
           </el-collapse-item>
         </el-collapse>
+
+        <div class="sidebar-permissions">
+          <app-permissions
+            :uuid="detail.uuid"
+            :owner-id="detail.ownerId"
+            :is-public="isPublic"
+            :organization-id="detail.organizationId"
+            @updated="reloadAfterPermissions"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -754,6 +811,20 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.archive-actions {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.sidebar-permissions {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 16px;
+  margin-top: 12px;
 }
 
 .text-link-btn {

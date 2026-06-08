@@ -25,7 +25,8 @@ import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import {fetchAuthSession} from "aws-amplify/auth";
 import {useGetProfileAndOrg} from "@/composables/useGetProfileAndOrg";
 import {useGetToken} from "@/composables/useGetToken";
-import {curryN, find, path, pathOr, propEq, propOr} from "ramda";
+import {useGetPrimaryData} from "@/composables/useGetPrimaryData";
+import {path} from "ramda";
 import {useSendXhr} from "@/mixins/request/request_composable";
 import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
@@ -212,7 +213,7 @@ router.beforeEach(async (to, from, next) => {
                     return store.dispatch('setActiveOrgSynced')
                 })
                 .then(() => {
-                    return getPrimaryData()
+                    return useGetPrimaryData()
                 }).catch(err => {
                     console.error('Error during workspace initialization:', err)
                     EventBus.$emit('toast', {
@@ -259,7 +260,7 @@ router.beforeEach(async (to, from, next) => {
                 // Only proceed with data loading if session switch succeeded
                 await checkActiveOrg(to)
                 if (sessionSwitched) {
-                    await getPrimaryData().catch(err => {
+                    await useGetPrimaryData().catch(err => {
                         console.error('Error loading workspace data:', err)
                         EventBus.$emit('toast', {
                             detail: {
@@ -268,10 +269,6 @@ router.beforeEach(async (to, from, next) => {
                             }
                         })
                     })
-
-                    // Force-refresh applications for the new org
-                    store.dispatch('analysisModule/fetchApplications', { force: true })
-                        .catch(err => console.warn('Failed to refresh applications on org switch:', err))
                 }
             }
         }
@@ -280,7 +277,7 @@ router.beforeEach(async (to, from, next) => {
     }
 })
 
-router.afterEach((to, from) => {
+router.afterEach((to) => {
 
     // Set nav state based on routegit a
     if (topLevelRoutes.indexOf(to.name) >= 0) {
@@ -291,118 +288,6 @@ router.afterEach((to, from) => {
 })
 
 //  ------ HELPER FUNCTIONS -------
-
-// GetPrimaryData calls endpoints that return data that should always
-// be available on each page. This data is organization scoped and is
-// only renewed on reload of app.
-async function getPrimaryData() {
-
-    return useGetToken().then(async token => {
-
-        const activeOrg = store.getters.activeOrganization
-        
-        // Skip fetching primary data for guest organizations
-        if (activeOrg?.isGuest) {
-            return Promise.resolve()
-        }
-        
-        const activeOrgId = activeOrg.organization.id
-        const teamUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams?api_key=${token}`
-
-        // ==== TEAM AND PUBLISHERS =====
-        const teamAndPublishersPromise = useSendXhr(teamUrl)
-            .then(response => {
-                return store.dispatch('updateTeams', response)
-            })
-            .then(() => {
-                const publisherTeam = store.getters.publisherTeam
-                const publisherUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams/${publisherTeam.id}/members?api_key=${token}`
-                return useSendXhr(publisherUrl)
-                    .then(resp => {
-                        return store.dispatch('updatePublishers', resp)
-                    })
-            })
-
-        // ==== ORG MEMBERS =====
-        const orgMemberUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/members?api_key=${token}`
-        let orgMemberPromise
-        if (store.getters.hasFeature('sandbox_org_feature')) {
-            orgMemberPromise = Promise.resolve()
-        } else {
-            orgMemberPromise = useSendXhr(orgMemberUrl)
-                .then(resp => {
-                    const orgMembers = updateMembers(resp)
-                    store.dispatch('updateOrgMembers',orgMembers)
-                }).catch(err => console.warn('Failed to load additional data:', err))
-        }
-
-        // ==== ORG CONTRIBUTORS ====
-        const orgContributorUrl =`${siteConfig.apiUrl}/contributors?api_key=${token}`
-        const contributorPromise = useSendXhr(orgContributorUrl)
-            .then(resp => {
-                store.dispatch('setOrgContributors', resp)
-            }).catch(err => console.warn('Failed to load additional data:', err))
-
-        // ==== DATA USE AGREEMENTS ====
-        const dataUseAgreementUrl =`${siteConfig.apiUrl}/organizations/${activeOrgId}/data-use-agreements?api_key=${token}`
-        const dataUseAgreementPromise = useSendXhr(dataUseAgreementUrl)
-            .then(resp => {
-                store.dispatch('updateDataUseAgreements', resp)
-            }).catch(err => console.warn('Failed to load additional data:', err))
-
-        // ==== Dataset Statuses ====
-        const datasetStatusUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/dataset-status?api_key=${token}`
-        const datasetStatusPromise = useSendXhr(datasetStatusUrl)
-            .then(resp => {
-                store.dispatch('updateOrgDatasetStatuses', resp)
-            }).catch(err => console.warn('Failed to load additional data:', err))
-
-
-        return Promise.all(
-            [
-                teamAndPublishersPromise,
-                orgMemberPromise,
-                contributorPromise,
-                dataUseAgreementPromise,
-                datasetStatusPromise,
-            ])
-    })
-}
-
-const isInList = curryN(3, _isInList)
-
-function _isInList(member, activeOrganization, listName) {
-    const profileId = propOr(0, 'id', member)
-    const list = propOr([], listName, activeOrganization)
-    const inList =  find(propEq('id', profileId), list)
-    return Boolean(inList)
-}
-
-function getOrgRole(member, activeOrganization) {
-    const checkList = isInList(member, activeOrganization)
-    switch(true) {
-        case checkList('administrators'):
-            return 'Administrator'
-        case checkList('owners'):
-            return 'Owner'
-        default:
-            return 'Collaborator'
-    }
-}
-
-function updateMembers(users) {
-    return users.map(member => {
-        const role = getOrgRole(member, store.getters.activeOrganization)
-        let newFields = { role }
-        if (!member.storage) {
-            newFields = {
-                storage: 0,
-                role
-            }
-        }
-        return Object.assign({}, newFields, member)
-    })
-}
 
 async function checkActiveOrg(to) {
     const preferredOrgId = store.getters.profile.preferredOrganization

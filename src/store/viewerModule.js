@@ -358,24 +358,36 @@ export const actions = {
   },
 
   /**
-   * Promote a chat-scoped viewer asset to a plain dataset asset by detaching
-   * its chat session (PATCH clear_chat_session). Metadata-only: the asset's
-   * bytes never move (dataset_id is unchanged), it simply starts appearing in
-   * the dataset's asset listing and is no longer reclaimed when the chat
-   * session is deleted. Idempotent — a no-op on an already-unscoped asset.
+   * Promote a chat-scoped viewer asset by detaching its chat session
+   * (PATCH clear_chat_session). Metadata-only: the asset's bytes never move
+   * (dataset_id is unchanged); it simply starts appearing in a listing and is
+   * no longer reclaimed when the chat session is deleted. Idempotent.
+   *
+   * Where it lands depends on `packageIds`:
+   *   - Pass the source package's node id (e.g. ['N:package:…']) to attach the
+   *     figure to that package — it becomes a package-scoped asset (shows in
+   *     the package's asset listing). This is the default for figures derived
+   *     from a package.
+   *   - Pass [] (or omit) to leave it unlinked — it becomes a plain dataset
+   *     asset (shows in the dataset's asset listing).
    * @param {String} datasetId
    * @param {String} assetId
+   * @param {String[]} [packageIds] package node ids to link; [] for dataset-only
    */
-  promoteViewerAsset: async ({rootState}, { datasetId, assetId }) => {
+  promoteViewerAsset: async ({rootState}, { datasetId, assetId, packageIds }) => {
     const token = await useGetToken()
     const url = `${rootState.config.api2Url}/packages/assets/${assetId}?dataset_id=${datasetId}`
+    const body = { clear_chat_session: true }
+    if (Array.isArray(packageIds)) {
+      body.package_ids = packageIds
+    }
     const resp = await fetch(url, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ clear_chat_session: true }),
+      body: JSON.stringify(body),
     })
     if (!resp.ok) {
       throw new Error(`Failed to promote viewer asset: ${resp.status}`)

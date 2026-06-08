@@ -1,5 +1,17 @@
 import { useGetToken, useGetAllTokens } from "@/composables/useGetToken";
 
+// extractErrorMessage pulls the workflow-service `{ "message": "..." }` body off a
+// failed response, falling back to the HTTP status when none is present.
+const extractErrorMessage = async (response) => {
+  try {
+    const body = await response.json();
+    if (body?.message) return body.message;
+  } catch {
+    /* non-JSON body */
+  }
+  return `Error ${response.status}: ${response.statusText}`;
+};
+
 const initialState = () => ({
   computeNodes: [],
   computeNodesLoaded: false,
@@ -62,6 +74,13 @@ export const mutations = {
     state.deletingApplications = state.deletingApplications.filter(
       (u) => u !== uuid
     );
+  },
+  UPDATE_APPLICATION_STATUS(state, { uuid, status }) {
+    // Applications are referenced by both the master list and the
+    // categorized (pre/processor/post) lists, so mutating the object's
+    // status keeps every view in sync.
+    const application = state.applications.find((a) => a.uuid === uuid);
+    if (application) application.status = status;
   },
   UPDATE_PREPROCESSORS(state, preprocessors) {
     state.preprocessors = preprocessors;
@@ -175,6 +194,17 @@ export const mutations = {
       if (description !== undefined) workflow.description = description;
     }
   },
+  UPDATE_WORKFLOW_VISIBILITY(state, { uuid, visibility, official }) {
+    const apply = (w) => {
+      if (!w) return;
+      w.visibility = visibility;
+      if (official !== undefined) w.official = official;
+    };
+    apply(state.workflows.find((w) => w.uuid === uuid));
+    if (state.selectedWorkflow?.uuid === uuid) {
+      apply(state.selectedWorkflow);
+    }
+  },
   SET_ANALYTICS_CHANNEL(state, channel) {
     state.analyticsChannel = channel;
   },
@@ -234,7 +264,10 @@ export const actions = {
         return Promise.reject();
       });
   },
-  fetchApplications: async ({ state, commit, rootState }, { force } = {}) => {
+  fetchApplications: async (
+    { state, commit, rootState },
+    { force, includeArchived } = {}
+  ) => {
     if (!force && state.applicationsLoaded) return;
     try {
       const userToken = await useGetToken();
@@ -246,7 +279,9 @@ export const actions = {
         || rootState.profile?.preferredOrganization
         || rootState.organizations?.[0]?.organization?.id;
       if (!orgId) return;
-      const url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
+      // Archived applications are excluded by default; opt in with includeArchived.
+      let url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
+      if (includeArchived) url += `&includeArchived=true`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -526,6 +561,59 @@ export const actions = {
       throw err;
     }
   },
+  // Publish makes a workflow public (discoverable/runnable across organizations).
+  // Backend enforces creator-only and that every processor references an App
+  // Store application; surfaces those rejections via the response message.
+  publishWorkflow: async ({ commit, rootState }, { uuid }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}/publish`;
+    const userToken = await useGetToken();
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    const result = await response.json();
+    commit("UPDATE_WORKFLOW_VISIBILITY", {
+      uuid,
+      visibility: result.visibility || "public",
+      official: result.official ?? false,
+    });
+    return result;
+  },
+  // Unpublish reverts a workflow to private and clears any Official badge.
+  // Backend allows the creator or a super-admin (moderation).
+  unpublishWorkflow: async ({ commit, rootState }, { uuid }) => {
+    const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}/unpublish`;
+    const userToken = await useGetToken();
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    const result = await response.json();
+    commit("UPDATE_WORKFLOW_VISIBILITY", {
+      uuid,
+      visibility: result.visibility || "",
+      official: result.official ?? false,
+    });
+    return result;
+  },
   // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
     const url = `${rootState.config.api2Url}/applications/deploy`;
@@ -778,6 +866,38 @@ export const actions = {
       throw err;
     }
   },
+  // Partially update an app store application's lifecycle status.
+  // status is one of "active" | "archived".
+  // PATCH /applications/store/{uuid}
+  setApplicationStatus: async ({ commit, rootState }, { uuid, status }) => {
+    if (!uuid) throw new Error("Missing application uuid");
+    const url = `${rootState.config.api2Url}/applications/store/${uuid}`;
+    const userToken = await useGetToken();
+
+    try {
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        throw new Error(
+          `Error ${response.status}: ${response.statusText} - ${errorDetails}`
+        );
+      }
+
+      commit("UPDATE_APPLICATION_STATUS", { uuid, status });
+      return await response.json();
+    } catch (err) {
+      console.error("Failed to update application status:", err.message);
+      throw err;
+    }
+  },
   deleteComputeNode: async ({ commit, rootState }, computeNode) => {
     const url = `${rootState.config.api2Url}/compute-nodes/${computeNode?.uuid}`;
     const userToken = await useGetToken();
@@ -870,6 +990,10 @@ export const actions = {
       throw new Error(message);
     }
     const newRun = await resp.json();
+    // Preserve the user-supplied name on the optimistic add in case the API response omits it.
+    if (payload?.name && newRun && !newRun.name) {
+      newRun.name = payload.name;
+    }
     commit("PREPEND_WORKFLOW_INSTANCE", newRun);
     return newRun;
   },
@@ -929,12 +1053,18 @@ export const actions = {
       throw new Error(`Failed to fetch workflow definition: ${resp.status}`);
     }
   },
-  fetchWorkflows: async ({ commit, rootState }, { search, cursor, limit, status, append } = {}) => {
+  fetchWorkflows: async ({ commit, rootState }, { search, cursor, limit, status, append, visibility, official } = {}) => {
     try {
       const userToken = await useGetToken();
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-      });
+      // Public discovery lists the cross-organization catalog, so it must NOT be
+      // scoped to the active workspace. Otherwise list the active workspace.
+      const params = new URLSearchParams();
+      if (visibility === "public") {
+        params.set("visibility", "public");
+        if (official) params.set("official", "true");
+      } else {
+        params.set("organization_id", rootState.activeOrganization.organization.id);
+      }
       if (limit) params.set("limit", limit);
       if (search) params.set("search", search);
       if (cursor) params.set("cursor", cursor);

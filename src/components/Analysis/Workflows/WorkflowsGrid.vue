@@ -5,12 +5,14 @@ import { useRouter } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 
 const store = useStore();
 const router = useRouter();
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
+const scopeFilter = ref("workspace"); // "workspace" | "public"
 const pageSize = ref(10);
 const currentPage = ref(1);
 const isLoadingAll = ref(false);
@@ -27,6 +29,13 @@ const filterOptions = [
   { label: "Archived", value: "archived" },
   { label: "All", value: "all" },
 ];
+
+const scopeOptions = [
+  { label: "This workspace", value: "workspace" },
+  { label: "Public", value: "public" },
+];
+
+const isPublicScope = computed(() => scopeFilter.value === "public");
 
 const filteredWorkflows = computed(() => {
   let list = [...workflows.value];
@@ -148,12 +157,14 @@ const ALL_FETCH_CAP = 50; // hard stop at 5,000 workflows
 const fetchAllWorkflows = async () => {
   if (isLoadingAll.value) return;
   isLoadingAll.value = true;
+  const visibility = isPublicScope.value ? "public" : undefined;
   try {
     // First batch replaces, subsequent batches append.
     await store.dispatch("analysisModule/fetchWorkflows", {
       cursor: undefined,
       limit: ALL_FETCH_BATCH,
       status: getStatusParam(),
+      visibility,
       append: false,
     });
     let safety = ALL_FETCH_CAP;
@@ -162,6 +173,7 @@ const fetchAllWorkflows = async () => {
         cursor: nextCursor.value,
         limit: ALL_FETCH_BATCH,
         status: getStatusParam(),
+        visibility,
         append: true,
       });
     }
@@ -170,8 +182,9 @@ const fetchAllWorkflows = async () => {
   }
 };
 
-// Re-fetch all when status filter changes
-watch(statusFilter, () => {
+// Re-fetch all when the status or scope filter changes
+watch([statusFilter, scopeFilter], () => {
+  currentPage.value = 1;
   fetchAllWorkflows();
 });
 
@@ -211,17 +224,36 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="status-buttons">
-        <button
-          v-for="option in filterOptions"
-          :key="option.value"
-          class="filter-btn"
-          :class="{ active: statusFilter === option.value }"
-          @click="statusFilter = option.value"
-        >
-          {{ option.label }}
-        </button>
+      <div class="filter-row">
+        <div class="status-buttons scope-buttons">
+          <button
+            v-for="option in scopeOptions"
+            :key="option.value"
+            class="filter-btn"
+            :class="{ active: scopeFilter === option.value }"
+            @click="scopeFilter = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+
+        <div class="status-buttons">
+          <button
+            v-for="option in filterOptions"
+            :key="option.value"
+            class="filter-btn"
+            :class="{ active: statusFilter === option.value }"
+            @click="statusFilter = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
+
+      <p v-if="isPublicScope" class="scope-hint">
+        Public workflows published across all workspaces. They can be run from
+        any workspace; only the creator can edit or unpublish them.
+      </p>
 
       <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
         <div
@@ -258,6 +290,18 @@ onMounted(async () => {
                 <span class="tag created">
                   {{ new Date(wf.createdAt).toLocaleDateString() }}
                 </span>
+                <span v-if="wf.visibility === 'public'" class="tag public">
+                  Public
+                </span>
+                <el-tooltip
+                  v-if="wf.official"
+                  content="This workflow has been reviewed and validated by Pennsieve."
+                  placement="top"
+                >
+                  <span class="official-mark" @click.stop>
+                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
+                  </span>
+                </el-tooltip>
               </div>
             </div>
 
@@ -393,11 +437,30 @@ onMounted(async () => {
   max-width: 320px;
 }
 
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .status-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.scope-buttons {
+  padding-right: 16px;
+  border-right: 1px solid theme.$gray_2;
+}
+
+.scope-hint {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: theme.$gray_5;
+  line-height: 1.4;
 }
 
 .filter-btn {
@@ -566,7 +629,18 @@ onMounted(async () => {
       background: theme.$gray_1;
       color: theme.$gray_5;
     }
+
+    &.public {
+      background: theme.$green_tint;
+      color: theme.$status_green;
+    }
   }
+}
+
+.official-mark {
+  display: inline-flex;
+  align-items: center;
+  color: theme.$purple_3;
 }
 
 .wf-card-actions {

@@ -78,15 +78,8 @@
         <IconGitHub :width="14" :height="14" color="currentColor" />
         <span>View on GitHub</span>
       </a>
-      <router-link
-        v-if="matchedApp"
-        :to="{ name: 'published-app-details', params: { uuid: matchedApp.uuid } }"
-        class="card-action-link app-details-link"
-      >
-        View application details &rarr;
-      </router-link>
       <span
-        v-else-if="repo.publishing_to_appstore && !matchedApp"
+        v-if="repo.publishing_to_appstore && !matchedAppRaw && !hasReleases"
         class="card-action-hint"
       >
         Create Github release to add to app store
@@ -158,6 +151,13 @@ export default {
     // viewer doesn't own. Repos without a matched app keep the link.
     canShowExternalLinks() {
       return !this.isPrivateUnowned
+    },
+
+    // True when the repo already has at least one GitHub release. A repo that
+    // has been released doesn't need another release to reach the App Store,
+    // so the "create a release" hint should not be shown in that case.
+    hasReleases() {
+      return (this.repo?.content?.releases?.length || 0) > 0
     },
   },
 
@@ -350,12 +350,8 @@ export default {
   }
 }
 
-.app-details-link,
 .card-action-hint {
   margin-left: auto;
-}
-
-.card-action-hint {
   font-size: 13px;
   font-weight: 500;
   color: theme.$gray_4;
