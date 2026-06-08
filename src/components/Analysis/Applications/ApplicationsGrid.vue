@@ -241,7 +241,7 @@ const goToManifestBuilder = () => {
         </p>
         <p class="info-note">
           <strong>Configure your application's defaults.</strong>
-          Generate an <code>app.json</code> manifest with the
+          Generate an <code>app.yml</code> manifest with the
           <router-link
             :to="{ name: 'application-manifest-builder' }"
             class="info-link"
@@ -275,7 +275,7 @@ const goToManifestBuilder = () => {
             class="applications-search-input"
           />
           <el-button type="primary" @click="goToManifestBuilder">
-            Create app.json
+            Create app.yml
           </el-button>
         </div>
       </div>

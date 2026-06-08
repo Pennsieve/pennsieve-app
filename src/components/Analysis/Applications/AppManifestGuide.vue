@@ -2,73 +2,70 @@
 import { ref } from "vue";
 
 /*
-  The canonical app.json example shown in the guide. Kept as a string so it can
-  be rendered verbatim and copied to the clipboard in one click.
+  The canonical app.yml example shown in the guide. Kept as a string so it can
+  be rendered verbatim and copied to the clipboard in one click. The
+  `# yaml-language-server` directive enables schema autocomplete/validation in
+  editors such as VS Code.
 */
-const exampleManifest = `{
-  "$schema": "https://app.pennsieve.io/static/schemas/app.v1.json",
-  "schemaVersion": "1.0",
+const exampleManifest = `# yaml-language-server: $schema=https://app.pennsieve.io/static/schemas/app-manifest.v1.json
+schemaVersion: "1.0"
 
-  "name": "Spike Sorter",
-  "description": "Detects and sorts neural spikes from extracellular recordings.",
-  "applicationType": "processor",
-  "categories": ["Preprocessing", "Machine Learning"],
-  "tags": ["electrophysiology", "spike-sorting"],
+name: Spike Sorter
+description: Detects and sorts neural spikes from extracellular recordings.
+applicationType: processor
+categories:
+  - Preprocessing
+  - Machine Learning
+tags:
+  - electrophysiology
+  - spike-sorting
 
-  "runtime": {
-    "computeTypes": ["standard"],
-    "gpu": { "enabled": true, "count": 1, "type": "nvidia-t4" }
-  },
+runtime:
+  computeTypes:
+    - standard
+  gpu:
+    enabled: true
+    count: 1
+    type: nvidia-t4
 
-  "resources": {
-    "cpu": 4096,
-    "memory": 16384
-  },
+resources:
+  cpu: 4096
+  memory: 16384
 
-  "parameters": [
-    {
-      "name": "threshold",
-      "label": "Detection threshold (σ)",
-      "description": "Spike detection threshold in standard deviations.",
-      "type": "number",
-      "required": true,
-      "default": 5,
-      "min": 1,
-      "max": 20
-    },
-    {
-      "name": "sorter",
-      "label": "Sorting algorithm",
-      "type": "enum",
-      "default": "kilosort",
-      "allowedValues": ["kilosort", "mountainsort", "spykingcircus"]
-    },
-    {
-      "name": "drift_correction",
-      "label": "Enable drift correction",
-      "type": "boolean",
-      "default": true
-    }
-  ],
+parameters:
+  - name: threshold
+    label: Detection threshold (σ)
+    description: Spike detection threshold in standard deviations.
+    type: number
+    required: true
+    default: 5
+    min: 1
+    max: 20
+  - name: sorter
+    label: Sorting algorithm
+    type: enum
+    default: kilosort
+    allowedValues:
+      - kilosort
+      - mountainsort
+      - spykingcircus
+  - name: drift_correction
+    label: Enable drift correction
+    type: boolean
+    default: true
 
-  "inputs": [
-    {
-      "name": "recording",
-      "dataType": "timeseries",
-      "required": true,
-      "description": "Raw extracellular recording."
-    }
-  ],
-  "outputs": [
-    {
-      "name": "sorted_units",
-      "dataType": "package",
-      "description": "Sorted spike trains and unit metadata."
-    }
-  ]
-}`;
+inputs:
+  - name: recording
+    dataType: timeseries
+    required: true
+    description: Raw extracellular recording.
 
-const SCHEMA_URL = "https://app.pennsieve.io/static/schemas/app.v1.json";
+outputs:
+  - name: sorted_units
+    dataType: package
+    description: Sorted spike trains and unit metadata.`;
+
+const SCHEMA_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
 
 const copied = ref(false);
 
@@ -122,10 +119,10 @@ const portFields = [
 <template>
   <div class="manifest-guide">
     <header class="guide-header">
-      <h1>Application manifest (app.json)</h1>
+      <h1>Application manifest (app.yml)</h1>
       <p class="lede">
         Applications are published from a GitHub repository. Add an
-        <code>app.json</code> file to the root of your repository to declare its
+        <code>app.yml</code> file to the root of your repository to declare its
         runtime, resources, parameters, and inputs/outputs. When you publish the
         repository to the App Store, Pennsieve reads this file and uses it to
         populate the application's defaults — including the default values shown
@@ -135,19 +132,19 @@ const portFields = [
         :to="{ name: 'application-manifest-builder' }"
         class="builder-cta"
       >
-        Build your app.json with the manifest builder &rsaquo;
+        Build your app.yml with the manifest builder &rsaquo;
       </router-link>
     </header>
 
     <section class="guide-section">
-      <h2>1. Add app.json to your repository</h2>
+      <h2>1. Add app.yml to your repository</h2>
       <p>
-        Create a file named <code>app.json</code> in the root of your repository
+        Create a file named <code>app.yml</code> in the root of your repository
         and commit it. The example below is a complete, valid manifest.
       </p>
       <div class="code-block">
         <div class="code-toolbar">
-          <span class="code-filename">app.json</span>
+          <span class="code-filename">app.yml</span>
           <button class="copy-btn" type="button" @click="copyExample">
             {{ copied ? "Copied!" : "Copy" }}
           </button>
@@ -155,8 +152,9 @@ const portFields = [
         <pre><code>{{ exampleManifest }}</code></pre>
       </div>
       <p class="guide-note">
-        Add the <code>$schema</code> line shown above to get autocomplete and
-        inline validation in editors such as VS Code. The schema lives at
+        Add the <code># yaml-language-server</code> directive shown above to get
+        autocomplete and inline validation in editors such as VS Code. The schema
+        lives at
         <a :href="SCHEMA_URL" target="_blank" rel="noopener">{{ SCHEMA_URL }}</a>.
       </p>
     </section>
@@ -166,14 +164,14 @@ const portFields = [
       <p>
         From <strong>My Code</strong>, enable
         <strong>Publishing &rarr; App Store</strong> on the repository. Pennsieve
-        validates <code>app.json</code> during registration and maps it onto the
+        validates <code>app.yml</code> during registration and maps it onto the
         application: <code>resources</code> and <code>runtime</code> become the
         runtime configuration, <code>parameters</code> become the typed parameter
         schema, and <code>inputs</code>/<code>outputs</code> become the ports used
         to validate workflow connections.
       </p>
       <p class="guide-note guide-note--warn">
-        If <code>app.json</code> is missing or fails validation, the application
+        If <code>app.yml</code> is missing or fails validation, the application
         still registers, but with no declared defaults — every parameter must
         then be configured manually for each run.
       </p>

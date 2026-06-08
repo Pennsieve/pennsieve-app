@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://app.pennsieve.io/static/schemas/app.v1.json",
+  "$id": "https://app.pennsieve.io/static/schemas/app-manifest.v1.json",
   "title": "Pennsieve Application Manifest",
-  "description": "Declarative manifest (app.json) committed to an application's source repository. Pennsieve reads this file when the repository is published to the App Store to seed the application's runtime configuration, parameters, inputs/outputs, and classification.",
+  "description": "Declarative manifest (app.yml) committed to an application's source repository. Pennsieve reads this file when the repository is published to the App Store to seed the application's runtime configuration, parameters, inputs/outputs, and classification.",
   "type": "object",
   "required": ["schemaVersion", "name"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "Optional pointer to this schema for editor autocomplete and validation."
+      "description": "Optional pointer to this schema for editor autocomplete and validation. In app.yml this is normally expressed as a `# yaml-language-server: $schema=<url>` directive comment rather than a key."
     },
     "schemaVersion": {
       "const": "1.0",

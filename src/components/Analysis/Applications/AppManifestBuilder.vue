@@ -1,11 +1,14 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
 
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
 import {
   createApplicationSchema,
   buildManifest,
+  serializeManifestYaml,
+  parseManifest,
   validateParameters,
   APPLICATION_TYPES,
   MANIFEST_SCHEMA_URL,
@@ -18,7 +21,7 @@ const router = useRouter();
   ----------
   `meta` holds the top-level manifest fields; `schema` is the editable
   ApplicationSchema the embedded editor binds to. buildManifest() merges the
-  two into the app.json the author commits to their repository.
+  two into the app.yml the author commits to their repository.
 */
 const meta = reactive({
   name: "",
@@ -32,7 +35,15 @@ const schema = ref(createApplicationSchema());
   Derived manifest + live preview
 */
 const manifest = computed(() => buildManifest(schema.value, meta));
-const manifestJson = computed(() => JSON.stringify(manifest.value, null, 2));
+
+/*
+  YAML preview — the exact app.yml the author commits. Serialization (including
+  the yaml-language-server directive) lives in the schema module so the builder
+  and any consumer stay in lock-step.
+*/
+const manifestYaml = computed(() =>
+  serializeManifestYaml(schema.value, meta),
+);
 
 /*
   Validation — surfaced inline; never blocks copy/download (an author may want
@@ -47,13 +58,41 @@ const validation = computed(() => {
 });
 
 /*
+  Import — load an existing app.yml back into the form. Parses the YAML through
+  the schema module (the same path a consumer uses) and repopulates both the
+  top-level metadata and the editable schema.
+*/
+const fileInput = ref(null);
+
+const openImport = () => fileInput.value?.click();
+
+const importManifest = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const { meta: parsedMeta, schema: parsedSchema } = parseManifest(text);
+    meta.name = parsedMeta.name;
+    meta.description = parsedMeta.description;
+    meta.applicationType = parsedMeta.applicationType;
+    schema.value = parsedSchema;
+    ElMessage.success(`Loaded ${file.name}`);
+  } catch (e) {
+    ElMessage.error("Could not parse that file as a valid app.yml manifest.");
+  } finally {
+    // Reset so selecting the same file again re-triggers the change event.
+    event.target.value = "";
+  }
+};
+
+/*
   Actions
 */
 const copied = ref(false);
 
 const copyManifest = async () => {
   try {
-    await navigator.clipboard.writeText(manifestJson.value);
+    await navigator.clipboard.writeText(manifestYaml.value);
     copied.value = true;
     setTimeout(() => (copied.value = false), 2000);
   } catch (e) {
@@ -62,11 +101,11 @@ const copyManifest = async () => {
 };
 
 const downloadManifest = () => {
-  const blob = new Blob([manifestJson.value], { type: "application/json" });
+  const blob = new Blob([manifestYaml.value], { type: "text/yaml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "app.json";
+  a.download = "app.yml";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -82,7 +121,7 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
       <div>
         <h1>Create an application manifest</h1>
         <p class="lede">
-          Fill in the form to generate an <code>app.json</code> manifest, then
+          Fill in the form to generate an <code>app.yml</code> manifest, then
           add the file to the root of your application's GitHub repository. When
           the repository is published to the App Store, Pennsieve reads this
           manifest to configure the application's runtime, resources, and
@@ -91,6 +130,16 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
             Read the manifest guide &rsaquo;
           </a>
         </p>
+      </div>
+      <div class="builder-header-actions">
+        <el-button @click="openImport">Import app.yml</el-button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".yml,.yaml,application/x-yaml,text/yaml"
+          class="hidden-file-input"
+          @change="importManifest"
+        />
       </div>
     </header>
 
@@ -142,7 +191,7 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
       <aside class="builder-preview">
         <div class="preview-card">
           <div class="preview-toolbar">
-            <span class="preview-filename">app.json</span>
+            <span class="preview-filename">app.yml</span>
             <div class="preview-actions">
               <el-button size="small" text @click="copyManifest">
                 {{ copied ? "Copied!" : "Copy" }}
@@ -166,12 +215,12 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
             </ul>
           </div>
 
-          <pre class="preview-code"><code>{{ manifestJson }}</code></pre>
+          <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
 
           <p class="preview-footnote">
             Validated against
             <a :href="MANIFEST_SCHEMA_URL" target="_blank" rel="noopener">
-              app.v1.json
+              app-manifest.v1.json
             </a>
           </p>
         </div>
@@ -191,6 +240,10 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
 
 .builder-header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
 
   h1 {
     font-size: 24px;
@@ -211,6 +264,14 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
     color: theme.$purple_1;
     white-space: nowrap;
   }
+}
+
+.builder-header-actions {
+  flex: 0 0 auto;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .builder-body {

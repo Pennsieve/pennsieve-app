@@ -14,6 +14,9 @@ import {
   arePortsCompatible,
   validateAppConnection,
   buildManifest,
+  manifestToYaml,
+  serializeManifestYaml,
+  parseManifest,
   createPort,
   MANIFEST_SCHEMA_URL,
 } from './applicationSchema'
@@ -281,6 +284,117 @@ describe('applicationSchema', () => {
       schema.runtime.gpu = { enabled: true, count: 2, type: 'nvidia-t4' }
       const on = buildManifest(schema, { name: 'X' })
       expect(on.runtime.gpu).toEqual({ enabled: true, count: 2, type: 'nvidia-t4' })
+    })
+  })
+
+  describe('manifestToYaml', () => {
+    it('emits $schema as a yaml-language-server directive, not a data key', () => {
+      const yaml = manifestToYaml(buildManifest(createApplicationSchema(), { name: 'X' }))
+      expect(yaml.startsWith(`# yaml-language-server: $schema=${MANIFEST_SCHEMA_URL}\n`)).toBe(true)
+      expect(yaml).not.toMatch(/^\$schema:/m)
+      expect(yaml).toMatch(/^name: X$/m)
+    })
+  })
+
+  describe('parseManifest (round-trip)', () => {
+    it('parses YAML text back into meta + editable schema', () => {
+      const yaml = [
+        'schemaVersion: "1.0"',
+        'name: Spike Sorter',
+        'description: Sorts spikes.',
+        'applicationType: preprocessor',
+        'categories:',
+        '  - Preprocessing',
+        'runtime:',
+        '  computeTypes:',
+        '    - standard',
+        '  gpu:',
+        '    enabled: true',
+        '    count: 2',
+        '    type: nvidia-t4',
+        'resources:',
+        '  cpu: 4096',
+        '  memory: 16384',
+        'parameters:',
+        '  - name: threshold',
+        '    type: number',
+        '    required: true',
+        '    default: 5',
+        '    min: 1',
+        '    max: 20',
+        'inputs:',
+        '  - name: recording',
+        '    dataType: timeseries',
+        '    required: true',
+      ].join('\n')
+
+      const { meta, schema } = parseManifest(yaml)
+      expect(meta).toEqual({
+        name: 'Spike Sorter',
+        description: 'Sorts spikes.',
+        applicationType: 'preprocessor',
+      })
+      expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
+      expect(schema.runtime.computeTypes).toEqual(['standard'])
+      expect(schema.runtime.gpu).toMatchObject({ enabled: true, count: 2, type: 'nvidia-t4' })
+      expect(schema.categories).toEqual(['Preprocessing'])
+      // Manifest `default` maps back onto the editable `defaultValue`.
+      expect(schema.parameters[0]).toMatchObject({
+        name: 'threshold',
+        type: 'number',
+        required: true,
+        defaultValue: 5,
+        min: 1,
+        max: 20,
+      })
+      expect(schema.inputs[0]).toMatchObject({
+        name: 'recording',
+        dataType: 'timeseries',
+        required: true,
+      })
+    })
+
+    it('round-trips serialize -> parse without loss of meaningful fields', () => {
+      const original = createApplicationSchema({
+        resources: { cpu: 2048, memory: 8192 },
+        runtime: {
+          computeTypes: ['standard'],
+          gpu: { enabled: true, count: 1, type: 'nvidia-t4' },
+        },
+        parameters: [
+          createParameter({
+            name: 'sorter',
+            type: PARAM_TYPES.ENUM,
+            defaultValue: 'kilosort',
+            allowedValues: ['kilosort', 'mountainsort'],
+          }),
+        ],
+        inputs: [createPort({ name: 'recording', dataType: 'timeseries', required: true })],
+        outputs: [createPort({ name: 'units', dataType: 'package' })],
+        tags: ['ephys'],
+        categories: ['Preprocessing'],
+      })
+      const meta = { name: 'Spike Sorter', description: 'Sorts spikes.', applicationType: 'processor' }
+
+      const yaml = serializeManifestYaml(original, meta)
+      const parsed = parseManifest(yaml)
+
+      expect(parsed.meta).toEqual(meta)
+      // The re-serialized manifest object should be identical to the first.
+      expect(buildManifest(parsed.schema, parsed.meta)).toEqual(
+        buildManifest(original, meta),
+      )
+    })
+
+    it('accepts an already-parsed object and falls back to defaults on partial input', () => {
+      const { meta, schema } = parseManifest({ name: 'Only A Name' })
+      expect(meta).toEqual({
+        name: 'Only A Name',
+        description: '',
+        applicationType: 'processor',
+      })
+      expect(schema.runtime.computeTypes).toEqual(['standard'])
+      expect(schema.parameters).toEqual([])
     })
   })
 })
