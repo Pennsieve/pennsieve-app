@@ -1314,9 +1314,6 @@ export default {
 
     // Fetch new data for a given table
     EventBus.$on("refresh-table-data", this.refreshTableData);
-    
-    // Fetch connected records when component mounts
-    this.fetchConnectedRecords();
 
     // Open proper drawer component
     EventBus.$on("add-relationship", this.handleAddRelationship);
