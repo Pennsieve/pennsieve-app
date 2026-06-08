@@ -1235,9 +1235,15 @@ export default {
       handler: function (newConcepts) {
         const isNewRoute = this.$route.path.indexOf("/new") > 0;
         const hasConcepts = Array.isArray(newConcepts) && newConcepts.length > 0;
-        if (this.relationshipCountsUrl && !isNewRoute && hasConcepts) {
+        if (!hasConcepts) {
+          return;
+        }
+        if (this.relationshipCountsUrl && !isNewRoute) {
           this.relationships = [];
           this.getRelationshipCounts();
+        }
+        if (this.stringSubtypeUrl) {
+          this.fetchStringSubtypes();
         }
       },
     },
@@ -1290,7 +1296,8 @@ export default {
 
     stringSubtypeUrl: {
       handler() {
-        if (this.stringSubtypeUrl) {
+        const hasConcepts = Array.isArray(this.concepts) && this.concepts.length > 0;
+        if (this.stringSubtypeUrl && hasConcepts) {
           this.fetchStringSubtypes();
         }
       },
@@ -1351,6 +1358,10 @@ export default {
      * retrieves the string subtype configuration used to populate the AddEditPropertyDialog
      */
     fetchStringSubtypes: function () {
+      const hasConcepts = Array.isArray(this.concepts) && this.concepts.length > 0;
+      if (!hasConcepts) {
+        return;
+      }
       this.stringSubtypeUrl.then((url) => {
         useSendXhr(url)
           .then((subTypes) => {
@@ -1600,13 +1611,6 @@ export default {
           })
           .catch((err) => {
             this.isRelationshipsLoading = false;
-            // A 404 here means the package has no proxied relations, which is
-            // a valid empty state — don't surface it as a user-facing error.
-            const status = err && err.status;
-            if (status === 404) {
-              this.relationships = [];
-              return;
-            }
             useHandleXhrError(err);
           });
       });
