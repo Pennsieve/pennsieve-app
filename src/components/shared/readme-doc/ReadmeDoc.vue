@@ -88,19 +88,21 @@ export default {
 
   methods: {
     getReadmeDocument: async function(val) {
-
-      useGetToken()
-        .then(token => {
-          const url = `${this.config.api2Url}/readme/docs/${val}`
-          this.sendXhr(url, {
-            method: 'GET',
-            header: {
-              'Authorization': `Bearer ${token}`
-            },
-          }).then( result => {
-            this.content = result
-          })
+      try {
+        const token = await useGetToken()
+        const url = `${this.config.api2Url}/readme/docs/${val}`
+        const result = await this.sendXhr(url, {
+          method: 'GET',
+          header: {
+            'Authorization': `Bearer ${token}`
+          },
         })
+        this.content = result
+      } catch (err) {
+        // No readme doc exists for this slug (commonly 404). Clear content
+        // and stay silent — the help panel just renders empty.
+        this.content = {}
+      }
     }
   }
 }
