@@ -32,6 +32,8 @@
  * the richer schema.
  */
 
+import { dump as dumpYaml, load as loadYaml } from "js-yaml";
+
 import {
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
@@ -406,12 +408,12 @@ export const buildSchemaPayload = (schema) => {
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Serialization — editable ApplicationSchema  ->  app.json manifest
+ * Serialization — editable ApplicationSchema  ->  app.yml manifest
  * ────────────────────────────────────────────────────────────────────────── */
 
 /** Canonical location of the manifest JSON Schema (served as a static asset). */
 export const MANIFEST_SCHEMA_URL =
-  "https://app.pennsieve.io/static/schemas/app.v1.json";
+  "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
 
 export const MANIFEST_SCHEMA_VERSION = "1.0";
 
@@ -426,7 +428,7 @@ export const APPLICATION_TYPES = Object.freeze([
  * Serialize one parameter into the manifest shape. Differs from the API
  * payload (`serializeParameter`) in that the default is keyed `default` (not
  * `defaultValue`) and empty/irrelevant fields are omitted to keep the emitted
- * app.json clean.
+ * app.yml clean.
  */
 const manifestParameter = (p) => {
   const out = { name: (p.name || "").trim(), type: p.type };
@@ -455,13 +457,14 @@ const manifestPort = (port) => {
 };
 
 /**
- * Build the `app.json` manifest object from the editable schema plus the
+ * Build the `app.yml` manifest object from the editable schema plus the
  * top-level metadata the form collects. The result matches the JSON Schema at
- * MANIFEST_SCHEMA_URL and is what the author commits to their repository.
+ * MANIFEST_SCHEMA_URL and is what the author commits (serialized to YAML) to
+ * their repository.
  *
  * @param {ApplicationSchema} schema
  * @param {{name?: string, description?: string, applicationType?: string}} [meta]
- * @returns {Object} app.json manifest
+ * @returns {Object} app.yml manifest
  */
 export const buildManifest = (schema, meta = {}) => {
   const s = schema || createApplicationSchema();
@@ -510,6 +513,94 @@ export const buildManifest = (schema, meta = {}) => {
   if (mOutputs.length) manifest.outputs = mOutputs.map(manifestPort);
 
   return manifest;
+};
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * YAML (de)serialization — manifest object  <->  app.yml text
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Serialize a manifest object to the YAML an author commits as `app.yml`. The
+ * `$schema` reference is emitted as a `yaml-language-server` directive comment
+ * (the YAML convention for editor autocomplete/validation) rather than a data
+ * key, so the body stays clean.
+ *
+ * @param {Object} manifest  manifest object (e.g. from buildManifest)
+ * @returns {string} app.yml text
+ */
+export const manifestToYaml = (manifest) => {
+  const { $schema, ...rest } = manifest || {};
+  const body = dumpYaml(rest, { lineWidth: -1, noRefs: true });
+  return $schema ? `# yaml-language-server: $schema=${$schema}\n${body}` : body;
+};
+
+/**
+ * Convenience: build the manifest from an editable schema + meta and serialize
+ * it to app.yml in one step.
+ *
+ * @param {ApplicationSchema} schema
+ * @param {{name?: string, description?: string, applicationType?: string}} [meta]
+ * @returns {string} app.yml text
+ */
+export const serializeManifestYaml = (schema, meta) =>
+  manifestToYaml(buildManifest(schema, meta));
+
+/**
+ * Parse a committed `app.yml` manifest — either raw YAML text or an
+ * already-parsed object — back into the top-level metadata and the editable
+ * ApplicationSchema the form binds to. This is the consumption-side inverse of
+ * buildManifest(): Pennsieve reads the file from the source repository and maps
+ * it onto the application. Tolerant of partial/legacy manifests.
+ *
+ * The `yaml-language-server` directive comment is ignored by the YAML parser,
+ * so manifests produced by serializeManifestYaml round-trip cleanly.
+ *
+ * @param {string|Object} source  raw app.yml text or a parsed manifest object
+ * @returns {{ meta: {name: string, description: string, applicationType: string},
+ *             schema: ApplicationSchema }}
+ */
+export const parseManifest = (source) => {
+  const manifest =
+    typeof source === "string" ? loadYaml(source) || {} : source || {};
+
+  const meta = {
+    name: typeof manifest.name === "string" ? manifest.name : "",
+    description:
+      typeof manifest.description === "string" ? manifest.description : "",
+    applicationType: APPLICATION_TYPES.some(
+      (t) => t.value === manifest.applicationType,
+    )
+      ? manifest.applicationType
+      : "processor",
+  };
+
+  const runtime = manifest.runtime || {};
+  const computeTypes =
+    Array.isArray(runtime.computeTypes) && runtime.computeTypes.length
+      ? runtime.computeTypes.map((t) =>
+          t === "ecs" ? COMPUTE_TYPES.STANDARD : t,
+        )
+      : [...DEFAULT_COMPUTE_TYPES];
+  const resources = manifest.resources || {};
+
+  const schema = createApplicationSchema({
+    resources: {
+      cpu: resources.cpu ?? null,
+      memory: resources.memory ?? null,
+    },
+    runtime: { computeTypes, gpu: parseGpu(runtime) },
+    // Manifest parameters key the default as `default`; the editable schema
+    // (and parseParameter) expect `defaultValue`.
+    parameters: asArray(manifest.parameters).map((p) =>
+      parseParameter({ ...p, defaultValue: p?.default }),
+    ),
+    inputs: asArray(manifest.inputs).map(parsePort),
+    outputs: asArray(manifest.outputs).map(parsePort),
+    tags: asArray(manifest.tags),
+    categories: asArray(manifest.categories),
+  });
+
+  return { meta, schema };
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
