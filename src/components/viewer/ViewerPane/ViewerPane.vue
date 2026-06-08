@@ -155,20 +155,21 @@ export default {
   },
 
   watch: {
-    pkg: {
-      handler: async function (pkg) {
-        if (pkg && Object.keys(pkg.content || {}).length > 0) {
-          await this.loadViewer(pkg);
-          if (
-            pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
-            "timeseries"
-          ) {
-            this.fetchTimeseriesData();
-          }
+    "pkg.content.id": {
+      handler: async function (packageId) {
+        if (!packageId) {
+          return;
+        }
+        const pkg = this.pkg;
+        await this.loadViewer(pkg);
+        if (
+          pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
+          "timeseries"
+        ) {
+          this.fetchTimeseriesData();
         }
       },
       immediate: true,
-      deep: true,
     },
   },
 
