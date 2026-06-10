@@ -201,6 +201,15 @@ export default {
   },
 
   /**
+   * Clear any stale activeViewer left over from the previous page (e.g.
+   * FileDetails preview) before ViewerPane mounts, so its immediate
+   * watcher doesn't fire a fetch for the wrong package.
+   */
+  created: function () {
+    this.openViewer({});
+  },
+
+  /**
    * Vue lifecycle method
    */
   mounted: function () {
