@@ -59,6 +59,7 @@ export default {
       // Top-level tabs: just one crumb (the tab name, as current)
       const topLevelTabs = {
         'runs': 'Runs',
+        'notebooks': 'Notebooks',
         'workflows': 'Workflows',
         'applications': 'Applications',
         'compute-nodes': 'Compute Nodes',
@@ -138,6 +139,10 @@ export default {
         {
           name: "Runs",
           to: "runs",
+        },
+        {
+          name: "Notebooks",
+          to: "notebooks",
         },
         {
           name: "Workflows",

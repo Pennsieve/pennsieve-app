@@ -1,83 +1,98 @@
 <script setup>
-// Dedicated full-page interactive notebook for a workflow run. Opened in its own
-// tab from the run detail view (or linked directly). It owns only page chrome —
-// the live kernel connect/execute/close lifecycle lives in JupyterSession.vue +
-// the useJupyterSession composable. Because this can load in a fresh tab where
-// the analysis store isn't populated, it relies only on the route params.
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+// Dedicated interactive-notebook page for a workflow run. It lives inside the
+// platform chrome (BfNavigation left menu stays intact) but is its OWN page —
+// not a child of Analysis — so it does not inherit the Analysis tab bar
+// (Runs/Workflows/...). A simple BfRafter breadcrumb provides "back to the run".
+// The live kernel lifecycle lives in JupyterSession.vue + useJupyterSession.
+import { computed, onMounted, onBeforeUnmount } from "vue";
+import { useRoute } from "vue-router";
+import { useStore } from "vuex";
+import BfPage from "../../layout/BfPage/BfPage.vue";
+import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
+import OrgBreadcrumb from "../../shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 import JupyterSession from "./JupyterSession.vue";
 
+const props = defineProps({
+  // Passed by the router (props: { page: true }); falls back to the route, then
+  // to the active organization in the store.
+  orgId: { type: String, default: "" },
+  runId: { type: String, default: "" },
+});
+
 const route = useRoute();
-const router = useRouter();
+const store = useStore();
+const resolvedOrgId = computed(
+  () =>
+    props.orgId ||
+    route.params.orgId ||
+    store.state.activeOrganization?.organization?.id ||
+    ""
+);
+const resolvedRunId = computed(() => props.runId || route.params.runId || "");
 
-const runId = computed(() => route.params.runId || "");
-const orgId = computed(() => route.params.orgId || "");
+// The notebook wants the horizontal room, so collapse the primary nav while it's
+// open — but remember the user's prior state and restore it on leave so we don't
+// permanently change their preference.
+let prevNavCondensed = false;
+onMounted(() => {
+  prevNavCondensed = store.state.primaryNavCondensed;
+  store.dispatch("condensePrimaryNav", true);
+});
+onBeforeUnmount(() => {
+  store.dispatch("condensePrimaryNav", prevNavCondensed);
+});
 
-const backToRun = () => {
-  if (!runId.value) return;
-  router.push({ name: "run-detail", params: { orgId: orgId.value, runId: runId.value } });
-};
+// Analysis › Runs › this run › Notebook (the run crumb links back to the run).
+// Every route is fully-qualified with orgId — vue-router does not inherit params
+// for named-route links, so omitting it throws "Missing required param orgId".
+const workspaceRoute = computed(() => ({
+  name: "datasets-list",
+  params: { orgId: resolvedOrgId.value },
+}));
+const crumbs = computed(() => [
+  { name: "Runs", route: { name: "runs", params: { orgId: resolvedOrgId.value } } },
+  {
+    name: "Run Details",
+    route: {
+      name: "run-detail",
+      params: { orgId: resolvedOrgId.value, runId: resolvedRunId.value },
+    },
+  },
+  { name: "Notebook" },
+]);
 </script>
 
 <template>
-  <div class="notebook-page">
-    <header class="notebook-page__header">
-      <div class="notebook-page__title">
-        <button class="notebook-page__back" type="button" @click="backToRun">← Back to run</button>
-        <h1>Interactive Notebook</h1>
-        <span class="notebook-page__run">run {{ runId }}</span>
-      </div>
-    </header>
+  <bf-page>
+    <bf-rafter slot="heading" class="primary" :org-id="resolvedOrgId">
+      <template #breadcrumb>
+        <org-breadcrumb
+          v-if="resolvedOrgId"
+          page-name="Analysis"
+          :crumbs="crumbs"
+          :page-route="{ name: 'runs', params: { orgId: resolvedOrgId } }"
+          :workspace-route="workspaceRoute"
+        />
+      </template>
+    </bf-rafter>
 
-    <main class="notebook-page__body">
-      <JupyterSession v-if="runId" :run-id="runId" />
-      <p v-else class="notebook-page__error">No run specified.</p>
-    </main>
-  </div>
+    <div class="notebook-stage">
+      <JupyterSession v-if="resolvedRunId" :run-id="resolvedRunId" />
+      <p v-else class="notebook-stage__error">No run specified.</p>
+    </div>
+  </bf-page>
 </template>
 
 <style scoped>
-.notebook-page {
+.notebook-stage {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
   background: #fff;
 }
-.notebook-page__header {
-  flex: 0 0 auto;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 12px 20px;
-}
-.notebook-page__title {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-}
-.notebook-page__title h1 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-.notebook-page__back {
-  border: none;
-  background: none;
-  color: #295eff;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 0;
-}
-.notebook-page__run {
-  font-size: 12px;
-  color: #888;
-  font-family: ui-monospace, Menlo, monospace;
-}
-.notebook-page__body {
-  flex: 1 1 auto;
-  overflow: auto;
-}
-.notebook-page__error {
+.notebook-stage__error {
   padding: 20px;
-  color: #b42318;
+  color: #c14d49;
 }
 </style>

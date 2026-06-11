@@ -13,6 +13,9 @@ import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconCopyDocument from "../../icons/IconCopyDocument.vue";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
+import IconControllerPlay from "../../icons/IconControllerPlay.vue";
+import IconXCircle from "../../icons/IconXCircle.vue";
+import { endInteractiveSession } from "@/composables/useJupyterSession";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -241,11 +244,34 @@ const interactiveSessionAvailable = computed(() => {
 const openNotebook = () => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid) return;
-  const href = router.resolve({
-    name: "notebook-session",
+  router.push({
+    name: "run-notebook",
     params: { orgId: route.params.orgId, runId: activity.uuid },
-  }).href;
-  window.open(href, "_blank", "noopener");
+  });
+};
+
+// Terminate the interactive session without opening the notebook: ends it
+// cleanly so the workflow resumes to the next step. Confirmed via the in-app
+// Pennsieve dialog (not the browser prompt).
+const endingSession = ref(false);
+const confirmEndOpen = ref(false);
+const endSession = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || endingSession.value) return;
+  confirmEndOpen.value = true;
+};
+const confirmEndSession = async () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid) return;
+  endingSession.value = true;
+  try {
+    await endInteractiveSession(activity.uuid);
+    confirmEndOpen.value = false;
+  } catch (e) {
+    errorBanner.value = e?.message || "Could not end the interactive session.";
+  } finally {
+    endingSession.value = false;
+  }
 };
 
 /*
@@ -1253,10 +1279,37 @@ onUnmounted(() => {
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
         <div v-if="interactiveSessionAvailable" class="header-actions">
+          <bf-button class="secondary" :disabled="endingSession" @click="endSession">
+            {{ endingSession ? 'Ending…' : 'End Session' }}
+          </bf-button>
           <bf-button class="primary" @click="openNotebook">Open Notebook</bf-button>
         </div>
       </template>
     </div>
+
+    <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
+    <el-dialog
+      v-model="confirmEndOpen"
+      title="End interactive session?"
+      width="460px"
+      :close-on-click-modal="!endingSession"
+      :show-close="!endingSession"
+      align-center
+    >
+      <p style="margin: 0; color: #4d4d4d; line-height: 1.5;">
+        Ending the session shuts down the notebook kernel and resumes the
+        workflow at the next step. Any unsaved notebook changes will be lost —
+        open the notebook first if you need to save your work.
+      </p>
+      <template #footer>
+        <bf-button class="secondary mr-8" :disabled="endingSession" @click="confirmEndOpen = false">
+          Cancel
+        </bf-button>
+        <bf-button class="red" :disabled="endingSession" @click="confirmEndSession">
+          {{ endingSession ? 'Ending…' : 'End Session' }}
+        </bf-button>
+      </template>
+    </el-dialog>
 
     <!-- Error Banner -->
     <div v-if="errorBanner" class="error-banner">
@@ -1312,6 +1365,28 @@ onUnmounted(() => {
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
+                  <div
+                    v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
+                    class="node-actions"
+                    @click.stop
+                  >
+                    <button
+                      class="node-action node-action--end"
+                      title="End session — resumes the workflow"
+                      :disabled="endingSession"
+                      @click="endSession"
+                    >
+                      <IconXCircle :width="14" :height="14" color="#c14d49" />
+                    </button>
+                    <button
+                      class="node-action node-action--play"
+                      :class="{ 'node-action--waiting': data.status === 'STARTED' }"
+                      title="Interactive notebook is waiting for you — open it"
+                      @click="openNotebook"
+                    >
+                      <IconControllerPlay :width="18" :height="11" color="#011f5b" />
+                    </button>
+                  </div>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -2592,6 +2667,63 @@ onUnmounted(() => {
   justify-content: center;
   z-index: 1;
   line-height: 1;
+}
+
+/* Interactive processor affordances: End session (✕) + Open notebook (▶). */
+.node-actions {
+  position: absolute;
+  top: -12px;
+  right: -10px;
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+}
+.node-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #b3bcce; /* purple_0_7 */
+  background: #fff;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.node-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.node-action--play:hover {
+  background: #e6e9ef; /* purple_tint */
+  animation: none;
+}
+/* Pulse only while the interactive step is actually running (STARTED) — i.e.
+   the session is live and waiting for the user. */
+.node-action--waiting {
+  box-shadow: 0 0 0 0 rgba(1, 31, 91, 0.5);
+  animation: nb-waiting-pulse 2s infinite;
+}
+.node-action--waiting:hover {
+  animation: none;
+}
+/* The play glyph only fills the left half of its 0 0 20 12 viewBox, so nudge
+   it right to optically center within the round button. */
+.node-action--play svg {
+  transform: translateX(5px);
+}
+.node-action--end {
+  border-color: #f0c0bb;
+}
+.node-action--end:hover {
+  background: #feeeec; /* red_tint */
+  border-color: #c14d49; /* red_2 */
+}
+@keyframes nb-waiting-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(1, 31, 91, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
 .custom-node {

@@ -89,28 +89,32 @@ const selectedNodeParamSchema = computed(() => {
   return [];
 });
 
-// Snapshot of original defaultParams when workflow is loaded (for change detection)
+// Snapshot of original defaultParams + versions (tags) when the workflow is
+// loaded, so we can detect edits made in browse mode.
 const originalDefaultParams = ref({});
+const originalTags = ref({});
 
 const snapshotDefaultParams = () => {
   const snapshot = {};
+  const tags = {};
   for (const node of nodes.value) {
-    if (node.type === "default" && node.data?.defaultParams) {
-      snapshot[node.id] = { ...node.data.defaultParams };
-    }
+    if (node.type !== "default") continue;
+    snapshot[node.id] = { ...(node.data?.defaultParams || {}) };
+    tags[node.id] = node.data?.tag || "";
   }
   originalDefaultParams.value = snapshot;
+  originalTags.value = tags;
 };
 
-// Track whether any changes have been made in browse mode
+// Track whether any default-param or version change has been made in browse mode
 const hasAnyChanges = computed(() => {
   for (const node of nodes.value) {
-    if (node.type === "default" && node.data?.defaultParams) {
-      const current = JSON.stringify(node.data.defaultParams);
-      const original = JSON.stringify(
-        originalDefaultParams.value[node.id] || {},
-      );
-      if (current !== original) return true;
+    if (node.type !== "default") continue;
+    const current = JSON.stringify(node.data?.defaultParams || {});
+    const original = JSON.stringify(originalDefaultParams.value[node.id] || {});
+    if (current !== original) return true;
+    if ((node.data?.tag || "") !== (originalTags.value[node.id] || "")) {
+      return true;
     }
   }
   return false;
@@ -122,6 +126,7 @@ const saveWorkflowChanges = async () => {
   if (!workflow?.uuid) return;
 
   const defaultParams = {};
+  const versions = {};
   for (const node of nodes.value) {
     if (node.type !== "default") continue;
     const current = node.data?.defaultParams || {};
@@ -134,12 +139,21 @@ const saveWorkflowChanges = async () => {
     if (Object.keys(params).length > 0 || Object.keys(original).length > 0) {
       defaultParams[node.id] = params;
     }
+    // Only send a version when it changed to a non-empty value (the API rejects
+    // empty version strings).
+    const tag = node.data?.tag || "";
+    if (tag && tag !== (originalTags.value[node.id] || "")) {
+      versions[node.id] = tag;
+    }
   }
+
+  const payload = { defaultParams };
+  if (Object.keys(versions).length > 0) payload.versions = versions;
 
   try {
     await store.dispatch("analysisModule/updateWorkflow", {
       uuid: workflow.uuid,
-      payload: { defaultParams },
+      payload,
     });
     EventBus.$emit("toast", {
       detail: { type: "success", msg: "Workflow changes saved." },
@@ -532,6 +546,12 @@ const isWorkflowCreator = computed(() => {
     profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
   );
 });
+
+// Application version + default params are editable while building a new
+// workflow (create mode) or by the creator viewing an existing definition.
+const canEditConfig = computed(
+  () => mode.value === "create" || isWorkflowCreator.value,
+);
 
 const isPublicWorkflow = computed(
   () => selectedWorkflow.value?.visibility === "public",
@@ -1028,7 +1048,11 @@ const openNodeSettings = (id) => {
         }}</span>
       </span>
       <div class="header-actions">
-        <bf-button :disabled="!hasAnyChanges" @click="saveWorkflowChanges">
+        <bf-button
+          v-if="isWorkflowCreator"
+          :disabled="!hasAnyChanges"
+          @click="saveWorkflowChanges"
+        >
           Save Changes
         </bf-button>
       </div>
@@ -1440,7 +1464,7 @@ const openNodeSettings = (id) => {
                   <div class="info-row">
                     <span class="info-label">Version</span>
                     <el-select
-                      v-if="!isReadOnly"
+                      v-if="canEditConfig"
                       v-model="selectedNode.data.tag"
                       size="small"
                       class="info-inline-select"
@@ -1631,6 +1655,7 @@ const openNodeSettings = (id) => {
                         >
                       </el-tooltip>
                     </span>
+                    <template v-if="canEditConfig">
                     <!-- Has app default: show value with edit toggle -->
                     <template v-if="param.defaultValue != null">
                       <template
@@ -1715,6 +1740,18 @@ const openNodeSettings = (id) => {
                           :value="v"
                         />
                       </el-select>
+                    </template>
+                    </template>
+                    <!-- Read-only for non-creators -->
+                    <template v-else>
+                      <span class="info-value param-value-truncate">
+                        {{
+                          selectedNode.data.defaultParams?.[param.name] ??
+                          (param.defaultValue != null
+                            ? param.defaultValue
+                            : "—")
+                        }}
+                      </span>
                     </template>
                   </div>
                 </div>
