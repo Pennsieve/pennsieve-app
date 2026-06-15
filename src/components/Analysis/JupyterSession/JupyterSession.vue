@@ -4,7 +4,8 @@
 // loads/saves a notebook.ipynb on EFS, and provides a Jupyter-like editing
 // surface (code + markdown cells, per-cell run, run-all, restart, command-mode
 // keyboard shortcuts).
-import { onMounted, onBeforeUnmount, nextTick, ref, computed } from "vue";
+import { onMounted, onBeforeUnmount, nextTick, ref, computed, watch } from "vue";
+import { useRoute, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
@@ -24,9 +25,18 @@ const props = defineProps({
   runId: { type: String, required: true },
 });
 
+// Route to the Analysis tab (orgId from the current route) — offered as a way
+// back once the session has ended and the notebook surface is gone.
+const route = useRoute();
+const analysisRoute = computed(() => ({
+  name: "analysis",
+  params: { orgId: route.params.orgId },
+}));
+
 const {
   status,
   connectingMessage,
+  connectPhase,
   kernelStatus,
   kernelName,
   error,
@@ -56,6 +66,76 @@ const {
   restartAndRunAll,
 } = useJupyterSession();
 
+/* ---- connect progress (simulated, time-calibrated) ------------------------
+   There's no real progress signal for a launching kernel, so we simulate one to
+   give a sense of how long the wait is. The "connecting" phase (broker + Fargate
+   task coming up) is calibrated to ~1 min; once we're attaching to the kernel
+   the remaining wait is short, so we recalibrate to ~16s. The bar eases toward a
+   ceiling (never a false 100%) until the session is actually ready. */
+const PHASE = {
+  connecting: { ms: 60000, ceiling: 90 },
+  kernel: { ms: 16000, ceiling: 98 },
+};
+const progress = ref(0); // 0–100
+const etaSeconds = ref(null);
+let progressTimer = null;
+let phaseStart = 0;
+let phaseFloor = 0;
+let phaseMs = 0;
+let phaseCeiling = 0;
+
+function tickProgress() {
+  const elapsed = Date.now() - phaseStart;
+  const frac = Math.min(1, elapsed / phaseMs);
+  const eased = 1 - Math.pow(1 - frac, 2); // ease-out: decelerates near the end
+  const val = phaseFloor + (phaseCeiling - phaseFloor) * eased;
+  if (val > progress.value) progress.value = val;
+  const remain = Math.ceil((phaseMs - elapsed) / 1000);
+  etaSeconds.value = remain > 0 ? remain : 0;
+}
+
+function beginPhase(name) {
+  const cfg = PHASE[name];
+  if (!cfg) return;
+  phaseStart = Date.now();
+  phaseFloor = progress.value; // continue from wherever the bar is now
+  phaseMs = cfg.ms;
+  phaseCeiling = cfg.ceiling;
+  tickProgress();
+  if (!progressTimer) progressTimer = setInterval(tickProgress, 200);
+}
+
+function stopProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
+
+// Drive the bar off the session status + connect phase.
+watch(status, (s) => {
+  if (s === "connecting") {
+    progress.value = 0;
+    beginPhase("connecting");
+  } else if (s === "ready") {
+    progress.value = 100;
+    etaSeconds.value = 0;
+    stopProgress();
+  } else {
+    stopProgress(); // error / closed / idle
+  }
+});
+watch(connectPhase, (p) => {
+  if (p === "kernel" && status.value === "connecting") beginPhase("kernel");
+});
+
+const etaLabel = computed(() => {
+  if (etaSeconds.value == null) return "";
+  if (etaSeconds.value <= 0) return "Almost ready — finishing up…";
+  if (etaSeconds.value >= 60) return "Estimated wait: about a minute";
+  return `Estimated wait: about ${etaSeconds.value}s`;
+});
+
 const selectedId = ref(null);
 const cellRefs = new Map();
 const ending = ref(false);
@@ -63,6 +143,30 @@ const confirmEnd = ref(false);
 const showFiles = ref(true);
 const fileBrowserRef = ref(null);
 let lastD = 0;
+
+// One-time info dialog shown when a session opens. Dismissed permanently per
+// browser via localStorage (mirrors the app's other "seen-…" info dismissals).
+const INFO_DISMISS_KEY = "seen-notebook-info";
+const showInfoDialog = ref(false);
+const dontShowInfoAgain = ref(false);
+function maybeShowInfo() {
+  try {
+    if (localStorage.getItem(INFO_DISMISS_KEY) === "true") return;
+  } catch (_) {
+    /* private mode / storage blocked — just show it */
+  }
+  showInfoDialog.value = true;
+}
+function dismissInfo() {
+  if (dontShowInfoAgain.value) {
+    try {
+      localStorage.setItem(INFO_DISMISS_KEY, "true");
+    } catch (_) {
+      /* ignore: persistence is best-effort */
+    }
+  }
+  showInfoDialog.value = false;
+}
 
 // Opening an existing .ipynb (output/ is always empty at start, so candidates
 // live in input/). Banner offers the staged notebook(s); the file browser's
@@ -125,7 +229,10 @@ const selectedCell = () => cells.value[idx(selectedId.value)] || null;
 onMounted(async () => {
   await connect(props.runId);
   if (cells.value.length) selectedId.value = cells.value[0].id;
-  if (status.value === "ready") scanInputNotebooks();
+  if (status.value === "ready") {
+    scanInputNotebooks();
+    maybeShowInfo();
+  }
   window.addEventListener("keydown", onKeydown, true);
   window.addEventListener("beforeunload", onBeforeUnload);
 });
@@ -133,8 +240,31 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown, true);
   window.removeEventListener("beforeunload", onBeforeUnload);
+  stopProgress();
+  // Best-effort flush of unsaved edits before dropping the connection, so a
+  // later reconnect reopens the latest work. Fire-and-forget (unmount can't
+  // await); the request is issued before disconnect() disposes the manager.
+  // No-op after an explicit close — contents is already gone, so save() bails.
+  if (dirty.value && status.value === "ready") save();
   // Leave the session running; just drop the local connection.
   disconnect();
+});
+
+// In-app navigation away from the notebook: await a save of unsaved edits BEFORE
+// the route changes, so the persisted working copy is current and a later
+// reconnect reopens the latest work. Unlike the onBeforeUnmount flush (which
+// can't await), this guarantees the write completes for the common case (the
+// user clicking elsewhere in the app). We never block navigation — a failed save
+// still lets the user leave (autosave + the beforeunload warning are the net).
+onBeforeRouteLeave(async () => {
+  if (dirty.value && status.value === "ready") {
+    try {
+      await save();
+    } catch (_) {
+      /* don't trap the user on a save error */
+    }
+  }
+  return true;
 });
 
 function onBeforeUnload(e) {
@@ -227,17 +357,21 @@ async function saveAndRefresh() {
   fileBrowserRef.value?.refresh?.();
 }
 
-// End the interactive session (resumes the workflow). Confirmed via the
-// in-app dialog — `saveFirst` writes notebook.ipynb to output/ before closing.
-// On a failed save we keep the dialog open rather than tearing down unsaved work.
+// End the interactive session (resumes the workflow). Confirmed via the in-app
+// dialog. "Save & end" writes the notebook then commits the session (notebook +
+// generated files upload). "Discard & end" clears output/ so nothing uploads —
+// the whole session is thrown away. On a failed save we keep the dialog open
+// rather than tearing down unsaved work.
 async function endSession(saveFirst) {
   ending.value = true;
   try {
     if (saveFirst) {
       const saved = await save();
       if (!saved) return;
+      await close();
+    } else {
+      await close({ discardOutput: true });
     }
-    await close();
   } finally {
     ending.value = false;
     if (status.value === "closed") confirmEnd.value = false;
@@ -437,8 +571,9 @@ const kernelPill = computed(() => {
     >
       <p class="nb-confirm-text">
         Ending the session shuts down the kernel and resumes the workflow at the
-        next step. Save first to write
-        <code>output/notebook.ipynb</code> so your work is passed along.
+        next step. <strong>Save &amp; end</strong> uploads the notebook and any
+        files it generated to Pennsieve. <strong>Discard &amp; end</strong>
+        throws the whole session away — nothing from this session is uploaded.
       </p>
       <p v-if="dirty" class="nb-confirm-warn">You have unsaved changes.</p>
       <p v-if="error" class="nb-confirm-err">{{ error }}</p>
@@ -450,11 +585,56 @@ const kernelPill = computed(() => {
           :disabled="ending"
           @click="endSession(false)"
         >
-          Close without saving
+          Discard &amp; end
         </el-button>
         <el-button type="primary" :loading="ending" @click="endSession(true)">
-          Save &amp; close
+          Save &amp; end
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- One-time "how notebook sessions work" info dialog -->
+    <el-dialog
+      v-model="showInfoDialog"
+      title="How notebook sessions work"
+      width="520px"
+      align-center
+    >
+      <ul class="nb-info-list">
+        <li class="nb-info-item">
+          <strong>Sessions close after inactivity.</strong>
+          After about 1 hour with no activity the kernel shuts down and the
+          workflow resumes, so save before stepping away. In-memory variables are
+          lost on timeout — your notebook is recovered, but you'll re-run cells to
+          rebuild state.
+        </li>
+        <li class="nb-info-item">
+          <strong>Your output folder is uploaded to Pennsieve.</strong>
+          Anything you write to the <code>output/</code> folder is uploaded to the
+          output location you selected when you started the session.
+        </li>
+        <li class="nb-info-item">
+          <strong>Opening an existing notebook may overwrite it.</strong>
+          An opened notebook replaces the original only when your selected output
+          folder is the same folder the notebook is stored in; otherwise it's
+          saved as a new file.
+        </li>
+        <li class="nb-info-item">
+          <strong>Leaving doesn't end the session.</strong>
+          You can navigate away and reconnect later — the session keeps running
+          (and your work autosaves) until you end it or it times out.
+        </li>
+        <li class="nb-info-item">
+          <strong>Ending is your choice to keep or discard.</strong>
+          <em>Save &amp; end</em> uploads your work; <em>Discard &amp; end</em>
+          uploads nothing from the session.
+        </li>
+      </ul>
+      <template #footer>
+        <div class="nb-info-footer">
+          <el-checkbox v-model="dontShowInfoAgain">Don't show this again</el-checkbox>
+          <el-button type="primary" @click="dismissInfo">Got it</el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -483,9 +663,52 @@ const kernelPill = computed(() => {
     </el-dialog>
 
     <!-- states -->
-    <p v-if="status === 'connecting'" class="nb-msg">{{ connectingMessage }}</p>
-    <p v-if="status === 'error'" class="nb-msg nb-msg--error">{{ error }}</p>
-    <p v-if="status === 'closed'" class="nb-msg">Session ended. The workflow will continue.</p>
+    <!-- Connecting: full empty-state while the kernel task launches + warms up.
+         Surfaces the live stage message (connecting → starting/reconnecting →
+         waiting) so a cold start (image pull, ~1 min) doesn't look stalled. -->
+    <div v-if="status === 'connecting'" class="nb-empty">
+      <img
+        class="nb-empty__illo"
+        src="@/assets/images/illustrations/illo-dr_azumi_1.svg"
+        alt=""
+      />
+      <h2 class="nb-empty__title">Getting your notebook ready</h2>
+      <div class="nb-empty__status">
+        <el-icon class="nb-empty__spin"><Loading /></el-icon>
+        <span class="nb-empty__msg">{{ connectingMessage }}</span>
+      </div>
+      <div class="nb-empty__bar">
+        <span class="nb-empty__bar-fill" :style="{ width: progress + '%' }" />
+      </div>
+      <p v-if="etaLabel" class="nb-empty__eta">{{ etaLabel }}</p>
+      <p class="nb-empty__hint">
+        We're launching an interactive compute session for this run. The first
+        launch can take up to a minute while the environment is pulled and
+        started — you can leave this tab open.
+      </p>
+    </div>
+
+    <div v-if="status === 'error'" class="nb-empty">
+      <img
+        class="nb-empty__illo"
+        src="@/assets/images/illustrations/illo-dr_azumi_1.svg"
+        alt=""
+      />
+      <h2 class="nb-empty__title">Couldn't connect to your notebook</h2>
+      <p class="nb-empty__msg nb-empty__msg--error">{{ error }}</p>
+      <el-button type="primary" @click="connect(props.runId)">Try again</el-button>
+    </div>
+
+    <div v-if="status === 'closed'" class="nb-empty">
+      <img
+        class="nb-empty__illo"
+        src="@/assets/images/illustrations/illo-dr_azumi_1.svg"
+        alt=""
+      />
+      <h2 class="nb-empty__title">Session ended</h2>
+      <p class="nb-empty__msg">Your kernel has been shut down and the workflow will continue at the next step.</p>
+      <router-link :to="analysisRoute" class="nb-empty__link">Return to Analysis →</router-link>
+    </div>
 
     <!-- Offer to open an existing notebook staged in input/ -->
     <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
@@ -679,8 +902,93 @@ const kernelPill = computed(() => {
   padding: 12px 0 12px 52px;
 }
 .nb-inline-err { color: #c14d49; font-size: 12px; }
-.nb-msg { padding: 20px; color: #4d4d4d; }
-.nb-msg--error { color: #c14d49; }
+
+/* Full-height empty state for connecting / error / closed — illustration,
+   title, live status, and a reassuring hint while the kernel warms up. */
+.nb-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.nb-empty__illo {
+  width: 200px;
+  height: auto;
+  max-width: 60%;
+  opacity: 0.9;
+}
+.nb-empty__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1c1c1c; /* gray_6 */
+}
+.nb-empty__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #011f5b; /* purple_3 */
+}
+.nb-empty__spin {
+  font-size: 16px;
+  animation: nb-spin 1s linear infinite;
+}
+.nb-empty__msg {
+  font-size: 14px;
+  color: #4d4d4d; /* gray_5 */
+  margin: 0;
+  max-width: 440px;
+  line-height: 1.5;
+}
+.nb-empty__msg--error { color: #c14d49; }
+/* Determinate progress bar — the fill width is a simulated, time-calibrated
+   estimate (no real progress signal exists for a launching kernel). */
+.nb-empty__bar {
+  width: 240px;
+  max-width: 70%;
+  height: 4px;
+  border-radius: 2px;
+  background: #e6e9ef;
+  overflow: hidden;
+}
+.nb-empty__bar-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: #011f5b; /* purple_3 */
+  transition: width 0.2s linear;
+}
+.nb-empty__eta {
+  margin: 0;
+  font-size: 12px;
+  color: #4d628c; /* purple_2 */
+}
+.nb-empty__hint {
+  margin: 0;
+  font-size: 13px;
+  color: #888;
+  max-width: 420px;
+  line-height: 1.5;
+}
+.nb-empty__link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #011f5b; /* purple_3 */
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.nb-empty__link:hover { background: #4d628c; /* purple_2 */ }
 .nb-confirm-text { margin: 0; color: #4d4d4d; line-height: 1.5; }
 .nb-confirm-text code {
   background: #f2f2f2;
@@ -690,6 +998,45 @@ const kernelPill = computed(() => {
 }
 .nb-confirm-warn { margin: 12px 0 0; color: #e0912a; font-size: 13px; } /* orange */
 .nb-confirm-err { margin: 12px 0 0; color: #c14d49; font-size: 13px; }
+
+/* Info dialog */
+.nb-info-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.nb-info-item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4d4d4d; /* gray_5 */
+  padding-left: 16px;
+  position: relative;
+}
+.nb-info-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #011f5b; /* purple_3 */
+}
+.nb-info-item strong { color: #333333; /* gray_6 */ }
+.nb-info-item code {
+  background: #f2f2f2;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.nb-info-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .nb-open-banner {
   display: flex;
   align-items: center;

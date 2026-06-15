@@ -4,23 +4,31 @@
 // as more notebook environments are published.
 
 // Returns the kernel/session type for a workflow, or null if it isn't a
-// notebook. Primary signal is the well-known name ("Jupyter Notebook" = Python);
-// falls back to an interactive DAG node.
+// notebook. The authoritative signal is an interactive node's declared
+// sessionType (e.g. "r"); we fall back to the workflow name when the listing
+// doesn't expose nodes. Definitions may carry either `dag` or `processors`.
 export function notebookKernel(wf) {
-  const name = (wf?.name || "").toLowerCase();
-  if (name.includes("jupyter") || name.includes("python notebook")) {
-    return "jupyter";
-  }
-  if (name.includes("r notebook")) return "r";
-  const node = (wf?.dag || []).find(
+  const nodes = wf?.dag || wf?.processors || [];
+  const node = nodes.find(
     (n) =>
       n?.runtimeConfig?.interactive ||
       n?.interactive ||
       n?.runtimeConfig?.sessionType ||
       n?.sessionType
   );
-  if (!node) return null;
-  return node.runtimeConfig?.sessionType || node.sessionType || "jupyter";
+  const sessionType = node && (node.runtimeConfig?.sessionType || node.sessionType);
+  if (sessionType) return sessionType === "python" ? "jupyter" : sessionType;
+
+  // Name fallback (separators normalized so "r-notebook", "R Session", and
+  // "Pennsieve R Session" all match).
+  const name = (wf?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (name.includes("jupyter") || name.includes("python")) return "jupyter";
+  if (/\br\b/.test(name) && (name.includes("notebook") || name.includes("session"))) {
+    return "r";
+  }
+  // An interactive node with no explicit sessionType defaults to Python/Jupyter.
+  if (node) return "jupyter";
+  return null;
 }
 
 export function isNotebookWorkflow(wf) {

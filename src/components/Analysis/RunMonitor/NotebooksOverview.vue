@@ -117,10 +117,40 @@ const recentNotebookRuns = computed(() =>
     .slice(0, 10)
 );
 
-// After a notebook is created, re-fetch so it appears in Active Notebooks with
-// the normalized run shape (the POST response shape differs from the summary).
-const onNotebookCreated = () => {
-  store.dispatch("analysisModule/fetchWorkflowInstances");
+// After a notebook is created, open its notebook page straight away — it shows
+// the "waiting for the kernel" empty state while the session task launches.
+// The createRun POST response shape differs from the runs summary and may not
+// carry a usable run id, so we identify the new run by set difference: snapshot
+// the run ids before refetching, then pick the one that appears afterward (the
+// list always has a real `uuid`). Falls back to a direct id or name match.
+const onNotebookCreated = async (newRun) => {
+  const before = new Set(
+    (store.getters["analysisModule/workflowInstances"] || [])
+      .map((r) => r.uuid)
+      .filter(Boolean)
+  );
+  await store.dispatch("analysisModule/fetchWorkflowInstances");
+  const instances = store.getters["analysisModule/workflowInstances"] || [];
+
+  const fresh = instances.filter((r) => r.uuid && !before.has(r.uuid));
+  const directId = newRun?.uuid || newRun?.id || newRun?.runId;
+  const run =
+    fresh.find((r) => r.name === newRun?.name) ||
+    fresh[0] ||
+    (directId && instances.find((r) => r.uuid === directId)) ||
+    (newRun?.name &&
+      instances
+        .filter((r) => r.name === newRun.name)
+        .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0]);
+
+  if (!run?.uuid) {
+    console.warn("[Notebooks] could not resolve created run id from", newRun);
+    return;
+  }
+
+  const orgId =
+    route.params.orgId || store.state.activeOrganization?.organization?.id;
+  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
 };
 
 /* ----------------------------------------------------------- navigation ----- */
@@ -356,12 +386,14 @@ onBeforeUnmount(() => {
         {{ endRunError }}
       </p>
       <template #footer>
-        <bf-button class="secondary mr-8" :disabled="!!endingRunId" @click="confirmEndRun = null">
-          Cancel
-        </bf-button>
-        <bf-button class="red" :disabled="!!endingRunId" @click="confirmEndSession">
-          {{ endingRunId ? 'Ending…' : 'End Session' }}
-        </bf-button>
+        <div class="end-dialog-footer">
+          <bf-button class="secondary" :disabled="!!endingRunId" @click="confirmEndRun = null">
+            Cancel
+          </bf-button>
+          <bf-button class="red" :disabled="!!endingRunId" @click="confirmEndSession">
+            {{ endingRunId ? 'Ending…' : 'End Session' }}
+          </bf-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -374,6 +406,13 @@ onBeforeUnmount(() => {
   max-width: 1000px;
   margin: 0;
   padding: 16px 24px;
+}
+/* End-session dialog footer: right-aligned buttons with an even 8px gap (the
+   mr-8 utility doesn't reliably land on the bf-button root). */
+.end-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .info-section {
   margin-bottom: 32px;

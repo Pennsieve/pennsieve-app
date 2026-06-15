@@ -17,6 +17,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
 import { notebookKernel, kernelLabel } from "./notebookHelpers";
+import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -56,11 +57,40 @@ const executing = ref(false);
 const stepTitles = [
   "Select Kernel",
   "Select Compute Node",
+  "Compute Resources",
   "Select Dataset",
   "Select Input Files",
   "Output Destination",
   "Review & Start",
 ];
+
+/* ------------------------------------------------------ compute resources --- */
+// Fargate CPU/memory for the notebook task. Lowest tier is 1 vCPU (1024). Memory
+// can be set automatically (balanced for the CPU) or pinned to a specific value.
+const DEFAULT_CPU = "1024"; // 1 vCPU
+const resourceCpu = ref(DEFAULT_CPU);
+const resourceMemory = ref(""); // "" → automatic
+const cpuOptions = STANDARD_CPU_OPTIONS;
+const memoryOptions = computed(() => getStandardMemoryOptions(resourceCpu.value));
+// Balanced default memory for a CPU when memory is left automatic: 2 GB per vCPU
+// (the low end of each CPU's valid range), e.g. 1 vCPU → 2 GB, 4 vCPU → 8 GB.
+const autoMemoryForCpu = (cpu) => String(parseInt(cpu, 10) * 2);
+const resolvedMemory = computed(
+  () => resourceMemory.value || autoMemoryForCpu(resourceCpu.value)
+);
+const memoryLabel = (val) => `${(parseInt(val, 10) / 1024).toFixed(0)} GB`;
+const cpuLabel = (cpu) =>
+  cpuOptions.find((o) => o.value === cpu)?.label || cpu;
+// Changing CPU invalidates a pinned memory value outside the new range — drop
+// back to automatic so we never submit an unsupported CPU/memory pair.
+watch(resourceCpu, () => {
+  if (
+    resourceMemory.value &&
+    !memoryOptions.value.some((o) => o.value === resourceMemory.value)
+  ) {
+    resourceMemory.value = "";
+  }
+});
 
 const configDefinition = ref(null);
 const definitionLoading = ref(false);
@@ -78,6 +108,10 @@ const dataTargetNodes = computed(() =>
 // the upload), so the upload-bucket target param is not asked of the user — it's
 // hidden from the launcher and left to its default.
 const isHiddenTargetParam = (name) => /bucket/i.test(name || "");
+// The destination folder/path param defaults to "/" (dataset root) so output
+// lands in the root folder unless the user picks somewhere else.
+const isOutputFolderParam = (name) =>
+  /(path|folder|prefix|dir(ectory)?|subpath|destination)/i.test(name || "");
 const hasVisibleTargetParams = computed(() =>
   dataTargetNodes.value.some((d) =>
     (dataTargetConfigs[d.id]?.params || []).some(
@@ -169,10 +203,12 @@ const canNext = computed(() => {
     case 1:
       return !!form.value.computeNodeId;
     case 2:
-      return !!form.value.datasetId;
+      return true; // resources always have a valid default (1 vCPU)
     case 3:
-      return dataSourcesComplete.value;
+      return !!form.value.datasetId;
     case 4:
+      return dataSourcesComplete.value;
+    case 5:
       return dataTargetsComplete.value;
     default:
       return true;
@@ -238,7 +274,12 @@ async function loadDefinition() {
           type: pd.type || "string",
           description: pd.description || "",
           required: pd.defaultValue == null,
-          value: pd.defaultValue != null ? String(pd.defaultValue) : "",
+          value:
+            pd.defaultValue != null
+              ? String(pd.defaultValue)
+              : isOutputFolderParam(pd.name)
+              ? "/"
+              : "",
         })),
       };
     }
@@ -366,6 +407,8 @@ function reset() {
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
+  resourceCpu.value = DEFAULT_CPU;
+  resourceMemory.value = "";
   step.value = 0;
   configDefinition.value = null;
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
@@ -389,7 +432,7 @@ watch(visible, (open) => {
 });
 
 const next = async () => {
-  if (step.value === 2) await loadDefinition();
+  if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
   if (step.value < stepTitles.length - 1) step.value++;
 };
 const back = () => {
@@ -428,6 +471,8 @@ async function execute() {
         nodeId: node.id,
         interactive: true,
         sessionType,
+        cpu: resourceCpu.value,
+        memory: resolvedMemory.value,
       });
     }
 
@@ -446,10 +491,11 @@ async function execute() {
 
     console.log("[Notebook] createRun payload:", JSON.stringify(payload, null, 2));
     const newRun = await store.dispatch("analysisModule/createRun", payload);
+    console.log("[Notebook] createRun response:", JSON.stringify(newRun, null, 2));
     EventBus.$emit("toast", {
       detail: {
         type: "success",
-        msg: "Notebook starting — it will appear under Active Notebooks.",
+        msg: "Starting your notebook…",
       },
     });
     store.commit("analysisModule/CLEAR_SELECTED_FILES");
@@ -470,7 +516,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 3 ? '840px' : '560px'"
+    :width="step === 4 ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -542,8 +588,47 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 2: Dataset -->
+      <!-- Step 2: Compute resources -->
       <div v-if="step === 2" class="wizard-step">
+        <p class="wizard-step-desc">
+          Choose the CPU and memory for this notebook's compute task.
+        </p>
+        <div class="resource-grid">
+          <div class="resource-field">
+            <label class="resource-label">CPU</label>
+            <el-select v-model="resourceCpu" size="default" style="width: 100%">
+              <el-option
+                v-for="opt in cpuOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </div>
+          <div class="resource-field">
+            <label class="resource-label">Memory</label>
+            <el-select v-model="resourceMemory" size="default" style="width: 100%">
+              <el-option
+                :label="`Automatic (${memoryLabel(autoMemoryForCpu(resourceCpu))})`"
+                value=""
+              />
+              <el-option
+                v-for="opt in memoryOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </div>
+        </div>
+        <p class="resource-hint">
+          Memory is set automatically based on the CPU unless you pick a specific
+          value. Higher tiers cost more — start small and scale up if needed.
+        </p>
+      </div>
+
+      <!-- Step 3: Dataset -->
+      <div v-if="step === 3" class="wizard-step">
         <p class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -589,8 +674,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 3: Input files -->
-      <div v-if="step === 3" class="wizard-step">
+      <!-- Step 4: Input files -->
+      <div v-if="step === 4" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -641,8 +726,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 4: Output destination -->
-      <div v-if="step === 4" class="wizard-step">
+      <!-- Step 5: Output destination -->
+      <div v-if="step === 5" class="wizard-step">
         <p class="wizard-step-desc">
           Configure where the notebook's results are saved.
         </p>
@@ -679,8 +764,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 5: Review -->
-      <div v-if="step === 5" class="wizard-step">
+      <!-- Step 6: Review -->
+      <div v-if="step === 6" class="wizard-step">
         <p class="wizard-step-desc">Review and start the notebook session.</p>
         <div class="wizard-summary">
           <div class="wizard-summary-row">
@@ -692,6 +777,13 @@ async function execute() {
           <div class="wizard-summary-row">
             <span class="wizard-summary-label">Compute Node</span>
             <span class="wizard-summary-value">{{ selectedComputeNode?.name }}</span>
+          </div>
+          <div class="wizard-summary-row">
+            <span class="wizard-summary-label">Resources</span>
+            <span class="wizard-summary-value">
+              {{ cpuLabel(resourceCpu) }} ·
+              {{ resourceMemory ? memoryLabel(resourceMemory) : `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` }}
+            </span>
           </div>
           <div class="wizard-summary-row">
             <span class="wizard-summary-label">Dataset</span>
@@ -914,6 +1006,29 @@ async function execute() {
   overflow-y: auto;
   border: 1px solid theme.$gray_2;
   border-radius: 6px;
+}
+
+/* compute resources */
+.resource-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.resource-field {
+  display: flex;
+  flex-direction: column;
+}
+.resource-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  margin-bottom: 6px;
+}
+.resource-hint {
+  font-size: 12px;
+  color: theme.$gray_4;
+  line-height: 1.5;
+  margin: 14px 0 0;
 }
 
 /* output targets */

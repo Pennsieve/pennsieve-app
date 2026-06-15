@@ -15,7 +15,7 @@
 // The notebook document + files live on EFS; in-memory kernel state is
 // ephemeral, so "resume" = reopen the .ipynb and re-run.
 
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -47,20 +47,42 @@ export async function endInteractiveSession(runId) {
   }
   const conn = await resp.json(); // { kernelUrl, token }
   const kernelBaseUrl = trimSlash(conn.kernelUrl);
-  const closeResp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
-    method: "POST",
-    credentials: "include",
-    headers: { Authorization: `Bearer ${conn.token}` },
-  });
-  if (!closeResp.ok) {
-    throw new Error(`Could not end the session (${closeResp.status}).`);
+  // Closing shuts the kernel server down, which tears the whole task (sidecar
+  // included) down mid-response — so the POST very often fails with a network/
+  // CORS error and NO HTTP response. That's the success path: treat a thrown
+  // fetch error as closed (mirrors the in-session close()). Only an actual
+  // non-OK HTTP response means the sidecar reached us and refused (e.g. auth),
+  // i.e. the kernel is genuinely still running.
+  try {
+    const closeResp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${conn.token}` },
+    });
+    if (!closeResp.ok) {
+      throw new Error(`Could not end the session (${closeResp.status}).`);
+    }
+  } catch (e) {
+    // Re-throw our own non-OK error; swallow a fetch/network failure (the task
+    // tore itself down, which is exactly what ending the session does).
+    if (e instanceof Error && /Could not end the session/.test(e.message)) {
+      throw e;
+    }
+    console.warn(
+      "[notebook] end-session close did not return cleanly (task likely torn down):",
+      e?.message || e
+    );
   }
 }
 
-// Save the notebook into output/ (a symlink to OUTPUT_DIR, relative to the
-// workspace root_dir) so it's persisted as a run output and passed to the next
-// workflow step — not left in the ephemeral workspace root.
-const NOTEBOOK_PATH = "output/notebook.ipynb";
+// Default path for a brand-new notebook: under output/ (a symlink to OUTPUT_DIR,
+// relative to the workspace root_dir) so it's persisted as a run output and
+// passed to the next workflow step — not left in the ephemeral workspace root.
+// When the user opens an existing notebook from input/, the working copy keeps
+// THAT notebook's filename under output/ (see openNotebookFrom), so the finalizer
+// upload overwrites the original by name. The active path is per-session
+// (notebookPath inside the composable), not this module-level default.
+const DEFAULT_NOTEBOOK_PATH = "output/notebook.ipynb";
 
 let cellSeq = 0;
 const newId = () => `cell-${Date.now().toString(36)}-${cellSeq++}`;
@@ -108,11 +130,51 @@ function nbCellsToCells(nbCells) {
   }));
 }
 
+// Jupyter kernelspec name to start for a given session/kernel type. The R image
+// registers IRkernel as "ir"; everything else is Python ("python3").
+const KERNEL_BY_SESSION = { r: "ir", jupyter: "python3", python: "python3" };
+
+// The /session/connect response doesn't include the session type, but the run
+// record does (its interactive node's sessionType). Resolve which Jupyter kernel
+// to start from it. Without this we'd start the server's DEFAULT kernel — which
+// is "python3" even in the R image (it also ships a Python kernel), so an R
+// session would wrongly open Python. Defaults to python3 on any failure.
+async function resolveKernelName(runId) {
+  try {
+    const token = await useGetToken();
+    const url = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
+      runId
+    )}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return "python3";
+    const run = await resp.json();
+    const nodes = run?.dag || run?.processors || [];
+    const node = nodes.find(
+      (n) =>
+        n?.runtimeConfig?.interactive ||
+        n?.interactive ||
+        n?.runtimeConfig?.sessionType ||
+        n?.sessionType
+    );
+    const st = node && (node.runtimeConfig?.sessionType || node.sessionType);
+    return KERNEL_BY_SESSION[st] || "python3";
+  } catch (_) {
+    return "python3";
+  }
+}
+
 export function useJupyterSession() {
   const status = ref("idle"); // idle | connecting | ready | error | closed
   // What to show while status === "connecting"; updated once we know whether
   // we're attaching to a live kernel or launching a fresh one.
   const connectingMessage = ref("Connecting to your notebook…");
+  // Coarse phase of the connect sequence so the UI can show a time-calibrated
+  // progress bar: "connecting" while we wait for the broker + Fargate task to
+  // come up (simulate ~1 min — covers a cold launch/image pull), then "kernel"
+  // once the task is up and we're attaching to the kernel (much shorter, ~16s).
+  const connectPhase = ref("idle"); // idle | connecting | kernel
   const kernelStatus = ref("unknown"); // idle | busy | starting | restarting | dead ...
   const kernelName = ref(""); // e.g. "Python 3.12.3" — from the kernel's info reply
   const error = ref(null);
@@ -128,7 +190,42 @@ export function useJupyterSession() {
   let contents = null;
   let kernel = null;
   let kernelBaseUrl = null;
+  // Active save path. A new notebook saves to output/notebook.ipynb; opening one
+  // from input/ retargets this to output/{originalName} so edits round-trip back
+  // to the same Pennsieve file (overwrite-by-name).
+  let notebookPath = DEFAULT_NOTEBOOK_PATH;
   let sessionToken = null; // broker-signed session JWT (NOT the Cognito token)
+  // nbformat kernelspec metadata for saved notebooks — captured from the live
+  // kernel so an R notebook is written with the R (ir) kernelspec, not a
+  // hard-coded Python one, and reopens with the right kernel.
+  let nbKernelSpecName = "python3";
+  let nbDisplayName = "Python 3";
+  let nbLanguage = "python";
+
+  // ---- autosave -------------------------------------------------------------
+
+  // Debounced autosave: persist to output/ a few seconds after edits settle so a
+  // navigate-away (or an idle/heartbeat reclaim) doesn't lose unsaved work — a
+  // later reconnect reopens whatever's in output/. save() flips dirty=false on
+  // success, so this won't loop.
+  const AUTOSAVE_DELAY_MS = 2500;
+  let autosaveTimer = null;
+  function cancelAutosave() {
+    if (autosaveTimer) {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = null;
+    }
+  }
+  watch(dirty, (isDirty) => {
+    if (!isDirty) return;
+    cancelAutosave();
+    autosaveTimer = setTimeout(() => {
+      autosaveTimer = null;
+      if (contents && status.value === "ready" && dirty.value && !saving.value) {
+        save();
+      }
+    }, AUTOSAVE_DELAY_MS);
+  });
 
   // ---- broker connect -------------------------------------------------------
 
@@ -182,7 +279,10 @@ export function useJupyterSession() {
   // Retry at 1.5s (down from 2s): with the ALB health-check ramp shortened to
   // ~10-15s, the kernel endpoint stops 502'ing quickly, so a tighter cadence
   // catches the first healthy response sooner. ~90s total window preserved.
-  async function acquireKernel(settings, { intervalMs = 1500, maxAttempts = 60 } = {}) {
+  async function acquireKernel(
+    settings,
+    { intervalMs = 1500, maxAttempts = 60, kernelName = "python3" } = {}
+  ) {
     let lastErr = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let km = null;
@@ -197,7 +297,10 @@ export function useJupyterSession() {
         } else {
           connectingMessage.value =
             "Starting your kernel… this can take a minute on first launch.";
-          k = await km.startNew({ name: "python3" });
+          // Start the kernel resolved from the run's sessionType (e.g. "ir" for
+          // R, "python3" for Jupyter). The R image also ships a Python kernel, so
+          // relying on the server default would wrongly start Python.
+          k = await km.startNew({ name: kernelName });
         }
         kernelManager = km;
         return k;
@@ -220,9 +323,13 @@ export function useJupyterSession() {
 
   async function connect(runId) {
     status.value = "connecting";
+    connectPhase.value = "connecting";
     connectingMessage.value = "Connecting to your notebook…";
     error.value = null;
     try {
+      // Resolve which kernel to start (from the run's sessionType) in parallel
+      // with the broker poll so it adds no latency.
+      const kernelNamePromise = resolveKernelName(runId);
       const conn = await fetchConnection(runId); // { kernelUrl, token, ... }
       kernelBaseUrl = trimSlash(conn.kernelUrl);
       sessionToken = conn.token;
@@ -240,22 +347,30 @@ export function useJupyterSession() {
       // — during which /api/kernels can 502 / fail CORS. KernelManager.ready
       // rejects on that, so retry the whole acquisition patiently instead of
       // surfacing a one-shot "failed to connect".
-      kernel = await acquireKernel(settings);
+      connectPhase.value = "kernel";
+      const kernelName_ = await kernelNamePromise;
+      kernel = await acquireKernel(settings, { kernelName: kernelName_ });
+
+      // Record the kernelspec for saved notebooks (so an R notebook is written
+      // with the R kernelspec, not a hard-coded Python one).
+      if (kernel?.name) nbKernelSpecName = kernel.name;
 
       kernel.statusChanged.connect((_, s) => {
         kernelStatus.value = s;
       });
       kernelStatus.value = kernel.status;
 
-      // Surface the real language + version (e.g. "Python 3.12.3") from the
-      // kernel's info reply, rather than a hard-coded label.
+      // Surface the real language + version (e.g. "Python 3.12.3" / "R 4.4.1")
+      // from the kernel's info reply, rather than a hard-coded label.
       kernel.info
         .then((info) => {
           const li = info?.language_info || {};
+          if (li.name) nbLanguage = li.name;
           const name = li.name
             ? li.name.charAt(0).toUpperCase() + li.name.slice(1)
             : "Kernel";
           kernelName.value = li.version ? `${name} ${li.version}` : name;
+          nbDisplayName = kernelName.value;
         })
         .catch(() => {});
 
@@ -269,21 +384,63 @@ export function useJupyterSession() {
 
   // ---- notebook load / save -------------------------------------------------
 
-  function loadNotebook() {
-    // A fresh interactive session always starts with an empty output/ folder —
-    // there's never a saved output/notebook.ipynb to reopen — so always start a
-    // new notebook rather than probing for one (which only ever 404s). To work
-    // from an existing notebook, the user opens one staged in input/ via the
-    // file browser (openNotebookFrom).
+  // The most recently modified .ipynb under output/, or null. On a brand-new
+  // session output/ is empty; after any save/autosave a working copy lives there,
+  // which is what lets a reconnect restore the document.
+  async function findOutputNotebook() {
+    if (!contents) return null;
+    try {
+      const model = await contents.get("output", { content: true });
+      const items = Array.isArray(model.content) ? model.content : [];
+      const nbs = items.filter(
+        (e) => e.type === "notebook" || /\.ipynb$/i.test(e.name)
+      );
+      if (!nbs.length) return null;
+      nbs.sort(
+        (a, b) =>
+          new Date(b.last_modified || 0) - new Date(a.last_modified || 0)
+      );
+      return nbs[0];
+    } catch (_) {
+      return null; // output/ may not exist yet
+    }
+  }
+
+  async function loadNotebook() {
+    // On reconnect the kernel + EFS persist across navigation, so an earlier
+    // session may have saved (or autosaved) a working copy under output/. Reopen
+    // the most recent one so code + outputs come back instead of a blank seeded
+    // notebook. Only seed when output/ has no notebook (a genuinely fresh start).
+    const saved = await findOutputNotebook();
+    if (saved) {
+      try {
+        const model = await contents.get(saved.path, {
+          content: true,
+          type: "notebook",
+        });
+        const loaded = nbCellsToCells(model.content?.cells);
+        cells.value = loaded.length ? loaded : seedCells();
+        notebookPath = saved.path;
+        dirty.value = false;
+        lastSavedAt.value = model.last_modified || null;
+        return;
+      } catch (_) {
+        // Fall through to a fresh seed if the saved copy can't be read.
+      }
+    }
     cells.value = seedCells();
+    notebookPath = DEFAULT_NOTEBOOK_PATH;
     dirty.value = false;
     lastSavedAt.value = null;
   }
 
-  // Load an existing .ipynb (e.g. one staged in input/) into the editor,
-  // REPLACING the current cells. Save still targets output/notebook.ipynb, so
-  // this imports the chosen notebook into the working session — left dirty until
-  // the user saves it out to OUTPUT_DIR.
+  // Open an existing .ipynb staged in input/ into the editor, then work on a
+  // COPY in output/ that keeps the same filename. input/ is the read-only origin
+  // (a file the platform staged); output/ is where edits land and what the
+  // finalizer uploads — so saving back with the same name overwrites the original
+  // Pennsieve file (the platform's only "edit" is upload-same-name-to-overwrite).
+  // We materialize the copy immediately so it exists in output/ even if the
+  // session is reclaimed (idle/timeout) before the first manual save.
   async function openNotebookFrom(path) {
     if (!contents) return false;
     try {
@@ -293,8 +450,14 @@ export function useJupyterSession() {
       });
       const loaded = nbCellsToCells(model.content?.cells);
       cells.value = loaded.length ? loaded : seedCells();
-      dirty.value = true;
+      // Working copy in output/ keeps the original basename so the upload
+      // overwrites the source file by name.
+      const basename = path.split("/").pop() || "notebook.ipynb";
+      notebookPath = `output/${basename}`;
       notebookSource.value = path;
+      // Persist the copy to output/ now; save() clears dirty on success.
+      const ok = await save();
+      if (!ok) dirty.value = true; // fall back to "unsaved" if the copy failed
       return true;
     } catch (e) {
       error.value = `Could not open ${path}: ${e?.message || e}`;
@@ -344,8 +507,10 @@ export function useJupyterSession() {
         return base;
       }),
       metadata: {
-        kernelspec: { name: "python3", display_name: "Python 3" },
-        language_info: { name: "python" },
+        // Captured from the live kernel so an R notebook saves with the R
+        // (ir) kernelspec and reopens with the right kernel.
+        kernelspec: { name: nbKernelSpecName, display_name: nbDisplayName },
+        language_info: { name: nbLanguage },
       },
       nbformat: 4,
       nbformat_minor: 5,
@@ -358,7 +523,7 @@ export function useJupyterSession() {
     if (!contents) return false;
     saving.value = true;
     try {
-      const model = await contents.save(NOTEBOOK_PATH, {
+      const model = await contents.save(notebookPath, {
         type: "notebook",
         format: "json",
         content: toNbformat(),
@@ -633,6 +798,7 @@ export function useJupyterSession() {
   // Drop the local kernel/contents connections WITHOUT ending the session, so
   // navigating away / closing the tab leaves the kernel running to reconnect to.
   function disconnect() {
+    cancelAutosave();
     try { kernel?.dispose?.(); } catch (_) {}
     try { kernelManager?.dispose?.(); } catch (_) {}
     try { contents?.dispose?.(); } catch (_) {}
@@ -641,9 +807,57 @@ export function useJupyterSession() {
     contents = null;
   }
 
+  // Remove everything UNDER output/ (but keep the folder itself — it's the
+  // symlink to OUTPUT_DIR the finalizer reads) so a discarded session uploads
+  // nothing to Pennsieve. Used by the "discard & end" path before close()
+  // triggers the finalizer. Recurses depth-first because the Contents API
+  // refuses to delete a non-empty directory; best-effort per entry.
+  async function clearOutputDir() {
+    if (!contents) return;
+    const deleteTree = async (path) => {
+      let model;
+      try {
+        model = await contents.get(path, { content: true });
+      } catch (_) {
+        return;
+      }
+      if (Array.isArray(model.content)) {
+        for (const child of model.content) await deleteTree(child.path);
+      }
+      try {
+        await contents.delete(path);
+      } catch (err) {
+        console.warn(
+          `[notebook] could not delete ${path} during discard:`,
+          err?.message || err
+        );
+      }
+    };
+    let root;
+    try {
+      root = await contents.get("output", { content: true });
+    } catch (_) {
+      return; // no output/ — nothing to clear
+    }
+    const items = Array.isArray(root.content) ? root.content : [];
+    for (const e of items) await deleteTree(e.path);
+  }
+
   // End the session: ask the sidecar to close (it shuts the kernel server down,
   // which makes the container return the task token so the workflow resumes).
-  async function close() {
+  // discardOutput clears output/ first so a "close without saving" uploads
+  // nothing — the whole session's results (notebook + any generated files) are
+  // thrown away, matching the user's explicit choice. (An involuntary
+  // idle/timeout reclaim never runs this, so it still keeps the autosaved work.)
+  async function close({ discardOutput = false } = {}) {
+    if (discardOutput) {
+      // Stop autosave and mark clean so nothing re-creates output/notebook.ipynb
+      // between the wipe and the close (the navigate-away/route-leave guards key
+      // off dirty + status), then clear output/ while contents is still live.
+      cancelAutosave();
+      dirty.value = false;
+      await clearOutputDir();
+    }
     if (!kernelBaseUrl) {
       disconnect();
       status.value = "closed";
@@ -687,6 +901,7 @@ export function useJupyterSession() {
     // state
     status,
     connectingMessage,
+    connectPhase,
     kernelStatus,
     kernelName,
     error,

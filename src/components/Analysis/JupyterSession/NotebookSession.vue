@@ -4,13 +4,14 @@
 // not a child of Analysis — so it does not inherit the Analysis tab bar
 // (Runs/Workflows/...). A simple BfRafter breadcrumb provides "back to the run".
 // The live kernel lifecycle lives in JupyterSession.vue + useJupyterSession.
-import { computed, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import BfPage from "../../layout/BfPage/BfPage.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import OrgBreadcrumb from "../../shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 import JupyterSession from "./JupyterSession.vue";
+import { useGetToken } from "@/composables/useGetToken";
 
 const props = defineProps({
   // Passed by the router (props: { page: true }); falls back to the route, then
@@ -37,28 +38,55 @@ let prevNavCondensed = false;
 onMounted(() => {
   prevNavCondensed = store.state.primaryNavCondensed;
   store.dispatch("condensePrimaryNav", true);
+  resolveRunName();
 });
+
+// The notebook is named after its workflow run, so the breadcrumb's final crumb
+// (and page title) shows the run name. Prefer an already-loaded run from the
+// store (navigating in from the Notebooks/Runs list), otherwise fetch the run
+// record directly. Falls back to "Notebook" until/unless a name is available.
+const runName = ref("");
+async function resolveRunName() {
+  const id = resolvedRunId.value;
+  if (!id) return;
+  const cached = (store.getters["analysisModule/workflowInstances"] || []).find(
+    (r) => r.uuid === id
+  );
+  if (cached?.name) {
+    runName.value = cached.name.trim();
+    return;
+  }
+  try {
+    const token = await useGetToken();
+    const url = `${store.state.config.api2Url}/compute/workflows/runs/${id}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return;
+    const run = await resp.json();
+    if (typeof run?.name === "string") runName.value = run.name.trim();
+  } catch {
+    /* best-effort: leave the default "Notebook" title */
+  }
+}
 onBeforeUnmount(() => {
   store.dispatch("condensePrimaryNav", prevNavCondensed);
 });
 
-// Analysis › Runs › this run › Notebook (the run crumb links back to the run).
-// Every route is fully-qualified with orgId — vue-router does not inherit params
-// for named-route links, so omitting it throws "Missing required param orgId".
+// Workspace › Analysis › Notebooks › Notebook (the Notebooks crumb links back to
+// the Notebooks tab). Every route is fully-qualified with orgId — vue-router does
+// not inherit params for named-route links, so omitting it throws "Missing
+// required param orgId".
 const workspaceRoute = computed(() => ({
   name: "datasets-list",
   params: { orgId: resolvedOrgId.value },
 }));
 const crumbs = computed(() => [
-  { name: "Runs", route: { name: "runs", params: { orgId: resolvedOrgId.value } } },
   {
-    name: "Run Details",
-    route: {
-      name: "run-detail",
-      params: { orgId: resolvedOrgId.value, runId: resolvedRunId.value },
-    },
+    name: "Notebooks",
+    route: { name: "notebooks", params: { orgId: resolvedOrgId.value } },
   },
-  { name: "Notebook" },
+  { name: runName.value || "Notebook" },
 ]);
 </script>
 
