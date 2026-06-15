@@ -3,12 +3,16 @@
     xmlns="http://www.w3.org/2000/svg"
     :width="width"
     :height="height"
-    :fill="fill"
-    :stroke="stroke"
     viewBox="0 0 24 24"
+    role="img"
   >
-    <circle pid="0" cx="12" cy="12" r="8"/><path pid="1" d="M12 11.289l-2.139-2.14a.504.504 0 1 0-.712.712l2.139 2.14-2.139 2.139a.504.504 0 1 0 .712.712L12 12.713l2.139 2.14a.504.504 0 1 0 .712-.713L12.712 12l2.139-2.139a.504.504 0 1 0-.712-.712z" />
-
+    <!-- Solid circle in `color`; the X is knocked out in `xColor` (white by
+         default) so it stays legible on a saturated/dark circle. -->
+    <circle cx="12" cy="12" r="8" :fill="color" />
+    <path
+      :fill="xColor"
+      d="M12 11.289l-2.139-2.14a.504.504 0 1 0-.712.712l2.139 2.14-2.139 2.139a.504.504 0 1 0 .712.712L12 12.713l2.139 2.14a.504.504 0 1 0 .712-.713L12.712 12l2.139-2.139a.504.504 0 1 0-.712-.712z"
+    />
   </svg>
 </template>
 
@@ -24,13 +28,15 @@ export default {
       type: Number,
       default: 16,
     },
-    fill: {
+    // Circle fill. Defaults to currentColor so it inherits the CSS `color`.
+    color: {
       type: String,
       default: "currentColor",
     },
-    stroke: {
+    // Fill of the "X". White by default for clear contrast on a colored circle.
+    xColor: {
       type: String,
-      default: "black",
+      default: "#ffffff",
     },
   },
 };

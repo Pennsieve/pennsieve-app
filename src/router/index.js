@@ -140,6 +140,8 @@ const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityM
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
+const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
+const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
@@ -181,6 +183,21 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
+    },
+    {
+      // Interactive Jupyter notebook for a run. Its own page (keeps the
+      // BfNavigation left menu) but NOT a child of Analysis, so it doesn't show
+      // the Analysis tab bar — just a breadcrumb back to the run.
+      name: 'run-notebook',
+      path: '/:orgId/analysis/runs/:runId/notebook',
+      components: {
+        page: NotebookSession,
+        navigation: BfNavigation,
+      },
+      // navigation: true passes :orgId to BfNavigation (it builds links from the
+      // orgId prop); without it the left-nav router-links throw "Missing
+      // required param orgId".
+      props: { page: true, navigation: true },
     },
     {
       name: 'my-workspace',
@@ -1609,6 +1626,13 @@ const router = createRouter({
           path: 'runs',
           components: {
             stage: RunsOverview,
+          }
+        },
+        {
+          name: 'notebooks',
+          path: 'notebooks',
+          components: {
+            stage: NotebooksOverview,
           }
         },
         {

@@ -159,7 +159,7 @@ async function doDeleteMontage(evt) {
       >
         <template #operations>
           <div v-if="montage.name === selectedMontageName" class="icon-wrapper">
-            <IconXCircle stroke="#808fad" fill="#808fad" class="active-indicator"/>
+            <IconXCircle color="#808fad" x-color="#808fad" class="active-indicator"/>
           </div>
         </template>
         <template #items>

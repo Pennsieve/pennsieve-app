@@ -1,10 +1,13 @@
 <script setup>
 import { computed, ref, watch, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
+import IconControllerPlay from "../../icons/IconControllerPlay.vue";
+import IconXCircle from "../../icons/IconXCircle.vue";
+import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
@@ -22,6 +25,7 @@ import {
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
 
 /*
@@ -179,6 +183,40 @@ watch(dashboardRange, () => {
 */
 const selectRun = (run) => {
   router.push({ name: "run-detail", params: { runId: run.uuid } });
+};
+
+// Open the interactive notebook for a run waiting on a user session. run-notebook
+// is a top-level route, so orgId must be passed explicitly (route param, with a
+// store fallback).
+const openNotebook = (run) => {
+  const orgId =
+    route.params.orgId || store.state.activeOrganization?.organization?.id;
+  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+};
+
+// End the interactive session for a run (clean resume) without opening it.
+// Confirmed via the in-app Pennsieve dialog (not the browser prompt).
+const endingRunId = ref(null);
+const confirmEndRun = ref(null);
+const endRunError = ref("");
+const endRun = (run) => {
+  if (endingRunId.value) return;
+  endRunError.value = "";
+  confirmEndRun.value = run;
+};
+const confirmEndSession = async () => {
+  const run = confirmEndRun.value;
+  if (!run || endingRunId.value) return;
+  endingRunId.value = run.uuid;
+  endRunError.value = "";
+  try {
+    await endInteractiveSession(run.uuid);
+    confirmEndRun.value = null;
+  } catch (e) {
+    endRunError.value = e?.message || "Could not end the interactive session.";
+  } finally {
+    endingRunId.value = null;
+  }
 };
 
 /*
@@ -396,6 +434,27 @@ onBeforeUnmount(() => {
               class="active-run-card"
               @click="selectRun(run)"
             >
+              <div
+                v-if="run.interactive && run.status === 'STARTED'"
+                class="active-run-actions"
+                @click.stop
+              >
+                <button
+                  class="active-run-action active-run-action--end"
+                  title="End interactive session — resumes the workflow"
+                  :disabled="endingRunId === run.uuid"
+                  @click="endRun(run)"
+                >
+                  <IconXCircle :width="15" :height="15" color="#c14d49" />
+                </button>
+                <button
+                  class="active-run-action active-run-action--play"
+                  title="Open interactive notebook"
+                  @click="openNotebook(run)"
+                >
+                  <IconControllerPlay :width="16" :height="10" color="#011f5b" />
+                </button>
+              </div>
               <div class="active-run-name">{{ runDisplayName(run) || 'Unnamed run' }}</div>
               <div v-if="run.name && run.workflowName" class="active-run-subtitle">{{ run.workflowName }}</div>
               <div class="active-run-meta">
@@ -567,6 +626,34 @@ onBeforeUnmount(() => {
         </el-collapse>
       </div>
     </div>
+
+    <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
+    <el-dialog
+      :model-value="!!confirmEndRun"
+      @update:model-value="(v) => { if (!v && !endingRunId) confirmEndRun = null; }"
+      title="End interactive session?"
+      width="460px"
+      :close-on-click-modal="!endingRunId"
+      :show-close="!endingRunId"
+      align-center
+    >
+      <p style="margin: 0; color: #4d4d4d; line-height: 1.5;">
+        Ending the session shuts down the notebook kernel and resumes the
+        workflow at the next step. Any unsaved notebook changes will be lost —
+        open the notebook first if you need to save your work.
+      </p>
+      <p v-if="endRunError" style="margin: 12px 0 0; color: #c14d49; font-size: 13px;">
+        {{ endRunError }}
+      </p>
+      <template #footer>
+        <bf-button class="secondary mr-8" :disabled="!!endingRunId" @click="confirmEndRun = null">
+          Cancel
+        </bf-button>
+        <bf-button class="red" :disabled="!!endingRunId" @click="confirmEndSession">
+          {{ endingRunId ? 'Ending…' : 'End Session' }}
+        </bf-button>
+      </template>
+    </el-dialog>
 
     <!-- Wizard Dialog -->
     <el-dialog
@@ -880,6 +967,7 @@ onBeforeUnmount(() => {
 }
 
 .active-run-card {
+  position: relative;
   background: theme.$white;
   border: 1px solid #67e8f9;
   border-radius: 4px;
@@ -891,6 +979,45 @@ onBeforeUnmount(() => {
     border-color: #06b6d4;
     box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15);
   }
+}
+
+.active-run-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+}
+.active-run-action {
+  width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #b3bcce;
+  background: #fff;
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover {
+    background: #e6e9ef;
+    border-color: #011f5b;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+.active-run-action--end:hover {
+  background: #feeeec; /* red_tint */
+  border-color: #c14d49; /* red_2 */
+}
+/* The play glyph fills the left half of its 0 0 20 12 viewBox — nudge to center. */
+.active-run-action--play svg {
+  transform: translateX(4px);
 }
 
 .active-run-name {
