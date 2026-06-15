@@ -127,16 +127,31 @@ const incomingEdgeColor = (nodeId) => {
   return edge?.style?.stroke || "#cccccc";
 };
 
+const DEFAULT_COMPUTE_TYPES = ["standard", "lambda", "gpu"];
+
+// Display label for a compute type; "gpu" should read as "GPU", others Title-cased.
+const formatComputeTypeLabel = (ct) => {
+  if (!ct) return "";
+  if (ct === "gpu") return "GPU";
+  return ct.charAt(0).toUpperCase() + ct.slice(1);
+};
+
+// Ensure "gpu" is always selectable, even when the API-supplied list omits it.
+const withGpu = (types) =>
+  types.includes("gpu") ? types : [...types, "gpu"];
+
 const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.runtimeConfig?.computeTypes || [];
+  const types = tt?.runtimeConfig?.computeTypes;
+  return types && types.length ? withGpu(types) : [];
 };
 
 const getComputeTypesForProcessor = (sourceUrl) => {
-  if (!sourceUrl) return ["standard", "lambda"];
+  if (!sourceUrl) return DEFAULT_COMPUTE_TYPES;
   const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
-  return app?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+  const types = app?.runtimeConfig?.computeTypes;
+  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
 
 /* Version helpers — match WorkflowBuilder */
@@ -1611,7 +1626,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       store.dispatch("analysisModule/fetchTargetTypes"),
-      store.dispatch("analysisModule/fetchApplications", { force: true }),
+      store.dispatch("analysisModule/fetchApplications"),
       fetchOrgCounters(),
     ]);
   } catch (err) {
@@ -1972,7 +1987,7 @@ onUnmounted(() => {
                     <el-option
                       v-for="ct in getComputeTypesForProcessor(selectedNode.data?.sourceUrl)"
                       :key="ct"
-                      :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                      :label="formatComputeTypeLabel(ct)"
                       :value="ct"
                     />
                   </el-select>
@@ -2156,7 +2171,7 @@ onUnmounted(() => {
                     <el-option
                       v-for="ct in getComputeTypesForTarget(selectedNode.data?.targetType)"
                       :key="ct"
-                      :label="ct"
+                      :label="formatComputeTypeLabel(ct)"
                       :value="ct"
                     />
                   </el-select>

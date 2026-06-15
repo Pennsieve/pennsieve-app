@@ -134,6 +134,8 @@ const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/Comp
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
+const AppManifestGuide = () => import ('../components/Analysis/Applications/AppManifestGuide.vue')
+const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
@@ -1678,6 +1680,20 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsGrid,
+          }
+        },
+        {
+          name: 'application-manifest-guide',
+          path: 'applications/manifest-guide',
+          components: {
+            stage: AppManifestGuide,
+          }
+        },
+        {
+          name: 'application-manifest-builder',
+          path: 'applications/manifest-builder',
+          components: {
+            stage: AppManifestBuilder,
           }
         },
         {

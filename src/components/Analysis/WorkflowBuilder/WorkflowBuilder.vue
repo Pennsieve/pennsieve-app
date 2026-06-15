@@ -242,13 +242,31 @@ const getUserName = (userId) => {
     : String(userId);
 };
 
+const DEFAULT_COMPUTE_TYPES = ["standard", "lambda", "gpu"];
+
+// Display label for a compute type; "gpu" should read as "GPU", others Title-cased.
+const formatComputeTypeLabel = (ct) => {
+  if (!ct) return "";
+  if (ct === "gpu") return "GPU";
+  return ct.charAt(0).toUpperCase() + ct.slice(1);
+};
+
+// Ensure "gpu" is always selectable, even when the API-supplied list omits it.
+const withGpu = (types) =>
+  types.includes("gpu") ? types : [...types, "gpu"];
+
 const getComputeTypesForTarget = (targetType) => {
-  if (!targetType) return ["standard", "lambda"];
+  if (!targetType) return DEFAULT_COMPUTE_TYPES;
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   // TODO: use API-driven computeTypes once target types return them reliably
-  // return tt?.runtimeConfig?.computeTypes || ["standard", "lambda"];
+  // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? types : ["standard", "lambda"];
+  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+};
+
+const getComputeTypesForApplication = (application) => {
+  const types = application?.runtimeConfig?.computeTypes;
+  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -1397,7 +1415,7 @@ const openNodeSettings = (id) => {
                           selectedNode.data.targetType,
                         )"
                         :key="ct"
-                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :label="formatComputeTypeLabel(ct)"
                         :value="ct"
                       />
                     </el-select>
@@ -1531,12 +1549,11 @@ const openNodeSettings = (id) => {
                     >
                       <!-- TODO: use API-driven computeTypes once applications return them reliably -->
                       <el-option
-                        v-for="ct in (selectedNode.data.application
-                          ?.runtimeConfig?.computeTypes?.length
-                          ? selectedNode.data.application.runtimeConfig.computeTypes
-                          : ['standard', 'lambda'])"
+                        v-for="ct in getComputeTypesForApplication(
+                          selectedNode.data.application,
+                        )"
                         :key="ct"
-                        :label="ct.charAt(0).toUpperCase() + ct.slice(1)"
+                        :label="formatComputeTypeLabel(ct)"
                         :value="ct"
                       />
                     </el-select>

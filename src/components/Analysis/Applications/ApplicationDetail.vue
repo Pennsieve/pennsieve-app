@@ -78,6 +78,12 @@ const isAppOwner = computed(() => {
 // Permissions only apply to private applications.
 const isPublic = computed(() => detail.value?.isPrivate === false);
 
+// Private GitHub repos return 401 from raw.githubusercontent.com, so we can't
+// render their README (or its images) in the browser. Show a link instead.
+const isPrivateRepo = computed(
+  () => detail.value?.visibility === "private" || detail.value?.isPrivate === true
+);
+
 // Keep the local detail in sync when the archive toggle changes status.
 const onArchiveChange = (status) => {
   if (detail.value) detail.value = { ...detail.value, status };
@@ -257,7 +263,14 @@ const loadDetail = async (uuid) => {
 
     if (detailResult.status === "fulfilled") {
       detail.value = detailResult.value;
-      renderReadme(getReadmeContent(detailResult.value?.assets));
+      // Only render the README for public repos. Private repo assets aren't
+      // reachable from the browser, so we surface a GitHub link instead.
+      const detailIsPrivate =
+        detailResult.value?.visibility === "private" ||
+        detailResult.value?.isPrivate === true;
+      if (!detailIsPrivate) {
+        renderReadme(getReadmeContent(detailResult.value?.assets));
+      }
     } else {
       console.error(detailResult.reason);
       detailError.value = "Failed to load application";
@@ -346,7 +359,19 @@ watch(
               </span>
             </el-tooltip>
           </div>
-          <div v-if="!readmeHtml" class="readme-empty">
+          <div v-if="isPrivateRepo" class="readme-empty readme-private">
+            <p>README preview isn't available for private repositories.</p>
+            <a
+              v-if="githubRepoUrl"
+              :href="githubRepoUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="readme-github-link"
+            >
+              View README on GitHub
+            </a>
+          </div>
+          <div v-else-if="!readmeHtml" class="readme-empty">
             No README available
           </div>
           <div v-else class="readme-content" v-html="readmeHtml" />
@@ -641,6 +666,17 @@ watch(
   text-align: center;
   color: theme.$gray_4;
   font-size: 14px;
+}
+
+.readme-private {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  p {
+    margin: 0;
+  }
 }
 
 .readme-content {
