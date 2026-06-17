@@ -84,6 +84,10 @@ const isPrivateRepo = computed(
   () => detail.value?.visibility === "private" || detail.value?.isPrivate === true
 );
 
+// Anyone can open a public repo on GitHub. A private repo is only viewable by
+// the owner (others must request permission from the repo owner).
+const canViewOnGitHub = computed(() => !isPrivateRepo.value || isAppOwner.value);
+
 // Keep the local detail in sync when the archive toggle changes status.
 const onArchiveChange = (status) => {
   if (detail.value) detail.value = { ...detail.value, status };
@@ -335,13 +339,13 @@ watch(
             <span class="readme-title">README</span>
             <el-tooltip
               v-if="githubRepoUrl"
-              :content="isAppOwner ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
+              :content="canViewOnGitHub ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
               placement="top"
-              :disabled="isAppOwner"
+              :disabled="canViewOnGitHub"
             >
               <span class="github-link-wrap">
                 <a
-                  v-if="isAppOwner"
+                  v-if="canViewOnGitHub"
                   :href="githubRepoUrl"
                   target="_blank"
                   rel="noopener noreferrer"
