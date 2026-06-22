@@ -293,7 +293,7 @@ onBeforeUnmount(() => {
               + New Notebook
             </bf-button>
             <bf-button
-              class="secondary"
+              class="ghost"
               :disabled="!hasEnvBuilder"
               :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
               @click="createEnvVisible = true"
@@ -463,6 +463,8 @@ onBeforeUnmount(() => {
 }
 .info-card-actions {
   margin-top: 16px;
+  display: flex;
+  gap: 12px;
 }
 .info-card {
   background: theme.$gray_1;
