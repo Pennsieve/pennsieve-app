@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import LayerTypeIcon from './LayerTypeIcon.vue'
 
 const props = defineProps({
   nodeId: {
@@ -190,7 +191,10 @@ async function confirmDeleteLayer(layer) {
         <tbody>
           <tr v-for="layer in layers" :key="layer.layerName">
             <td>
-              <div class="layer-name">{{ layer.layerName }}</div>
+              <div class="layer-name">
+                <LayerTypeIcon :layer-type="layer.layerType" :size="18" />
+                <span>{{ layer.layerName }}</span>
+              </div>
               <div v-if="layer.description" class="layer-description">{{ layer.description }}</div>
             </td>
             <td>
@@ -400,6 +404,9 @@ async function confirmDeleteLayer(layer) {
 }
 
 .layer-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: 'Courier New', monospace;
   font-weight: 500;
   color: theme.$gray_6;
