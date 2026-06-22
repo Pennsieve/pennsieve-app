@@ -70,15 +70,21 @@ const stepTitles = [
 // Fargate CPU/memory for the notebook task. Lowest tier is 1 vCPU (1024). Memory
 // can be set automatically (balanced for the CPU) or pinned to a specific value.
 const DEFAULT_CPU = "1024"; // 1 vCPU
+// Sentinel for "let the platform pick memory for the chosen CPU". A non-empty
+// value is used deliberately: Element Plus won't render the label of an
+// empty-string-valued <el-option>, which would leave the Memory select looking
+// blank instead of showing the default.
+const AUTO_MEMORY = "auto";
 const resourceCpu = ref(DEFAULT_CPU);
-const resourceMemory = ref(""); // "" → automatic
+const resourceMemory = ref(AUTO_MEMORY);
 const cpuOptions = STANDARD_CPU_OPTIONS;
 const memoryOptions = computed(() => getStandardMemoryOptions(resourceCpu.value));
 // Balanced default memory for a CPU when memory is left automatic: 2 GB per vCPU
 // (the low end of each CPU's valid range), e.g. 1 vCPU → 2 GB, 4 vCPU → 8 GB.
 const autoMemoryForCpu = (cpu) => String(parseInt(cpu, 10) * 2);
-const resolvedMemory = computed(
-  () => resourceMemory.value || autoMemoryForCpu(resourceCpu.value)
+const isAutoMemory = computed(() => resourceMemory.value === AUTO_MEMORY);
+const resolvedMemory = computed(() =>
+  isAutoMemory.value ? autoMemoryForCpu(resourceCpu.value) : resourceMemory.value
 );
 const memoryLabel = (val) => `${(parseInt(val, 10) / 1024).toFixed(0)} GB`;
 const cpuLabel = (cpu) =>
@@ -87,10 +93,10 @@ const cpuLabel = (cpu) =>
 // back to automatic so we never submit an unsupported CPU/memory pair.
 watch(resourceCpu, () => {
   if (
-    resourceMemory.value &&
+    !isAutoMemory.value &&
     !memoryOptions.value.some((o) => o.value === resourceMemory.value)
   ) {
-    resourceMemory.value = "";
+    resourceMemory.value = AUTO_MEMORY;
   }
 });
 
@@ -408,7 +414,7 @@ function reset() {
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
   resourceCpu.value = DEFAULT_CPU;
-  resourceMemory.value = "";
+  resourceMemory.value = AUTO_MEMORY;
   step.value = 0;
   configDefinition.value = null;
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
@@ -613,7 +619,7 @@ async function execute() {
             <el-select v-model="resourceMemory" size="default" style="width: 100%">
               <el-option
                 :label="`Automatic (${memoryLabel(autoMemoryForCpu(resourceCpu))})`"
-                value=""
+                :value="AUTO_MEMORY"
               />
               <el-option
                 v-for="opt in memoryOptions"
@@ -800,7 +806,7 @@ async function execute() {
             <span class="wizard-summary-label">Resources</span>
             <span class="wizard-summary-value">
               {{ cpuLabel(resourceCpu) }} ·
-              {{ resourceMemory ? memoryLabel(resourceMemory) : `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` }}
+              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }}
             </span>
           </div>
           <div class="wizard-summary-row">
