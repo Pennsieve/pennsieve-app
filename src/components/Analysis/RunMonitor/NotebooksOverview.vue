@@ -15,6 +15,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
+import EnvironmentsSection from "./EnvironmentsSection.vue";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -359,6 +360,8 @@ onBeforeUnmount(() => {
           <h3>No notebooks yet</h3>
           <p>Start a notebook to work with your data interactively.</p>
         </div>
+
+        <environments-section />
       </template>
 
     <new-notebook-dialog
