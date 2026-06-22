@@ -279,12 +279,14 @@ onBeforeUnmount(() => {
   <div class="notebooks-container">
       <div class="info-section">
         <div class="info-card">
-          <h3>Notebooks</h3>
+          <h3>Notebooks &amp; Environments</h3>
           <p>
-            Launch an interactive Jupyter notebook on your data in a few clicks —
-            pick a kernel, compute node, and input files, and start exploring.
-            For multi-step analyses, add a notebook step to a custom workflow
-            under
+            Launch an interactive Jupyter or R notebook on your data in a few
+            clicks — pick a kernel, compute node, and input files, and start
+            exploring. Create a reusable <strong>environment</strong> from a
+            <code>requirements.txt</code> to preinstall the Python or R packages
+            you need, then attach it when you launch a notebook. For multi-step
+            analyses, add a notebook step to a custom workflow under
             <router-link :to="{ name: 'workflows' }" class="info-card-link">
               Workflows</router-link
             >.
