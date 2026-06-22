@@ -232,7 +232,7 @@ async function submit() {
   font-size: 13px;
   color: theme.$gray_6;
   background: #faeeda;
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 12px;
 }
 .env-label {
@@ -250,7 +250,7 @@ async function submit() {
   flex: 1;
   padding: 10px;
   border: 1px solid theme.$gray_3;
-  border-radius: 6px;
+  border-radius: 3px;
   background: theme.$white;
   font-size: 13px;
   color: theme.$gray_6;
@@ -291,7 +291,7 @@ async function submit() {
   align-items: center;
   padding: 0 11px;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
+  border-radius: 3px;
   background: theme.$gray_1;
   color: theme.$gray_6;
   font-size: 13px;
