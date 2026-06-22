@@ -15,6 +15,9 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
+import EnvironmentsSection from "./EnvironmentsSection.vue";
+import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -25,9 +28,10 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookWorkflow, interactiveCapable } from "./notebookHelpers";
 
 const store = useStore();
+const computeResources = useComputeResourcesStore();
 const router = useRouter();
 const route = useRoute();
 const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
@@ -44,6 +48,24 @@ const getUserName = (userId) =>
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
+// Public "Pennsieve - Build {Python,R} Environment" workflows, resolved from the
+// definitions list and handed to the create-environment dialog (one per language).
+const buildPythonEnvWorkflow = ref(null);
+const buildREnvWorkflow = ref(null);
+const buildEnvWorkflows = computed(() => ({
+  python: buildPythonEnvWorkflow.value,
+  r: buildREnvWorkflow.value,
+}));
+const hasEnvBuilder = computed(
+  () => !!buildPythonEnvWorkflow.value || !!buildREnvWorkflow.value
+);
+const computeNodesList = computed(() =>
+  (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
+);
+const createEnvVisible = ref(false);
+function onEnvCreated({ nodeId }) {
+  if (nodeId) computeResources.fetchNodeLayers(nodeId, true);
+}
 const isLoading = ref(false);
 const dialogVisible = ref(false);
 
@@ -76,7 +98,16 @@ async function fetchNotebookWorkflows() {
       }
     }
     const all = [...byId.values()];
-    notebookWorkflows.value = all.filter(isNotebookWorkflow);
+    // Require the Official flag (set by Pennsieve, not user-settable) so a workflow
+    // a user merely *names* "Pennsieve - …" can't masquerade as an official kernel
+    // or environment builder. Name still selects which official workflow it is.
+    const official = all.filter((w) => w?.official);
+    notebookWorkflows.value = official.filter(isNotebookWorkflow);
+    buildPythonEnvWorkflow.value =
+      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
+      null;
+    buildREnvWorkflow.value =
+      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
@@ -248,12 +279,14 @@ onBeforeUnmount(() => {
   <div class="notebooks-container">
       <div class="info-section">
         <div class="info-card">
-          <h3>Notebooks</h3>
+          <h3>Notebooks &amp; Environments</h3>
           <p>
-            Launch an interactive Jupyter notebook on your data in a few clicks —
-            pick a kernel, compute node, and input files, and start exploring.
-            For multi-step analyses, add a notebook step to a custom workflow
-            under
+            Launch an interactive Jupyter or R notebook on your data in a few
+            clicks — pick a kernel, compute node, and input files, and start
+            exploring. Create a reusable <strong>environment</strong> from a
+            <code>requirements.txt</code> to preinstall the Python or R packages
+            you need, then attach it when you launch a notebook. For multi-step
+            analyses, add a notebook step to a custom workflow under
             <router-link :to="{ name: 'workflows' }" class="info-card-link">
               Workflows</router-link
             >.
@@ -264,6 +297,14 @@ onBeforeUnmount(() => {
               @click="dialogVisible = true"
             >
               + New Notebook
+            </bf-button>
+            <bf-button
+              class="ghost"
+              :disabled="!hasEnvBuilder"
+              :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
+              @click="createEnvVisible = true"
+            >
+              + New Environment
             </bf-button>
           </div>
         </div>
@@ -359,12 +400,21 @@ onBeforeUnmount(() => {
           <h3>No notebooks yet</h3>
           <p>Start a notebook to work with your data interactively.</p>
         </div>
+
+        <environments-section />
       </template>
 
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       @created="onNotebookCreated"
+    />
+
+    <create-environment-dialog
+      v-model="createEnvVisible"
+      :build-workflows="buildEnvWorkflows"
+      :compute-nodes="computeNodesList"
+      @created="onEnvCreated"
     />
 
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
@@ -419,6 +469,8 @@ onBeforeUnmount(() => {
 }
 .info-card-actions {
   margin-top: 16px;
+  display: flex;
+  gap: 12px;
 }
 .info-card {
   background: theme.$gray_1;

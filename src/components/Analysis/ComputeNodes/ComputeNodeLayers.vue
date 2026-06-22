@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import LayerTypeIcon from './LayerTypeIcon.vue'
 
 const props = defineProps({
   nodeId: {
@@ -35,6 +36,21 @@ const isValidName = computed(() => {
 onMounted(async () => {
   await computeResourcesStore.fetchNodeLayers(props.nodeId)
 })
+
+// Click-to-expand: which layer's detail panel is open (by name; null = none).
+const expandedLayer = ref(null)
+function toggleLayer(name) {
+  expandedLayer.value = expandedLayer.value === name ? null : name
+}
+
+const LAYER_TYPE_LABELS = {
+  'python-env': 'Python environment',
+  'r-env': 'R environment',
+  data: 'Data layer',
+}
+function layerTypeLabel(layerType) {
+  return LAYER_TYPE_LABELS[layerType] || 'Data layer'
+}
 
 function formatSize(sizeBytes) {
   if (!sizeBytes || sizeBytes === 0) return '\u2014'
@@ -188,9 +204,14 @@ async function confirmDeleteLayer(layer) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="layer in layers" :key="layer.layerName">
+          <template v-for="layer in layers" :key="layer.layerName">
+          <tr class="layer-row" @click="toggleLayer(layer.layerName)">
             <td>
-              <div class="layer-name">{{ layer.layerName }}</div>
+              <div class="layer-name">
+                <span class="expand-caret" :class="{ open: expandedLayer === layer.layerName }">▸</span>
+                <LayerTypeIcon :layer-type="layer.layerType" :size="18" />
+                <span>{{ layer.layerName }}</span>
+              </div>
               <div v-if="layer.description" class="layer-description">{{ layer.description }}</div>
             </td>
             <td>
@@ -205,9 +226,50 @@ async function confirmDeleteLayer(layer) {
             <td>{{ formatRelativeTime(layer.lastAccessed) }}</td>
             <td>{{ formatRelativeTime(layer.createdAt) }}</td>
             <td v-if="isOwner">
-              <button class="delete-button" @click="confirmDeleteLayer(layer)" title="Delete layer">&times;</button>
+              <button class="delete-button" @click.stop="confirmDeleteLayer(layer)" title="Delete layer">&times;</button>
             </td>
           </tr>
+          <tr v-if="expandedLayer === layer.layerName" class="layer-detail-row">
+            <td :colspan="isOwner ? 9 : 8">
+              <div class="layer-detail">
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Type</span>
+                    <span class="detail-value">
+                      <LayerTypeIcon :layer-type="layer.layerType" :size="14" />
+                      {{ layerTypeLabel(layer.layerType) }}
+                    </span>
+                  </div>
+                  <div v-if="layer.pythonVersion" class="detail-item">
+                    <span class="detail-label">Python</span>
+                    <span class="detail-value">{{ layer.pythonVersion }}</span>
+                  </div>
+                  <div v-if="layer.snapshotId" class="detail-item">
+                    <span class="detail-label">Snapshot</span>
+                    <span class="detail-value mono">{{ layer.snapshotId }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Created by</span>
+                    <span class="detail-value">{{ layer.createdBy || '—' }}</span>
+                  </div>
+                </div>
+
+                <template v-if="layer.packages && layer.packages.length">
+                  <div class="detail-subhead">{{ layer.packages.length }} packages</div>
+                  <div class="package-list">
+                    <code v-for="pkg in layer.packages" :key="pkg" class="package">{{ pkg }}</code>
+                  </div>
+                </template>
+                <div v-else-if="layer.layerType === 'python-env' || layer.layerType === 'r-env'" class="detail-empty">
+                  No package list recorded — built before package capture, or still building.
+                </div>
+                <div v-else class="detail-empty">
+                  Data layer — {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
+                </div>
+              </div>
+            </td>
+          </tr>
+          </template>
         </tbody>
         <tfoot>
           <tr>
@@ -400,6 +462,9 @@ async function confirmDeleteLayer(layer) {
 }
 
 .layer-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: 'Courier New', monospace;
   font-weight: 500;
   color: theme.$gray_6;
@@ -409,6 +474,93 @@ async function confirmDeleteLayer(layer) {
   font-size: 12px;
   color: theme.$gray_4;
   margin-top: 2px;
+}
+
+.layer-row {
+  cursor: pointer;
+}
+
+.expand-caret {
+  display: inline-block;
+  color: theme.$gray_4;
+  font-size: 10px;
+  transition: transform 0.12s ease;
+  width: 10px;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+
+.layer-detail-row > td {
+  background: theme.$gray_1;
+  padding: 12px 16px 16px;
+}
+
+.layer-detail {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-bottom: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: theme.$gray_4;
+}
+
+.detail-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: theme.$gray_6;
+
+  &.mono {
+    font-family: 'Courier New', monospace;
+  }
+}
+
+.detail-subhead {
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$gray_6;
+  margin-bottom: 6px;
+}
+
+.package-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.package {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: theme.$gray_6;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.detail-empty {
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 
 .footer-label {
