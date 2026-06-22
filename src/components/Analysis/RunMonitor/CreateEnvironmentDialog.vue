@@ -7,9 +7,9 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  // The public "Pennsieve - Build Python Environment" workflow (resolved by the
-  // parent from the workflow definitions). Null when it isn't published yet.
-  buildWorkflow: { type: Object, default: null },
+  // Public build workflows by language: { python: wf|null, r: wf|null }. A
+  // language is offered only when its workflow is published.
+  buildWorkflows: { type: Object, default: () => ({ python: null, r: null }) },
   computeNodes: { type: Array, default: () => [] },
   defaultNodeId: { type: String, default: "" },
 });
@@ -23,28 +23,65 @@ const visible = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-const PY_VERSIONS = ["3.12", "3.11", "3.10"];
-// Layer names: lowercase, digits, dashes (matches the backend validLayerName + LayerNameSelector).
+// Per-language config. version param key + defaults differ; the builder workflow
+// for each language is the matching public "Pennsieve - Build … Environment".
+const LANGS = {
+  python: {
+    label: "Python (Jupyter)",
+    layerType: "python-env",
+    versionLabel: "Python version",
+    versions: ["3.12", "3.11", "3.10"],
+    versionParam: "PYTHON_VERSION",
+    reqLabel: "requirements.txt",
+    reqPlaceholder: "numpy\npandas==2.3.3\nmatplotlib\nscikit-learn",
+  },
+  r: {
+    label: "R",
+    layerType: "r-env",
+    versionLabel: "R version",
+    versions: ["4.4", "4.3"],
+    versionParam: "R_VERSION",
+    reqLabel: "R packages (one per line)",
+    reqPlaceholder: "ggplot2\ndplyr\ntidyr",
+  },
+};
+// Layer names: lowercase, digits, dashes (matches the backend validLayerName).
 const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 
-const form = ref({ name: "", nodeId: "", pythonVersion: "3.12", requirements: "" });
+const form = ref({ language: "python", name: "", nodeId: "", version: "", requirements: "" });
 const submitting = ref(false);
 
+const availableLangs = computed(() =>
+  Object.keys(LANGS).filter((k) => props.buildWorkflows[k])
+);
+const langCfg = computed(() => LANGS[form.value.language] || LANGS.python);
+const selectedWorkflow = computed(() => props.buildWorkflows[form.value.language] || null);
+
+function resetForm() {
+  const lang = availableLangs.value[0] || "python";
+  form.value = {
+    language: lang,
+    name: "",
+    nodeId: props.defaultNodeId || props.computeNodes[0]?.uuid || "",
+    version: LANGS[lang].versions[0],
+    requirements: "",
+  };
+}
 watch(visible, (open) => {
-  if (open) {
-    form.value = {
-      name: "",
-      nodeId: props.defaultNodeId || props.computeNodes[0]?.uuid || "",
-      pythonVersion: "3.12",
-      requirements: "",
-    };
-  }
+  if (open) resetForm();
 });
+// Switching language resets the version to that language's default.
+watch(
+  () => form.value.language,
+  (lang) => {
+    if (LANGS[lang]) form.value.version = LANGS[lang].versions[0];
+  }
+);
 
 const nameValid = computed(() => NAME_RE.test(form.value.name));
 const canSubmit = computed(
   () =>
-    !!props.buildWorkflow &&
+    !!selectedWorkflow.value &&
     nameValid.value &&
     !!form.value.nodeId &&
     !!form.value.requirements.trim() &&
@@ -61,8 +98,7 @@ function onFile(e) {
   reader.readAsText(file);
 }
 
-// Build-workflow node IDs are builder-generated, so resolve by type (mirrors how
-// mcp-service keys its public quick-plot workflow).
+// Build-workflow node IDs are builder-generated, so resolve by type.
 function resolveNodes(dag) {
   let builder = null;
   let target = null;
@@ -79,36 +115,33 @@ async function submit() {
   if (!canSubmit.value) return;
   submitting.value = true;
   try {
+    const cfg = langCfg.value;
     const def = await store.dispatch(
       "analysisModule/fetchWorkflowDefinition",
-      props.buildWorkflow.uuid
+      selectedWorkflow.value.uuid
     );
     const { builder, target, dataSource } = resolveNodes(def && def.dag);
     if (!builder || !target) {
       throw new Error("Build workflow is missing a processor or persistent-layer node.");
     }
     if (dataSource) {
-      throw new Error(
-        "The environment builder workflow must be data-source-free (no input dataset)."
-      );
+      throw new Error("The environment builder workflow must be data-source-free.");
     }
 
-    // 1. Create the EMPTY python-env layer the build will populate.
     await cr.createNodeLayer(form.value.nodeId, {
       layerName: form.value.name,
-      layerType: "python-env",
+      layerType: cfg.layerType,
     });
 
-    // 2. Run the public build workflow, overriding REQUIREMENTS + the target layer.
     await store.dispatch("analysisModule/createRun", {
       workflowInstanceConfiguration: {
-        workflowId: props.buildWorkflow.uuid,
+        workflowId: selectedWorkflow.value.uuid,
         computeNodeId: form.value.nodeId,
       },
       processorParams: {
         [builder]: {
           REQUIREMENTS: form.value.requirements,
-          PYTHON_VERSION: form.value.pythonVersion,
+          [cfg.versionParam]: form.value.version,
         },
       },
       dataTargets: { [target]: { params: { layerName: form.value.name } } },
@@ -127,18 +160,33 @@ async function submit() {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="New Python environment" width="560px">
-    <div v-if="!buildWorkflow" class="env-warn">
-      The environment builder isn’t available yet. (It needs the public
-      “Pennsieve - Build Python Environment” workflow.)
+  <el-dialog v-model="visible" title="New environment" width="560px">
+    <div v-if="availableLangs.length === 0" class="env-warn">
+      The environment builder isn’t available yet. (It needs a public
+      “Pennsieve - Build Python Environment” / “… Build R Environment” workflow.)
     </div>
     <template v-else>
+      <label class="env-label">Language</label>
+      <div class="env-langs">
+        <button
+          v-for="k in ['python', 'r']"
+          :key="k"
+          type="button"
+          class="env-lang"
+          :class="{ active: form.language === k, disabled: !buildWorkflows[k] }"
+          :disabled="!buildWorkflows[k]"
+          @click="form.language = k"
+        >
+          {{ LANGS[k].label }}
+          <span v-if="!buildWorkflows[k]" class="env-lang-note">unavailable</span>
+        </button>
+      </div>
+
       <label class="env-label">Name</label>
       <el-input v-model="form.name" placeholder="e.g. my-analysis-stack" size="default" />
-      <span v-if="form.name && !nameValid" class="env-hint err">
-        Lowercase letters, numbers and dashes only.
+      <span class="env-hint" :class="{ err: form.name && !nameValid }">
+        Lowercase letters, numbers and dashes.
       </span>
-      <span v-else class="env-hint">Lowercase letters, numbers and dashes.</span>
 
       <div class="env-grid">
         <div>
@@ -148,15 +196,15 @@ async function submit() {
           </el-select>
         </div>
         <div>
-          <label class="env-label">Python version</label>
-          <el-select v-model="form.pythonVersion" size="default" style="width: 100%">
-            <el-option v-for="v in PY_VERSIONS" :key="v" :label="v" :value="v" />
+          <label class="env-label">{{ langCfg.versionLabel }}</label>
+          <el-select v-model="form.version" size="default" style="width: 100%">
+            <el-option v-for="v in langCfg.versions" :key="v" :label="v" :value="v" />
           </el-select>
         </div>
       </div>
 
       <div class="env-req-head">
-        <label class="env-label">requirements.txt</label>
+        <label class="env-label">{{ langCfg.reqLabel }}</label>
         <label class="env-upload">
           Upload file
           <input type="file" accept=".txt,text/plain" style="display: none" @change="onFile" />
@@ -166,7 +214,7 @@ async function submit() {
         v-model="form.requirements"
         type="textarea"
         :rows="9"
-        placeholder="numpy&#10;pandas==2.3.3&#10;matplotlib&#10;scikit-learn"
+        :placeholder="langCfg.reqPlaceholder"
         spellcheck="false"
       />
     </template>
@@ -196,6 +244,36 @@ async function submit() {
   font-weight: 500;
   color: theme.$gray_6;
   margin: 12px 0 4px;
+}
+.env-langs {
+  display: flex;
+  gap: 8px;
+}
+.env-lang {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 6px;
+  background: theme.$white;
+  font-size: 13px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &.active {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+    font-weight: 500;
+  }
+  &.disabled {
+    color: theme.$gray_4;
+    cursor: not-allowed;
+  }
+}
+.env-lang-note {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
 }
 .env-hint {
   font-size: 11px;

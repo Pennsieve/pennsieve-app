@@ -16,6 +16,8 @@ import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
+import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -29,6 +31,7 @@ import {
 import { isNotebookWorkflow } from "./notebookHelpers";
 
 const store = useStore();
+const computeResources = useComputeResourcesStore();
 const router = useRouter();
 const route = useRoute();
 const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
@@ -45,9 +48,24 @@ const getUserName = (userId) =>
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
-// The public "Pennsieve - Build Python Environment" workflow, resolved from the
-// definitions list and handed to the Environments section's create dialog.
+// Public "Pennsieve - Build {Python,R} Environment" workflows, resolved from the
+// definitions list and handed to the create-environment dialog (one per language).
 const buildPythonEnvWorkflow = ref(null);
+const buildREnvWorkflow = ref(null);
+const buildEnvWorkflows = computed(() => ({
+  python: buildPythonEnvWorkflow.value,
+  r: buildREnvWorkflow.value,
+}));
+const hasEnvBuilder = computed(
+  () => !!buildPythonEnvWorkflow.value || !!buildREnvWorkflow.value
+);
+const computeNodesList = computed(
+  () => store.getters["analysisModule/computeNodes"] || []
+);
+const createEnvVisible = ref(false);
+function onEnvCreated({ nodeId }) {
+  if (nodeId) computeResources.fetchNodeLayers(nodeId, true);
+}
 const isLoading = ref(false);
 const dialogVisible = ref(false);
 
@@ -84,6 +102,8 @@ async function fetchNotebookWorkflows() {
     buildPythonEnvWorkflow.value =
       all.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
       null;
+    buildREnvWorkflow.value =
+      all.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
@@ -272,6 +292,14 @@ onBeforeUnmount(() => {
             >
               + New Notebook
             </bf-button>
+            <bf-button
+              class="secondary"
+              :disabled="!hasEnvBuilder"
+              :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
+              @click="createEnvVisible = true"
+            >
+              + New Environment
+            </bf-button>
           </div>
         </div>
       </div>
@@ -367,13 +395,20 @@ onBeforeUnmount(() => {
           <p>Start a notebook to work with your data interactively.</p>
         </div>
 
-        <environments-section :build-workflow="buildPythonEnvWorkflow" />
+        <environments-section />
       </template>
 
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       @created="onNotebookCreated"
+    />
+
+    <create-environment-dialog
+      v-model="createEnvVisible"
+      :build-workflows="buildEnvWorkflows"
+      :compute-nodes="computeNodesList"
+      @created="onEnvCreated"
     />
 
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
