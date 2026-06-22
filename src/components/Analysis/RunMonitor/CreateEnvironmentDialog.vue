@@ -25,12 +25,15 @@ const visible = computed({
 
 // Per-language config. version param key + defaults differ; the builder workflow
 // for each language is the matching public "Pennsieve - Build … Environment".
+// Version is fixed by the builder image (e.g. processor-build-python-layer is
+// python:3.12) and must match the notebook session's interpreter — it's not a
+// user choice, just shown for clarity.
 const LANGS = {
   python: {
     label: "Python (Jupyter)",
     layerType: "python-env",
     versionLabel: "Python version",
-    versions: ["3.12", "3.11", "3.10"],
+    version: "3.12",
     versionParam: "PYTHON_VERSION",
     reqLabel: "requirements.txt",
     reqPlaceholder: "numpy\npandas==2.3.3\nmatplotlib\nscikit-learn",
@@ -39,7 +42,7 @@ const LANGS = {
     label: "R",
     layerType: "r-env",
     versionLabel: "R version",
-    versions: ["4.4", "4.3"],
+    version: "4.4",
     versionParam: "R_VERSION",
     reqLabel: "R packages (one per line)",
     reqPlaceholder: "ggplot2\ndplyr\ntidyr",
@@ -48,7 +51,7 @@ const LANGS = {
 // Layer names: lowercase, digits, dashes (matches the backend validLayerName).
 const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 
-const form = ref({ language: "python", name: "", nodeId: "", version: "", requirements: "" });
+const form = ref({ language: "python", name: "", nodeId: "", requirements: "" });
 const submitting = ref(false);
 
 const availableLangs = computed(() =>
@@ -63,20 +66,12 @@ function resetForm() {
     language: lang,
     name: "",
     nodeId: props.defaultNodeId || props.computeNodes[0]?.uuid || "",
-    version: LANGS[lang].versions[0],
     requirements: "",
   };
 }
 watch(visible, (open) => {
   if (open) resetForm();
 });
-// Switching language resets the version to that language's default.
-watch(
-  () => form.value.language,
-  (lang) => {
-    if (LANGS[lang]) form.value.version = LANGS[lang].versions[0];
-  }
-);
 
 const nameValid = computed(() => NAME_RE.test(form.value.name));
 const canSubmit = computed(
@@ -141,7 +136,7 @@ async function submit() {
       processorParams: {
         [builder]: {
           REQUIREMENTS: form.value.requirements,
-          [cfg.versionParam]: form.value.version,
+          [cfg.versionParam]: cfg.version,
         },
       },
       dataTargets: { [target]: { params: { layerName: form.value.name } } },
@@ -197,9 +192,9 @@ async function submit() {
         </div>
         <div>
           <label class="env-label">{{ langCfg.versionLabel }}</label>
-          <el-select v-model="form.version" size="default" style="width: 100%">
-            <el-option v-for="v in langCfg.versions" :key="v" :label="v" :value="v" />
-          </el-select>
+          <div class="env-version" :title="`Set by the builder — must match the notebook's ${langCfg.versionLabel.toLowerCase()}`">
+            {{ langCfg.version }}
+          </div>
         </div>
       </div>
 
@@ -220,10 +215,12 @@ async function submit() {
     </template>
 
     <template #footer>
-      <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
-      <bf-button :disabled="!canSubmit" :processing="submitting" @click="submit">
-        Create environment
-      </bf-button>
+      <div class="env-footer">
+        <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
+        <bf-button :disabled="!canSubmit" :processing="submitting" @click="submit">
+          Create environment
+        </bf-button>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -286,6 +283,22 @@ async function submit() {
 .env-grid {
   display: grid;
   grid-template-columns: 1fr 140px;
+  gap: 12px;
+}
+.env-version {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$gray_1;
+  color: theme.$gray_6;
+  font-size: 13px;
+}
+.env-footer {
+  display: flex;
+  justify-content: flex-end;
   gap: 12px;
 }
 .env-req-head {
