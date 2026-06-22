@@ -98,12 +98,16 @@ async function fetchNotebookWorkflows() {
       }
     }
     const all = [...byId.values()];
-    notebookWorkflows.value = all.filter(isNotebookWorkflow);
+    // Require the Official flag (set by Pennsieve, not user-settable) so a workflow
+    // a user merely *names* "Pennsieve - …" can't masquerade as an official kernel
+    // or environment builder. Name still selects which official workflow it is.
+    const official = all.filter((w) => w?.official);
+    notebookWorkflows.value = official.filter(isNotebookWorkflow);
     buildPythonEnvWorkflow.value =
-      all.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
+      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
       null;
     buildREnvWorkflow.value =
-      all.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
+      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
