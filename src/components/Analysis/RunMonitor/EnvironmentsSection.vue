@@ -3,14 +3,15 @@ import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import LayerTypeIcon from "../ComputeNodes/LayerTypeIcon.vue";
+import { interactiveCapable } from "./notebookHelpers";
 
 const store = useStore();
 const cr = useComputeResourcesStore();
 
 // Environments (python-env / r-env layers) are per compute node, so the section
 // is scoped to one node at a time.
-const computeNodes = computed(
-  () => store.getters["analysisModule/computeNodes"] || []
+const computeNodes = computed(() =>
+  (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
 );
 const selectedNodeId = ref("");
 const expanded = ref(null);

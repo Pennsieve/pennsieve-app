@@ -17,7 +17,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
-import { notebookKernel, kernelLabel } from "./notebookHelpers";
+import { notebookKernel, kernelLabel, interactiveCapable } from "./notebookHelpers";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
 
 const props = defineProps({
@@ -123,13 +123,9 @@ const hasVisibleTargetParams = computed(() =>
 );
 
 /* --------------------------------------------------------- compute nodes ---- */
-// A node can host a notebook only if it has interactive sessions enabled
-// (maxInteractiveSessions > 0). Only those are offered — no fallback to the
-// full list, since a non-interactive node can't run a notebook.
-const interactiveCapable = (cn) =>
-  (cn.maxInteractiveSessions || 0) > 0 ||
-  cn.enableInteractive === true ||
-  cn.interactive === true;
+// A node can host a notebook only if it has interactive sessions enabled — only
+// those are offered (no fallback to the full list). Shared predicate so the
+// Notebooks page filters nodes consistently everywhere.
 const interactiveComputeNodes = computed(() =>
   computeNodes.value.filter(interactiveCapable)
 );

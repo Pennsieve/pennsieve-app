@@ -44,6 +44,17 @@ export function isNotebookWorkflow(wf) {
   return !!notebookKernel(wf);
 }
 
+// A compute node can host notebooks/environments only if it has interactive
+// sessions enabled. Non-interactive nodes can't run a notebook and have no use
+// for env layers, so they're excluded from the Notebooks-page node pickers.
+export function interactiveCapable(cn) {
+  return (
+    (cn?.maxInteractiveSessions || 0) > 0 ||
+    cn?.enableInteractive === true ||
+    cn?.interactive === true
+  );
+}
+
 // Human label for a kernel/session type ("jupyter" == Python today).
 export function kernelLabel(sessionType) {
   if (!sessionType || sessionType === "jupyter" || sessionType === "python") {

@@ -28,7 +28,7 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookWorkflow, interactiveCapable } from "./notebookHelpers";
 
 const store = useStore();
 const computeResources = useComputeResourcesStore();
@@ -59,8 +59,8 @@ const buildEnvWorkflows = computed(() => ({
 const hasEnvBuilder = computed(
   () => !!buildPythonEnvWorkflow.value || !!buildREnvWorkflow.value
 );
-const computeNodesList = computed(
-  () => store.getters["analysisModule/computeNodes"] || []
+const computeNodesList = computed(() =>
+  (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
 );
 const createEnvVisible = ref(false);
 function onEnvCreated({ nodeId }) {
