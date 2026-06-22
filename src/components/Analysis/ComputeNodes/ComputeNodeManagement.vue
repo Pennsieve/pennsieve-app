@@ -968,7 +968,7 @@ async function saveConfig() {
       </div>
 
       <!-- Persistent Layers Section -->
-      <div class="management-section">
+      <div id="persistent-layers" class="management-section">
         <div class="section-header">
           <h2>Persistent Layers</h2>
         </div>

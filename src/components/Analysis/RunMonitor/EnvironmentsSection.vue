@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import LayerTypeIcon from "../ComputeNodes/LayerTypeIcon.vue";
 import { interactiveCapable } from "./notebookHelpers";
 
 const store = useStore();
+const route = useRoute();
 const cr = useComputeResourcesStore();
 
 // Environments (python-env / r-env layers) are per compute node, so the section
@@ -15,6 +17,18 @@ const computeNodes = computed(() =>
 );
 const selectedNodeId = ref("");
 const expanded = ref(null);
+
+// Deep-link to the Persistent Layers section of the selected node's management
+// page, where every layer (not just python-env/r-env) can be created/deleted.
+const manageLayersRoute = computed(() =>
+  selectedNodeId.value
+    ? {
+        name: "compute-node-management",
+        params: { orgId: route.params.orgId, nodeId: selectedNodeId.value },
+        hash: "#persistent-layers",
+      }
+    : null
+);
 
 watch(
   computeNodes,
@@ -64,19 +78,28 @@ function formatSize(b) {
   <div class="dashboard-section">
     <div class="env-header">
       <h3 class="dashboard-section-title">Environments</h3>
-      <el-select
-        v-if="computeNodes.length > 1"
-        v-model="selectedNodeId"
-        size="small"
-        style="width: 240px"
-      >
-        <el-option
-          v-for="n in computeNodes"
-          :key="n.uuid"
-          :label="n.name"
-          :value="n.uuid"
-        />
-      </el-select>
+      <div class="env-header-actions">
+        <el-select
+          v-if="computeNodes.length > 1"
+          v-model="selectedNodeId"
+          size="small"
+          style="width: 240px"
+        >
+          <el-option
+            v-for="n in computeNodes"
+            :key="n.uuid"
+            :label="n.name"
+            :value="n.uuid"
+          />
+        </el-select>
+        <router-link
+          v-if="manageLayersRoute"
+          :to="manageLayersRoute"
+          class="env-manage-link"
+        >
+          Manage layers →
+        </router-link>
+      </div>
     </div>
     <p class="env-desc">
       Reusable Python &amp; R package environments on this compute node — attach one
@@ -125,6 +148,22 @@ function formatSize(b) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.env-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.env-manage-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_1;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .env-desc {
   font-size: 13px;
