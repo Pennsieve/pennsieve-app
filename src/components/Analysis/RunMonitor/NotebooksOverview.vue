@@ -45,6 +45,9 @@ const getUserName = (userId) =>
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
+// The public "Pennsieve - Build Python Environment" workflow, resolved from the
+// definitions list and handed to the Environments section's create dialog.
+const buildPythonEnvWorkflow = ref(null);
 const isLoading = ref(false);
 const dialogVisible = ref(false);
 
@@ -78,6 +81,9 @@ async function fetchNotebookWorkflows() {
     }
     const all = [...byId.values()];
     notebookWorkflows.value = all.filter(isNotebookWorkflow);
+    buildPythonEnvWorkflow.value =
+      all.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
+      null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
@@ -361,7 +367,7 @@ onBeforeUnmount(() => {
           <p>Start a notebook to work with your data interactively.</p>
         </div>
 
-        <environments-section />
+        <environments-section :build-workflow="buildPythonEnvWorkflow" />
       </template>
 
     <new-notebook-dialog

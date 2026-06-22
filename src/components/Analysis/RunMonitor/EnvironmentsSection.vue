@@ -3,9 +3,22 @@ import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import LayerTypeIcon from "../ComputeNodes/LayerTypeIcon.vue";
+import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+
+defineProps({
+  // The public "Pennsieve - Build Python Environment" workflow, resolved by the
+  // parent. Null until it's published — the create button is disabled then.
+  buildWorkflow: { type: Object, default: null },
+});
 
 const store = useStore();
 const cr = useComputeResourcesStore();
+const createVisible = ref(false);
+
+function onCreated({ nodeId }) {
+  if (nodeId) cr.fetchNodeLayers(nodeId, true);
+}
 
 // Environments (python-env / r-env layers) are per compute node, so the section
 // is scoped to one node at a time.
@@ -63,19 +76,29 @@ function formatSize(b) {
   <div class="dashboard-section">
     <div class="env-header">
       <h3 class="dashboard-section-title">Environments</h3>
-      <el-select
-        v-if="computeNodes.length > 1"
-        v-model="selectedNodeId"
-        size="small"
-        style="width: 240px"
-      >
-        <el-option
-          v-for="n in computeNodes"
-          :key="n.uuid"
-          :label="n.name"
-          :value="n.uuid"
-        />
-      </el-select>
+      <div class="env-header-right">
+        <el-select
+          v-if="computeNodes.length > 1"
+          v-model="selectedNodeId"
+          size="small"
+          style="width: 240px"
+        >
+          <el-option
+            v-for="n in computeNodes"
+            :key="n.uuid"
+            :label="n.name"
+            :value="n.uuid"
+          />
+        </el-select>
+        <bf-button
+          class="secondary"
+          :disabled="!buildWorkflow || !selectedNodeId"
+          :title="buildWorkflow ? '' : 'Environment builder not available yet'"
+          @click="createVisible = true"
+        >
+          + New Python Environment
+        </bf-button>
+      </div>
     </div>
     <p class="env-desc">
       Reusable Python &amp; R package environments on this compute node — attach one
@@ -113,6 +136,14 @@ function formatSize(b) {
         </div>
       </div>
     </div>
+
+    <create-environment-dialog
+      v-model="createVisible"
+      :build-workflow="buildWorkflow"
+      :compute-nodes="computeNodes"
+      :default-node-id="selectedNodeId"
+      @created="onCreated"
+    />
   </div>
 </template>
 
@@ -124,6 +155,11 @@ function formatSize(b) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.env-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .env-desc {
   font-size: 13px;
