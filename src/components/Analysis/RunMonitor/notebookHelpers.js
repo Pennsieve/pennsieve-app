@@ -22,7 +22,16 @@ export function notebookKernel(wf) {
   // Name fallback (separators normalized so "r-notebook", "R Session", and
   // "Pennsieve R Session" all match).
   const name = (wf?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if (name.includes("jupyter") || name.includes("python")) return "jupyter";
+  // Environment builders (e.g. "Pennsieve - Build Python Environment") carry a
+  // language in their name but are NOT notebooks — exclude them explicitly.
+  if (name.includes("build") || name.includes("environment")) return null;
+  if (name.includes("jupyter")) return "jupyter";
+  // Standardized notebook names are "Pennsieve - <Language> Notebook - <version>";
+  // require the notebook/session qualifier so a workflow that merely mentions a
+  // language isn't mistaken for a kernel (mirrors the R branch).
+  if (name.includes("python") && (name.includes("notebook") || name.includes("session"))) {
+    return "jupyter";
+  }
   if (/\br\b/.test(name) && (name.includes("notebook") || name.includes("session"))) {
     return "r";
   }
