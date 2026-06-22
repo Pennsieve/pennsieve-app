@@ -12,6 +12,7 @@ import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
+import EnvironmentLayerSelector from "./EnvironmentLayerSelector.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
@@ -45,7 +46,7 @@ const config = computed(() => store.state.config);
 
 /* ----------------------------------------------------------- wizard state --- */
 const step = ref(0);
-const form = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
+const form = ref({ workflowId: "", computeNodeId: "", datasetId: "", environmentLayer: "" });
 const runName = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
@@ -58,6 +59,7 @@ const stepTitles = [
   "Select Kernel",
   "Select Compute Node",
   "Compute Resources",
+  "Environment",
   "Select Dataset",
   "Select Input Files",
   "Output Destination",
@@ -205,10 +207,12 @@ const canNext = computed(() => {
     case 2:
       return true; // resources always have a valid default (1 vCPU)
     case 3:
-      return !!form.value.datasetId;
+      return true; // environment layer is optional
     case 4:
-      return dataSourcesComplete.value;
+      return !!form.value.datasetId;
     case 5:
+      return dataSourcesComplete.value;
+    case 6:
       return dataTargetsComplete.value;
     default:
       return true;
@@ -403,7 +407,7 @@ function onFileSelect(selectedFiles, parentId) {
 
 /* ----------------------------------------------------------- wizard nav ----- */
 function reset() {
-  form.value = { workflowId: "", computeNodeId: "", datasetId: "" };
+  form.value = { workflowId: "", computeNodeId: "", datasetId: "", environmentLayer: "" };
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
@@ -432,7 +436,7 @@ watch(visible, (open) => {
 });
 
 const next = async () => {
-  if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
+  if (step.value === 4) await loadDefinition(); // leaving Dataset → load inputs
   if (step.value < stepTitles.length - 1) step.value++;
 };
 const back = () => {
@@ -487,6 +491,9 @@ async function execute() {
       dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
+      // Mount the selected environment layer (python-env / r-env). `layers` is a
+      // run-request root field (workflow-service createRunRequestBody.Layers).
+      ...(form.value.environmentLayer && { layers: [form.value.environmentLayer] }),
     };
 
     console.log("[Notebook] createRun payload:", JSON.stringify(payload, null, 2));
@@ -516,7 +523,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 4 ? '840px' : '560px'"
+    :width="step === 5 ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -627,8 +634,23 @@ async function execute() {
         </p>
       </div>
 
-      <!-- Step 3: Dataset -->
+      <!-- Step 3: Environment -->
       <div v-if="step === 3" class="wizard-step">
+        <p class="wizard-step-desc">
+          Optionally mount a prebuilt environment layer so its packages are
+          importable in the notebook. Only layers matching this kernel
+          ({{ notebookKernel(selectedWorkflow) === "r" ? "r-env" : "python-env" }})
+          are shown.
+        </p>
+        <EnvironmentLayerSelector
+          v-model="form.environmentLayer"
+          :compute-node-id="form.computeNodeId"
+          :session-type="notebookKernel(selectedWorkflow) || 'jupyter'"
+        />
+      </div>
+
+      <!-- Step 4: Dataset -->
+      <div v-if="step === 4" class="wizard-step">
         <p class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -674,8 +696,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 4: Input files -->
-      <div v-if="step === 4" class="wizard-step">
+      <!-- Step 5: Input files -->
+      <div v-if="step === 5" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -726,8 +748,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 5: Output destination -->
-      <div v-if="step === 5" class="wizard-step">
+      <!-- Step 6: Output destination -->
+      <div v-if="step === 6" class="wizard-step">
         <p class="wizard-step-desc">
           Configure where the notebook's results are saved.
         </p>
@@ -764,8 +786,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 6: Review -->
-      <div v-if="step === 6" class="wizard-step">
+      <!-- Step 7: Review -->
+      <div v-if="step === 7" class="wizard-step">
         <p class="wizard-step-desc">Review and start the notebook session.</p>
         <div class="wizard-summary">
           <div class="wizard-summary-row">
@@ -784,6 +806,10 @@ async function execute() {
               {{ cpuLabel(resourceCpu) }} ·
               {{ resourceMemory ? memoryLabel(resourceMemory) : `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` }}
             </span>
+          </div>
+          <div class="wizard-summary-row">
+            <span class="wizard-summary-label">Environment</span>
+            <span class="wizard-summary-value">{{ form.environmentLayer || "None" }}</span>
           </div>
           <div class="wizard-summary-row">
             <span class="wizard-summary-label">Dataset</span>
