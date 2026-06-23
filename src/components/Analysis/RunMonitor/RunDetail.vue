@@ -174,6 +174,24 @@ const getComputeTypesForProcessor = (sourceUrl) => {
   return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
 
+// Compliant compute nodes require ECS execution for per-execution isolation, so
+// the lambda target is offered but disabled (a Lambda mounts the shared
+// per-node filesystem and can't be isolated per run). Basic/secure are
+// unaffected. Mirrors the converter's compliant rejection.
+const LAMBDA_COMPLIANT_MSG =
+  "Lambda isn't available on compliant compute nodes — they require ECS execution so each run is isolated.";
+const configureNodeIsCompliant = computed(() => {
+  const n = computeNodes.value.find(
+    (cn) => cn.uuid === initiateForm.value.computeNodeId
+  );
+  return (n?.deploymentMode || "basic").toLowerCase() === "compliant";
+});
+const isComputeTypeDisabled = (ct) =>
+  ct === "lambda" && configureNodeIsCompliant.value;
+// Don't leave a disabled value selected — fall back to standard on compliant.
+const computeTypeForMode = (ct) =>
+  configureNodeIsCompliant.value && ct === "lambda" ? "standard" : ct;
+
 /* Version helpers — match WorkflowBuilder */
 const normalizeUrl = (url) => {
   if (!url) return "";
@@ -630,7 +648,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
         }));
         nodeConfigs[d.id] = {
-          computeType: srcCfg?.executionTarget || d.computeType || fallback,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
           targetType: d.targetType || null,
           params: targetParams,
         };
@@ -656,7 +674,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
         const matchedApp = findMatchedApp(d.sourceUrl);
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
+          executionTarget: computeTypeForMode(srcCfg?.executionTarget || d.computeType || "standard"),
           version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
           memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
@@ -1552,7 +1570,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -1733,7 +1760,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
 
