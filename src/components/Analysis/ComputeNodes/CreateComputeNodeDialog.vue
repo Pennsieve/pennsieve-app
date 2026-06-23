@@ -29,7 +29,7 @@ const steps = [
   { title: 'Basics' },
   { title: 'Infrastructure' },
   { title: 'AI Access' },
-  { title: 'GPU' }
+  { title: 'Capabilities' }
 ]
 
 // Form data
@@ -44,7 +44,9 @@ const computeNode = ref({
   llmBaaAcknowledged: false,
   enableGpu: false,
   maxGpuInstances: 2,
-  gpuTier: 'small'
+  gpuTier: 'small',
+  enableInteractive: false,
+  maxInteractiveSessions: 2
 })
 
 // GPU tiers from API
@@ -302,7 +304,9 @@ const closeDialog = () => {
     llmBaaAcknowledged: false,
     enableGpu: false,
     maxGpuInstances: 2,
-    gpuTier: 'small'
+    gpuTier: 'small',
+    enableInteractive: false,
+    maxInteractiveSessions: 2
   }
   emit('close', false)
   if (computeNodeForm.value) {
@@ -325,7 +329,8 @@ const handleCreateComputeNode = async () => {
       enableLLMAccess: computeNode.value.enableLLMAccess,
       llmBaaAcknowledged: computeNode.value.llmBaaAcknowledged,
       maxGpuInstances: computeNode.value.enableGpu ? computeNode.value.maxGpuInstances : 0,
-      gpuTier: computeNode.value.enableGpu ? computeNode.value.gpuTier : 'small'
+      gpuTier: computeNode.value.enableGpu ? computeNode.value.gpuTier : 'small',
+      maxInteractiveSessions: computeNode.value.enableInteractive ? computeNode.value.maxInteractiveSessions : 0
     }
 
     await createComputeNode(formattedComputeNode)
@@ -612,11 +617,11 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Step 4: GPU -->
+      <!-- Step 4: Compute Capabilities (GPU + interactive) -->
       <div v-show="currentStep === 4" class="step-panel">
         <div class="step-header">
-          <h3 class="step-title">GPU Compute</h3>
-          <p class="step-description">Enable GPU instances for workloads that require hardware acceleration (ML inference, training, etc.).</p>
+          <h3 class="step-title">Compute Capabilities</h3>
+          <p class="step-description">Optional add-ons for this node: GPU instances for hardware-accelerated workloads, and interactive Jupyter notebook sessions in workflows.</p>
         </div>
 
         <div class="form-section">
@@ -670,6 +675,34 @@ onMounted(() => {
               />
               <div class="field-help">
                 Maximum number of GPU instances in the Auto Scaling Group. Instances scale to zero when idle.
+              </div>
+            </div>
+          </template>
+
+          <div class="form-field llm-toggle-field">
+            <div class="llm-toggle-row">
+              <div class="llm-toggle-info">
+                <label class="field-label">Enable Interactive Notebooks</label>
+                <div class="field-help">
+                  When enabled, workflows on this node can include interactive Jupyter notebook steps. Provisions a shared per-account load balancer + DNS (≈ $17–35/mo while enabled); $0 when disabled. Not available in compliant mode.
+                </div>
+              </div>
+              <el-switch v-model="computeNode.enableInteractive" :disabled="isLoading" />
+            </div>
+          </div>
+
+          <template v-if="computeNode.enableInteractive">
+            <div class="form-field">
+              <label class="field-label">Max Concurrent Sessions</label>
+              <el-input-number
+                v-model="computeNode.maxInteractiveSessions"
+                :min="1"
+                :max="50"
+                :disabled="isLoading"
+                size="default"
+              />
+              <div class="field-help">
+                Maximum number of simultaneous interactive notebook sessions on this node.
               </div>
             </div>
           </template>

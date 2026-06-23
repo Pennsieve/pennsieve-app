@@ -134,10 +134,14 @@ const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/Comp
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
+const AppManifestGuide = () => import ('../components/Analysis/Applications/AppManifestGuide.vue')
+const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
+const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
+const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
@@ -179,6 +183,21 @@ const router = createRouter({
         page: () => import("./Login/LoginV2.vue"),
       },
       props: false,
+    },
+    {
+      // Interactive Jupyter notebook for a run. Its own page (keeps the
+      // BfNavigation left menu) but NOT a child of Analysis, so it doesn't show
+      // the Analysis tab bar — just a breadcrumb back to the run.
+      name: 'run-notebook',
+      path: '/:orgId/analysis/runs/:runId/notebook',
+      components: {
+        page: NotebookSession,
+        navigation: BfNavigation,
+      },
+      // navigation: true passes :orgId to BfNavigation (it builds links from the
+      // orgId prop); without it the left-nav router-links throw "Missing
+      // required param orgId".
+      props: { page: true, navigation: true },
     },
     {
       name: 'my-workspace',
@@ -1610,6 +1629,13 @@ const router = createRouter({
           }
         },
         {
+          name: 'notebooks',
+          path: 'notebooks',
+          components: {
+            stage: NotebooksOverview,
+          }
+        },
+        {
           name: 'run-configure',
           path: 'runs/configure',
           components: {
@@ -1654,6 +1680,20 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsGrid,
+          }
+        },
+        {
+          name: 'application-manifest-guide',
+          path: 'applications/manifest-guide',
+          components: {
+            stage: AppManifestGuide,
+          }
+        },
+        {
+          name: 'application-manifest-builder',
+          path: 'applications/manifest-builder',
+          components: {
+            stage: AppManifestBuilder,
           }
         },
         {

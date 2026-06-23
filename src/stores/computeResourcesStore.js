@@ -1408,7 +1408,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
-  const createNodeLayer = async (nodeId, { layerName, description }) => {
+  const createNodeLayer = async (nodeId, { layerName, description, layerType }) => {
     try {
       const token = await useGetToken()
       const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers`
@@ -1418,7 +1418,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ layerName, description })
+        body: JSON.stringify({ layerName, description, ...(layerType && { layerType }) })
       })
       if (response.ok) {
         await fetchNodeLayers(nodeId, true)
