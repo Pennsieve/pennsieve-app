@@ -86,6 +86,25 @@ This is where the new public-datasets UI lives (see §Navigation decision below)
 
 **Gap**: there is no in-app browsing UI for public datasets today; unauthenticated/redirect paths send users to the standalone Discover app (`src/main.js`).
 
+### Confirmed Discover API (verified against live endpoint)
+
+Base: `{discoverUrl}` = `https://api.pennsieve.net/discover`. List/detail are public (no token); search passes `api_key`.
+
+| Purpose | Endpoint | Response |
+|---------|----------|----------|
+| **List** | `GET /datasets?limit&offset&datasetType=research&embargo=false` | `{ limit, offset, totalCount, datasets[] }` — ~243 datasets in dev |
+| **Detail** | `GET /datasets/{id}` | full metadata object (same fields as a list item); **no embedded files** |
+| **Files** | `GET /datasets/{id}/versions/{version}/files/browse?limit&offset&path=` | `{ totalCount, files[] }`; entries are `type: "Directory" | "File"`; **path-based folder navigation** via `path=` |
+| **Search** *(v2)* | `GET /search/datasets?limit&offset&query&api_key={token}` | same shape as List |
+
+Dataset fields available: `id`, `sourceDatasetId`, `name`, `description`, `banner`, `readme`, `changelog`, `doi`, `version`, `revision`, `size`, `fileCount`, `recordCount`, `modelCount`, `owner*`, `organizationName/Id`, `license`, `tags`, `contributors[]`, `uri`/`arn` (S3), `status`, `versionPublishedAt`, `updatedAt`, `embargo*`, `datasetType`.
+
+Notes:
+- Files browse is **paginated + path-scoped** — maps cleanly onto a folder-by-folder file nav (mirrors `BfDatasetFiles`).
+- Detail returns metadata only; the files tab is a separate browse call per folder.
+- `version` from the detail/list response feeds the files-browse URL.
+- The existing `collectionStore.getPublicDatasets` already transforms the list response — reuse that field mapping in the new adapter.
+
 ## 4. Functional Scope
 
 ### In scope
@@ -166,9 +185,9 @@ Notes:
 > Each step is independently shippable / reviewable. Refine as we go.
 
 ### Phase 0 — Foundations
+- [x] Verify discover API responses (shape, pagination, fields available) — see §3 "Confirmed Discover API".
 - [ ] Define the minimal `ReadOnlyDatasetSource` interface (§4a) from Phase 1 needs (Q7).
 - [ ] Create store: source-agnostic Pinia store keyed by `sourceType`, with a `discover` adapter.
-- [ ] Verify discover API responses (shape, pagination, fields available).
 
 ### Phase 1 — Browse (read-only list, no search)
 - [ ] Add a third **"Public Datasets"** tab to `SharedWithMe.vue`'s `el-tabs`.
