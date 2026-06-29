@@ -121,6 +121,9 @@ const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/P
 const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
 const PublicDatasetFiles = () => import('../components/datasets/PublicDataset/PublicDatasetFiles.vue')
 const PublicDatasetFileDetails = () => import('../components/datasets/PublicDataset/PublicDatasetFileDetails.vue')
+const PublicDatasetMetadata = () => import('../components/datasets/PublicDataset/PublicDatasetMetadata.vue')
+const PublicDatasetRecords = () => import('../components/datasets/PublicDataset/PublicDatasetRecords.vue')
+const PublicDatasetRecord = () => import('../components/datasets/PublicDataset/PublicDatasetRecord.vue')
 const PublicDatasetNavigation = () => import('../components/datasets/PublicDataset/PublicDatasetNavigation.vue')
 const MyCollections = () => import('../components/user/collections/MyCollections.vue')
 const CollectionDetails = () => import('../components/user/collections/CollectionDetails.vue')
@@ -551,6 +554,21 @@ const router = createRouter({
               name: 'public-dataset-file-details',
               path: 'files/details',
               component: PublicDatasetFileDetails,
+            },
+            {
+              name: 'public-dataset-metadata',
+              path: 'metadata',
+              component: PublicDatasetMetadata,
+            },
+            {
+              name: 'public-dataset-records',
+              path: 'metadata/:model',
+              component: PublicDatasetRecords,
+            },
+            {
+              name: 'public-dataset-record',
+              path: 'metadata/:model/:recordId',
+              component: PublicDatasetRecord,
             },
           ]
         },

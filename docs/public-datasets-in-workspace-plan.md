@@ -208,6 +208,32 @@ Preview degrades gracefully: unsupported types show "No preview available".
 
 **Open decision**: inline Preview pane in file-details (matches workspace File Details) vs. a full-page viewer route like discover's `/package/{sourcePackageId}` (richer). Lean: inline preview in file-details for V1, full-page later if needed.
 
+## 4d. Metadata (Models / Records) via DuckDB-WASM (plan — multi-phase)
+
+**Goal**: mirror the workspace **Metadata** experience (Models list → Records table → Record detail) for public datasets, read-only. There is **no metadata service** for published datasets — models/records are **files on S3**, queried client-side with **DuckDB-WASM**.
+
+**S3 layout** (confirmed against dataset 5323 v1; relative to dataset root):
+- `metadata/models/{model}/versions/{N}/schema.json` — JSON Schema: `{ properties:{ name:{type,description,enum?,"x-pennsieve-key":true} }, required:[] }`. The `x-pennsieve-key` property is the title/key. Model name = directory name; latest = max `versions/{N}`.
+- `metadata/models/{model}/versions/{N}/records.jsonl` — one record per line: `{ "id", "data": { <prop>: <value> } }` (note **`data`**, vs workspace records' `value`).
+- `metadata/relationships.csv` — `source_record_id, target_record_id, relationship_type`.
+- `metadata/files.csv` — `record_id, package_id, path`.
+
+**Existing assets**: `src/stores/duckdbStore.js` (DuckDB-WASM init, connections, `loadFile` for **csv/parquet**, `executeQuery`). Presigned file URLs via `getFileDownloadUrl` (download-manifest). Frontend to mirror: `modelList.vue`, `ListRecords.vue` (columns from `schema.properties` + `formatCellValue`), `RecordSpecViewer.vue`.
+
+**Mapping** workspace → published: model `{name, latest_version.schema}` ← schema.json (`displayName` = humanized dir name; `propertyCount` = #properties; key = `x-pennsieve-key`); record `{id, value}` ← `{id, data}` (alias `data`→`value`); relationships/files ← the two CSVs.
+
+### Phases
+- [x] **M0 (DONE)**: `duckdbStore.loadFile` now supports **json/jsonl** (`read_json_auto`, `format='newline_delimited'` for jsonl).
+- [x] **M1 (DONE)**: `readOnlyDatasetStore` discover-adapter metadata actions — `listModels(id, version)` (browse `metadata/models`, resolve latest `versions/{N}`, fetch each `schema.json`), `getModel(...)`, `getRecordsUrl(...)`; store action `queryRecords(...)` loads `records.jsonl` into DuckDB and runs `SELECT id, to_json(data) AS data ... LIMIT/OFFSET` (cached by fileId so pagination reuses the table).
+- [x] **M2 (DONE)**: enabled the **Metadata** secondary-nav item; `PublicDatasetMetadata.vue` (models grid from schemas) + `PublicDatasetRecords.vue` (DuckDB-backed records table, columns from `schema.properties`, offset pagination). Routes `public-dataset-metadata` (`/metadata`) + `public-dataset-records` (`/metadata/:model`).
+- [x] **M3 (DONE)**: records rows clickable → `PublicDatasetRecord.vue` (route `public-dataset-record` at `/metadata/:model/:recordId`). Shows properties (schema + value via `ConceptInstanceStaticProperty`), attached **files** (`files.csv` → links to file-details by path), and **relationships** (`relationships.csv`, in/outbound by type). New store actions `getRecord`, `getRecordRelationships`, `getRecordFiles` (DuckDB over jsonl/csv). Relationship targets show record ids (not yet resolved to labels/models).
+- [x] **M4a (DONE)**: relationship targets resolve to **label + owning model** and are **clickable** (navigate across models). Backed by a lazily-built, cached cross-model DuckDB index (`idx_{dataset}_{version}`: id, model, model_version, label via `to_json(data)->>'titleProperty'`); `resolveRecords(...)` queries it. `listModels` now cached per dataset.
+- [x] **Resilient JSONL load**: some published `records.jsonl` are **invalid JSON** — the publish pipeline double-escapes embedded quotes (`\\"` instead of `\"`; e.g. dataset 5323 `cde`, ~108/2444 lines). Added `duckdbStore.loadJsonlLenient` (parse line-by-line in JS, skip malformed lines, load cleaned NDJSON); `readOnlyDatasetStore._loadRecords` tries native DuckDB read first, falls back to lenient. **Backend bug flagged** (publish-pipeline serializer escaping quotes twice — fix at source + backfill).
+- [x] **M4b (partial)**: records **search** (debounced; `WHERE CAST(to_json(data) AS VARCHAR) ILIKE '%…%'`) + **column sorting** (el-table `sortable="custom"` → `ORDER BY (to_json(data)->>'col') … NULLS LAST`), both server-side in DuckDB with offset pagination. Search/sort reset on model change.
+- [ ] **M4c** *(later)*: Explore graph (model/relationship visualization); typed numeric sort; per-column filters.
+
+**Notes**: no auth/cursor — offset pagination or load-all for modest datasets; DuckDB queries run in a worker (already wrapped). Records.jsonl can be large — load on model select, not upfront.
+
 ## 5. Open Questions
 
 1. ~~**Placement**~~ — RESOLVED, see Navigation decision above.

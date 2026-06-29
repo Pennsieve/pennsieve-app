@@ -55,6 +55,17 @@
           <IconFiles color="currentColor" :height="20" :width="20" />
         </template>
       </bf-navigation-item>
+
+      <bf-navigation-item
+        :link="{ name: 'public-dataset-metadata', params: { datasetId } }"
+        label="Metadata"
+        :secondary="true"
+        :condensed="secondaryNavCondensed"
+      >
+        <template #icon>
+          <IconGraph color="currentColor" :height="20" :width="20" />
+        </template>
+      </bf-navigation-item>
     </div>
   </div>
 </template>
@@ -64,6 +75,7 @@ import { mapState, mapGetters, mapActions } from "vuex";
 import BfNavigationItem from "@/components/bf-navigation/bf-navigation-item/BfNavigationItem.vue";
 import IconOverview from "@/components/icons/IconOverview.vue";
 import IconFiles from "@/components/icons/IconFiles.vue";
+import IconGraph from "@/components/icons/IconGraph.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
 import IconNavCollapse from "@/components/icons/IconNavCollapse.vue";
 import IconNavExpand from "@/components/icons/IconNavExpand.vue";
@@ -81,6 +93,7 @@ export default {
     BfNavigationItem,
     IconOverview,
     IconFiles,
+    IconGraph,
     IconArrowLeft,
     IconNavCollapse,
     IconNavExpand,
