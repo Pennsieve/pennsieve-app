@@ -10,7 +10,11 @@
         <p>The dataset may not exist or is no longer public.</p>
       </div>
 
-      <router-view v-else :dataset="store.current" />
+      <router-view
+        v-else
+        :key="`${datasetId}-${store.current.version}`"
+        :dataset="store.current"
+      />
     </div>
   </bf-stage>
 </template>
@@ -25,15 +29,18 @@ const route = useRoute();
 const store = useReadOnlyDatasetStore();
 
 const datasetId = computed(() => route.params.datasetId);
+// Optional ?version=N — defaults to latest when absent.
+const version = computed(() => route.query.version || null);
 
 const load = () => {
   if (datasetId.value) {
-    store.fetchDataset(datasetId.value, "discover");
+    store.fetchDataset(datasetId.value, version.value, "discover");
+    store.fetchVersions(datasetId.value, "discover");
   }
 };
 
 onMounted(load);
-watch(datasetId, load);
+watch([datasetId, version], load);
 </script>
 
 <style scoped lang="scss">

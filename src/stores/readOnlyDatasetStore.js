@@ -48,6 +48,7 @@ const mapDiscoverDataset = (d) => ({
   owner: `${d.ownerFirstName || ""} ${d.ownerLastName || ""}`.trim(),
   organizationName: d.organizationName || "",
   updatedAt: d.updatedAt || d.revisedAt || d.versionPublishedAt,
+  versionPublishedAt: d.versionPublishedAt,
   doi: d.doi,
   version: d.version,
   revision: d.revision,
@@ -69,10 +70,21 @@ const discoverAdapter = {
     };
   },
 
-  async get(id) {
-    const url = `${siteConfig.discoverUrl}/datasets/${id}`;
+  async get(id, version) {
+    const url = version
+      ? `${siteConfig.discoverUrl}/datasets/${id}/versions/${version}`
+      : `${siteConfig.discoverUrl}/datasets/${id}`;
     const response = await useSendXhr(url, { method: "GET" });
     return mapDiscoverDataset(response);
+  },
+
+  // All published versions of a dataset (newest first).
+  async getVersions(id) {
+    const url = `${siteConfig.discoverUrl}/datasets/${id}/versions`;
+    const response = await useSendXhr(url, { method: "GET" });
+    return (Array.isArray(response) ? response : [])
+      .map(mapDiscoverDataset)
+      .sort((a, b) => b.version - a.version);
   },
 
   // Path-scoped, paginated file browsing for a published version.
@@ -201,6 +213,7 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
   const current = ref(null);
   const isLoadingCurrent = ref(false);
   const currentError = ref(null);
+  const versions = ref([]);
 
   const fetchDatasets = async (sourceType = "discover") => {
     const adapter = adapters[sourceType];
@@ -229,7 +242,7 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     }
   };
 
-  const fetchDataset = async (id, sourceType = "discover") => {
+  const fetchDataset = async (id, version = null, sourceType = "discover") => {
     const adapter = adapters[sourceType];
     if (!adapter?.get) {
       currentError.value = new Error(`Unknown read-only dataset source: ${sourceType}`);
@@ -239,13 +252,27 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     isLoadingCurrent.value = true;
     currentError.value = null;
     try {
-      current.value = await adapter.get(id);
+      current.value = await adapter.get(id, version);
     } catch (e) {
       console.error("Error loading read-only dataset:", e);
       currentError.value = e;
       current.value = null;
     } finally {
       isLoadingCurrent.value = false;
+    }
+  };
+
+  const fetchVersions = async (id, sourceType = "discover") => {
+    const adapter = adapters[sourceType];
+    if (!adapter?.getVersions) {
+      versions.value = [];
+      return;
+    }
+    try {
+      versions.value = await adapter.getVersions(id);
+    } catch (e) {
+      console.warn("Could not load dataset versions:", e);
+      versions.value = [];
     }
   };
 
@@ -539,8 +566,10 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     current,
     isLoadingCurrent,
     currentError,
+    versions,
     fetchDatasets,
     fetchDataset,
+    fetchVersions,
     browseFiles,
     getFileDownloadUrl,
     getFileContent,

@@ -1,5 +1,13 @@
 <template>
   <div class="public-dataset-overview">
+    <!-- Dataset-level actions (top-right; grows with Download / pipeline) -->
+    <div v-if="dataset.doi" class="overview-actions">
+      <el-button @click="showAddToCollection = true">
+        <IconCollection class="mr-8" :width="16" :height="16" color="currentColor" />
+        Add to Collection
+      </el-button>
+    </div>
+
     <div class="header-row">
       <!-- Left: title, authors, description, metadata -->
       <div class="header-info">
@@ -13,7 +21,32 @@
             </span>
           </bf-pill>
           <bf-pill v-if="dataset.doi">DOI: {{ dataset.doi }}</bf-pill>
-          <bf-pill v-if="dataset.version">Version {{ dataset.version }}<template v-if="dataset.revision">, Rev. {{ dataset.revision }}</template></bf-pill>
+
+          <el-dropdown
+            v-if="hasMultipleVersions"
+            trigger="click"
+            @command="onSelectVersion"
+          >
+            <bf-pill class="version-pill">
+              Version {{ dataset.version }} <span class="caret">▾</span>
+            </bf-pill>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="v in store.versions"
+                  :key="v.version"
+                  :command="v.version"
+                  :class="{ 'is-active': v.version === dataset.version }"
+                >
+                  Version {{ v.version }}
+                  <span v-if="v.versionPublishedAt" class="version-date">
+                    · {{ formatDate(v.versionPublishedAt) }}
+                  </span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <bf-pill v-else-if="dataset.version">Version {{ dataset.version }}<template v-if="dataset.revision">, Rev. {{ dataset.revision }}</template></bf-pill>
         </div>
 
         <div v-if="contributorNames.length" class="dataset-owners">
@@ -89,11 +122,18 @@
       class="overview-dashboard"
       :options="dashboardOptions"
     />
+
+    <add-to-collection-dialog
+      v-model:visible="showAddToCollection"
+      :doi="dataset.doi"
+      :dataset-name="dataset.name"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, markRaw } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 import IconFiles from "@/components/icons/IconFiles.vue";
 import IconStorage from "@/components/icons/IconStorage.vue";
@@ -102,10 +142,12 @@ import IconLicense from "@/components/icons/IconLicense.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconEyeball from "@/components/icons/IconEyeball.vue";
 import BfPill from "@/components/shared/BfPill/BfPill.vue";
+import IconCollection from "@/components/icons/IconCollection.vue";
 import { StaticDashboard } from "pennsieve-dashboard";
 import "pennsieve-dashboard/style.css";
 import MarkdownPanelWidget from "@/components/datasets/DatasetOverview/widgets/MarkdownPanelWidget.vue";
 import CitationPanelWidget from "./widgets/CitationPanelWidget.vue";
+import AddToCollectionDialog from "./AddToCollectionDialog.vue";
 
 const props = defineProps({
   dataset: {
@@ -115,6 +157,28 @@ const props = defineProps({
 });
 
 const store = useReadOnlyDatasetStore();
+const route = useRoute();
+const router = useRouter();
+
+const showAddToCollection = ref(false);
+
+// ---- Version selection ----
+const hasMultipleVersions = computed(() => store.versions.length > 1);
+const latestVersion = computed(() =>
+  store.versions.length ? Math.max(...store.versions.map((v) => v.version)) : null
+);
+
+const onSelectVersion = (version) => {
+  if (version === props.dataset.version) return;
+  const query = { ...route.query };
+  // Keep the URL clean when selecting the latest version.
+  if (version === latestVersion.value) {
+    delete query.version;
+  } else {
+    query.version = version;
+  }
+  router.push({ name: route.name, params: route.params, query });
+};
 
 // ---- README (rendered read-only in the dashboard wrapper) ----
 const readmeContent = ref("");
@@ -247,10 +311,27 @@ const formatDate = (value) => {
   margin-bottom: 16px;
 }
 
+.overview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
 .pill-with-icon {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.version-pill {
+  cursor: pointer;
+
+  .caret {
+    margin-left: 4px;
+    font-size: 10px;
+    color: theme.$gray_5;
+  }
 }
 
 

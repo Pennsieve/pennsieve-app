@@ -239,9 +239,9 @@ Preview degrades gracefully: unsupported types show "No preview available".
 Inventory from the overall review, roughly prioritized:
 
 1. **Use as pipeline / notebook input (Vision Goal 3)** — the headline unmet goal. Run analytic pipelines on a public dataset (or selected files) from "My Workspace", outside an org. Needs the dataset-reference contract with the compute/notebook layer (§4b Q3) + Goal 4 (where outputs land).
-2. **Add to collection** — original Phase 3/4; not built. Lower effort (reuse `collectionStore`).
+2. **Add to collection** — DONE. "Add to Collection" button on the Overview (when the dataset has a DOI) opens `AddToCollectionDialog`: lists the user's collections (`getUserCollections`), adds by DOI (`editCollectionDataset(id, [doi], null)`), and supports inline "create & add" (`createNewCollection`). Reuses `collectionStore`.
 3. **Catalog search** — DONE (v2 section). Facets/filters still open.
-4. **Discover parity**: version selector + version history (datasets are versioned; we pin the list's version); README on Overview — DONE; contributors w/ ORCID + external publications + funding; whole-dataset download (vs per-file/zip).
+4. **Discover parity**: version selector — DONE (Overview "Version N ▾" dropdown when >1 version; `?version=N` query param, defaults to latest, cascades to Files/Metadata/Overview via a remount key; store `getVersions`/`fetchVersions` + `get(id, version)`; selector lives on Overview only for now); README on Overview — DONE; contributors w/ ORCID + external publications + funding; whole-dataset download (vs per-file/zip).
 5. **Preview depth**: timeseries (`TSViewer`) = V2, OME-Zarr/neuroglancer (`OrthogonalFrame`) = V3.
 6. **Metadata M4c**: Explore graph, typed numeric sort, per-column filters.
 7. **Private "views"** (`sourceType:'view'`) — the whole second effort; scaffolding (badges/abstraction) exists.
